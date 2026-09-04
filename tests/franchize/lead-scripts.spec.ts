@@ -17,9 +17,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  budgetAlternativesLine,
   buildSuggestedResponse,
   intentChip,
   matchBikeTariff,
+  parseBudgetRu,
   parseDurationDays,
   parseDurationHours,
   scoreIntents,
@@ -755,5 +757,246 @@ describe("lead-scripts: регрессии самообучения", () => {
     expect(res?.intent.key).toBe("price");
     const occurrences = (res?.script.match(/2–4 дня/g) ?? []).length;
     expect(occurrences).toBe(1);
+  });
+});
+
+// ── Итерация «ещё умнее»: temperature / objection / телефон / бюджет / аудит ──
+
+describe("lead-scripts: ещё умнее — temperature", () => {
+  it("hot → assumptive close «сегодня или завтра?» вместо вопроса про даты", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Байк свободен на завтра? Беру!",
+        firstMessage: null,
+        itemPrice: 2500,
+        analysis: { intent: "availability", confidence: 90, temperature: "hot", objection: "none" },
+      },
+    }));
+    expect(res?.intent.key).toBe("availability");
+    expect(res?.script).toContain("сегодня или завтра?");
+    expect(res?.script).not.toContain("Или оставьте телефон");
+  });
+
+  it("cold → мягкий тест-драйв, без давящего CTA", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Сколько стоит аренда? Пока просто смотрю",
+        firstMessage: null,
+        itemPrice: 2500,
+        analysis: { intent: "price", confidence: 90, temperature: "cold", objection: "none" },
+      },
+    }));
+    expect(res?.script).toContain("бесплатный тест-драйв");
+    expect(res?.script).not.toContain("сегодня или завтра?");
+  });
+
+  it("без temperature — CTA прежний (регрессия старых скриптов)", () => {
+    const res = buildSuggestedResponse(buildLead());
+    expect(res?.script).not.toContain("сегодня или завтра?");
+    expect(res?.script).not.toContain("бесплатный тест-драйв:");
+  });
+});
+
+describe("lead-scripts: ещё умнее — превентивные возражения", () => {
+  it("objection=trust при интенте availability → строка про дилера и договор", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А это точно свободно? Не кинете?",
+        firstMessage: null,
+        itemPrice: 2500,
+        analysis: { intent: "availability", confidence: 90, temperature: "warm", objection: "trust" },
+      },
+    }));
+    expect(res?.script).toContain("официальный дилер 79Bike");
+    expect(res?.script).toContain("залог возвращаем за 3 рабочих дня");
+  });
+
+  it("objection=price при интенте discount НЕ дублируется отдельным абзацем", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Дорого, подешевле есть?",
+        firstMessage: null,
+        itemPrice: 2500,
+        analysis: { intent: "discount", confidence: 90, temperature: "warm", objection: "price" },
+      },
+    }));
+    expect(res?.intent.key).toBe("discount");
+    expect(res?.script).not.toContain("И если смущает цена");
+  });
+
+  it("objection=license при интенте price → строка про модели без прав", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Сколько стоит аренда? Прав пока нет",
+        firstMessage: null,
+        itemPrice: 2500,
+        analysis: { intent: "price", confidence: 90, temperature: "warm", objection: "license" },
+      },
+    }));
+    expect(res?.script).toContain("без них");
+  });
+});
+
+describe("lead-scripts: ещё умнее — телефон уже известен", () => {
+  it("entities.phone → quick-reply «попросить телефон» меняется на «перезвонить»", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Сколько стоит аренда? Мой номер +7 999 123-45-67",
+        firstMessage: null,
+        itemPrice: 2500,
+        analysis: {
+          intent: "price", confidence: 90, temperature: "warm", objection: "none",
+          entities: { phone: "+7 999 123-45-67" },
+        },
+      },
+    }));
+    expect(res?.quickReplies.some((q) => q.label === "📞 Попросить телефон")).toBe(false);
+    expect(res?.quickReplies.some((q) => q.label === "📞 Перезвонить покупателю")).toBe(true);
+    expect(res?.nextBestAction).toContain("Телефон уже в карточке");
+  });
+
+  it("lead.phone → availability-CTA «перезвоню», а не «оставьте телефон»", () => {
+    const res = buildSuggestedResponse(buildLead({
+      phone: "+7 999 123-45-67",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А это свободно?", firstMessage: null,
+      },
+    }));
+    expect(res?.script).toContain("перезвоню в течение пары минут");
+    expect(res?.script).not.toContain("Или оставьте телефон");
+  });
+});
+
+describe("lead-scripts: ещё умнее — бюджет", () => {
+  it("parseBudgetRu: тысячи, десятичные, «бюджет 5000», не путает срок с бюджетом", () => {
+    expect(parseBudgetRu("бюджет до 6 тысяч, что подойдёт?")).toBe(6000);
+    expect(parseBudgetRu("есть за 5,5 тыс?")).toBe(5500);
+    expect(parseBudgetRu("бюджет 5000 р")).toBe(5000);
+    expect(parseBudgetRu("нужно до 4 дней")).toBeNull();
+    expect(parseBudgetRu("на неделю")).toBeNull();
+  });
+
+  it("budgetAlternativesLine: модели под бюджет, текущая исключена", () => {
+    // 6000 ₽ → HMD M02 / Jilang Max Pro / Leopard Asaka / Motoland / Regulmoto (6000) + Kayo/Wenbox (4000)
+    // NBSP-заметка: цифры с разрядами сравниваем «в плоском» виде без пробелов.
+    const flat = (s: string) => s.replace(/\s+/g, "");
+    const line = budgetAlternativesLine(6000, "hmd-m02");
+    expect(flat(line ?? "")).toContain("подбюджетдо6000₽");
+    expect(line).not.toContain("HMD M02");
+    expect(line).toContain("в сутки");
+    // пустой бюджет → null
+    expect(budgetAlternativesLine(null)).toBeNull();
+  });
+
+  it("«бюджет до 6 тысяч, что подойдёт?» → price-скрипт с конкретными моделями", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Бюджет до 6 тысяч, что подойдёт?",
+        firstMessage: null,
+        itemPrice: 2500,
+      },
+    }));
+    expect(res?.intent.key).toBe("price");
+    const flat = (s: string) => s.replace(/\s+/g, "");
+    expect(flat(res?.script ?? "")).toContain("Подбюджетдо6000₽");
+    expect(res?.script).toContain("в сутки");
+  });
+
+  it("самообучение iter2: срок + бюджет → итог за срок («За 2 дня — итого до …»)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Бюджет до 6 тысяч, что подскажете на 2 дня?",
+        firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("price");
+    const flat = (s: string) => s.replace(/\s+/g, "");
+    // 6 000 ₽ × 2 дня = 12 000 ₽ — честный потолок по бюджету покупателя
+    expect(flat(res?.script ?? "")).toContain("За2дня—итогодо12000₽");
+    // Строка бюджета с заглавной буквы (вставляется как отдельный абзац)
+    expect(flat(res?.script ?? "")).toContain("Подбюджетдо6000₽");
+  });
+
+  it("самообучение iter2: «Прав категории А нет» → documents (стем «категор»)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Прав категории А нет, только B. Есть что-то для меня?",
+        firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("documents");
+  });
+
+  it("самообучение iter2: generic без модели — «проверю наличие» без рассогласования", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: null,
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Подскажите что-нибудь по байкам", firstMessage: null,
+      },
+    }));
+    expect(res?.script).toContain("проверю наличие и пришлю");
+    expect(res?.script).not.toContain("наличие наш байк");
+  });
+});
+
+describe("lead-scripts: ещё умнее — аудит цифры в AI-ответе", () => {
+  it("AI ответил без чисел при названном сроке → движок добивает расчёт (source остаётся ai)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "79BIKE Falcon GT",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Интересует байк на 3 месяца",
+        firstMessage: null,
+        itemPrice: 12000,
+        analysis: {
+          intent: "long_term",
+          confidence: 90,
+          suggestedReply: "Здравствуйте, Иван! Да, доступна долгосрочная аренда — приезжайте, всё оформим.",
+          temperature: "hot",
+          objection: "none",
+        },
+      },
+    }));
+    expect(res?.source).toBe("ai");
+    // Расчёт добавлен движком: ставка слоя 11–30 дней 7 000 ₽ × 90 дней.
+    // NBSP-заметка: Intl ru-RU ставит неразрывный пробел (U+00A0/U+202F)
+    // в разрядах — сравниваем «в плоском» виде без пробелов.
+    const flat = (s: string) => s.replace(/\s+/g, "");
+    expect(flat(res?.script ?? "")).toContain("7000");
+    expect(flat(res?.script ?? "")).toContain("630000");
+    expect(res?.script).toContain("приезжайте");
+  });
+
+  it("AI ответил С цифрой → текст не трогается дословно", () => {
+    const reply = "Здравствуйте, Иван! На 3 месяца — ставка 7 000 ₽/сутки, итого около 630 000 ₽.";
+    const res = buildSuggestedResponse(buildLead({
+      bikeTitle: "79BIKE Falcon GT",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Интересует байк на 3 месяца",
+        firstMessage: null,
+        itemPrice: 12000,
+        analysis: {
+          intent: "long_term",
+          confidence: 90,
+          suggestedReply: reply,
+          temperature: "hot",
+          objection: "none",
+        },
+      },
+    }));
+    expect(res?.source).toBe("ai");
+    expect(res?.script).toBe(reply);
   });
 });

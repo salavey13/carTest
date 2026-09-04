@@ -37,6 +37,15 @@
 //      сообщения («3 месяца», «2 недели», «на выходные») парсится в дни →
 //      ставка по тарифному слою из rent-CSV → сумма в первом же ответе,
 //      без «приезжайте — обсудим».
+//   7. ИТЕРАЦИЯ «ещё умнее» (2026-09-04): движок читает AI-обогащение
+//      ДО КОНЦА — temperature решает, КАК закрывать (hot → assumptive
+//      close «сегодня или завтра?», cold → мягкий тест-драйв), objection
+//      отрабатывается ПРЕВЕНТИВНО (когда интент сам его не закрывает),
+//      entities.phone меняет CTA с «оставьте телефон» на «перезвоню»,
+//      бюджет покупателя парсится и сразу подставляются КОНКРЕТНЫЕ модели
+//      парка в его бюджет. И аудит цифры: AI-ответ без единого числа при
+//      названном сроке дополняется нашим расчётом — цифра в ответе есть
+//      ВСЕГДА.
 //
 // AI-ПЕРВЫЙ (не хардкод): если внешний AI-агент (см.
 // public/docs/autoreply/vip-bike-avito-agent-prompt.md) приложил к webhook'у
@@ -171,6 +180,9 @@ const INTENT_KEYWORDS: ReadonlyArray<{
       // Почасовая аренда — тоже вопрос о цене (пакеты 1ч/3ч/6ч/12ч).
       // «часа/часов», а не «час»: «час» ловится внутри «у частника».
       "почасов", "полдня", "часа", "часов", "часок", "на час", "за час",
+      // Бюджет — вопрос о цене: «бюджет 5000, что подойдёт?» → price-скрипт,
+      // где parseBudgetRu подставит конкретные модели под бюджет.
+      "бюджет",
     ],
   },
   {
@@ -181,7 +193,11 @@ const INTENT_KEYWORDS: ReadonlyArray<{
     key: "documents",
     words: [
       "документ", "права нужны", "нужны ли права", "какие права", "паспорт",
-      "удостоверение", "справка", "без прав", "категория",
+      "удостоверение", "справка", "без прав", "категор",
+      // Самообучение iter2: «Прав категории А нет, только B» — словo
+      // «категория» не матчит склонение «категории», нужен стем; плюс частые
+      // отрицания («нет прав», «права нет», «прав нет») без других слов.
+      "нет прав", "права нет", "прав нет",
     ],
   },
   {
@@ -753,6 +769,126 @@ function hourlyQuoteLine(
   return day ? `на ${label} выгоднее сутки — ${fmtPrice(day.rate)}` : null;
 }
 
+// ── «Ещё умнее»: бюджет, temperature, objection, телефон ──────────────────
+// Читаем AI-обогащение до конца и парсим то, что агент мог пропустить.
+
+/**
+ * Бюджет покупателя из текста («бюджет до 6 тысяч», «до 5000 р»,
+ * «5,5 тыс»), или null. Слабые сигналы игнорируем: «до 4 дней» — это срок,
+ * а не бюджет (тысячи — отдельные маркеры; «голое» число принимаем только
+ * 4-значное после «бюджет/до/в районе»).
+ */
+export function parseBudgetRu(rawText: string): number | null {
+  const text = norm(rawText);
+  if (!text) return null;
+  // «6 тысяч / 5,5 тыс / 6k» → 6000/5500.
+  const thousands = text.match(/(\d{1,2}(?:[.,]\d)?)\s*(?:тыс|тысяч|тысячи|k\b)/);
+  if (thousands) {
+    const n = parseFloat(thousands[1].replace(",", "."));
+    if (Number.isFinite(n) && n > 0 && n < 100) return Math.round(n * 1000);
+  }
+  // «бюджет 5000», «до 5000 р» — только 4–6-значные числа рядом с маркером.
+  const plain = text.match(/(?:бюджет|в районе|около)\s*(\d{4,6})/);
+  if (plain) {
+    const n = parseInt(plain[1], 10);
+    if (Number.isFinite(n) && n >= 1000 && n <= 500000) return n;
+  }
+  return null;
+}
+
+/**
+ * Конкретные модели парка под бюджет: до 2 самых дорогих из подходящих
+ * (ближайшие к бюджету = самые интересные байки), текущая модель — исключена.
+ * null — бюджет не назван или подходящих нет.
+ */
+export function budgetAlternativesLine(
+  budget: number | null,
+  excludeTariffId: string | null = null,
+): string | null {
+  if (!budget || budget <= 0) return null;
+  const fits = BIKE_TARIFFS.filter(
+    (t) => t.id !== excludeTariffId && (t.weekday ?? t.daily) != null && (t.weekday ?? t.daily)! <= budget,
+  ).sort((a, b) => (b.weekday ?? b.daily!) - (a.weekday ?? a.daily!));
+  const picks = fits.slice(0, 2);
+  if (picks.length > 0) {
+    const parts = picks.map((t) => `${t.displayName} — ${fmtPrice(t.weekday ?? t.daily!)} в сутки`);
+    return `под бюджет до ${fmtPrice(budget)} есть варианты: ${parts.join(", ")}.`;
+  }
+  // Ни одна суточная ставка не влезает → честный обходной путь: почасово.
+  const cheapestHour = BIKE_TARIFFS.reduce<number | null>(
+    (min, t) => (t.hour1 != null && (min == null || t.hour1 < min) ? t.hour1 : min),
+    null,
+  );
+  if (cheapestHour != null && cheapestHour <= budget) {
+    return `в бюджет до ${fmtPrice(budget)} на сутки не уложиться, но почасово — запросто: от ${fmtPrice(cheapestHour)} в час.`;
+  }
+  return null;
+}
+
+/**
+ * Конкретные модели парка под бюджет + итог за названный срок.
+ * (обёртка над budgetAlternativesLine: budget × days — честный потолок).
+ */
+function budgetLineFor(
+  budget: number | null,
+  tariffId: string | null,
+  duration: DurationHint | null,
+): string | null {
+  const line = budgetAlternativesLine(budget, tariffId);
+  if (!line || !budget) return null;
+  if (duration && duration.days >= 2) {
+    return `${line} За ${duration.label} — итого до ${fmtPrice(budget * duration.days)}.`;
+  }
+  return line;
+}
+
+/** Assumptive close для горячего покупателя (Straight Line: меняем вопрос «какие даты?» на «сегодня или завтра?»). */
+function hotCloseLine(): string | null {
+  return "Осталось зафиксировать даты — сделаю это сразу же. Когда удобнее подъехать — сегодня или завтра?";
+}
+
+/** Мягкая линия для холодного: не давим бронью — зовём на бесплатный тест. */
+function coldSoftLine(): string {
+  return "Если пока присматриваетесь — приезжайте на бесплатный тест-драйв: покажем байк вживую и ответим на все вопросы уже на месте, без обязательств.";
+}
+
+/**
+ * Превентивная отработка возражения из AI-анализа — даже когда интент сам
+ * про другое (спросил про наличие, а «горячится» возражение trust).
+ * null — возражение уже закрыто самим интентом.
+ */
+function objectionLineFor(objection: string | null, intentKey: ScriptIntentKey): string | null {
+  if (!objection || objection === "none") return null;
+  // Интент уже работает с этим возражением — не дублируем абзац.
+  if (intentKey === "discount" && objection === "price") return null;
+  if (intentKey === "documents" && objection === "license") return null;
+  switch (objection) {
+    case "price":
+      return "И если смущает цена — срок и почасовые пакеты реально снижают сумму, а техосмотр и лимит пробега уже включены, сюрпризов в итоге не будет.";
+    case "license":
+      return "Если вопрос по правам — есть модели, которые можно арендовать без них: электроэндуро класса М доедет и на автомобильных правах.";
+    case "experience":
+      return "Если опыта мало — начнём с лёгкой модели и дам короткий инструктаж перед выездом: большинство уверенно катает уже через 10 минут.";
+    case "trust":
+      return "И для спокойствия: мы — официальный дилер 79Bike с шоурумом в Нижнем Новгороде — договор, акт приёма-передачи, залог возвращаем за 3 рабочих дня.";
+    default:
+      return null;
+  }
+}
+
+/** Универсальные однострочники с учётом того, что телефон УЖЕ известен. */
+function universalQuickRepliesFor(knownPhone: boolean): readonly QuickReply[] {
+  if (!knownPhone) return UNIVERSAL_QUICK_REPLIES;
+  return UNIVERSAL_QUICK_REPLIES.map((q) =>
+    q.label === "📞 Попросить телефон"
+      ? {
+          label: "📞 Перезвонить покупателю",
+          text: "Номер уже в карточке — перезвоню в течение пары минут, отвечу на все вопросы и зафиксирую бронь.",
+        }
+      : q,
+  );
+}
+
 // ── Распознавание интента (fallback после AI) ──────────────────────────────
 
 interface IntentScore {
@@ -824,6 +960,14 @@ interface ScriptCtx {
   tariff: BikeTariff | null;
   /** Почасовая аренда из сообщения («на 3 часа», «почасово»), если упомянута. */
   hours: HoursHint | null;
+  /** «Горячесть» покупателя от AI-агента: hot → assumptive close, cold → мягкий тест. */
+  temperature: "hot" | "warm" | "cold" | null;
+  /** Возражение от AI-агента: price | license | experience | trust (null — нет). */
+  objection: string | null;
+  /** Телефон покупателя уже известен (lead.phone или entities.phone) — CTA «перезвоню», не «оставьте телефон». */
+  knownPhone: boolean;
+  /** Бюджет покупателя (₽), распознанный из текста/entities — подставляем конкретные модели парка. */
+  budget: number | null;
 }
 
 function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
@@ -831,18 +975,28 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
   short: string;
   nextBestAction: string;
 } {
-  const { greet, bike, price, priceLine, bikeRef, duration, tariff, hours } = ctx;
+  const { greet, bike, price, priceLine, bikeRef, duration, tariff, hours, temperature, objection, knownPhone, budget } = ctx;
+  const objectionLine = objectionLineFor(objection, key);
+  const budgetLine = budgetLineFor(budget, tariff?.id ?? null, duration);
   switch (key) {
     case "availability": {
       const est =
         duration && (tariff || price)
           ? `${cap(durationEstimateLine(duration.days, duration.label, price, tariff) ?? "")}.`
           : null;
+      const ctaLine =
+        temperature === "hot"
+          ? hotCloseLine()!
+          : knownPhone
+            ? `Напишите точные даты — сразу зафиксирую бронь за вами: ${BOOKING_LINK}. Номер у меня уже есть — перезвоню в течение пары минут и оформлю всё по телефону.`
+            : `Напишите точные даты — сразу зафиксирую бронь за вами: ${BOOKING_LINK}. Или оставьте телефон — оформлю за 10 минут и перезвоню.`;
       return {
         script: joinParas(
           `${greet} Да, ${bikeRef} свободен!`,
           est ?? priceLine,
-          `Напишите точные даты — сразу зафиксирую бронь за вами: ${BOOKING_LINK}. Или оставьте телефон — оформлю за 10 минут и перезвоню.`,
+          ...(temperature === "cold" ? [coldSoftLine()] : []),
+          ...(objectionLine ? [objectionLine] : []),
+          ctaLine,
           `${cap(includedPhraseFor(tariff))}. ${cap(depositPhraseFor(tariff))}.`,
         ),
         short: est
@@ -873,15 +1027,26 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
         `На какие даты считать? Назову точную сумму и сразу зафиксирую бронь: ${BOOKING_LINK}.`;
       const hourlyCta =
         `На какое время нужен байк? Скажете срок — посчитаю пакет и зафиксирую бронь: ${BOOKING_LINK}.`;
+      const finalCta = temperature === "hot" ? hotCloseLine()! : hours && !duration ? hourlyCta : hourlyTail;
+      // Срок назван, но расчёт невозможен (нет ни модели, ни цены) — всё
+      // равно признаём срок текстом: игнорировать названное — ошибка скрипта.
+      const durationAck =
+        duration && !est ? `Вы назвали срок — ${duration.label}: подтвердите байк — и я сразу назову точную сумму за этот срок.` : null;
       return {
         script: joinParas(
           `${greet}`,
           dayLine,
           // Расчёт под названный срок/часы; если цифры уже в dayLine — не дублируем слои.
           est ?? hourly ?? (tariff || price ? null : `${cap(PRICE_TIERS_PHRASE)}.`),
+          ...(durationAck ? [durationAck] : []),
+          // Бюджет назван → конкретные модели парка под него (Straight Line:
+          // не «подберём», а сразу названия и цифры).
+          ...(budgetLine ? [cap(budgetLine)] : []),
+          ...(temperature === "cold" ? [coldSoftLine()] : []),
+          ...(objectionLine ? [objectionLine] : []),
           `${cap(includedPhraseFor(tariff))}.`,
           `${cap(GEAR_PHRASE)}. Залог можно оставить СТС — наличные готовить не нужно.`,
-          hours && !duration ? hourlyCta : hourlyTail,
+          finalCta,
         ),
         short: est
           ? `${greet} ${est} Даты скажете — зафиксирую точную цену.`
@@ -954,7 +1119,10 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
             ? `Сутки — ${fmtPrice(price)}, но срок уже снижает цену: ${tierLineFor(price, tariff)}. Нужен байк на пару часов — ${hourlyLine ? `${hourlyLine}, это совсем другие деньги.` : "почасово от 1 часа, это совсем другие деньги."}`
             : `${cap(PRICE_TIERS_PHRASE)}.`,
           `${cap(includedPhraseFor(tariff))}, плюс свой мотосервис и подменный байк на форс-мажор — у частников этого нет, а по отдельности это вышло бы дороже.`,
-          `И есть модели проще — от 4–6 тысяч в сутки. Назовите бюджет и даты — подберу вариант и зафиксирую бронь.`,
+          // Бюджет назван → конкретные модели под него, а не «подберём».
+          budgetLine
+            ? `${cap(budgetLine)} Напишите даты — зафиксирую вариант за вами.`
+            : `И есть модели проще — от 4–6 тысяч в сутки. Назовите бюджет и даты — подберу вариант и зафиксирую бронь.`,
         ),
         short: price
           ? `${greet} Срок снижает цену: ${tierLineFor(price, tariff)}. Какой бюджет и даты?`
@@ -1001,6 +1169,10 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
         duration && (tariff || price)
           ? `${cap(durationEstimateLine(duration.days, duration.label, price, tariff) ?? "")}.`
           : null;
+      const longCta =
+        temperature === "hot"
+          ? hotCloseLine()!
+          : `Напишите даты начала и конца — зафиксирую ${bikeRef} за вами и пришлю точную смету: ${BOOKING_LINK}.`;
       return {
         script: joinParas(
           `${greet}`,
@@ -1008,11 +1180,12 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
             (duration
               ? `На ${duration.label} — наши лучшие условия: ${PRICE_TIERS_PHRASE}.`
               : `Для долгого срока у нас лучшие условия: ${PRICE_TIERS_PHRASE}.`),
+          ...(objectionLine ? [objectionLine] : []),
           `${cap(includedPhraseFor(tariff))}.`,
           est
             ? `${cap(depositPhraseFor(tariff))}. Оформление за 10 минут по паспорту, приезжаете один раз.`
             : `Для аренды от недели сделаю индивидуальную цену.`,
-          `Напишите даты начала и конца — зафиксирую ${bikeRef} за вами и пришлю точную смету: ${BOOKING_LINK}.`,
+          longCta,
         ),
         short: est
           ? `${greet} ${est} Даты скажете — зафиксирую лучшую цену.`
@@ -1028,6 +1201,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
         script: joinParas(
           `${greet} Рад помочь!`,
           `Подскажите, на какие даты нужен байк — пришлю свободные варианты с ценами. В парке 27 мотоциклов: электроэндуро, спортбайки, круизеры и скутеры — от 4 000 ₽/сутки, почасово тоже можно.${bike ? ` Кстати, ${bike} из объявления как раз в наличии${exactDay ? ` — ${fmtPrice(exactDay)} в сутки` : ""}.` : ""}`,
+          ...(objectionLine ? [objectionLine] : []),
           `Отвечаю быстро, можно прямо здесь.`,
         ),
         short: `${greet} Подскажите даты — покажу варианты и посчитаю цену. ${bike ? `${bike} пока в наличии!` : "В парке 27 байков от 4 000 ₽/сутки."}`,
@@ -1040,7 +1214,10 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
       return {
         script: joinParas(
           `${greet} Спасибо, что написали!`,
-          `Напишите удобные даты — проверю наличие ${bikeRef} и пришлю точную цену с условиями.`,
+          // Самообучение iter2: «наличие наш байк» — рассогласование; имя
+          // модели вставляем только когда оно есть.
+          `Напишите удобные даты — проверю наличие${bike ? ` — ${bike}` : ""} и пришлю точную цену с условиями.`,
+          ...(objectionLine ? [objectionLine] : []),
           `Отвечаем быстро: обычно в течение пары минут. Забронировать можно и самому: ${BOOKING_LINK}`,
         ),
         short: `${greet} Подскажите даты — проверю наличие и пришлю точную цену.`,
@@ -1103,6 +1280,22 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
   const lastText = lead.avito?.lastMessage || "";
   const firstText = lead.avito?.firstMessage || "";
 
+  // ── AI-обогащение до конца (итерация «ещё умнее») ──
+  const temperatureRaw = (analysis?.temperature || "").trim().toLowerCase();
+  const temperature =
+    temperatureRaw === "hot" || temperatureRaw === "warm" || temperatureRaw === "cold"
+      ? (temperatureRaw as "hot" | "warm" | "cold")
+      : null;
+  const objectionRaw = (analysis?.objection || "").trim().toLowerCase();
+  const objection = objectionRaw && objectionRaw !== "none" ? objectionRaw : null;
+  // Телефон уже известен → CTA «перезвоню», а не «оставьте телефон»;
+  // NBA пойдёт через звонок, quick-reply «попросить телефон» меняется.
+  const knownPhone =
+    !!(lead.phone || "").trim() || !!(analysis?.entities?.phone || "").trim();
+  // Бюджет: текст покупателя → entities от агента (те же парсер).
+  const budget =
+    parseBudgetRu(lastText) ?? parseBudgetRu(firstText) ?? parseBudgetRu(analysis?.entities?.budget || "");
+
   const ctx: ScriptCtx = {
     greet,
     name,
@@ -1121,6 +1314,10 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     // Почасовая аренда («на 3 часа», «полдня», «почасово») — пакеты в ответе.
     hours: parseDurationHours(lastText) ?? parseDurationHours(firstText),
     tariff,
+    temperature,
+    objection,
+    knownPhone,
+    budget,
   };
 
   // 1. Полный текст от AI-агента — он главнее шаблона (только при доверии).
@@ -1129,12 +1326,30 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     const intentKey: ScriptIntentKey = intentFromAi ?? "generic";
     const built = buildScript(ctx, intentKey);
     const short = (analysis?.shortReply || "").trim() || built.short;
+    // АУДИТ ЦИФРЫ (Straight Line): покупатель назвал срок/часы, а агент
+    // ответил без единого числа → движок добивает СВОЙ расчёт из rent-CSV.
+    // Цифра в первом же ответе — всегда, даже если агент забыл.
+    let script = aiReply;
+    if (!/\d/.test(aiReply)) {
+      const auditLine =
+        (ctx.duration && (tariff || price)
+          ? durationEstimateLine(ctx.duration.days, ctx.duration.label, price, tariff)
+          : null) ??
+        (ctx.hours
+          ? ctx.hours.hours == null
+            ? hourlyBlockLine(tariff, price)
+            : hourlyQuoteLine(ctx.hours.hours, ctx.hours.label, tariff, price)
+          : null);
+      if (auditLine) script = `${aiReply}\n\n${cap(auditLine)}.`;
+    }
     return {
       intent: INTENT_META[intentKey],
-      script: aiReply,
+      script,
       short,
-      nextBestAction: (analysis?.nextBestAction || "").trim() || built.nextBestAction,
-      quickReplies: [...INTENT_QUICK_REPLIES[intentKey], ...UNIVERSAL_QUICK_REPLIES].slice(0, 5),
+      nextBestAction:
+        (knownPhone ? "Телефон уже в карточке — позвонить сразу, пока интерес горячий. " : "") +
+        ((analysis?.nextBestAction || "").trim() || built.nextBestAction),
+      quickReplies: [...INTENT_QUICK_REPLIES[intentKey], ...universalQuickRepliesFor(knownPhone)].slice(0, 5),
       matched: [],
       source: "ai",
       aiNotes: (analysis?.notes || "").trim() || null,
@@ -1150,8 +1365,10 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
       intent: INTENT_META[intentFromAi],
       script: built.script,
       short: built.short,
-      nextBestAction: (analysis?.nextBestAction || "").trim() || built.nextBestAction,
-      quickReplies: [...INTENT_QUICK_REPLIES[intentFromAi], ...UNIVERSAL_QUICK_REPLIES].slice(0, 5),
+      nextBestAction:
+        (knownPhone ? "Телефон уже в карточке — позвонить сразу, пока интерес горячий. " : "") +
+        ((analysis?.nextBestAction || "").trim() || built.nextBestAction),
+      quickReplies: [...INTENT_QUICK_REPLIES[intentFromAi], ...universalQuickRepliesFor(knownPhone)].slice(0, 5),
       matched: keywordPrimary.matched.slice(0, 4),
       source: "hybrid",
       aiNotes: (analysis?.notes || "").trim() || null,
@@ -1165,8 +1382,11 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     intent: INTENT_META[intentKey],
     script: built.script,
     short: built.short,
-    nextBestAction: built.nextBestAction,
-    quickReplies: [...INTENT_QUICK_REPLIES[intentKey], ...UNIVERSAL_QUICK_REPLIES].slice(0, 5),
+    nextBestAction:
+      knownPhone
+        ? `Телефон уже в карточке — позвонить сразу, пока интерес горячий. ${built.nextBestAction}`
+        : built.nextBestAction,
+    quickReplies: [...INTENT_QUICK_REPLIES[intentKey], ...universalQuickRepliesFor(knownPhone)].slice(0, 5),
     matched: keywordPrimary.matched.slice(0, 4),
     source: "rules",
     aiNotes: null,

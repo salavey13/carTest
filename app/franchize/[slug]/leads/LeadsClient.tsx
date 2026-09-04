@@ -9,9 +9,11 @@ import type {LeadRow, LeadTodoRow} from "./leads-types";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
 import { isAvitoLead } from "./leads-utils";
 import { isHandlingTodo } from "./lib/lead-handling";
+import { computeLeadSpeedMetrics } from "./lib/lead-speed";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
+import { LeadSpeedPanel } from "./components/LeadSpeedPanel";
 import { LeadsToolbar } from "./components/LeadsToolbar";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
@@ -408,6 +410,15 @@ export function LeadsClient({
       ? leadsState.filter((l) => l.identityState !== 'operator_placeholder')
       : leadsState,
     [leadsState, hidePlaceholders]
+  );
+
+  // ── Скорость обработки (просьба босса: счётчики наглядно) ──
+  // Медиана/средняя скорость ответа, очередь «ждут», SLA-просрочки, перезвоны.
+  // Считается по activeLeads (заглушки операторов не портят метрики) и
+  // перевычисляется с nowTick раз в минуту — очередь «живёт» без re-fetch.
+  const speedMetrics = useMemo(
+    () => computeLeadSpeedMetrics(activeLeads, todosState, nowTick),
+    [activeLeads, todosState, nowTick],
   );
 
   // Segment counts for toolbar tabs
@@ -852,6 +863,10 @@ export function LeadsClient({
   return (
     <div className="space-y-5">
       <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
+
+      {/* Скорость обработки: медиана ответа, очередь «ждут», SLA-просрочки,
+          распределение времени ответа и перезвоны — см. lib/lead-speed.ts. */}
+      <LeadSpeedPanel metrics={speedMetrics} T={T} />
 
       {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
           complaint. Shows the actual server error + manual retry. The loading
