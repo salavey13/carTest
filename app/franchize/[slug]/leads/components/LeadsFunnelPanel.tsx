@@ -21,6 +21,7 @@ import {
   Bike,
   Receipt,
   CalendarDays,
+  ArrowRight,
 } from "lucide-react";
 import { NORM_KEV_PER_WEEK, type LeadKpiMetrics } from "../lib/lead-kpi";
 import { fmtDurationMs } from "../lib/lead-speed";
@@ -111,9 +112,20 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
           return (
             <div
               key={s.key}
-              className="relative overflow-hidden rounded-xl border px-3 py-2"
+              className="relative rounded-xl border px-3 py-2"
               style={{ borderColor: T.border, backgroundColor: T.borderSoft }}
             >
+              {/* Соединитель ступеней — узел-стрелка в зазоре сетки (sm+,
+                  где воронка в одну строку; на мобиле 2 колонки и он лишний). */}
+              {i > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -left-3 top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border sm:flex"
+                  style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+                >
+                  <ArrowRight className="h-2.5 w-2.5" style={{ color: T.textFaint }} />
+                </span>
+              )}
               <div className="flex items-center gap-1.5">
                 <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: s.color }} />
                 <p className="truncate text-[10px] font-medium uppercase tracking-wider" style={{ color: T.textFaint }}>
@@ -153,10 +165,12 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
           </span>
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: T.borderSoft }}>
-          <div
-            className="h-full rounded-full transition-all"
+          <motion.div
+            className="h-full rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(100, normPct)}%` }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
             style={{
-              width: `${Math.min(100, normPct)}%`,
               backgroundColor: kpi.normProgress >= 1 ? "#22c55e" : T.accent,
             }}
           />
@@ -172,10 +186,12 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
           </span>
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: T.borderSoft }}>
-          <div
-            className="h-full rounded-full transition-all"
+          <motion.div
+            className="h-full rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(100, weekPct)}%` }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
             style={{
-              width: `${Math.min(100, weekPct)}%`,
               backgroundColor: weekProgress >= 1 ? "#22c55e" : "#f59e0b",
             }}
           />
@@ -221,6 +237,15 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
           >
             <Flame className="h-3 w-3" />
             {kpi.hotWaiting > 0 ? `Горячих ждут: ${kpi.hotWaiting}` : "Горячие — все отвечены"}
+            {kpi.hotWaiting > 0 && (
+              <motion.span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: "#ef4444" }}
+                animate={{ opacity: [1, 0.25, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+              />
+            )}
           </span>
         )}
         {kpi.testdrives > 0 && (

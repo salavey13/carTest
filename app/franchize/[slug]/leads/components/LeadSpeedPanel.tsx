@@ -31,6 +31,8 @@ interface Tile {
   value: string;
   color: string;
   title?: string;
+  /** Критическая метрика (> 0) — мигающая точка привлекает взгляд. */
+  pulse?: boolean;
 }
 
 export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
@@ -71,6 +73,7 @@ export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
       label: "Ждут > 24 ч",
       value: String(metrics.waitingOver24h),
       color: metrics.waitingOver24h > 0 ? "#ef4444" : T.textMuted,
+      pulse: metrics.waitingOver24h > 0,
       title:
         metrics.waitingOver1h > 0
           ? `Из них дольше часа ждут: ${metrics.waitingOver1h}`
@@ -102,6 +105,15 @@ export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
                 <p className="truncate text-[10px] font-medium uppercase tracking-wider" style={{ color: T.textFaint }}>
                   {t.label}
                 </p>
+                {t.pulse && (
+                  <motion.span
+                    aria-hidden="true"
+                    className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: "#ef4444" }}
+                    animate={{ opacity: [1, 0.25, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                  />
+                )}
               </div>
               <p className="mt-0.5 text-lg font-black leading-tight tracking-tight" style={{ color: t.color }}>
                 {t.value}
@@ -117,10 +129,13 @@ export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
           <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: T.borderSoft }}>
             {metrics.buckets.map((b) =>
               b.count > 0 ? (
-                <div
+                <motion.div
                   key={b.key}
-                  className="h-full transition-all"
-                  style={{ width: `${(b.count / totalHandledTimed) * 100}%`, backgroundColor: b.color }}
+                  className="h-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(b.count / totalHandledTimed) * 100}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  style={{ backgroundColor: b.color }}
                   title={`${b.label}: ${b.count}`}
                 />
               ) : null,
