@@ -18,6 +18,7 @@ import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type Franchize
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
+import { sanitizeTelegramText, oneLine as oneLineValue, escapeHtmlText } from "@/lib/tg-text";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
@@ -3645,11 +3646,32 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         // combined with long HTML lines, Telegram's wrapping algorithm broke the
         // notification into one character per line on mobile. All notification
         // text is now normalized: nbsp/narrow-nbsp → regular space.
+        //
+        // FIX (2026-09-05, "одна буква на строку" round 2): nbsp-only
+        // normalization was NOT enough — the bike line still arrived split one
+        // character per line (R/e/g/u/l…, " · ", dates and price included).
+        // Hardened sanitizer:
+        //   1. CR/CRLF → LF; strips every break-prone invisible char Telegram
+        //      may render as a line break or break opportunity: \v \f
+        //      NEL(U+0085) LS/PS(U+2028/U+2029), zero-width & bidi controls
+        //      (U+200B–U+200F, U+2060–U+206F, U+FEFF), other control chars.
+        //   2. nbsp family (U+00A0/U+202F/U+2007) → plain space (kept from 08-29).
+        //   3. REPAIRS the pathological shape itself: a run of ≥6 consecutive
+        //      one-character lines is re-joined into a single line
+        //      ("R\ne\ng…" → "Reg…"). Legit text never contains 6+ single-char
+        //      lines in a row, so even if a mangled string sneaks in from
+        //      imported/edited data, the notification renders correctly.
+        //   4. oneLine() collapses newline/whitespace runs in interpolated data
+        //      (bike names / recipient / phone never legitimately multiline).
+        //   5. esc() HTML-escapes data — these messages go out as parse_mode HTML.
         if (createdRentals.length > 0) {
           const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
-          // Normalize Unicode spaces that break Telegram's line wrapping
-          // (U+00A0 nbsp from toLocaleString, U+202F narrow nbsp) → plain space.
-          const tgText = (s: string) => s.replace(/[   ]/g, " ");
+          // Round-2 hardening lives in @/lib/tg-text (tested in
+          // tests/tg-text.spec.ts): strips break-prone invisible chars,
+          // nbsp family → space, and re-joins "о д н а  б у к в а" runs.
+          const tgText = sanitizeTelegramText;
+          const oneLine = oneLineValue;
+          const esc = escapeHtmlText;
           const fmtRu = (iso: string) => {
             const d = new Date(iso);
             return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -3658,7 +3680,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             `🏍 <b>Аренда создана</b>`,
             ``,
             ...createdRentals.map((r) => [
-              `🏍 ${r.bikeName}`,
+              `🏍 ${esc(r.bikeName)}`,
               `📅 ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)}`,
               `💰 ${formatMoney(r.totalRub)} ₽`,
             ].join("\n")),
@@ -3674,20 +3696,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               await sendComplexMessage(
                 target,
                 tgText([
-                  `🔑 <b>Новая аренда ожидает активации</b> (#${payload.orderId})`,
+                  `🔑 <b>Новая аренда ожидает активации</b> (#${oneLine(payload.orderId)})`,
                   ``,
-                  ...createdRentals.map((r) => `🏍 ${r.bikeName} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`).join("\n"),
+                  ...createdRentals.map((r) => `🏍 ${esc(r.bikeName)} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`).join("\n"),
                   ``,
-                  `Получатель: ${payload.recipient}`,
-                  `Телефон: ${payload.phone}`,
+                  `Получатель: ${esc(payload.recipient)}`,
+                  `Телефон: ${esc(payload.phone)}`,
                   `Одометр подскажет страница аренды (последнее известное значение подгружено из карточки байка).`,
                   ``,
                   `<a href="https://t.me/${botUsername}/app?startapp=rentals_analytics">📈 Аналитика аренд</a>`,
                 ].join("\n")),
                 createdRentals.length === 1
                   ? [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }]]
-                  : createdRentals.map((r) => [{ text: `🔑 ${r.bikeName}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
-                { parseMode: "HTML" },
+                  : createdRentals.map((r) => [{ text: `🔑 ${oneLine(r.bikeName)}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
+                // FIX: url-buttons need an INLINE keyboard — the default "reply"
+                // keyboard ignores/invalidates url buttons and pollutes the
+                // operator's chat with a one-time menu.
+                { parseMode: "HTML", keyboardType: "inline" },
               );
             } catch (ownerNotifyErr) {
               logger.warn("[franchize] Failed to send rental deeplink notification to owner/admin:", { target, error: ownerNotifyErr instanceof Error ? ownerNotifyErr.message : String(ownerNotifyErr) });
@@ -3704,8 +3729,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                     [{ text: "📸 Открыть страницу аренды", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }],
                     [{ text: "📄 Мой договор", url: `https://t.me/${botUsername}/app?startapp=profile` }],
                   ]
-                : createdRentals.map((r) => [{ text: `📸 ${r.bikeName}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
-              { parseMode: "HTML" },
+                : createdRentals.map((r) => [{ text: `📸 ${oneLine(r.bikeName)}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
+              { parseMode: "HTML", keyboardType: "inline" },
             );
           } catch (renterNotifyErr) {
             logger.warn("[franchize] Failed to send rental deeplink notification to renter:", { error: renterNotifyErr instanceof Error ? renterNotifyErr.message : String(renterNotifyErr) });
@@ -3735,13 +3760,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 tgText([
                   `🔑 <b>Новая аренда вашего байка</b>`,
                   ``,
-                  `🏍 ${r.bikeName} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`,
+                  `🏍 ${esc(r.bikeName)} · ${fmtRu(r.startIso)} → ${fmtRu(r.endIso)} · ${formatMoney(r.totalRub)} ₽`,
                   ``,
-                  `Получатель: ${payload.recipient}`,
+                  `Получатель: ${esc(payload.recipient)}`,
                   `Аренда ожидает активации оператором экипажа.`,
                 ].join("\n")),
                 [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]],
-                { parseMode: "HTML" },
+                { parseMode: "HTML", keyboardType: "inline" },
               );
             } catch (subrenterNotifyErr) {
               logger.warn("[franchize] Failed to send rental deeplink notification to subrenter:", { bikeId: r.bikeId, error: subrenterNotifyErr instanceof Error ? subrenterNotifyErr.message : String(subrenterNotifyErr) });

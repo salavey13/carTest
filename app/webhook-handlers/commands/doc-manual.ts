@@ -2293,7 +2293,7 @@ ${qrDeepLink}`);
   // ── Send confirmation to the operator (v3 polish: rich context + deep links) ──
   // Was: "✅ Договор аренды готов!" with generic "🚀 Открыть" button → bot app root.
   // Now: full context (bike, client, dates, price, rental ID) + 2 deep-link buttons.
-  const bikeTitleForMsg = `${bike.make} ${bike.model}`.trim();
+  const bikeTitleForMsg = `${bike.make} ${bike.model}`.replace(/\s+/g, " ").trim();
   const startDateForMsg = isRent ? `${context.rentStartDate || ""} ${context.rentStartTime || ""}`.trim() : undefined;
   const endDateForMsg = isRent ? `${context.rentEndDate || ""} ${context.rentEndTime || ""}`.trim() : undefined;
   const depositForMsg = isRent ? Number(context.depositOverride || 20000) : undefined;
