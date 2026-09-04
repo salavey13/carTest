@@ -33,6 +33,10 @@
 //   4. Отработка возражений: «дорого» → ценность → альтернатива, не скидка.
 //   5. Скорость: раздел разворачивается в шторке РЯДОМ с кнопкой
 //      «Открыть чат Авито» — «прочитал → скопировал → вставил» за секунды.
+//   6. ПРАВКА БОССА (2026-09-04, Straight Line): цифра — сразу. Срок из
+//      сообщения («3 месяца», «2 недели», «на выходные») парсится в дни →
+//      ставка по тарифному слою из rent-CSV → сумма в первом же ответе,
+//      без «приезжайте — обсудим».
 //
 // AI-ПЕРВЫЙ (не хардкод): если внешний AI-агент (см.
 // public/docs/autoreply/vip-bike-avito-agent-prompt.md) приложил к webhook'у
@@ -69,7 +73,7 @@ const DELIVERY_PHRASE = `доставка по Нижнему Новгороду
 const TESTDRIVE_PHRASE =
   "бесплатный, по записи — приезжайте, покатайтесь и решите уже на месте. С собой паспорт и права";
 const PRICE_TIERS_PHRASE =
-  "чем дольше срок, тем ниже цена суток: 2–4 дня — минус ~15%, от недели — до минус 40%. Даём байки и почасово — от 1 часа";
+  "чем дольше срок, тем ниже цена суток: 2–4 дня — минус ~15%, 5–10 дней — минус ~25%, 11–30 дней — минус ~33%. Даём байки и почасово — от 1 часа";
 const SALE_PHRASE =
   "мы — официальный дилер 79Bike: гарантия на раму, мотор и батарею, собственный мотосервис и запчасти всегда в наличии";
 
@@ -213,8 +217,8 @@ const INTENT_KEYWORDS: ReadonlyArray<{
   {
     key: "long_term",
     words: [
-      "на месяц", "на неделю", "на две недели", "долгосроч", "длительн",
-      "посуточно", "надолго", "на лето", "на сезон", "помесячн",
+      "месяц", "недел", "полгода",
+      "долгосроч", "длительн", "посуточно", "надолго", "на лето", "на сезон", "помесячн",
     ],
   },
   {
@@ -333,8 +337,12 @@ const INTENT_QUICK_REPLIES: Record<ScriptIntentKey, readonly QuickReply[]> = {
   ],
   long_term: [
     {
-      label: "📆 Индивидуальный расчёт",
-      text: "Для срока от недели сделаю индивидуальную цену — напишите даты начала и конца.",
+      label: "📆 Тарифы от 11 дней",
+      text: `От 11 дней цена суток минус ~33%, от 2–4 дней — минус ~15%. Напишите даты — посчитаю итог и зафиксирую ставку за вами.`,
+    },
+    {
+      label: "🧮 Расчёт на мой срок",
+      text: "Напишите даты начала и конца — пришлю расчёт по тарифу длительной аренды и зафиксирую байк за вами.",
     },
   ],
   greeting: [
@@ -393,6 +401,118 @@ function joinParas(...paras: Array<string | null | undefined>): string {
   return paras.map((p) => (p || "").trim()).filter(Boolean).join("\n\n");
 }
 
+// ── Мгновенный расчёт цены по сроку (Straight Line: цифра — сразу) ─────────
+// Тарифные слои — медианы по всему парку из public/docs/autoreply/vip-bike-
+// rent.csv (27 моделей, поля rent_2_4d / rent_5_10d / rent_11_30d, см.
+// docs/gold-standard-electro-bike-spec-schema.md): ставка суток 2–4 суток
+// = 0.85 от цены суток, 5–10 суток = 0.75, 11–30 суток = 0.67. Цена
+// объявления (itemPrice) = суточная ставка будней — считаем от неё.
+const TIER_RATIO_2_4_DAYS = 0.85;
+const TIER_RATIO_5_10_DAYS = 0.75;
+const TIER_RATIO_11_30_DAYS = 0.67;
+
+/** Ставка суток в тарифном слое под срок (округление до 100 ₽). */
+export function tierDailyRate(days: number, listingPrice: number): number {
+  const ratio =
+    days >= 11
+      ? TIER_RATIO_11_30_DAYS
+      : days >= 5
+        ? TIER_RATIO_5_10_DAYS
+        : days >= 2
+          ? TIER_RATIO_2_4_DAYS
+          : 1;
+  return Math.round((listingPrice * ratio) / 100) * 100;
+}
+
+/** Строка «2–4 дня — по X ₽, 5–10 дней — по Y ₽, 11–30 дней — по Z ₽ за сутки». */
+function tierLineFor(listingPrice: number): string {
+  return `2–4 дня — по ${fmtPrice(tierDailyRate(2, listingPrice))}, 5–10 дней — по ${fmtPrice(
+    tierDailyRate(7, listingPrice),
+  )}, 11–30 дней — по ${fmtPrice(tierDailyRate(30, listingPrice))} за сутки`;
+}
+
+/** Срок аренды, распознанный из текста покупателя. */
+export interface DurationHint {
+  days: number;
+  /** Человекочитаемая метка для вставки в ответ («3 месяца», «выходные»). */
+  label: string;
+}
+
+const DURATION_NUM_WORDS: Record<string, number> = {
+  "один": 1, "одну": 1, "одна": 1, "одни": 1,
+  "два": 2, "две": 2, "пара": 2,
+  "три": 3, "четыре": 4, "пять": 5, "шесть": 6,
+  "семь": 7, "восемь": 8, "девять": 9, "десять": 10,
+};
+
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+/**
+ * Срок аренды из текста («на 3 месяца», «2 недели», «на выходные»,
+ * «полгода», «на сутки»…) → дни. null — срок не назван.
+ */
+export function parseDurationDays(rawText: string): DurationHint | null {
+  const text = norm(rawText);
+  if (!text) return null;
+
+  // Спец-случаи (порядок важен).
+  if (text.includes("полгода")) return { days: 180, label: "полгода" };
+  if (text.includes("выходн")) return { days: 2, label: "выходные" };
+  if (/(на лето|на сезон|сезон)/.test(text)) return { days: 90, label: "сезон (~3 месяца)" };
+  if (/сутки|завтра|сегодня|на день/.test(text)) return { days: 1, label: "сутки" };
+
+  // «N дней / N недели / N месяца» — числом или словом.
+  const m = text.match(
+    /(одну|один|одна|одни|две|два|пара|три|четыре|пять|шесть|семь|восемь|девять|десять|\d{1,3})\s*(дн|недел|месяц)/,
+  );
+  if (m) {
+    const n = /^\d/.test(m[1]) ? parseInt(m[1], 10) : DURATION_NUM_WORDS[m[1]] ?? 0;
+    if (n > 0) {
+      if (m[2].startsWith("дн")) {
+        const days = Math.max(1, n);
+        return { days, label: `${n} ${pluralRu(days, "день", "дня", "дней")}` };
+      }
+      if (m[2].startsWith("недел")) {
+        const days = Math.max(2, n * 7);
+        return { days, label: `${n} ${pluralRu(n, "неделю", "недели", "недель")}` };
+      }
+      const days = Math.max(2, n * 30);
+      return { days, label: `${n} ${pluralRu(n, "месяц", "месяца", "месяцев")}` };
+    }
+  }
+
+  // Единица без числа: «на месяц», «на неделю».
+  if (text.includes("месяц")) return { days: 30, label: "месяц" };
+  if (text.includes("недел")) return { days: 7, label: "неделя" };
+  return null;
+}
+
+/**
+ * Фраза-расчёт для вставки в ответ: ставка по тарифному слою + итог за срок.
+ * Для сроков больше 30 дней — ещё и сумма за месяц (вопрос «на 3 месяца?»
+ * получает конкретную цифру ПЕРВЫМ же ответом, а не «приезжайте — обсудим»).
+ */
+function durationEstimateLine(days: number, label: string, listingPrice: number): string {
+  const rate = tierDailyRate(days, listingPrice);
+  const total = rate * days;
+  if (days < 2) return `на ${label} — ${fmtPrice(rate)}`;
+  if (days > 30) {
+    return `на ${label} — ставка длительной аренды, примерно ${fmtPrice(rate)} в сутки: это около ${fmtPrice(
+      rate * 30,
+    )} в месяц, за весь срок — примерно ${fmtPrice(total)}. И это не потолок: под такой срок сделаю индивидуальную цену ещё ниже`;
+  }
+  if (days >= 11) {
+    return `на ${label} — ставка длительной аренды, примерно ${fmtPrice(rate)} в сутки: итого около ${fmtPrice(total)}`;
+  }
+  return `на ${label} выйдет примерно ${fmtPrice(total)} — по ${fmtPrice(rate)} в сутки уже со скидкой за срок`;
+}
+
 // ── Распознавание интента (fallback после AI) ──────────────────────────────
 
 interface IntentScore {
@@ -446,6 +566,8 @@ interface ScriptCtx {
   messagesCount: number;
   priceLine: string;
   bikeRef: string;
+  /** Срок из сообщения покупателя («3 месяца» → 90 дней), если назван. */
+  duration: DurationHint | null;
 }
 
 function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
@@ -453,47 +575,62 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
   short: string;
   nextBestAction: string;
 } {
-  const { greet, bike, price, priceLine, bikeRef } = ctx;
+  const { greet, bike, price, priceLine, bikeRef, duration } = ctx;
   switch (key) {
-    case "availability":
+    case "availability": {
+      const est =
+        duration && price
+          ? `${cap(durationEstimateLine(duration.days, duration.label, price))}.`
+          : null;
       return {
         script: joinParas(
-          `${greet} Да, ${bikeRef} свободен на нужные вам даты!`,
-          `Напишите, когда планируете забрать и на сколько дней, — сразу зафиксирую бронь за вами.${price ? ` ${priceLine}` : ""}`,
-          `${cap(INCLUDED_PHRASE)}. ${cap(GEAR_PHRASE)}. ${cap(PRICE_TIERS_PHRASE)}.`,
-          `Забронировать можно прямо в Telegram: ${BOOKING_LINK} — или оставьте телефон, оформлю за вас. Залог: ${DEPOSIT_PHRASE}.`,
+          `${greet} Да, ${bikeRef} свободен!`,
+          est ?? priceLine,
+          `Напишите точные даты — сразу зафиксирую бронь за вами: ${BOOKING_LINK}. Или оставьте телефон — оформлю за 10 минут и перезвоню.`,
+          `${cap(INCLUDED_PHRASE)}. ${cap(DEPOSIT_PHRASE)}.`,
         ),
-        short: `${greet} Да, свободен! Напишите даты — сразу забронирую за вами.`,
+        short: est
+          ? `${greet} Да, свободен! ${est} Даты скажете — забронирую.`
+          : `${greet} Да, свободен! Напишите даты — сразу забронирую за вами.`,
         nextBestAction:
-          "Цель ответа — даты + предоплата: уточнить срок → назвать цену → дать ссылку на бронь в Telegram (t.me/oneBikePlsBot). Без телефона — попросить номер для подтверждения.",
+          "Пик интереса: если срок назван — итог в деньгах уже в ответе. Взять даты → зафиксировать бронь (ссылка или телефон для оформления).",
       };
-    case "price":
+    }
+    case "price": {
+      const est =
+        duration && price
+          ? `${cap(durationEstimateLine(duration.days, duration.label, price))}.`
+          : null;
       return {
         script: joinParas(
           `${greet}`,
           bike
-            ? `${bike} — аренда ${price ? `${fmtPrice(price)} в сутки` : "от цены в объявлении"}.`
+            ? `${bike} — ${price ? `${fmtPrice(price)} в сутки. Чем дольше срок, тем ниже цена суток: ${tierLineFor(price)}. Почасово тоже даём — от 1 часа.` : "цена зависит от срока — напишите даты, посчитаю точно."}`
             : priceLine,
-          `${cap(PRICE_TIERS_PHRASE)}.`,
+          est ?? `${cap(PRICE_TIERS_PHRASE)}.`,
           `${cap(INCLUDED_PHRASE)}.`,
-          `${cap(GEAR_PHRASE)}. Залог: ${DEPOSIT_PHRASE}.`,
-          `Готов зафиксировать байк за вами — напишите срок и даты, посчитаю итог. Бронь — в Telegram: ${BOOKING_LINK}.`,
+          `${cap(GEAR_PHRASE)}. Залог можно оставить СТС — наличные готовить не нужно.`,
+          `На какие даты считать? Назову точную сумму и сразу зафиксирую бронь: ${BOOKING_LINK}.`,
         ),
-        short: price
-          ? `${greet} ${fmtPrice(price)}/сутки. На какие даты? Проверю наличие.`
-          : `${greet} Цена зависит от дат и срока — напишите, когда планируете, и пришлю точную стоимость.`,
+        short: est
+          ? `${greet} ${est} Даты скажете — зафиксирую точную цену.`
+          : price
+            ? `${greet} ${fmtPrice(price)}/сутки. На какие даты? Проверю наличие.`
+            : `${greet} Цена зависит от дат и срока — напишите, когда планируете, и пришлю точную стоимость.`,
         nextBestAction:
-          "Не голая цифра: цена → ценность (что входит) → скидки за срок → вопрос про даты. Цель первого ответа — даты, а не сделка.",
+          "Сначала цифра (ставка + итог за названный срок), затем ценность (что входит) — и один вопрос: даты. Цель — даты и телефон, не сделка в один чат.",
       };
+    }
     case "deposit":
       return {
         script: joinParas(
           `${greet}`,
-          `${cap(DEPOSIT_PHRASE)}. Никаких скрытых удержаний: вернёте байк в целости — залог вернётся в течение 3 рабочих дней.`,
+          `${cap(DEPOSIT_PHRASE)}.`,
+          `Скрытых удержаний нет: подписываем акт возврата — залог возвращается полностью, точно в срок из договора.`,
           `${cap(DOCS_PHRASE)}.`,
           `Напишите модель и даты — назову точный залог и посчитаю стоимость.`,
         ),
-        short: `${greet} Залог — от 10 до 50 тысяч по модели, возвращаем за 3 рабочих дня, можно СТС вместо наличных. Модель подскажете?`,
+        short: `${greet} Залог — от 10 до 50 тысяч по модели, возвращаем в течение 3 рабочих дней, можно СТС вместо наличных. Модель подскажете?`,
         nextBestAction:
           "Снять тревогу полностью → сразу перевести к датам и модели: «модель подскажете — назову точный залог».",
       };
@@ -520,18 +657,23 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
         short: `${greet} Да, доставляем: по городу 500 ₽, за город — по договорённости. Адрес подскажете?`,
         nextBestAction: "Уточнить адрес → назвать стоимость доставки → закрыть на даты и время.",
       };
-    case "discount":
+    case "discount": {
       return {
         script: joinParas(
-          `${greet} Понимаю, бюджет важен!`,
-          `Смотрите честно: ${INCLUDED_PHRASE}, плюс свой мотосервис и подменный байк на случай форс-мажора — по отдельности это вышло бы заметно дороже.`,
-          `И скидки за срок уже в прайсе: ${PRICE_TIERS_PHRASE}. Есть модели проще — от 4–6 тысяч в сутки.`,
-          `Напишите срок, даты и бюджет — подберу лучший вариант.`,
+          `${greet} Понимаю, бюджет важен — давайте считать фактами, а не на ощупь.`,
+          price
+            ? `Сутки — ${fmtPrice(price)}, но срок уже снижает цену: ${tierLineFor(price)}. Нужен байк на пару часов — почасово от 1 часа, это совсем другие деньги.`
+            : `${cap(PRICE_TIERS_PHRASE)}.`,
+          `${cap(INCLUDED_PHRASE)}, плюс свой мотосервис и подменный байк на форс-мажор — у частников этого нет, а по отдельности это вышло бы дороже.`,
+          `И есть модели проще — от 4–6 тысяч в сутки. Назовите бюджет и даты — подберу вариант и зафиксирую бронь.`,
         ),
-        short: `${greet} Срок снижает цену суток (от недели — до −40%). Какой бюджет и даты?`,
+        short: price
+          ? `${greet} Срок снижает цену: ${tierLineFor(price)}. Какой бюджет и даты?`
+          : `${greet} Срок снижает цену суток (от 11 дней — минус треть). Какой бюджет и даты?`,
         nextBestAction:
-          "Возражение «дорого»: сначала ценность → потом альтернатива (срок/модель) → НЕ скидка. Спросить даты.",
+          "Возражение «дорого»: НЕ скидка — пересчёт (срок/часы/модель проще). Дать 2 конкретных варианта под бюджет → вопрос про даты.",
       };
+    }
     case "test_drive":
       return {
         script: joinParas(
@@ -565,17 +707,32 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
         short: `${greet} Да, свой мотосервис: диагностика 2 400 ₽, масло 2 000 ₽, цепь 3 000 ₽. Что с байком?`,
         nextBestAction: "Собрать симптомы → озвучить вилку работ → записать на слот 10:00–20:00.",
       };
-    case "long_term":
+    case "long_term": {
+      const est =
+        duration && price
+          ? `${cap(durationEstimateLine(duration.days, duration.label, price))}.`
+          : null;
       return {
         script: joinParas(
           `${greet}`,
-          `На длительный срок — наши лучшие условия: ${PRICE_TIERS_PHRASE}. Для аренды от недели сделаю индивидуальную цену.`,
+          est ??
+            (duration
+              ? `На ${duration.label} — наши лучшие условия: ${PRICE_TIERS_PHRASE}.`
+              : `Для долгого срока у нас лучшие условия: ${PRICE_TIERS_PHRASE}.`),
           `${cap(INCLUDED_PHRASE)}.`,
-          `Напишите даты начала и конца — посчитаю и зафиксирую байк за вами.`,
+          est
+            ? `Залог — от 10 до 50 тысяч по модели (можно СТС), оформление за 10 минут по паспорту, приезжаете один раз.`
+            : `Для аренды от недели сделаю индивидуальную цену.`,
+          `Напишите даты начала и конца — зафиксирую ${bikeRef} за вами и пришлю точную смету: ${BOOKING_LINK}.`,
         ),
-        short: `${greet} Для долгого срока — до −40% от суточной цены, от недели посчитаю индивидуально. Напишите даты.`,
-        nextBestAction: "Посчитать индивидуально → зафиксировать даты → взять телефон для подтверждения.",
+        short: est
+          ? `${greet} ${est} Даты скажете — зафиксирую лучшую цену.`
+          : `${greet} Для долгого срока цена суток заметно ниже, от недели — индивидуально. Напишите даты.`,
+        nextBestAction: duration
+          ? "Цифра названа → взять даты старта/финиша → проверить календарь → зафиксировать ставку и бронь (телефон для подтверждения)."
+          : "Получить срок и даты → назвать ставку по тарифу → зафиксировать бронь.",
       };
+    }
     case "greeting":
       return {
         script: joinParas(
@@ -662,6 +819,11 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
       ? `Стоимость — ${fmtPrice(price)} в сутки.`
       : "Стоимость зависит от срока — напишите даты, пришлю точную цену.",
     bikeRef: bike || "наш байк",
+    // Срок из сообщения («на 3 месяца», «на выходные») → мгновенный расчёт
+    // ставки и суммы прямо в ответе. Последнее сообщение главнее первого.
+    duration:
+      parseDurationDays(lead.avito?.lastMessage || "") ??
+      parseDurationDays(lead.avito?.firstMessage || ""),
   };
 
   // 1. Полный текст от AI-агента — он главнее шаблона (только при доверии).

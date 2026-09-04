@@ -19,7 +19,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildSuggestedResponse,
   intentChip,
+  parseDurationDays,
   scoreIntents,
+  tierDailyRate,
 } from "@/app/franchize/[slug]/leads/lib/lead-scripts";
 import type { LeadRow } from "@/app/franchize/[slug]/leads/leads-types";
 
@@ -251,6 +253,88 @@ describe("lead-scripts: sale и service (реальные линии бизне�
     expect(res?.intent.key).toBe("service");
     expect(res?.script).toContain("2 000 ₽");
     expect(res?.script).toContain("2 400 ₽");
+  });
+});
+
+describe("lead-scripts: мгновенный расчёт по сроку (Straight Line)", () => {
+  const flat = (s: string) => s.replace(/\s+/g, "");
+
+  it("«на 3 месяца» → long_term + расчёт по тарифу 11–30 дней (ставка 12 000 ₽)", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Хочу взять байк на 3 месяца, сколько выйдет?",
+        firstMessage: null,
+        itemPrice: 12000,
+      },
+    }));
+    expect(res?.intent.key).toBe("long_term");
+    expect(res?.source).toBe("rules");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("8000₽");    // 12 000 × 0.67 → 8 000 ₽/сутки
+    expect(f).toContain("240000₽");  // около 240 000 ₽ в месяц
+    expect(f).toContain("720000₽");  // 90 дней → ~720 000 ₽
+    expect(res?.script).toContain("3 месяца");
+  });
+
+  it("«на 2 недели» → 14 дней попадает в тариф 11–30 дней: 12 000 × 0.67 = 8 000 ₽ × 14 = 112 000 ₽", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А есть смысл брать на 2 недели?", firstMessage: null,
+        itemPrice: 12000,
+      },
+    }));
+    expect(res?.intent.key).toBe("long_term");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("8000₽");
+    expect(f).toContain("112000₽");
+  });
+
+  it("«свободен на выходные?» → availability с расчётом 2 дней сразу", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Свободен на выходные?", firstMessage: null,
+        itemPrice: 12000,
+      },
+    }));
+    expect(res?.intent.key).toBe("availability");
+    const f = flat(res?.script ?? "");
+    expect(f).toContain("20400₽"); // 12 000 × 0.85 = 10 200 × 2 дня
+  });
+
+  it("tierDailyRate: границы тарифных слоёв (1 / 2 / 5 / 11 дней)", () => {
+    expect(tierDailyRate(1, 10000)).toBe(10000);
+    expect(tierDailyRate(2, 10000)).toBe(8500);
+    expect(tierDailyRate(5, 10000)).toBe(7500);
+    expect(tierDailyRate(11, 10000)).toBe(6700);
+  });
+
+  it("parseDurationDays: спец-случаи, множители и null", () => {
+    expect(parseDurationDays("можно на выходные")?.days).toBe(2);
+    expect(parseDurationDays("на сутки")?.days).toBe(1);
+    expect(parseDurationDays("свободно на завтра?")?.days).toBe(1);
+    expect(parseDurationDays("на месяц")?.days).toBe(30);
+    expect(parseDurationDays("на 3 месяца")?.days).toBe(90);
+    expect(parseDurationDays("на 2 недели")?.days).toBe(14);
+    expect(parseDurationDays("пять дней")?.days).toBe(5);
+    expect(parseDurationDays("на полгода")?.days).toBe(180);
+    expect(parseDurationDays("на лето")?.days).toBe(90);
+    expect(parseDurationDays("сколько стоит?")).toBeNull();
+    expect(parseDurationDays("")).toBeNull();
+  });
+
+  it("без цены расчёта нет — но срок всё равно признаётся текстом", () => {
+    const res = buildSuggestedResponse(buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Хочу на 3 месяца", firstMessage: null,
+      },
+    }));
+    expect(res?.intent.key).toBe("long_term");
+    expect(res?.script).toContain("3 месяца");
+    expect(res?.script).not.toContain("undefined");
   });
 });
 
