@@ -61,6 +61,13 @@ class LeadStore:
             )
         except sqlite3.OperationalError:
             pass  # колонка уже существует
+        # B5: дайджест контекста диалога (2–4 строки фактов) для уведомлений.
+        try:
+            self.conn.execute(
+                "ALTER TABLE leads ADD COLUMN context_digest TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
         self.conn.commit()
         os.chmod(self.path, 0o600)
 
@@ -323,14 +330,15 @@ class LeadStore:
         reply: str,
         reason: str,
         analyzed_message_at: int = 0,
+        context_digest: str = "",
     ) -> None:
         self.conn.execute(
             """
             UPDATE leads SET category=?, suggested_reply=?, agent_reason=?,
-                analyzed_message_at=?, updated_at=? WHERE id=?
+                analyzed_message_at=?, context_digest=?, updated_at=? WHERE id=?
             """,
             (category, reply, reason, normalize_epoch(analyzed_message_at),
-             iso_utc(), lead_id),
+             str(context_digest or "")[:600], iso_utc(), lead_id),
         )
         self.conn.commit()
 

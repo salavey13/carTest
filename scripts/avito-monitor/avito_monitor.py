@@ -342,9 +342,15 @@ def parse_agent_json(text: str) -> dict[str, str]:
     category = str(data.get("category") or "Требует внимания").strip()
     reply = str(data.get("reply") or "").strip()
     reason = str(data.get("reason") or "").strip()
+    context_digest = str(data.get("context_digest") or "").strip()[:500]
     if not reply:
         raise ValueError("агент вернул пустую рекомендацию")
-    return {"category": category, "reply": reply, "reason": reason}
+    return {
+        "category": category,
+        "reply": reply,
+        "reason": reason,
+        "context_digest": context_digest,
+    }
 
 
 def relevant_knowledge(profile_name: str, item_title: str) -> dict:
@@ -389,6 +395,7 @@ def generate_agent_reply(
             "category": "Требует ручного ответа",
             "reply": "Не отправлять клиенту: анализ недоступен. Нужен ручной ответ.",
             "reason": "Z.ai не настроен",
+            "context_digest": "",
         }
     if base_url.endswith("/v1"):
         endpoint = base_url + "/messages"
@@ -419,8 +426,23 @@ def generate_agent_reply(
 Статус модели в продаже не доказывает свободную дату аренды.
 Если поле указано среди unknowns, не отвечай наугад — уточни у клиента нужную деталь
 или предложи менеджеру проверить условие.
+
+Правила ведения ответа (методология продаж):
+- ЭХО обязательное: первый абзац reply — повтори суть последнего сообщения клиента
+  своими словами (модель, даты, вопрос). Клиент не должен повторяться.
+- Каждый reply заканчивай конкретным следующим шагом. Для аренды, просмотра и
+  тест-райда предлагай два конкретных слота сегодня/завтра (например «14:00 или 16:30»),
+  если verified_knowledge подтверждает работу в эти часы.
+- Возражение или пауза («надо подумать», «дорого», «посоветуюсь») — сначала признай
+  (AAA: понял → это нормально/частый вопрос), затем ОДИН короткий вопрос:
+  «что главное смущает?» или «что должно произойти, чтобы это стало „да"?».
+- Детальный вопрос (характеристики, комплектация, документы) — сначала встречный
+  вопрос («на какие даты/для какой задачи смотрите?»), характеристики списком не вываливай.
+- Цену не снижай, скидки и торг не предлагай никогда. Альтернатива скидке — другая
+  модель или другой формат аренды из verified_knowledge.
+
 Верни только JSON без markdown:
-{"category":"краткая категория лида","reply":"рекомендуемый ответ клиенту","reason":"почему такой ответ"}
+{"category":"краткая категория лида","reply":"рекомендуемый ответ клиенту","reason":"почему такой ответ","context_digest":"2-4 короткие строки фактов истории: что клиент уже спрашивал, что обещано, даты/модель/бюджет; если это первое сообщение — пустая строка"}
 """.strip()
     last_error: Exception = RuntimeError("неизвестная ошибка агента")
     for attempt in range(2):
@@ -463,6 +485,7 @@ def generate_agent_reply(
         "category": "Требует ручного ответа",
         "reply": "Не отправлять клиенту: анализ недоступен. Нужен ручной ответ.",
         "reason": str(last_error)[:200],
+        "context_digest": "",
     }
 
 
@@ -616,17 +639,25 @@ def format_notification(
         if history_error
         else ""
     )
+    # B5: дайджест фактов из истории — менеджер готов за 5 секунд, клиент
+    # не повторяется.
+    digest = str(analysis.get("context_digest") or "").strip()
+    digest_block = (
+        f"\n<b>Контекст:</b>\n{escape(digest)}\n"
+        if digest
+        else ""
+    )
     text = f"""<b>{escape(analysis["category"])}</b>
 
 <b>Профиль:</b> {escape(profile_name)}
 <b>Объявление:</b> {escape(context["title"])}
 <b>Цена:</b> {escape(context["price"] or "не указана")}
 <b>Клиент:</b> {escape(context["client_name"])}
-{warning}
+{warning}{digest_block}
 <b>Последние сообщения:</b>
 {dialog_text}
 
-<b>Рекомендуемый ответ:</b>
+<b>Рекомендуемый ответ (начинается с эха):</b>
 <code>{escape(analysis["reply"])}</code>
 
 <b>Почему:</b> {escape(analysis["reason"] or "по контексту диалога")}
@@ -801,6 +832,7 @@ def process_profile(
                 "category": stored_category,
                 "reply": str(lead["suggested_reply"] or ""),
                 "reason": str(lead["agent_reason"] or ""),
+                "context_digest": str(lead["context_digest"] or ""),
             }
             logger.info("GLM пропущен: анализ уже сохранён для %s", chat_id)
         if analysis is None:
@@ -817,6 +849,7 @@ def process_profile(
                 analysis["reply"],
                 analysis["reason"],
                 analyzed_message_at=last_at,
+                context_digest=analysis.get("context_digest", ""),
             )
         last_inbound = ""
         for message in reversed(dialog):
