@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "rental": {
+      "name": "Аренда/Прокат",
+      "user_id": 167526519
+    },
+    "sale": {
+      "name": "Продажа",
+      "user_id": 363186771
+    }
+  },
+  "telegram": {
+    "chat_id": "6266482385"
+  },
+  "settings": {
+    "check_interval_minutes": 10,
+    "state_file": "/opt/vip-bike-avito/scripts/state.json",
+    "log_file": "/opt/vip-bike-avito/scripts/monitor.log"
+  }
+}
