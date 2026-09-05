@@ -970,8 +970,13 @@ export function LeadsClient({
 
         {/* Плейбук смены: упорядоченная очередь действий с готовыми
             сообщениями (курс 2026: off-the-call SOP решает больше, чем
-            скрипт в диалоге). */}
-        <LeadsPlaybookPanel actions={playbookActions} T={T} />
+            скрипт в диалоге). Клик по действию открывает лида-адресата
+            в шторке — «прочитал → открыл → сделал». */}
+        <LeadsPlaybookPanel
+          actions={playbookActions}
+          onOpenLead={(leadId) => setSelectedId(leadId)}
+          T={T}
+        />
 
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
             конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}

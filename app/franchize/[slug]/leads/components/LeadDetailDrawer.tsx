@@ -23,6 +23,7 @@ import {
   Copy,
   Check,
   Quote,
+  Brain,
   type LucideIcon,
 } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
@@ -63,6 +64,7 @@ import { LeadHistorySection } from "./LeadHistorySection";
 import { LeadHandlingSection } from "./LeadHandlingSection";
 import { getLeadHandling, isHandlingTodo } from "../lib/lead-handling";
 import { buildSuggestedResponse } from "../lib/lead-scripts";
+import { buildLeadPrep } from "../lib/lead-prep";
 
 export interface LeadDrawerNote {
   id: string;
@@ -204,6 +206,11 @@ export function LeadDetailDrawer(props: Props) {
   // из metadata webhook'а: чистая функция, в БД не пишется, работает
   // ретроактивно для всех существующих лидов.
   const suggested = useMemo(() => (lead ? buildSuggestedResponse(lead) : null), [lead]);
+
+  // 🧠 Подготовка к контакту («5 минут подготовки», курс 2026 — план B5):
+  // факты диалога + эхо-строка. Чистая функция от лида; для лидов без
+  // фактов hasPrep=false → секция не рендерится.
+  const prep = useMemo(() => (lead ? buildLeadPrep(lead) : null), [lead]);
 
   // «Прочитать заметки» — раскрыть секцию заметок и прокрутить к ней.
   // Ждём 350 мс: шторка успевает отыграть входную анимацию (иначе
@@ -636,6 +643,71 @@ export function LeadDetailDrawer(props: Props) {
           </span>
           <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
         </a>
+      )}
+
+      {/* 1b¾. Подготовка («5 минут подготовки», курс 2026 / план B5,
+          приоритет босса): факты диалога + эхо-строка. Правило курса:
+          клиент не должен повторяться — ПЕРВЫЙ абзац ответа повторяет ЕМУ
+          то, что он сказал. Эхо копируется одной кнопкой, факты читаются
+          за секунды перед звонком. Стоит ПЕРЕД «Готовым ответом»:
+          подготовка → затем скрипт. */}
+      {prep?.hasPrep && (
+        <div
+          className="mt-4 rounded-2xl border p-3"
+          style={{ borderColor: "#8b5cf633", background: "#8b5cf60d" }}
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <Brain className="h-3.5 w-3.5 shrink-0" style={{ color: "#8b5cf6" }} aria-hidden />
+            <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#8b5cf6" }}>
+              Подготовка
+            </span>
+            <span className="text-[10px]" style={{ color: T.textFaint }}>
+              факты диалога — не переспрашивайте клиента
+            </span>
+          </div>
+          {/* Факты: байк/цена, даты, бюджет, права, прогресс сделки */}
+          {prep.facts.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {prep.facts.map((f, i) => (
+                <span
+                  key={`${f.icon}:${i}`}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[11px]"
+                  style={{ borderColor: "#8b5cf62e", color: T.textMuted }}
+                >
+                  <span className="shrink-0" aria-hidden>{f.icon}</span>
+                  <span className="truncate font-semibold" style={{ color: T.text }}>{f.text}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Эхо-строка: готовое начало ответа «Вы писали про … — …» */}
+          {prep.echoLine && (
+            <div
+              className="flex items-stretch gap-2 rounded-xl border px-3 py-2"
+              style={{ borderColor: T.border, background: T.bgCard }}
+            >
+              <p className="min-w-0 flex-1 self-center text-[12px] leading-snug" style={{ color: T.text }}>
+                {prep.echoLine}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  void copyText(prep.echoLine!, "эхо-строку");
+                  flashCopied("prep-echo");
+                }}
+                aria-label={copiedKey === "prep-echo" ? "Скопировано" : "Скопировать начало ответа"}
+                className="flex h-7 w-7 shrink-0 self-center items-center justify-center rounded-lg border transition-colors"
+                style={{
+                  borderColor: copiedKey === "prep-echo" ? "rgba(34,197,94,0.5)" : T.border,
+                  color: copiedKey === "prep-echo" ? "#22c55e" : T.textMuted,
+                  backgroundColor: copiedKey === "prep-echo" ? "rgba(34,197,94,0.08)" : "transparent",
+                }}
+              >
+                {copiedKey === "prep-echo" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* 1b+. Готовый ответ — читаемая «открыточка» под интент вопроса

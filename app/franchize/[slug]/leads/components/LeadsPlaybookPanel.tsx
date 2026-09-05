@@ -18,12 +18,16 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ListChecks, Copy, Check, Sparkles } from "lucide-react";
+import { ListChecks, Copy, Check, Sparkles, ChevronRight } from "lucide-react";
 import type { NextAction } from "../lib/lead-playbook";
 import { PLAYBOOK_BENCHMARKS } from "../lib/lead-playbook";
 
 interface LeadsPlaybookPanelProps {
   actions: NextAction[];
+  /** Открыть лида-адресата в шторке (просьба UX: действие без перехода —
+   *  это только текст; курс 2026: SOP = «прочитал → сделал», а «сделал»
+   *  начинается с открытия диалога). leadId отсутствует → строка статична. */
+  onOpenLead?: (leadId: string) => void;
   T: any;
 }
 
@@ -33,7 +37,7 @@ const TONE_COLOR: Record<NextAction["tone"], string> = {
   info: "#3b82f6",
 };
 
-export function LeadsPlaybookPanel({ actions, T }: LeadsPlaybookPanelProps) {
+export function LeadsPlaybookPanel({ actions, onOpenLead, T }: LeadsPlaybookPanelProps) {
   // Какая строка только что скопирована — галочка вместо иконки на 2 секунды.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -72,7 +76,12 @@ export function LeadsPlaybookPanel({ actions, T }: LeadsPlaybookPanelProps) {
             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{ backgroundColor: `${TONE_COLOR[actions[0].tone]}22`, color: TONE_COLOR[actions[0].tone] }}
           >
-            {actions.length} действо
+            {actions.length}{" "}
+            {actions.length % 10 === 1 && actions.length % 100 !== 11
+              ? "действие"
+              : [2, 3, 4].includes(actions.length % 10) && ![12, 13, 14].includes(actions.length % 100)
+                ? "действия"
+                : "действий"}
           </span>
         )}
       </div>
@@ -89,32 +98,66 @@ export function LeadsPlaybookPanel({ actions, T }: LeadsPlaybookPanelProps) {
         <ol className="space-y-2">
           {actions.map((a, i) => {
             const tone = TONE_COLOR[a.tone];
-            const isCopied = copiedKey === `${a.key}:${a.leadId ?? i}`;
+            const rowKey = `${a.key}:${a.leadId ?? i}`;
+            const isCopied = copiedKey === rowKey;
+            const clickable = !!a.leadId && !!onOpenLead;
+            // Тело строки — кнопка, если есть лид-адресат: клик открывает
+            // шторку лида (полный контекст перед звонком/сообщением).
+            const Body = clickable ? "button" : "div";
             return (
               <li
-                key={`${a.key}:${a.leadId ?? i}`}
-                className="flex items-start gap-2.5 rounded-xl border px-3 py-2"
+                key={rowKey}
+                className="flex items-stretch gap-2.5 rounded-xl border px-3 py-2"
                 style={{ borderColor: T.border, backgroundColor: T.borderSoft }}
               >
-                <span
-                  aria-hidden="true"
-                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[13px]"
-                  style={{ backgroundColor: `${tone}1f` }}
+                <Body
+                  {...(clickable
+                    ? {
+                        type: "button" as const,
+                        onClick: () => onOpenLead!(a.leadId!),
+                        "aria-label": `${a.title} — открыть лида`,
+                      }
+                    : {})}
+                  className={`flex min-w-0 flex-1 items-start gap-2.5 rounded-lg text-left ${
+                    clickable ? "cursor-pointer transition hover:brightness-110 active:scale-[0.99]" : ""
+                  }`}
                 >
-                  {a.emoji}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] font-bold leading-tight" style={{ color: tone }} title={a.title}>
-                    {i + 1}. {a.title}
-                  </p>
-                  <p className="mt-0.5 text-[10px] leading-snug" style={{ color: T.textFaint }} title={a.detail}>
-                    {a.detail}
-                  </p>
-                </div>
+                  <span
+                    aria-hidden="true"
+                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[13px]"
+                    style={{ backgroundColor: `${tone}1f` }}
+                  >
+                    {a.emoji}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-bold leading-tight" style={{ color: tone }} title={a.title}>
+                      {/* №1 danger-очереди пульсирует: первое действие —
+                          «ответить сейчас» (окно 60 сек / зона смерти 5 мин).
+                          Тот же паттерн ping, что у «новая заметка» на карточке. */}
+                      {i === 0 && a.tone === "danger" && (
+                        <span className="relative mr-1.5 inline-flex h-2 w-2" aria-hidden>
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: tone }} />
+                          <span className="relative inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: tone }} />
+                        </span>
+                      )}
+                      {i + 1}. {a.title}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug" style={{ color: T.textFaint }} title={a.detail}>
+                      {a.detail}
+                    </p>
+                  </div>
+                  {clickable && (
+                    <ChevronRight
+                      className="mt-1 h-4 w-4 shrink-0"
+                      style={{ color: T.textFaint }}
+                      aria-hidden
+                    />
+                  )}
+                </Body>
                 {a.message && (
                   <button
                     type="button"
-                    onClick={() => copyMessage(`${a.key}:${a.leadId ?? i}`, a.message!)}
+                    onClick={() => copyMessage(rowKey, a.message!)}
                     aria-label={isCopied ? "Скопировано" : "Скопировать сообщение"}
                     className="ml-1 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors"
                     style={{

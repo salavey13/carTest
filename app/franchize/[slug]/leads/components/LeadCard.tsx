@@ -260,10 +260,20 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                 style={{ color: T.textMuted }}
               >
                 {lead.phone && (
-                  <span className="inline-flex items-center gap-1">
+                  /* Курс 2026 («call now»): телефон — не текст, а действие.
+                     Пауза карточки: клик по номеру звонит напрямую, не открывая
+                     шторку (stopPropagation не даёт всплыть onSelect). */
+                  <a
+                    href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-semibold transition hover:brightness-125"
+                    style={{ color: "#22c55e" }}
+                    title={`Позвонить: ${lead.phone}`}
+                    aria-label={`Позвонить ${displayName} по номеру ${lead.phone}`}
+                  >
                     <Phone className="h-3 w-3" aria-hidden />
                     {lead.phone}
-                  </span>
+                  </a>
                 )}
                 {rel && (
                   <span className="inline-flex items-center gap-1">

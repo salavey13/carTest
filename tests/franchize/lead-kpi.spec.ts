@@ -244,14 +244,20 @@ describe("lead-kpi: горячие лиды и юнит-экономика", () 
 
 describe("lead-kpi: пакет 2 — неделя, продажи, юнит-экономика, диалог", () => {
   it("startOfWeek: четверг/воскресенье → понедельник 00:00 той же недели", () => {
+    // 2026-09-04 (пт) и 2026-09-06 (вс) строятся ЛОКАЛЬНО: UTC-константа
+    // («2026-09-06T23:00Z») в MSK — уже понедельник, тест ломался от таймзоны
+    // машины. startOfWeek работает в локальном календаре — вход тоже локальный.
+    const fridayLocal = new Date(2026, 8, 4, 12, 0, 0, 0).getTime();
+    const sundayLocal = new Date(2026, 8, 6, 23, 0, 0, 0).getTime();
     // 2026-09-04 — пятница; неделя начинается в пн 2026-08-31 (локально).
-    const monday = startOfWeek(Date.parse("2026-09-04T12:00:00.000Z"));
+    const monday = startOfWeek(fridayLocal);
     const d = new Date(monday);
     expect(d.getDay()).toBe(1); // понедельник
     expect(d.getHours()).toBe(0);
     expect(d.getMinutes()).toBe(0);
+    expect(d.getMonth()).toBe(7); // август (пн 2026-08-31)
     // Воскресенье 2026-09-06 — та же неделя (неделя начинается в пн).
-    expect(startOfWeek(Date.parse("2026-09-06T23:00:00.000Z"))).toBe(monday);
+    expect(startOfWeek(sundayLocal)).toBe(monday);
   });
 
   it("leadsThisWeek/kevThisWeek: только текущая рабочая неделя; заглушки исключены", () => {
