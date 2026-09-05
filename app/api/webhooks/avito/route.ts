@@ -28,9 +28,16 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 //      Avito validates the URL by POSTing '{}' and expects 200 OK within 2s —
 //      this route acks that immediately.
 //
-// Contract: ALWAYS answer 200 fast. Avito retries non-200s; a broken handler
-// must never turn into a redelivery storm. Lead persistence is best-effort:
-// if Supabase fails we log and ack (Avito data can be re-imported from chats).
+// Contract: ALWAYS answer 200 fast to the OFFICIAL Avito webhook (Avito
+// retries non-200s; a broken handler must never turn into a redelivery
+// storm). Lead persistence is best-effort there: if Supabase fails we log
+// and ack (Avito data can be re-imported from chats).
+//
+// EXCEPTION — factory poller events (body.id starts with "monitor:"):
+// the factory avito_monitor cron re-delivers via its own durable outbox,
+// so a Supabase failure MUST surface as 503 to trigger that retry. Always
+// acking would silently drop the lead (the monitor forwards each event
+// once per new inbound message).
 // ═══════════════════════════════════════════════════════════════════════════
 
 const CREW_SLUG = "vip-bike";
@@ -70,8 +77,18 @@ type AvitoWebhookBody = {
     url?: string;
     profile?: string;
     category?: string;
+    /** Lead-temperature from the monitor's BANT scoring: hot|warm|cold. */
+    score?: string;
   };
 };
+
+const LEAD_SCORES = new Set(["hot", "warm", "cold"]);
+
+function sanitizeScore(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  return LEAD_SCORES.has(v) ? v : null;
+}
 
 /**
  * Manual/assistant-bot ingest envelope (interim path until Avito API keys are
@@ -157,6 +174,7 @@ async function createLead(input: {
   analysis?: Record<string, unknown> | null;
 }): Promise<void> {
   const { value, eventId, now, extra, phone, client, analysis } = input;
+  const leadScore = sanitizeScore(client?.score);
   const metadata: Record<string, unknown> = {
     name: buyerDisplayName(value, client?.name),
     phone: null,
@@ -177,6 +195,7 @@ async function createLead(input: {
     ...(client?.url ? { sourceUrl: client.url } : {}),
     ...(client?.profile ? { avitoProfile: client.profile } : {}),
     ...(client?.category ? { analysisCategory: client.category } : {}),
+    ...(leadScore ? { leadScore } : {}),
     ...(analysis ? { analysis } : {}),
     ...(extra || {}),
   };
@@ -451,6 +470,17 @@ export async function POST(request: NextRequest) {
     if ((body as BotForwardBody).type === "bot_forward") {
       return await handleBotForward(body as BotForwardBody);
     }
+    // Factory poller events may fail the whole pipeline with 503 — the
+    // monitor's outbox retries them. Official Avito events stay always-ack.
+    const isMonitorEvent =
+      typeof body.id === "string" && body.id.startsWith("monitor:");
+    const onPersistError = () => {
+      if (!isMonitorEvent) return ack();
+      return NextResponse.json(
+        { ok: false, error: "lead persistence failed; retry via monitor outbox" },
+        { status: 503 },
+      );
+    };
     if (body.payload?.type !== "message" || !body.payload.value) return ack();
     const value = body.payload.value;
     if (!value.chat_id) return ack();
@@ -466,7 +496,7 @@ export async function POST(request: NextRequest) {
     const existing = await findLeadByChatId(value.chat_id);
     if (existing.error) {
       logger.error("[avito-webhook] lookup failed", existing.error);
-      return ack();
+      return onPersistError();
     }
 
     if (existing.data?.id) {
@@ -492,6 +522,8 @@ export async function POST(request: NextRequest) {
       if (body.client?.url && !merged.sourceUrl) merged.sourceUrl = body.client.url;
       if (body.client?.profile) merged.avitoProfile = body.client.profile;
       if (body.client?.category) merged.analysisCategory = body.client.category;
+      const updateScore = sanitizeScore(body.client?.score);
+      if (updateScore) merged.leadScore = updateScore;
       await updateLead(existing.data.id, merged, { value, eventId: body.id ?? null, now, analysis });
       return ack();
     }
@@ -508,6 +540,14 @@ export async function POST(request: NextRequest) {
     return ack();
   } catch (error) {
     logger.error("[avito-webhook] processing failed", error);
+    const isMonitorRetry =
+      typeof body.id === "string" && body.id.startsWith("monitor:");
+    if (isMonitorRetry) {
+      return NextResponse.json(
+        { ok: false, error: "lead persistence failed; retry via monitor outbox" },
+        { status: 503 },
+      );
+    }
     return ack();
   }
 }
