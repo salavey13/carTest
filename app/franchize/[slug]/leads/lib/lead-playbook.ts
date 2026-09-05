@@ -27,6 +27,9 @@
 //      имеют заметно более высокую явку, чем «через три дня».
 //   7. РЕАНИМАЦИЯ GHOST (55) — «no for now ≠ no forever»: лёгкое
 //      сообщение-мем даёт самый высокий отклик из всех сообщений курса.
+//   8. ПУЛЬС-ЧЕК ПО ДОЛГО ПРОПАВШИМ (50) — тишина ≥ 7 дней: дожим уже
+//      не «куда пропали», а с поводом из факта (сезон/модель) — «нет»
+//      истекает, препятствия (занятость, бюджет месяца) прошли.
 //
 // Модуль чистый: без React, без Date.now() внутри (now передаётся снаружи).
 // Сообщения переиспользуют скриптовый движок (lead-scripts.ts) — один
@@ -36,7 +39,7 @@ import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { ensureLeadArraysSafe } from "./lead-speed";
 import { matchTodosToLead } from "./pipeline-stages";
 import { getLeadHandling } from "./lead-handling";
-import { ghostReengageLine, pullUpLine } from "./lead-scripts";
+import { ghostReengageLine, pullUpLine, seasonalReengageLine } from "./lead-scripts";
 
 // ── Ориентиры курса (бенчмарки для UI) ─────────────────────────────────────
 
@@ -83,6 +86,8 @@ const FRESH_WINDOW_MS = 60 * 60_000;
 const CONTRACT_HANG_MS = 24 * 60 * 60 * 1000;
 /** Тишина покупателя, после которой диалог считается «пропавшим». */
 export const GHOST_SILENCE_MS = 24 * 60 * 60 * 1000;
+/** Тишина, после которой лёгкое «куда пропали?» меняется на пульс-чек с поводом. */
+export const GHOST_LONG_SILENCE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Аренда стартует позже чем через… — кандидат на «подтянуть на сегодня». */
 const PULLUP_HORIZON_MS = 36 * 60 * 60 * 1000;
 
@@ -94,7 +99,8 @@ export type NextActionKey =
   | "fresh-waiting"
   | "contract-hanging"
   | "pull-up"
-  | "ghost";
+  | "ghost"
+  | "ghost-long";
 
 export interface NextAction {
   key: NextActionKey;
@@ -123,6 +129,7 @@ const WEIGHT = {
   contractHanging: 70,
   pullUp: 60,
   ghost: 55,
+  ghostLong: 50,
 } as const;
 
 const PRE_RENTAL_STAGES: ReadonlySet<string> = new Set([
@@ -333,7 +340,10 @@ export function buildNextActions(
       }
     }
 
-    // ── Ghost: авито-диалог молчит >24 ч, никто его не ведёт ──
+    // ── Ghost: авито-диалог молчит; никто его не ведёт. Курс: «нет» ≠
+    // «нет навсегда» — но тон зависит от давности: сутки–неделя — лёгкое
+    // «куда пропали?» (самый высокий отклик), дольше недели — пульс-чек
+    // с ПОВОДОМ ИЗ ФАКТА (сезон/модель), препятствия за неделю истекают.
     const avito = lead.avito;
     if (avito && isAvitoLike && !handling.handled && !isConverted && !handling.callback) {
       const messagesCount =
@@ -345,20 +355,37 @@ export function buildNextActions(
         !!(avito.lastMessage || "").trim() ||
         !!(avito.firstMessage || "").trim();
       const silenceFrom = safeMs(avito.lastMessageAt || lead.lastSeenAt || lead.createdAt);
-      if (hadDialog && Number.isFinite(silenceFrom) && now - silenceFrom >= GHOST_SILENCE_MS) {
-        found.push(
-          action(
-            "ghost",
-            "👻",
-            `Реанимировать: ${who}`,
-            `тишина ${fmtAge(now - silenceFrom)} — «нет» не навсегда: лёгкое сообщение даёт самый высокий отклик`,
-            ghostReengageLine(name),
-            leadId,
-            "info",
-            WEIGHT.ghost,
-            now - silenceFrom,
-          ),
-        );
+      if (hadDialog && Number.isFinite(silenceFrom)) {
+        const silence = now - silenceFrom;
+        if (silence >= GHOST_LONG_SILENCE_MS) {
+          found.push(
+            action(
+              "ghost-long",
+              "🍂",
+              `Пульс-чек: ${who}`,
+              `тишина ${fmtAge(silence)} — «нет» истекает: препятствия (сезон, занятость) прошли, дожим с поводом из факта`,
+              seasonalReengageLine(lead.bikeTitle),
+              leadId,
+              "info",
+              WEIGHT.ghostLong,
+              silence,
+            ),
+          );
+        } else if (silence >= GHOST_SILENCE_MS) {
+          found.push(
+            action(
+              "ghost",
+              "👻",
+              `Реанимировать: ${who}`,
+              `тишина ${fmtAge(silence)} — «нет» не навсегда: лёгкое сообщение даёт самый высокий отклик`,
+              ghostReengageLine(name),
+              leadId,
+              "info",
+              WEIGHT.ghost,
+              silence,
+            ),
+          );
+        }
       }
     }
   }

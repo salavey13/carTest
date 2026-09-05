@@ -1006,6 +1006,18 @@ export function ghostReengageLine(name: string | null = null): string {
 }
 
 /**
+ * Пульс-чек по «долго пропавшим» (курс 2026, «no ≠ no forever»):
+ * легитимные препятствия (сезон, занятость, бюджет месяца) истекают,
+ * поэтому дожим «пропавших за неделю+» идёт с ПОВОДОМ ИЗ ФАКТА
+ * («сезон в разгаре», «модель вернулась»), а не с «ну что, надумали?».
+ * Используется плейбуком для тишины ≥ 7 дней (ghost-long).
+ */
+export function seasonalReengageLine(bikeTitle: string | null = null): string {
+  const bike = (bikeTitle || "").trim();
+  return `Сезон в разгаре${bike ? ` — ${bike} как раз свободен` : ", байки в наличии"}. Если даты ещё актуальны — зафиксирую бронь за пару минут. Если планы поменялись — просто напишите «нет», не обижусь 🙂`;
+}
+
+/**
  * «Подтянуть на сегодня»: перенос будущей брони на ближайшее окно —
  * same-day/next-day визиты имеют заметно более высокую явку, чем
  * «через три дня» (курс 2026, приём «pull-up appointments»).
@@ -1025,6 +1037,57 @@ export function testdriveReminderLine(name: string | null = null, hoursBefore: 2
     return `Напоминаю о нашем тест-драйве завтра${who}! Подготовим байк к вашему приезду и соберём экипировку по размеру — напишите рост, чтобы всё подобрать. Если планы изменились — перенесём без проблем.`;
   }
   return `Встречаемся через час${who}! Байк готов, ждём вас. Если задерживаетесь — напишите, подвезём без спешки.`;
+}
+
+// ── Эхо (курс 2026, «5 минут подготовки», приоритет босса) ─────────────
+
+/** Минимальная длина сообщения, из которого имеет смысл строить эхо. */
+const ECHO_MIN = 8;
+/** Максимальная длина фрагмента эха (одна строка, без переноса). */
+const ECHO_MAX = 80;
+
+/** Фрагмент сообщения клиента для эха (одна строка, ≤ ECHO_MAX знаков). */
+function echoFragment(raw: string | null | undefined): string | null {
+  const one = (raw || "").replace(/\s+/g, " ").trim();
+  if (one.length < ECHO_MIN) return null;
+  return one.length > ECHO_MAX ? `${one.slice(0, ECHO_MAX - 1).trimEnd()}…` : one;
+}
+
+/**
+ * Эхо-строка: «Вы писали: „…"» — МЫ повторяем ЕМУ то, что он сказал.
+ * Курс: «you repeating to them what they told you is exceptionally
+ * positive; them repeating themselves is really negative». null — сообщение
+ * короче порога («привет», «ок») — эхо строить не из чего.
+ */
+export function echoLine(raw: string | null | undefined): string | null {
+  const frag = echoFragment(raw);
+  return frag ? `Вы писали: «${frag}»` : null;
+}
+
+/** Ответ агента уже несёт эхо (свой или цитату клиента) — не дублируем. */
+function replyAlreadyEchoes(reply: string, raw: string | null | undefined): boolean {
+  if (/вы писали|вы ищете|вы смотрите|вы спрашивали|вы хотели/i.test(reply)) return true;
+  const frag = echoFragment(raw);
+  if (!frag) return false;
+  // Достаточно совпадения первых 20 знаков фрагмента (кавычки/пунктуация
+  // у агента могут отличаться) — это уже эхо по смыслу.
+  const probe = frag.slice(0, 20).toLowerCase();
+  return probe.length >= 8 && reply.toLowerCase().includes(probe);
+}
+
+/**
+ * Вшить эхо в готовый скрипт: первый абзац = приветствие + эхо, дальше —
+ * абзацы шаблона без изменений. Курс: «первый абзац reply = эхо последнего
+ * сообщения клиента» — клиент не повторяется, оператор показывает,
+ * что прочитал.
+ */
+function withEcho(script: string, greet: string, echo: string | null): string {
+  if (!echo) return script;
+  if (script.startsWith(greet)) {
+    const rest = script.slice(greet.length).trim();
+    return joinParas(`${greet} ${echo}`, rest);
+  }
+  return joinParas(echo, script);
 }
 
 // ── Распознавание интента (fallback после AI) ──────────────────────────────
@@ -1254,9 +1317,12 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
       return {
         script: joinParas(
           `${greet} Понимаю, бюджет важен — давайте считать фактами, а не на ощупь.`,
+          // Курс 2026, «никогда не снижать цену»: на прямой торг —
+          // беспроигрышный контр-якорь «мы могли бы и дороже», дальше
+          // пересчёт УСЛОВИЙ (срок/часы/модель), а не цены.
           price
-            ? `Сутки — ${fmtPrice(price)}, но срок уже снижает цену: ${tierLineFor(price, tariff)}. Нужен байк на пару часов — ${hourlyLine ? `${hourlyLine}, это совсем другие деньги.` : "почасово от 1 часа, это совсем другие деньги."}`
-            : `${cap(PRICE_TIERS_PHRASE)}.`,
+            ? `Мы могли бы и дороже 🙂 — зато срок снижает цену: ${tierLineFor(price, tariff)}. Нужен байк на пару часов — ${hourlyLine ? `${hourlyLine}, это совсем другие деньги.` : "почасово от 1 часа, это совсем другие деньги."}`
+            : `Мы могли бы и дороже 🙂 ${cap(PRICE_TIERS_PHRASE)}.`,
           `${cap(includedPhraseFor(tariff))}, плюс свой мотосервис и подменный байк на форс-мажор — у частников этого нет, а по отдельности это вышло бы дороже.`,
           // Бюджет назван → конкретные модели под него, а не «подберём».
           budgetLine
@@ -1267,7 +1333,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
           ? `${greet} Срок снижает цену: ${tierLineFor(price, tariff)}. Какой бюджет и даты?`
           : `${greet} Срок снижает цену суток (от 11 дней — минус треть). Какой бюджет и даты?`,
         nextBestAction:
-          "Возражение «дорого»: НЕ скидка — пересчёт (срок/часы/модель проще). Дать 2 конкретных варианта под бюджет → вопрос про даты.",
+          "Возражение «дорого»: НЕ скидка — контр-якорь «мы могли бы и дороже», затем пересчёт (срок/часы/модель проще). Дать 2 конкретных варианта под бюджет → вопрос про даты.",
       };
     }
     case "test_drive":
@@ -1465,6 +1531,10 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     budget,
   };
 
+  // Эхо (курс 2026, приоритет босса): первый абзац ответа = «Вы писали: „…“».
+  // Источник — последнее сообщение клиента; короче 8 знаков («привет») — эха нет.
+  const echo = echoLine(lastText);
+
   // 1. Полный текст от AI-агента — он главнее шаблона (только при доверии).
   const intentFromAi = aiIntent(lead);
   if (aiTrusted(lead) && aiReply && aiReply.length <= AI_REPLY_MAX) {
@@ -1487,6 +1557,21 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
           : null);
       if (auditLine) script = `${aiReply}\n\n${cap(auditLine)}.`;
     }
+    // АУДИТ ЭХА: мониторный промпт уже велит агенту начинать с эха — если
+    // агент его дал (или перефразировал запрос), не дублируем; промолчал —
+    // движок вшивает эхо после первого абзаца (или после приветственного
+    // предложения, если агент прислал всё одним абзацем).
+    if (echo && !replyAlreadyEchoes(script, lastText)) {
+      const firstPara = script.indexOf("\n\n");
+      if (firstPara > 0) {
+        script = `${script.slice(0, firstPara)}\n\n${echo}${script.slice(firstPara)}`;
+      } else {
+        const greetMatch = script.match(/^([^!]{1,40}!)\s*/);
+        script = greetMatch
+          ? `${greetMatch[1]}\n\n${echo}\n\n${script.slice(greetMatch[1].length).trim()}`
+          : `${echo}\n\n${script}`;
+      }
+    }
     return {
       intent: INTENT_META[intentKey],
       script,
@@ -1508,7 +1593,7 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     const built = buildScript(ctx, intentFromAi);
     return {
       intent: INTENT_META[intentFromAi],
-      script: built.script,
+      script: withEcho(built.script, greet, echo),
       short: built.short,
       nextBestAction:
         (knownPhone ? "Телефон уже в карточке — позвонить сразу, пока интерес горячий. " : "") +
@@ -1525,7 +1610,7 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
   const built = buildScript(ctx, intentKey);
   return {
     intent: INTENT_META[intentKey],
-    script: built.script,
+    script: withEcho(built.script, greet, echo),
     short: built.short,
     nextBestAction:
       knownPhone

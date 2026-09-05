@@ -9,16 +9,19 @@
  *  4. Просроченный перезвон → callback-overdue с приоритетом над свежими.
  *  5. Ghost: авито-диалог молчит >24 ч → ghost с мем-сообщением; обработан/
  *     сконвертирован/перезвон назначен — не ghost.
- *  6. Pull-up: бронь стартует >36 ч при договорной стадии → «подтянуть».
- *  7. Договор висит >24 ч без аренды → contract-hanging.
- *  8. Лимит действий и сортировка по весу; заглушки и битые данные — чисто.
- *  9. Бенчмарки курса присутствуют (60 сек / 5 мин / 50% / +29%).
+ *  6. Пульс-чек (курс 2026): тишина ≥ 7 дней → ghost-long с поводом из
+ *     факта (сезон/модель) вместо «куда пропали»; вес ниже ghost.
+ *  7. Pull-up: бронь стартует >36 ч при договорной стадии → «подтянуть».
+ *  8. Договор висит >24 ч без аренды → contract-hanging.
+ *  9. Лимит действий и сортировка по весу; заглушки и битые данные — чисто.
+ * 10. Бенчмарки курса присутствуют (60 сек / 5 мин / 50% / +29%).
  */
 
 import { describe, expect, it } from "vitest";
 import {
   buildNextActions,
   PLAYBOOK_BENCHMARKS,
+  GHOST_LONG_SILENCE_MS,
   GHOST_SILENCE_MS,
 } from "@/app/franchize/[slug]/leads/lib/lead-playbook";
 import type { LeadRow, LeadTodoRow } from "@/app/franchize/[slug]/leads/leads-types";
@@ -306,5 +309,80 @@ describe("lead-playbook: очередь и границы", () => {
     const keys = PLAYBOOK_BENCHMARKS.map((b) => b.key);
     expect(keys).toEqual(["sec60", "min5", "first", "weekend"]);
     expect(GHOST_SILENCE_MS).toBe(24 * 60 * 60 * 1000);
+  });
+});
+
+// ── Пульс-чек по долго пропавшим (курс 2026, «no ≠ no forever») ────────────
+
+describe("lead-playbook: пульс-чек (ghost-long)", () => {
+  function ghostLead(daysSilent: number, bikeTitle: string | null = null): LeadRow {
+    const lastMessageAt = new Date(NOW - daysSilent * 24 * 60 * 60 * 1000).toISOString();
+    return buildLead({
+      createdAt: lastMessageAt,
+      bikeTitle,
+      avito: {
+        chatId: "chat-1", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Я подумаю", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 4, lastMessageAt,
+      },
+    });
+  }
+
+  it("тишина 8 дней → ghost-long с сезонным сообщением (не «куда пропали»)", () => {
+    const actions = buildNextActions([ghostLead(8, "79BIKE Falcon GT")], [], NOW, 6);
+    const pulse = actions.find((a) => a.key === "ghost-long");
+    expect(pulse).toBeDefined();
+    expect(pulse!.weight).toBe(50);
+    expect(pulse!.emoji).toBe("🍂");
+    expect(pulse!.message).toContain("Сезон в разгаре");
+    expect(pulse!.message).toContain("79BIKE Falcon GT как раз свободен");
+    expect(actions.find((a) => a.key === "ghost")).toBeUndefined();
+  });
+
+  it("граница: ровно 7 дней — уже ghost-long; сутки–неделя — обычный ghost", () => {
+    const at7 = buildNextActions([ghostLead(7)], [], NOW, 6);
+    expect(at7.find((a) => a.key === "ghost-long")).toBeDefined();
+    const at6 = buildNextActions([ghostLead(6)], [], NOW, 6);
+    expect(at6.find((a) => a.key === "ghost-long")).toBeUndefined();
+    expect(at6.find((a) => a.key === "ghost")).toBeDefined();
+    expect(GHOST_LONG_SILENCE_MS).toBe(7 * GHOST_SILENCE_MS);
+  });
+
+  it("пульс-чек без модели — «байки в наличии», без «undefined»", () => {
+    const actions = buildNextActions([ghostLead(10)], [], NOW, 6);
+    const pulse = actions.find((a) => a.key === "ghost-long")!;
+    expect(pulse.message).toContain("байки в наличии");
+    expect(pulse.message).not.toContain("undefined");
+  });
+
+  it("вес 50: свежие проблемы (горячий 110) выше пульса в очереди", () => {
+    const hot = buildLead({
+      user_id: "avito:hot",
+      full_name: "Хот Хотов",
+      createdAt: "2026-09-04T11:58:00.000Z",
+      avito: {
+        chatId: "hot", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Беру!", firstMessage: "Беру!",
+        itemPrice: 2500, messagesCount: 2, lastMessageAt: "2026-09-04T11:58:00.000Z",
+        analysis: { temperature: "hot", confidence: 90 },
+      },
+    });
+    const actions = buildNextActions([ghostLead(9), hot], [], NOW, 6);
+    expect(actions[0].key).toBe("hot-waiting");
+    expect(actions[actions.length - 1].key).toBe("ghost-long");
+  });
+
+  it("конвертированный лид не получает пульс-чек", () => {
+    const lead = buildLead({
+      createdAt: "2026-08-20T06:00:00.000Z",
+      contractCount: 1,
+      avito: {
+        chatId: "chat-1", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Спасибо!", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 4,
+        lastMessageAt: new Date(NOW - 9 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    expect(buildNextActions([lead], [], NOW, 6)).toHaveLength(0);
   });
 });

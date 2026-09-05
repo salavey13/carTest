@@ -20,6 +20,7 @@ import {
   budgetAlternativesLine,
   buildSuggestedResponse,
   detectStall,
+  echoLine,
   ghostReengageLine,
   intentChip,
   matchBikeTariff,
@@ -28,6 +29,7 @@ import {
   parseDurationHours,
   pullUpLine,
   scoreIntents,
+  seasonalReengageLine,
   tariffDailyRate,
   testdriveReminderLine,
   tierDailyRate,
@@ -413,7 +415,31 @@ describe("lead-scripts: скрипты используют реальные ф�
 });
 
 describe("lead-scripts: AI-анализ главнее локального детектора", () => {
-  it("suggested_reply агента используется дословно, source = ai", () => {
+  it("suggested_reply агента С эхом используется дословно (движок не дублирует), source = ai", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, сколько стоит аренда?",
+        firstMessage: null,
+        analysis: {
+          intent: "price",
+          confidence: 95,
+          suggestedReply: "Здравствуйте! Вы писали про аренду — полный текст от агента про цену и сроки.",
+          shortReply: "Короткий текст агента.",
+          nextBestAction: "Перезвонить",
+          model: "glm-4.6/avito-agent-v1",
+        },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res?.source).toBe("ai");
+    expect(res?.script).toBe("Здравствуйте! Вы писали про аренду — полный текст от агента про цену и сроки.");
+    expect(res?.short).toBe("Короткий текст агента.");
+    expect(res?.nextBestAction).toBe("Перезвонить");
+    expect(res?.aiNotes).toBeNull();
+  });
+
+  it("AI-ответ БЕЗ эха — движок вшивает «Вы писали» после первого абзаца (курс 2026)", () => {
     const lead = buildLead({
       avito: {
         chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
@@ -424,17 +450,16 @@ describe("lead-scripts: AI-анализ главнее локального де
           confidence: 95,
           suggestedReply: "Здравствуйте! Полный текст от агента про цену и сроки.",
           shortReply: "Короткий текст агента.",
-          nextBestAction: "Перезвонить",
           model: "glm-4.6/avito-agent-v1",
         },
       },
     });
     const res = buildSuggestedResponse(lead);
     expect(res?.source).toBe("ai");
-    expect(res?.script).toBe("Здравствуйте! Полный текст от агента про цену и сроки.");
-    expect(res?.short).toBe("Короткий текст агента.");
-    expect(res?.nextBestAction).toBe("Перезвонить");
-    expect(res?.aiNotes).toBeNull();
+    const paras = res!.script.split("\n\n");
+    expect(paras[0]).toBe("Здравствуйте!");
+    expect(paras[1]).toBe("Вы писали: «Здравствуйте, сколько стоит аренда?»");
+    expect(paras[2]).toContain("Полный текст от агента");
   });
 
   it("intent агента без текста → наш шаблон под него, source = hybrid", () => {
@@ -982,7 +1007,7 @@ describe("lead-scripts: ещё умнее — аудит цифры в AI-отв
     expect(res?.script).toContain("приезжайте");
   });
 
-  it("AI ответил С цифрой → текст не трогается дословно", () => {
+  it("AI ответил С цифрой → тело дословно, эхо вшивается после приветствия", () => {
     const reply = "Здравствуйте, Иван! На 3 месяца — ставка 7 000 ₽/сутки, итого около 630 000 ₽.";
     const res = buildSuggestedResponse(buildLead({
       bikeTitle: "79BIKE Falcon GT",
@@ -1001,7 +1026,13 @@ describe("lead-scripts: ещё умнее — аудит цифры в AI-отв
       },
     }));
     expect(res?.source).toBe("ai");
-    expect(res?.script).toBe(reply);
+    // Курс 2026: агент промолчал про эхо → движок вшивает его сам.
+    const paras = res!.script.split("\n\n");
+    expect(paras[0]).toBe("Здравствуйте, Иван!");
+    expect(paras[1]).toBe("Вы писали: «Интересует байк на 3 месяца»");
+    // Тело агента дословно после приветствия — цифра НЕ дублируется вторым абзацем.
+    expect(paras[2]).toBe(reply.slice("Здравствуйте, Иван!".length).trim());
+    expect(paras).toHaveLength(3);
   });
 });
 
@@ -1088,5 +1119,104 @@ describe("lead-scripts: реанимация, pull-up и напоминания 
     expect(res).not.toBeNull();
     expect(res!.intent.key).toBe("test_drive");
     expect(res!.quickReplies.some((q) => q.label.includes("Напомнить накануне"))).toBe(true);
+  });
+});
+
+// ── Курс 2026, волна 2: эхо + контр-якорь + пульс-чек ──────────────────────
+
+describe("lead-scripts: эхо — «Вы писали: …» (курс 2026, приоритет босса)", () => {
+  it("rules-скрипт начинается с эха последнего сообщения клиента", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Здравствуйте, есть ли у вас электровелосипед на неделю?",
+        firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 2, lastMessageAt: "2026-09-02T11:00:00.000Z",
+      },
+    });
+    const res = buildSuggestedResponse(lead)!;
+    const firstPara = res.script.split("\n\n")[0];
+    // Первый абзац = приветствие + эхо (клиент не повторяется).
+    expect(firstPara).toContain("Здравствуйте, Иван!");
+    expect(firstPara).toContain("Вы писали: «");
+    expect(firstPara).toContain("электровелосипед");
+  });
+
+  it("короткое сообщение («привет») — эхо не строится", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "привет", firstMessage: null,
+        itemPrice: 2500, messagesCount: 1, lastMessageAt: "2026-09-02T11:00:00.000Z",
+      },
+    });
+    const res = buildSuggestedResponse(lead)!;
+    expect(res.script).not.toContain("Вы писали");
+  });
+
+  it("echoLine: длинный фрагмент обрезается с многоточием, короткий → null", () => {
+    expect(echoLine("коротко")).toBeNull();
+    expect(echoLine("   ")).toBeNull();
+    const long =
+      "Очень длинное сообщение клиента про аренду электровелосипеда на две недели с доставкой до парка и вопросом про шлем";
+    const e = echoLine(long)!;
+    expect(e.startsWith("Вы писали: «")).toBe(true);
+    expect(e.endsWith("…»")).toBe(true);
+    expect(e.length).toBeLessThanOrEqual("Вы писали: «".length + 80 + 2);
+    const short = echoLine("Хочу байк на завтра")!;
+    expect(short).toBe("Вы писали: «Хочу байк на завтра»");
+  });
+
+  it("переносы и двойные пробелы схлопываются в одну строку эха", () => {
+    const e = echoLine("Байк\n\nсвободен   на  выходные?")!;
+    expect(e).toBe("Вы писали: «Байк свободен на выходные?»");
+  });
+});
+
+describe("lead-scripts: контр-якорь «мы могли бы и дороже» (курс 2026)", () => {
+  it("discount-скрипт с ценой: якорь + пересчёт сроком, без обещания скидки", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А можно подешевле? 2500 в сутки дороговато",
+        firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 2, lastMessageAt: "2026-09-02T11:00:00.000Z",
+      },
+    });
+    const res = buildSuggestedResponse(lead)!;
+    expect(res.intent.key).toBe("discount");
+    expect(res.script).toContain("Мы могли бы и дороже");
+    expect(res.nextBestAction).toContain("могли бы и дороже");
+    expect(res.script).not.toMatch(/сделаем скидку|даём скидку/i);
+    // Пересчёт условий (срок/часы), а не цены.
+    expect(res.script).toContain("срок снижает цену");
+  });
+
+  it("discount без цены: якорь + слои срока", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "дорого, подешевле будет?", firstMessage: null,
+        itemPrice: null, messagesCount: 1, lastMessageAt: "2026-09-02T11:00:00.000Z",
+      },
+    });
+    const res = buildSuggestedResponse(lead)!;
+    expect(res.intent.key).toBe("discount");
+    expect(res.script).toContain("Мы могли бы и дороже");
+    expect(res.script).toMatch(/чем дольше срок/i);
+  });
+});
+
+describe("lead-scripts: пульс-чек по долго пропавшим (курс 2026, «no ≠ no forever»)", () => {
+  it("seasonalReengageLine: повод из факта — модель свободна / парк в наличии", () => {
+    const withBike = seasonalReengageLine("79BIKE Falcon GT");
+    expect(withBike).toContain("Сезон в разгаре");
+    expect(withBike).toContain("79BIKE Falcon GT как раз свободен");
+    expect(withBike).toContain("напишите «нет»");
+    const noBike = seasonalReengageLine(null);
+    expect(noBike).toContain("байки в наличии");
+    expect(noBike).not.toContain("undefined");
+    const spaced = seasonalReengageLine("   ");
+    expect(spaced).toContain("байки в наличии");
   });
 });
