@@ -12,6 +12,12 @@
 // магнит недели, юнит-экономика (выручка на лид), дожим (лид → сделка),
 // марафон (всего обработано), глубина диалога («эффективный контакт» из
 // протокола) + легенда «Идеальная неделя».
+// ПАКЕТ 3 (+4, 2026-09-06 — «enhance leads with ideas from transcript»,
+// The Ultimate Sales Training 2026): Пять минут (доля ответов ≤5 мин —
+// «правило 5 минут» курса), Молния (лучший ответ — до 60 сек: +391%),
+// Реаниматор (молчаливые диалоги >24 ч доведены до нуля — «no for now ≠
+// no forever»), Выходной боец (обработка выходных лидов — «продавай 7 дней
+// в неделю», +29% к году).
 //
 // Каждое достижение — бейдж с уровнями бронза / серебро / золото (и «легенда»
 // для составных). Уровень берётся из той же KPI-математики, что и панели
@@ -417,6 +423,64 @@ const DEFS: AchievementDef[] = [
     tiers: [
       { tier: "bronze", target: 2 },
       { tier: "silver", target: 4 },
+      { tier: "gold", target: 6 },
+    ],
+    format: fmtCount,
+  },
+
+  // ── ПАКЕТ 3: плейбук 2026 (The Ultimate Sales Training) ──────────────
+  {
+    id: "five-minutes",
+    emoji: "⏱",
+    title: "Пять минут",
+    desc: "Доля ответов ≤5 минут — после 5 минут тишины шанс закрытия падает на 80% (курс 2026)",
+    metric: (k) => k.speed.under5mRate,
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 0.3 },
+      { tier: "silver", target: 0.5 },
+      { tier: "gold", target: 0.7 },
+    ],
+    format: fmtPercent,
+  },
+  {
+    id: "lightning",
+    emoji: "🌩",
+    title: "Молния",
+    desc: "Лучший ответ за смену — ответ в первую минуту даёт +391% к шансу закрытия (курс 2026)",
+    metric: (k) => k.speed.fastestMs,
+    direction: "min",
+    tiers: [
+      { tier: "bronze", target: 15 * 60_000 },
+      { tier: "silver", target: 5 * 60_000 },
+      { tier: "gold", target: 60_000 },
+    ],
+    format: (v) => fmtDurationMs(v),
+  },
+  {
+    id: "ghost-buster",
+    emoji: "👻",
+    title: "Реаниматор",
+    desc: "Молчаливые авито-диалоги (>24 ч без ответа) — «нет» не навсегда: реанимируй и доведи до нуля",
+    metric: (k) => (k.avitoLeads > 0 ? k.ghostsTotal : null),
+    direction: "min",
+    tiers: [
+      { tier: "bronze", target: 5 },
+      { tier: "silver", target: 2 },
+      { tier: "gold", target: 0 },
+    ],
+    format: fmtCount,
+  },
+  {
+    id: "weekend-warrior",
+    emoji: "🗓",
+    title: "Выходной боец",
+    desc: "Выходных лидов обработано — «продавай 7 дней в неделю»: сб+вс дают +29% выручки за год (курс 2026)",
+    metric: (k) => (k.weekendLeads > 0 ? k.weekendHandled : null),
+    direction: "max",
+    tiers: [
+      { tier: "bronze", target: 1 },
+      { tier: "silver", target: 3 },
       { tier: "gold", target: 6 },
     ],
     format: fmtCount,

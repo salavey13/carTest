@@ -387,3 +387,116 @@ describe("lead-kpi: edge cases — битые данные не роняют а�
     expect(kpi.speed.callbacksPending).toBe(0);
   });
 });
+
+// ── Плейбук 2026: выходные, ghost, авито-канал ─────────────────────────────
+
+describe("lead-kpi: плейбук 2026 (weekend / ghosts / avitoLeads)", () => {
+  // Локальная суббота/воскресенье через new Date(y, m, d) — независимо от TZ
+  // раннера: ISO строится от ЛОКАЛЬНОГО полудня субботы, getDay() вернёт 6.
+  const SAT_ISO = new Date(2026, 7, 29, 12, 0, 0).toISOString(); // сб 29 авг
+  const SUN_ISO = new Date(2026, 7, 30, 12, 0, 0).toISOString(); // вс 30 авг
+  const FRI_ISO = "2026-09-04T10:00:00.000Z"; // пятница (NOW)
+
+  it("Выходные лиды считаются, будни — нет", () => {
+    const leads = [
+      buildLead({ user_id: "l-sat", createdAt: SAT_ISO }),
+      buildLead({ user_id: "l-sun", createdAt: SUN_ISO }),
+      buildLead({ user_id: "l-fri", createdAt: FRI_ISO }),
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.weekendLeads).toBe(2);
+    expect(kpi.weekendHandled).toBe(0);
+  });
+
+  it("Обработанность выходных лидов: отметка или конверсия засчитывается", () => {
+    const todo = handledTodo("l-sat", "2026-08-31T10:00:00.000Z"); // отметка в понедельник
+    const converted = buildLead({
+      user_id: "l-sun-conv",
+      createdAt: SUN_ISO,
+      rentals: [
+        {
+          rentalId: "r-1", status: "active", paymentStatus: "paid",
+          startDate: "2026-09-01T10:00:00.000Z", endDate: "2026-09-20T10:00:00.000Z",
+          bikeTitle: "79BIKE Falcon GT", totalCost: 21000,
+        },
+      ],
+    });
+    const kpi = computeLeadKpi(
+      [buildLead({ user_id: "l-sat", createdAt: SAT_ISO }), converted],
+      [todo],
+      NOW,
+    );
+    expect(kpi.weekendLeads).toBe(2);
+    expect(kpi.weekendHandled).toBe(2);
+  });
+
+  it("avitoLeads: считаются по каналу/chatId/user_id, прочие — нет", () => {
+    const leads = [
+      buildLead({ user_id: "avito:a", contactChannel: "avito" }),
+      buildLead({ user_id: "plain-b", contactChannel: "web" }),
+      buildLead({ user_id: "avito:c", contactChannel: "web" }), // префикс user_id
+    ];
+    const kpi = computeLeadKpi(leads, [], NOW);
+    expect(kpi.avitoLeads).toBe(2);
+  });
+
+  it("Ghost: авито-диалог молчит >24 ч без обработки → ghostsTotal 1", () => {
+    const ghost = buildLead({
+      user_id: "avito:ghost",
+      createdAt: "2026-09-02T06:00:00.000Z",
+      avito: {
+        chatId: "g", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Я подумаю", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 3, lastMessageAt: "2026-09-02T12:00:00.000Z", // 48 ч тишины
+      },
+    });
+    const kpi = computeLeadKpi([ghost], [], NOW);
+    expect(kpi.ghostsTotal).toBe(1);
+  });
+
+  it("Не ghost: свежий диалог, обработанный, конвертированный или с перезвоном", () => {
+    const fresh = buildLead({
+      user_id: "avito:fresh",
+      avito: {
+        chatId: "f", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Актуально?", firstMessage: "Актуально?",
+        itemPrice: 2500, messagesCount: 2, lastMessageAt: "2026-09-04T11:00:00.000Z",
+      },
+    });
+    const handled = buildLead({
+      user_id: "avito:handled",
+      createdAt: "2026-09-02T06:00:00.000Z",
+      avito: {
+        chatId: "h", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Подумаю", firstMessage: "Привет",
+        itemPrice: 2500, messagesCount: 3, lastMessageAt: "2026-09-02T12:00:00.000Z",
+      },
+    });
+    const withCb = buildLead({
+      user_id: "avito:cb",
+      createdAt: "2026-09-02T06:00:00.000Z",
+      avito: {
+        chatId: "c", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Подумаю", firstMessage: "Привет",
+        itemPrice: 2500, messagesCount: 3, lastMessageAt: "2026-09-02T12:00:00.000Z",
+      },
+    });
+    const todos = [handledTodo("avito:handled"), callbackTodo("avito:cb", "2026-09-05T10:00:00.000Z")];
+    const kpi = computeLeadKpi([fresh, handled, withCb], todos, NOW);
+    expect(kpi.ghostsTotal).toBe(0);
+  });
+
+  it("Без переписки (нет сообщений) — не ghost даже при старом createdAt", () => {
+    const empty = buildLead({
+      user_id: "avito:empty",
+      createdAt: "2026-08-25T06:00:00.000Z",
+      avito: {
+        chatId: "e", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: null, firstMessage: null,
+        itemPrice: 2500, messagesCount: 0, lastMessageAt: null,
+      },
+    });
+    const kpi = computeLeadKpi([empty], [], NOW);
+    expect(kpi.ghostsTotal).toBe(0);
+  });
+});

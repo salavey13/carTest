@@ -19,13 +19,17 @@ import { describe, expect, it } from "vitest";
 import {
   budgetAlternativesLine,
   buildSuggestedResponse,
+  detectStall,
+  ghostReengageLine,
   intentChip,
   matchBikeTariff,
   parseBudgetRu,
   parseDurationDays,
   parseDurationHours,
+  pullUpLine,
   scoreIntents,
   tariffDailyRate,
+  testdriveReminderLine,
   tierDailyRate,
 } from "@/app/franchize/[slug]/leads/lib/lead-scripts";
 import type { LeadRow } from "@/app/franchize/[slug]/leads/leads-types";
@@ -998,5 +1002,91 @@ describe("lead-scripts: ещё умнее — аудит цифры в AI-отв
     }));
     expect(res?.source).toBe("ai");
     expect(res?.script).toBe(reply);
+  });
+});
+
+// ── Плейбук 2026: стоп-слова, реанимация, напоминания ──────────────────────
+
+describe("lead-scripts: детектор стоп-слов (курс 2026)", () => {
+  it("«подумаю» → think; «посоветуюсь с женой» → spouse (главнее think)", () => {
+    expect(detectStall("Хорошо, я подумаю")).toBe("think");
+    expect(detectStall("Надо подумать, не готов решить")).toBe("think");
+    expect(detectStall("Нужно посоветоваться с женой, пока подумаю")).toBe("spouse");
+    expect(detectStall("Спрошу жену")).toBe("spouse");
+  });
+
+  it("«у других дешевле» → competitor; «занят, отвечу позже» → time; без сигналов → null", () => {
+    expect(detectStall("В другом месте дешевле нашли")).toBe("competitor");
+    expect(detectStall("Почему у вас дороже?")).toBe("competitor");
+    expect(detectStall("Я занят, созвонимся позже")).toBe("time");
+    expect(detectStall("Нет времени сейчас")).toBe("time");
+    expect(detectStall("Какие документы нужны?")).toBeNull();
+    expect(detectStall("")).toBeNull();
+  });
+
+  it("Стоп-слово в тексте → движок вставляет отработку возражения в скрипт", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Спасибо, я подумаю", firstMessage: "Здравствуйте, сколько стоит аренда?",
+        itemPrice: 2500, messagesCount: 3, lastMessageAt: "2026-09-02T11:00:00.000Z",
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res).not.toBeNull();
+    expect(res!.script).toContain("подумайте");
+    expect(res!.script).toContain("что главное смущает");
+  });
+
+  it("AI-objection competitor → линия «если бы у них было то же самое»", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "А у других дешевле", firstMessage: "Здравствуйте",
+        itemPrice: 2500, messagesCount: 2, lastMessageAt: "2026-09-02T11:00:00.000Z",
+        analysis: { intent: "price", confidence: 90, objection: "competitor" },
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res).not.toBeNull();
+    expect(res!.script).toContain("официальный дилер");
+  });
+});
+
+describe("lead-scripts: реанимация, pull-up и напоминания (курс 2026)", () => {
+  it("ghostReengageLine: с именем и без, лёгкий тон с вопросом о датах", () => {
+    expect(ghostReengageLine("Иван")).toContain("Куда пропали, Иван?");
+    expect(ghostReengageLine(null)).toContain("Куда пропали?");
+    expect(ghostReengageLine(null)).toContain("байк");
+  });
+
+  it("pullUpLine предлагает сегодня/завтра без доплат", () => {
+    const line = pullUpLine();
+    expect(line).toContain("сегодня или завтра");
+    expect(line).toContain("без доплат");
+  });
+
+  it("testdriveReminderLine: 24 ч — с подготовкой под размер; 1 ч — короткое", () => {
+    const d24 = testdriveReminderLine("Иван", 24);
+    expect(d24).toContain("завтра");
+    expect(d24).toContain("Иван");
+    expect(d24).toContain("рост");
+    const d1 = testdriveReminderLine(null, 1);
+    expect(d1).toContain("через час");
+  });
+
+  it("test_drive интент содержит быстрый ответ «Напомнить накануне»", () => {
+    const lead = buildLead({
+      avito: {
+        chatId: "chat-123", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Хочу протестировать байк, можно приехать?",
+        firstMessage: "Хочу протестировать байк, можно приехать?",
+        itemPrice: 2500, messagesCount: 2, lastMessageAt: "2026-09-02T11:00:00.000Z",
+      },
+    });
+    const res = buildSuggestedResponse(lead);
+    expect(res).not.toBeNull();
+    expect(res!.intent.key).toBe("test_drive");
+    expect(res!.quickReplies.some((q) => q.label.includes("Напомнить накануне"))).toBe(true);
   });
 });

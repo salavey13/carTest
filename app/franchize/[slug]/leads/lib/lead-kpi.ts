@@ -34,6 +34,12 @@
 // байков), revenuePerLead (лайт-LTV: выручка на лид), avgDialogDepth
 // («эффективный контакт» из протокола — глубина диалога покупателя).
 //
+// ПЛЕЙБУК 2026 (2026-09-06, «enhance leads with ideas from transcript» —
+// The Ultimate Sales Training 2026): +4 метрики — weekendLeads/weekendHandled
+// («продавай 7 дней в неделю»: суббота+воскресенье = +104 дня = +29% в год),
+// ghostsTotal (молчаливые авито-диалоги >24 ч без ответа — пул реанимации:
+// «no for now ≠ no forever») и avitoLeads (канал для применимости метрик).
+//
 // Модуль чистый: без React, без Date.now() внутри (now передаётся снаружи).
 // Скоростные метрики (lead-speed.ts) встроены в результат одним вызовом —
 // клиент считает всё за один useMemo.
@@ -47,6 +53,14 @@ import {
 } from "./lead-speed";
 import { computeLeadStage, matchTodosToLead } from "./pipeline-stages";
 import { isCallbackTodo, isHandledTodo } from "./lead-handling";
+
+/**
+ * Порог тишины, после которого авито-диалог считается «пропавшим»
+ * (ghost): последнее сообщение покупателя старше суток, отметки
+ * «обработан»/конверсии/перезвона нет. По курсу 2026 такие лиды не «нет»,
+ * а «не сейчас» — их реанимируют мем-сообщением (самый высокий отклик).
+ */
+export const GHOST_SILENCE_MS = 24 * 60 * 60 * 1000;
 
 // ── Нормы дня (протокол: «нормирование КЭВ/звонков») ───────────────────────
 
@@ -112,6 +126,15 @@ export interface LeadKpiMetrics {
   hotWaiting: number;
   /** Лидов с заявленным тест-драйвом (avito intent=testdrive) — КЭВ-приглашения. */
   testdrives: number;
+  /** Лидов авито-канала (webhook/bot_forward) — база применимости авито-метрик. */
+  avitoLeads: number;
+  /** Лидов, пришедших в выходные (сб/вс) — «продавай 7 дней в неделю» (+29%). */
+  weekendLeads: number;
+  /** Из них обработано или сконвертировалось. */
+  weekendHandled: number;
+  /** Авито-диалоги, молчащие >24 ч без обработки/конверсии/перезвона —
+   *  пул реанимации («no for now ≠ no forever», курс 2026). */
+  ghostsTotal: number;
   /** Выручка экипажа по лидам (сумма totalSpent), ₽. */
   revenue: number;
   /** Средний чек сделки, ₽ — null, если сделок нет. */
@@ -185,6 +208,10 @@ export function computeLeadKpi(
   let hotTotal = 0;
   let hotWaiting = 0;
   let testdrives = 0;
+  let avitoLeads = 0;
+  let weekendLeads = 0;
+  let weekendHandled = 0;
+  let ghostsTotal = 0;
   let salesTotal = 0;
   let revenue = 0;
   let dialogDepthSum = 0;
@@ -223,10 +250,36 @@ export function computeLeadKpi(
     // «ждёт» = не обработан, не конвертирован, без назначенного перезвона.
     if (lead.avito?.analysis?.temperature === "hot") {
       hotTotal += 1;
-      if (isUnhandledWaiting(lead, allTodos)) hotWaiting += 1;
+      if (isLeadUnhandledWaiting(lead, allTodos)) hotWaiting += 1;
     }
 
     if (lead.avito?.analysis?.intent === "testdrive") testdrives += 1;
+
+    // Авито-канал: та же тройка проверок, что в lead-scripts.isAvitoLeadLike
+    // (локальная лёгкая копия вместо React-цепочки leads-utils).
+    const isAvitoLike =
+      lead.contactChannel === "avito" ||
+      !!lead.avito?.chatId ||
+      lead.user_id.startsWith("avito:");
+    if (isAvitoLike) avitoLeads += 1;
+
+    // «Продавай 7 дней в неделю» (курс 2026): лиды, пришедшие в сб/вс,
+    // плюс их обработанность — покрытие выходных = +29% к году.
+    if (createdMs && Number.isFinite(createdMs)) {
+      const day = new Date(createdMs).getDay();
+      if (day === 0 || day === 6) {
+        weekendLeads += 1;
+        if (isLeadHandledLike(lead, allTodos)) weekendHandled += 1;
+      }
+    }
+
+    // Ghost-диалог: авито, была переписка, тишина покупателя >24 ч, при
+    // этом лид не обработан, не конвертировался и без назначенного перезвона
+    // — пул реанимации («нет — не навсегда», курс 2026).
+    if (isAvitoLike && isGhostDialog(lead, now)) {
+      const waiting = isLeadUnhandledWaiting(lead, allTodos);
+      if (waiting) ghostsTotal += 1;
+    }
 
     // Глубина диалога: захваченные сообщения покупателя (авито-канал).
     // EDGE CASE: Number.isFinite — Infinity из битых метаданных испортил бы
@@ -264,6 +317,10 @@ export function computeLeadKpi(
     hotTotal,
     hotWaiting,
     testdrives,
+    avitoLeads,
+    weekendLeads,
+    weekendHandled,
+    ghostsTotal,
     revenue,
     avgDealCheck,
     revenuePerLead,
@@ -282,7 +339,7 @@ export function computeLeadKpi(
  * lead-speed.ts (matchTodosToLead + isHandledTodo + isCallbackTodo), —
  * горячие лиды просто получают отдельный счётчик, чтобы «не слить целевых».
  */
-function isUnhandledWaiting(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
+export function isLeadUnhandledWaiting(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
   const isConverted = lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0;
   if (isConverted) return false;
 
@@ -293,4 +350,41 @@ function isUnhandledWaiting(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
     if (isCallbackTodo(t) && t.status !== "done") hasActiveCallback = true;
   }
   return !hasHandledMark && !hasActiveCallback;
+}
+
+/**
+ * Обработан ли лид (отметка «обработан» ИЛИ конверсия) — без требования
+ * времени. Используется для «обработанность выходных лидов» (покрытие
+ * сб/вс), где время отметки не важно, важен факт.
+ */
+function isLeadHandledLike(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
+  if (lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0) return true;
+  for (const t of matchTodosToLead(lead, allTodos)) {
+    if (isHandledTodo(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * Авито-диалог «пропал» (ghost): была переписка (lastMessage или >1
+ * сообщения покупателя) и последнее сообщение покупателя старше 24 ч.
+ * Обработанность/конверсию/перезвон проверяет вызывающий (isLeadUnhandledWaiting)
+ * — здесь только факт тишины в канале.
+ */
+function isGhostDialog(lead: LeadRow, now: number): boolean {
+  const avito = lead.avito;
+  if (!avito) return false;
+  const messagesCount = typeof avito.messagesCount === "number" && Number.isFinite(avito.messagesCount)
+    ? avito.messagesCount
+    : 0;
+  const hadDialog = messagesCount >= 2 || !!(avito.lastMessage || "").trim() || !!(avito.firstMessage || "").trim();
+  if (!hadDialog) return false;
+  const silenceFrom = avito.lastMessageAt || lead.lastSeenAt || lead.createdAt || null;
+  if (!silenceFrom) return false;
+  const t = new Date(silenceFrom).getTime();
+  if (!Number.isFinite(t)) return false;
+  const age = now - t;
+  // БУДУЩЕЕ время (ошибка часов/теста) — тишиной не считаем.
+  if (age < 0) return false;
+  return age >= GHOST_SILENCE_MS;
 }

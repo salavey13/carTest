@@ -251,3 +251,49 @@ describe("lead-speed: edge cases — битые данные не роняют �
     expect(m.waitingTotal).toBe(0);
   });
 });
+
+// ── Правило 5 минут (плейбук 2026) ──────────────────────────────────────────
+
+describe("lead-speed: правило 5 минут (under5m / handledTimedTotal)", () => {
+  it("Считает долю обработок, уложившихся в 5 минут", () => {
+    const leads = [
+      buildLead({ user_id: "l-fast", createdAt: "2026-09-04T10:00:00.000Z" }),
+      buildLead({ user_id: "l-slow", createdAt: "2026-09-04T10:00:00.000Z" }),
+    ];
+    const todos = [
+      handledTodo("l-fast", "2026-09-04T10:03:00.000Z"), // 3 мин → в пятёрке
+      handledTodo("l-slow", "2026-09-04T10:40:00.000Z"), // 40 мин → мимо
+    ];
+    const m = computeLeadSpeedMetrics(leads, todos, NOW);
+    expect(m.handledTimedTotal).toBe(2);
+    expect(m.under5m).toBe(1);
+    expect(m.under5mRate).toBeCloseTo(0.5, 6);
+  });
+
+  it("Нет timed-точек (только конверсии) → under5mRate null", () => {
+    const lead = buildLead({
+      user_id: "l-conv",
+      rentals: [
+        {
+          rentalId: "r-1", status: "active", paymentStatus: "paid",
+          startDate: "2026-09-03T10:00:00.000Z", endDate: "2026-09-20T10:00:00.000Z",
+          bikeTitle: "79BIKE Falcon GT", totalCost: 21000,
+        },
+      ],
+    });
+    const m = computeLeadSpeedMetrics([lead], [], NOW);
+    expect(m.handledTimedTotal).toBe(0);
+    expect(m.under5m).toBe(0);
+    expect(m.under5mRate).toBeNull();
+  });
+
+  it("Граница окна: ровно 5 минут — считается уложившимся (≤)", () => {
+    const todos = [handledTodo("l-edge", "2026-09-04T10:05:00.000Z")];
+    const m = computeLeadSpeedMetrics(
+      [buildLead({ user_id: "l-edge", createdAt: "2026-09-04T10:00:00.000Z" })],
+      todos,
+      NOW,
+    );
+    expect(m.under5m).toBe(1);
+  });
+});

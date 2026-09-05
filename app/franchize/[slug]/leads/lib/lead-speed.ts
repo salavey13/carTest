@@ -13,6 +13,11 @@
 //   • Медиана и средняя скорость — по лидам с известными обеими точками.
 //   • Распределение по бакетам: ≤15 мин / 15 мин–1 ч / 1–4 ч / 4–24 ч /
 //     >24 ч — мини-бар в UI показывает, где застревает скорость.
+//   • ПРАВИЛО 5 МИНУТ (Ultimate Sales Blueprint 2026): ответ в первые
+//     60 сек = +391% к шансу закрытия, после 5 минут тишины — −80%.
+//     Считаем долю обработок, уложившихся в 5 минут (under5m), и число
+//     обработок с известным временем (handledTimedTotal) — из них
+//     достижения «Пять минут» и «Молния».
 //   • Ждут ответа: лиды без отметки «обработан» и без конверсии; отдельно
 //     счётчики «ждут >1 ч» и «ждут >24 ч» (SLA-тревога) + топ-3 «дольше всех
 //     ждут» для всплывающей подсказки.
@@ -62,6 +67,12 @@ export interface LeadSpeedMetrics {
   avgMs: number | null;
   /** Быстрый ответ (минимальное время обработки), null — нет точек. */
   fastestMs: number | null;
+  /** Обработок с известным временем — знаменатель доли «в 5 минут». */
+  handledTimedTotal: number;
+  /** Из них уложились в 5 минут (правило 5 минут из курса 2026). */
+  under5m: number;
+  /** Доля ответов ≤5 минут 0..1, null — нет timed-точек. */
+  under5mRate: number | null;
   /** Ждут первого внятного ответа прямо сейчас. */
   waitingTotal: number;
   /** Ждут дольше часа (начало просадки скорости). */
@@ -77,6 +88,12 @@ export interface LeadSpeedMetrics {
   /** Топ-3 «дольше всех ждут» — для подсказки оператору, кого спасать. */
   worstWaiting: WorstWaiting[];
 }
+
+/**
+ * Правило 5 минут (Ultimate Sales Blueprint 2026): после 5 минут тишины
+ * шанс закрытия падает на 80%. Порог для доли быстрых ответов.
+ */
+export const FAST_RESPONSE_WINDOW_MS = 5 * 60_000;
 
 // ── Константы бакетов ───────────────────────────────────────────────────────
 
@@ -202,6 +219,7 @@ export function computeLeadSpeedMetrics(
   let handledTotal = 0;
   let handledToday = 0;
   let converted = 0;
+  let under5m = 0;
   let waitingTotal = 0;
   let waitingOver1h = 0;
   let waitingOver24h = 0;
@@ -234,6 +252,7 @@ export function computeLeadSpeedMetrics(
         if (Number.isFinite(created) && Number.isFinite(done) && done >= created) {
           const ms = done - created;
           handleTimes.push(ms);
+          if (ms <= FAST_RESPONSE_WINDOW_MS) under5m += 1;
           buckets.find((b) => b.key === bucketFor(ms))!.count += 1;
         }
       }
@@ -283,6 +302,9 @@ export function computeLeadSpeedMetrics(
     medianMs,
     avgMs,
     fastestMs,
+    handledTimedTotal: handleTimes.length,
+    under5m,
+    under5mRate: handleTimes.length > 0 ? under5m / handleTimes.length : null,
     waitingTotal,
     waitingOver1h,
     waitingOver24h,

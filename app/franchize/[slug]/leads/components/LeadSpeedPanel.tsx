@@ -169,7 +169,7 @@ export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
         </span>
         {metrics.waitingTotal > 0 && (
           <span className="text-[10px]" style={{ color: T.textFaint }}>
-            Быстрый первый ответ — главная конверсия: до часа шанс сделки падает вдвое
+            Правило 5 минут (курс 2026): после 5 минут тишины шанс сделки −80% · ответ в первую минуту = +391%
           </span>
         )}
       </div>

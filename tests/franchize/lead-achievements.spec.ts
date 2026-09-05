@@ -37,6 +37,9 @@ function buildSpeed(overrides: Partial<LeadSpeedMetrics> = {}): LeadSpeedMetrics
     medianMs: 30 * 60_000, // 30 мин — серебро «Скорострела»
     avgMs: 40 * 60_000,
     fastestMs: 5 * 60_000,
+    handledTimedTotal: 10,
+    under5m: 6,
+    under5mRate: 0.6, // серебро «Пяти минут»
     waitingTotal: 0,
     waitingOver1h: 0,
     waitingOver24h: 0,
@@ -59,6 +62,10 @@ function buildKpi(overrides: Partial<LeadKpiMetrics> = {}): LeadKpiMetrics {
     hotTotal: 4,
     hotWaiting: 0,
     testdrives: 2,
+    avitoLeads: 20,
+    weekendLeads: 4,
+    weekendHandled: 3,
+    ghostsTotal: 2,
     revenue: 200_000,
     avgDealCheck: 25_000,
     revenuePerLead: 5_000,
@@ -308,15 +315,18 @@ describe("lead-achievements: сводка", () => {
       revenue: 500_000, // касса — золото
     });
     const list = computeLeadAchievements(kpi);
-    // 23 достижения всего (13 пакета 1 + 10 пакета 2), 2 скрыты → 21 доступно.
+    // 27 достижений всего (13 + 10 + 4 плейбука), скрыты 3 → 24 доступно:
+    // скорострел (медиана null), молния (fastestMs null), горячий спасатель
+    // (hotTotal 0).
     // Открыты с фикстурой: очередь, SLA, перезвон, КЭВ-мастер, клоузер, разгон,
     // диалог, воронка, касса, магнит, тест-драйвер, средний чек, продажник,
-    // норма недели, магнит недели, юнит-экономика, дожим, глубокий диалог = 18;
+    // норма недели, магнит недели, юнит-экономика, дожим, глубокий диалог (18)
+    // + плейбук: пять минут (60%), реаниматор (2 ghost), выходной боец (3/4) = 21;
     // закрыты: марафон (10 < 20), идеальная смена (медиана null),
     // идеальная неделя (8 < 20).
-    expect(countUnlocked(list)).toBe(18);
-    expect(list.filter((a) => !a.available)).toHaveLength(2);
-    expect(list).toHaveLength(23);
+    expect(countUnlocked(list)).toBe(21);
+    expect(list.filter((a) => !a.available)).toHaveLength(3);
+    expect(list).toHaveLength(27);
   });
 });
 
@@ -497,5 +507,77 @@ describe("lead-achievements: sticky-стор (localStorage)", () => {
     expect(store["queue-cleaner"]).toBe("gold");
     expect(store["closer"]).toBe("silver");
     window.localStorage.removeItem("achv-spec");
+  });
+});
+
+// ── ПАКЕТ 3: плейбук 2026 (The Ultimate Sales Training) ─────────────────────
+
+describe("lead-achievements: пакет 3 (правило 5 минут / молния / реаниматор / выходные)", () => {
+  it("Пять минут: доля ≤5 мин 60% — серебро (≥50%), прогресс к золоту 70%", () => {
+    const list = computeLeadAchievements(buildKpi());
+    const a = find(list, "five-minutes");
+    expect(a.unlocked).toBe(true);
+    expect(a.tier).toBe("silver");
+    expect(a.progress).toBeCloseTo((0.6 - 0.5) / (0.7 - 0.5), 6);
+  });
+
+  it("Пять минут: нет timed-обработок — метрика null → бейдж скрыт", () => {
+    const list = computeLeadAchievements(
+      buildKpi({ speed: buildSpeed({ handledTimedTotal: 0, under5m: 0, under5mRate: null }) }),
+    );
+    const a = find(list, "five-minutes");
+    expect(a.available).toBe(false);
+  });
+
+  it("Молния: лучший ответ 30 сек — золото (≤60 сек), maxed", () => {
+    const list = computeLeadAchievements(
+      buildKpi({ speed: buildSpeed({ fastestMs: 30_000 }) }),
+    );
+    const a = find(list, "lightning");
+    expect(a.tier).toBe("gold");
+    expect(a.maxed).toBe(true);
+  });
+
+  it("Молния: лучший ответ 12 минут — бронза (≤15 мин), прогресс к серебру 5 мин = 0.3", () => {
+    const list = computeLeadAchievements(
+      buildKpi({ speed: buildSpeed({ fastestMs: 12 * 60_000 }) }),
+    );
+    const a = find(list, "lightning");
+    expect(a.unlocked).toBe(true);
+    expect(a.tier).toBe("bronze");
+    // (cur 15м − value 12м) / (15м − 5м) = 3м/10м = 0.3
+    expect(a.progress).toBeCloseTo(0.3, 6);
+  });
+
+  it("Реаниматор: 2 ghost-диалога при наличии авито — серебро (≤2)", () => {
+    const list = computeLeadAchievements(buildKpi({ avitoLeads: 20, ghostsTotal: 2 }));
+    const a = find(list, "ghost-buster");
+    expect(a.available).toBe(true);
+    expect(a.tier).toBe("silver");
+    // Прогресс к золоту (0): (cur 2 − value 2) / (2 − 0) = 0 — только на пороге.
+    expect(a.progress).toBe(0);
+  });
+
+  it("Реаниматор: нет авито-лидов — бейдж скрыт (нечего реанимировать)", () => {
+    const list = computeLeadAchievements(buildKpi({ avitoLeads: 0, ghostsTotal: 0 }));
+    const a = find(list, "ghost-buster");
+    expect(a.available).toBe(false);
+  });
+
+  it("Выходной боец: 3 из 4 выходных обработано — серебро (≥3)", () => {
+    const list = computeLeadAchievements(buildKpi({ weekendLeads: 4, weekendHandled: 3 }));
+    const a = find(list, "weekend-warrior");
+    expect(a.available).toBe(true);
+    expect(a.tier).toBe("silver");
+  });
+
+  it("Выходной боец: выходных лидов не было — бейдж скрыт", () => {
+    const list = computeLeadAchievements(buildKpi({ weekendLeads: 0, weekendHandled: 0 }));
+    const a = find(list, "weekend-warrior");
+    expect(a.available).toBe(false);
+  });
+
+  it("Счётчик бейджей вырос: 27 достижений в списке", () => {
+    expect(computeLeadAchievements(buildKpi()).length).toBe(27);
   });
 });

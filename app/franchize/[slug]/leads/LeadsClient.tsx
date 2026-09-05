@@ -12,10 +12,12 @@ import { isAvitoLead } from "./leads-utils";
 import { isHandlingTodo } from "./lib/lead-handling";
 import { computeLeadKpi } from "./lib/lead-kpi";
 import { computeLeadAchievements } from "./lib/lead-achievements";
+import { buildNextActions } from "./lib/lead-playbook";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
 import { LeadSpeedPanel } from "./components/LeadSpeedPanel";
+import { LeadsPlaybookPanel } from "./components/LeadsPlaybookPanel";
 import { LeadsFunnelPanel } from "./components/LeadsFunnelPanel";
 import { LeadsAchievementsPanel } from "./components/LeadsAchievementsPanel";
 import { LeadsToolbar } from "./components/LeadsToolbar";
@@ -479,6 +481,14 @@ export function LeadsClient({
   const achievements = useMemo(
     () => computeLeadAchievements(kpiMetrics),
     [kpiMetrics],
+  );
+  // Плейбук смены — очередь «что делать сейчас» (off-the-call SOP из курса
+  // The Ultimate Sales Training 2026): горячие в золотом окне, просроченные
+  // перезвоны, свежие «кто первый», висящие договоры, pull-up броней,
+  // реанимация «пропавших». Чистый расчёт от тех же данных, тот же nowTick.
+  const playbookActions = useMemo(
+    () => buildNextActions(activeLeads, todosState, nowTick, 4),
+    [activeLeads, todosState, nowTick],
   );
 
   // Segment counts for toolbar tabs
@@ -957,6 +967,11 @@ export function LeadsClient({
             распределение времени ответа и перезвоны — см. lib/lead-speed.ts.
             speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
         <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
+
+        {/* Плейбук смены: упорядоченная очередь действий с готовыми
+            сообщениями (курс 2026: off-the-call SOP решает больше, чем
+            скрипт в диалоге). */}
+        <LeadsPlaybookPanel actions={playbookActions} T={T} />
 
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
             конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}

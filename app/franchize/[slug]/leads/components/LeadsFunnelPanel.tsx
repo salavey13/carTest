@@ -258,6 +258,22 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
             Тест-драйвы: {kpi.testdrives}
           </span>
         )}
+        {/* «Продавай 7 дней в неделю» (курс 2026): сб+вс = +104 дня = +29% к году.
+            Чип показывает покрытие выходных лидов — где теряем деньги. */}
+        {kpi.weekendLeads > 0 && (
+          <span
+            className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={{
+              borderColor:
+                kpi.weekendHandled < kpi.weekendLeads ? "rgba(245,158,11,0.4)" : "rgba(34,197,94,0.4)",
+              color: kpi.weekendHandled < kpi.weekendLeads ? "#f59e0b" : "#22c55e",
+            }}
+            title="Выходные лиды (сб/вс) и сколько из них обработано — «продавай 7 дней в неделю»: +29% выручки за счёт выходных"
+          >
+            <CalendarDays className="h-3 w-3" />
+            Выходные: {kpi.weekendHandled}/{kpi.weekendLeads}
+          </span>
+        )}
         {/* EDGE CASE: Number.isFinite — страховка, чтобы битые данные никогда
             не отрисовали «NaN ₽» / «Infinity ₽» (либ уже гарантирует конечность). */}
         {kpi.avgDealCheck != null && Number.isFinite(kpi.avgDealCheck) && (
