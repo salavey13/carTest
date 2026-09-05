@@ -193,6 +193,17 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T }: LeadsPlaybookPane
             {b.fact}
           </span>
         ))}
+        {/* Ссылка на полную инструкцию — порядок очереди и правила ответов
+            подробно разобраны в гайде (self-contained, работает офлайн). */}
+        <a
+          href="/docs/avito-leads-guide.html"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="ml-auto inline-flex items-center gap-1 text-[10px] underline decoration-dotted transition hover:brightness-125"
+          style={{ color: T.accent }}
+        >
+          📘 Как работать с лидами
+        </a>
       </div>
     </motion.div>
   );
