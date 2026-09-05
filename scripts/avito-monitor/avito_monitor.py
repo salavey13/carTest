@@ -1085,6 +1085,52 @@ def send_outbox_alert(
     )
 
 
+def format_sla_report(report: dict) -> str:
+    def fmt(section: dict) -> str:
+        if section.get("n", 0) == 0:
+            return "нет данных"
+        return (
+            f"медиана {section['median_s']}с · p90 {section['p90_s']}с · "
+            f"≤2мин {section['within_2min_pct']}% · ≤5мин {section['within_5min_pct']}% "
+            f"(n={section['n']})"
+        )
+
+    weekdays = ", ".join(
+        f"{key}:{value}"
+        for key, value in report.get("by_weekday_first_message_msk", {}).items()
+    )
+    return (
+        f"📊 <b>Avito speed-to-lead за {report['period_days']} дн.</b>\n\n"
+        f"<b>Лидов:</b> {report['leads']}\n"
+        f"<b>Детекция (сообщение → найдено):</b> {fmt(report['detection'])}\n"
+        f"<b>Уведомление (сообщение → команда):</b> {fmt(report['notification'])}\n"
+        f"<b>Первые сообщения по дням (МСК):</b> {weekdays or '—'}\n\n"
+        "Цель по методологии: ответ клиенту ≤60 сек, обнаружение ≤2 мин."
+    )
+
+
+def send_sla_report(config: dict, store: LeadStore, days: int) -> str:
+    """B2: еженедельный отчёт здоровым адресатам (карантинные исключены)."""
+    report = store.sla_report(days)
+    text = format_sla_report(report)
+    token, targets = telegram_runtime(config)
+    if not token or not targets:
+        return text
+    quarantined = set(store.quarantined_targets())
+    delivered = 0
+    for target_hash, chat_id in targets.items():
+        if target_hash in quarantined:
+            continue
+        ok, _ = send_telegram(token, chat_id, text)
+        delivered += 1 if ok else 0
+    logger.info(
+        "SLA-отчёт отправлен: адресатов=%s, доставлено=%s",
+        len(targets) - len(quarantined & set(targets)),
+        delivered,
+    )
+    return text
+
+
 def agent_health() -> bool:
     result = generate_agent_reply(
         profile_name="Продажа",
@@ -1189,12 +1235,40 @@ def main() -> int:
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--agent-health", action="store_true")
     parser.add_argument("--init-db", action="store_true")
+    parser.add_argument(
+        "--sla-report",
+        type=int,
+        metavar="DAYS",
+        help="speed-to-lead отчёт за N дней (печать JSON + текст)",
+    )
+    parser.add_argument(
+        "--sla-report-send",
+        action="store_true",
+        help="SLA-отчёт за 7 дней команде в Telegram",
+    )
     args = parser.parse_args()
     if args.self_test:
         print(json.dumps(monitor_self_test(), ensure_ascii=False, sort_keys=True))
         return 0
     if args.agent_health:
         return 0 if agent_health() else 1
+    if args.sla_report is not None or args.sla_report_send:
+        days = args.sla_report if args.sla_report is not None else 7
+        store = LeadStore(DB_FILE)
+        try:
+            text = (
+                send_sla_report(config := load_config(), store, days)
+                if args.sla_report_send
+                else format_sla_report(store.sla_report(days))
+            )
+            print(text)
+            if args.sla_report is not None:
+                print(
+                    json.dumps(store.sla_report(days), ensure_ascii=False, sort_keys=True)
+                )
+        finally:
+            store.close()
+        return 0
     if args.init_db:
         store = LeadStore(DB_FILE)
         try:

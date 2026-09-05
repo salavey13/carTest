@@ -68,6 +68,13 @@ class LeadStore:
             )
         except sqlite3.OperationalError:
             pass
+        # B2: время первого сообщения клиента — база speed-to-lead метрик.
+        try:
+            self.conn.execute(
+                "ALTER TABLE leads ADD COLUMN first_message_at INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass
         self.conn.commit()
         os.chmod(self.path, 0o600)
 
@@ -226,8 +233,9 @@ class LeadStore:
                     profile_key, profile_name, avito_user_id, chat_id,
                     item_title, item_price, item_url, client_name,
                     last_message_at, last_direction, last_inbound_at,
-                    last_outbound_at, notified_message_at, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    last_outbound_at, notified_message_at, created_at, updated_at,
+                    first_message_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     profile_key,
@@ -245,6 +253,7 @@ class LeadStore:
                     normalize_epoch(legacy_notified_at),
                     now,
                     now,
+                    epoch,
                 ),
             )
             lead_id = int(cursor.lastrowid)
@@ -733,6 +742,68 @@ class LeadStore:
             result[name] = int(self.conn.execute(query).fetchone()[0])
         return result
 
+    def sla_report(self, days: int = 7) -> dict:
+        """B2: speed-to-lead метрики за период.
+
+        detection    = created_at − first_message_at (монитор нашёл лид)
+        notification = notified_message_at − first_message_at (команда узнала)
+        Лиды без first_message_at (старые, до B2) в задержках не участвуют.
+        """
+        since_iso = iso_utc(int(time.time()) - days * 86400)
+        rows = self.conn.execute(
+            """
+            SELECT created_at, first_message_at, notified_message_at
+            FROM leads WHERE created_at >= ?
+            """,
+            (since_iso,),
+        ).fetchall()
+        detection: list[int] = []
+        notification: list[int] = []
+        by_weekday: dict[str, int] = {}
+        for row in rows:
+            try:
+                created = int(datetime.fromisoformat(row["created_at"]).timestamp())
+            except (TypeError, ValueError):
+                continue
+            first = int(row["first_message_at"] or 0)
+            notified = int(row["notified_message_at"] or 0)
+            if first <= 0:
+                continue
+            detection.append(max(0, created - first))
+            weekday = datetime.fromtimestamp(first, MOSCOW).strftime("%a")
+            by_weekday[weekday] = by_weekday.get(weekday, 0) + 1
+            if notified > 0:
+                notification.append(max(0, notified - first))
+
+        def stats(values: list[int]) -> dict:
+            if not values:
+                return {"n": 0}
+            ordered = sorted(values)
+
+            def pct(p: int) -> int:
+                idx = min(len(ordered) - 1, round(p / 100 * (len(ordered) - 1)))
+                return ordered[idx]
+
+            return {
+                "n": len(ordered),
+                "median_s": pct(50),
+                "p90_s": pct(90),
+                "within_2min_pct": round(
+                    100 * sum(1 for v in ordered if v <= 120) / len(ordered)
+                ),
+                "within_5min_pct": round(
+                    100 * sum(1 for v in ordered if v <= 300) / len(ordered)
+                ),
+            }
+
+        return {
+            "period_days": days,
+            "leads": len(rows),
+            "detection": stats(detection),
+            "notification": stats(notification),
+            "by_weekday_first_message_msk": by_weekday,
+        }
+
 
 def self_test() -> dict[str, int]:
     with tempfile.TemporaryDirectory() as directory:
@@ -770,6 +841,13 @@ def self_test() -> dict[str, int]:
             "SELECT analyzed_message_at FROM leads WHERE id=?", (lead_id,)
         ).fetchone()
         assert int(row["analyzed_message_at"]) == 1_800_000_000
+        # B2: first_message_at фиксируется при создании, sla_report видит лид.
+        assert int(
+            store.conn.execute(
+                "SELECT first_message_at FROM leads WHERE id=?", (lead_id,)
+            ).fetchone()[0]
+        ) == 1_800_000_000
+        assert store.sla_report(7)["detection"]["n"] == 1
         store.enqueue_delivery(
             lead_id,
             "test",
