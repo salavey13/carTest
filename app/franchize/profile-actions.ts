@@ -494,6 +494,77 @@ async function notifyAchievementUnlocked(params: {
   }
 }
 
+/**
+ * ПУТЬ ОПЕРАТОРА (rank-up праздник): после нового профильного бейджа
+ * пересчитываем XP по ВСЕМ разблокировкам профиля (15 XP каждый,
+ * lib/lead-gamification.xpForProfileUnlocks) и, если порог звания только что
+ * пересечён, шлём achiever'у отдельный тост «Новое звание». Лидерский
+ * localStorage-XP серверу недоступен и сознательно не учитывается: здесь
+ * считается только профильная часть — этого достаточно, чтобы звания
+ * «Механик» и «Гонщик» были достижимы одними сменами (7 бейджей = 105 XP
+ * = Механик). Никогда не бросает: сбой праздника не ломает грант.
+ */
+async function notifyRankUpIfCrossed(params: {
+  slug: string;
+  userId: string;
+  achievementId: string;
+}): Promise<void> {
+  try {
+    const { xpForProfileUnlocks, rankForXp, OPERATOR_RANKS } = await import(
+      "@/app/franchize/[slug]/leads/lib/lead-gamification"
+    );
+
+    const { data: user } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", params.userId)
+      .maybeSingle();
+    if (!user) return;
+
+    const metadata = ((user.metadata || {}) as Record<string, any>) || {};
+    const profiles = ((metadata.franchizeProfiles || {}) as Record<string, any>) || {};
+    const state = (profiles[params.slug] || {}) as Record<string, any>;
+    const achievementsMap = (state.achievements || {}) as Record<string, unknown>;
+
+    const unlockedIds = Object.keys(achievementsMap).filter((id) => achievementsMap[id]);
+    const xp = xpForProfileUnlocks(unlockedIds);
+    const { def } = rankForXp(xp);
+    // Уровень 1 («Новичок бокса», floor 0) не празднуем — это стартовая точка.
+    if (def.level <= 1) return;
+
+    // «Только что пересечён»: это звание требует хотя бы один бейдж
+    // достигнутого уровня XP, и текущий бейдж ровно тем — иначе праздник
+    // повторялся бы при каждом следующем гранте того же звания.
+    const { PROFILE_XP_FALLBACK } = await import(
+      "@/app/franchize/[slug]/leads/lib/lead-gamification"
+    );
+    const floorBefore = xp - PROFILE_XP_FALLBACK;
+    const rankBefore = rankForXp(floorBefore).def;
+    if (rankBefore.level >= def.level) return;
+
+    const { sendComplexMessage } = await import(
+      "@/app/webhook-handlers/actions/sendComplexMessage"
+    );
+    const nextDef = OPERATOR_RANKS.find((r) => r.level === def.level + 1) ?? null;
+    const lines = [
+      `🎖 <b>Новое звание: ${def.emoji} ${def.title}</b>`,
+      "",
+      `Путь оператора · уровень ${def.level} из ${OPERATOR_RANKS.length}`,
+      xp.toLocaleString("ru-RU") + " XP опыта" + (nextDef ? ` · до «${nextDef.title}» ещё ${nextDef.floor - xp} XP` : " · максимум пути!"),
+      "",
+      "Звание растёт от реальных достижений: бейджи лид-воронки и смен. Продолжай! 🔥",
+    ];
+    await sendComplexMessage(params.userId, lines.join("\n"), [], { parseMode: "HTML" });
+  } catch (error) {
+    logger.warn("[notifyRankUpIfCrossed] non-fatal failure", {
+      slug: params.slug,
+      userId: params.userId,
+      achievementId: params.achievementId,
+      error,
+    });
+  }
+}
+
 // ── ПОСЛЕДОВАТЕЛЬНОСТЬ ЗАПИСЕЙ ПРОФИЛЯ (фикс «достижения выдаются повторно») ──
 // grantFranchizeAchievementAction — read-modify-write ВСЕГО users.metadata
 // (JSONB). Telegram-потоки выдают пачки достижений параллельно
@@ -615,9 +686,17 @@ async function grantAchievementOnce(
     if ((count ?? 1) > 0) {
       // iter18 (bonus): celebrate NEW unlocks in Telegram — the achiever + the
       // crew owner + crew admins get a message right away (fire-and-forget).
+      // ПУТЬ ОПЕРАТОРА: при новом бейдже проверяем пересечение порога звания
+      // по профильному XP (лидерский localStorage-XP сервер не видит — звания,
+      // взятые в лид-воронке, празднует панель страницы лидов).
       if (!alreadyUnlocked) {
         setImmediate(() => {
           void notifyAchievementUnlocked({
+            slug,
+            userId: params.userId,
+            achievementId: params.achievementId,
+          });
+          void notifyRankUpIfCrossed({
             slug,
             userId: params.userId,
             achievementId: params.achievementId,

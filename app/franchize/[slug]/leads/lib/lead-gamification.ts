@@ -18,6 +18,10 @@
 //      золото 50 / легенда 100). XP копится из sticky-стора «заработано
 //      навсегда» — той же таблицы id → лучший уровень, что и тосты. Никакой
 //      новой памяти: цифры гаснут — XP остаётся.
+//   1а. МОСТ С ПРОФИЛЕМ: shift-бейджи из users.metadata (серии смен, часы,
+//      «ранняя пташка»…) — плоские, без уровней; каждый даёт
+//      PROFILE_XP_FALLBACK (15) XP и считается в звании наравне с
+//      лестничными (computeOperatorRank принимает их вторым аргументом).
 //   2. ЗВАНИЯ (5 уровней пути): Новичок бокса → Механик → Гонщик →
 //      Бригадир смены → Легенда экипажа. Звание растёт только от реальных
 //      достижений — накрутить его нельзя, честно как KPI.
@@ -51,6 +55,39 @@ export function xpForEvent(event: AchievementEvent): number {
   const order: AchievementTier[] = ["bronze", "silver", "gold", "legend"];
   const prev = order[Math.max(0, order.indexOf(event.tier) - 1)];
   return TIER_XP[event.tier] - TIER_XP[prev];
+}
+
+// ── XP профильных достижений (мост «профиль ↔ путь оператора») ─────────────
+// Shift/бонусные бейджи (серии смен, часы, early-bird…) живут в
+// users.metadata (grantFranchizeAchievementAction) и НЕ имеют уровней —
+// это плоские «получил/нет». Они тоже труд, и путь оператора должен их
+// считать: плоская цена PROFILE_XP_FALLBACK за каждый взятый id.
+// XP лестничных бейджей выше ровно потому, что тот же труд делится на
+// уровни, а здесь — разовый факт.
+
+/** Плоская цена одного профильного (безуровневого) достижения в XP. */
+export const PROFILE_XP_FALLBACK = 15;
+
+/**
+ * XP за профильные разблокировки. acceptable input — Set/id-массив/объект
+ * вида id→true (это форма users.metadata.franchizeProfiles[slug].achievements).
+ * Битые элементы (пустые id) молча пропускаются.
+ */
+export function xpForProfileUnlocks(
+  ids: Iterable<unknown> | Record<string, unknown> | null | undefined,
+): number {
+  if (!ids) return 0;
+  const list: unknown[] =
+    typeof ids === "object" && !Array.isArray(ids) && !(ids instanceof Set)
+      ? Object.entries(ids as Record<string, unknown>)
+          .filter(([, v]) => v) // achievements: id → {unlockedAt…} или true
+          .map(([id]) => id)
+      : Array.from(ids as Iterable<unknown>);
+  let xp = 0;
+  for (const id of list) {
+    if (typeof id === "string" && id.trim().length > 0) xp += PROFILE_XP_FALLBACK;
+  }
+  return xp;
 }
 
 /** Суммарный XP по sticky-стору (id → лучший уровень за всё время). */
@@ -108,8 +145,12 @@ export function rankForXp(xp: number): { def: OperatorRankDef; next: OperatorRan
   return { def, next, progress };
 }
 
-export function computeOperatorRank(store: AchievementStore): OperatorRank {
-  const xp = xpForStore(store);
+export function computeOperatorRank(
+  store: AchievementStore,
+  /** Мост: профильные достижения (серии смен и пр.) — тоже XP. */
+  profileUnlocks?: Iterable<unknown> | Record<string, unknown> | null,
+): OperatorRank {
+  const xp = xpForStore(store) + xpForProfileUnlocks(profileUnlocks ?? null);
   const { def, next, progress } = rankForXp(xp);
   return {
     level: def.level,

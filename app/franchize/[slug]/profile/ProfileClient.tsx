@@ -175,15 +175,19 @@ export function FranchizeProfileClient({
   const [profileDocsStatus, setProfileDocsStatus] = useState<ProfileDocsStatusState | null>(null);
 
   useEffect(() => {
+    // FIX (TS2304, legacy): `cancelled` объявлялась внутри run(), а cleanup
+    // (`return () => { cancelled = true }`) живёт на уровне эффекта — имя
+    // было вне области видимости, guard не работал (race при быстрой смене
+    // сессии/размонтировании). Поднята на уровень эффекта.
+    let cancelled = false;
     const run = async () => {
       // 2026-09-02 fix: hold the skeleton while the Telegram session is still
       // resolving — the early return used to flash an empty page, then load.
-      if (authLoading) return;
+      if (authLoading || cancelled) return;
       if (!dbUser?.user_id) {
         setIsLoading(false);
         return;
       }
-      let cancelled = false;
       try {
         const result = await getFranchizeProfileBySlugAction({
           slug,
@@ -543,12 +547,14 @@ export function FranchizeProfileClient({
       />
 
       {/* Achievements Panel — at the very end — CREW ONLY (iter14):
-          crew gamification is not for ordinary renters. */}
+          crew gamification is not for ordinary renters. slug — ключ
+          лидерского sticky-стора: путь оператора един для профиля и лидов. */}
       {canOpenCloserDashboard && (
         <AchievementsPanel
           catalog={catalog}
           unlockedSet={unlockedSet}
           error={error}
+          slug={slug}
           T={T}
         />
       )}

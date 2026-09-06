@@ -22,6 +22,7 @@ import {
   LINKED_ACHIEVEMENT_META,
   primaryBadgeForAction,
   rankForXp,
+  xpForProfileUnlocks,
   xpForEvent,
   xpForStore,
 } from "@/app/franchize/[slug]/leads/lib/lead-gamification";
@@ -146,5 +147,45 @@ describe("lead-gamification: карта кормления «плейбук → 
       expect(PLAYBOOK_STEP_META[k], `${k} без подписи чипа`).toBeTruthy();
       expect(primaryBadgeForAction(k)).toBeTruthy();
     }
+  });
+});
+
+// ── Мост «профиль ↔ путь оператора» (XP за shift-бейджи без уровней) ──────
+describe("lead-gamification: профильный XP-мост", () => {
+  it("xpForProfileUnlocks: Set из id → 15 XP за каждый", () => {
+    expect(xpForProfileUnlocks(new Set())).toBe(0);
+    expect(xpForProfileUnlocks(new Set(["shift_streak_3"]))).toBe(15);
+    expect(xpForProfileUnlocks(new Set(["a", "b", "c"]))).toBe(45);
+  });
+
+  it("xpForProfileUnlocks: принимаем форму users.metadata (id → объект)", () => {
+    expect(
+      xpForProfileUnlocks({
+        shift_streak_3: { unlockedAt: "2026-09-06T10:00:00Z" },
+        shift_early_bird: true,
+        shift_off: false, // falsy — не считается
+      }),
+    ).toBe(30);
+  });
+
+  it("xpForProfileUnlocks: null/undefined/мусор → 0, без падений", () => {
+    expect(xpForProfileUnlocks(null)).toBe(0);
+    expect(xpForProfileUnlocks(undefined)).toBe(0);
+    expect(xpForProfileUnlocks(["", "  ", 42, null])).toBe(0); // не-строки и пустые id — мимо
+  });
+
+  it("мост: 7 профильных бейджей (105 XP) = звание «Механик» без единого лид-бейджа", () => {
+    const seven = Object.fromEntries(
+      Array.from({ length: 7 }, (_, i) => [`shift_badge_${i}`, { unlockedAt: "2026-09-06" }]),
+    );
+    const rank = computeOperatorRank({}, seven);
+    expect(rank.xp).toBe(105);
+    expect(rank.title).toBe("Механик");
+    expect(rank.next?.title).toBe("Гонщик");
+  });
+
+  it("мост складывается с лидерским стором: бейдж золото (50) + 3 профильных (45) = 95 XP", () => {
+    const rank = computeOperatorRank({ speedster: "gold" }, new Set(["a", "b", "c"]));
+    expect(rank.xp).toBe(50 + 45);
   });
 });
