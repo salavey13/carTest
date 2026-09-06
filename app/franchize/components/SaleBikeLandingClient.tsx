@@ -31,10 +31,10 @@ import type { CatalogItemVM, FranchizeCrewVM } from "@/app/franchize/actions";
 import {
   checkFranchizeCarsAvailability,
   createFranchizeOrderInvoice,
-  getFranchizeOperatorDashboardAccess,
   sendFranchizeBuyPrintPdf,
   upsertFranchizeIntent,
 } from "@/app/franchize/actions";
+import { probeCrewAccess } from "@/app/franchize/lib/crew-access-client";
 import type { PageSize } from "@/app/franchize/server-actions/buy-print";
 import { crewPaletteForSurface, crewPaletteWithCssVars, readablePaletteTextOnColor } from "@/app/franchize/lib/theme";
 import {
@@ -334,11 +334,21 @@ export function SaleBikeLandingClient({
   useEffect(() => {
     let cancelled = false;
 
-    getFranchizeOperatorDashboardAccess({ slug: resolvedSlug })
-      .then((result) => {
+    // PROBE (wave 8 completion) + identity gate: the buy-sheet is a crew tool,
+    // so anonymous / logged-out visitors (the majority of landing traffic)
+    // fire ZERO access calls — before, the raw server action ran for EVERY
+    // visitor and was rejected server-side. Crew visitors share the
+    // single-flight+TTL probe with any other component on the page.
+    if (!dbUser?.user_id || !resolvedSlug) {
+      setCanPrintBuySheet(false);
+      return;
+    }
+
+    void probeCrewAccess(resolvedSlug)
+      .then((access) => {
         if (cancelled) return;
-        const role = String(result.role || "").toLowerCase();
-        setCanPrintBuySheet(Boolean(result.canOpen && ["admin", "owner"].includes(role)));
+        const role = String(access.role || "").toLowerCase();
+        setCanPrintBuySheet(access.canOpen && ["admin", "owner"].includes(role));
       })
       .catch(() => {
         if (!cancelled) setCanPrintBuySheet(false);
@@ -347,7 +357,7 @@ export function SaleBikeLandingClient({
     return () => {
       cancelled = true;
     };
-  }, [resolvedSlug]);
+  }, [resolvedSlug, dbUser?.user_id]);
 
   const monthlyPaymentEstimate = useMemo(() => {
     if (finalPrice <= 0) return 0;

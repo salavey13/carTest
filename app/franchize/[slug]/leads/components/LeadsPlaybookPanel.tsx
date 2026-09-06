@@ -20,7 +20,10 @@
 //   • «СДЕЛАЛ»: у каждого действия чекбокс — строка уходит в свёрнутый
 //     блок «Отработано (N)» внизу (клик — раскрыть и вернуть, если поторопился).
 //     Отметки живут в localStorage ДО КОНЦА ДНЯ (ключ на экипаж) — новая
-//     смена начинает с чистой очередью. Это ручное «сделал» дополняет
+//     смена начинает с чистой очередью. Вкладка, пережившая полночь
+//     (ночная смена), очищается САМА: таймер до полуночи перечитывает стор,
+//     а toggle дополнительно защищён от протекания чужого дня
+//     (lib/lead-playbook-done.ts). Это ручное «сделал» дополняет
 //     автогашение: как только лид обработан в данных, действие само
 //     исчезает из очереди.
 //   • Прогресс в шапке: «Отработано N из M» — полоска, как у звания.
@@ -34,6 +37,13 @@ import { motion } from "framer-motion";
 import { ListChecks, Copy, Check, Sparkles, ChevronRight, ChevronDown } from "lucide-react";
 import type { NextAction } from "../lib/lead-playbook";
 import { PLAYBOOK_BENCHMARKS } from "../lib/lead-playbook";
+import {
+  applyPlaybookDoneToggle,
+  msUntilNextMidnight,
+  parsePlaybookDone,
+  playbookTodayKey,
+  type PlaybookDoneState,
+} from "../lib/lead-playbook-done";
 import { computeOperatorRank, operatorRankForXp, primaryBadgeForAction } from "../lib/lead-gamification";
 import { loadAchievementStore } from "../lib/lead-achievements";
 
@@ -70,31 +80,11 @@ function doneKeyOf(a: NextAction): string {
   return a.leadId ? `${a.key}:${a.leadId}` : `${a.key}:${a.title}`;
 }
 
-/** Сегодняшняя дата (локальная) — отметки живут до полуночи. */
-function todayKey(now = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function loadDoneSet(storageKey: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as { day?: string; keys?: unknown };
-    if (parsed.day !== todayKey() || !Array.isArray(parsed.keys)) return new Set();
-    return new Set(parsed.keys.filter((k): k is string => typeof k === "string"));
-  } catch {
-    return new Set();
-  }
-}
-
-function saveDoneSet(storageKey: string, keys: Set<string>): void {
+/** Запись стора отметок (I/O-обёртка; чистая логика — в lib/lead-playbook-done.ts). */
+function saveDoneSet(storageKey: string, state: PlaybookDoneState): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify({ day: todayKey(), keys: Array.from(keys) }));
+    window.localStorage.setItem(storageKey, JSON.stringify({ day: state.day, keys: Array.from(state.keys) }));
   } catch {
     /* private mode / quota — отметки живут в памяти до перезагрузки */
   }
@@ -130,33 +120,54 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
   const rank = useMemo(() => operatorRankForXp(leadXp), [leadXp]);
 
   // ── «Сделал» — дневные отметки, crew-only ──
-  const [doneKeys, setDoneKeys] = useState<Set<string>>(new Set());
+  // Чистая логика (день/сброс/защита полуночи) — в lib/lead-playbook-done.ts.
+  const [doneState, setDoneState] = useState<PlaybookDoneState>({ day: "", keys: new Set() });
   useEffect(() => {
     if (!doneStorageKey) {
-      setDoneKeys(new Set());
+      setDoneState({ day: "", keys: new Set() });
       return;
     }
-    setDoneKeys(loadDoneSet(doneStorageKey));
+    setDoneState({ day: playbookTodayKey(), keys: parsePlaybookDone(window.localStorage.getItem(doneStorageKey)) });
+  }, [doneStorageKey]);
+
+  // ДЕННАЯ ГРАНИЦА: вкладка оператора (ночная смена), пережившая полночь,
+  // больше не держит вчерашние отметки — таймер до полуночи перечитывает
+  // стор, parsePlaybookDone возвращает пустой набор для чужого дня, очередь
+  // очищается САМА (без действий и перезагрузки). Многодневные вкладки:
+  // таймер перенастраивается на следующую полночь.
+  useEffect(() => {
+    if (!doneStorageKey) return;
+    let timer: number;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        setDoneState({ day: playbookTodayKey(), keys: parsePlaybookDone(window.localStorage.getItem(doneStorageKey)) });
+        schedule();
+      }, msUntilNextMidnight());
+    };
+    schedule();
+    return () => window.clearTimeout(timer);
   }, [doneStorageKey]);
 
   const toggleDone = useCallback(
     (key: string) => {
       if (!doneStorageKey) return;
-      setDoneKeys((prev) => {
+      setDoneState((prev) => {
+        // Защита полуночи внутри toggle: если таймер ещё не успел, а день
+        // уже сменился — базой будет ЧИСТЫЙ набор, вчерашние отметки не
+        // протекут в запись нового дня.
+        const next = applyPlaybookDoneToggle(prev, key);
         // Тактильный клик на «сделал» (на «вернуть в очередь» — тихо:
         // отмена — не достижение).
-        if (!prev.has(key)) buzz(12);
-        const next = new Set(prev);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
+        if (next.added) buzz(12);
         saveDoneSet(doneStorageKey, next);
-        return next;
+        return { day: next.day, keys: next.keys };
       });
     },
     [doneStorageKey],
   );
 
   // Очередь = активные (не отмеченные) + отработанные (уходят вниз).
+  const doneKeys = doneState.keys;
   const { active, done } = useMemo(() => {
     const activeList: NextAction[] = [];
     const doneList: NextAction[] = [];
@@ -165,7 +176,7 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
       else activeList.push(a);
     }
     return { active: activeList, done: doneList };
-  }, [actions, doneKeys, doneStorageKey]);
+  }, [actions, doneState, doneStorageKey]);
 
   // Компактный режим на телефоне: первые 2 активных + «ещё N».
   // SSR-начало — развернуто (гидрация без расхождений); ПЕРВЫЙ замер после
@@ -445,6 +456,30 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
             >
               Ещё {hiddenCount} {hiddenCount === 1 ? "действие" : hiddenCount < 5 ? "действия" : "действий"}
               <ChevronDown className="h-4 w-4" aria-hidden />
+            </button>
+          )}
+          {/* «Свернуть» — обратная сторона «Ещё N»: раньше развёрнутая очередь
+              была односторонней до конца таб-сессии (sessionStorage держал "1",
+              а пути назад не было). Снимаем предпочтение — следующий заход
+              снова компактный, текущий сворачивается сразу. */}
+          {isNarrow && expandedMobile && active.length > 2 && (
+            <button
+              type="button"
+              onClick={() => {
+                setExpandedMobile(false);
+                if (compactPrefKey) {
+                  try {
+                    window.sessionStorage.removeItem(compactPrefKey);
+                  } catch {
+                    /* private mode */
+                  }
+                }
+              }}
+              className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
+              style={{ borderColor: T.border, color: T.textMuted }}
+            >
+              Свернуть очередь
+              <ChevronDown className="h-4 w-4 rotate-180" aria-hidden />
             </button>
           )}
         </>

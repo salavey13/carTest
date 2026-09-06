@@ -14,10 +14,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  getFranchizeOperatorDashboardAccess,
-  type FranchizeCrewVM,
-} from "@/app/franchize/actions";
+import { type FranchizeCrewVM } from "@/app/franchize/actions";
+import { probeCrewAccess } from "@/app/franchize/lib/crew-access-client";
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
@@ -135,8 +133,13 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
       try {
         // Check owner access — UI only. The server action enforces auth
         // independently via verifyCrewAccess.
-        const accessCheck = await getFranchizeOperatorDashboardAccess({ slug });
-        setIsOwner(Boolean(accessCheck.success && accessCheck.canOpen));
+        // PROBE (wave 8 completion): the shared single-flight+TTL probe
+        // dedupes this check with AchievementToastSync (layout) and
+        // AchievementExplorer (explorer_salary) on the SAME page — before,
+        // this direct call fired a second identical server action per visit.
+        // Never rejects → the salary load below can't die on the access check.
+        const access = await probeCrewAccess(slug);
+        setIsOwner(access.canOpen);
 
         // 2026-08-19 review fix: previously this client component imported
         // `supabaseAdmin` from "@/lib/supabase-server" and ran four raw

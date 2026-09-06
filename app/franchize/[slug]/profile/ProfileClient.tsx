@@ -44,9 +44,9 @@ import {
   getProfileDocsStatusAction,
 } from "@/app/franchize/profile-actions";
 import {
-  getFranchizeOperatorDashboardAccess,
   type FranchizeCrewVM,
 } from "@/app/franchize/actions";
+import { probeCrewAccess } from "@/app/franchize/lib/crew-access-client";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
@@ -203,7 +203,12 @@ export function FranchizeProfileClient({
         const [digestRes, prefillRes, operatorAccessRes, rentalSecretsRes, docsRes, profileDocsRes, subrenterOwnedRes, subrentersOverviewRes] = await Promise.all([
           getFranchizeActivityDigestAction({ slug, userId: dbUser.user_id }),
           getFranchizeFormPrefillAction({ slug, userId: dbUser.user_id }),
-          getFranchizeOperatorDashboardAccess({ slug }),
+          // PROBE (wave 8 completion): shared single-flight+TTL check instead
+          // of the raw server action — dedupes with AchievementToastSync on
+          // this page (was a 2nd identical call per visit) and NEVER rejects,
+          // so an access-check blip can no longer reject the whole
+          // Promise.all and kill the profile master load.
+          probeCrewAccess(slug),
           getFranchizeUserRentalSecretsAction({ slug, userId: dbUser.user_id }),
           getRentalDocsPrefillAction({ slug, userId: dbUser.user_id }),
           getProfileDocsStatusAction({ slug, userId: dbUser.user_id }),
@@ -220,7 +225,7 @@ export function FranchizeProfileClient({
         if (subrenterOwnedRes?.success && subrenterOwnedRes.data) setSubrenterOwned(subrenterOwnedRes.data);
         if (subrentersOverviewRes?.success && subrentersOverviewRes.data) setSubrentersOverview(subrentersOverviewRes.data);
         setCanOpenCloserDashboard(
-          Boolean(operatorAccessRes.success && operatorAccessRes.canOpen),
+          Boolean(operatorAccessRes.canOpen),
         );
         // 2026-09-02 fix: the achievement write used to be awaited BEFORE the
         // first paint — it is a non-critical counter bump, so fire-and-forget.

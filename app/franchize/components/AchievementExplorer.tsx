@@ -11,8 +11,10 @@
 // requests from their client. The server still re-gates the grant itself
 // (client check is UX optimization, not the security boundary).
 //
-// One probe per page per session (sessionStorage guard) — re-visiting the page
-// in the same session does not re-fire the server action.
+// One successful grant per page per session (sessionStorage guard, written
+// after the grant call succeeds) — re-visiting the page in the same session
+// does not re-fire the server action; a failed call stays unlocked so the
+// next mount retries.
 
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -39,7 +41,6 @@ export function AchievementExplorer({
         firedRef.current = true;
         return;
       }
-      window.sessionStorage.setItem(sessionKey, "1");
     } catch {
       // sessionStorage unavailable — still fire once per mount lifetime
     }
@@ -62,7 +63,21 @@ export function AchievementExplorer({
           achievementId,
           sourceRoute: typeof window !== "undefined" ? window.location.pathname : undefined,
         });
-        if (cancelled || !result.success || !result.granted || result.granted.length === 0) return;
+        // SESSION GUARD — written only AFTER a successful grant call. The
+        // guard used to be set BEFORE the probe, so one transient network
+        // blip at the first visit locked the explorer badge out for the
+        // whole tab session (guard present, grant never retried). Now a
+        // failed call leaves the session unlocked: the next mount of this
+        // page retries (the probe's short error-TTL keeps that cheap; the
+        // grant itself is idempotent — already-owned badges return
+        // granted: [] without toasting).
+        if (cancelled || !result.success) return;
+        try {
+          window.sessionStorage.setItem(sessionKey, "1");
+        } catch {
+          /* ignore */
+        }
+        if (!result.granted || result.granted.length === 0) return;
         // Mark as seen so AchievementToastSync doesn't toast them again.
         try {
           const storageKey = `franchize-ach-seen:${slug}`;
