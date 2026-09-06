@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useMemo } from "react";
 import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine, History, Target } from "lucide-react";
 import {
   DropdownMenu,
@@ -157,8 +158,10 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   // 🎯 Готовый ответ (авито-лиды): чип с распознанным интентом вопроса
   // в метаряде + пункт меню «Скопировать готовый ответ». Чистая функция
   // поверх metadata webhook'а — в БД не пишется, не-авито лиды получают null.
-  const suggested = buildSuggestedResponse(lead);
-  const intent = intentChip(lead);
+  // Script engine = full keyword scoring: memoize per lead object so toasts/
+  // keystrokes elsewhere never re-run it for every visible card (wave 4 perf).
+  const suggested = useMemo(() => buildSuggestedResponse(lead), [lead]);
+  const intent = useMemo(() => intentChip(lead), [lead]);
 
   return (
     <motion.article

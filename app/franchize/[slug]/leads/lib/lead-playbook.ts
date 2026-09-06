@@ -43,6 +43,10 @@ import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { ensureLeadArraysSafe } from "./lead-speed";
 import { matchTodosToLead } from "./pipeline-stages";
 import { getLeadHandling } from "./lead-handling";
+import { isAvitoLead } from "./lead-identity";
+import { GHOST_SILENCE_MS } from "./lead-kpi";
+// public API kept: specs import GHOST_SILENCE_MS from this module
+export { GHOST_SILENCE_MS };
 import { ghostReengageLine, pullUpLine, referralAskLine, seasonalReengageLine } from "./lead-scripts";
 
 // ── Ориентиры курса (бенчмарки для UI) ─────────────────────────────────────
@@ -83,13 +87,11 @@ export const PLAYBOOK_BENCHMARKS: readonly PlaybookBenchmark[] = [
 /** «Золотое окно» первого ответа (курс: 60 сек; практично — 5 мин). */
 const GOLD_WINDOW_MS = 5 * 60_000;
 /** «Зона смерти»: после 5 минут тишины закрытие падает на 80%. */
-export const DEATH_ZONE_MS = 5 * 60_000;
 /** Свежий не-горячий лид: пока конкурент не ответил. */
 const FRESH_WINDOW_MS = 60 * 60_000;
 /** Тишина, после которой договор считается «висящим». */
 const CONTRACT_HANG_MS = 24 * 60 * 60 * 1000;
 /** Тишина покупателя, после которой диалог считается «пропавшим». */
-export const GHOST_SILENCE_MS = 24 * 60 * 60 * 1000;
 /** Тишина, после которой лёгкое «куда пропали?» меняется на пульс-чек с поводом. */
 export const GHOST_LONG_SILENCE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Аренда стартует позже чем через… — кандидат на «подтянуть на сегодня». */
@@ -222,12 +224,9 @@ export function buildNextActions(
     const isConverted =
       lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0;
 
-    // Канал авито — та же тройка проверок, что в lead-kpi (ghost-семантика
-    // должна совпадать с ghostsTotal, иначе панель и счётчик разойдутся).
-    const isAvitoLike =
-      lead.contactChannel === "avito" ||
-      !!lead.avito?.chatId ||
-      lead.user_id.startsWith("avito:");
+    // Avito channel - canonical detector (lib/lead-identity); ghost semantics
+    // matches lead-kpi because it is now literally the same function.
+    const isAvitoLike = isAvitoLead(lead);
 
     // ── Просроченный перезвон — обещание уже нарушено ──
     if (

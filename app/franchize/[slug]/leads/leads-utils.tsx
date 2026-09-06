@@ -2,6 +2,7 @@
 "use client";
 
 import { SOURCE_META, BOARD_COLUMNS, AVITO_COLUMN_STAGES, sourceGroupOf } from "./leads-constants";
+import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { PIPELINE_STAGES } from "./lib/pipeline-stages";
 import { compareByPriority, computeLeadPriority, handledPenalty, type LeadPriority } from "./lib/lead-priority";
 import { getLeadHandling, isHandlingTodo } from "./lib/lead-handling";
@@ -11,19 +12,8 @@ import type {LeadRow, LeadTodoRow} from "./leads-types";
 export const AVITO_COLOR = "#0a8f2a";
 export const AVITO_BG = "#0a8f2a1a";
 
-/**
- * True when the lead came from the Avito pipeline (webhook v3, factory monitor
- * enrichment, or an assistant-bot forward). Such leads have no phone/TG —
- * the Avito chat link is the ONLY way to answer them, so the UI highlights
- * them (badge + row accent + dedicated «Авито» source filter).
- */
-export function isAvitoLead(lead: LeadRow): boolean {
-  return (
-    lead.contactChannel === "avito" ||
-    !!lead.avito?.chatId ||
-    lead.user_id.startsWith("avito:")
-  );
-}
+import { isAvitoLead } from "./lib/lead-identity";
+export { isAvitoLead };
 
 export function getInitials(name: string | null): string {
   if (!name) return "?";
@@ -56,98 +46,6 @@ export function formatDate(dateStr: string | null): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export function temperatureColor(urgency: number | null | undefined, pendingTodos: number): string {
-  const score = (urgency || 0) + pendingTodos * 15;
-  if (score >= 90) return "#ef4444";
-  if (score >= 60) return "#f59e0b";
-  if (score >= 30) return "#3b82f6";
-  return "#64748b";
-}
-
-export function temperatureLabel(urgency: number | null | undefined, pendingTodos: number): string {
-  const score = (urgency || 0) + pendingTodos * 15;
-  if (score >= 90) return "Горячий";
-  if (score >= 60) return "Тёплый";
-  if (score >= 30) return "Холодный";
-  return "Ледяной";
-}
-
-/**
- * Generates CSV export of leads data.
- * UTF-8 BOM for proper Excel Russian character display.
- */
-export function generateLeadsCSV(leads: LeadRow[]): string {
-  const BOM = "﻿";
-  const headers = [
-    "ID",
-    "Имя",
-    "Телефон",
-    "Источник",
-    "Статус верификации",
-    "Тема",
-    "Этап",
-    "Байк",
-    "Создан",
-    "Активность",
-    "Изменено",
-    "Срочность",
-    "Telegram ID"
-  ];
-
-  const rows = leads.map((lead) => {
-    const source = SOURCE_META[lead.source as keyof typeof SOURCE_META];
-    return [
-      lead.user_id,
-      lead.full_name || "Без имени",
-      lead.phone || "—",
-      source?.label || lead.source,
-      lead.verified ? "Верифицирован" : "Не верифицирован",
-      lead.intentType || "—",
-      lead.intentStage || "new",
-      lead.bikeTitle || "—",
-      lead.createdAt ? formatDate(lead.createdAt) : "—",
-      lead.lastSeenAt ? formatDate(lead.lastSeenAt) : "—",
-      // «Изменено» — последняя модификация (заметка/туду/стадия); без неё — активность
-      formatDate(lead.lastModifiedAt || lead.lastSeenAt || lead.createdAt),
-      lead.urgencyScore?.toString() || "0",
-      lead.telegramChatId || "—"
-    ].map((field) => {
-      // Escape quotes and wrap in quotes for CSV
-      const str = String(field).replace(/"/g, '""');
-      return `"${str}"`;
-    }).join(",");
-  });
-
-  return BOM + [headers.join(","), ...rows].join("\n");
-}
-
-/**
- * Triggers browser download of CSV file.
- */
-export function downloadLeadsCSV(leads: LeadRow[], filename: string = `leads-${new Date().toISOString().split('T')[0]}.csv`): void {
-  const csv = generateLeadsCSV(leads);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
-}
-
-export function isToday(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-}
-
 export function metaFor(source: string) { return SOURCE_META[source] || SOURCE_META.unknown; }
 
 export function fmtMoney(n: number | undefined): string {
@@ -155,24 +53,6 @@ export function fmtMoney(n: number | undefined): string {
   return new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
 }
 
-/**
- * Normalize a phone number to canonical E.164-ish form (+7XXXXXXXXXX for RU).
- * Accepts +7/7/8 prefix, spaces, dashes, parentheses.
- * Returns null if input is empty or unparseable.
- *
- * MUST mirror the server-side normalizePhone() in server-actions/leads.ts and
- * crew-todos.ts so client-side matching stays consistent with server-side filtering.
- */
-function normalizePhone(input: string | null | undefined): string | null {
-  if (!input) return null;
-  let s = input.trim().replace(/[\s\-\(\)]/g, "");
-  if (!s) return null;
-  if (/^8\d{10}$/.test(s)) s = "+7" + s.slice(1);
-  else if (/^7\d{10}$/.test(s)) s = "+" + s;
-  else if (/^\d{10}$/.test(s)) s = "+7" + s;
-  else if (!s.startsWith("+")) s = "+" + s;
-  return s;
-}
 
 export function getTodoLeadId(todo: LeadTodoRow): string | null {
   // 1. user_id column — canonical Telegram chat_id
@@ -216,44 +96,6 @@ export function getTodoLeadId(todo: LeadTodoRow): string | null {
     } catch { /* ignore */ }
   }
   return null;
-}
-
-export function getTodoLeadPhone(todo: LeadTodoRow): string | null {
-  if (!todo.description) return null;
-  try { return JSON.parse(todo.description).lead_phone || null; } catch { return null; }
-}
-
-export function getTodosForLead(todos: LeadTodoRow[], lead: LeadRow): LeadTodoRow[] {
-  // Build identity set with normalized phone so a lead keyed by "+7999..." matches
-  // todos whose description.lead_phone is "8999..." (legacy formatting).
-  const leadUserIds = new Set(
-    [lead.user_id, lead.phone, normalizePhone(lead.phone)].filter(Boolean) as string[]
-  );
-  // Build rental_id lookup from lead's rentals for rental_id-based matching
-  const leadRentalIds = new Set(lead.rentals.map((r) => r.rentalId).filter(Boolean));
-  return todos.filter((t) => {
-    // 1. Match by rental_id (strongest link — works before QR claim)
-    if (t.rental_id && leadRentalIds.has(t.rental_id)) return true;
-    // 2. Match by identity fields
-    const leadId = getTodoLeadId(t);
-    if (leadId && leadUserIds.has(leadId)) return true;
-    const leadPhone = getTodoLeadPhone(t);
-    if (leadPhone) {
-      const normalizedTodoPhone = normalizePhone(leadPhone);
-      if (normalizedTodoPhone && leadUserIds.has(normalizedTodoPhone)) return true;
-      // Raw comparison as last-resort fallback for non-RU phones or weird formats.
-      if (lead.phone && leadPhone === lead.phone) return true;
-    }
-    if (leadId && lead.phone && leadId === lead.phone) return true;
-    // 3. Match by rental_id from description JSON (legacy)
-    if (t.description) {
-      try {
-        const desc = JSON.parse(t.description);
-        if (desc.rental_id && typeof desc.rental_id === 'string' && leadRentalIds.has(desc.rental_id)) return true;
-      } catch { /* ignore */ }
-    }
-    return false;
-  });
 }
 
 export function filterLeads(

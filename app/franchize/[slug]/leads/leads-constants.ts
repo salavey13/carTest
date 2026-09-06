@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  Flame, Phone, CheckCircle, ChevronDown, ChevronRight, Plus,
-  Trash2, Send, Clock, TrendingUp, Search, X, Bike, FileText,
-  CircleDot, Users, Lock, AlertCircle, LayoutList, Columns3,
-  Calendar, UserPlus, Download, Star, Filter, StickyNote, History,
-  MapPin, ExternalLink, Banknote, Briefcase, ShieldAlert, Hash,
-  MessageSquare, Wallet, Gauge, Activity, Check, Loader2, XCircle,
-  RotateCcw, Camera, ShieldCheck, Eye, ImageOff, RefreshCw
-} from "lucide-react";
+import { Phone, CheckCircle, TrendingUp, Bike, FileText, Users, MessageSquare, Wallet, type LucideIcon } from "lucide-react";
 
-export const SOURCE_META: Record<string, { label: string; icon: typeof Flame; color: string; bg: string }> = {
+export const SOURCE_META: Record<string, { label: string; icon: LucideIcon; color: string; bg: string }> = {
   web_callback:    { label: "Звонок",       icon: Phone,        color: "#3b82f6", bg: "#3b82f620" },
   callback_request:{ label: "Заявка",       icon: MessageSquare,color: "#0af",    bg: "#0af20" },
   rental_contract: { label: "Аренда",       icon: CheckCircle,  color: "#10b981", bg: "#10b98120" },
@@ -55,42 +47,16 @@ export function sourceGroupOf(source: string | null | undefined): string {
   return RAW_SOURCE_TO_GROUP[source] ?? source;
 }
 
-export const STAGE_LABELS: Record<string, string> = {
-  contract_generated: "Договор готов",
-  checkout_started:   "Оформление",
-  checkout_completed: "Оплачен",
-  dismissed:          "Отклонён",
-  interest_paid:      "Интерес",
-  new:                "Новый",
-  contacted:          "Контакт установлен",
-  viewed:             "Просмотр",
-  configured:         "Настроил",
-};
-
 export type Segment = "all" | "hot" | "verified" | "warm" | "troubled";
-
-export const SEGMENT_META: Record<Segment, { label: string; icon: typeof Flame; color: string }> = {
-  all:       { label: "Все",         icon: Users,       color: "#64748b" },
-  hot:       { label: "Горячие",     icon: Flame,       color: "#ef4444" },
-  verified:  { label: "Клиенты",     icon: CheckCircle, color: "#10b981" },
-  warm:      { label: "Заявки",      icon: Phone,       color: "#3b82f6" },
-  troubled:  { label: "Ждут внимания", icon: AlertCircle, color: "#f59e0b" },
-};
 
 export type ViewMode = "list" | "board" | "table";
 // "priority" — сортировка по итоговому индексу Priority Score 0–100
 // (см. lib/lead-priority.ts): LIFO-свежесть + температура + задачи +
 // LTV + этап воронки, с мультипликатором ×2 для Авито. Дефолтный режим.
 export type SortMode = "priority" | "recent" | "urgent" | "name" | "spent";
-export type DetailSection = "contacts" | "deals" | "tasks" | "notes";
 
-export const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: "priority", label: "🔥 Приоритет" },
-  { value: "recent",  label: "Свежие" },
-  { value: "urgent",  label: "⏱ Срочность" },
-  { value: "spent",   label: "💰 По выручке" },
-  { value: "name",    label: "А → Я" },
-];
+/** Rent/sale/service lens used by the crew KPI server action (leads-kpis.ts). */
+export type Mode = "rent" | "sale" | "service";
 
 // Funnel (kanban) columns — MUST stay in sync with PIPELINE_STAGES keys in
 // ./lib/pipeline-stages.ts (groupLeadsForBoard groups by stageKey and falls
@@ -128,60 +94,6 @@ export const RENTAL_STATUS_META: Record<string, { label: string; color: string }
   pending_confirmation:  { label: "В обработке", color: "#f59e0b" },
   cancelled:             { label: "Отменена",     color: "#64748b" },
 };
-
-export const RENTAL_HISTORY_LABELS: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  pending_confirmation: { label: "Заявка создана",  color: "#f59e0b", icon: Clock },
-  active:               { label: "Активирована",    color: "#10b981", icon: Activity },
-  completed:            { label: "Завершена",       color: "#3b82f6", icon: CheckCircle },
-  cancelled:            { label: "Отклонена",       color: "#ef4444", icon: X },
-  confirmed:            { label: "Подтверждена",    color: "#8b5cf6", icon: CheckCircle },
-  disputed:             { label: "В споре",         color: "#ef4444", icon: ShieldAlert },
-};
-
-export const TROUBLED_QUICK_REASONS = [
-  "Байк на зарядке",
-  "Байк на ремонте",
-  "Нет свободных дат",
-  "Перенос на другие даты",
-];
-
-export const TODO_PRIORITIES = [
-  { value: "low",    label: "Низкий" },
-  { value: "medium", label: "Средний" },
-  { value: "high",   label: "Высокий" },
-] as const;
-
-export const PASSWORD_MIN_LENGTH = 4;
-
-export const LEAD_CARD_TRANSITION_MS = 200;
-export const BOARD_MAX_HEIGHT = "calc(100vh - 280px)";
-export const DETAIL_PANEL_MAX_HEIGHT = "calc(100vh - 140px)";
-export const SEARCH_DEBOUNCE_MS = 300;
-// ── Leads UI v2 types ──
-export type Mode = "rent" | "sale" | "service";
-
-export type StageKey =
-  | "new" | "needs_contact" | "contract_sent" | "awaiting_qr_claim"
-  | "documents_missing" | "active_rental" | "return_due"
-  | "closed_won" | "closed_lost";
-
-export type SortModeV2 = "recent" | "urgent" | "name" | "spent" | "sla" | "return_due" | "overdue_todos";
-
-export type FilterFlags = {
-  overdueOnly: boolean;
-  unclaimedQrOnly: boolean;
-  documentsMissingOnly: boolean;
-  activeRentalOnly: boolean;
-  returnDueOnly: boolean;
-  dismissedOnly: boolean;
-  hideOperatorPlaceholders: boolean;
-};
-
-export type LeadQuickAction =
-  | { type: "call" } | { type: "telegram" } | { type: "notify" }
-  | { type: "request_docs" } | { type: "resend_qr" } | { type: "open_contract" }
-  | { type: "verify_photos" } | { type: "create_rental" } | { type: "schedule_return" }
-  | { type: "dismiss" } | { type: "assign_owner" } | { type: "pin" } | { type: "more" };
 
 export type LeadSignal = {
   key: string;

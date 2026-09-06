@@ -1,5 +1,6 @@
 import type {LeadRow, LeadRentalRow, LeadTodoRow} from "../leads-types";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+import { parseTodoDesc } from "./lead-identity";
 
 export const PIPELINE_STAGES = [
   { key: "new", label: "Новые", tone: "gray", color: "#64748b" },
@@ -320,22 +321,6 @@ export function computeQrStatus(lead: LeadRow): "unclaimed" | "sent" | "claimed"
   return "unclaimed";
 }
 
-export function getPrimaryActions(lead: LeadRow): Array<{ type: string; label: string }> {
-  const stage = lead.stageKey || computeLeadStage(lead);
-  const map: Record<string, Array<{ type: string; label: string }>> = {
-    new: [{ type: "telegram", label: "Написать в TG" }, { type: "call", label: "Позвонить" }, { type: "more", label: "Ещё" }],
-    needs_contact: [{ type: "telegram", label: "Написать в TG" }, { type: "call", label: "Позвонить" }, { type: "more", label: "Ещё" }],
-    contract_sent: [{ type: "resend_qr", label: "Переслать QR" }, { type: "call", label: "Позвонить" }, { type: "telegram", label: "Написать в TG" }, { type: "more", label: "Ещё" }],
-    awaiting_qr_claim: [{ type: "resend_qr", label: "Переслать QR" }, { type: "call", label: "Позвонить" }, { type: "telegram", label: "Написать в TG" }, { type: "more", label: "Ещё" }],
-    documents_missing: [{ type: "request_docs", label: "Запросить документы" }, { type: "call", label: "Позвонить" }, { type: "telegram", label: "Написать в TG" }, { type: "more", label: "Ещё" }],
-    active_rental: [{ type: "open_contract", label: "Открыть договор" }, { type: "call", label: "Позвонить" }, { type: "telegram", label: "Написать в TG" }, { type: "more", label: "Ещё" }],
-    return_due: [{ type: "schedule_return", label: "Назначить возврат" }, { type: "open_contract", label: "Открыть договор" }, { type: "verify_photos", label: "Проверить фото" }, { type: "more", label: "Ещё" }],
-    closed_won: [{ type: "create_rental", label: "Создать аренду" }, { type: "more", label: "Ещё" }],
-    closed_lost: [{ type: "reopen", label: "Открыть повторно" }, { type: "more", label: "Ещё" }],
-  };
-  return map[stage] || map.new;
-}
-
 export function computeAssignee(lead: LeadRow, todos: LeadTodoRow[]): string | null {
   const leadTodos = matchTodosToLead(lead, todos);
   const pending = leadTodos.filter((t) => t.status !== "done").sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -352,7 +337,7 @@ export function matchTodosToLead(lead: LeadRow, todos: LeadTodoRow[]): LeadTodoR
     if (t.rental_id && rentalIds.has(t.rental_id)) return true;
     if (t.description) {
       try {
-        const d = JSON.parse(t.description);
+        const d = parseTodoDesc(t);
         if (d.rental_id && rentalIds.has(d.rental_id)) return true;
       } catch {}
     }
@@ -397,7 +382,7 @@ function extractTodoLeadIds(todo: LeadTodoRow): string[] {
   }
   if (todo.description) {
     try {
-      const d = JSON.parse(todo.description);
+      const d = parseTodoDesc(todo);
       if (typeof d.user_id === 'string' && /^\d{1,12}$/.test(d.user_id)) {
         push(d.user_id);
         if (/^[78]\d{10}$/.test(d.user_id)) push(normalizePhone(d.user_id));

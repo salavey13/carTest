@@ -9,6 +9,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
 import { isAvitoLead } from "./leads-utils";
+import { DISMISS_REASONS } from "./lib/dismiss-reasons";
 import { isHandlingTodo } from "./lib/lead-handling";
 import { computeLeadKpi } from "./lib/lead-kpi";
 import { computeLeadAchievements } from "./lib/lead-achievements";
@@ -38,7 +39,6 @@ import {
   type Segment,
   type ViewMode,
   type SortMode,
-  type FilterFlags,
 } from "./leads-constants";
 import { LEADS_PAGE_SIZE } from "./leads-constants";
 
@@ -125,15 +125,6 @@ export function LeadsClient({
   // flagged is_dismissed_lead=true).
   const [dismissTarget, setDismissTarget] = useState<LeadRow | null>(null);
 
-  // Dismiss reasons — currently a static list, but the dialog accepts any
-  // DismissReason[]. In the future these could come from crew settings.
-  const DISMISS_REASONS: DismissReason[] = [
-    { value: "duplicate", label: "Дубликат", requiresNote: false },
-    { value: "spam", label: "Спам", requiresNote: false },
-    { value: "client_refused", label: "Клиент отказался", requiresNote: false },
-    { value: "wrong_phone", label: "Неверный телефон", requiresNote: false },
-    { value: "other", label: "Другая причина", requiresNote: true },
-  ];
 
   const router = useRouter();
   const { dbUser } = useAppContext();
@@ -242,7 +233,6 @@ export function LeadsClient({
   }, [tgReadyTick]);
 
   const {
-    showPasswordEntry,
     passwordInput,
     setPasswordInput,
     passwordError,
@@ -351,16 +341,6 @@ export function LeadsClient({
 
   // Default filter flags — LeadsToolbar expects these props but root LeadsClient
   // doesn't use useLeadFilters (it uses useFilteredSortedLeads instead).
-  // Pass all-false defaults so the toolbar renders without crashing.
-  const defaultFilterFlags: FilterFlags = {
-    overdueOnly: false,
-    unclaimedQrOnly: false,
-    documentsMissingOnly: false,
-    activeRentalOnly: false,
-    returnDueOnly: false,
-    dismissedOnly: false,
-    hideOperatorPlaceholders: false,
-  };
 
   /** Called by TodoList after toggle/add/delete — keeps todosState in sync */
   const handleTodoUpdate = useCallback((action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => {
@@ -384,7 +364,6 @@ export function LeadsClient({
     warm,
     availableSources,
     hasFilters: baseHasFilters,
-    boardColumns,
   } = useFilteredSortedLeads(leadsState, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders, priorityMap);
 
   // ── Stage + Owner filters (applied AFTER useFilteredSortedLeads) ──
@@ -1037,8 +1016,6 @@ export function LeadsClient({
         viewMode={viewMode} onViewModeChange={setViewMode}
         segmentCounts={segmentCounts}
         hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
-        filterFlags={defaultFilterFlags}
-        onFilterFlagsChange={() => {}}
         T={T} isAuto={isAuto}
       />
 

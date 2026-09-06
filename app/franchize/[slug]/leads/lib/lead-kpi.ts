@@ -52,6 +52,7 @@ import {
   type LeadSpeedMetrics,
 } from "./lead-speed";
 import { computeLeadStage, matchTodosToLead } from "./pipeline-stages";
+import { isAvitoLead } from "./lead-identity";
 import { isCallbackTodo, isHandledTodo } from "./lead-handling";
 
 /**
@@ -254,13 +255,8 @@ export function computeLeadKpi(
     }
 
     if (lead.avito?.analysis?.intent === "testdrive") testdrives += 1;
-
-    // Авито-канал: та же тройка проверок, что в lead-scripts.isAvitoLeadLike
-    // (локальная лёгкая копия вместо React-цепочки leads-utils).
-    const isAvitoLike =
-      lead.contactChannel === "avito" ||
-      !!lead.avito?.chatId ||
-      lead.user_id.startsWith("avito:");
+    // Avito channel — canonical detector (lib/lead-identity), one copy for kpi/playbook/scripts.
+    const isAvitoLike = isAvitoLead(lead);
     if (isAvitoLike) avitoLeads += 1;
 
     // «Продавай 7 дней в неделю» (курс 2026): лиды, пришедшие в сб/вс,

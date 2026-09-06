@@ -34,28 +34,3 @@ export function useVirtualList<T>(
   };
 }
 
-export function useVirtualGrid<T>(
-  items: T[],
-  itemHeight: number,
-  containerHeight: number,
-  columns: number,
-  overscan: number = 5
-) {
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  const virtualizer = useVirtualizer({
-    count: Math.ceil(items.length / columns),
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => itemHeight,
-    overscan,
-    scrollMargin: 0,
-    horizontal: false,
-  });
-
-  return {
-    parentRef,
-    virtualRows: virtualizer.getVirtualItems(),
-    totalHeight: virtualizer.getTotalSize(),
-    scrollToIndex: virtualizer.scrollToIndex,
-  };
-}

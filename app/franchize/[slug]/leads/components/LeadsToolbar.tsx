@@ -91,9 +91,6 @@ export function LeadsToolbar({
   // Placeholders toggle
   hidePlaceholders,
   setHidePlaceholders,
-  // Unused v2 props (accepted for compatibility)
-  filterFlags,
-  onFilterFlagsChange,
   // Theme
   T,
   isAuto,
@@ -119,8 +116,6 @@ export function LeadsToolbar({
   onViewModeChange?: (v: "list" | "board" | "table") => void;
   hidePlaceholders: boolean;
   setHidePlaceholders: (v: boolean) => void;
-  filterFlags?: any;
-  onFilterFlagsChange?: any;
   T: any;
   isAuto: boolean;
 }) {

@@ -76,6 +76,7 @@
 
 import type { LeadRow } from "../leads-types";
 import { BIKE_TARIFFS, type BikeTariff } from "./lead-tariffs.generated";
+import { isAvitoLead as isAvitoLeadLike } from "./lead-identity";
 
 // ── Бизнес-константы VIP BIKE (едины для всех скриптов) ─────────────────────
 const BRAND = "VIP BIKE";
@@ -449,17 +450,6 @@ function depositPhraseFor(tariff: BikeTariff | null): string {
   return DEPOSIT_PHRASE;
 }
 
-/**
- * Канал авито? Дублирует isAvitoLead() из leads-utils (та .tsx-цепочка тянет
- * React-импорты) — тут лёгкая локальная копия тех же трёх проверок.
- */
-function isAvitoLeadLike(lead: LeadRow): boolean {
-  return (
-    lead.contactChannel === "avito" ||
-    !!lead.avito?.chatId ||
-    lead.user_id.startsWith("avito:")
-  );
-}
 
 /** Склеивание абзацев: пустые строки выкидываются. */
 function joinParas(...paras: Array<string | null | undefined>): string {
