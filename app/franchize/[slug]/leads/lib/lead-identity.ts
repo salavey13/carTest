@@ -29,8 +29,12 @@ export function isAvitoLead(lead: LeadRow): boolean {
  * Todos are replaced, not mutated, on updates; the identity fields inside the
  * description (rental_id / lead_id / phone) never change after creation, so
  * the cache cannot go stale for the fields consumers read.
+ *
+ * NB: no eslint-disable for @typescript-eslint/no-explicit-any here — the
+ * build lint config (next/core-web-vitals) does not register the TS plugin,
+ * so referencing that rule in a disable comment is itself a build error.
+ * The `any` below mirrors JSON.parse's own return type and is intentional.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors JSON.parse's own `any`
 const descCache = new WeakMap<LeadTodoRow, any>();
 
 export function parseTodoDesc(todo: LeadTodoRow): any {

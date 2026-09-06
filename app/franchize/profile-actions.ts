@@ -160,21 +160,21 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     {
       id: "shift_hours_13",
       title: "13 часов... иди домой!",
-      description: "Накопил 13 часов. Хватит на сегодня, иди отдыхать!",
+      description: "13 часов ПОДРЯД в одной смене — марафон без выхода. Хватит на сегодня, иди отдыхать!",
       category: "operations",
       triggerSources: ["telegram:/shift"],
     },
     {
       id: "shift_hours_69",
       title: "69 часов... ниииче!",
-      description: "Накопил 69 часов. Ниииче! 👀",
+      description: "Накопил 69 часов за все смены суммарно. Ниииче! 👀",
       category: "operations",
       triggerSources: ["telegram:/shift"],
     },
     {
       id: "shift_hours_100",
       title: "100 часов... богоподобно!",
-      description: "Накопил 100 часов. Просто бог工作时间! 🏆",
+      description: "Накопил 100 часов за все смены суммарно. Просто богоподобно! 🏆",
       category: "operations",
       triggerSources: ["telegram:/shift"],
     },
@@ -494,6 +494,32 @@ async function notifyAchievementUnlocked(params: {
   }
 }
 
+// ── ПОСЛЕДОВАТЕЛЬНОСТЬ ЗАПИСЕЙ ПРОФИЛЯ (фикс «достижения выдаются повторно») ──
+// grantFranchizeAchievementAction — read-modify-write ВСЕГО users.metadata
+// (JSONB). Telegram-потоки выдают пачки достижений параллельно
+// (fire-and-forget циклы в shift.ts), поэтому два гранта могли прочитать
+// одну и ту же версию metadata и затереть разблокировки друг друга
+// (классический lost update): бейдж исчезал из профиля и выдавался заново
+// при следующем триггере — «Новое достижение!» звучало дважды-трижды.
+// Два слоя защиты:
+//   1. In-process очередь на пользователя — гранты одного инстанса сервера
+//      больше не пересекаются (это и есть 99% кейса: пачка из одного
+//      вебхука clock_out).
+//   2. CAS по updated_at (оптимистичная блокировка) — межинстансная запись
+//      перечитывает metadata и повторяет слияние до 5 раз, вместо того
+//      чтобы молча затирать чужую запись.
+const PROFILE_WRITE_RETRIES = 5;
+const profileWriteQueues = new Map<string, Promise<unknown>>();
+
+function enqueueProfileWrite<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const tail = profileWriteQueues.get(key) ?? Promise.resolve();
+  // Следующая задача стартует независимо от исхода предыдущей (then по обоим
+  // веткам); в map кладём «заглушку», которая никогда не реджектится.
+  const run = tail.then(task, task);
+  profileWriteQueues.set(key, run.catch(() => undefined));
+  return run;
+}
+
 export async function grantFranchizeAchievementAction(params: {
   slug: string;
   userId: string;
@@ -507,72 +533,103 @@ export async function grantFranchizeAchievementAction(params: {
     return { success: false, error: "userId and achievementId are required" };
   }
 
-  const { data: user, error } = await supabaseAdmin
-    .from("users")
-    .select("metadata")
-    .eq("user_id", params.userId)
-    .maybeSingle();
+  // Пачки грантов одному пользователю выполняются строго по очереди.
+  return enqueueProfileWrite(`${params.userId}:${slug}`, () =>
+    grantAchievementOnce(params, slug),
+  );
+}
 
-  if (error) return { success: false, error: error.message };
+async function grantAchievementOnce(
+  params: {
+    userId: string;
+    achievementId: string;
+    source: string;
+    context?: Record<string, unknown>;
+    incrementCounters?: Record<string, number>;
+  },
+  slug: string,
+): Promise<{ success: boolean; alreadyUnlocked?: boolean; error?: string }> {
+  // CAS-цикл: читаем metadata + updated_at, сливаем изменения, пишем с
+  // условием «updated_at не изменился». count 0 → параллельная запись
+  // успела: перечитываем и повторяем (достижение/счётчики сохраняются).
+  for (let attempt = 0; attempt <= PROFILE_WRITE_RETRIES; attempt += 1) {
+    const { data: user, error } = await supabaseAdmin
+      .from("users")
+      .select("metadata, updated_at")
+      .eq("user_id", params.userId)
+      .maybeSingle();
 
-  const metadata = ((user?.metadata || {}) as Record<string, any>) || {};
-  const profiles = ((metadata.franchizeProfiles || {}) as Record<string, any>) || {};
-  const currentState = (profiles[slug] || DEFAULT_PROFILE(slug)) as FranchizeProfileState;
+    if (error) return { success: false, error: error.message };
+    if (!user) return { success: false, error: "user row not found" };
 
-  const currentAchievements = { ...(currentState.achievements || {}) };
-  const alreadyUnlocked = !!currentAchievements[params.achievementId];
+    const metadata = ((user.metadata || {}) as Record<string, any>) || {};
+    const profiles = ((metadata.franchizeProfiles || {}) as Record<string, any>) || {};
+    const currentState = (profiles[slug] || DEFAULT_PROFILE(slug)) as FranchizeProfileState;
 
-  if (!alreadyUnlocked) {
-    currentAchievements[params.achievementId] = {
-      unlockedAt: new Date().toISOString(),
-      source: params.source,
-      context: params.context,
-    };
-  }
+    const currentAchievements = { ...(currentState.achievements || {}) };
+    const alreadyUnlocked = !!currentAchievements[params.achievementId];
 
-  const nextCounters = { ...(currentState.counters || {}) };
-  Object.entries(params.incrementCounters || {}).forEach(([key, value]) => {
-    const delta = Number(value || 0);
-    if (!Number.isFinite(delta)) return;
-    nextCounters[key] = (nextCounters[key] || 0) + delta;
-  });
+    if (!alreadyUnlocked) {
+      currentAchievements[params.achievementId] = {
+        unlockedAt: new Date().toISOString(),
+        source: params.source,
+        context: params.context,
+      };
+    }
 
-  const nextState: FranchizeProfileState = {
-    ...currentState,
-    slug,
-    achievements: currentAchievements,
-    counters: nextCounters,
-    lastActivityAt: new Date().toISOString(),
-  };
-
-  const nextMetadata = {
-    ...metadata,
-    franchizeProfiles: {
-      ...profiles,
-      [slug]: nextState,
-    },
-  };
-
-  const { error: updateError } = await supabaseAdmin
-    .from("users")
-    .update({ metadata: nextMetadata, updated_at: new Date().toISOString() })
-    .eq("user_id", params.userId);
-
-  if (updateError) return { success: false, error: updateError.message };
-
-  // iter18 (bonus): celebrate NEW unlocks in Telegram — the achiever + the
-  // crew owner + crew admins get a message right away (fire-and-forget).
-  if (!alreadyUnlocked) {
-    setImmediate(() => {
-      void notifyAchievementUnlocked({
-        slug,
-        userId: params.userId,
-        achievementId: params.achievementId,
-      });
+    const nextCounters = { ...(currentState.counters || {}) };
+    Object.entries(params.incrementCounters || {}).forEach(([key, value]) => {
+      const delta = Number(value || 0);
+      if (!Number.isFinite(delta)) return;
+      nextCounters[key] = (nextCounters[key] || 0) + delta;
     });
+
+    const nextState: FranchizeProfileState = {
+      ...currentState,
+      slug,
+      achievements: currentAchievements,
+      counters: nextCounters,
+      lastActivityAt: new Date().toISOString(),
+    };
+
+    const nextMetadata = {
+      ...metadata,
+      franchizeProfiles: {
+        ...profiles,
+        [slug]: nextState,
+      },
+    };
+
+    const seenUpdatedAt = (user as { updated_at?: string | null }).updated_at ?? null;
+    const baseUpdate = supabaseAdmin
+      .from("users")
+      .update({ metadata: nextMetadata, updated_at: new Date().toISOString() }, { count: "exact" })
+      .eq("user_id", params.userId);
+    // updated_at может быть NULL (старые строки) — тогда CAS-условие «IS NULL».
+    const { error: updateError, count } =
+      seenUpdatedAt == null
+        ? await baseUpdate.is("updated_at", null)
+        : await baseUpdate.eq("updated_at", seenUpdatedAt);
+
+    if (updateError) return { success: false, error: updateError.message };
+    if ((count ?? 1) > 0) {
+      // iter18 (bonus): celebrate NEW unlocks in Telegram — the achiever + the
+      // crew owner + crew admins get a message right away (fire-and-forget).
+      if (!alreadyUnlocked) {
+        setImmediate(() => {
+          void notifyAchievementUnlocked({
+            slug,
+            userId: params.userId,
+            achievementId: params.achievementId,
+          });
+        });
+      }
+      return { success: true, alreadyUnlocked };
+    }
+    // count === 0: конкурентная запись (или строка удалена) — повторяем.
   }
 
-  return { success: true, alreadyUnlocked };
+  return { success: false, error: "concurrent profile update conflict (retries exhausted)" };
 }
 
 /**

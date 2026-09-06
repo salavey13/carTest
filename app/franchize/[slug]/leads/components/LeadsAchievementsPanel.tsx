@@ -35,6 +35,12 @@ import {
   mergeAchievementsWithStore,
   saveAchievementStore,
 } from "../lib/lead-achievements";
+import {
+  actionsFeedingAchievement,
+  computeOperatorRank,
+  PLAYBOOK_STEP_META,
+  xpForEvent,
+} from "../lib/lead-gamification";
 
 interface LeadsAchievementsPanelProps {
   achievements: LeadAchievement[];
@@ -101,6 +107,12 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
     [achievements, store],
   );
 
+  // ПУТЬ ОПЕРАТОРА: XP и звание считаются из ТОГО ЖЕ sticky-стора —
+  // взятые уровни бейджей конвертируются в XP (см. lib/lead-gamification.ts).
+  // Связка «плейбук ↔ достижения»: панель показывает звание/прогресс пути,
+  // плейбук-панель — какой бейдж прокачивает каждый шаг.
+  const rank = useMemo(() => computeOperatorRank(store), [store]);
+
   const visible = display.filter((a) => a.available);
   const unlocked = countUnlocked(display);
   // Свёрнуто: открытые + почти открытые (прогресс ≥ 50%) — «что уже есть и
@@ -148,6 +160,50 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </button>
           )}
+        </div>
+
+        {/* ПУТЬ ОПЕРАТОРА — звание + XP из sticky-стора достижений.
+            Звание растёт только от реальных бейджей: шаги плейбука → метрики →
+            уровни → XP. Прогресс-бар — до следующего звания. */}
+        <div
+          className="mb-3 flex items-center gap-2.5 rounded-xl border px-3 py-2"
+          style={{ borderColor: T.border, backgroundColor: T.borderSoft }}
+          title="Звание растёт от XP достижений: бронза 10 · серебро 25 · золото 50 · легенда 100 XP. Шаги плейбука двигают метрики — метрики открывают бейджи."
+        >
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg"
+            style={{ backgroundColor: `${TIER_COLORS.gold}1f` }}
+            aria-hidden
+          >
+            {rank.emoji}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="truncate text-[11px] font-black" style={{ color: T.text }}>
+                {rank.title}
+                <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: T.textFaint }}>
+                  путь оператора
+                </span>
+              </p>
+              <span className="shrink-0 text-[10px] font-bold" style={{ color: TIER_COLORS.gold }}>
+                {rank.xp} XP
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full" style={{ backgroundColor: T.border }}>
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.round(rank.progress * 100)}%`,
+                  background: `linear-gradient(90deg, ${TIER_COLORS.bronze}, ${TIER_COLORS.gold})`,
+                }}
+              />
+            </div>
+            <p className="mt-0.5 text-[9px] font-semibold" style={{ color: T.textFaint }}>
+              {rank.next
+                ? `до «${rank.next.title}» ещё ${rank.xpToNext} XP`
+                : "МАКСИМУМ — ты Легенда экипажа 👑"}
+            </p>
+          </div>
         </div>
 
         {prioritized.length === 0 ? (
@@ -274,6 +330,33 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
                       ? ` · цель: ${detail.nextLabel}`
                       : ""}
                 </p>
+                {/* Связка «плейбук → достижения»: чем этот бейдж кормится.
+                    Даже взятый бейдж показывает шаги — прогресс к следующему
+                    уровню идёт теми же действиями (lib/lead-gamification.ts). */}
+                {(() => {
+                  const feeders = actionsFeedingAchievement(detail.id);
+                  if (feeders.length === 0 || detail.maxed) return null;
+                  return (
+                    <p className="mt-1.5 flex flex-wrap items-center gap-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: T.textFaint }}>
+                        Кормится шагом плейбука:
+                      </span>
+                      {feeders.map((k) => {
+                        const step = PLAYBOOK_STEP_META[k];
+                        if (!step) return null;
+                        return (
+                          <span
+                            key={k}
+                            className="rounded-md px-1.5 py-0.5 text-[9px] font-bold"
+                            style={{ backgroundColor: `${TIER_COLORS.gold}14`, color: TIER_COLORS.gold }}
+                          >
+                            {step.emoji} {step.label}
+                          </span>
+                        );
+                      })}
+                    </p>
+                  );
+                })()}
               </div>
             </motion.div>
           )}
@@ -307,6 +390,12 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
               </p>
               <p className="text-sm font-black leading-tight" style={{ color: T.text }}>
                 {toast.title}
+                <span
+                  className="ml-1.5 rounded-md px-1 py-0.5 text-[10px] font-black"
+                  style={{ backgroundColor: `${TIER_COLORS.gold}1f`, color: TIER_COLORS.gold }}
+                >
+                  +{xpForEvent(toast)} XP
+                </span>
               </p>
               <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug" style={{ color: T.textMuted }}>
                 {toast.desc}

@@ -439,7 +439,16 @@ async function grantShiftAchievements(
         if (totalShifts >= 7) achievementsToGrant.push({ id: "shift_week_7", context: { totalShifts } });
         if (totalShifts >= 30) achievementsToGrant.push({ id: "shift_month_30", context: { totalShifts } });
 
-        if (totalHours >= 13) achievementsToGrant.push({ id: "shift_hours_13", context: { totalHours: Math.round(totalHours * 10) / 10 } });
+        // «13 часов... иди домой!» — это ОДНА смена ПОДРЯД (марафон без выхода
+        // со смены), а не накопительный итог: 13 часов суммарно набираются за
+        // две обычные смены, и бейдж тогда ничего не значит. Считаем длительность
+        // только что закрытой смены; 69/100 — честные накопительные вехи.
+        // FIX (2026-09-06): раньше сравнивался totalHours — бейдж выдавался
+        // «вроде за один день», хотя смен было несколько.
+        const closedShiftHours = closedShift
+            ? Math.round(((Date.parse(closedShift.clockOutIso) - Date.parse(closedShift.clockInIso)) / 3_600_000) * 10) / 10
+            : 0;
+        if (closedShiftHours >= 13) achievementsToGrant.push({ id: "shift_hours_13", context: { shiftHours: closedShiftHours, singleShift: true } });
         if (totalHours >= 69) achievementsToGrant.push({ id: "shift_hours_69", context: { totalHours: Math.round(totalHours * 10) / 10 } });
         if (totalHours >= 100) achievementsToGrant.push({ id: "shift_hours_100", context: { totalHours: Math.round(totalHours * 10) / 10 } });
 

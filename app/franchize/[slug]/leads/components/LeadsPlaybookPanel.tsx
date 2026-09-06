@@ -21,6 +21,7 @@ import { motion } from "framer-motion";
 import { ListChecks, Copy, Check, Sparkles, ChevronRight } from "lucide-react";
 import type { NextAction } from "../lib/lead-playbook";
 import { PLAYBOOK_BENCHMARKS } from "../lib/lead-playbook";
+import { primaryBadgeForAction } from "../lib/lead-gamification";
 
 interface LeadsPlaybookPanelProps {
   actions: NextAction[];
@@ -101,6 +102,11 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T }: LeadsPlaybookPane
             const rowKey = `${a.key}:${a.leadId ?? i}`;
             const isCopied = copiedKey === rowKey;
             const clickable = !!a.leadId && !!onOpenLead;
+            // Связка «плейбук → достижения»: шаг плейбука двигает РОВНО ТУ
+            // метрику, которую меряет бейдж (lib/lead-gamification.ts).
+            // Чип показывает, какой бейдж прокачает этот шаг — оператор видит,
+            // что SOP-действие не абстрактная дисциплина, а прогресс в пути.
+            const feeds = primaryBadgeForAction(a.key);
             // Тело строки — кнопка, если есть лид-адресат: клик открывает
             // шторку лида (полный контекст перед звонком/сообщением).
             const Body = clickable ? "button" : "div";
@@ -145,6 +151,16 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T }: LeadsPlaybookPane
                     <p className="mt-0.5 text-[10px] leading-snug" style={{ color: T.textFaint }} title={a.detail}>
                       {a.detail}
                     </p>
+                    {feeds && (
+                      <p
+                        className="mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold"
+                        style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "#f59e0b" }}
+                        title={`Этот шаг приближает бейдж «${feeds.title}» — достижения считаются из тех же цифр`}
+                      >
+                        <span aria-hidden>🏆</span>
+                        прокачает: {feeds.emoji} {feeds.title}
+                      </p>
+                    )}
                   </div>
                   {clickable && (
                     <ChevronRight

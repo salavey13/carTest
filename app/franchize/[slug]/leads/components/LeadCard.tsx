@@ -88,6 +88,23 @@ function isValidLeadRow(lead: unknown): lead is LeadRow {
  * accent indicator without eating into the card content.
  */
 export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, handling, onReadNotes, T }: Props) {
+  // 🎯 Готовый ответ (авито-лиды): чип с распознанным интентом вопроса
+  // в метаряде + пункт меню «Скопировать готовый ответ». Чистая функция
+  // поверх metadata webhook'а — в БД не пишется, не-авито лиды получают null.
+  // Script engine = full keyword scoring: memoize per lead object so toasts/
+  // keystrokes elsewhere never re-run it for every visible card (wave 4 perf).
+  // HOOKS FIRST (rules-of-hooks): оба useMemo обязаны выполниться до любого
+  // раннего return — guard валидности ниже раньше хуков ломал порядок вызовов
+  // (Vercel build: "useMemo is called conditionally").
+  const suggested = useMemo(
+    () => (isValidLeadRow(lead) ? buildSuggestedResponse(lead) : null),
+    [lead],
+  );
+  const intent = useMemo(
+    () => (isValidLeadRow(lead) ? intentChip(lead) : null),
+    [lead],
+  );
+
   // Type guard provides both runtime safety and type narrowing
   if (!isValidLeadRow(lead)) {
     return null;
@@ -154,14 +171,6 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
   const lastTouchedRel = lead.lastNoteAt ? relativeTime(lead.lastNoteAt) : "";
   const showCreatorChip = !!docCreator && (!lastTouched || lastTouched !== docCreator);
   const showTouchedChip = !!lastTouched;
-
-  // 🎯 Готовый ответ (авито-лиды): чип с распознанным интентом вопроса
-  // в метаряде + пункт меню «Скопировать готовый ответ». Чистая функция
-  // поверх metadata webhook'а — в БД не пишется, не-авито лиды получают null.
-  // Script engine = full keyword scoring: memoize per lead object so toasts/
-  // keystrokes elsewhere never re-run it for every visible card (wave 4 perf).
-  const suggested = useMemo(() => buildSuggestedResponse(lead), [lead]);
-  const intent = useMemo(() => intentChip(lead), [lead]);
 
   return (
     <motion.article
