@@ -12,7 +12,6 @@ import type {
 const DEFAULT_CONTRACT_STATUS = 'draft' as const;
 
 // ─── Мапперы row → camelCase ─────────────────────────────────────────────────
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const toLessor = (r: any): Lessor => ({
   id: r.id,
   entityType: r.entity_type,
@@ -93,7 +92,6 @@ const toContract = (r: any): RentalContract => ({
   prepaymentWords: r.prepayment_words ?? null,
   warrantyMonths: r.warranty_months === null || r.warranty_months === undefined ? null : Number(r.warranty_months),
 });
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ─── Арендодатель ────────────────────────────────────────────────────────────
 export function getActiveLessor(): Lessor | null {

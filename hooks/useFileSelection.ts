@@ -202,8 +202,12 @@ export const useFileSelection = ({
 
     }, [docXagentFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
 
-    // Generic handler for adding DocX preset files
-    const createDocXPresetHandler = useCallback((presetFiles: string[], presetName: string, achievementKey: string) => {
+    // Generic hook factory for adding DocX preset files.
+    // FIX (rules-of-hooks): раньше возвращала useCallback из useCallback —
+    // хук вызывался внутри колбэка. Теперь это кастомный хук-фабрика
+    // (use* по правилам именования): каждый производный хендлер — свой
+    // useCallback, вызывается на верхнем уровне хука.
+    const useDocXPresetHandler = (presetFiles: string[], presetName: string, achievementKey: string) => {
         return useCallback(async () => {
             if (imageReplaceTaskActive) {
                 logger.warn(`[File Selection] Add ${presetName} skipped: Image replace task active.`);
@@ -239,17 +243,17 @@ export const useFileSelection = ({
                 logger.warn(`[File Selection] Cannot log '${achievementKey}': dbUser.user_id is missing.`);
             }
         }, [presetFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
-    }, [files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]);
+    };
 
-    const handleAddDocXRentalFiles = createDocXPresetHandler(docXRentalFiles, "Rental Docs", "usedAddDocXRentalFiles");
-    const handleAddDocXSaleFiles = createDocXPresetHandler(docXSaleFiles, "Sale Docs", "usedAddDocXSaleFiles");
-    const handleAddDocXSubrentFiles = createDocXPresetHandler(docXSubrentFiles, "Subrent Docs", "usedAddDocXSubrentFiles");
-    const handleAddDocXCommercialFiles = createDocXPresetHandler(docXCommercialFiles, "Commercial Docs", "usedAddDocXCommercialFiles");
-    const handleAddDocXCoreFiles = createDocXPresetHandler(docXCoreFiles, "DocX Core", "usedAddDocXCoreFiles");
-    const handleAddDocXAppFiles = createDocXPresetHandler(docXAppFiles, "DocX App", "usedAddDocXAppFiles");
-    const handleAddDocXMigrationsFiles = createDocXPresetHandler(docXMigrationsFiles, "DocX Migrations", "usedAddDocXMigrationsFiles");
-    const handleAddDocXDocsFiles = createDocXPresetHandler(docXDocsFiles, "DocX Docs", "usedAddDocXDocsFiles");
-    const handleAddDocXAuditFiles = createDocXPresetHandler(docXAuditFiles, "Audit", "usedAddDocXAuditFiles");
+    const handleAddDocXRentalFiles = useDocXPresetHandler(docXRentalFiles, "Rental Docs", "usedAddDocXRentalFiles");
+    const handleAddDocXSaleFiles = useDocXPresetHandler(docXSaleFiles, "Sale Docs", "usedAddDocXSaleFiles");
+    const handleAddDocXSubrentFiles = useDocXPresetHandler(docXSubrentFiles, "Subrent Docs", "usedAddDocXSubrentFiles");
+    const handleAddDocXCommercialFiles = useDocXPresetHandler(docXCommercialFiles, "Commercial Docs", "usedAddDocXCommercialFiles");
+    const handleAddDocXCoreFiles = useDocXPresetHandler(docXCoreFiles, "DocX Core", "usedAddDocXCoreFiles");
+    const handleAddDocXAppFiles = useDocXPresetHandler(docXAppFiles, "DocX App", "usedAddDocXAppFiles");
+    const handleAddDocXMigrationsFiles = useDocXPresetHandler(docXMigrationsFiles, "DocX Migrations", "usedAddDocXMigrationsFiles");
+    const handleAddDocXDocsFiles = useDocXPresetHandler(docXDocsFiles, "DocX Docs", "usedAddDocXDocsFiles");
+    const handleAddDocXAuditFiles = useDocXPresetHandler(docXAuditFiles, "Audit", "usedAddDocXAuditFiles");
 
     const handleSelectAll = useCallback(async () => { 
         if (imageReplaceTaskActive) {

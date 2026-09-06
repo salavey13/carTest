@@ -17,10 +17,8 @@ import { createRequire } from 'node:module';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // createRequire нужен для CJS-пакетов в ESM-модуле
 const _require = createRequire(import.meta.url);
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const PizZip = _require('pizzip') as new (data: Buffer) => any;
 const Docxtemplater = _require('docxtemplater') as new (zip: any, opts: any) => any;
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 import type { Lessor, Client, BikeUnit, RentalContract } from './types.js';
 
@@ -180,7 +178,6 @@ export function generateContract(input: ContractDocInput): GeneratedContract {
   );
   const zip = new PizZip(templateBuf) as InstanceType<typeof PizZip>;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc = new Docxtemplater(zip, {
     parser:        makeParser(),
     paragraphLoop: true,

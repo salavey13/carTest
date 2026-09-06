@@ -181,10 +181,13 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
 const RepoXmlPageContext = createContext<RepoXmlPageContextType>(defaultContextValue as RepoXmlPageContextType);
 
 export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ children }) => {
-    try {
-        logger.log("[RepoXmlPageProvider] Initializing...");
+    // FIX (rules-of-hooks): тело провайдера раньше было обёрнуто в try/catch
+    // с ранним return в catch — все ~100 хуков вызывались «условно».
+    // React-хуки обязаны вызываться безусловно; ошибки рендера в React
+    // ловятся Error Boundary, а не try/catch вокруг хуков.
+    logger.log("[RepoXmlPageProvider] Initializing...");
 
-        const [fetchStatusState, setFetchStatusState] = useState<FetchStatus>('idle');
+    const [fetchStatusState, setFetchStatusState] = useState<FetchStatus>('idle');
         const [repoUrlEnteredState, setRepoUrlEnteredState] = useState<boolean>(false);
         const [filesFetchedState, setFilesFetchedState] = useState<boolean>(false);
         const [primaryHighlightPathState, setPrimaryHighlightPathState] = useState<string | null>(null);
@@ -226,13 +229,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const pendingFlowDetailsRef = useRef(pendingFlowDetailsState); 
         const repoUrlStateRef = useRef(repoUrlState); 
         
-        let appToastHook: ReturnType<typeof useAppToast>;
-        try {
-            appToastHook = useAppToast();
-        } catch (e: any) {
-            logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR initializing useAppToast:", e);
-            appToastHook = { success: (m) => logger.error("Toast (success) suppressed, hook failed:", m), error: (m) => logger.error("Toast (error) suppressed, hook failed:", m), info: (m) => logger.warn("Toast (info) suppressed, hook failed:", m), warning: (m) => logger.warn("Toast (warning) suppressed, hook failed:", m), loading: (m) => logger.warn("Toast (loading) suppressed, hook failed:", m), message: (m) => logger.warn("Toast (message) suppressed, hook failed:", m), custom: (m) => logger.warn("Toast (custom) suppressed, hook failed:", m), dismiss: () => logger.warn("Toast (dismiss) suppressed, hook failed"), addToastToHistory: () => logger.warn("Toast (addToastToHistory) suppressed, hook failed") };
-        }
+        // FIX (rules-of-hooks): безусловный вызов хука. Защита от сбоя тостера
+        // — внутри addToastStable (проверка appToastHook на валидность).
+        const appToastHook = useAppToast();
         const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => { 
             if (!appToastHook || typeof appToastHook.success !== 'function') { 
                 logger.error("addToastStable: appToastHook is invalid or incomplete.", { message, type, appToastHookExists: !!appToastHook });
@@ -951,12 +950,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             addToastStable, dbUser, processTelegramStartParamStable,
         ]);
 
-        return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
-
-    } catch (providerError: any) {
-        logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
-        return <div className="fixed inset-0 flex items-center justify-center bg-red-900 text-white p-4 z-[9999]">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
-    }
+    return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
 };
 
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
