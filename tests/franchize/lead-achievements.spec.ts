@@ -33,6 +33,7 @@ function buildSpeed(overrides: Partial<LeadSpeedMetrics> = {}): LeadSpeedMetrics
   return {
     handledTotal: 10,
     handledToday: 4,
+    activeDaysThisWeek: 5,
     converted: 3,
     medianMs: 30 * 60_000, // 30 мин — серебро «Скорострела»
     avgMs: 40 * 60_000,
@@ -321,12 +322,13 @@ describe("lead-achievements: сводка", () => {
     // Открыты с фикстурой: очередь, SLA, перезвон, КЭВ-мастер, клоузер, разгон,
     // диалог, воронка, касса, магнит, тест-драйвер, средний чек, продажник,
     // норма недели, магнит недели, юнит-экономика, дожим, глубокий диалог (18)
-    // + плейбук: пять минут (60%), реаниматор (2 ghost), выходной боец (3/4) = 21;
+    // + плейбук: пять минут (60%), реаниматор (2 ghost), выходной боец (3/4),
+    // LAPS-ритм (5 активных дней = золото) = 22;
     // закрыты: марафон (10 < 20), идеальная смена (медиана null),
     // идеальная неделя (8 < 20).
-    expect(countUnlocked(list)).toBe(21);
+    expect(countUnlocked(list)).toBe(22);
     expect(list.filter((a) => !a.available)).toHaveLength(3);
-    expect(list).toHaveLength(27);
+    expect(list).toHaveLength(28);
   });
 });
 
@@ -577,7 +579,7 @@ describe("lead-achievements: пакет 3 (правило 5 минут / мол�
     expect(a.available).toBe(false);
   });
 
-  it("Счётчик бейджей вырос: 27 достижений в списке", () => {
-    expect(computeLeadAchievements(buildKpi()).length).toBe(27);
+  it("Счётчик бейджей вырос: 28 достижений в списке (волна 7: +LAPS-ритм)", () => {
+    expect(computeLeadAchievements(buildKpi()).length).toBe(28);
   });
 });

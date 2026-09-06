@@ -1020,6 +1020,44 @@ export function seasonalReengageLine(bikeTitle: string | null = null): string {
 }
 
 /**
+ * «Вы передумали?» — реактивация давно проигранных («25 Years of Sales
+ * Knowledge in 34 Minutes», LAPS: reactivation campaign «Have you given
+ * up on X?»). Прямой вопрос снятия неловкости: «если отказались — скажите,
+ * перестанем напоминать; если актуально — вот конкретный шаг». Даёт мягкий
+ * сигнал интереса одним касанием. Используется плейбуком для лидов в
+ * стадии «Потеряно» (closed_lost) — отдельный класс от живых ghost'ов.
+ * mode: rent | sale | generic — под какой funnel-этап был интерес.
+ */
+export function givenUpLine(mode: "rent" | "sale" | "generic" = "generic"): string {
+  const thing =
+    mode === "rent" ? "прокат" : mode === "sale" ? "покупку байка" : "поездку";
+  return `Хочу спросить прямо: вы передумали насчёт ${thing}? 🙂 Если да — скажите, я пойму и больше не побеспокою. Если нет — как раз освободились байки на ближайшие дни, зафиксирую бронь за пару минут.`;
+}
+
+/**
+ * «10:01» — мгновенное первое касание («25 Years of Sales Knowledge»,
+ * money loves speed: «лид пришёл в 10:00 — пиши в 10:01. Это не свидания,
+ * не надо играть в загадочность»). Усиление плейбук-действия «Ответить
+ * горячему» (<5 мин): открытые слова «вы только что всплыли на экране»
+ * превращают скорость в плюс — клиент видит, что он не в общей очереди.
+ */
+export function instantFollowUpLine(name: string | null = null): string {
+  const who = name ? `, ${name}` : "";
+  return `Здравствуйте${who}! Ваше сообщение только что всплыло на экране — решил написать сразу, пока вы онлайн. Байк свободен: какие даты смотрите? Зафиксирую бронь за пару минут.`;
+}
+
+/**
+ * «Ball-boy» — протокол сбора возражений («25 Years of Sales Knowledge»):
+ * вместо тенниса «вопрос → ответ → вопрос» ловим каждое сомнение («ок,
+ * цену записал, что ещё?»), собираем СПИСОК и отвечаем одним блоком.
+ * Возврат строки-приглашения перечислить всё, если у клиента ≥2 сигналов
+ * сомнения (возражение + вопрос о цене/сроках и т.п.).
+ */
+export function ballBoyInviteLine(): string {
+  return "Хорошо, я записал. Давайте так: назовите всё, что смущает, одним сообщением — цену, сроки, права, что угодно. Отвечу по каждому пункту сразу и без «ну-у, смотря что…» 🙂";
+}
+
+/**
  * «Подтянуть на сегодня»: перенос будущей брони на ближайшее окно —
  * same-day/next-day визиты имеют заметно более высокую явку, чем
  * «через три дня» (курс 2026, приём «pull-up appointments»).
@@ -1184,6 +1222,8 @@ interface ScriptCtx {
   knownPhone: boolean;
   /** Бюджет покупателя (₽), распознанный из текста/entities — подставляем конкретные модели парка. */
   budget: number | null;
+  /** BALL-BOY: сомнений ≥2 → добавить приглашение перечислить всё списком. */
+  ballBoy: boolean;
 }
 
 function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
@@ -1191,9 +1231,13 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
   short: string;
   nextBestAction: string;
 } {
-  const { greet, bike, price, priceLine, bikeRef, duration, tariff, hours, temperature, objection, knownPhone, budget } = ctx;
+  const { greet, bike, price, priceLine, bikeRef, duration, tariff, hours, temperature, objection, knownPhone, budget, ballBoy } = ctx;
   const objectionLine = objectionLineFor(objection, key);
   const budgetLine = budgetLineFor(budget, tariff?.id ?? null, duration);
+  // Ball-boy идёт ПЕРЕД отработкой первого возражения: сначала собираем
+  // весь список сомнений, потом отвечаем одним блоком (иначе отвечаем
+  // на первое возражение и теряем остальные).
+  const ballBoyLine = ballBoy ? ballBoyInviteLine() : null;
   switch (key) {
     case "availability": {
       const est =
@@ -1211,6 +1255,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
           `${greet} Да, ${bikeRef} свободен!`,
           est ?? priceLine,
           ...(temperature === "cold" ? [coldSoftLine()] : []),
+          ...(ballBoyLine ? [ballBoyLine] : []),
           ...(objectionLine ? [objectionLine] : []),
           ctaLine,
           `${cap(includedPhraseFor(tariff))}. ${cap(depositPhraseFor(tariff))}.`,
@@ -1259,6 +1304,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
           // не «подберём», а сразу названия и цифры).
           ...(budgetLine ? [cap(budgetLine)] : []),
           ...(temperature === "cold" ? [coldSoftLine()] : []),
+          ...(ballBoyLine ? [ballBoyLine] : []),
           ...(objectionLine ? [objectionLine] : []),
           `${cap(includedPhraseFor(tariff))}.`,
           `${cap(GEAR_PHRASE)}. Залог можно оставить СТС — наличные готовить не нужно.`,
@@ -1404,6 +1450,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
             (duration
               ? `На ${duration.label} — наши лучшие условия: ${PRICE_TIERS_PHRASE}.`
               : `Для долгого срока у нас лучшие условия: ${PRICE_TIERS_PHRASE}.`),
+          ...(ballBoyLine ? [ballBoyLine] : []),
           ...(objectionLine ? [objectionLine] : []),
           `${cap(includedPhraseFor(tariff))}.`,
           est
@@ -1428,6 +1475,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
           // «Sizzle, not steak» («10 Steps»): продаём не «мотоцикл в наличии»,
           // а день, который он сделает.
           `И знаете, что обычно происходит? Заезжают «покататься на пару часов» — а потом пишут, что это был лучший день отпуска.`,
+          ...(ballBoyLine ? [ballBoyLine] : []),
           ...(objectionLine ? [objectionLine] : []),
           `Отвечаю быстро, можно прямо здесь.`,
         ),
@@ -1444,6 +1492,7 @@ function buildScript(ctx: ScriptCtx, key: ScriptIntentKey): {
           // Самообучение iter2: «наличие наш байк» — рассогласование; имя
           // модели вставляем только когда оно есть.
           `Напишите удобные даты — проверю наличие${bike ? ` — ${bike}` : ""} и пришлю точную цену с условиями.`,
+          ...(ballBoyLine ? [ballBoyLine] : []),
           ...(objectionLine ? [objectionLine] : []),
           `Отвечаем быстро: обычно в течение пары минут. Забронировать можно и самому: ${BOOKING_LINK}`,
         ),
@@ -1521,6 +1570,15 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     objectionRaw && objectionRaw !== "none" && OBJECTION_TYPES.has(objectionRaw)
       ? (objectionRaw as Exclude<ObjectionType, null>)
       : (detectStall(lastText) ?? detectStall(firstText));
+  // BALL-BOY («25 Years of Sales Knowledge»): сомнений ≥2 (возражение И
+  // второй сигнал — возражение в первом сообщении, отличное от последнего,
+  // либо поимённый вопрос о цене при stall-типе) → в скрипт добавляется
+  // приглашение перечислить всё списком. Встроено в ctx как флаг.
+  const stallFirst = detectStall(firstText);
+  const secondDoubt =
+    (stallFirst && objection && stallFirst !== objection) ||
+    (!!objection && (parseBudgetRu(lastText) != null || parseBudgetRu(firstText) != null));
+  const ballBoy = !!objection && secondDoubt;
   // Телефон уже известен → CTA «перезвоню», а не «оставьте телефон»;
   // NBA пойдёт через звонок, quick-reply «попросить телефон» меняется.
   const knownPhone =
@@ -1551,6 +1609,7 @@ export function buildSuggestedResponse(lead: LeadRow): SuggestedResponse | null 
     objection,
     knownPhone,
     budget,
+    ballBoy,
   };
 
   // Эхо (курс 2026, приоритет босса): первый абзац ответа = «Вы писали: „…“».

@@ -207,6 +207,9 @@ export const PLAYBOOK_FEEDS: Record<NextActionKey, readonly string[]> = {
   "ghost-long": ["ghost-buster"],
   // Рекомендация «1+1=11» → новые лиды и касса экипажа.
   "referral": ["lead-magnet", "cashier"],
+  // Реактивация «Потеряно» («Вы передумали?», LAPS) → те же магнит/касса:
+  // оживший лид снова в воронке.
+  "reactivation": ["lead-magnet", "cashier"],
 };
 
 /** Все шаги плейбука, которые кормят бейдж (обратная карта). */
@@ -228,6 +231,7 @@ export const PLAYBOOK_STEP_META: Record<NextActionKey, { emoji: string; label: s
   "ghost": { emoji: "👻", label: "Реанимировать молчуна" },
   "ghost-long": { emoji: "🍂", label: "Пульс-чек пропавшему" },
   "referral": { emoji: "🤝", label: "Попросить рекомендацию" },
+  "reactivation": { emoji: "📭", label: "Спросить «передумали?»" },
 };
 
 /** Мета бейджей, встречающихся в карте кормления (эмодзи + имя для чипов). */

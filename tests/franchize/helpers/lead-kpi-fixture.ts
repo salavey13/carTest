@@ -14,6 +14,7 @@ export function buildSpeed(overrides: Partial<LeadSpeedMetrics> = {}): LeadSpeed
   return {
     handledTotal: 10,
     handledToday: 4,
+    activeDaysThisWeek: 5,
     converted: 3,
     medianMs: 30 * 60_000, // 30 мин — серебро «Скорострела»
     avgMs: 40 * 60_000,

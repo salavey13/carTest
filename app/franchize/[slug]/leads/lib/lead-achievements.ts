@@ -627,6 +627,35 @@ export function computeLeadAchievements(kpi: LeadKpiMetrics): LeadAchievement[] 
     color: TIER_COLORS.legend,
   });
 
+  // ── LAPS-РИТМ («25 Years of Sales Knowledge», Дент): бизнес строится на
+  // РОВНОЙ недельной воронке (50→10→6→2 каждую неделю), а не на пиках.
+  // Прокси-метрика регулярности: ≥4 разных дней недели с обработками
+  // (пн–пт). Пики «два дня героизма, три дня тишины» бейдж не открывают.
+  const lapRhythm = kpi.speed.activeDaysThisWeek;
+  const rhythmTiers = [
+    { tier: "bronze" as const, target: 3 },
+    { tier: "silver" as const, target: 4 },
+    { tier: "gold" as const, target: 5 },
+  ];
+  const rhythmIdx = rhythmTiers.findLastIndex((t) => lapRhythm >= t.target);
+  const rhythmNext = rhythmTiers[rhythmIdx + 1] ?? null;
+  out.push({
+    id: "lap-rhythm",
+    emoji: "🫀",
+    title: "LAPS-ритм",
+    desc: "Регулярность смены: сколько РАЗНЫХ дней недели были рабочими (была хотя бы одна обработка). Курс LAPS: ровный ритм строит бизнес, пики — нет",
+    tier: rhythmIdx >= 0 ? rhythmTiers[rhythmIdx].tier : "bronze",
+    value: lapRhythm,
+    nextTarget: rhythmNext ? rhythmNext.target : null,
+    progress: rhythmNext ? Math.min(1, lapRhythm / rhythmNext.target) : 1,
+    unlocked: rhythmIdx >= 0,
+    maxed: rhythmIdx === rhythmTiers.length - 1,
+    available: true,
+    valueLabel: `${lapRhythm} дн`,
+    nextLabel: rhythmNext ? `${rhythmNext.target} дн` : null,
+    color: TIER_COLORS[rhythmIdx >= 0 ? rhythmTiers[rhythmIdx].tier : "bronze"],
+  });
+
   return out;
 }
 

@@ -47,7 +47,7 @@ import { isAvitoLead } from "./lead-identity";
 import { GHOST_SILENCE_MS } from "./lead-kpi";
 // public API kept: specs import GHOST_SILENCE_MS from this module
 export { GHOST_SILENCE_MS };
-import { ghostReengageLine, pullUpLine, referralAskLine, seasonalReengageLine } from "./lead-scripts";
+import { givenUpLine, ghostReengageLine, instantFollowUpLine, pullUpLine, referralAskLine, seasonalReengageLine } from "./lead-scripts";
 
 // ── Ориентиры курса (бенчмарки для UI) ─────────────────────────────────────
 
@@ -102,6 +102,12 @@ const PULLUP_HORIZON_MS = 36 * 60 * 60 * 1000;
  * пока эмоция жива. Неделя — разумный горизонт, потом повод остывает.
  */
 export const REFERRAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Давность потери, после которой лид в «Потеряно» становится кандидатом
+ * на реактивацию («Вы передумали?», LAPS reactivation). Месяц — разумный
+ * горизонт: раньше ещё горячий, позже — сезон может уйти.
+ */
+export const LOST_REACTIVATE_MS = 30 * 24 * 60 * 60 * 1000;
 
 // ── Типы ───────────────────────────────────────────────────────────────────
 
@@ -113,7 +119,8 @@ export type NextActionKey =
   | "pull-up"
   | "ghost"
   | "ghost-long"
-  | "referral";
+  | "referral"
+  | "reactivation";
 
 export interface NextAction {
   key: NextActionKey;
@@ -146,6 +153,9 @@ const WEIGHT = {
   // Ниже ghost-long: приятная опция, не операционка — при нескольких
   // закрытиях за неделю не вытесняет перезвоны/ghost/pull-up из очереди.
   referral: 45,
+  // Самый низкий: реактивация «Потеряно» — фоновая работа, никогда
+  // не раньше живых диалогов.
+  reactivation: 40,
 } as const;
 
 const PRE_RENTAL_STAGES: ReadonlySet<string> = new Set([
@@ -267,7 +277,7 @@ export function buildNextActions(
               "🔥",
               `Ответить горячему: ${who}`,
               `ждёт ${fmtAge(ageMs)} — окно первого ответа: +391% к закрытию, мотивация живёт минуты`,
-              `Здравствуйте${name ? `, ${name}` : ""}! Байк свободен — когда удобнее подъехать, сегодня или завтра? Зафиксирую бронь сразу.`,
+              instantFollowUpLine(name),
               leadId,
               "danger",
               WEIGHT.hotFresh,
@@ -444,6 +454,42 @@ export function buildNextActions(
         "info",
         WEIGHT.referral,
         sinceEnd,
+      ),
+    );
+  }
+
+  // ── «Вы передумали?»: реактивация проигранных («25 Years of Sales
+  // Knowledge», LAPS reactivation campaign). Лиды в стадии «Потеряно»
+  // (closed_lost) с давностью ≥ LOST_REACTIVATE_MS: прямой мягкий вопрос
+  // «отказались или ещё думаете?» со встроенным разрешением перестать
+  // напоминать — самый честный способ оживить пул потерь. Отдельный проход:
+  // потерянные не участвуют в очереди ожидания. ВЕС 40 — самый низкий:
+  // реактивация не должна стоять выше живых диалогов.
+  for (const rawLead of leads) {
+    const lead = ensureLeadArraysSafe(rawLead);
+    if (lead.identityState === "operator_placeholder") continue;
+    if ((lead.stageKey || "") !== "closed_lost") continue;
+
+    // Точка потери: последнее касание (модификация/просмотр) или создание.
+    const lostAtMs = safeMs(lead.lastModifiedAt || lead.lastSeenAt || lead.createdAt);
+    if (!Number.isFinite(lostAtMs)) continue;
+    const lostFor = now - lostAtMs;
+    if (lostFor < LOST_REACTIVATE_MS) continue;
+
+    const mode: "rent" | "sale" | "generic" =
+      lead.sales.length > 0 ? "sale" : lead.rentals.length > 0 ? "rent" : "generic";
+    const name = leadFirstName(lead);
+    found.push(
+      action(
+        "reactivation",
+        "📭",
+        `Реактивировать: ${name ? name : "Лид"}`,
+        `в «Потеряно» ${fmtAge(lostFor)} — курс LAPS: прямой вопрос «передумали?» оживляет пул потерь без неловкости`,
+        givenUpLine(mode),
+        lead.user_id || null,
+        "info",
+        WEIGHT.reactivation,
+        lostFor,
       ),
     );
   }

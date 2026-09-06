@@ -33,6 +33,7 @@
 
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { isHandledTodo, isCallbackTodo } from "./lead-handling";
+import { startOfWeek } from "./lead-kpi";
 import { matchTodosToLead } from "./pipeline-stages";
 
 // ── Типы ────────────────────────────────────────────────────────────────────
@@ -59,6 +60,9 @@ export interface LeadSpeedMetrics {
   handledTotal: number;
   /** Из них — с отметкой/активностью СЕГОДНЯ (календарный день now). */
   handledToday: number;
+  /** Разных календарных дней текущей недели (с понедельника), где была
+   *  хотя бы одна обработка — LAPS-ритм: регулярность, а не пики. */
+  activeDaysThisWeek: number;
   /** Лидов сконвертировалось (аренда/покупка/договор) — «до денег дошли». */
   converted: number;
   /** Медиана времени обработки (мс), null — нет ни одной точки. */
@@ -134,6 +138,12 @@ export function fmtDurationMs(ms: number): string {
 }
 
 // ── Внутренние хелперы ──────────────────────────────────────────────────────
+
+/** Ключ календарного дня (локальный) для набора активных дней. */
+function isoDayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
 
 function isSameCalendarDay(iso: string, now: number): boolean {
   const d = new Date(iso);
@@ -218,6 +228,8 @@ export function computeLeadSpeedMetrics(
 
   let handledTotal = 0;
   let handledToday = 0;
+  const weekStart = startOfWeek(now);
+  const activeDays = new Set<string>();
   let converted = 0;
   let under5m = 0;
   let waitingTotal = 0;
@@ -246,6 +258,10 @@ export function computeLeadSpeedMetrics(
     if (isHandled) {
       handledTotal += 1;
       if (handledAt && isSameCalendarDay(handledAt, now)) handledToday += 1;
+      if (handledAt) {
+        const t = new Date(handledAt).getTime();
+        if (Number.isFinite(t) && t >= weekStart) activeDays.add(isoDayKey(handledAt));
+      }
       if (handledAt && lead.createdAt) {
         const created = new Date(lead.createdAt).getTime();
         const done = new Date(handledAt).getTime();
@@ -298,6 +314,7 @@ export function computeLeadSpeedMetrics(
   return {
     handledTotal,
     handledToday,
+    activeDaysThisWeek: activeDays.size,
     converted,
     medianMs,
     avgMs,
