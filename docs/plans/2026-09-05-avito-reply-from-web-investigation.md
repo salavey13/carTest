@@ -61,8 +61,12 @@ CRM (rental.vip-bike.ru)                 Фабрика (marketing.vip-bike.ru)
 
 ## Гейты (нужны владельцу)
 
-1. **OAuth re-auth с scope `messenger:write`** — перейти по authorize-ссылке фабрики,
-   подтвердить в Avito под аккаунтом профилей. До этого отправка невозможна технически.
+1. **OAuth re-auth с scope `messenger:write`** — ✅ инфраструктура готова 05.09
+   (сервис `avito-oauth` на фабрике, авто-обмен на колбэке, refresh-cron,
+   инструкция `integrations/avito-agent/OAUTH-WRITE-TOKEN.md`). Остался один
+   проход владельца по authorize-ссылке **на каждый профиль** (sale/rental,
+   под соответствующим аккаунтом Avito). Проба на фейковом чате покажет
+   `write-ok` / `subscription-required` / `forbidden` и `account_match`.
 2. **Подписка Messenger API для аренды** — влияет и на чтение (402), возможно и на отправку.
 3. **Решение по релею** — согласие, что отправки ходят через фабричный сервер.
 4. Политика безопасности: кто имеет право жать «Отправить» (роль оператора в CRM).
