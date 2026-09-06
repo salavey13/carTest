@@ -30,6 +30,10 @@
 //   8. ПУЛЬС-ЧЕК ПО ДОЛГО ПРОПАВШИМ (50) — тишина ≥ 7 дней: дожим уже
 //      не «куда пропали», а с поводом из факта (сезон/модель) — «нет»
 //      истекает, препятствия (занятость, бюджет месяца) прошли.
+//   9. РЕКОМЕНДАЦИЯ ПОСЛЕ ЗАКРЫТИЯ (45) — «1+1=11» («10 Steps To Become A
+//      Sales Machine», Squibb): просьба в 7-дневном окне после ЗАВЕРШЁННОЙ
+//      (completed) аренды — самая низкая позиция: приятная опция, которая не
+//      вытесняет операционные действия из очереди.
 //
 // Модуль чистый: без React, без Date.now() внутри (now передаётся снаружи).
 // Сообщения переиспользуют скриптовый движок (lead-scripts.ts) — один
@@ -137,7 +141,9 @@ const WEIGHT = {
   pullUp: 60,
   ghost: 55,
   ghostLong: 50,
-  referral: 65,
+  // Ниже ghost-long: приятная опция, не операционка — при нескольких
+  // закрытиях за неделю не вытесняет перезвоны/ghost/pull-up из очереди.
+  referral: 45,
 } as const;
 
 const PRE_RENTAL_STAGES: ReadonlySet<string> = new Set([
@@ -403,26 +409,36 @@ export function buildNextActions(
   // после успешного опыта; рекомендатель рискует своей репутацией, поэтому
   // приведённых друзей потом обслуживают безупречно. Отдельный проход ПОСЛЕ
   // основного цикла: закрытые лиды не участвуют в очереди ожидания.
+  // ВЕС 45 (ниже ghost-long): просьба — приятная опция, а не операционка;
+  // при нескольких закрытиях за неделю она не вытесняет из очереди
+  // перезвоны/ghost/pull-up. Считаем только ЗАВЕРШЁННЫЕ аренды
+  // (status="completed"): у отменённой endDate тоже наступает, но «успешного
+  // опыта» не было — караулить клиента с «Рады, что всё прошло отлично!»
+  // после отмены — прямой вред рекомендациям.
   for (const rawLead of leads) {
     const lead = ensureLeadArraysSafe(rawLead);
     if (lead.identityState === "operator_placeholder") continue;
     if ((lead.stageKey || "") !== "closed_won") continue;
 
-    const finished = lead.rentals
-      .map((r) => safeMs(r.endDate))
-      .filter((t) => Number.isFinite(t) && t < now)
-      .sort((a, b) => b - a); // свежайшая закрытая аренда первой
-    if (finished.length === 0) continue;
-    const sinceEnd = now - finished[0];
-    if (sinceEnd < 0 || sinceEnd > REFERRAL_WINDOW_MS) continue;
+    // Одним проходом: максимальный endDate среди завершённых в прошлом.
+    let latestEndMs = NaN;
+    for (const r of lead.rentals) {
+      if (r.status !== "completed") continue;
+      const t = safeMs(r.endDate);
+      if (Number.isFinite(t) && t < now && (Number.isNaN(latestEndMs) || t > latestEndMs)) {
+        latestEndMs = t;
+      }
+    }
+    if (Number.isNaN(latestEndMs)) continue;
+    const sinceEnd = now - latestEndMs;
+    if (sinceEnd > REFERRAL_WINDOW_MS) continue;
 
     const name = leadFirstName(lead);
-    const who = name ? name : "Лид";
     found.push(
       action(
         "referral",
         "🤝",
-        `Попросить рекомендацию: ${who}`,
+        `Попросить рекомендацию: ${name ? name : "Лид"}`,
         `аренда закрыта ${fmtAge(sinceEnd)} назад — окно «1+1=11»: эмоция от удачной поездки ещё жива`,
         referralAskLine(name),
         lead.user_id || null,

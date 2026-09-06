@@ -386,3 +386,103 @@ describe("lead-playbook: пульс-чек (ghost-long)", () => {
     expect(buildNextActions([lead], [], NOW, 6)).toHaveLength(0);
   });
 });
+
+// ── Плейбук 2026 волна 3: «1+1=11» — рекомендация после закрытой аренды ──
+describe("lead-playbook: рекомендация (referral, «10 Steps» Squibb)", () => {
+  const closedLead = (endIso: string, status = "completed") =>
+    buildLead({
+      stageKey: "closed_won",
+      rentals: [
+        {
+          rentalId: "r-1",
+          status,
+          paymentStatus: "paid",
+          startDate: "2026-08-25T10:00:00.000Z",
+          endDate: endIso,
+          bikeTitle: "Y-VOLT Surge V",
+          totalCost: 12000,
+        },
+      ],
+    });
+
+  it("завершённая аренда 3 дня назад → действие «Попросить рекомендацию»", () => {
+    const end = new Date(NOW - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const actions = buildNextActions([closedLead(end)], [], NOW, 6);
+    const ref = actions.find((a) => a.key === "referral")!;
+    expect(ref).toBeDefined();
+    expect(ref.title).toContain("Иван");
+    expect(ref.message).toContain("перешлите");
+  });
+
+  it("аренда закрыта ровно на границе 7 дней — действие ещё показывается", () => {
+    const end = new Date(NOW - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const actions = buildNextActions([closedLead(end)], [], NOW, 6);
+    expect(actions.find((a) => a.key === "referral")).toBeDefined();
+  });
+
+  it("аренда закрыта 8 дней назад — окно истекло, действия нет", () => {
+    const end = new Date(NOW - 8 * 24 * 60 * 60 * 1000).toISOString();
+    expect(buildNextActions([closedLead(end)], [], NOW, 6)).toHaveLength(0);
+  });
+
+  it("ОТМЕНЁННАЯ аренда (endDate недавно) — НЕ считается успешным опытом", () => {
+    const end = new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString();
+    expect(buildNextActions([closedLead(end, "cancelled")], [], NOW, 6)).toHaveLength(0);
+  });
+
+  it("несколько аренд: берётся свежайшая ЗАВЕРШЁННАЯ, отменённая не мешает", () => {
+    const completedOld = new Date(NOW - 6 * 24 * 60 * 60 * 1000).toISOString();
+    const lead = buildLead({
+      stageKey: "closed_won",
+      rentals: [
+        {
+          rentalId: "r-old", status: "completed", paymentStatus: "paid",
+          startDate: "2026-08-20T10:00:00.000Z", endDate: completedOld,
+          bikeTitle: null, totalCost: 9000,
+        },
+        {
+          rentalId: "r-cancelled", status: "cancelled", paymentStatus: "none",
+          startDate: "2026-09-03T10:00:00.000Z",
+          endDate: new Date(NOW - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          bikeTitle: null, totalCost: 0,
+        },
+      ],
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    const ref = actions.find((a) => a.key === "referral")!;
+    expect(ref).toBeDefined();
+    expect(ref.detail).toContain("6 д"); // свежайшая completed, не отменённая
+  });
+
+  it("не-closed_won лид даже со свежей completed-арендой — действий нет", () => {
+    const end = new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const lead = closedLead(end);
+    lead.stageKey = "active_rental";
+    expect(buildNextActions([lead], [], NOW, 6)).toHaveLength(0);
+  });
+
+  it("вес 45: рекомендация ниже ghost (55) — не вытесняет операционку из очереди", () => {
+    const end = new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString();
+    // Локальная ghost-фикстура (ghostLead из другого describe не видна):
+    // авито-диалог молчит 1 день → действие ghost (вес 55).
+    const lastMessageAt = new Date(NOW - 1 * 24 * 60 * 60 * 1000).toISOString();
+    const ghost = buildLead({
+      createdAt: lastMessageAt,
+      avito: {
+        chatId: "chat-ghost", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Я подумаю", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 4, lastMessageAt,
+      },
+    });
+    const actions = buildNextActions([closedLead(end), ghost], [], NOW, 4);
+    expect(actions.findIndex((a) => a.key === "ghost"))
+      .toBeLessThan(actions.findIndex((a) => a.key === "referral"));
+  });
+
+  it("операторская заглушка (operator_placeholder) — рекомендации нет", () => {
+    const end = new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const lead = closedLead(end);
+    lead.identityState = "operator_placeholder";
+    expect(buildNextActions([lead], [], NOW, 6)).toHaveLength(0);
+  });
+});
