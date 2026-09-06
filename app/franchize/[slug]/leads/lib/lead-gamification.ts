@@ -151,6 +151,11 @@ export function computeOperatorRank(
   profileUnlocks?: Iterable<unknown> | Record<string, unknown> | null,
 ): OperatorRank {
   const xp = xpForStore(store) + xpForProfileUnlocks(profileUnlocks ?? null);
+  return operatorRankForXp(xp);
+}
+
+/** Полная картина звания по голому XP (без стора) — общая математика выше. */
+export function operatorRankForXp(xp: number): OperatorRank {
   const { def, next, progress } = rankForXp(xp);
   return {
     level: def.level,
@@ -161,6 +166,24 @@ export function computeOperatorRank(
     progress,
     xpToNext: next ? Math.max(0, next.floor - xp) : null,
   };
+}
+
+/**
+ * ПРАЗДНИК ЗВАНИЯ (клиентская половина): пересечён ли порог звания переходом
+ * prevXp → nextXp. Возвращает полную картину НОВОГО звания — или null, если
+ * порог не взят (плюс-в-пределах одного звания), движение назад и уровень 1
+ * («Новичок бокса» — старт, не достижение). Прыжок через ДВА порога сразу
+ * (легендарный бейдж = 100 XP) празднует высший взятый.
+ *
+ * Сервер (notifyRankUpIfCrossed) празднует только профильные бейджи —
+ * лидерский localStorage-XP ему недоступен. Эта функция — то, чем панель
+ * лидов закрывает вторую половину пути: бейдж воронки взял порог → баннер.
+ */
+export function detectRankUp(prevXp: number, nextXp: number): OperatorRank | null {
+  const before = rankForXp(prevXp).def;
+  const after = rankForXp(nextXp).def;
+  if (after.level <= 1 || after.level <= before.level) return null;
+  return operatorRankForXp(nextXp);
 }
 
 // ── Карта кормления: шаг плейбука → бейджи ────────────────────────────────

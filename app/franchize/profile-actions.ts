@@ -510,9 +510,12 @@ async function notifyRankUpIfCrossed(params: {
   achievementId: string;
 }): Promise<void> {
   try {
-    const { xpForProfileUnlocks, rankForXp, OPERATOR_RANKS } = await import(
-      "@/app/franchize/[slug]/leads/lib/lead-gamification"
-    );
+    const {
+      PROFILE_XP_FALLBACK,
+      rankForXp,
+      OPERATOR_RANKS,
+      xpForProfileUnlocks,
+    } = await import("@/app/franchize/[slug]/leads/lib/lead-gamification");
 
     const { data: user } = await supabaseAdmin
       .from("users")
@@ -535,9 +538,6 @@ async function notifyRankUpIfCrossed(params: {
     // «Только что пересечён»: это звание требует хотя бы один бейдж
     // достигнутого уровня XP, и текущий бейдж ровно тем — иначе праздник
     // повторялся бы при каждом следующем гранте того же звания.
-    const { PROFILE_XP_FALLBACK } = await import(
-      "@/app/franchize/[slug]/leads/lib/lead-gamification"
-    );
     const floorBefore = xp - PROFILE_XP_FALLBACK;
     const rankBefore = rankForXp(floorBefore).def;
     if (rankBefore.level >= def.level) return;
@@ -587,7 +587,14 @@ function enqueueProfileWrite<T>(key: string, task: () => Promise<T>): Promise<T>
   // Следующая задача стартует независимо от исхода предыдущей (then по обоим
   // веткам); в map кладём «заглушку», которая никогда не реджектится.
   const run = tail.then(task, task);
-  profileWriteQueues.set(key, run.catch(() => undefined));
+  const tailStub = run.catch(() => undefined);
+  profileWriteQueues.set(key, tailStub);
+  // Гигиена памяти: когда наша задача завершилась и map всё ещё держит
+  // ЕЁ хвост (новых грантов не прилетело) — ключ убирается. Долгоживущий
+  // процесс иначе копит resolved-промисы на каждого пользователя навсегда.
+  void tailStub.then(() => {
+    if (profileWriteQueues.get(key) === tailStub) profileWriteQueues.delete(key);
+  });
   return run;
 }
 

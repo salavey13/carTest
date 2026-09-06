@@ -38,9 +38,13 @@ import {
 import {
   actionsFeedingAchievement,
   computeOperatorRank,
+  detectRankUp,
   PLAYBOOK_STEP_META,
   xpForEvent,
+  xpForStore,
+  type OperatorRank,
 } from "../lib/lead-gamification";
+import { LeadsRankUpCelebration } from "./LeadsRankUpCelebration";
 
 interface LeadsAchievementsPanelProps {
   achievements: LeadAchievement[];
@@ -54,6 +58,9 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
   const [expanded, setExpanded] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [toastQueue, setToastQueue] = useState<AchievementEvent[]>([]);
+  // ПРАЗДНИК ЗВАНИЯ: полная картина нового звания или null. Ставится, когда
+  // дифф стора поднял XP через порог (detectRankUp) — см. эффект ниже.
+  const [rankUp, setRankUp] = useState<OperatorRank | null>(null);
 
   // ── Sticky-стор «заработано навсегда» ──
   // storeRef — зеркало для диффа (синхронно виден эффектам), store — рендер-стейт.
@@ -84,9 +91,14 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
       return;
     }
     if (events.length === 0) return;
+    // ПРАЗДНИК ЗВАНИЯ (клиентская половина — сервер лидерский localStorage не
+    // видит): XP до диффа vs после. Порог пересечён → гранд-баннер ровно один
+    // раз на пересечение (базовый прогон выше выходит рано и не доходит сюда).
+    const rankUpReached = detectRankUp(xpForStore(storeRef.current), xpForStore(nextStore));
     storeRef.current = nextStore;
     saveAchievementStore(storageKey, nextStore);
     setStore(nextStore);
+    if (rankUpReached) setRankUp(rankUpReached);
     // Очередь поздравлений: не теряем ни одного события, но и не заслоняем
     // страницу — максимум 4 ждут своей очереди, остальное стор уже запомнил.
     setToastQueue((q) => [...q, ...events].slice(0, 4));
@@ -362,6 +374,10 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
           )}
         </AnimatePresence>
       </motion.div>
+
+      {/* ПРАЗДНИК ЗВАНИЯ — гранд-баннер по центру: sticky-стор пересёк порог.
+          Живёт 9 с или до клика (LeadsRankUpCelebration). */}
+      <LeadsRankUpCelebration rank={rankUp} cardColor={T.bgCard} onDismiss={() => setRankUp(null)} />
 
       {/* Тост-поздравление со свежим событием — по одному из очереди.
           Видно из любой точки страницы, т.к. бейджи живут внизу длинного

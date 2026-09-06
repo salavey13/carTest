@@ -10,13 +10,18 @@
  *     в computeLeadAchievements() и имеет мета для чипов; обратная карта
  *     actionsFeedingAchievement() — точная инверсия; все 8 шагов покрыты.
  *  5. primaryBadgeForAction: первый бейдж из карты, эмодзи/имя на месте.
+ *  6. detectRankUp (праздник звания на клиенте): пересечение порога,
+ *     «в пределах звания» → null, уровень 1 не празднуется, прыжок через
+ *     два порога берёт высший, максимум пути — next = null.
  */
 
 import { describe, expect, it } from "vitest";
 import {
   actionsFeedingAchievement,
   computeOperatorRank,
+  detectRankUp,
   OPERATOR_RANKS,
+  operatorRankForXp,
   PLAYBOOK_FEEDS,
   PLAYBOOK_STEP_META,
   LINKED_ACHIEVEMENT_META,
@@ -187,5 +192,62 @@ describe("lead-gamification: профильный XP-мост", () => {
   it("мост складывается с лидерским стором: бейдж золото (50) + 3 профильных (45) = 95 XP", () => {
     const rank = computeOperatorRank({ speedster: "gold" }, new Set(["a", "b", "c"]));
     expect(rank.xp).toBe(50 + 45);
+  });
+});
+
+// ── Праздник звания на клиенте (detectRankUp) ─────────────────────────────
+// Сервер празднует rank-up только по профильным бейджам (localStorage ему
+// недоступен); лидерскую половину закрывает detectRankUp(prevXp, nextXp),
+// которую панель достижений зовёт после диффа стора.
+describe("lead-gamification: detectRankUp (клиентский праздник звания)", () => {
+  it("переход 95 → 110 XP: взят «Механик», xp и хвост до следующего — от нового значения", () => {
+    const up = detectRankUp(95, 110);
+    expect(up).not.toBeNull();
+    expect(up!.title).toBe("Механик");
+    expect(up!.level).toBe(2);
+    expect(up!.xp).toBe(110);
+    expect(up!.next?.title).toBe("Гонщик");
+    expect(up!.xpToNext).toBe(250 - 110);
+  });
+
+  it("плюс в пределах одного звания → null (праздник не повторяется)", () => {
+    expect(detectRankUp(110, 130)).toBeNull();
+    expect(detectRankUp(0, 15)).toBeNull();
+    expect(detectRankUp(0, 99)).toBeNull();
+  });
+
+  it("движение назад / без движения → null", () => {
+    expect(detectRankUp(120, 100)).toBeNull(); // XP не может упасть в сторе, но функция честна
+    expect(detectRankUp(100, 100)).toBeNull();
+  });
+
+  it("уровень 1 («Новичок бокса») не празднуется — это старт, не достижение", () => {
+    // 0 → 50 XP всё ещё уровень 1 (floor «Механика» = 100).
+    const up = detectRankUp(0, 50);
+    expect(up).toBeNull();
+  });
+
+  it("прыжок через ДВА порога (легенда = 100 XP) празднует высший взятый", () => {
+    // 90 → 260 XP: и «Механик» (100), и «Гонщик» (250) — праздник «Гонщика».
+    const up = detectRankUp(90, 260);
+    expect(up).not.toBeNull();
+    expect(up!.title).toBe("Гонщик");
+    expect(up!.level).toBe(3);
+  });
+
+  it("максимальное звание: next = null, xpToNext = null", () => {
+    const up = detectRankUp(690, 720);
+    expect(up).not.toBeNull();
+    expect(up!.title).toBe("Легенда экипажа");
+    expect(up!.next).toBeNull();
+    expect(up!.xpToNext).toBeNull();
+    expect(up!.progress).toBe(1);
+  });
+
+  it("operatorRankForXp согласован с computeOperatorRank на том же XP", () => {
+    const store: AchievementStore = { speedster: "gold", closer: "silver" }; // 50 + 25 = 75
+    const viaStore = computeOperatorRank(store);
+    const viaXp = operatorRankForXp(viaStore.xp);
+    expect(viaXp).toEqual(viaStore);
   });
 });

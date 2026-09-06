@@ -955,6 +955,7 @@ export function LeadsClient({
           actions={playbookActions}
           onOpenLead={(leadId) => setSelectedId(leadId)}
           T={T}
+          storageKey={`leads-achv:${slug}`}
         />
 
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,

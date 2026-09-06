@@ -25,7 +25,7 @@ import { withAlpha } from "@/app/franchize/lib/theme";
 import type { FranchizeAchievementDefinition } from "@/app/franchize/profile-actions";
 import { EmptyState, itemVariants, type CrewTokens } from "./profile-shared";
 import { computeOperatorRank, xpForProfileUnlocks } from "@/app/franchize/[slug]/leads/lib/lead-gamification";
-import { loadAchievementStore } from "@/app/franchize/[slug]/leads/lib/lead-achievements";
+import { loadAchievementStore, type AchievementStore } from "@/app/franchize/[slug]/leads/lib/lead-achievements";
 
 export function AchievementsPanel({
   catalog,
@@ -43,14 +43,14 @@ export function AchievementsPanel({
 }) {
   // Лидерский sticky-стор (id → лучший уровень). Читается после монтирования
   // (SSR = {}), чтобы не расходиться с гидрацией.
-  const [leadStore, setLeadStore] = useState<Record<string, string>>({});
+  const [leadStore, setLeadStore] = useState<AchievementStore>({});
   useEffect(() => {
     if (!slug) return;
     setLeadStore(loadAchievementStore(`leads-achv:${slug}`));
   }, [slug]);
 
   const rank = useMemo(
-    () => computeOperatorRank(leadStore as never, unlockedSet),
+    () => computeOperatorRank(leadStore, unlockedSet),
     [leadStore, unlockedSet],
   );
 

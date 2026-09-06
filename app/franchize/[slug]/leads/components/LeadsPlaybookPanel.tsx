@@ -16,12 +16,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ListChecks, Copy, Check, Sparkles, ChevronRight } from "lucide-react";
 import type { NextAction } from "../lib/lead-playbook";
 import { PLAYBOOK_BENCHMARKS } from "../lib/lead-playbook";
-import { primaryBadgeForAction } from "../lib/lead-gamification";
+import { computeOperatorRank, operatorRankForXp, primaryBadgeForAction } from "../lib/lead-gamification";
+import { loadAchievementStore } from "../lib/lead-achievements";
 
 interface LeadsPlaybookPanelProps {
   actions: NextAction[];
@@ -30,6 +31,11 @@ interface LeadsPlaybookPanelProps {
    *  начинается с открытия диалога). leadId отсутствует → строка статична. */
   onOpenLead?: (leadId: string) => void;
   T: any;
+  /** Ключ sticky-стора достижений (`leads-achv:<slug>`) — из него считается
+   *  звание «пути оператора» для чипа в шапке. Связка замыкается там, где
+   *  идёт работа: SOP-шаги сверху → бейджи внизу страницы → XP → звание.
+   *  Без ключа чип не рисуется. */
+  storageKey?: string;
 }
 
 const TONE_COLOR: Record<NextAction["tone"], string> = {
@@ -38,9 +44,25 @@ const TONE_COLOR: Record<NextAction["tone"], string> = {
   info: "#3b82f6",
 };
 
-export function LeadsPlaybookPanel({ actions, onOpenLead, T }: LeadsPlaybookPanelProps) {
+export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey }: LeadsPlaybookPanelProps) {
   // Какая строка только что скопирована — галочка вместо иконки на 2 секунды.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // ПУТЬ ОПЕРАТОРА в контексте работы: звание из того же sticky-стора, что
+  // у панели достижений. Читается после монтирования (SSR — пусто) и ЖИВО:
+  // saveAchievementStore шлёт window-событие «leads-achv-changed»
+  // (storage-события в своей вкладке не срабатывают), чип перечитывает стор —
+  // XP растёт прямо над очередью действий, без перезагрузки. Чип появляется,
+  // как только есть первый XP: свежий оператор не видит шума.
+  const [leadXp, setLeadXp] = useState(0);
+  useEffect(() => {
+    if (!storageKey) return;
+    const reload = () => setLeadXp(computeOperatorRank(loadAchievementStore(storageKey)).xp);
+    reload();
+    window.addEventListener("leads-achv-changed", reload as EventListener);
+    return () => window.removeEventListener("leads-achv-changed", reload as EventListener);
+  }, [storageKey]);
+  const rank = useMemo(() => operatorRankForXp(leadXp), [leadXp]);
 
   const copyMessage = async (key: string, text: string) => {
     try {
@@ -83,6 +105,20 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T }: LeadsPlaybookPane
               : [2, 3, 4].includes(actions.length % 10) && ![12, 13, 14].includes(actions.length % 100)
                 ? "действия"
                 : "действий"}
+          </span>
+        )}
+        {/* ПУТЬ ОПЕРАТОРА — чип звания в шапке плейбука: путь виден там, где
+            идёт работа (панель достижений — внизу длинного скролла). Появляется
+            с первым XP; тултип объясняет весь цикл SOP → бейдж → XP → звание. */}
+        {leadXp > 0 && (
+          <span
+            className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+            style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "#f59e0b" }}
+            title={`Путь оператора: ${rank.xp} XP. Шаги этой очереди открывают бейджи — бейджи дают XP, XP растит звание. Панель достижений внизу страницы.`}
+          >
+            <span aria-hidden>{rank.emoji}</span>
+            {rank.title} · {rank.xp} XP
+            {rank.next && <span className="hidden font-semibold sm:inline">· ещё {rank.xpToNext}</span>}
           </span>
         )}
       </div>

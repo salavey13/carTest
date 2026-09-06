@@ -769,11 +769,16 @@ export function loadAchievementStore(key: string): AchievementStore {
   }
 }
 
-/** Пишет стор; приватный режим и переполнение тихо игнорируются. */
+/** Пишет стор; приватный режим и переполнение тихо игнорируются.
+ *  После записи шлёт window-событие «leads-achv-changed»: storage-события
+ *  НЕ срабатывают в своей же вкладке, а на странице несколько слушателей
+ *  одного стора (панель достижений, чип звания в плейбуке) — пусть
+ *  узнают об обновлении сразу, без опроса. */
 export function saveAchievementStore(key: string, store: AchievementStore): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(store));
+    window.dispatchEvent(new CustomEvent("leads-achv-changed", { detail: { key } }));
   } catch {
     /* private mode / quota — стор живёт в памяти до перезагрузки */
   }
