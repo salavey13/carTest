@@ -39,7 +39,7 @@ import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { ensureLeadArraysSafe } from "./lead-speed";
 import { matchTodosToLead } from "./pipeline-stages";
 import { getLeadHandling } from "./lead-handling";
-import { ghostReengageLine, pullUpLine, seasonalReengageLine } from "./lead-scripts";
+import { ghostReengageLine, pullUpLine, referralAskLine, seasonalReengageLine } from "./lead-scripts";
 
 // ── Ориентиры курса (бенчмарки для UI) ─────────────────────────────────────
 
@@ -90,6 +90,12 @@ export const GHOST_SILENCE_MS = 24 * 60 * 60 * 1000;
 export const GHOST_LONG_SILENCE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Аренда стартует позже чем через… — кандидат на «подтянуть на сегодня». */
 const PULLUP_HORIZON_MS = 36 * 60 * 60 * 1000;
+/**
+ * Окно просьбы о рекомендации после закрытой аренды («1+1=11», 10 Steps
+ * To Become A Sales Machine): лучшее время — сразу после успешного опыта,
+ * пока эмоция жива. Неделя — разумный горизонт, потом повод остывает.
+ */
+export const REFERRAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ── Типы ───────────────────────────────────────────────────────────────────
 
@@ -100,7 +106,8 @@ export type NextActionKey =
   | "contract-hanging"
   | "pull-up"
   | "ghost"
-  | "ghost-long";
+  | "ghost-long"
+  | "referral";
 
 export interface NextAction {
   key: NextActionKey;
@@ -130,6 +137,7 @@ const WEIGHT = {
   pullUp: 60,
   ghost: 55,
   ghostLong: 50,
+  referral: 65,
 } as const;
 
 const PRE_RENTAL_STAGES: ReadonlySet<string> = new Set([
@@ -388,6 +396,41 @@ export function buildNextActions(
         }
       }
     }
+  }
+
+  // ── «1+1=11»: попросить рекомендацию у свежезакрытой аренды («10 Steps
+  // To Become A Sales Machine», Squibb) — лучший момент для просьбы сразу
+  // после успешного опыта; рекомендатель рискует своей репутацией, поэтому
+  // приведённых друзей потом обслуживают безупречно. Отдельный проход ПОСЛЕ
+  // основного цикла: закрытые лиды не участвуют в очереди ожидания.
+  for (const rawLead of leads) {
+    const lead = ensureLeadArraysSafe(rawLead);
+    if (lead.identityState === "operator_placeholder") continue;
+    if ((lead.stageKey || "") !== "closed_won") continue;
+
+    const finished = lead.rentals
+      .map((r) => safeMs(r.endDate))
+      .filter((t) => Number.isFinite(t) && t < now)
+      .sort((a, b) => b - a); // свежайшая закрытая аренда первой
+    if (finished.length === 0) continue;
+    const sinceEnd = now - finished[0];
+    if (sinceEnd < 0 || sinceEnd > REFERRAL_WINDOW_MS) continue;
+
+    const name = leadFirstName(lead);
+    const who = name ? name : "Лид";
+    found.push(
+      action(
+        "referral",
+        "🤝",
+        `Попросить рекомендацию: ${who}`,
+        `аренда закрыта ${fmtAge(sinceEnd)} назад — окно «1+1=11»: эмоция от удачной поездки ещё жива`,
+        referralAskLine(name),
+        lead.user_id || null,
+        "info",
+        WEIGHT.referral,
+        sinceEnd,
+      ),
+    );
   }
 
   return found
