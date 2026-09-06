@@ -372,8 +372,11 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                     // when the user clicks the overflow trigger.
                     e.stopPropagation();
                   }}
-                  className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition hover:bg-black/5"
-                  style={{ color: T.textFaint, minHeight: "28px", minWidth: "28px" }}
+                  // MOBILE WAVE 3: hit-area 28px → 36px (Apple HIG / Material
+                  // — минимальный палец-тач), визуально компенсируем
+                  // отрицательными полями, чтобы шапка карточки не выросла.
+                  className="-m-1 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg transition hover:bg-black/5"
+                  style={{ color: T.textFaint }}
                   aria-label="Действия с лидом"
                 >
                   <MoreVertical className="h-3.5 w-3.5" />

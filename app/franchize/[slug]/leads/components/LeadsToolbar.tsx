@@ -552,7 +552,7 @@ function Dropdown({
                       onChange(opt.value);
                       setOpen(false);
                     }}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs transition hover:opacity-80"
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs transition hover:opacity-80 sm:py-2"
                     style={{ color: active ? T.borderActive : T.text }}
                   >
                     <span className="truncate">{opt.label}</span>

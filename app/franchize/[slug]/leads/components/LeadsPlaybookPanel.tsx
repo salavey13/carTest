@@ -53,6 +53,10 @@ interface LeadsPlaybookPanelProps {
    *  crew-only. Без ключа чекбоксы не рисуются (обычному пользователю
    *  очередь просто читается). */
   doneStorageKey?: string;
+  /** Ключ session-предпочтения «очередь развёрнута» на телефоне — для
+   *  ВСЕХ пользователей (очередь — не геймификация). Без ключа компактный
+   *  режим просто сворачивается на каждый новый заход. */
+  compactPrefKey?: string;
 }
 
 const TONE_COLOR: Record<NextAction["tone"], string> = {
@@ -96,7 +100,16 @@ function saveDoneSet(storageKey: string, keys: Set<string>): void {
   }
 }
 
-export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey }: LeadsPlaybookPanelProps) {
+/** Микро-тактильный отклик (Android/Chrome; iOS тихо игнорирует). */
+function buzz(ms = 10): void {
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* нет хаптики — не беда */
+  }
+}
+
+export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey, compactPrefKey }: LeadsPlaybookPanelProps) {
   // Какая строка только что скопирована — галочка вместо иконки на 2 секунды.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -130,6 +143,9 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
     (key: string) => {
       if (!doneStorageKey) return;
       setDoneKeys((prev) => {
+        // Тактильный клик на «сделал» (на «вернуть в очередь» — тихо:
+        // отмена — не достижение).
+        if (!prev.has(key)) buzz(12);
         const next = new Set(prev);
         if (next.has(key)) next.delete(key);
         else next.add(key);
@@ -152,18 +168,38 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
   }, [actions, doneKeys, doneStorageKey]);
 
   // Компактный режим на телефоне: первые 2 активных + «ещё N».
-  // SSR-начало — развернуто (гидрация без расхождений), после монтирования
-  // сужаем на <sm: очередь — рабочий список, но 6 строк на телефоне съедают
-  // экран; 2 первых + счётчик дают картину без свайпа.
+  // SSR-начало — развернуто (гидрация без расхождений); ПЕРВЫЙ замер после
+  // монтирования сужает <sm: очередь — рабочий список, но 6 строк на
+  // телефоне съедают экран; 2 первых + счётчик дают картину без свайпа.
+  // FIX: раньше expandedMobile инициализировался true и НИЧЕГО не сбрасывал
+  // его в false — compact оставался false навсегда, «ещё N» не появлялся,
+  // и телефон всегда получал все 6 строк (компактный режим был мёртвым
+  // кодом). Теперь первый замер matchMedia сворачивает очередь; последующие
+  // смены ориентировки/ресайза выбор пользователя не перекрывают.
+  // Развёрнутое состояние ОПОМИНАЕТСЯ в sessionStorage (compactPrefKey) —
+  // оператор, работающий из полной очереди, не сворачивает её заново
+  // на каждом возврате на страницу.
   const [expandedMobile, setExpandedMobile] = useState(true);
   const [isNarrow, setIsNarrow] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
-    const sync = () => setIsNarrow(mq.matches);
+    const prefExpanded = (() => {
+      try {
+        return !!compactPrefKey && window.sessionStorage.getItem(compactPrefKey) === "1";
+      } catch {
+        return false;
+      }
+    })();
+    let first = true;
+    const sync = () => {
+      setIsNarrow(mq.matches);
+      if (first && mq.matches && !prefExpanded) setExpandedMobile(false);
+      first = false;
+    };
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
-  }, []);
+  }, [compactPrefKey]);
   const compact = isNarrow && !expandedMobile;
   const visibleActive = compact ? active.slice(0, 2) : active;
   const hiddenCount = active.length - visibleActive.length;
@@ -173,6 +209,7 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
     try {
       await navigator.clipboard.writeText(text);
       setCopiedKey(key);
+      buzz(8);
       window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
     } catch {
       // Clipboard API может быть недоступен (http/TG WebView) — тихо игнорируем:
@@ -189,7 +226,9 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
     // метрику, которую меряет бейдж (lib/lead-gamification.ts).
     // Чип показывает, какой бейдж прокачает этот шаг — оператор видит,
     // что SOP-действие не абстрактная дисциплина, а прогресс в пути.
-    const feeds = isDoneRow ? null : primaryBadgeForAction(a.key);
+    // CREW ONLY: чип — часть геймификации, обычному пользователю не
+    // показывается (storageKey — crew-маркер, как у чипа звания выше).
+    const feeds = isDoneRow || !storageKey ? null : primaryBadgeForAction(a.key);
     // Тело строки — кнопка, если есть лид-адресат: клик открывает
     // шторку лида (полный контекст перед звонком/сообщением).
     const Body = clickable ? "button" : "div";
@@ -389,7 +428,18 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
           {hiddenCount > 0 && (
             <button
               type="button"
-              onClick={() => setExpandedMobile(true)}
+              onClick={() => {
+                setExpandedMobile(true);
+                // Помним выбор до конца таб-сессии — возвраты на страницу
+                // не сворачивают очередь заново.
+                if (compactPrefKey) {
+                  try {
+                    window.sessionStorage.setItem(compactPrefKey, "1");
+                  } catch {
+                    /* private mode */
+                  }
+                }
+              }}
               className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition active:scale-[0.99]"
               style={{ borderColor: T.border, color: T.textMuted }}
             >

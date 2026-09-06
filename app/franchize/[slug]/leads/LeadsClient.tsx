@@ -29,7 +29,7 @@ import { LeadDetailSheet } from "./components/LeadDetailSheet";
 import type { LeadDrawerNote } from "./components/LeadDetailDrawer";
 import { getLeadNotes, createLeadNote } from "@/app/franchize/server-actions/lead-notes";
 import { notifyLeadViaTelegram } from "@/app/franchize/server-actions/lead-notify";
-import { getFranchizeOperatorDashboardAccess } from "@/app/franchize/actions";
+import { probeCrewAccess } from "@/app/franchize/lib/crew-access-client";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
@@ -257,6 +257,9 @@ export function LeadsClient({
   // серверной TG-сессии). Дефолт false — пока сервер не подтвердил, панелей
   // нет (без вспышки), и computeLeadAchievements для не-crew не вызывается.
   // Парольные зрители (без TG-идентичности) экипажем не считаются.
+  // PROBE: тот же чек запрашивают AchievementToastSync (layout) и
+  // AchievementExplorer — общий single-flight+TTL probe превращает 3
+  // одинаковых server-action-запроса в 1 на страницу.
   const [isCrew, setIsCrew] = useState(false);
   useEffect(() => {
     if (!dbUser?.user_id || !slug) {
@@ -264,9 +267,9 @@ export function LeadsClient({
       return;
     }
     let cancelled = false;
-    void getFranchizeOperatorDashboardAccess({ slug })
+    void probeCrewAccess(slug)
       .then((res) => {
-        if (!cancelled) setIsCrew(!!(res?.success && res?.canOpen));
+        if (!cancelled) setIsCrew(res.canOpen);
       })
       .catch(() => {
         if (!cancelled) setIsCrew(false);
@@ -466,6 +469,22 @@ export function LeadsClient({
   }, [operators, leadsState]);
 
   const hasFilters = baseHasFilters || filterStage !== "all" || filterOwner !== "all";
+
+  // FIX (mobile wave 3, dead button): EmptyState рисует «Сбросить фильтры»,
+  // но onReset никто не передавал — кнопка была мёртвой (клик ничего не
+  // делал). Сбрасываем ВСЁ, что участвует в hasFilters: поиск, источник,
+  // стадию, ответственного, сегмент и флаг заглушек. Сортировку не трогаем —
+  // это не фильтр, оператор выбирал её осознанно. Пагинация пересчитывается
+  // сама (effect выше следит за этими же зависимостями).
+  const resetAllFilters = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+    setFilterSource("all");
+    setFilterStage("all");
+    setFilterOwner("all");
+    setSegment("all");
+    setHidePlaceholders(false);
+  }, []);
 
   // Filter out operator placeholders from segment counts for cleaner metrics
   const activeLeads = useMemo(() => 
@@ -962,6 +981,7 @@ export function LeadsClient({
         T={T}
         storageKey={isCrew ? `leads-achv:${slug}` : undefined}
         doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
+        compactPrefKey={`leads-playbook-expanded:${slug}`}
       />
 
       {/* MOBILE: аналитика (скорость/воронка/достижения) — за компактным
@@ -1073,7 +1093,7 @@ export function LeadsClient({
         // the card list (click a row → detail panel on desktop / sheet on
         // mobile), but dense and scannable.
         sortedLeads.length === 0 ? (
-          <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
+          <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} onReset={resetAllFilters} T={T} />
         ) : (
           <LeadTableView
             leads={visibleLeads}
@@ -1088,7 +1108,7 @@ export function LeadsClient({
           />
         )
       ) : sortedLeads.length === 0 ? (
-        <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} T={T} />
+        <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} onReset={resetAllFilters} T={T} />
       ) : (
         <LeadList
           leads={visibleLeads}

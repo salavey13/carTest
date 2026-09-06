@@ -4,9 +4,14 @@
 // ──────────────────────────────────────────────────────────────────────────
 // Mounts on crew tool pages (analytics / leads / todos / salary / dashboard /
 // map-riders). On mount, grants the matching "explorer_*" achievement to crew
-// members (server gates access) and toasts the newly unlocked badges.
+// members and toasts the newly unlocked badges.
 //
-// One call per page per session (sessionStorage guard) — re-visiting the page
+// CREW ONLY: the shared crew-access probe (lib/crew-access-client.ts) is
+// checked BEFORE the grant call — ordinary users fire zero gamification
+// requests from their client. The server still re-gates the grant itself
+// (client check is UX optimization, not the security boundary).
+//
+// One probe per page per session (sessionStorage guard) — re-visiting the page
 // in the same session does not re-fire the server action.
 
 import { useEffect, useRef } from "react";
@@ -14,6 +19,7 @@ import { toast } from "sonner";
 import { Trophy } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { grantFranchizeExplorationAchievementAction } from "@/app/franchize/profile-actions";
+import { probeCrewAccess } from "@/app/franchize/lib/crew-access-client";
 
 export function AchievementExplorer({
   slug,
@@ -42,6 +48,14 @@ export function AchievementExplorer({
     let cancelled = false;
     void (async () => {
       try {
+        // CREW ONLY: probe first (shared single-flight+TTL — dedupes with
+        // AchievementToastSync / LeadsClient on the same page). Non-crew
+        // clients now fire ZERO gamification requests: previously the grant
+        // action was called for every logged-in visitor and rejected
+        // server-side — a wasted roundtrip (and a gamification trace) per
+        // page per session for ordinary users.
+        const access = await probeCrewAccess(slug);
+        if (cancelled || !access.canOpen) return;
         const result = await grantFranchizeExplorationAchievementAction({
           userId: dbUser.user_id!,
           slug,
