@@ -29,6 +29,7 @@ import { LeadDetailSheet } from "./components/LeadDetailSheet";
 import type { LeadDrawerNote } from "./components/LeadDetailDrawer";
 import { getLeadNotes, createLeadNote } from "@/app/franchize/server-actions/lead-notes";
 import { notifyLeadViaTelegram } from "@/app/franchize/server-actions/lead-notify";
+import { getFranchizeOperatorDashboardAccess } from "@/app/franchize/actions";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { EmptyState } from "./components/EmptyState";
 import { LeadDetailContent } from "./components/LeadDetailContent";
@@ -248,6 +249,33 @@ export function LeadsClient({
   const isAuthed = !!(dbUser?.user_id || passwordAuthed);
   const shouldShowPassword = !isInTelegram && !dbUser?.user_id && !passwordAuthed;
 
+  // ── CREW-гейт геймификации («достижения — только для своих») ──
+  // Путь оператора (достижения, XP, чип звания в плейбуке) — инструмент
+  // экипажа; обычному пользователю страницы он не показывается вовсе.
+  // Тот же серверный чек, что гейтит crew-панели профиля
+  // (getFranchizeOperatorDashboardAccess: admin/owner/active member по
+  // серверной TG-сессии). Дефолт false — пока сервер не подтвердил, панелей
+  // нет (без вспышки), и computeLeadAchievements для не-crew не вызывается.
+  // Парольные зрители (без TG-идентичности) экипажем не считаются.
+  const [isCrew, setIsCrew] = useState(false);
+  useEffect(() => {
+    if (!dbUser?.user_id || !slug) {
+      setIsCrew(false);
+      return;
+    }
+    let cancelled = false;
+    void getFranchizeOperatorDashboardAccess({ slug })
+      .then((res) => {
+        if (!cancelled) setIsCrew(!!(res?.success && res?.canOpen));
+      })
+      .catch(() => {
+        if (!cancelled) setIsCrew(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dbUser?.user_id, slug]);
+
   // Fetch leads client-side after auth passes (page.tsx passes empty arrays for security)
   //
   // ROBUSTNESS FIX (iter8, "leads sometimes don't load in desktop web Telegram"):
@@ -457,16 +485,20 @@ export function LeadsClient({
     [activeLeads, todosState, nowTick],
   );
   // Достижения — геймификация тех же цифр (бронза/серебро/золото/легенда).
+  // CREW ONLY: для обычных пользователей не считаем ВООБЩЕ (нулевой CPU на
+  // ~27 бейджей × каждый пересчёт лидов) и не показываем панель.
   const achievements = useMemo(
-    () => computeLeadAchievements(kpiMetrics),
-    [kpiMetrics],
+    () => (isCrew ? computeLeadAchievements(kpiMetrics) : []),
+    [kpiMetrics, isCrew],
   );
   // Плейбук смены — очередь «что делать сейчас» (off-the-call SOP из курса
   // The Ultimate Sales Training 2026): горячие в золотом окне, просроченные
   // перезвоны, свежие «кто первый», висящие договоры, pull-up броней,
   // реанимация «пропавших». Чистый расчёт от тех же данных, тот же nowTick.
+  // Лимит 6 (потолок lib): панель сама покажет компактные 2 на сложенном
+  // мобильном виде и всё остальное — по «ещё N».
   const playbookActions = useMemo(
-    () => buildNextActions(activeLeads, todosState, nowTick, 4),
+    () => buildNextActions(activeLeads, todosState, nowTick, 6),
     [activeLeads, todosState, nowTick],
   );
 
@@ -919,6 +951,19 @@ export function LeadsClient({
     <div className="space-y-5">
       <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
 
+      {/* Плейбук смены — ВСЕГДА на виду (и на телефоне тоже): это не
+          аналитика, а рабочая очередь «что делать сейчас». Раньше он жил
+          внутри мобильного свёртка «Аналитика смены» — и главный SOP-
+          инструмент оператора был спрятан за тапом. Панель сама компактна
+          на телефоне (2 действия + «ещё N»). Чип звания — crew-only. */}
+      <LeadsPlaybookPanel
+        actions={playbookActions}
+        onOpenLead={(leadId) => setSelectedId(leadId)}
+        T={T}
+        storageKey={isCrew ? `leads-achv:${slug}` : undefined}
+        doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
+      />
+
       {/* MOBILE: аналитика (скорость/воронка/достижения) — за компактным
           переключателем. На телефоне три панели занимали ~1.5 экрана и
           уводили сами ЛИДЫ под сгиб; свёрнуто по умолчанию, выбор помнится.
@@ -947,25 +992,17 @@ export function LeadsClient({
             speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
         <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
 
-        {/* Плейбук смены: упорядоченная очередь действий с готовыми
-            сообщениями (курс 2026: off-the-call SOP решает больше, чем
-            скрипт в диалоге). Клик по действию открывает лида-адресата
-            в шторке — «прочитал → открыл → сделал». */}
-        <LeadsPlaybookPanel
-          actions={playbookActions}
-          onOpenLead={(leadId) => setSelectedId(leadId)}
-          T={T}
-          storageKey={`leads-achv:${slug}`}
-        />
-
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
             конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}
         <LeadsFunnelPanel kpi={kpiMetrics} T={T} />
 
-        {/* Достижения экипажа: геймификация метрик воронки/скорости.
-            storageKey — sticky-стор «заработано навсегда» на экипаж (фикс
-            повторных тостов при колебании метрик и перезагрузках). */}
-        <LeadsAchievementsPanel achievements={achievements} storageKey={`leads-achv:${slug}`} T={T} />
+        {/* Достижения экипажа — CREW ONLY (путь оператора не для обычных
+            пользователей; для не-crew панель даже не считается). storageKey —
+            sticky-стор «заработано навсегда» на экипаж (фикс повторных тостов
+            при колебании метрик и перезагрузках). */}
+        {isCrew && (
+          <LeadsAchievementsPanel achievements={achievements} storageKey={`leads-achv:${slug}`} T={T} />
+        )}
       </div>
 
       {/* Load-error banner — silent empty pages were the #1 desktop-web-Telegram
@@ -1076,7 +1113,7 @@ export function LeadsClient({
           <button
             type="button"
             onClick={() => setVisibleCount((c) => c + LEADS_PAGE_SIZE)}
-            className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99]"
+            className="flex min-h-[44px] items-center rounded-xl border px-5 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99]"
             style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
           >
             Показать ещё {Math.min(LEADS_PAGE_SIZE, hiddenCount)}

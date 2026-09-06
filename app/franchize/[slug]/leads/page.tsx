@@ -34,11 +34,11 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
     <main className="min-h-screen" style={surface.page}>
       <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_leads" />
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/leads`} groupLinks={[]} items={[]} />
-      <div className="mx-auto w-full max-w-7xl px-4 py-6">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--franchize-text-primary, inherit)" }}>
+      <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:py-6">
+        <h1 className="text-xl font-bold sm:text-2xl" style={{ color: "var(--franchize-text-primary, inherit)" }}>
           Клиенты и заявки
         </h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
+        <p className="mt-1 text-[13px] sm:text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
           Все, кто оставил заявку, интересовался техникой или оформлял аренду
         </p>
         <AnalyticsLeadsNav slug={crew.slug || slug} />
