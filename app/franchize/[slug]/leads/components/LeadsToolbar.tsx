@@ -319,16 +319,20 @@ export function LeadsToolbar({
         </button>
       </div>
 
-      {/* ── Row 3: segment chips — horizontal scroll on all sizes ── */}
+      {/* ── Row 3: segment chips — horizontal scroll on all sizes ──
+          MOBILE POLISH: py-2.5 на телефоне (тап ≥40px, Apple HIG 44px
+          рекомендация), snap-прокрутка без «залипания» между чипами,
+          при скролле — обрезка контента по краю (scroll-padding). */}
       <div
-        className="pb-1"
+        className="snap-x snap-mandatory pb-1.5"
         style={{
           display: "flex",
-          gap: "4px",
+          gap: "6px",
           overflowX: "auto",
           overflowY: "hidden",
           scrollbarWidth: "none",
           WebkitOverflowScrolling: "touch",
+          scrollPaddingLeft: "2px",
         }}
       >
         {(Object.keys(SEGMENT_META) as Segment[]).map((key) => {
@@ -340,13 +344,14 @@ export function LeadsToolbar({
             <button
               key={key}
               onClick={() => setSegment(key)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+              aria-pressed={active}
+              className={`flex snap-start items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition active:scale-[0.97] sm:py-1.5 ${
                 active ? "" : "hover:opacity-80"
               }`}
               style={
                 active
                   ? { flexShrink: 0, backgroundColor: meta.color + "15", color: meta.color, borderColor: meta.color + "40" }
-                  : { flexShrink: 0, color: T.textMuted, borderColor: "transparent" }
+                  : { flexShrink: 0, color: T.textMuted, borderColor: "transparent", backgroundColor: T.borderSoft }
               }
             >
               <Icon className="h-3.5 w-3.5" />
@@ -480,18 +485,17 @@ function Dropdown({
         onClick={() => setOpen(!open)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="inline-flex items-center gap-1 rounded-xl border whitespace-nowrap transition"
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border py-2.5 text-[11px] transition active:scale-[0.97] sm:py-2"
         style={{
           borderColor: open ? T.borderActive : T.inputBorder,
           backgroundColor: T.inputBg,
           color: T.text,
-          // MOBILE: 11px + увеличенные тапы (38px высота) — прошлые 10px/7px
-          // были ниже комфортной зоны касания Apple (44px) и Android (48px).
-          fontSize: "11px",
           lineHeight: "1",
-          padding: "9px 10px",
+          padding: undefined,
           maxWidth: "160px",
           overflow: "hidden",
+          paddingLeft: "10px",
+          paddingRight: "10px",
         }}
       >
         <span style={{ color: T.textMuted, flexShrink: 0 }}>{label}:</span>

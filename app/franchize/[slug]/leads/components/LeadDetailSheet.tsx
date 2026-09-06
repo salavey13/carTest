@@ -271,36 +271,35 @@ export function LeadDetailSheet({ open, onClose, children, title, T }: LeadDetai
               dragElastic={{ top: 0, bottom: 0.4 }}
               onDragEnd={handleDragEnd}
             >
-              {/* Sticky sheet header — drag handle + title + X on the right.
-                  The sheet's top is BELOW the measured CrewHeader bottom, so
-                  the X can never end up under the header. It is also centered
-                  in the row above the content, away from the Telegram-native
-                  top corner buttons. */}
+              {/* Sticky sheet header — handle + title + X. Вся строка —
+                  drag-регион (мобильный полиш: раньше тянуть можно было
+                  только за ручку 44px — мимо пальца на ходу); X-кнопка
+                  исключена из drag (stopPropagation на pointerdown), чтобы
+                  закрытие листа не путалось с закрытием шторки. Верх шторки
+                  ниже измеренного низа CrewHeader — X не может уехать под
+                  нативные кнопки Telegram. */}
               <div
                 className="sticky top-0 z-10 flex shrink-0 items-center gap-3 px-3 pb-2 pt-3"
                 style={{
                   backgroundColor: T.bgCard,
                   borderBottom: `1px solid ${T.borderSoft}`,
                 }}
+                onPointerDown={(e) => {
+                  // Вся шапка тянет шторку вниз, кроме кнопки X (см. ниже).
+                  if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
+                  dragControls.start(e);
+                }}
               >
-                {/* Drag handle — the only draggable region */}
-                <motion.div
-                  onPointerDown={(e) => {
-                    dragControls.start(e);
-                  }}
-                  className="flex h-11 w-11 shrink-0 cursor-grab items-center justify-center rounded-md active:cursor-grabbing"
-                  aria-label="Перетащите вниз, чтобы закрыть"
-                  role="button"
-                  tabIndex={-1}
-                >
+                {/* Визуальная ручка — по центру первого ряда шапки */}
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md">
                   <div
                     className="h-1.5 w-10 rounded-full"
                     style={{ backgroundColor: T.textFaint }}
                   />
-                </motion.div>
+                </div>
                 {title && (
                   <p
-                    className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight"
+                    className="min-w-0 flex-1 cursor-grab select-none truncate text-sm font-semibold leading-tight active:cursor-grabbing"
                     style={{ color: T.text }}
                   >
                     {title}
@@ -308,6 +307,8 @@ export function LeadDetailSheet({ open, onClose, children, title, T }: LeadDetai
                 )}
                 <button
                   type="button"
+                  data-no-drag
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={onClose}
                   className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:bg-black/10 active:scale-95"
                   style={{ color: T.textMuted, borderColor: T.borderSoft }}

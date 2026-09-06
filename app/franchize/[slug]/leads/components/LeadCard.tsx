@@ -559,63 +559,67 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
             )}
           </div>
 
-          {/* Bike + rental summary */}
-          {(lead.bikeTitle || rental) && (
-            <div
-              className="rounded-2xl border p-2.5 text-sm md:p-3"
-              style={{
-                borderColor: T.border,
-                background: T.bgElevated,
-                color: T.textMuted,
-              }}
-            >
-              {lead.bikeTitle && (
-                <>
-                  Байк: <span style={{ color: T.text }}>{lead.bikeTitle}</span>
-                </>
+          {/* Bike + rental summary И SLA-блок — на мобиле ОДНОЙ строкой
+              (две колонки: байк слева, SLA справа). Раньше блоки шли друг
+              под другом на всю ширину — карточка вытягивалась в 2 лишних
+              экрана-строки, а SLA-цифра Alone-in-the-corner выглядела
+              потерянной. На md+ прежняя вертикаль (там карточки шире). */}
+          {(lead.bikeTitle || rental || (topSignal && topSignal.key !== "document_missing_age")) && (
+            <div className="flex items-stretch gap-2">
+              {(lead.bikeTitle || rental) && (
+                <div
+                  className="min-w-0 flex-1 rounded-2xl border p-2.5 text-sm md:p-3"
+                  style={{
+                    borderColor: T.border,
+                    background: T.bgElevated,
+                    color: T.textMuted,
+                  }}
+                >
+                  {lead.bikeTitle && (
+                    <p className="min-w-0">
+                      Байк:{" "}
+                      <span className="break-words" style={{ color: T.text }}>
+                        {lead.bikeTitle}
+                      </span>
+                    </p>
+                  )}
+                  <div
+                    className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]"
+                    style={{ color: T.textFaint }}
+                  >
+                    {rentalCount > 0 && <span>{rentalCount} аренд</span>}
+                    {revenue > 0 && <span>{fmtMoney(revenue)}</span>}
+                    {returnDate && <span>Возврат: {returnDate}</span>}
+                  </div>
+                </div>
               )}
-              <div
-                className="mt-1.5 flex flex-wrap gap-3 text-[11px]"
-                style={{ color: T.textFaint }}
-              >
-                {rentalCount > 0 && <span>{rentalCount} аренд</span>}
-                {revenue > 0 && <span>{fmtMoney(revenue)}</span>}
-                {returnDate && <span>Возврат: {returnDate}</span>}
-              </div>
-            </div>
-          )}
 
-          {/* SLA block — right aligned, compact.
-              FIX ("флажки наезжают на другие"): сигнал document_missing_age
-              («⚠ / Документы отсутствуют») — чистый шум: та же мысль уже
-              в бейдже стадии и в плашке «Следующий шаг», а его value (⚠) не
-              несёт информации. Не дублируем. */}
-          {topSignal && topSignal.key !== "document_missing_age" && (
-            <div className="flex justify-end">
-              <div
-                className="rounded-xl border p-2.5 text-right md:rounded-2xl md:p-3"
-                style={{
-                  borderColor: `${slaColor}40`,
-                  background: `${slaColor}1a`,
-                  minWidth: 0,
-                }}
-              >
+              {/* SLA — компактная правая колонка той же строки (на мобиле
+                  видна сразу, без «под сгибом»). signal document_missing_age
+                  — шум: та же мысль в бейдже стадии и «Следующем шаге». */}
+              {topSignal && topSignal.key !== "document_missing_age" && (
                 <div
-                  className="text-[10px] uppercase tracking-wide"
-                  style={{ color: slaColor }}
+                  className="flex w-[92px] shrink-0 flex-col items-center justify-center rounded-xl border p-2 text-center md:w-auto md:flex-none md:px-3 md:py-2.5 md:text-right"
+                  style={{
+                    borderColor: `${slaColor}40`,
+                    background: `${slaColor}1a`,
+                    minWidth: 0,
+                  }}
                 >
-                  SLA
+                  <div className="text-[9px] uppercase tracking-wide md:text-[10px]" style={{ color: slaColor }}>
+                    SLA
+                  </div>
+                  <div
+                    className="mt-0.5 text-base font-bold leading-tight md:text-xl"
+                    style={{ color: slaColor }}
+                  >
+                    {topSignal.value}
+                  </div>
+                  <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight md:text-[11px]" style={{ color: T.textMuted }}>
+                    {topSignal.detail || topSignal.label}
+                  </div>
                 </div>
-                <div
-                  className="mt-0.5 text-base font-bold md:text-xl"
-                  style={{ color: slaColor }}
-                >
-                  {topSignal.value}
-                </div>
-                <div className="text-[11px]" style={{ color: T.textMuted }}>
-                  {topSignal.detail || topSignal.label}
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>
