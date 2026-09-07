@@ -28,6 +28,8 @@ import { RentalIdealBadge } from "../../../components/RentalIdealBadge";
 import { RentalQuickActionBar } from "../../../components/RentalQuickActionBar";
 import { RentalTimeline } from "../../../components/RentalTimeline";
 import { RentalDepositTracker } from "../../../components/RentalDepositTracker";
+// P2 §1.5: prepayments/booking fees received against this rental
+import { RentalPrepaymentCard } from "../../../components/RentalPrepaymentCard";
 import { RentalOdometerDelta } from "../../../components/RentalOdometerDelta";
 import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRoleGuard";
 // Polish v3 components (Phase 3: extend modal, Phase 5: renter + guest views)
@@ -460,13 +462,21 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             </FranchizeRentalRoleGuard>
           )}
 
-          {/* Deposit tracker (Idea F) + Odometer delta (Idea G) */}
+          {/* Deposit tracker (Idea F) + Odometer delta (Idea G) + Prepayments (P2 §1.5) */}
           {rental.found && (
             <div className="grid gap-2 sm:grid-cols-2 max-sm:grid-cols-1">
               <RentalDepositTracker
                 depositRub={depositRub}
                 depositReturned={depositReturned}
                 status={status}
+                accentColor={accent}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                borderSoft={borderSoft}
+              />
+              <RentalPrepaymentCard
+                prepaymentTotal={rental.prepaymentTotal}
+                prepaymentCount={rental.prepaymentCount}
                 accentColor={accent}
                 textPrimary={textPrimary}
                 textSecondary={textSecondary}

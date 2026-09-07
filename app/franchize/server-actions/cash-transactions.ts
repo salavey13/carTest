@@ -187,8 +187,10 @@ export async function createManualCashTransaction(params: {
   paymentMethod?: string;
   category?: string;
   description?: string;
+  /** P2 §1.5: optional rental link — prepayments/booking fees reserve a future rental. */
+  rentalId?: string;
 }): Promise<ActionResponse<{ id: string }>> {
-  const { slug, transactionType, amount, paymentMethod, category, description } = params;
+  const { slug, transactionType, amount, paymentMethod, category, description, rentalId } = params;
 
   // Валидация суммы
   if (amount <= 0) {
@@ -216,6 +218,7 @@ export async function createManualCashTransaction(params: {
     // CR fix C1+H3: map client-friendly type names to DB CHECK constraint values.
     // The UI sends "manual_in" / "manual_out" but the DB only allows:
     //   income_rental, income_sale, income_equipment, income_service, income_other,
+    //   income_prepayment (P2 §1.5 — added by migration 20260825000000),
     //   expense_commission, expense_salary, expense_deposit_return, expense_other
     // Also map payment_method: "tbank"/"sber" → "transfer" (DB only allows cash/card/transfer/other).
     const TYPE_MAP: Record<string, { dbType: string; flow: "in" | "out" }> = {
@@ -224,6 +227,8 @@ export async function createManualCashTransaction(params: {
       // Also accept the DB-native types directly (for future use)
       income_other: { dbType: "income_other", flow: "in" },
       expense_other: { dbType: "expense_other", flow: "out" },
+      // P2 §1.5: prepayments/booking fees — «не в выручке» until the rental completes
+      income_prepayment: { dbType: "income_prepayment", flow: "in" },
     };
     const mapped = TYPE_MAP[transactionType] ?? { dbType: transactionType, flow: (transactionType.startsWith("income_") ? "in" : "out") as "in" | "out" };
     const flowDirection = mapped.flow;
@@ -238,6 +243,24 @@ export async function createManualCashTransaction(params: {
     };
     const mappedMethod = METHOD_MAP[paymentMethod || "cash"] || "cash";
 
+    // P2 §1.5: validate the optional rental link BEFORE insert — the rental must
+    // exist and belong to this crew, so a prepayment can never be attached to
+    // another crew's (or a nonexistent) rental id via the manual form/API.
+    let validatedRentalId: string | null = null;
+    if (rentalId && rentalId.trim() !== "") {
+      const { data: rental, error: rentalError } = await supabaseAdmin
+        .from("rentals")
+        .select("rental_id")
+        .eq("rental_id", rentalId.trim())
+        .eq("crew_id", access.crewId)
+        .maybeSingle();
+      if (rentalError || !rental) {
+        logger.warn("[createManualCashTransaction] Rental link rejected", { rentalId, error: rentalError?.message });
+        return { success: false, error: "Аренда для привязки предоплаты не найдена в этой команде." };
+      }
+      validatedRentalId = rental.rental_id;
+    }
+
     const { data: transaction, error } = await supabaseAdmin
       .from("cash_transactions")
       .insert({
@@ -250,6 +273,7 @@ export async function createManualCashTransaction(params: {
         description: description || "Ручная запись",
         transaction_date: new Date().toISOString(),
         created_by: access.actorUserId,  // CR fix H1: use cookie-derived identity
+        ...(validatedRentalId ? { rental_id: validatedRentalId } : {}),
       })
       .select("id")
       .single();
@@ -269,6 +293,56 @@ export async function createManualCashTransaction(params: {
   } catch (err) {
     logger.error("[createManualCashTransaction] Exception:", err);
     return errorResponse(handleError(err, "createManualCashTransaction"));
+  }
+}
+
+/**
+ * P2 §1.5: lite list of the crew's open rentals for the prepayment link
+ * selector in the cash-ledger manual form. Returns only what the dropdown
+ * needs (id, dates, status, bike name) — no heavy card payload.
+ * Equipment rows are excluded implicitly: they carry crew_id=NULL in rentals
+ * (migration 20260815000001) while this query filters crew_id=eq.
+ */
+export async function getCrewOpenRentalsLite(params: {
+  slug: string;
+}): Promise<ActionResponse<Array<{
+  rentalId: string;
+  status: string;
+  startDate: string | null;
+  bikeName: string;
+}>>> {
+  const { slug } = params;
+
+  try {
+    const access = await verifyCrewAccess(slug);
+    if (!access.allowed) {
+      return { success: false, error: access.error };
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, status, agreed_start_date, requested_start_date, cars(make, model)")
+      .eq("crew_id", access.crewId)
+      .in("status", ["pending_confirmation", "confirmed", "active"])
+      .order("agreed_start_date", { ascending: false, nullsFirst: false })
+      .limit(50);
+
+    if (error) {
+      logger.error("[getCrewOpenRentalsLite] Query failed:", error);
+      return { success: false, error: "Не удалось загрузить список броней." };
+    }
+
+    const rentals = (data || []).map((r: any) => ({
+      rentalId: r.rental_id as string,
+      status: (r.status || "") as string,
+      startDate: (r.agreed_start_date || r.requested_start_date || null) as string | null,
+      bikeName: [r.cars?.make, r.cars?.model].filter(Boolean).join(" ") || "Без байка",
+    }));
+
+    return successResponse(rentals);
+  } catch (err) {
+    logger.error("[getCrewOpenRentalsLite] Exception:", err);
+    return errorResponse(handleError(err, "getCrewOpenRentalsLite"));
   }
 }
 

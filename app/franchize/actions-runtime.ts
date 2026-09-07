@@ -5644,6 +5644,12 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   // (or forever, when the fetch failed silently).
   startPhotoCount: number | null;
   endPhotoCount: number | null;
+  // P2 §1.5: prepayments/booking fees linked to this rental via
+  // cash_transactions.rental_id (income_prepayment). Informational — this is
+  // money already received against the future rental, excluded from daily
+  // revenue until the rental starts.
+  prepaymentTotal: number;
+  prepaymentCount: number;
 }> {
   const safeSlug = slug.trim();
   const safeRentalId = rentalId.trim();
@@ -5683,6 +5689,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       artifactDepositRub: null,
       startPhotoCount: null,
       endPhotoCount: null,
+      prepaymentTotal: 0,
+      prepaymentCount: 0,
     };
   }
 
@@ -5726,6 +5734,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       specsOdometer: null,
       specsDepositRub: null,
       artifactDepositRub: null,
+      prepaymentTotal: 0,
+      prepaymentCount: 0,
     };
   }
 
@@ -5824,6 +5834,25 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   })();
 
+  // ── P2 §1.5: prepayments received for this rental ──
+  // Single indexed lookup (transaction_type + rental_id); non-fatal on error —
+  // a missing aggregate must never take down the whole rental page.
+  let prepaymentTotal = 0;
+  let prepaymentCount = 0;
+  try {
+    const { data: prepayRows, error: prepayError } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("amount")
+      .eq("rental_id", safeRentalId)
+      .eq("transaction_type", "income_prepayment");
+    if (!prepayError && prepayRows) {
+      prepaymentCount = prepayRows.length;
+      prepaymentTotal = prepayRows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    }
+  } catch (prepayErr) {
+    console.warn("[getFranchizeRentalCard] prepayment fetch failed (non-fatal):", prepayErr);
+  }
+
   return {
     found: true,
     rentalId: data.rental_id,
@@ -5864,6 +5893,8 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     artifactDepositRub,
     startPhotoCount: typeof (data as any).start_photo_count === "number" ? (data as any).start_photo_count : null,
     endPhotoCount: typeof (data as any).end_photo_count === "number" ? (data as any).end_photo_count : null,
+    prepaymentTotal,
+    prepaymentCount,
   };
 }
 

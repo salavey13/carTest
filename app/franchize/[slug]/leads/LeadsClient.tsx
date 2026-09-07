@@ -65,6 +65,22 @@ interface LeadsClientProps {
   isAuto?: boolean;
 }
 
+// ── Session-level stale-while-revalidate cache (perf, 2026-09-07) ────────────
+// The leads payload is ~1MB of JSON (533 intents + 1000 todos + metadata) and
+// every mount re-downloaded it — navigating leads → bikes → leads re-spun the
+// loader for data we literally just had. Now: the LAST payload per slug is
+// kept in-memory; a remount paints instantly from it and, when older than
+// LEADS_CACHE_TTL_MS, revalidates in the background. Crew-scoped data (not
+// user-private), so a per-slug key is safe inside one browser session.
+type LeadsCacheEntry = {
+  at: number;
+  leads: LeadRow[];
+  todos: LeadTodoRow[];
+  operators?: Array<{ id: string; name: string }>;
+};
+const leadsCache = new Map<string, LeadsCacheEntry>();
+const LEADS_CACHE_TTL_MS = 30_000;
+
 // ── In-app notifications (typed toast) ─────────────────────────────────────
 // Everything the page wants to tell the operator inline — copy/notify/todo/
 // dismiss results — flows through ONE typed toast instead of a plain pill
@@ -347,9 +363,14 @@ export function LeadsClient({
         );
         if (isCancelled()) return false;
         if (result.success) {
-          setLeadsState((result.leads || []).filter(Boolean) as LeadRow[]);
-          setTodosState((result.todos || []).filter(Boolean) as LeadTodoRow[]);
-          if (result.operators) setOperators(result.operators);
+          const freshLeads = (result.leads || []).filter(Boolean) as LeadRow[];
+          const freshTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
+          const freshOperators = result.operators || undefined;
+          setLeadsState(freshLeads);
+          setTodosState(freshTodos);
+          if (freshOperators) setOperators(freshOperators);
+          // Write through the session cache so the next mount paints instantly.
+          leadsCache.set(slug, { at: Date.now(), leads: freshLeads, todos: freshTodos, operators: freshOperators });
           setLeadsLoadError(null);
           return true;
         }
@@ -373,6 +394,20 @@ export function LeadsClient({
   useEffect(() => {
     if (!isAuthed || shouldShowPassword) return;
     if (leadsFetchedRef.current) return;
+
+    // PERF (2026-09-07): stale-while-revalidate — paint instantly from the
+    // session cache when we have a payload for this slug; skip the network
+    // round entirely while it is fresher than the TTL.
+    const cached = leadsCache.get(slug);
+    if (cached) {
+      setLeadsState(cached.leads);
+      setTodosState(cached.todos);
+      if (cached.operators) setOperators(cached.operators);
+      if (Date.now() - cached.at < LEADS_CACHE_TTL_MS) {
+        leadsFetchedRef.current = true;
+        return;
+      }
+    }
 
     let cancelled = false;
     setIsFetchingLeads(true);

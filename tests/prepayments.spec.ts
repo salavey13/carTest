@@ -23,37 +23,73 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const supabaseOrNull = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 // P2 prepayment tracking ships via
-// supabase/migrations/20260825000000_prepayment_tracking.sql. Environments
-// without that migration (its tables were never applied to the production
-// project) skip this suite instead of failing with "relation does not exist".
+// supabase/migrations/20260825000000_prepayment_tracking.sql. The migration
+// creates the prepayment_summary view + the income_prepayment CHECK value —
+// probe the VIEW (a missing table errors with 42P01, so this reliably gates
+// on "migration applied", unlike filtering a CHECK value which PostgREST
+// silently returns as an empty set).
 const prepaymentFeatureReady = supabaseOrNull
-  ? await featureReady(supabaseOrNull, (c) => c.from('income_transactions').select('id').limit(1))
+  ? await featureReady(supabaseOrNull, (c) => c.from('prepayment_summary').select('*').limit(1))
   : false
+
+// Run-scoped fixture ids: crews.name is UNIQUE and users/cars PKs would
+// collide with rows left behind by a crashed earlier run.
+const RUN = Date.now()
+const TEST_USER_ID = `test_prepay_user_${RUN}`
+const TEST_BIKE_ID = `test-prepay-bike-${RUN}`
 
 describe.skipIf(!prepaymentFeatureReady)('P2 Prepayment Tracking', () => {
   // Dereferenced only inside test bodies, which never run unless ready.
   const supabase = supabaseOrNull as SupabaseClient
 
   let testCrewId: string
+  let testVehicleId: string
   let testRentalId: string
   let testPrepaymentId: string
 
   beforeAll(async () => {
     // Create test crew
-    const { data: crew } = await supabase
+    // FK chain: rentals.vehicle_id → cars.id, cars.crew_id → crews.id,
+    // crews.owner_id → users.user_id — so the user row is created first and
+    // the car row satisfies the vehicles FK the original fixture missed.
+    await supabase.from('users').insert({ user_id: TEST_USER_ID })
+
+    const { data: crew, error: crewError } = await supabase
       .from('crews')
-      .insert({ name: 'Prepayment Test Crew', owner_id: 'test_user' })
+      .insert({ name: `Prepayment Test Crew ${RUN}`, owner_id: TEST_USER_ID })
       .select()
       .single()
+    if (crewError) throw crewError
 
     testCrewId = crew?.id || ''
 
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('cars')
+      .insert({
+        id: TEST_BIKE_ID,
+        crew_id: testCrewId,
+        make: 'BMW',
+        model: 'R 1250 GS',
+        description: 'test bike',
+        daily_price: 5000,
+        image_url: 'https://example.com/test.jpg',
+        rent_link: 'https://example.com/rent',
+        type: 'bike'
+      })
+      .select()
+      .single()
+    if (vehicleError) throw vehicleError
+
+    testVehicleId = vehicle?.id || TEST_BIKE_ID
+
     // Create test rental
-    const { data: rental } = await supabase
+    const { data: rental, error: rentalError } = await supabase
       .from('rentals')
       .insert({
         crew_id: testCrewId,
-        vehicle_id: 'test-bike-001',
+        user_id: TEST_USER_ID,
+        owner_id: TEST_USER_ID,
+        vehicle_id: testVehicleId,
         agreed_start_date: new Date().toISOString(),
         agreed_end_date: new Date(Date.now() + 86400000).toISOString(),
         status: 'confirmed',
@@ -61,15 +97,19 @@ describe.skipIf(!prepaymentFeatureReady)('P2 Prepayment Tracking', () => {
       })
       .select()
       .single()
+    if (rentalError) throw rentalError
 
     testRentalId = rental?.rental_id || ''
   })
 
   afterAll(async () => {
-    // Cleanup
+    // Cleanup in reverse FK order: transactions → rentals → cars → crews → users
+    if (!prepaymentFeatureReady || !testCrewId) return
     await supabase.from('cash_transactions').delete().eq('crew_id', testCrewId)
     await supabase.from('rentals').delete().eq('crew_id', testCrewId)
+    await supabase.from('cars').delete().eq('crew_id', testCrewId)
     await supabase.from('crews').delete().eq('id', testCrewId)
+    await supabase.from('users').delete().eq('user_id', TEST_USER_ID)
   })
 
   describe('Transaction Type Constraint', () => {

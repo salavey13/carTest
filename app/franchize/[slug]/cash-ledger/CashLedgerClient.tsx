@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { DollarSign, TrendingUp, TrendingDown, Plus, Filter } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
+import { getCrewOpenRentalsLite } from "../../server-actions/cash-transactions";
 
 interface CashTransaction {
   id: string;
@@ -31,6 +32,7 @@ interface CashLedgerClientProps {
 const TRANSACTION_TYPES = [
   { value: "", label: "Все типы" },
   { value: "income_rental", label: "Аренда (вход)" },
+  { value: "income_prepayment", label: "Предоплата (бронь)" },
   { value: "income_sale", label: "Продажа (вход)" },
   { value: "income_equipment", label: "Экипировка (вход)" },
   { value: "expense_commission", label: "Комиссия (расход)" },
@@ -38,6 +40,30 @@ const TRANSACTION_TYPES = [
   { value: "manual_in", label: "Ручной вход" },
   { value: "manual_out", label: "Ручной расход" },
 ];
+
+// Full DB-native label map — raw type strings must never leak into the table
+// (e.g. rows created via API with income_service / expense_deposit_return).
+const TYPE_LABELS: Record<string, string> = {
+  income_prepayment: "Предоплата (бронь)",
+  income_rental: "Аренда (вход)",
+  income_sale: "Продажа (вход)",
+  income_equipment: "Экипировка (вход)",
+  income_service: "Сервис (вход)",
+  income_other: "Прочий вход",
+  expense_commission: "Комиссия (расход)",
+  expense_salary: "Зарплата (расход)",
+  expense_deposit_return: "Возврат залога (расход)",
+  expense_other: "Прочий расход",
+  manual_in: "Ручной вход",
+  manual_out: "Ручной расход",
+};
+
+interface OpenRentalLite {
+  rentalId: string;
+  status: string;
+  startDate: string | null;
+  bikeName: string;
+}
 
 export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
   const { dbUser, userCrewMemberships } = useAppContext();
@@ -65,7 +91,26 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
     category: "",
     description: "",
     paymentMethod: "cash",
+    rentalId: "",
   });
+
+  // P2 §1.5: open-rental options for the prepayment link selector (lazy)
+  const [openRentals, setOpenRentals] = useState<OpenRentalLite[]>([]);
+  const [rentalsLoaded, setRentalsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!showManualForm || manualForm.transactionType !== "income_prepayment" || rentalsLoaded) return;
+    let cancelled = false;
+    getCrewOpenRentalsLite({ slug }).then((res) => {
+      if (!cancelled) {
+        if (res.success && res.data) setOpenRentals(res.data);
+        setRentalsLoaded(true);
+      }
+    }).catch(() => {
+      if (!cancelled) setRentalsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [showManualForm, manualForm.transactionType, rentalsLoaded, slug]);
 
   const T = crew?.theme?.palette || {
     bg: "#0B0C10",
@@ -139,13 +184,14 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
           category: manualForm.category,
           description: manualForm.description,
           paymentMethod: manualForm.paymentMethod,
+          rentalId: manualForm.transactionType === "income_prepayment" && manualForm.rentalId ? manualForm.rentalId : undefined,
         }),
       });
 
       const result = await res.json();
       if (result.success) {
         setShowManualForm(false);
-        setManualForm({ transactionType: "manual_in", amount: "", category: "", description: "", paymentMethod: "cash" });
+        setManualForm({ transactionType: "manual_in", amount: "", category: "", description: "", paymentMethod: "cash", rentalId: "" });
         loadData();
       } else {
         alert(`Ошибка: ${result.error}`);
@@ -167,8 +213,7 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
   };
 
   const getTransactionLabel = (type: string) => {
-    const found = TRANSACTION_TYPES.find((t) => t.value === type);
-    return found?.label || type;
+    return TYPE_LABELS[type] || type;
   };
 
   return (
@@ -359,8 +404,37 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
                   >
                     <option value="manual_in">Входящая</option>
                     <option value="manual_out">Исходящая</option>
+                    <option value="income_prepayment">Предоплата (бронь)</option>
                   </select>
+                  {manualForm.transactionType === "income_prepayment" && (
+                    <p className="mt-1 text-xs" style={{ color: T.textMuted }}>
+                      Предоплата за будущую бронь — не входит в выручку дня.
+                    </p>
+                  )}
                 </div>
+
+                {manualForm.transactionType === "income_prepayment" && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>
+                      Привязать к брони <span style={{ color: T.textMuted }}>(необязательно)</span>
+                    </label>
+                    <select
+                      value={manualForm.rentalId}
+                      onChange={(e) => setManualForm({ ...manualForm, rentalId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border"
+                      style={{ background: T.bg, borderColor: T.borderSoft, color: T.text }}
+                    >
+                      <option value="">Без привязки</option>
+                      {openRentals.map((r) => (
+                        <option key={r.rentalId} value={r.rentalId}>
+                          {r.bikeName}
+                          {r.startDate ? ` · ${formatDateRu(r.startDate.slice(0, 10))}` : ""}
+                          {` · ${r.status === "active" ? "активна" : r.status === "confirmed" ? "подтверждена" : "ожидает"}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium mb-1" style={{ color: T.text }}>Сумма (₽)</label>

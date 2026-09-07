@@ -227,6 +227,37 @@ EQUIP_KPIS=$(echo "$EQUIP_DATA" | jq -r --arg today "$TODAY" --arg start "$START
     end
 ')
 
+# ─── Prepayments (P2 PRD §1.5 — NOT counted in TOTAL_REVENUE) ────────────────
+# cash_transactions rows with transaction_type=income_prepayment whose
+# transaction_date (MSK day) falls in the digest window. A prepayment is a
+# booking fee for a FUTURE rental: money is received today, but revenue is
+# recognized only when the rental starts — so the section is informational
+# and the «Итого выручка за день» line below stays prepayment-free.
+# Bike names resolve through the rental link (PostgREST nested embed):
+# cash_transactions.rental_id → rentals.vehicle_id → cars(make, model).
+# Prepayments without a rental link fall back to «Без байка» + description.
+PREPAY_DATA=$(supabase_query "cash_transactions" \
+  "select=id,amount,description,rental_id,rentals(cars(make,model))&crew_id=eq.${CREW_ID}&transaction_type=eq.income_prepayment&transaction_date=gte.${START_UTC}&transaction_date=lte.${END_UTC}&order=transaction_date.asc&limit=100")
+
+PREPAY_SECTION=$(echo "$PREPAY_DATA" | jq -r '
+  # Defensive: a PostgREST error object / garbage must yield an empty section.
+  if type != "array" then ""
+  else
+    def bikename:
+      ([((.rentals.cars // {}).make // ""), ((.rentals.cars // {}).model // "")]
+       | map(select(length > 0)) | join(" "));
+    (map(select(((.amount // 0) | tonumber? // 0) > 0))) as $rows
+    | if ($rows | length) == 0 then ""
+      else
+        (["💳 Предоплаты (не в выручке):"] +
+         [$rows[] |
+          "• \(if bikename != "" then bikename else "Без байка" end): \(.description // "Предоплата") — \((.amount // 0) | round) ₽"] +
+         ["── Итого предоплат: \([$rows[] | ((.amount // 0) | tonumber? // 0)] | add | round) ₽"])
+        | join("\n")
+      end
+  end
+' 2>/dev/null || echo "")
+
 # ─── Total revenue ───────────────────────────────────────────────────────────
 # Day total = rentals (started-today, see RENTALS_TODAY) + sales + CLIENT
 # services + equipment ISSUED TODAY. Internal/crew services (no
@@ -333,6 +364,15 @@ ${ACTIVE_RENTALS_LINKS}
 "
 fi
 
+# Prepayments block: only occupies message space when there were prepayments
+# today (an empty PREPAY_SECTION collapses to the original layout).
+PREPAY_BLOCK=""
+if [[ -n "$PREPAY_SECTION" ]]; then
+  PREPAY_BLOCK="
+${PREPAY_SECTION}
+"
+fi
+
 RENTALS_LINK="$(analytics_link "rentals" "$TODAY")"
 SALES_LINK="$(analytics_link "sales" "$TODAY")"
 SERVICES_LINK="$(analytics_link "services" "$TODAY")"
@@ -353,7 +393,7 @@ ${SHIFT_KPIS}
 
 <b>🧥 Экипировка</b> — на складе ${EQUIP_STOCK}
 ${EQUIP_KPIS}
-
+${PREPAY_BLOCK}
 ━━━━━━━━━━━━━━━━━━
 ${ACTIVE_SECTION}<b>Итого выручка за день: ${TOTAL_REVENUE} ₽</b>
 

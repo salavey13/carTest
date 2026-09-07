@@ -1370,7 +1370,13 @@ export async function getFranchizeLeads(
         ? privateSchema().from("user_rental_secrets").select("chat_id, renter_phone").eq("crew_slug", safeSlug).in("renter_phone", leadPhones) as Promise<{ data: Array<{ chat_id: string | null; renter_phone: string | null }> | null }>
         : { data: [], error: null },
       // 9. Troubled users
-      supabaseAdmin.from("users").select("user_id, metadata").not("metadata->>troubled", "is", null),
+      // PERF (2026-09-07): was a FULL-TABLE scan over every troubled user of
+      // every crew (no limit, no scope) — the map built from it is only ever
+      // probed with leadMap keys (numeric TG ids ⊆ allUserIds), so scope the
+      // query the same way as the users-enrichment query above.
+      allUserIds.length > 0
+        ? supabaseAdmin.from("users").select("user_id, metadata").in("user_id", allUserIds).not("metadata->>troubled", "is", null)
+        : { data: [], error: null },
       // 11. Lead-linked todos (filtered by crew_id on DB side).
       // BUG FIX: include both `lead_followup` AND `rental_verification` — the latter
       // covers passport/odometer/return-checklist todos which are tied to the same

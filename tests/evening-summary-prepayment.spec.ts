@@ -24,14 +24,18 @@ const supabaseOrNull = supabaseUrl && supabaseKey ? createClient(supabaseUrl, su
 
 // The 'income_prepayment' transaction type arrives with
 // supabase/migrations/20260825000000_prepayment_tracking.sql, which also
-// creates income_transactions. Environments without that migration skip the
-// DB-backed suites; the pure formatting and script tests below still run
-// everywhere. (The marker table is probed instead of the enum value because
-// PostgREST returns an empty result set — not an error — when filtering a
-// missing enum value on an existing column.)
+// creates the prepayment_summary view. Probe the VIEW (a missing table errors
+// with 42P01, so this reliably gates on "migration applied" — filtering a
+// CHECK value instead would silently return an empty set, not an error).
 const prepaymentFeatureReady = supabaseOrNull
-  ? await featureReady(supabaseOrNull, (c) => c.from('income_transactions').select('id').limit(1))
+  ? await featureReady(supabaseOrNull, (c) => c.from('prepayment_summary').select('*').limit(1))
   : false
+
+// Run-scoped fixture ids (crews.name UNIQUE; PK collisions with a crashed
+// earlier run would abort setup).
+const RUN = Date.now()
+const TEST_USER_ID = `test_es_prepay_user_${RUN}`
+const TEST_BIKE_ID = 'test-prepayment-bike-001'
 
 describe('Evening Summary Prepayment Section', () => {
   // Dereferenced only in DB-backed suites/hooks, which no-op unless ready.
@@ -45,32 +49,40 @@ describe('Evening Summary Prepayment Section', () => {
     // No fixtures when the prepayment feature is not deployed — the DB-backed
     // suites below are skipped and cleanup must not run either.
     if (!prepaymentFeatureReady) return
+    // FK chain: cars.crew_id → crews.id, crews.owner_id → users.user_id —
+    // the user row must exist before the crew row.
+    await supabase.from('users').insert({ user_id: TEST_USER_ID })
     // Setup test data
-    const { data: crew } = await supabase
+    const { data: crew, error: crewError } = await supabase
       .from('crews')
-      .insert({ name: 'Evening Summary Test Crew', owner_id: 'test_user' })
+      .insert({ name: `Evening Summary Test Crew ${RUN}`, owner_id: TEST_USER_ID })
       .select()
       .single()
+    if (crewError) throw crewError
 
     testCrewId = crew?.id || ''
 
-    const { data: vehicle } = await supabase
+    const { data: vehicle, error: vehicleError } = await supabase
       .from('cars')
       .insert({
-        id: 'test-prepayment-bike-001',
+        id: TEST_BIKE_ID,
         crew_id: testCrewId,
         make: 'BMW',
         model: 'R 1250 GS',
-        type: 'bike',
-        daily_price: 5000
+        description: 'test bike',
+        daily_price: 5000,
+        image_url: 'https://example.com/test.jpg',
+        rent_link: 'https://example.com/rent',
+        type: 'bike'
       })
       .select()
       .single()
+    if (vehicleError) throw vehicleError
 
     testVehicleId = vehicle?.id || 'test-prepayment-bike-001'
 
     // Create test prepayment for today
-    await supabase
+    const { error: prepayError } = await supabase
       .from('cash_transactions')
       .insert({
         crew_id: testCrewId,
@@ -82,13 +94,17 @@ describe('Evening Summary Prepayment Section', () => {
         transaction_date: new Date().toISOString(),
         created_at: new Date().toISOString()
       })
+    if (prepayError) throw prepayError
   })
 
   afterAll(async () => {
+    // Reverse-FK cleanup: transactions → rentals → cars → crews → users.
     if (!prepaymentFeatureReady || !testCrewId) return
     await supabase.from('cash_transactions').delete().eq('crew_id', testCrewId)
-    await supabase.from('cars').delete().eq('id', testVehicleId)
+    await supabase.from('rentals').delete().eq('crew_id', testCrewId)
+    await supabase.from('cars').delete().eq('id', TEST_BIKE_ID)
     await supabase.from('crews').delete().eq('id', testCrewId)
+    await supabase.from('users').delete().eq('user_id', TEST_USER_ID)
   })
 
   describe.skipIf(!prepaymentFeatureReady)('Data Fetching', () => {
@@ -110,10 +126,12 @@ describe('Evening Summary Prepayment Section', () => {
 
     it('should include rental_id for prepayments linked to rentals', async () => {
       // Create a rental and link prepayment to it
-      const { data: rental } = await supabase
+      const { data: rental, error: rentalError } = await supabase
         .from('rentals')
         .insert({
           crew_id: testCrewId,
+          user_id: TEST_USER_ID,
+          owner_id: TEST_USER_ID,
           vehicle_id: testVehicleId,
           agreed_start_date: new Date().toISOString(),
           agreed_end_date: new Date(Date.now() + 86400000).toISOString(),
@@ -122,6 +140,7 @@ describe('Evening Summary Prepayment Section', () => {
         })
         .select()
         .single()
+      if (rentalError) throw rentalError
 
       await supabase
         .from('cash_transactions')

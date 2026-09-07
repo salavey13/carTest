@@ -51,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { slug } = await params;
     const body = await request.json();
-    const { type, transactionType, amount, flowDirection, category, description, paymentMethod } = body;
+    const { type, transactionType, amount, flowDirection, category, description, paymentMethod, rentalId } = body;
 
     // Support both 'type' (legacy) and 'transactionType' (new) parameters
     const finalTransactionType = transactionType || type;
@@ -77,6 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       paymentMethod: paymentMethod || undefined,
       category: category || undefined,
       description: description || undefined,
+      rentalId: rentalId || undefined,
     });
 
     if (!result.success) {
