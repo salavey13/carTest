@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Copy, Check, ExternalLink } from "lucide-react";
+import { Copy, Check, ExternalLink, type LucideIcon } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 
 export interface InfoTile {
   label: string;
   value: string;
+  /** Иконка перед подписью (референс-дизайн §7: у каждой ячейки маленькая
+   *  иконка — телефон, байк, календарь…). Необязательная: старые вызовы
+   *  без иконок продолжают работать. */
+  icon?: LucideIcon;
   tone?: "default" | "accent" | "warning" | "danger" | "good";
   copyable?: boolean;
   /** When set, the tile value renders as an external link (new tab). */
@@ -72,11 +76,20 @@ function Tile({ item, T }: { item: InfoTile; T: ThemeTokens }) {
       className="glass-panel flex h-full min-h-[64px] flex-col justify-between rounded-2xl p-3 sm:p-4"
     >
       <div className="flex items-center justify-between gap-2">
-        <div
-          className="text-[10px] font-semibold uppercase tracking-wider"
-          style={{ color: T.textFaint }}
-        >
-          {item.label}
+        <div className="flex min-w-0 items-center gap-1.5">
+          {item.icon && (
+            <item.icon
+              className="h-3.5 w-3.5 shrink-0"
+              style={{ color: toneColor || T.textFaint }}
+              aria-hidden
+            />
+          )}
+          <div
+            className="text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: T.textFaint }}
+          >
+            {item.label}
+          </div>
         </div>
         {item.copyable && (
           <button

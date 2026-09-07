@@ -14,6 +14,7 @@ import { isHandlingTodo } from "./lib/lead-handling";
 import { computeLeadKpi } from "./lib/lead-kpi";
 import { computeLeadAchievements } from "./lib/lead-achievements";
 import { buildNextActions } from "./lib/lead-playbook";
+import { PIPELINE_STAGES, type StageKey } from "./lib/pipeline-stages";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
@@ -492,6 +493,22 @@ export function LeadsClient({
 
   const hasFilters = baseHasFilters || filterStage !== "all" || filterOwner !== "all";
 
+  // Референс-дизайн §3: оранжевый бейдж «N» на кнопке фильтров — считаем
+  // ВСЕ активные сужения списка (поиск, источник, стадия, ответственный,
+  // сегмент, заглушки). Клик — resetAllFilters ниже.
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        debouncedSearchQuery.trim().length > 0,
+        filterSource !== "all",
+        filterStage !== "all",
+        filterOwner !== "all",
+        segment !== "all",
+        hidePlaceholders,
+      ].filter(Boolean).length,
+    [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders],
+  );
+
   // FIX (mobile wave 3, dead button): EmptyState рисует «Сбросить фильтры»,
   // но onReset никто не передавал — кнопка была мёртвой (клик ничего не
   // делал). Сбрасываем ВСЁ, что участвует в hasFilters: поиск, источник,
@@ -541,6 +558,19 @@ export function LeadsClient({
   const playbookActions = useMemo(
     () => buildNextActions(activeLeads, todosState, nowTick, 6),
     [activeLeads, todosState, nowTick],
+  );
+  // ВОРОНКА ПАЙПЛАЙНА (референс-дизайн §2): распределение лидов по стадиям
+  // для кликабельной полосы в LeadsFunnelPanel — сегменты с счётчиками,
+  // клик = stage-фильтр списка (тот же filterStage, что у дропдауна).
+  const stageBreakdown = useMemo(
+    () =>
+      PIPELINE_STAGES.map((s) => ({
+        key: s.key as string,
+        label: s.label,
+        color: s.color,
+        count: activeLeads.filter((l) => ((l.stageKey as StageKey | undefined) || "new") === s.key).length,
+      })).filter((s) => s.count > 0),
+    [activeLeads],
   );
 
   // Segment counts for toolbar tabs
@@ -1039,8 +1069,16 @@ export function LeadsClient({
         <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
 
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
-            конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек. */}
-        <LeadsFunnelPanel kpi={kpiMetrics} T={T} />
+            конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек.
+            Наверху — кликабельная полоса стадий пайплайна (референс §2):
+            клик по сегменту = фильтр списка по стадии. */}
+        <LeadsFunnelPanel
+          kpi={kpiMetrics}
+          T={T}
+          stageBreakdown={stageBreakdown}
+          activeStage={filterStage}
+          onStageSelect={setFilterStage}
+        />
 
         {/* Достижения экипажа — CREW ONLY (путь оператора не для обычных
             пользователей; для не-crew панель даже не считается). storageKey —
@@ -1103,6 +1141,7 @@ export function LeadsClient({
           viewMode={viewMode} onViewModeChange={setViewMode}
           segmentCounts={segmentCounts}
           hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
+          activeFilterCount={activeFilterCount} onResetFilters={resetAllFilters}
           T={T} isAuto={isAuto}
         />
       </div>

@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Phone,
   AlertCircle,
+  SlidersHorizontal,
 } from "lucide-react";
 import { type Segment, SOURCE_META, SOURCE_GROUPS, sourceGroupOf } from "../leads-constants";
 
@@ -91,6 +92,9 @@ export function LeadsToolbar({
   // Placeholders toggle
   hidePlaceholders,
   setHidePlaceholders,
+  // Active filters badge (reference design §3: orange «2» on the filter button)
+  activeFilterCount,
+  onResetFilters,
   // Theme
   T,
   isAuto,
@@ -116,6 +120,11 @@ export function LeadsToolbar({
   onViewModeChange?: (v: "list" | "board" | "table") => void;
   hidePlaceholders: boolean;
   setHidePlaceholders: (v: boolean) => void;
+  /** Сколько фильтров сейчас активно — оранжевый бейдж на кнопке сброса
+   *  (референс §3). 0/undefined — кнопка не рисуется. */
+  activeFilterCount?: number;
+  /** Клик по бейдж-кнопке — сбросить все фильтры разом. */
+  onResetFilters?: () => void;
   T: any;
   isAuto: boolean;
 }) {
@@ -218,6 +227,33 @@ export function LeadsToolbar({
             <Table2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Таблица</span>
           </button>
         </div>
+
+        {/* Активные фильтры — оранжевый бейдж-кнопка (референс §3: фильтр
+            с оранжевым счётчиком «2»). Показывает, что список сужен, клик
+            сбрасывает всё разом — раньше единственный сброс жил в EmptyState,
+            т.е. был доступен только когда лидов уже ноль. */}
+        {onResetFilters && (activeFilterCount ?? 0) > 0 && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            title={`Активных фильтров: ${activeFilterCount} — сбросить все`}
+            aria-label={`Сбросить фильтры (${activeFilterCount})`}
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95"
+            style={{
+              borderColor: "rgba(245,158,11,0.45)",
+              backgroundColor: "rgba(245,158,11,0.08)",
+              color: "#f59e0b",
+            }}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+            <span
+              className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full px-1 text-[9px] font-black tabular-nums"
+              style={{ backgroundColor: "#f59e0b", color: "#1c1917" }}
+            >
+              {activeFilterCount}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ── Row 2: labeled dropdown filters ──

@@ -28,15 +28,12 @@ const TONE_COLORS: Record<LeadSignal["tone"], string> = {
 };
 
 /**
- * 4 circular SLA indicators in an evenly-spaced horizontal row.
- *
- * Each indicator:
- *   - 48px circle (h-12 w-12) with a colored ring matching the signal tone.
- *   - Icon + bold value below.
- *   - Label + optional detail below the value.
- *
- * Layout: 2x2 grid on mobile, 4-col on desktop. Items use `place-items-center`
- * and equal `gap-3` so the spacing stays even regardless of content length.
+ * SLA / риск-чипы (референс-дизайн §5): компактные горизонтальные чипы
+ * «иконка + значение + подпись» в тоне серьёзности (danger → красный,
+ * warning → янтарный). Раньше каждый сигнал был крупной круглой карточкой
+ * с кольцом (48px круг + значение + label + detail столбиком) — на 4 сигнала
+ * это съедало пол-экрана шторки до контента. Чипы той же семантики, но в
+ * 3 раза ниже; на мобиле — снап-полоса, на sm+ — перенос строкой.
  */
 export function LeadSLAOverview({ signals, T }: Props) {
   const top4 = signals.slice(0, 4);
@@ -55,65 +52,43 @@ export function LeadSLAOverview({ signals, T }: Props) {
   }
 
   return (
-    <section className="flex items-stretch gap-1 overflow-x-auto pb-1 md:grid md:grid-cols-4 md:overflow-visible md:gap-1" style={{ scrollbarWidth: "none" }}>
+    <section
+      aria-label="SLA и риски"
+      className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 md:flex-wrap md:snap-none md:overflow-visible"
+      style={{ scrollbarWidth: "none" }}
+    >
       {top4.map((s, i) => {
         const Icon = SIGNAL_ICONS[s.key] || Clock;
         const color = TONE_COLORS[s.tone] || TONE_COLORS.neutral;
         return (
-          <div key={s.key} className="flex shrink-0 items-stretch md:shrink md:flex-1">
           <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", damping: 22, stiffness: 260, delay: i * 0.05 }}
-            className="glass-panel relative flex w-full min-w-[100px] flex-col items-center gap-1.5 rounded-2xl p-3 text-center md:min-w-0 md:p-4"
+            key={s.key}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", damping: 24, stiffness: 280, delay: i * 0.05 }}
+            className="flex shrink-0 snap-start items-center gap-2.5 rounded-2xl border px-3 py-2.5 md:min-w-[190px] md:flex-1"
+            style={{
+              borderColor: `${color}40`,
+              background: `${color}12`,
+            }}
+            title={s.detail ? `${s.label} · ${s.detail}` : s.label}
           >
-            {/* Circular icon with colored ring */}
             <div
-              className="relative grid h-12 w-12 place-items-center rounded-full"
-              style={{ background: `${color}1a` }}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
+              style={{ background: `${color}1f` }}
               aria-hidden
             >
-              <Icon className="h-5 w-5" style={{ color }} />
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.4, delay: i * 0.05 + 0.1 }}
-                style={{ border: `2px solid ${color}66` }}
-              />
+              <Icon className="h-4 w-4" style={{ color }} />
             </div>
-            {/* Bold value — uses tabular-nums so values align across cards */}
-            <div
-              className="text-lg font-bold tabular-nums"
-              style={{ color: T.text }}
-            >
-              {s.value}
-            </div>
-            <div className="text-[11px]" style={{ color: T.textMuted }}>
-              {s.label}
-            </div>
-            {s.detail && (
-              <div className="text-[10px] font-medium" style={{ color }}>
-                {s.detail}
+            <div className="min-w-0">
+              <div className="text-sm font-bold leading-tight tabular-nums" style={{ color }}>
+                {s.value}
               </div>
-            )}
-          </motion.div>
-          {/* Pointy arrow connector — indicates movement through SLA stages */}
-          {i < top4.length - 1 && (
-            <div
-              className="flex shrink-0 items-center justify-center px-1"
-              aria-hidden
-            >
-              <svg
-                width="16" height="24" viewBox="0 0 16 24"
-                fill="none" xmlns="http://www.w3.org/2000/svg"
-                style={{ color: T.textFaint, minWidth: "16px" }}
-              >
-                <path d="M2 4L12 12L2 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <div className="truncate text-[11px] leading-tight" style={{ color: T.textMuted }}>
+                {s.label}
+              </div>
             </div>
-          )}
-          </div>
+          </motion.div>
         );
       })}
     </section>

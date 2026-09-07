@@ -26,17 +26,37 @@ import {
 import { NORM_KEV_PER_WEEK, type LeadKpiMetrics } from "../lib/lead-kpi";
 import { fmtDurationMs } from "../lib/lead-speed";
 
+// Сегмент воронки ПАЙПЛАЙНА (референс-дизайн §2): стадия + цвет + счётчик.
+export interface StageSegment {
+  key: string;
+  label: string;
+  color: string;
+  count: number;
+}
+
 interface LeadsFunnelPanelProps {
   kpi: LeadKpiMetrics;
   T: any;
+  /** Распределение лидов по стадиям пайплайна — горизонтальная полоса-воронка
+   *  над KPI-ступенями. Клик по сегменту фильтрует список по стадии. */
+  stageBreakdown?: StageSegment[];
+  /** Активный stage-фильтр списка (подсветка сегмента). */
+  activeStage?: string;
+  /** Колбэк клика: получает key сегмента; повторный клик по активному — "all"
+   *  (сброс) обрабатывается в панели, родителю летит уже готовое значение. */
+  onStageSelect?: (key: string) => void;
 }
 
 function pct(v: number | null): string {
   return v == null ? "—" : `${Math.round(v * 100)}%`;
 }
 
-export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
+export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageSelect }: LeadsFunnelPanelProps) {
   const { funnel } = kpi;
+  const stageTotal = stageBreakdown?.reduce((s, x) => s + x.count, 0) ?? 0;
+  // Конверсия для футера полосы (референс: «Конверсия: 34%») — в сделку,
+  // а если сделок ещё нет — в КЭВ, чтобы полоса не показывала «—» на живом пайплайне.
+  const stripConversion = kpi.dealRate != null ? pct(kpi.dealRate) : pct(kpi.kevRate);
 
   const steps = [
     {
@@ -104,6 +124,60 @@ export function LeadsFunnelPanel({ kpi, T }: LeadsFunnelPanelProps) {
           Ср. скорость ответа: {kpi.speed.medianMs != null ? fmtDurationMs(kpi.speed.medianMs) : "—"}
         </span>
       </div>
+
+      {/* ВОРОНКА ПАЙПЛАЙНА (референс §2): горизонтальная полоса цветных
+          сегментов по стадиям — ширина пропорциональна числу лидов, внутри
+          счётчик + подпись. Клик = фильтр списка по стадии (повторный клик —
+          сброс). На мобиле полоса скроллится, минимальная ширина сегмента —
+          тап-таргет. */}
+      {stageBreakdown && stageBreakdown.length > 0 && (
+        <div className="mb-3">
+          <div
+            className="flex gap-1 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+            role="group"
+            aria-label="Воронка пайплайна по стадиям"
+          >
+            {stageBreakdown.map((seg) => {
+              const active = activeStage === seg.key;
+              return (
+                <button
+                  key={seg.key}
+                  type="button"
+                  onClick={() => onStageSelect?.(active ? "all" : seg.key)}
+                  aria-pressed={active}
+                  title={`${seg.label}: ${seg.count}${onStageSelect ? (active ? " — снять фильтр" : " — фильтровать список") : ""}`}
+                  className="min-h-[52px] shrink-0 grow basis-0 cursor-pointer overflow-hidden rounded-lg border px-2 py-1.5 text-center transition active:scale-[0.97]"
+                  style={{
+                    minWidth: 64,
+                    flexGrow: Math.max(1, seg.count),
+                    flexBasis: 0,
+                    backgroundColor: active ? seg.color : `${seg.color}1c`,
+                    borderColor: active ? seg.color : `${seg.color}38`,
+                  }}
+                >
+                  <span
+                    className="block text-base font-black leading-tight tabular-nums"
+                    style={{ color: active ? (T.accentContrast || "#fff") : seg.color }}
+                  >
+                    {seg.count}
+                  </span>
+                  <span
+                    className="block truncate text-[9px] font-semibold leading-tight"
+                    style={{ color: active ? (T.accentContrast || "#fff") : T.textMuted }}
+                  >
+                    {seg.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[10px]" style={{ color: T.textFaint }}>
+            <span>Всего лидов: {stageTotal}</span>
+            <span>Конверсия: {stripConversion}</span>
+          </div>
+        </div>
+      )}
 
       {/* Ступени воронки */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

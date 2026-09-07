@@ -24,6 +24,19 @@ import {
   Check,
   Quote,
   Brain,
+  Bike,
+  Flag,
+  Globe,
+  MessagesSquare,
+  Route,
+  CalendarDays,
+  History,
+  Activity,
+  UserRound,
+  ArrowRight,
+  Hash,
+  FileText,
+  PenLine,
   type LucideIcon,
 } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
@@ -79,6 +92,16 @@ export interface LeadDrawerNote {
  * this field even though it exists in the DB and is used by sla-signals.ts.
  */
 export type DrawerTodo = LeadTodoRow & { due_date?: string | null };
+
+// Цвет аватара автора заметки (референс §10): стабильный хеш имени → палитра.
+// Один и тот же оператор всегда одного цвета во всех заметках и лидах.
+const NOTE_AVATAR_COLORS = ["#3b82f6", "#8b5cf6", "#06b6d4", "#f59e0b", "#22c55e", "#ef4444", "#ec4899"];
+
+function noteAvatarColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return NOTE_AVATAR_COLORS[h % NOTE_AVATAR_COLORS.length];
+}
 
 interface Props {
   lead: LeadRow;
@@ -236,14 +259,18 @@ export function LeadDetailDrawer(props: Props) {
     setCopiedKey(null);
   }, [leadId]);
 
+  // Инфо-плитки с иконками (референс-дизайн §7: у каждой ячейки маленькая
+  // иконка перед подписью — телефон, байк, календарь…). Цвет иконки
+  // подхватывает tone плитки (danger/warning/accent), дефолт — приглушённый.
   const infoItems: InfoTile[] = [
-    { label: "Телефон", value: lead?.phone || "—", copyable: !!lead?.phone },
-    { label: "TG ID", value: lead?.user_id || "—", copyable: !!lead?.user_id },
-    { label: "Байк", value: lead?.bikeTitle || "—" },
-    { label: "Стадия", value: stageLabel, tone: "accent" },
+    { label: "Телефон", value: lead?.phone || "—", copyable: !!lead?.phone, icon: Phone },
+    { label: "TG ID", value: lead?.user_id || "—", copyable: !!lead?.user_id, icon: Hash },
+    { label: "Байк", value: lead?.bikeTitle || "—", icon: Bike },
+    { label: "Стадия", value: stageLabel, tone: "accent", icon: Flag },
     {
       label: "Приоритет",
       value: `${lead?.urgencyScore ?? 0}/100`,
+      icon: Flame,
       tone:
         (lead?.urgencyScore ?? 0) >= 80
           ? "danger"
@@ -251,10 +278,10 @@ export function LeadDetailDrawer(props: Props) {
             ? "warning"
             : "default",
     },
-    { label: "Источник", value: SOURCE_META[lead?.source]?.label || lead?.source || "—" },
-    { label: "Канал", value: lead?.contactChannel || "—" },
-    { label: "Маршрут", value: lead?.sourceRoute || "—", copyable: !!lead?.sourceRoute },
-    { label: "Первый контакт", value: lead?.createdAt ? formatDate(lead?.createdAt) : "—" },
+    { label: "Источник", value: SOURCE_META[lead?.source]?.label || lead?.source || "—", icon: Globe },
+    { label: "Канал", value: lead?.contactChannel || "—", icon: MessagesSquare },
+    { label: "Маршрут", value: lead?.sourceRoute || "—", copyable: !!lead?.sourceRoute, icon: Route },
+    { label: "Первый контакт", value: lead?.createdAt ? formatDate(lead?.createdAt) : "—", icon: CalendarDays },
     // «Изменено» — последняя модификация (заметка/туду/смена стадии); точная
     // дата + «N назад». Оператор видит, какие лиды уже обработаны.
     {
@@ -262,10 +289,11 @@ export function LeadDetailDrawer(props: Props) {
       value: lead?.lastModifiedAt
         ? `${formatDate(lead.lastModifiedAt)} · ${relativeTime(lead.lastModifiedAt)}`
         : "—",
+      icon: History,
     },
-    { label: "Последняя активность", value: rel || "—" },
-    { label: "Ответственный", value: assignee },
-    { label: "Следующее действие", value: STAGE_NEXT_ACTION[stageKey] || "—" },
+    { label: "Последняя активность", value: rel || "—", icon: Activity },
+    { label: "Ответственный", value: assignee, icon: UserRound },
+    { label: "Следующее действие", value: STAGE_NEXT_ACTION[stageKey] || "—", icon: ArrowRight },
   ];
   // 👤 Операторы лида (просьба босса): кто создал через /doc и кто трогал
   // последним (автор последней заметки). Добавляются в сетку только когда
@@ -274,6 +302,7 @@ export function LeadDetailDrawer(props: Props) {
     infoItems.push({
       label: "Создал (/doc)",
       value: lead.ownerName,
+      icon: FileText,
     });
   }
   if (lead?.lastTouchedBy) {
@@ -281,6 +310,7 @@ export function LeadDetailDrawer(props: Props) {
     infoItems.push({
       label: "Последний оператор",
       value: lead.lastTouchedBy + (touchRel ? ` · ${touchRel}` : ""),
+      icon: PenLine,
     });
   }
   if (avito?.chatId) {
@@ -289,10 +319,11 @@ export function LeadDetailDrawer(props: Props) {
       value: `ID ${avito.chatId}`,
       copyable: true,
       href: avito.itemUrl || avito.profileUrl || undefined,
+      icon: MessageCircle,
     });
   }
   if (avito?.itemId) {
-    infoItems.push({ label: "Avito объявление", value: String(avito.itemId) });
+    infoItems.push({ label: "Avito объявление", value: String(avito.itemId), icon: ExternalLink });
   }
 
   // Handling-состояние («отработан»/«перезвонить») выводим собственной
@@ -320,6 +351,17 @@ export function LeadDetailDrawer(props: Props) {
     }
     return true;
   });
+
+  // Счётчики табов задач (референс §9: «Мои (3)», «Просроченные (2)» —
+  // цифра на каждой вкладке, чтобы объём очереди читался до клика).
+  const mineTodosCount = visibleTodos.filter((t) => {
+    if (!assigneeId && !assigneeLabel) return false;
+    return (!!assigneeId && t.assigned_to === assigneeId) ||
+      (!!assigneeLabel && t.assigned_to === assigneeLabel);
+  }).length;
+  const overdueTodosCount = visibleTodos.filter(
+    (t) => !!t.due_date && new Date(t.due_date).getTime() < Date.now() && t.status !== "done",
+  ).length;
 
   const qrStatus: QrStatus = (() => {
     const isClaimed =
@@ -1171,8 +1213,8 @@ export function LeadDetailDrawer(props: Props) {
           <div className="mb-3 flex flex-wrap gap-2">
             {([
               { v: "all", label: `Все (${todos.length})`, color: "#eab308" },
-              { v: "mine", label: "Мои", color: "#3b82f6" },
-              { v: "overdue", label: "Просроченные", color: "#ef4444" },
+              { v: "mine", label: `Мои (${mineTodosCount})`, color: "#3b82f6" },
+              { v: "overdue", label: `Просроченные (${overdueTodosCount})`, color: "#ef4444" },
             ] as const).map((f) => (
               <button
                 key={f.v}
@@ -1362,28 +1404,43 @@ export function LeadDetailDrawer(props: Props) {
                 Заметок нет
               </p>
             ) : (
-              notes.map((n) => (
-                <div
-                  key={n.id}
-                  className="rounded-2xl border p-3"
-                  style={{
-                    borderColor: T.border,
-                    background: T.bgCard,
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs font-medium" style={{ color: T.text }}>
-                      {n.created_by || "Аноним"}
-                    </span>
-                    <span className="shrink-0 text-xs" style={{ color: T.textFaint }}>
-                      {relativeTime(n.created_at)}
-                    </span>
+              notes.map((n) => {
+                const author = n.created_by || "Аноним";
+                return (
+                  <div
+                    key={n.id}
+                    className="flex gap-2.5 rounded-2xl border p-3"
+                    style={{
+                      borderColor: T.border,
+                      background: T.bgCard,
+                    }}
+                  >
+                    {/* Аватар автора (референс §10): инициалы в цветном круге,
+                        цвет стабилен по имени (хеш) — авторы различаются с первого
+                        взгляда, как в мессенджерах. */}
+                    <div
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold"
+                      style={{ background: `${noteAvatarColor(author)}26`, color: noteAvatarColor(author) }}
+                      aria-hidden
+                    >
+                      {getInitials(author)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-medium" style={{ color: T.text }}>
+                          {author}
+                        </span>
+                        <span className="shrink-0 text-xs" style={{ color: T.textFaint }}>
+                          {relativeTime(n.created_at)}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-sm" style={{ color: T.textMuted }}>
+                        {n.text}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1.5 text-sm" style={{ color: T.textMuted }}>
-                    {n.text}
-                  </p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </Section>
