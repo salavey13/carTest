@@ -24,14 +24,62 @@ export interface LeadPathStep {
   title: string;
   /** Как закрыть шаг — конкретные действия и их очки. */
   hint: string;
-  /** Порог по очкам ПРОЗРАЧНОГО лидерборда (0 — шаг открывается сразу). */
+  /** Порог по очкам ПРОЗРАЧНОГО лидерборда (0 — шаг открывается сразу).
+   *  Для kind:"guides" — декоративное значение на кривой лестницы: закрытие
+   *  считается по гайдам (см. isLeadPathStepDone), не по очкам. */
   points: number;
+  /** Тип закрытия: "points" (по умолчанию) — порог очков лидерборда;
+   *  "guides" — открыты все гайды «Библиотеки оператора» (OPERATOR_GUIDES). */
+  kind?: "points" | "guides";
 }
+
+/** «БИБЛИОТЕКА ОПЕРАТОРА» — три самоучителя системы (public/docs, работают
+ *  офлайн). Один источник правды для: ссылок в футере плейбука, отметок
+ *  «прочитано» (localStorage `leads-guides:<slug>`) и шага-«Теории» пути.
+ *  Порядок = порядок чтения: сначала механика лидов, потом мышление, потом
+ *  техника продаж. */
+export interface OperatorGuide {
+  id: string;
+  href: string;
+  emoji: string;
+  title: string;
+  desc: string;
+}
+
+export const OPERATOR_GUIDES: OperatorGuide[] = [
+  {
+    id: "avito-guide",
+    href: "/docs/avito-leads-guide.html",
+    emoji: "📘",
+    title: "Гид по лидам Avito",
+    desc: "Скорость первого ответа, готовые ответы, порядок очереди — полная инструкция по системе лидов",
+  },
+  {
+    id: "brutal-truths",
+    href: "/docs/brutal-business-truths-2026.html",
+    emoji: "💣",
+    title: "Жёсткие бизнес-правды",
+    desc: "«13 Years Of Brutally Honest Business Advice» — конспект за 90 минут: честность, цена позиции, работа с возражениями",
+  },
+  {
+    id: "ultimate-sales",
+    href: "/docs/ultimate-sales-playbook-2026.html",
+    emoji: "🏆",
+    title: "Ultimate Sales 2026",
+    desc: "Полный плейбук продаж: окно 60 секунд, зона смерти 5 минут, бенчмарки курса",
+  },
+];
 
 /**
  * Шаги привязаны к серверным очкам lead_events (Lead Game wave) — одинаковые
  * для всей смены, не только для закрытий: взял в работу +3, перезвон +1/+5,
  * задачи +2, заметки +1. Значения порогов — четверти «нормальной смены».
+ *
+ * ВОЛНА «next step reveal»: между «5 минут подготовки» и короной вставлен
+ * шаг «Теория» (id theory) — закрытие ПО ГАЙДАМ «Библиотеки оператора»
+ * (все три документа из public/docs), а не по очкам: оператор, который
+ * умеет mechanically закрывать очередь, читает, ПОЧЕМУ очередь именно
+ * такая — до того, как лестница объявит его «Легендой смены».
  */
 export const LEAD_PATH_STEPS: LeadPathStep[] = [
   { id: "start",       emoji: "🏁", title: "Старт смены",          hint: "Открыть «Клиенты и заявки» — уже хорошо",            points: 0 },
@@ -40,6 +88,7 @@ export const LEAD_PATH_STEPS: LeadPathStep[] = [
   { id: "order",       emoji: "🧹", title: "Порядок в очереди",    hint: "Закрывать задачи по лидам (+2 за каждую)",           points: 20 },
   { id: "playbook",    emoji: "🎯", title: "Плейбук-мастер",       hint: "Пройти очередь плейбука смены (задачи и перезвоны)", points: 35 },
   { id: "prep",        emoji: "🧠", title: "5 минут подготовки",   hint: "Изучить карточку клиента перед разговором",          points: 60 },
+  { id: "theory",      emoji: "📚", title: "Теория",               hint: "Открыть все три гайда из «Библиотеки оператора» под плейбуком", points: 80, kind: "guides" },
   { id: "top3",        emoji: "👑", title: "Легенда смены",        hint: "Войти в топ-3 прозрачного лидерборда экипажа",       points: 100 },
 ];
 
@@ -51,6 +100,10 @@ export interface LeadPathStats {
   myRank: number | null;
   /** Размер экипажа в лидерборде — для честного «топ-3». */
   crewSize: number;
+  /** Сколько РАЗЛИЧНЫХ гайдов «Библиотеки оператора» открыто (0..3).
+   *  Локальная метрика (localStorage на устройстве) — чтение личное,
+   *  серверу не нужно; для не-crew остаётся undefined → шаг не закрыт. */
+  guidesRead?: number;
 }
 
 /** Сохраняемое состояние пути (users.metadata.leads_path). */
@@ -77,12 +130,45 @@ export function leadPathTodayKey(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Завершён ли шаг: порог по очкам; «Легенда смены» — честный топ-3. */
+/** Завершён ли шаг: порог по очкам; «Теория» — все гайды библиотеки;
+ *  «Легенда смены» — честный топ-3. */
 export function isLeadPathStepDone(step: LeadPathStep, stats: LeadPathStats): boolean {
   if (step.id === "top3") {
     return stats.myRank != null && stats.myRank <= 3 && stats.crewSize >= 3;
   }
+  if (step.kind === "guides") {
+    return (stats.guidesRead ?? 0) >= OPERATOR_GUIDES.length;
+  }
   return stats.myPoints >= step.points;
+}
+
+// ── Отметки «гайд прочитан» (шаг «Теория») ─────────────────────────────────
+// Формат стора — плоский JSON-массив id из OPERATOR_GUIDES. Чистые функции;
+// I/O (getItem/setItem/dispatch события «leads-guides-changed») — в панелях.
+
+/** Ключ стора отметок — единый для чтения и записи. */
+export function guidesStorageKey(slug: string): string {
+  return `leads-guides:${slug}`;
+}
+
+/** Парс стора отметок: чужие/неизвестные id отбрасываются, дубли схлопываются. */
+export function parseGuidesReadIds(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const known = new Set(OPERATOR_GUIDES.map((g) => g.id));
+    return Array.from(new Set(parsed.filter((x): x is string => typeof x === "string" && known.has(x))));
+  } catch {
+    return [];
+  }
+}
+
+/** Чистое добавление отметки: массив id → новый массив (без мутаций). */
+export function applyGuideRead(prev: string[], guideId: string): string[] {
+  const known = new Set(OPERATOR_GUIDES.map((g) => g.id));
+  if (!known.has(guideId) || prev.includes(guideId)) return prev;
+  return [...prev, guideId];
 }
 
 /**
@@ -182,6 +268,9 @@ export function computeLeadPathProgress(
       currentPct = stats.myRank != null && stats.myRank <= 3 && stats.crewSize >= 3
         ? 100
         : 0;
+    } else if (step.kind === "guides") {
+      // «Теория»: прогресс — доля открытых гайдов библиотеки, не очков.
+      currentPct = Math.max(0, Math.min(100, Math.round(((stats.guidesRead ?? 0) / OPERATOR_GUIDES.length) * 100)));
     } else if (step.points > 0) {
       currentPct = Math.max(0, Math.min(100, Math.round((stats.myPoints / step.points) * 100)));
     } else {

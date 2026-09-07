@@ -22,6 +22,7 @@ import { Check, Lock, Map as MapIcon } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import {
   LEAD_PATH_STEPS,
+  OPERATOR_GUIDES,
   type LeadPathProgress,
   type LeadPathState,
   type LeadPathStep,
@@ -41,6 +42,9 @@ interface Props {
   state: LeadPathState;
   /** Мои очки из серверного лидерборда — прогресс-бар текущего шага. */
   myPoints: number;
+  /** Сколько гайдов «Библиотеки оператора» открыто — прогресс шага
+   *  «Теория» (kind:"guides" закрывается гайдами, не очками). */
+  guidesRead?: number;
   /** Патч состояния (drip/catch-up/celebrated) — родитель сохраняет в metadata. */
   onStatePatch: (next: LeadPathState) => void;
   T: ThemeTokens;
@@ -52,12 +56,14 @@ function StepCell({
   view,
   pct,
   myPoints,
+  guidesRead,
   T,
 }: {
   step: LeadPathStep;
   view: LeadPathStepView;
   pct: number;
   myPoints: number;
+  guidesRead: number;
   T: ThemeTokens;
 }) {
   if (view === "locked") {
@@ -107,7 +113,13 @@ function StepCell({
             {step.title}
           </p>
           <p className="text-[10px] font-semibold" style={{ color: accent }}>
-            {done ? "готово" : `${Math.min(myPoints, step.points)} / ${step.points} очков`}
+            {done
+              ? "готово"
+              : step.kind === "guides"
+                // «Теория»: прогресс считается гайдами, а не очками —
+                // «2 / 3 гайда» честнее, чем «35 / 80 очков».
+                ? `${Math.min(guidesRead, OPERATOR_GUIDES.length)} / ${OPERATOR_GUIDES.length} гайдов`
+                : `${Math.min(myPoints, step.points)} / ${step.points} очков`}
           </p>
         </div>
       </div>
@@ -131,7 +143,7 @@ function StepCell({
   );
 }
 
-export function LeadsPathPanel({ progress, state, myPoints, onStatePatch, T }: Props) {
+export function LeadsPathPanel({ progress, state, myPoints, guidesRead = 0, onStatePatch, T }: Props) {
   const [justCompletedId, setJustCompletedId] = useState<string | null>(null);
   // «Праздновали» — из состояния (metadata), чтобы перезагрузка не повторяла
   // конфетти; локальный ref гасит двойную отработку внутри сессии.
@@ -184,6 +196,7 @@ export function LeadsPathPanel({ progress, state, myPoints, onStatePatch, T }: P
               view={progress.views[i]}
               pct={i === progress.currentIndex ? progress.currentPct : 0}
               myPoints={myPoints}
+              guidesRead={guidesRead}
               T={T}
             />
             {/* Мягкое празднование завершённого шага */}
@@ -203,7 +216,14 @@ export function LeadsPathPanel({ progress, state, myPoints, onStatePatch, T }: P
         {/* Тизер следующего шага — интрига вместо когнитивной перегрузки */}
         {lockedLeft > 0 && (
           <div className="flex min-w-[132px] shrink-0 snap-start items-center" title="Шаги открываются по одной смене">
-            <StepCell step={LEAD_PATH_STEPS[stepsToShow.length]} view="locked" pct={0} myPoints={myPoints} T={T} />
+            <StepCell
+              step={LEAD_PATH_STEPS[stepsToShow.length]}
+              view="locked"
+              pct={0}
+              myPoints={myPoints}
+              guidesRead={guidesRead}
+              T={T}
+            />
           </div>
         )}
       </div>

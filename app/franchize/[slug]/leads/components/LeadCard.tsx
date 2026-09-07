@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useMemo } from "react";
-import { CheckCircle2, ChevronRight, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine, History, Target } from "lucide-react";
+import { CheckCircle2, ChevronRight, Eye, Phone, PhoneCall, Clock, MoreVertical, X, StickyNote, UserRound, PenLine, History, Target } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -49,6 +49,9 @@ interface Props {
   /** «Прочитать заметки» — открывает шторку лида сразу на секции заметок
    * (просьба босса: подсвеченный флажок, если у лида есть заметки). */
   onReadNotes?: (leadId: string) => void;
+  /** Лид уже открывался оператором В ЭТУ СМЕНУ (lib/lead-view-history.ts):
+   * тихая метка «👁» у имени — «кого я уже смотрел?» без лишней памяти. */
+  viewed?: boolean;
   T: ThemeTokens;
 }
 
@@ -87,7 +90,7 @@ function isValidLeadRow(lead: unknown): lead is LeadRow {
  * metadata 11px / md:13px. Left stripe is 3px (w-[3px]) so it reads as an
  * accent indicator without eating into the card content.
  */
-export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, handling, onReadNotes, T }: Props) {
+export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priority, handling, onReadNotes, viewed, T }: Props) {
   // 🎯 Готовый ответ (авито-лиды): чип с распознанным интентом вопроса
   // в метаряде + пункт меню «Скопировать готовый ответ». Чистая функция
   // поверх metadata webhook'а — в БД не пишется, не-авито лиды получают null.
@@ -251,6 +254,16 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                     className="h-4 w-4 shrink-0"
                     style={{ color: "#22c55e" }}
                     aria-label="Подтверждён"
+                  />
+                )}
+                {viewed && (
+                  /* «Уже открывали в эту смену» — тихая метка (next iteration
+                      «per-lead view history»): возвращаясь к списку, оператор
+                      сразу отличает изученных от свежих. */
+                  <Eye
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: T.textFaint }}
+                    aria-label="Вы уже открывали этого лида в этой смене"
                   />
                 )}
                 {pending > 0 && (

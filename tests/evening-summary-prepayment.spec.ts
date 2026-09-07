@@ -43,7 +43,15 @@ describe('Evening Summary Prepayment Section', () => {
 
   let testCrewId: string
   let testVehicleId: string
-  const testDate = new Date().toISOString().split('T')[0]
+  // «Сегодня» — в ЧАСОВОЙ ЗОНЕ ОТЧЁТА (Europe/Moscow, +03:00), а не UTC.
+  // FIX: окно выборки ниже строится как `${testDate}T00:00:00+03:00`…
+  // T23:59:59+03:00`, а вечерний саммари считает день по MSK
+  // (evening-summary.sh: moscow_today). Когда UTC-часы идут 21:00–23:59Z
+  // (это уже 00:00–02:59 следующего дня по MSK), UTC-дата отставала от
+  // MSK-даты: свежезасеянная транзакция (created_at = «сейчас») выпадала
+  // из СОБСТВЕННОГО окна выборки, и тест был красным каждую ночь по MSK.
+  // en-CA даёт ровно YYYY-MM-DD.
+  const testDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' })
 
   beforeAll(async () => {
     // No fixtures when the prepayment feature is not deployed — the DB-backed
@@ -82,6 +90,10 @@ describe('Evening Summary Prepayment Section', () => {
     testVehicleId = vehicle?.id || 'test-prepayment-bike-001'
 
     // Create test prepayment for today
+    // FIX: созд_at/transaction_date пинятся на ПОЛДЕНЬ MSK тестовой даты —
+    // строго внутри дневного окна (+03:00) при ЛЮБОМ моменте запуска;
+    // «сейчас» (UTC) выпадало из окна после 21:00Z (см. комментарий к testDate).
+    const prepayTimestamp = `${testDate}T12:00:00+03:00`
     const { error: prepayError } = await supabase
       .from('cash_transactions')
       .insert({
@@ -91,8 +103,8 @@ describe('Evening Summary Prepayment Section', () => {
         flow_direction: 'in',
         amount: 5000,
         description: 'Предоплата за бронь BMW',
-        transaction_date: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        transaction_date: prepayTimestamp,
+        created_at: prepayTimestamp
       })
     if (prepayError) throw prepayError
   })

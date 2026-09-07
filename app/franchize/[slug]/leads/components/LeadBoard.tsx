@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { Eye } from "lucide-react";
 import { Avatar } from "./Avatar";
 import { relativeTime, metaFor, getInitials, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { BOARD_COLUMNS, AVITO_COLUMN_STAGES } from "../leads-constants";
@@ -24,6 +25,8 @@ interface LeadBoardProps {
   priorityMap?: Map<string, LeadPriority>;
   /** «Прочитать заметки» — открывает шторку лида сразу на заметках. */
   onReadNotes?: (leadId: string) => void;
+  /** История просмотров за смену: у лидов из множества — метка «👁». */
+  viewedIds?: Set<string>;
   T: any;
 }
 
@@ -47,7 +50,7 @@ interface LeadBoardProps {
  *   • Desktop (lg+): fixed 260px columns, column body scrolls vertically
  *     inside `lg:max-h-[calc(100vh-280px)]` — as before.
  */
-export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, onReadNotes, T }: LeadBoardProps) {
+export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, onReadNotes, viewedIds, T }: LeadBoardProps) {
   const columns = useMemo(() => {
     // Group by the COMPUTED pipeline stage (stageKey), not the raw DB stage —
     // see groupLeadsForBoard(): raw stages like "viewed"/"clicked" used to
@@ -152,7 +155,14 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
                     <div className="flex items-center gap-2">
                       <Avatar name={lead.full_name} source={lead.source} size={32} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold" style={{ color: T.text }}>
+                        <p className="flex items-center gap-1 truncate text-xs font-bold" style={{ color: T.text }}>
+                          {viewedIds?.has(lead.user_id) && (
+                            <Eye
+                              className="h-3 w-3 shrink-0"
+                              style={{ color: T.textFaint }}
+                              aria-label="Вы уже открывали этого лида в этой смене"
+                            />
+                          )}
                           {lead.full_name || "Без имени"}
                         </p>
                         <p className="truncate text-[10px]" style={{ color: T.textMuted }}>

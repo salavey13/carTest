@@ -20,6 +20,9 @@ interface LeadListProps {
   priorityMap?: Map<string, LeadPriority>;
   /** «Прочитать заметки» — открывает шторку лида сразу на заметках. */
   onReadNotes?: (leadId: string) => void;
+  /** История просмотров за смену: у лидов из множества — метка «👁»
+   *  (lib/lead-view-history.ts, «per-lead view history»). */
+  viewedIds?: Set<string>;
   T: any;
   crewId: string;
   slug: string;
@@ -49,6 +52,7 @@ export function LeadList({
   getTodosForLead,
   priorityMap,
   onReadNotes,
+  viewedIds,
   T,
   crewId,
   slug,
@@ -123,6 +127,7 @@ export function LeadList({
                 priority={priorityMap?.get(lead.user_id)}
                 handling={getLeadHandling(leadTodos)}
                 onReadNotes={onReadNotes}
+                viewed={viewedIds?.has(lead.user_id) ?? false}
                 signals={computeLeadSignals(lead, leadTodos)}
               />
             </div>

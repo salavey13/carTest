@@ -13,9 +13,18 @@ import {
   applyLeadPathDrip,
   computeLeadPathProgress,
   DEFAULT_LEAD_PATH_STATE,
+  guidesStorageKey,
   mergeLeadPathState,
+  parseGuidesReadIds,
   type LeadPathState,
 } from "./lib/lead-path";
+import {
+  applyLeadViewed,
+  parseLeadViewHistory,
+  serializeLeadViewHistory,
+  viewedHistoryKey,
+} from "./lib/lead-view-history";
+import { msUntilNextMidnight } from "./lib/lead-playbook-done";
 import { LeadsPathPanel } from "./components/LeadsPathPanel";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
 import { DISMISS_REASONS } from "./lib/dismiss-reasons";
@@ -843,6 +852,23 @@ export function LeadsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCrew, prefsSettled]);
 
+  // ── Гайды «Библиотеки оператора» → шаг «Теория» пути ──
+  // Клик по ссылке в плейбуке пишет стор и шлёт «leads-guides-changed»;
+  // здесь счётчик перечитывается ЖИВО (без перезагрузки) и попадает в
+  // pathStats.guidesRead → computeLeadPathProgress закрывает шаг.
+  const guidesKey = useMemo(() => guidesStorageKey(slug), [slug]);
+  const [guidesReadCount, setGuidesReadCount] = useState(0);
+  useEffect(() => {
+    const reload = () => {
+      try {
+        setGuidesReadCount(parseGuidesReadIds(window.localStorage.getItem(guidesKey)).length);
+      } catch { /* private mode */ }
+    };
+    reload();
+    window.addEventListener("leads-guides-changed", reload as EventListener);
+    return () => window.removeEventListener("leads-guides-changed", reload as EventListener);
+  }, [guidesKey]);
+
   const pathStats = useMemo(() => {
     const meId = dbUser?.user_id || null;
     const idx = meId ? leaderboard.findIndex((e) => e.id === meId) : -1;
@@ -850,8 +876,59 @@ export function LeadsClient({
       myPoints: idx >= 0 ? leaderboard[idx].points : 0,
       myRank: idx >= 0 ? idx + 1 : null,
       crewSize: leaderboard.length,
+      guidesRead: guidesReadCount,
     };
-  }, [leaderboard, dbUser?.user_id]);
+  }, [leaderboard, dbUser?.user_id, guidesReadCount]);
+
+  // ── «ОТКРЫТО ЗА СМЕНУ»: личная история просмотров лидов (next iteration
+  // ideas: «per-lead view history — which leads you already opened this
+  // shift»). Оператор, вернувшись к списку, видит на карточке метку «👁»
+  // и счётчик в футере — когнитивный налог «кого я уже смотрел?» снят.
+  // История ЛИЧНАЯ и ЭФЕМЕРНАЯ: localStorage на устройстве, до конца дня
+  // (lib/lead-view-history.ts) — серверу она не нужна. Все точки открытия
+  // лида (список/доска/таблица/плейбук/«прочитать заметки») сходятся в
+  // один selectedId — track-эффект ниже покрывает их все.
+  const viewedKey = useMemo(() => viewedHistoryKey(slug), [slug]);
+  const [viewedIds, setViewedIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    // Гидрация после монтирования (SSR — пусто) и при смене slug.
+    try {
+      setViewedIds(parseLeadViewHistory(window.localStorage.getItem(viewedKey)));
+    } catch { /* private mode — история только в памяти */ }
+  }, [viewedKey]);
+  // Полуночная граница: вкладка ночной смены, пережившая дату, сама очищает
+  // историю (таймер +1 с после полуночи; parse вернёт пустой набор).
+  useEffect(() => {
+    let timer: number;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        try {
+          setViewedIds(parseLeadViewHistory(window.localStorage.getItem(viewedKey)));
+        } catch { /* private mode */ }
+        schedule();
+      }, msUntilNextMidnight());
+    };
+    schedule();
+    return () => window.clearTimeout(timer);
+  }, [viewedKey]);
+  const registerLeadViewed = useCallback(
+    (leadId: string) => {
+      try {
+        const current = parseLeadViewHistory(window.localStorage.getItem(viewedKey));
+        if (current.has(leadId)) return; // уже в истории — ни записи, ни рендера
+        const next = applyLeadViewed(current, leadId);
+        setViewedIds(next);
+        try {
+          window.localStorage.setItem(viewedKey, serializeLeadViewHistory(next));
+        } catch { /* private mode — история живёт в памяти до перезагрузки */ }
+      } catch { /* LS недоступен — молча: история не критична */ }
+    },
+    [viewedKey],
+  );
+  useEffect(() => {
+    if (selectedId) registerLeadViewed(selectedId);
+  }, [selectedId, registerLeadViewed]);
+
   const pathProgress = useMemo(
     () => computeLeadPathProgress(pathState, LEAD_PATH_STEPS, pathStats),
     [pathState, pathStats],
@@ -1329,6 +1406,7 @@ export function LeadsClient({
           storageKey={isCrew ? `leads-achv:${slug}` : undefined}
           doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
           compactPrefKey={`leads-playbook-expanded:${slug}`}
+          guidesKey={guidesKey}
         />
       </div>
 
@@ -1398,6 +1476,7 @@ export function LeadsClient({
                 progress={pathProgress}
                 state={pathState}
                 myPoints={pathStats.myPoints}
+                guidesRead={guidesReadCount}
                 onStatePatch={(next) => {
                   setPathState(next);
                   prefsRef.current.savePath(next);
@@ -1486,6 +1565,7 @@ export function LeadsClient({
           getTodosForLead={getTodosForLead}
           priorityMap={priorityMap}
           onReadNotes={handleReadNotes}
+          viewedIds={viewedIds}
           T={T}
         />
       ) : viewMode === "table" ? (
@@ -1502,6 +1582,7 @@ export function LeadsClient({
             getTodosForLead={getTodosForLead}
             priorityMap={priorityMap}
             onReadNotes={handleReadNotes}
+            viewedIds={viewedIds}
             sortMode={sortMode}
             onSortChange={setSortMode}
             T={T}
@@ -1518,6 +1599,7 @@ export function LeadsClient({
           getTodosForLead={getTodosForLead}
           priorityMap={priorityMap}
           onReadNotes={handleReadNotes}
+          viewedIds={viewedIds}
           T={T}
           crewId={crewId}
           slug={slug}
@@ -1554,6 +1636,7 @@ export function LeadsClient({
           <span className="text-[11px]" style={{ color: T.textFaint }}>
             Показано {visibleLeads.length} из {pageInfo.total} лидов
             {pageInfo.hasMore ? " — лучшие уже наверху" : ""}
+            {viewedIds.size > 0 ? ` · открыто за смену: ${viewedIds.size}` : ""}
             {lastSyncAt
               ? ` · обновлено ${new Date(lastSyncAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
               : ""}

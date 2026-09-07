@@ -6,13 +6,17 @@
 import { describe, expect, it } from "vitest";
 import {
   LEAD_PATH_STEPS,
+  OPERATOR_GUIDES,
+  applyGuideRead,
   applyLeadPathDrip,
   computeLeadPathProgress,
   countLeadPathDone,
   DEFAULT_LEAD_PATH_STATE,
+  guidesStorageKey,
   isLeadPathStepDone,
   leadPathTodayKey,
   mergeLeadPathState,
+  parseGuidesReadIds,
   type LeadPathStats,
   type LeadPathState,
 } from "@/app/franchize/[slug]/leads/lib/lead-path";
@@ -45,6 +49,19 @@ describe("isLeadPathStepDone", () => {
     expect(isLeadPathStepDone(top3, stats({ myPoints: 500, myRank: 4, crewSize: 5 }))).toBe(false);
     // В экипаже из двух человек «топ-3» — это все: шаг не должен закрываться даром
     expect(isLeadPathStepDone(top3, stats({ myPoints: 500, myRank: 1, crewSize: 2 }))).toBe(false);
+  });
+
+  it("«Теория» закрывается ТОЛЬКО гайдами библиотеки — очками не купить", () => {
+    const theory = LEAD_PATH_STEPS.find((s) => s.id === "theory");
+    if (!theory) throw new Error("шаг theory обязан существовать (wave «next step reveal»)");
+    // 500 очков, но гайды не открыты — шаг не закрыт
+    expect(isLeadPathStepDone(theory, stats({ myPoints: 500, guidesRead: 0 }))).toBe(false);
+    // Частично прочитанные гайды не закрывают
+    expect(isLeadPathStepDone(theory, stats({ myPoints: 500, guidesRead: OPERATOR_GUIDES.length - 1 }))).toBe(false);
+    // Все гайды — шаг закрыт (даже с нулём очков)
+    expect(isLeadPathStepDone(theory, stats({ myPoints: 0, guidesRead: OPERATOR_GUIDES.length }))).toBe(true);
+    // undefined (не-crew/старый снимок) — шаг не закрыт
+    expect(isLeadPathStepDone(theory, stats({ myPoints: 100 }))).toBe(false);
   });
 });
 
@@ -90,8 +107,11 @@ describe("countLeadPathDone: подряд с начала", () => {
     expect(countLeadPathDone(LEAD_PATH_STEPS, stats({ myPoints: 0 }))).toBe(1);
     // 10 очков → старт + первый контакт + перезвон (порог 9)
     expect(countLeadPathDone(LEAD_PATH_STEPS, stats({ myPoints: 10 }))).toBe(3);
-    // 100 очков, но rank вне топ-3 → «Легенда» не закрыта
+    // 100 очков, но гайды не открыты → «Теория» не закрыта (стоп на ней)
     expect(countLeadPathDone(LEAD_PATH_STEPS, stats({ myPoints: 200, myRank: 7, crewSize: 6 })))
+      .toBe(LEAD_PATH_STEPS.length - 2);
+    // Те же очки + все гайды → «Теория» закрыта, стоп на «Легенде» (rank вне топ-3)
+    expect(countLeadPathDone(LEAD_PATH_STEPS, stats({ myPoints: 200, myRank: 7, crewSize: 6, guidesRead: OPERATOR_GUIDES.length })))
       .toBe(LEAD_PATH_STEPS.length - 1);
   });
 });
@@ -143,7 +163,7 @@ describe("computeLeadPathProgress: видимость и catch-up", () => {
     const res = computeLeadPathProgress(
       { revealed: LEAD_PATH_STEPS.length, lastRevealDay: null, celebrated: [] },
       LEAD_PATH_STEPS,
-      stats({ myPoints: 500, myRank: 1, crewSize: 4 }),
+      stats({ myPoints: 500, myRank: 1, crewSize: 4, guidesRead: OPERATOR_GUIDES.length }),
     );
     expect(res.doneCount).toBe(LEAD_PATH_STEPS.length);
     expect(res.currentIndex).toBeNull();
@@ -201,5 +221,75 @@ describe("mergeLeadPathState: прогресс не откатывается с�
     expect(merged.revealed).toBe(6);
     expect(merged.lastRevealDay).toBe("2026-09-07");
     expect(merged.celebrated).toHaveLength(3);
+  });
+});
+
+describe("«Теория» (wave next-step-reveal): структура лестницы и гайды", () => {
+  it("теория вставлена между «подготовкой» и короной; всего 8 шагов", () => {
+    expect(LEAD_PATH_STEPS).toHaveLength(8);
+    expect(LEAD_PATH_STEPS[LEAD_PATH_STEPS.length - 1].id).toBe("top3"); // корона осталась финалом
+    expect(LEAD_PATH_STEPS[6].id).toBe("theory");
+    expect(LEAD_PATH_STEPS[5].id).toBe("prep");
+    expect(LEAD_PATH_STEPS[6].kind).toBe("guides");
+  });
+
+  it("catch-up сквозь теорию: очки + все гайды → текущий — «Легенда», revealed = 8", () => {
+    const res = computeLeadPathProgress(
+      { revealed: 2, lastRevealDay: "2026-09-08", celebrated: [] },
+      LEAD_PATH_STEPS,
+      stats({ myPoints: 100, myRank: null, crewSize: 4, guidesRead: OPERATOR_GUIDES.length }),
+    );
+    // Закрыты пороги 0/3/9/20/35/60 + теория (гайды) = 7 подряд
+    expect(res.doneCount).toBe(7);
+    expect(res.views[6]).toBe("done");
+    expect(res.views[7]).toBe("current");
+    expect(res.revealed).toBe(LEAD_PATH_STEPS.length);
+  });
+
+  it("прогресс текущей «Теории» — доля открытых гайдов, не очков", () => {
+    const one = computeLeadPathProgress(
+      DEFAULT_LEAD_PATH_STATE,
+      LEAD_PATH_STEPS,
+      stats({ myPoints: 100, guidesRead: 1 }), // пороги до 60 закрыты очками → текущая теория
+    );
+    expect(one.currentIndex).toBe(6);
+    expect(one.currentPct).toBe(Math.round((1 / OPERATOR_GUIDES.length) * 100));
+
+    const none = computeLeadPathProgress(
+      DEFAULT_LEAD_PATH_STATE,
+      LEAD_PATH_STEPS,
+      stats({ myPoints: 100, guidesRead: 0 }),
+    );
+    expect(none.currentIndex).toBe(6);
+    expect(none.currentPct).toBe(0);
+  });
+
+  it("OPERATOR_GUIDES: три гайда с уникальными id и офлайн-ссылками /docs/", () => {
+    expect(OPERATOR_GUIDES).toHaveLength(3);
+    const ids = new Set(OPERATOR_GUIDES.map((g) => g.id));
+    expect(ids.size).toBe(3);
+    for (const g of OPERATOR_GUIDES) {
+      expect(g.href).toMatch(/^\/docs\/.+\.html$/);
+      expect(g.title.length).toBeGreaterThan(0);
+    }
+    expect(OPERATOR_GUIDES.map((g) => g.href)).toEqual([
+      "/docs/avito-leads-guide.html",
+      "/docs/brutal-business-truths-2026.html",
+      "/docs/ultimate-sales-playbook-2026.html",
+    ]);
+  });
+
+  it("сторы отметок гайдов: парс валидирует id, apply не дублирует", () => {
+    expect(guidesStorageKey("motorpark")).toBe("leads-guides:motorpark");
+    expect(parseGuidesReadIds(null)).toEqual([]);
+    expect(parseGuidesReadIds("не json")).toEqual([]);
+    expect(parseGuidesReadIds("{}" )).toEqual([]);
+    // неизвестные id и дубли отбрасываются
+    expect(parseGuidesReadIds(JSON.stringify(["avito-guide", "avito-guide", "hack", 42, "ultimate-sales"]) as unknown as string))
+      .toEqual(["avito-guide", "ultimate-sales"]);
+    // apply добавляет только известный id и только один раз
+    expect(applyGuideRead([], "brutal-truths")).toEqual(["brutal-truths"]);
+    expect(applyGuideRead(["brutal-truths"], "brutal-truths")).toEqual(["brutal-truths"]);
+    expect(applyGuideRead([], "неизвестный")).toEqual([]);
   });
 });

@@ -23,7 +23,7 @@
 //
 
 import { useMemo } from "react";
-import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Flame, Zap, PhoneCall, StickyNote, History } from "lucide-react";
+import { ArrowDown, ArrowUp, Bike, CircleDollarSign, Table2, ExternalLink, Eye, Flame, Zap, PhoneCall, StickyNote, History } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
 import { relativeTime, metaFor, isAvitoLead, AVITO_COLOR, AVITO_BG } from "../leads-utils";
 import { STAGE_LABELS as PIPELINE_STAGE_LABELS, STAGE_COLORS } from "../lib/pipeline-stages";
@@ -42,6 +42,8 @@ interface LeadTableViewProps {
   priorityMap?: Map<string, LeadPriority>;
   /** «Прочитать заметки» — открывает шторку лида сразу на заметках. */
   onReadNotes?: (leadId: string) => void;
+  /** История просмотров за смену: у лидов из множества — метка «👁». */
+  viewedIds?: Set<string>;
   sortMode: SortMode;
   onSortChange?: (mode: SortMode) => void;
   T: ThemeTokens;
@@ -63,6 +65,7 @@ export function LeadTableView({
   getTodosForLead,
   priorityMap,
   onReadNotes,
+  viewedIds,
   sortMode,
   onSortChange,
   T,
@@ -293,7 +296,14 @@ export function LeadTableView({
                     <div className="flex items-center gap-2">
                       <Avatar name={lead.full_name} source={lead.source} size={28} />
                       <div className="min-w-0">
-                        <p className="truncate font-semibold" style={{ color: T.text }}>
+                        <p className="flex items-center gap-1 truncate font-semibold" style={{ color: T.text }}>
+                          {viewedIds?.has(lead.user_id) && (
+                            <Eye
+                              className="h-3 w-3 shrink-0"
+                              style={{ color: T.textFaint }}
+                              aria-label="Вы уже открывали этого лида в этой смене"
+                            />
+                          )}
                           {lead.full_name || "Без имени"}
                         </p>
                         {/* MOBILE: колонка «Контакты» скрыта ниже md — телефон,

@@ -46,6 +46,11 @@ import {
 } from "../lib/lead-playbook-done";
 import { computeOperatorRank, operatorRankForXp, primaryBadgeForAction } from "../lib/lead-gamification";
 import { loadAchievementStore } from "../lib/lead-achievements";
+import {
+  OPERATOR_GUIDES,
+  applyGuideRead,
+  parseGuidesReadIds,
+} from "../lib/lead-path";
 
 interface LeadsPlaybookPanelProps {
   actions: NextAction[];
@@ -67,6 +72,11 @@ interface LeadsPlaybookPanelProps {
    *  ВСЕХ пользователей (очередь — не геймификация). Без ключа компактный
    *  режим просто сворачивается на каждый новый заход. */
   compactPrefKey?: string;
+  /** Ключ отметок «гайд прочитан» (`leads-guides:<slug>`) — питает галочки
+   *  «Библиотеки оператора» и шаг «Теория» пути. БЕЗ crew-гейта: чтение —
+   *  личная полезность для любого пользователя, а шаг пути закрывается
+   *  только у экипажа (путь просто не монтируется не-crew). */
+  guidesKey?: string;
 }
 
 const TONE_COLOR: Record<NextAction["tone"], string> = {
@@ -99,7 +109,7 @@ function buzz(ms = 10): void {
   }
 }
 
-export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey, compactPrefKey }: LeadsPlaybookPanelProps) {
+export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey, compactPrefKey, guidesKey }: LeadsPlaybookPanelProps) {
   // Какая строка только что скопирована — галочка вместо иконки на 2 секунды.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -118,6 +128,36 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
     return () => window.removeEventListener("leads-achv-changed", reload as EventListener);
   }, [storageKey]);
   const rank = useMemo(() => operatorRankForXp(leadXp), [leadXp]);
+
+  // ── «БИБЛИОТЕКА ОПЕРАТОРА»: отметки «гайд прочитан» (шаг «Теория» пути) ──
+  // Читается после монтирования (SSR — пусто) и ЖИВО: клик по ссылке пишет
+  // стор и шлёт window-событие «leads-guides-changed» — и локальный стейт,
+ //  и LeadsClient (pathStats.guidesRead → прогресс шага «Теория»)
+ //  перечитывают стор без перезагрузки. I/O тут (как у done-отметок выше);
+ //  чистая логика — в lib/lead-path.ts.
+  const [guidesReadIds, setGuidesReadIds] = useState<string[]>([]);
+  useEffect(() => {
+    const reload = () => {
+      if (!guidesKey) return;
+      try {
+        setGuidesReadIds(parseGuidesReadIds(window.localStorage.getItem(guidesKey)));
+      } catch { /* private mode */ }
+    };
+    reload();
+    window.addEventListener("leads-guides-changed", reload as EventListener);
+    return () => window.removeEventListener("leads-guides-changed", reload as EventListener);
+  }, [guidesKey]);
+  const markGuideRead = useCallback(
+    (guideId: string) => {
+      if (!guidesKey) return;
+      try {
+        const next = applyGuideRead(parseGuidesReadIds(window.localStorage.getItem(guidesKey)), guideId);
+        window.localStorage.setItem(guidesKey, JSON.stringify(next));
+      } catch { /* private mode — отметка живёт в памяти до перезагрузки */ }
+      window.dispatchEvent(new Event("leads-guides-changed"));
+    },
+    [guidesKey],
+  );
 
   // ── «Сделал» — дневные отметки, crew-only ──
   // Чистая логика (день/сброс/защита полуночи) — в lib/lead-playbook-done.ts.
@@ -528,17 +568,40 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
             {b.fact}
           </span>
         ))}
-        {/* Ссылка на полную инструкцию — порядок очереди и правила ответов
-            подробно разобраны в гайде (self-contained, работает офлайн). */}
-        <a
-          href="/docs/avito-leads-guide.html"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="ml-auto inline-flex items-center gap-1 text-[10px] underline decoration-dotted transition hover:brightness-125"
-          style={{ color: T.accent }}
-        >
-          📘 Как работать с лидами
-        </a>
+      </div>
+
+      {/* БИБЛИОТЕКА ОПЕРАТОРА — все три самоучителя системы вместо бывшей
+          одиночной ссылки на Avito-гид. Галочка = «открывал в этой смене
+          мышления» (отметка живёт в localStorage на экипаж, без crew-гейта);
+          три галочки закрывают шаг «Теория» пути оператора. */}
+      <div className="mt-3 border-t pt-3" style={{ borderColor: T.border }}>
+        <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: T.textFaint }}>
+          Библиотека оператора
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {OPERATOR_GUIDES.map((g) => {
+            const read = guidesReadIds.includes(g.id);
+            return (
+              <a
+                key={g.id}
+                href={g.href}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={() => markGuideRead(g.id)}
+                className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition hover:brightness-125 active:scale-[0.98]"
+                style={{
+                  borderColor: read ? "rgba(34,197,94,0.4)" : T.border,
+                  color: read ? "#22c55e" : T.textMuted,
+                  backgroundColor: read ? "rgba(34,197,94,0.07)" : "transparent",
+                }}
+                title={`${g.desc}${read ? " · открыто — засчитано в «Теорию»" : ""}`}
+              >
+                {read ? <Check className="h-3 w-3 shrink-0" aria-hidden /> : <span aria-hidden>{g.emoji}</span>}
+                {g.title}
+              </a>
+            );
+          })}
+        </div>
       </div>
     </motion.div>
   );
