@@ -110,6 +110,12 @@ export type LeadHistoryEvent = {
   label: string;
   icon?: string;
   detail?: string;
+  /** Кто совершил (записанные события журнала) — TG id или "avito-agent". */
+  actor?: string | null;
+  /** Имя актора, если резолвлено (пришло с событием или ростером). */
+  actorName?: string | null;
+  /** true — записанный факт из public.lead_events (переживает производные данные). */
+  recorded?: boolean;
 };
 
 /**

@@ -5,7 +5,8 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
-import type { LeadRentalRow } from "@/app/franchize/[slug]/leads/leads-types";
+import { computeLeadLeaderboard, type LeadLeaderboardRow } from "@/app/franchize/lib/lead-events";
+import type { LeadRentalRow, LeadEventRow } from "@/app/franchize/[slug]/leads/leads-types";
 // NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
 // are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
 // poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
@@ -473,9 +474,30 @@ export async function getFranchizeLeads(
         analysisRaw && typeof analysisRaw === "object" && !Array.isArray(analysisRaw)
           ? (analysisRaw as Record<string, unknown>)
           : null;
+      // НАКОПИТЕЛЬНЫЕ факты клиента + лог чата (Lead Game wave) —
+      // «подготовка за 5 минут» без открытия Авито.
+      const clientFactsRaw = meta["clientFacts"];
+      const clientFacts =
+        clientFactsRaw && typeof clientFactsRaw === "object" && !Array.isArray(clientFactsRaw)
+          ? Object.fromEntries(
+              Object.entries(clientFactsRaw as Record<string, unknown>)
+                .filter(([, v]) => typeof v === "string" && (v as string).trim())
+                .slice(0, 12),
+            )
+          : null;
+      const messagesRaw = meta["messages"];
+      const messages = Array.isArray(messagesRaw)
+        ? (messagesRaw as Array<{ at?: unknown; from?: unknown; text?: unknown }>)
+            .filter((m) => m && typeof m.text === "string" && typeof m.at === "string")
+            .map((m) => ({
+              at: String(m.at),
+              from: typeof m.from === "string" ? m.from : "buyer",
+              text: String(m.text).slice(0, 500),
+            }))
+        : null;
       if (
         !chatId && !itemUrl && !profileUrl && !itemId && !lastMessage && !firstMessage &&
-        !analysis
+        !analysis && !clientFacts && !messages
       ) {
         return null;
       }
@@ -490,6 +512,8 @@ export async function getFranchizeLeads(
         messagesCount,
         lastMessageAt,
         analysis,
+        clientFacts,
+        messages,
       };
     };
 
@@ -1859,11 +1883,59 @@ export async function getFranchizeLeads(
       }
     }
 
+    // ── Lead Game: журнал истории + прозрачный лидерборд ──
+    // Журнал — записанные факты (webhook, «взял в работу», перезвоны,
+    // заметки, задачи). Переживает производные данные и виден ВСЕМ
+    // одинаково — «leaderboard is transparent». Лимит: 30 дней / 400 строк
+    // (страница лидов не должна тащить всю историю экипажа).
+    let leadEvents: LeadEventRow[] = [];
+    let leaderboard: LeadLeaderboardRow[] = [];
+    try {
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: eventRows, error: eventsError } = await supabaseAdmin
+        .from("lead_events")
+        .select("id, created_at, lead_id, type, actor, actor_name, label, detail, points")
+        .eq("crew_slug", slug)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(400);
+      if (eventsError) throw eventsError;
+
+      leadEvents = (eventRows || []).map((e) => ({
+        id: String(e.id),
+        createdAt: e.created_at,
+        leadId: e.lead_id,
+        type: e.type,
+        actor: e.actor,
+        actorName: e.actor_name,
+        label: e.label,
+        detail: e.detail,
+        points: e.points ?? 0,
+      }));
+
+      // Лидерборд — та же таблица событий, агрегация на сервере. Имена —
+      // из ростера операторов (owner + активные участники, см. выше).
+      const nameMap = new Map<string, string>();
+      for (const op of operators) nameMap.set(op.id, op.name);
+      for (const [tgId, u] of tgUserMap) {
+        if (u?.full_name || u?.username) {
+          nameMap.set(tgId, u.full_name || u.username || tgId);
+        }
+      }
+      leaderboard = computeLeadLeaderboard(leadEvents, nameMap);
+    } catch (eventsError) {
+      // Таблицы может ещё не быть (миграция не применена владельцем) —
+      // страница лидов обязана работать без истории/лидерборда.
+      logger.warn("[getFranchizeLeads] lead_events unavailable (migration pending?)", eventsError);
+    }
+
     return {
       success: true,
       leads: Array.from(leadMap.values()),
       todos: dedupedTodos,
       operators,
+      leadEvents,
+      leaderboard,
     };
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);

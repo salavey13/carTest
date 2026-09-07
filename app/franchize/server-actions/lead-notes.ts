@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
 // NOTE: cookies + telegram-actor-cookie imported DYNAMICALLY inside functions
 // to avoid `import "server-only"` poisoning the client bundle.
 
@@ -171,6 +172,24 @@ export async function createLeadNote(input: {
       .single();
 
     if (error) return { success: false, error: error.message };
+    // Журнал истории (Lead Game): заметка с атрибуцией автора. Slug — по
+    // crewId (в input его нет), actor — автор заметки (createdBy).
+    try {
+      const { data: crewRow } = await supabaseAdmin
+        .from("crews")
+        .select("slug")
+        .eq("id", crewId)
+        .maybeSingle();
+      void recordLeadEvent({
+        crewSlug: crewRow?.slug || "",
+        leadId,
+        type: "note_added",
+        actor: createdBy || null,
+        label: `Заметка: ${text.length > 60 ? text.slice(0, 60) + "…" : text}`,
+      });
+    } catch (e) {
+      logger.warn("[lead-notes] history event skipped", e);
+    }
     // 2026-09-03: в БД храним стабильный user_id оператора, но в ответе
     // резолвим его в имя (как getLeadNotes) — шторка сразу показывает
     // «Иванов», а не сырой chat_id.

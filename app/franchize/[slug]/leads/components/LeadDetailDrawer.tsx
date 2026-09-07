@@ -68,6 +68,7 @@ import {
 import { LeadSLAOverview } from "./LeadSLAOverview";
 import type { LeadPriority } from "../lib/lead-priority";
 import { LeadInfoGrid, type InfoTile } from "./LeadInfoGrid";
+import { LeadClientFactsSection } from "./LeadClientFactsSection";
 import {
   LeadDocumentsSection,
   type DocumentItem,
@@ -1084,6 +1085,13 @@ export function LeadDetailDrawer(props: Props) {
       <div className="mt-5">
         <LeadSLAOverview signals={signals} T={T} />
       </div>
+
+      {/* 3.5 НАКОПИТЕЛЬНАЯ КАРТОЧКА КЛИЕНТА («подготовка за 5 минут», Lead Game):
+          факты от авито-агента + лог чата. Рендерится только когда есть что
+          показывать — для лидов без Авито-контекста ничего не меняется. */}
+      {(avito?.clientFacts || avito?.messages) && (
+        <LeadClientFactsSection facts={avito?.clientFacts} messages={avito?.messages} T={T} />
+      )}
 
       {/* 4. Info grid */}
       <div className="mt-5">

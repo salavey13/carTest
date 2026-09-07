@@ -4,6 +4,12 @@ import { createHash } from "node:crypto";
 import { logger } from "@/lib/logger";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
+import {
+  appendMessageLog,
+  mergeClientFacts,
+  sanitizeClientFacts,
+} from "@/app/franchize/lib/lead-client-facts";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Avito Messenger v3 webhook receiver → VIP BIKE leads (franchize_intents).
@@ -175,6 +181,14 @@ async function createLead(input: {
 }): Promise<void> {
   const { value, eventId, now, extra, phone, client, analysis } = input;
   const leadScore = sanitizeScore(client?.score);
+  // НАКОПИТЕЛЬНЫЕ факты клиента («подготовка за 5 минут»): агент присылает
+  // их вместе с сообщением, webhook кладёт в metadata.clientFacts. Здесь —
+  // первый пасс: мерджим мониторный `client` + агентские client_facts.
+  const incomingFacts = mergeClientFacts(
+    null,
+    sanitizeClientFacts(client ? { name: client.name, ...factsFromAnalysis(analysis) } : factsFromAnalysis(analysis)),
+  );
+  const leadKey = `avito:${value.chat_id ?? eventId ?? now}`;
   const metadata: Record<string, unknown> = {
     name: buyerDisplayName(value, client?.name),
     phone: null,
@@ -192,6 +206,9 @@ async function createLead(input: {
     messagesCount: 1,
     capturedAt: now,
     capturedVia: "avito_webhook_v3",
+    // Накопительный лог чата — оператор видит всю переписку без открытия Авито.
+    messages: appendMessageLog(null, { at: value.created || now, from: "buyer", text: value.text || "" }),
+    ...(incomingFacts ? { clientFacts: incomingFacts } : {}),
     ...(client?.url ? { sourceUrl: client.url } : {}),
     ...(client?.profile ? { avitoProfile: client.profile } : {}),
     ...(client?.category ? { analysisCategory: client.category } : {}),
@@ -214,6 +231,26 @@ async function createLead(input: {
 
   if (error) throw error;
   logger.info("[avito-webhook] lead created", { chatId: value.chat_id });
+
+  // ЖУРНАЛ ИСТОРИИ (wave Lead Game): факты переживают лид и видны команде.
+  await recordLeadEvent({
+    crewSlug: CREW_SLUG,
+    leadId: leadKey,
+    type: "lead_created",
+    actor: "avito-agent",
+    label: "Лид захвачен из Авито",
+    detail: [value.item_title, value.text].filter(Boolean).join(" · ").slice(0, 300) || null,
+  });
+  if (analysis) {
+    await recordLeadEvent({
+      crewSlug: CREW_SLUG,
+      leadId: leadKey,
+      type: "analysis_attached",
+      actor: "avito-agent",
+      label: "AI-разбор первого сообщения",
+      detail: analysisSummary(analysis),
+    });
+  }
 }
 
 async function updateLead(
@@ -229,13 +266,25 @@ async function updateLead(
 ): Promise<void> {
   const { value, eventId, now, analysis } = input;
   const count = Number(prevMetadata.messagesCount || 0);
+  // Накопительные факты: client_facts от агента мерджатся к предыдущим
+  // (первое значение живёт, явные обновления перезаписывают) — карточка
+  // клиента только растёт, «подготовка за 5 минут» работает на всей переписке.
+  const mergedFacts = mergeClientFacts(
+    prevMetadata.clientFacts,
+    sanitizeClientFacts(factsFromAnalysis(analysis)),
+  );
   const merged: Record<string, unknown> = {
     ...prevMetadata,
     lastMessage: truncate(value.text, 1000) ?? prevMetadata.lastMessage ?? null,
     lastMessageAt: value.created || now,
     lastEventId: eventId,
     messagesCount: Number.isFinite(count) ? count + 1 : 1,
+    messages: appendMessageLog(
+      prevMetadata.messages,
+      { at: value.created || now, from: "buyer", text: value.text || "" },
+    ),
   };
+  if (mergedFacts) merged.clientFacts = mergedFacts;
   // Свежий анализ заменяет предыдущий (анализируется ПОСЛЕДНЕЕ сообщение).
   if (analysis) merged.analysis = analysis;
   // Backfill item info if the first captured event lacked it.
@@ -253,10 +302,54 @@ async function updateLead(
 
   if (error) throw error;
   logger.info("[avito-webhook] lead updated", { chatId: value.chat_id });
+
+  const leadKey = String(merged.avitoChatId ? `avito:${merged.avitoChatId}` : intentId);
+  await recordLeadEvent({
+    crewSlug: CREW_SLUG,
+    leadId: leadKey,
+    type: "avito_message",
+    actor: "avito-agent",
+    label: "Новое сообщение из Авито",
+    detail: truncate(value.text, 200) || null,
+  });
+  if (analysis) {
+    await recordLeadEvent({
+      crewSlug: CREW_SLUG,
+      leadId: leadKey,
+      type: "analysis_attached",
+      actor: "avito-agent",
+      label: "AI-разбор обновлён",
+      detail: analysisSummary(analysis),
+    });
+  }
 }
 
-/** Best-effort Telegram ping to the crew owner about a brand-new lead.
- *  Fire-and-forget: the webhook response must not wait on it (2s limit). */
+/** Факты из агентского analysis.client_facts (см. agent-prompt). */
+function factsFromAnalysis(analysis: unknown): Record<string, unknown> | null {
+  if (!analysis || typeof analysis !== "object") return null;
+  const cf = (analysis as Record<string, unknown>).client_facts;
+  if (!cf || typeof cf !== "object" || Array.isArray(cf)) return null;
+  return cf as Record<string, unknown>;
+}
+
+/** Короткое человекочитаемое резюме анализа для журнала/уведомлений. */
+function analysisSummary(analysis: Record<string, unknown>): string | null {
+  const parts: string[] = [];
+  for (const key of ["intent", "temperature", "objection"] as const) {
+    const v = analysis[key];
+    if (typeof v === "string" && v.trim()) parts.push(v.trim());
+  }
+  const nba = analysis.nextBestAction;
+  if (typeof nba === "string" && nba.trim()) parts.push(nba.trim());
+  const joined = parts.join(" · ");
+  return joined ? joined.slice(0, 200) : null;
+}
+
+/** Best-effort Telegram ping about a brand-new lead — ВСЕМ участникам экипажа.
+ *  «All participants get same notifications about new leads appearing» —
+ *  раньше пинг уходил только owner'у, и члены экипажа узнавали о лидах
+ *  постфактум. Теперь: owner + все active crew_members. Fire-and-forget:
+ *  the webhook response must not wait on it (2s limit). */
 function notifyCrewOwnerAsync(lead: {
   name: string;
   bikeTitle: string | null;
@@ -265,12 +358,26 @@ function notifyCrewOwnerAsync(lead: {
 }): void {
   void (async () => {
     try {
+      // Ростер экипажа: owner + активные участники — все получают ОДИНАКОВОЕ
+      // уведомление о новом лиде (дедуп ниже).
+      const recipients = new Set<string>();
       const { data: crew } = await supabaseAdmin
         .from("crews")
-        .select("owner_id")
+        .select("id, owner_id")
         .eq("slug", CREW_SLUG)
         .maybeSingle();
-      if (!crew?.owner_id) return;
+      if (crew?.owner_id) recipients.add(crew.owner_id);
+      if (crew?.id) {
+        const { data: members } = await supabaseAdmin
+          .from("crew_members")
+          .select("user_id")
+          .eq("crew_id", crew.id)
+          .eq("membership_status", "active");
+        for (const m of members ?? []) {
+          if (m.user_id) recipients.add(m.user_id);
+        }
+      }
+      if (recipients.size === 0) return;
 
       const lines = [
         "🟡 Новый лид из Авито",
@@ -284,15 +391,20 @@ function notifyCrewOwnerAsync(lead: {
       // Telegram is blocked on the VPS — use the self-hosted proxy, same as
       // the callback-lead generic handler. On Vercel the proxy also works.
       const base = process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:3000";
-      await fetch(`${base}/api/forward-telegram`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId: crew.owner_id,
-          text: lines.join("\n"),
-        }),
-        cache: "no-store",
-      });
+      // Все получатели параллельно; отдельная неудача не рушит остальных.
+      await Promise.allSettled(
+        Array.from(recipients).map((chatId) =>
+          fetch(`${base}/api/forward-telegram`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chatId,
+              text: lines.join("\n"),
+            }),
+            cache: "no-store",
+          }),
+        ),
+      );
     } catch (error) {
       logger.warn("[avito-webhook] crew notification failed", error);
     }
@@ -324,6 +436,9 @@ type AvitoAnalysisEnvelope = {
   objection?: string;
   /** Извлечённые сущности (dates/phone/bike/budget/…). */
   entities?: Record<string, unknown>;
+  /** НАКОПИТЕЛЬНЫЕ факты клиента («подготовка за 5 минут») — мерджатся
+   *  в metadata.clientFacts, а не заменяются. См. lead-client-facts.ts. */
+  client_facts?: Record<string, unknown>;
   /** Заметка агента для оператора. */
   notes?: string;
   /** Название модели/агента. */
@@ -371,6 +486,12 @@ function sanitizeAnalysis(input: unknown): Record<string, unknown> | null {
       if (key && val) entities[key] = val;
     }
     if (Object.keys(entities).length > 0) out.entities = entities;
+  }
+  // НАКОПИТЕЛЬНЫЕ факты клиента: проходим через свой санитайзер (известные
+  // ключи + кастомные, короткие строки) — они полетят в metadata.clientFacts.
+  if (raw.client_facts && typeof raw.client_facts === "object" && !Array.isArray(raw.client_facts)) {
+    const facts = sanitizeClientFacts(raw.client_facts);
+    if (facts) out.client_facts = facts;
   }
   const notes = str(raw.notes, 800);
   if (notes) out.notes = notes;
@@ -507,9 +628,21 @@ export async function POST(request: NextRequest) {
       // Idempotency: Avito redelivers on flaky networks.
       if (body.id && prevMeta.lastEventId === body.id) return ack();
       if (!fromBuyer) {
+        // Наш ответ (оператор ответил из Авито): кроме touch фиксируем его в
+        // накопительном логе чата — «подготовка за 5 минут» видит и наши
+        // реплики, а не только вопросы покупателя.
         await supabaseAdmin
           .from("franchize_intents")
-          .update({ last_seen_at: value.created || now })
+          .update({
+            last_seen_at: value.created || now,
+            metadata: {
+              ...prevMeta,
+              messages: appendMessageLog(
+                prevMeta.messages,
+                { at: value.created || now, from: "seller", text: value.text || "" },
+              ),
+            },
+          })
           .eq("id", existing.data.id);
         return ack();
       }

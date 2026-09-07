@@ -50,6 +50,8 @@ import { useTodosMapping, useFilteredSortedLeads, usePriorityMap } from "./hooks
 import { useTheme } from "./hooks/useTheme";
 import { usePasswordGate } from "./hooks/usePasswordGate";
 import type { LeadPriority } from "./lib/lead-priority";
+import type { LeadEventRow, LeadLeaderboardEntry } from "./leads-types";
+import { LeadsLeaderboardPanel } from "./components/LeadsLeaderboardPanel";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,8 @@ type LeadsCacheEntry = {
   leads: LeadRow[];
   todos: LeadTodoRow[];
   operators?: Array<{ id: string; name: string }>;
+  leadEvents?: LeadEventRow[];
+  leaderboard?: LeadLeaderboardEntry[];
 };
 const leadsCache = new Map<string, LeadsCacheEntry>();
 const LEADS_CACHE_TTL_MS = 30_000;
@@ -156,6 +160,11 @@ export function LeadsClient({
   // дропдаун «Ответственный»: фильтровать «только его лиды» можно для ЛЮБОГО
   // оператора, даже если на его имя пока не записан ни один лид.
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([]);
+  // Lead Game: журнал записанных событий + серверный лидерборд. Обе —
+  // crew-scoped (все участники видят одно и то же), приходят с той же
+  // загрузкой, что и лиды.
+  const [leadEvents, setLeadEvents] = useState<LeadEventRow[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeadLeaderboardEntry[]>([]);
   /** m4 fix: notify is a server-side Telegram send — dedupe double taps. */
   const [notifyBusy, setNotifyBusy] = useState(false);
   // Ref mirror of notifyBusy — the state value is captured in handleSheetAction's
@@ -366,11 +375,15 @@ export function LeadsClient({
           const freshLeads = (result.leads || []).filter(Boolean) as LeadRow[];
           const freshTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
           const freshOperators = result.operators || undefined;
+          const freshEvents = (result.leadEvents || []).filter(Boolean) as LeadEventRow[];
+          const freshBoard = (result.leaderboard || []).filter(Boolean) as LeadLeaderboardEntry[];
           setLeadsState(freshLeads);
           setTodosState(freshTodos);
           if (freshOperators) setOperators(freshOperators);
+          setLeadEvents(freshEvents);
+          setLeaderboard(freshBoard);
           // Write through the session cache so the next mount paints instantly.
-          leadsCache.set(slug, { at: Date.now(), leads: freshLeads, todos: freshTodos, operators: freshOperators });
+          leadsCache.set(slug, { at: Date.now(), leads: freshLeads, todos: freshTodos, operators: freshOperators, leadEvents: freshEvents, leaderboard: freshBoard });
           setLeadsLoadError(null);
           return true;
         }
@@ -403,6 +416,8 @@ export function LeadsClient({
       setLeadsState(cached.leads);
       setTodosState(cached.todos);
       if (cached.operators) setOperators(cached.operators);
+      if (cached.leadEvents) setLeadEvents(cached.leadEvents);
+      if (cached.leaderboard) setLeaderboard(cached.leaderboard);
       if (Date.now() - cached.at < LEADS_CACHE_TTL_MS) {
         leadsFetchedRef.current = true;
         return;
@@ -1122,6 +1137,14 @@ export function LeadsClient({
         {isCrew && (
           <div id="leads-achievements" className={flashCls("leads-achievements")}>
             <LeadsAchievementsPanel achievements={achievements} storageKey={`leads-achv:${slug}`} T={T} />
+            {/* ПРОЗРАЧНЫЙ ЛИДЕРБОРД (Lead Game): серверная агрегация журнала
+                lead_events — все участники видят одни и те же цифры. Прогресс
+                засчитывается не только за закрытия (взяты/перезвоны/задачи). */}
+            <LeadsLeaderboardPanel
+              leaderboard={leaderboard}
+              currentActorId={dbUser?.user_id || null}
+              T={T}
+            />
           </div>
         )}
       </div>
@@ -1294,6 +1317,7 @@ export function LeadsClient({
               todosBusy={todosBusy}
               asSheetChild
               focusNotesSignal={notesFocus && notesFocus.leadId === selectedId ? notesFocus.ts : 0}
+              recordedEvents={leadEvents.filter((e) => e.leadId === selectedId)}
             />
           </LeadDetailSheet>
         );

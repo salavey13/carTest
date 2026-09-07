@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { verifyCrewAccess } from "../_auth";
+import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
 
 /**
  * Manage lead-linked todos in crew_todos.
@@ -62,6 +63,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
+    // Журнал истории (Lead Game): задача заведена оператором.
+    void recordLeadEvent({
+      crewSlug: body.slug || "",
+      leadId: String(leadId),
+      type: "todo_created",
+      actor: auth.userId,
+      label: `Задача: ${String(title).slice(0, 120)}`,
+    });
+
     return NextResponse.json({ success: true, todo: data });
   } catch (error) {
     logger.error("[lead-todo] POST exception", error);
@@ -103,6 +113,24 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    // Журнал истории (Lead Game): только завершение даёт очки; возврат в
+    // pending — событие без очков (нельзя накручивать туда-сюда).
+    if (crewId && body.leadId) {
+      const { data: crewRow } = await supabaseAdmin
+        .from("crews")
+        .select("slug")
+        .eq("id", crewId)
+        .maybeSingle();
+      void recordLeadEvent({
+        crewSlug: crewRow?.slug || "",
+        leadId: String(body.leadId),
+        type: "todo_completed",
+        actor: auth.userId,
+        label: status === "done" ? "Задача выполнена" : "Задача возвращена в работу",
+        pointsOverride: status === "done" ? undefined : 0,
+      });
     }
 
     return NextResponse.json({ success: true });
@@ -214,6 +242,17 @@ export async function DELETE(request: NextRequest) {
       } else {
         return NextResponse.json({ success: false, error: "Avito лид не найден" }, { status: 404 });
       }
+
+      // Журнал истории (Lead Game): отклонение лида с причиной —
+      // тип closed_lost, очков не даёт (причины важнее очков).
+      void recordLeadEvent({
+        crewSlug: String(body.slug || ""),
+        leadId: String(leadId),
+        type: "closed_lost",
+        actor: dismissedBy,
+        label: "Лид отклонён",
+        detail: [dismissReason, dismissNote].filter(Boolean).join(" · ") || null,
+      });
 
       return NextResponse.json({ success: true });
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type {LeadRow, LeadTodoRow} from "../leads-types";
+import type {LeadRow, LeadTodoRow, LeadEventRow} from "../leads-types";
 import type {
   LeadSignal,
   LeadHistoryEvent,
@@ -62,6 +62,12 @@ interface Props {
   asSheetChild?: boolean;
   /** «Прочитать заметки» — раскрыть и прокрутить к секции заметок. */
   focusNotesSignal?: number;
+  /**
+   * Журнал записанных событий (public.lead_events, Lead Game wave) —
+   * уже отфильтрованный по этому лиду на вызывающей стороне. Записанные
+   * факты первичны: переживают производные данные и несут атрибуцию.
+   */
+  recordedEvents?: LeadEventRow[];
 }
 
 /**
@@ -103,6 +109,7 @@ export function LeadDetailContent({
   todosBusy = false,
   asSheetChild = false,
   focusNotesSignal = 0,
+  recordedEvents = [],
 }: Props) {
   // NOTE: We CANNOT early-return before hooks (React rules-of-hooks).
   // All hooks below handle null `lead` gracefully via try/catch + null-safe
@@ -141,13 +148,15 @@ export function LeadDetailContent({
   }, [enrichedLead, todos]);
 
   // ── 3. Compute history timeline ──
+  // История = записанные факты журнала (lead_events) + производные события.
+  // computeLeadHistory сам дедуплицирует пересечения.
   const history: LeadHistoryEvent[] = useMemo(() => {
     try {
-      return computeLeadHistory(enrichedLead, todos, notes);
+      return computeLeadHistory(enrichedLead, todos, notes, recordedEvents);
     } catch {
       return [];
     }
-  }, [enrichedLead, todos, notes]);
+  }, [enrichedLead, todos, notes, recordedEvents]);
 
   // ── 4. Build documents checklist from the first rental ──
   const docs: DocumentItem[] = useMemo(() => {

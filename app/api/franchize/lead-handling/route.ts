@@ -10,6 +10,7 @@ import {
   isHandledTodo,
   isCallbackTodo,
 } from "@/app/franchize/[slug]/leads/lib/lead-handling";
+import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
 
 /**
  * LEAD HANDLING STATE — «Отработан» + «Перезвонить в ...»
@@ -134,9 +135,42 @@ export async function POST(request: NextRequest) {
     try {
       let touched: any[] = [];
 
+      // Ключи журнала истории (Lead Game): событие пишется с атрибуцией
+      // оператора — экипаж видит, КТО взял лид/перезвонил. Slug резолвим
+      // по crewId (в body его нет, а журнал crew-scoped).
+      let crewSlug: string | null = null;
+      if (body.slug && typeof body.slug === "string") {
+        crewSlug = body.slug;
+      } else {
+        const { data: crewRow } = await supabaseAdmin
+          .from("crews")
+          .select("slug")
+          .eq("id", crewId)
+          .maybeSingle();
+        crewSlug = crewRow?.slug ?? null;
+      }
+      // Внешний actor объявлен выше (auth.userId) — журнал пишем от него.
+      const logEvent = (
+        type: "lead_handled" | "callback_set" | "callback_completed",
+        label: string,
+        detail?: string | null,
+        pointsOverride?: number,
+      ) => {
+        void recordLeadEvent({
+          crewSlug: crewSlug || "",
+          leadId: String(leadId),
+          type,
+          actor,
+          label,
+          detail: detail ?? null,
+          pointsOverride,
+        });
+      };
+
       switch (action) {
         case "handled": {
           touched = await markHandled();
+          logEvent("lead_handled", "Отработан — взят в работу");
           break;
         }
 
@@ -148,6 +182,9 @@ export async function POST(request: NextRequest) {
               .eq("id", handledRows.map((r: any) => r.id))
               .eq("crew_id", crewId);
           }
+          // Снятие отметки: событие в истории есть, очков нет —
+          // иначе снять/поставить можно было бы «накруткой».
+          logEvent("lead_handled", "Снял отметку «отработан»", null, 0);
           break;
         }
 
@@ -164,6 +201,11 @@ export async function POST(request: NextRequest) {
           if (Number.isNaN(dueIso.getTime())) {
             return NextResponse.json({ success: false, error: "Некорректное время перезвона" }, { status: 400 });
           }
+          logEvent(
+            "callback_set",
+            "Назначен перезвон",
+            `${dueIso.toLocaleString("ru-RU")}${note ? ` · ${String(note).slice(0, 120)}` : ""}`,
+          );
           const { data, error } = await supabaseAdmin
             .from("crew_todos")
             .insert({
@@ -201,6 +243,7 @@ export async function POST(request: NextRequest) {
               .eq("id", callbackRows.map((r: any) => r.id))
               .eq("crew_id", crewId);
           }
+          logEvent("callback_set", "Отменил перезвон", null, 0);
           break;
         }
 
@@ -217,6 +260,7 @@ export async function POST(request: NextRequest) {
             if (error) throw error;
             touched = data || [];
           }
+          logEvent("callback_completed", "Перезвон состоялся");
           const handledTouch = await markHandled();
           touched = [...touched, ...handledTouch];
           break;

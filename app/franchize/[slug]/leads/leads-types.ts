@@ -115,6 +115,18 @@ export interface LeadRow {
       /** ISO время анализа. */
       analyzedAt?: string | null;
     } | null;
+    /**
+     * НАКОПИТЕЛЬНЫЕ факты клиента (metadata.clientFacts, Lead Game wave):
+     * агент/монитор присылают их с каждым сообщением, webhook мерджит.
+     * «Подготовка за 5 минут»: оператор видит имя, город, бюджет, мото,
+     * дату катания и прочее без открытия Авито.
+     */
+    clientFacts?: Record<string, string> | null;
+    /**
+     * Накопительный лог чата (metadata.messages, последние 12 реплик):
+     * покупатель и наши ответы — полный контекст разговора без Авито.
+     */
+    messages?: Array<{ at: string; from: string; text: string }> | null;
   } | null;
   identityState?: 'claimed_user' | 'phone_only' | 'operator_placeholder' | 'merged' | 'avito_only';
   sourceCount?: number;
@@ -172,6 +184,42 @@ export interface LeadTodoRow {
   due_date: string | null;
 }
 
+/**
+ * Записанное событие истории лида (public.lead_events, Lead Game wave).
+ * В отличие от клиентски выводимой таймлайна — это ФАКТ в БД с атрибуцией:
+ * переживает производные данные и виден всем участникам одинаково.
+ */
+export interface LeadEventRow {
+  id: string;
+  createdAt: string;
+  /** Ключ лида — тот же, что в crew_todos.lead_id. */
+  leadId: string;
+  type: string;
+  /** TG user_id оператора или "avito-agent". */
+  actor: string | null;
+  actorName: string | null;
+  label: string;
+  detail: string | null;
+  /** Очки лидерборда (0 для служебных событий). */
+  points: number;
+}
+
+/**
+ * Строка прозрачного лидерборда: серверная агрегация lead_events за период.
+ * Одинаковая для всех участников (не localStorage).
+ */
+export interface LeadLeaderboardEntry {
+  id: string;
+  name: string;
+  points: number;
+  handled: number;
+  callbacks: number;
+  todoDone: number;
+  notes: number;
+  closed: number;
+  lastActionAt: string | null;
+}
+
 export interface GetFranchizeLeadsResult {
   success: boolean;
   leads?: LeadRow[];
@@ -182,6 +230,10 @@ export interface GetFranchizeLeadsResult {
    * name — человекочитаемая подпись опции.
    */
   operators?: Array<{ id: string; name: string }>;
+  /** Журнал записанных событий истории (последние 30 дней, cap 400). */
+  leadEvents?: LeadEventRow[];
+  /** Прозрачный лидерборд — серверная агрегация lead_events. */
+  leaderboard?: LeadLeaderboardEntry[];
   error?: string;
 }
 
