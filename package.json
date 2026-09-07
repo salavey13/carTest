@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node --max-old-space-size=4096 node_modules/next/dist/bin/next build",
+    "build": "NEXT_WEBPACK_PARALLELISM=16 MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=16777216 node --max-old-space-size=2560 --max-semi-space-size=8 node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",

@@ -14,19 +14,37 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execSync } from 'child_process'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { featureReady } from './helpers/db-feature-ready'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+// Null-safe: DB suites skip when Supabase env is absent (CI without .env.local).
+const supabaseOrNull = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
+
+// The 'income_prepayment' transaction type arrives with
+// supabase/migrations/20260825000000_prepayment_tracking.sql, which also
+// creates income_transactions. Environments without that migration skip the
+// DB-backed suites; the pure formatting and script tests below still run
+// everywhere. (The marker table is probed instead of the enum value because
+// PostgREST returns an empty result set — not an error — when filtering a
+// missing enum value on an existing column.)
+const prepaymentFeatureReady = supabaseOrNull
+  ? await featureReady(supabaseOrNull, (c) => c.from('income_transactions').select('id').limit(1))
+  : false
 
 describe('Evening Summary Prepayment Section', () => {
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  // Dereferenced only in DB-backed suites/hooks, which no-op unless ready.
+  const supabase = supabaseOrNull as SupabaseClient
 
   let testCrewId: string
   let testVehicleId: string
   const testDate = new Date().toISOString().split('T')[0]
 
   beforeAll(async () => {
+    // No fixtures when the prepayment feature is not deployed — the DB-backed
+    // suites below are skipped and cleanup must not run either.
+    if (!prepaymentFeatureReady) return
     // Setup test data
     const { data: crew } = await supabase
       .from('crews')
@@ -67,12 +85,13 @@ describe('Evening Summary Prepayment Section', () => {
   })
 
   afterAll(async () => {
+    if (!prepaymentFeatureReady || !testCrewId) return
     await supabase.from('cash_transactions').delete().eq('crew_id', testCrewId)
     await supabase.from('cars').delete().eq('id', testVehicleId)
     await supabase.from('crews').delete().eq('id', testCrewId)
   })
 
-  describe('Data Fetching', () => {
+  describe.skipIf(!prepaymentFeatureReady)('Data Fetching', () => {
     it('should fetch prepayments for current date range', async () => {
       const startOfDay = `${testDate}T00:00:00+03:00`
       const endOfDay = `${testDate}T23:59:59+03:00`
@@ -126,7 +145,7 @@ describe('Evening Summary Prepayment Section', () => {
     })
   })
 
-  describe('Calculations', () => {
+  describe.skipIf(!prepaymentFeatureReady)('Calculations', () => {
     it('should calculate prepayment count correctly', async () => {
       const { data, count } = await supabase
         .from('cash_transactions')
@@ -149,7 +168,7 @@ describe('Evening Summary Prepayment Section', () => {
     })
   })
 
-  describe('Bike Name Lookup', () => {
+  describe.skipIf(!prepaymentFeatureReady)('Bike Name Lookup', () => {
     it('should retrieve bike names for prepayments with rental_id', async () => {
       const { data: rentals } = await supabase
         .from('rentals')

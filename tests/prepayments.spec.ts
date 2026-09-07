@@ -14,13 +14,25 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { featureReady } from './helpers/db-feature-ready'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+// Null-safe: the suite skips when Supabase env is absent (CI without .env.local).
+const supabaseOrNull = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
-describe('P2 Prepayment Tracking', () => {
-  const supabase = createClient(supabaseUrl, supabaseKey)
+// P2 prepayment tracking ships via
+// supabase/migrations/20260825000000_prepayment_tracking.sql. Environments
+// without that migration (its tables were never applied to the production
+// project) skip this suite instead of failing with "relation does not exist".
+const prepaymentFeatureReady = supabaseOrNull
+  ? await featureReady(supabaseOrNull, (c) => c.from('income_transactions').select('id').limit(1))
+  : false
+
+describe.skipIf(!prepaymentFeatureReady)('P2 Prepayment Tracking', () => {
+  // Dereferenced only inside test bodies, which never run unless ready.
+  const supabase = supabaseOrNull as SupabaseClient
 
   let testCrewId: string
   let testRentalId: string
