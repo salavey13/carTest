@@ -22,6 +22,7 @@ import { LeadsPlaybookPanel } from "./components/LeadsPlaybookPanel";
 import { LeadsFunnelPanel } from "./components/LeadsFunnelPanel";
 import { LeadsAchievementsPanel } from "./components/LeadsAchievementsPanel";
 import { LeadsToolbar } from "./components/LeadsToolbar";
+import { LeadsGuidedTour } from "./components/LeadsGuidedTour";
 import { LeadList } from "./components/LeadList";
 import { LeadBoard } from "./components/LeadBoard";
 import { LeadTableView } from "./components/LeadTableView";
@@ -209,6 +210,27 @@ export function LeadsClient({
       return next;
     });
   }, [analyticsKey]);
+
+  // ── ОБЗОР-ТУР («новичок на смене»): связывает шаги плейбука с разделами UI.
+  // revealTarget раскрывает мобильный свёрток аналитики (если цель — она),
+  // отскролливает раздел в центр и вспыхивает рамкой на 2.2 c — страница
+  // видна, пока тур свёрнут в пилюлю и объясняет. Подсветка — ring, без
+  // layout-сдвига; состояние живёт тут, тур вызывает onReveal(id).
+  const [tourFlashId, setTourFlashId] = useState<string | null>(null);
+  const revealTarget = useCallback((id: string) => {
+    if (id === "leads-analytics") setAnalyticsOpen(true);
+    const wait = id === "leads-analytics" ? 150 : 50;
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTourFlashId(id);
+      window.setTimeout(() => setTourFlashId((cur) => (cur === id ? null : cur)), 2200);
+    }, wait);
+  }, []);
+  const flashCls = useCallback(
+    (id: string) =>
+      `relative rounded-2xl transition-all duration-500 ${tourFlashId === id ? "ring-2 ring-amber-400" : ""}`,
+    [tourFlashId],
+  );
 
   // Debounce search query
   useEffect(() => {
@@ -968,21 +990,25 @@ export function LeadsClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
+      <div id="leads-kpi" className={flashCls("leads-kpi")}>
+        <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
+      </div>
 
       {/* Плейбук смены — ВСЕГДА на виду (и на телефоне тоже): это не
           аналитика, а рабочая очередь «что делать сейчас». Раньше он жил
           внутри мобильного свёртка «Аналитика смены» — и главный SOP-
           инструмент оператора был спрятан за тапом. Панель сама компактна
           на телефоне (2 действия + «ещё N»). Чип звания — crew-only. */}
-      <LeadsPlaybookPanel
-        actions={playbookActions}
-        onOpenLead={(leadId) => setSelectedId(leadId)}
-        T={T}
-        storageKey={isCrew ? `leads-achv:${slug}` : undefined}
-        doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
-        compactPrefKey={`leads-playbook-expanded:${slug}`}
-      />
+      <div id="leads-playbook" className={flashCls("leads-playbook")}>
+        <LeadsPlaybookPanel
+          actions={playbookActions}
+          onOpenLead={(leadId) => setSelectedId(leadId)}
+          T={T}
+          storageKey={isCrew ? `leads-achv:${slug}` : undefined}
+          doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
+          compactPrefKey={`leads-playbook-expanded:${slug}`}
+        />
+      </div>
 
       {/* MOBILE: аналитика (скорость/воронка/достижения) — за компактным
           переключателем. На телефоне три панели занимали ~1.5 экрана и
@@ -1021,7 +1047,9 @@ export function LeadsClient({
             sticky-стор «заработано навсегда» на экипаж (фикс повторных тостов
             при колебании метрик и перезагрузках). */}
         {isCrew && (
-          <LeadsAchievementsPanel achievements={achievements} storageKey={`leads-achv:${slug}`} T={T} />
+          <div id="leads-achievements" className={flashCls("leads-achievements")}>
+            <LeadsAchievementsPanel achievements={achievements} storageKey={`leads-achv:${slug}`} T={T} />
+          </div>
         )}
       </div>
 
@@ -1062,20 +1090,22 @@ export function LeadsClient({
         </div>
       )}
 
-      <LeadsToolbar
-        searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-        sortMode={sortMode} setSortMode={(v) => setSortMode(v as SortMode)}
-        filterSource={filterSource} setFilterSource={setFilterSource}
-        availableSources={availableSources}
-        filterStage={filterStage} setFilterStage={setFilterStage}
-        filterOwner={filterOwner} setFilterOwner={setFilterOwner}
-        availableOwners={availableOwners}
-        segment={segment} setSegment={setSegment}
-        viewMode={viewMode} onViewModeChange={setViewMode}
-        segmentCounts={segmentCounts}
-        hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
-        T={T} isAuto={isAuto}
-      />
+      <div id="leads-toolbar" className={flashCls("leads-toolbar")}>
+        <LeadsToolbar
+          searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+          sortMode={sortMode} setSortMode={(v) => setSortMode(v as SortMode)}
+          filterSource={filterSource} setFilterSource={setFilterSource}
+          availableSources={availableSources}
+          filterStage={filterStage} setFilterStage={setFilterStage}
+          filterOwner={filterOwner} setFilterOwner={setFilterOwner}
+          availableOwners={availableOwners}
+          segment={segment} setSegment={setSegment}
+          viewMode={viewMode} onViewModeChange={setViewMode}
+          segmentCounts={segmentCounts}
+          hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
+          T={T} isAuto={isAuto}
+        />
+      </div>
 
       {viewMode === "board" ? (
         <LeadBoard
@@ -1242,6 +1272,19 @@ export function LeadsClient({
         onSubmit={confirmDismissLead}
         onCancel={() => setDismissTarget(null)}
         submitting={dismissBusy}
+      />
+
+      {/* ОБЗОР-ТУР + кнопка «?»: step-by-step введение (плейбук → KPI →
+          фильтры → шторка → аналитика → путь оператора) и ссылка на полный
+          гайд. Автозапуск один раз, когда лиды загрузились и гейт пройден;
+          «Пропустить»/Esc закрывают навсегда (done-флаг), кнопка «?» —
+          всегда доступна. Геймификационный шаг — только crew. */}
+      <LeadsGuidedTour
+        T={T}
+        slug={slug}
+        isCrew={isCrew}
+        autoLaunch={!shouldShowPassword && leadsState.length > 0}
+        onReveal={revealTarget}
       />
     </div>
   );

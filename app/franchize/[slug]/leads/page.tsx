@@ -35,12 +35,32 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
       <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_leads" />
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/leads`} groupLinks={[]} items={[]} />
       <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:py-6">
-        <h1 className="text-xl font-bold sm:text-2xl" style={{ color: "var(--franchize-text-primary, inherit)" }}>
-          Клиенты и заявки
-        </h1>
-        <p className="mt-1 text-[13px] sm:text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
-          Все, кто оставил заявку, интересовался техникой или оформлял аренду
-        </p>
+        {/* СПА-ССЫЛКА НА ПЛЕЙБУК-ГАЙД прямо в шапке лидов: полный SOP
+            (/docs/avito-leads-guide.html, self-contained, офлайн) доступен
+            одним тапом с любого места страницы — раньше ссылка жила только
+            в футере панели плейбука. Для новичков ниже — обзор-тур (кнопка «?»). */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold sm:text-2xl" style={{ color: "var(--franchize-text-primary, inherit)" }}>
+              Клиенты и заявки
+            </h1>
+            <p className="mt-1 text-[13px] sm:text-sm" style={{ color: "var(--franchize-text-secondary, inherit)" }}>
+              Все, кто оставил заявку, интересовался техникой или оформлял аренду
+            </p>
+          </div>
+          <a
+            href="/docs/avito-leads-guide.html"
+            target="_blank"
+            rel="noreferrer noopener"
+            title="Полный гайд по работе с лидами: очередь плейбука, правила ответов, шаблоны сообщений"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition hover:brightness-110"
+            style={{ borderColor: "var(--franchize-border, rgba(148,163,184,0.35))", color: "var(--franchize-text-primary, inherit)" }}
+          >
+            <span aria-hidden>📘</span>
+            <span className="hidden sm:inline">Гайд по лидам</span>
+            <span className="sm:hidden">Гайд</span>
+          </a>
+        </div>
         <AnalyticsLeadsNav slug={crew.slug || slug} />
         <LeadsClient
           leads={leads}
