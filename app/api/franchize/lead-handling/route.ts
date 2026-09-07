@@ -150,13 +150,18 @@ export async function POST(request: NextRequest) {
         crewSlug = crewRow?.slug ?? null;
       }
       // Внешний actor объявлен выше (auth.userId) — журнал пишем от него.
-      const logEvent = (
+      // 2026-09-08 bugfix: хелпер возвращает промис, а каждый вызов — await.
+      // Раньше было «void recordLeadEvent» — на serverless (Vercel) функция
+      // замораживается сразу после ответа и INSERT не успевал выполниться:
+      // журнал lead_events оставался пустым. recordLeadEvent сам never-throws
+      // (best-effort внутри), так что await ничего не может уронить.
+      const logEvent = async (
         type: "lead_handled" | "callback_set" | "callback_completed",
         label: string,
         detail?: string | null,
         pointsOverride?: number,
-      ) => {
-        void recordLeadEvent({
+      ): Promise<boolean> =>
+        recordLeadEvent({
           crewSlug: crewSlug || "",
           leadId: String(leadId),
           type,
@@ -165,12 +170,11 @@ export async function POST(request: NextRequest) {
           detail: detail ?? null,
           pointsOverride,
         });
-      };
 
       switch (action) {
         case "handled": {
           touched = await markHandled();
-          logEvent("lead_handled", "Отработан — взят в работу");
+          await logEvent("lead_handled", "Отработан — взят в работу");
           break;
         }
 
@@ -184,7 +188,7 @@ export async function POST(request: NextRequest) {
           }
           // Снятие отметки: событие в истории есть, очков нет —
           // иначе снять/поставить можно было бы «накруткой».
-          logEvent("lead_handled", "Снял отметку «отработан»", null, 0);
+          await logEvent("lead_handled", "Снял отметку «отработан»", null, 0);
           break;
         }
 
@@ -201,7 +205,7 @@ export async function POST(request: NextRequest) {
           if (Number.isNaN(dueIso.getTime())) {
             return NextResponse.json({ success: false, error: "Некорректное время перезвона" }, { status: 400 });
           }
-          logEvent(
+          await logEvent(
             "callback_set",
             "Назначен перезвон",
             `${dueIso.toLocaleString("ru-RU")}${note ? ` · ${String(note).slice(0, 120)}` : ""}`,
@@ -243,7 +247,7 @@ export async function POST(request: NextRequest) {
               .eq("id", callbackRows.map((r: any) => r.id))
               .eq("crew_id", crewId);
           }
-          logEvent("callback_set", "Отменил перезвон", null, 0);
+          await logEvent("callback_set", "Отменил перезвон", null, 0);
           break;
         }
 
@@ -260,7 +264,7 @@ export async function POST(request: NextRequest) {
             if (error) throw error;
             touched = data || [];
           }
-          logEvent("callback_completed", "Перезвон состоялся");
+          await logEvent("callback_completed", "Перезвон состоялся");
           const handledTouch = await markHandled();
           touched = [...touched, ...handledTouch];
           break;

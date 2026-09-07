@@ -180,7 +180,10 @@ export async function createLeadNote(input: {
         .select("slug")
         .eq("id", crewId)
         .maybeSingle();
-      void recordLeadEvent({
+      // 2026-09-08 bugfix: await вместо void — serverless (Vercel) замораживает
+      // функцию после ответа, fire-and-forget INSERT терялся. recordLeadEvent
+      // never-throws, а try/catch страхует любые другие сбои.
+      await recordLeadEvent({
         crewSlug: crewRow?.slug || "",
         leadId,
         type: "note_added",

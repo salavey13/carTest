@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Журнал истории (Lead Game): задача заведена оператором.
-    void recordLeadEvent({
+    // 2026-09-08 bugfix: await вместо void — на serverless (Vercel) функция
+    // замораживается после ответа, «void»-вставка терялась. recordLeadEvent
+    // сам never-throws (best-effort внутри), так что await безопасен.
+    await recordLeadEvent({
       crewSlug: body.slug || "",
       leadId: String(leadId),
       type: "todo_created",
@@ -123,7 +126,9 @@ export async function PATCH(request: NextRequest) {
         .select("slug")
         .eq("id", crewId)
         .maybeSingle();
-      void recordLeadEvent({
+      // 2026-09-08 bugfix: await (см. комментарий в POST) — иначе серверлес
+      // замораживает функцию и событие не дописывается.
+      await recordLeadEvent({
         crewSlug: crewRow?.slug || "",
         leadId: String(body.leadId),
         type: "todo_completed",
@@ -245,7 +250,8 @@ export async function DELETE(request: NextRequest) {
 
       // Журнал истории (Lead Game): отклонение лида с причиной —
       // тип closed_lost, очков не даёт (причины важнее очков).
-      void recordLeadEvent({
+      // 2026-09-08 bugfix: await (см. комментарий в POST).
+      await recordLeadEvent({
         crewSlug: String(body.slug || ""),
         leadId: String(leadId),
         type: "closed_lost",
