@@ -184,17 +184,18 @@ describe("iter27: cancelled exclusions across all aggregation surfaces (source g
 // pipeline (displayRentals → dayPageRentals → computeAnalyticsKpis) and asserts
 // the cancelled Panigale (ff73acb5) never reaches the KPI input rows.
 
-const env: Record<string, string> = {};
-for (const line of readFileSync("/home/z/my-project/upload/secrets_all.txt", "utf-8").split("\n")) {
-  const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-  if (m) env[m[1]!] = m[2].trim().replace(/^"|"$/g, "");
-}
+// Creds: process.env → environment secrets file (shared helper). When neither
+// source has them (fresh clone / CI), the live describe below SKIPS instead of
+// the whole file crashing at import (old module-scope readFileSync ENOENT).
+import { liveSupabaseCreds, hasSupabaseCreds } from "./helpers/live-env";
+const { url: LIVE_URL, key: LIVE_KEY } = liveSupabaseCreds();
+const hasLiveCreds = hasSupabaseCreds();
 
 async function sb(path: string): Promise<any[]> {
-  const res = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await fetch(`${LIVE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: LIVE_KEY,
+      Authorization: `Bearer ${LIVE_KEY}`,
     },
   });
   const text = await res.text();
@@ -234,10 +235,9 @@ async function fetchDayPage(date: string) {
   return items;
 }
 
-describe("iter27: live quick-counter simulation (vip-bike, Aug 29–31)", () => {
+describe.skipIf(!hasLiveCreds)("iter27: live quick-counter simulation (vip-bike, Aug 29–31)", () => {
   it("KPI cards exclude the cancelled rentals on every inspected day", async () => {
-    const hasCreds = !!(env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
-    if (!hasCreds) return; // no creds in CI — source guards above still cover the logic
+    if (!hasLiveCreds) return; // no creds in CI — source guards above still cover the logic
 
     for (const date of ["2026-08-29", "2026-08-30", "2026-08-31"]) {
       const items = await fetchDayPage(date);

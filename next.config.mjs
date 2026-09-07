@@ -10,21 +10,36 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Build-memory: the standalone `next lint` gate (CI/dev) is the lint
+  // enforcement point; running a second full ESLint pass inside `next build`
+  // spiked peak heap for zero extra safety. Skip it → build fits a 4GB heap
+  // (package.json runs node with --max-old-space-size=4096).
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Build-memory: cap the static-generation worker fan-out. On many-core build
+  // boxes Next defaults to cores-1 workers, each holding its own module graph —
+  // the main reason the build needed an 8GB heap before. 2 workers keeps peak
+  // RSS flat with a modest SSG time cost.
+  experimental: {
+    cpus: 2,
+    serverComponentsExternalPackages: ['sharp'],
+  },
   images: {
     unoptimized: true,
-  },
-  // I3 hotfix (C2): sharp is a native Node module — must be external so
-  // webpack doesn't try to bundle sharp.node. Without this, the server action
-  // uploadRentalPhoto (which imports sharp) fails at build/runtime with
-  // "Module not found: Can't resolve …/build/Release/sharp.node".
-  experimental: {
-    serverComponentsExternalPackages: ['sharp'],
   },
   // Note: server-assets fonts are bundled automatically without explicit tracing
   // Disabled experimental features to reduce memory usage during build
   // Disable source maps in production to reduce memory usage
   productionBrowserSourceMaps: false,
-  webpack: (config, { isServer }) => {
+  webpack: (config, { dev, isServer }) => {
+    // Build-memory: stop generating source maps entirely in production builds —
+    // source-map bookkeeping on a graph this size is a multi-hundred-MB heap
+    // line item, and browser maps were already disabled via
+    // productionBrowserSourceMaps: false (nothing consumes prod maps here).
+    if (!dev) {
+      config.devtool = false;
+    }
     // Only apply this to server-side bundles
     if (isServer) {
       config.externals = config.externals || [];

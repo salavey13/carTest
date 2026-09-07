@@ -36,8 +36,23 @@ function setMockImpl(fn: (table: string) => any) {
 }
 
 function buildChain(result: { data?: any; error?: any } = {}) {
+  // iter30: getMyWorkDayAction queries crew_members TWICE with different shapes:
+  //   1) access resolution (intents.ts resolveFranchizeOperatorAccess) —
+  //      .select("role, membership_status")… .maybeSingle() → ONE row object;
+  //   2) the sales roster — .select("user_id")… awaited directly → ARRAY.
+  // The table-keyed mock serves the membership object to both, so the roster
+  // path crashed with `(crewMembersForSales || []).map is not a function`.
+  // A membership-shaped payload now behaves as a dual-shape chain: maybeSingle
+  // still returns the membership row (access), while a direct await resolves
+  // an empty roster array (sales attribution is a no-op under the mock —
+  // cars → [] already disables the sales loop).
+  const isMembershipRow =
+    result.data != null &&
+    !Array.isArray(result.data) &&
+    typeof result.data === "object" &&
+    "membership_status" in result.data;
   const chain: any = {
-    data: result.data ?? null,
+    data: isMembershipRow ? [] : (result.data ?? null),
     error: result.error ?? null,
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),

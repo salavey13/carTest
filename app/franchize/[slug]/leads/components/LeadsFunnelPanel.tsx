@@ -127,8 +127,14 @@ export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageS
 
       {/* ВОРОНКА ПАЙПЛАЙНА (референс §2): горизонтальная полоса цветных
           сегментов по стадиям — ширина пропорциональна числу лидов, внутри
-          счётчик + подпись. Клик = фильтр списка по стадии (повторный клик —
-          сброс). На мобиле полоса скроллится, минимальная ширина сегмента —
+          счётчик + подпись. POINTINESS (референс): каждый сегмент заострён
+          справа (clip-path шеврон), у всех кроме первого слева ответная
+          выемка — полоса читается как настоящая сужающаяся воронка, а не
+          ряд скруглённых плашек. Сплошная заливка цветом стадии, белые
+          цифры — как в моке. Клик = фильтр списка по стадии (повторный клик —
+          сброс), активный сегмент подсвечен свечением (drop-shadow работает
+          ПОВЕРХ clip-path, в отличие от ring/outline, которые срезаются).
+          На мобиле полоса скроллится, минимальная ширина сегмента —
           тап-таргет. */}
       {stageBreakdown && stageBreakdown.length > 0 && (
         <div className="mb-3">
@@ -138,7 +144,7 @@ export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageS
             role="group"
             aria-label="Воронка пайплайна по стадиям"
           >
-            {stageBreakdown.map((seg) => {
+            {stageBreakdown.map((seg, idx) => {
               const active = activeStage === seg.key;
               return (
                 <button
@@ -147,32 +153,48 @@ export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageS
                   onClick={() => onStageSelect?.(active ? "all" : seg.key)}
                   aria-pressed={active}
                   title={`${seg.label}: ${seg.count}${onStageSelect ? (active ? " — снять фильтр" : " — фильтровать список") : ""}`}
-                  className="min-h-[52px] shrink-0 grow basis-0 cursor-pointer overflow-hidden rounded-lg border px-2 py-1.5 text-center transition active:scale-[0.97]"
+                  className="min-h-[52px] shrink-0 grow basis-0 cursor-pointer text-center transition active:scale-[0.97]"
                   style={{
-                    minWidth: 64,
+                    minWidth: 72,
                     flexGrow: Math.max(1, seg.count),
                     flexBasis: 0,
-                    backgroundColor: active ? seg.color : `${seg.color}1c`,
-                    borderColor: active ? seg.color : `${seg.color}38`,
+                    paddingLeft: 12,
+                    paddingRight: 8,
+                    // Шеврон: острый правый край 9px + ответная выемка слева
+                    // (кроме первого сегмента — плоский левый край, как в моке).
+                    clipPath:
+                      idx === 0
+                        ? "polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%)"
+                        : "polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%)",
+                    backgroundColor: seg.color,
+                    opacity: active ? 1 : 0.85,
+                    // Активный (выбранный фильтр): внутренняя белая кайма
+                    // (box-shadow срезается clip-path в шеврон — то, что
+                    // нужно) + свечение наружу (drop-shadow работает поверх
+                    // clip-path, в отличие от ring/outline).
+                    boxShadow: active ? "inset 0 0 0 2px rgba(255,255,255,0.7)" : undefined,
+                    filter: active ? `drop-shadow(0 0 8px ${seg.color})` : undefined,
                   }}
                 >
+                  {/* РЕФЕРЕНС §2: подпись СВЕРХУ (переносится на 2 строки,
+                      белая), крупный счётчик ПОД ней — зеркалит мок. */}
                   <span
-                    className="block text-base font-black leading-tight tabular-nums"
-                    style={{ color: active ? (T.accentContrast || "#fff") : seg.color }}
-                  >
-                    {seg.count}
-                  </span>
-                  <span
-                    className="block truncate text-[9px] font-semibold leading-tight"
-                    style={{ color: active ? (T.accentContrast || "#fff") : T.textMuted }}
+                    className="block px-0.5 text-[10px] font-bold leading-[1.15] text-white"
                   >
                     {seg.label}
+                  </span>
+                  <span
+                    className="block text-base font-black leading-tight tabular-nums text-white"
+                  >
+                    {seg.count}
                   </span>
                 </button>
               );
             })}
           </div>
-          <div className="mt-1 flex items-center justify-between text-[10px]" style={{ color: T.textFaint }}>
+          {/* РЕФЕРЕНС: футер полосы — ярким первичным текстом (в моке
+              «Всего лидов: 128» / «Конверсия: 34%» белые и заметные). */}
+          <div className="mt-1 flex items-center justify-between text-[11px] font-semibold" style={{ color: T.text }}>
             <span>Всего лидов: {stageTotal}</span>
             <span>Конверсия: {stripConversion}</span>
           </div>

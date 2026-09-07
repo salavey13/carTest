@@ -89,8 +89,9 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     expect(init).not.toMatch(/^Paul:/m);
   });
 
-  it("apply path holds exactly the 159 clean SQL files — no junk, no crons", () => {
-    expect(files.length).toBe(159);
+  it("apply path holds exactly the 160 clean SQL files — no junk, no crons", () => {
+    // 159 → 160: 20260901120000_owner_cash_entries.sql (deposit-entries feature)
+    expect(files.length).toBe(160);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

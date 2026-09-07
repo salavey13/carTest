@@ -277,17 +277,18 @@ describe("iter28: source guards — pages, gate, photos, service linkage", () =>
 
 // ── 4. LIVE simulation (vip-bike, creds-dependent like iter27) ───────────────
 
-const env: Record<string, string> = {};
-for (const line of readFileSync("/home/z/my-project/upload/secrets_all.txt", "utf-8").split("\n")) {
-  const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-  if (m) env[m[1]!] = m[2].trim().replace(/^"|"$/g, "");
-}
+// Creds: process.env → environment secrets file (shared helper). When neither
+// source has them (fresh clone / CI), the live describe below SKIPS instead of
+// the whole file crashing at import (old module-scope readFileSync ENOENT).
+import { liveSupabaseCreds, hasSupabaseCreds } from "./helpers/live-env";
+const { url: LIVE_URL, key: LIVE_KEY } = liveSupabaseCreds();
+const hasLiveCreds = hasSupabaseCreds();
 
 async function sb(path: string): Promise<any[]> {
-  const res = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await fetch(`${LIVE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: LIVE_KEY,
+      Authorization: `Bearer ${LIVE_KEY}`,
     },
   });
   const text = await res.text();
@@ -300,10 +301,9 @@ const SELECT = encodeURIComponent(
   "rental_id,vehicle_id,status,total_cost,agreed_start_date,agreed_end_date,created_at,metadata",
 );
 
-describe("iter28: live hero-bike simulation (vip-bike)", () => {
+describe.skipIf(!hasLiveCreds)("iter28: live hero-bike simulation (vip-bike)", () => {
   it("engine stats equal an independent manual computation over the same rows", async () => {
-    const hasCreds = !!(env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
-    if (!hasCreds) return; // no creds in CI — unit + source guards above still cover the logic
+    if (!hasLiveCreds) return; // no creds in CI — unit + source guards above still cover the logic
 
     // same or() query as getBikeStoryAction
     const orFilter = encodeURIComponent(
@@ -344,8 +344,7 @@ describe("iter28: live hero-bike simulation (vip-bike)", () => {
   });
 
   it("fleet-level: at least one bike in vip-bike has service history via metadata.bike", async () => {
-    const hasCreds = !!(env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
-    if (!hasCreds) return;
+    if (!hasLiveCreds) return;
     const svc = await sb(
       `rentals?select=rental_id,metadata->>bike&metadata->>bike=not.is.null&limit=200`,
     );

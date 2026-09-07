@@ -14,6 +14,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { buildRentalContractVariables } from "@/app/lib/rental-contract-vars";
+import { liveSupabaseCreds, hasSupabaseCreds } from "./helpers/live-env";
 
 // docx-capability pulls server-only modules; mock them like doc-generation.spec.ts
 vi.mock("@/lib/supabase-server", () => ({
@@ -31,9 +32,12 @@ const DOCS = join(process.cwd(), "docs");
 const OUT_DIR = "/home/z/my-project/download";
 const OUT_PATH = join(OUT_DIR, "rental-kawasaki-ex650k-2026-08-27-signed-preview.docx");
 
-// Live context (fetched via REST so the vitest supabase mocks don't interfere)
-const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+// Live context (fetched via REST so the vitest supabase mocks don't interfere).
+// Creds: process.env first, then the environment secrets file — and when
+// neither exists (fresh clone / CI) the suite skips instead of throwing
+// `Failed to parse URL from /rest/v1/...` on an empty base URL.
+const { url: SB_URL, key: SB_KEY } = liveSupabaseCreds();
+const hasLiveCreds = hasSupabaseCreds();
 
 async function rest(path: string, schema = "public"): Promise<any> {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
@@ -48,7 +52,7 @@ async function rest(path: string, schema = "public"): Promise<any> {
   return Array.isArray(body) ? body[0] : body;
 }
 
-describe("iter15: kawasaki doc regeneration (signed ПЭП preview)", () => {
+describe.skipIf(!hasLiveCreds)("iter15: kawasaki doc regeneration (signed ПЭП preview)", () => {
   it("generates the corrected contract DOCX", async () => {
     const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
 
