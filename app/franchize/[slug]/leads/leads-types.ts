@@ -11,6 +11,12 @@
  *   `export type { LeadRow, LeadTodoRow, ... } from "./leads-types"`
  */
 
+// TYPE-ONLY imports (erased at compile time — no runtime dependency on libs):
+import type { LeadKpiMetrics } from "./lib/lead-kpi";
+import type { NextAction } from "./lib/lead-playbook";
+import type { LeadAchievement } from "./lib/lead-achievements";
+import type { LeadsKpiCardsStats, LeadsSegment } from "./lib/leads-query-core";
+
 export interface LeadRentalRow {
   rentalId: string;
   status: string;
@@ -234,7 +240,68 @@ export interface GetFranchizeLeadsResult {
   leadEvents?: LeadEventRow[];
   /** Прозрачный лидерборд — серверная агрегация lead_events. */
   leaderboard?: LeadLeaderboardEntry[];
+  /** Оконная выдача (wave «load best leads first»): метаданные страницы. */
+  page?: LeadsPageInfo;
+  /** Агрегаты по ПОЛНОМУ набору лидов — питают KPI/воронку/плейбук/лидерборд. */
+  agg?: LeadsAggregates;
   error?: string;
+}
+
+/** Метаданные окна при серверной пагинации лидов. */
+export interface LeadsPageInfo {
+  /** Смещение текущего окна внутри отфильтрованного+отсортированного списка. */
+  offset: number;
+  /** Запрошенный размер окна (реальный кусок может быть меньше — конец списка). */
+  limit: number;
+  /** Всего лидов ПОСЛЕ применения фильтров (счётчик «Показано X из Y»). */
+  total: number;
+  /** Есть ли ещё лиды за окном. */
+  hasMore: boolean;
+}
+
+/**
+ * Агрегаты по ПОЛНОМУ набору лидов экипажа (не по окну!). Считаются на
+ * сервере за один проход в момент загрузки, чтобы клиенту не пришлось
+ * скачивать все 500+ лидов ради шести плиток и воронки.
+ */
+export interface LeadsAggregates {
+  /** KPI-воронка + скорость (lib/lead-kpi.ts — тот же объект, что считал клиент). */
+  kpi: LeadKpiMetrics;
+  /** Плиты LeadsKPICards: числа + 7-дневные тренды (по полному набору). */
+  kpiCards: LeadsKpiCardsStats;
+  /** Очередь «что делать сейчас» (lib/lead-playbook.ts, ≤6 действий). */
+  playbook: NextAction[];
+  /** Распределение по стадиям пайплайна — кликабельная полоса-воронка. */
+  stageBreakdown: Array<{ key: string; label: string; color: string; count: number }>;
+  /** Счётчики сегментов тулбара (all/hot/warm/verified/troubled). */
+  segmentCounts: { all: number; hot: number; warm: number; verified: number; troubled: number };
+  /** Опции фильтра «Источник» (по полному набору — фильтры не исчезают). */
+  availableSources: string[];
+  /** Опции фильтра «Ответственный»: ростер + легаси-имена с лидов. */
+  availableOwners: Array<{ value: string; label: string }>;
+  /** Достижения (бронза…легенда) — crew-only панель. */
+  achievements: LeadAchievement[];
+  /** Активных лидов (без заглушек-операторов) — знаменатель прогресса. */
+  totalActive: number;
+}
+
+/** Параметры оконной выдачи getFranchizeLeads (wave «load best leads first»). */
+export interface GetLeadsWindowOpts {
+  offset?: number;
+  /** 0/undefined = легаси-режим «отдать всё» (совместимость). */
+  limit?: number;
+  /** Поиск: имя/телефон/username/байк/маршрут (правила filterLeads). */
+  q?: string;
+  source?: string;
+  /** "all" | "avito" (виртуальная) | stageKey. */
+  stage?: string;
+  /** id оператора из ростера или легаси-имя. */
+  owner?: string;
+  segment?: LeadsSegment;
+  hidePlaceholders?: boolean;
+  sort?: "priority" | "recent" | "urgent" | "name" | "spent";
+  /** true — отдать только агрегаты/счётчики, без окна лидов (тихий рефреш). */
+  metaOnly?: boolean;
 }
 
 export interface LeadNote {

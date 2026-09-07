@@ -7,14 +7,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, ChevronDown, Info, Lock, Sparkles } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import type {LeadRow, LeadTodoRow} from "./leads-types";
+import type { GetLeadsWindowOpts, LeadsAggregates, LeadsPageInfo } from "./leads-types";
+import {
+  LEAD_PATH_STEPS,
+  applyLeadPathDrip,
+  computeLeadPathProgress,
+  DEFAULT_LEAD_PATH_STATE,
+  type LeadPathState,
+} from "./lib/lead-path";
+import { LeadsPathPanel } from "./components/LeadsPathPanel";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
-import { isAvitoLead } from "./leads-utils";
 import { DISMISS_REASONS } from "./lib/dismiss-reasons";
 import { isHandlingTodo } from "./lib/lead-handling";
-import { computeLeadKpi } from "./lib/lead-kpi";
 import { computeLeadAchievements } from "./lib/lead-achievements";
-import { buildNextActions } from "./lib/lead-playbook";
-import { PIPELINE_STAGES, type StageKey } from "./lib/pipeline-stages";
 
 // Import extracted components
 import { LeadsKPICards } from "./components/LeadsKPICards";
@@ -46,7 +51,8 @@ import {
 import { LEADS_PAGE_SIZE } from "./leads-constants";
 
 // Import hooks
-import { useTodosMapping, useFilteredSortedLeads, usePriorityMap } from "./hooks/useLeadsData";
+import { useTodosMapping, usePriorityMap } from "./hooks/useLeadsData";
+import { useLeadsUserPrefs, type PrefsResolution } from "./hooks/useLeadsUserPrefs";
 import { useTheme } from "./hooks/useTheme";
 import { usePasswordGate } from "./hooks/usePasswordGate";
 import type { LeadPriority } from "./lib/lead-priority";
@@ -76,14 +82,64 @@ interface LeadsClientProps {
 // user-private), so a per-slug key is safe inside one browser session.
 type LeadsCacheEntry = {
   at: number;
+  /** Ключ вида фильтров (q/source/stage/owner/segment/заглушки/сорт). */
+  hash: string;
   leads: LeadRow[];
   todos: LeadTodoRow[];
   operators?: Array<{ id: string; name: string }>;
   leadEvents?: LeadEventRow[];
   leaderboard?: LeadLeaderboardEntry[];
+  agg?: LeadsAggregates;
+  pageInfo?: LeadsPageInfo;
 };
-const leadsCache = new Map<string, LeadsCacheEntry>();
+/** Память: slug → (hash → entry), LRU-кап на вид. */
+const leadsCache = new Map<string, Map<string, LeadsCacheEntry>>();
 const LEADS_CACHE_TTL_MS = 30_000;
+const LEADS_CACHE_MEM_CAP = 6;
+const LEADS_CACHE_SS_KEY = (slug: string) => `leads-cache-v3:${slug}`;
+
+function readMemoryCache(slug: string, hash: string): LeadsCacheEntry | undefined {
+  return leadsCache.get(slug)?.get(hash);
+}
+
+function writeMemoryCache(slug: string, hash: string, entry: LeadsCacheEntry): void {
+  let perSlug = leadsCache.get(slug);
+  if (!perSlug) {
+    perSlug = new Map();
+    leadsCache.set(slug, perSlug);
+  }
+  perSlug.delete(hash);
+  perSlug.set(hash, entry);
+  while (perSlug.size > LEADS_CACHE_MEM_CAP) {
+    const oldest = perSlug.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    perSlug.delete(oldest);
+  }
+}
+
+/** sessionStorage: ПЕРЕЖИВАЕТ ПЕРЕЗАНГРУЗКУ страницы — «cache extensively».
+ *  Хранится последняя вью; при чтении матчим hash фильтров. */
+function readSessionCache(slug: string, hash: string): LeadsCacheEntry | null {
+  try {
+    const raw = window.sessionStorage.getItem(LEADS_CACHE_SS_KEY(slug));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LeadsCacheEntry;
+    if (!parsed || parsed.hash !== hash || !Array.isArray(parsed.leads)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionCache(slug: string, entry: LeadsCacheEntry): void {
+  try {
+    const raw = JSON.stringify(entry);
+    if (raw.length > 1_800_000) return; // не раздуваем квоту sessionStorage
+    window.sessionStorage.setItem(LEADS_CACHE_SS_KEY(slug), raw);
+  } catch {
+    /* private mode / quota */
+  }
+}
 
 // ── In-app notifications (typed toast) ─────────────────────────────────────
 // Everything the page wants to tell the operator inline — copy/notify/todo/
@@ -129,12 +185,8 @@ export function LeadsClient({
   const [filterSource, setFilterSource] = useState<string>("all");
   const [filterStage, setFilterStage] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<string>("all");
-  // ── Пагинация (просьба босса: «лидов уже пара сотен») ──
-  // Показываем первые VISIBLE_PAGE_SIZE лидов всех вьюх (список/канбан/таблица);
-  // кнопка «Показать ещё» дозагружает следующую страницу. Список-вью при этом
-  // остаётся виртуализированным, а канбан/таблица перестают рендерить сотни
-  // карточек за раз. Сбрасывается при смене любого фильтра/поиска.
-  const [visibleCount, setVisibleCount] = useState(LEADS_PAGE_SIZE);
+  // ── Пагинация теперь СЕРВЕРНАЯ: окно LEADS_PAGE_SIZE «лучших» лидов +
+  // «Показать ещё» (fetchWindow("more")). См. блок оконной загрузки выше. ──
   const [segment, setSegment] = useState<Segment>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hidePlaceholders, setHidePlaceholders] = useState(false); // Show all leads by default — hiding placeholders was hiding everything when identityState wasn't set
@@ -178,7 +230,6 @@ export function LeadsClient({
   const createTodoBusyRef = useRef(false);
   const [notesBusy, setNotesBusy] = useState(false);
   const [todosBusy, setTodosBusy] = useState(false);
-  const leadsFetchedRef = useRef(false);
 
   // ── Lead detail sheet state (2026-09-01 sheet overhaul) ──
   // Notes are fetched lazily for the SELECTED lead (they live in a separate
@@ -343,108 +394,328 @@ export function LeadsClient({
   const [leadsLoadError, setLeadsLoadError] = useState<string | null>(null);
   const [isFetchingLeads, setIsFetchingLeads] = useState(false);
   const [manualRetryTick, setManualRetryTick] = useState(0);
-  const fetchLeads = useCallback(async (isCancelled: () => boolean): Promise<boolean> => {
-    const initData = (() => {
-      try {
-        const tg = (window as any).Telegram?.WebApp;
-        return typeof tg?.initData === "string" && tg.initData.length > 0 ? tg.initData : undefined;
-      } catch {
-        return undefined;
-      }
-    })();
-    const maxAttempts = 3;
-    let lastError = "";
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        // STATIC import — safe now because leads.ts has NO module-level server-only imports.
-        // Dynamic import() of server actions breaks Next.js server action registration
-        // ("Failed to find Server Action" error). The fix was to move cookies +
-        // telegram-actor-cookie + privateSchema to dynamic imports INSIDE the functions
-        // in leads.ts, so the module-level imports are clean for the client RPC stub.
-        const result = await getFranchizeLeads(
-          slug,
-          dbUser?.user_id || passwordAuthOwnerId || "",
-          false, // isPasswordAuth=false — server tries cookie auth first
-          initData,
-          // 2026-09-01: forward the analytics password so browser password-auth
-          // users can actually load leads (server verifies it via RPC).
-          storedPassword || undefined,
-        );
-        if (isCancelled()) return false;
-        if (result.success) {
-          const freshLeads = (result.leads || []).filter(Boolean) as LeadRow[];
-          const freshTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
-          const freshOperators = result.operators || undefined;
-          const freshEvents = (result.leadEvents || []).filter(Boolean) as LeadEventRow[];
-          const freshBoard = (result.leaderboard || []).filter(Boolean) as LeadLeaderboardEntry[];
-          setLeadsState(freshLeads);
-          setTodosState(freshTodos);
-          if (freshOperators) setOperators(freshOperators);
-          setLeadEvents(freshEvents);
-          setLeaderboard(freshBoard);
-          // Write through the session cache so the next mount paints instantly.
-          leadsCache.set(slug, { at: Date.now(), leads: freshLeads, todos: freshTodos, operators: freshOperators, leadEvents: freshEvents, leaderboard: freshBoard });
-          setLeadsLoadError(null);
-          return true;
-        }
-        lastError = result.error || "неизвестная ошибка";
-        console.error(`[LeadsClient] getFranchizeLeads failed (attempt ${attempt}/${maxAttempts}):`, lastError);
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : String(e);
-        if (isCancelled()) return false;
-        console.error(`[LeadsClient] getFranchizeLeads error (attempt ${attempt}/${maxAttempts}):`, e);
-      }
-      if (attempt < maxAttempts) {
-        // growing backoff: 1.5s → 4s (covers cookie-set races and cold starts)
-        await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 1500 : 4000));
-        if (isCancelled()) return false;
-      }
-    }
-    setLeadsLoadError(lastError);
-    return false;
-  }, [slug, dbUser?.user_id, passwordAuthOwnerId, storedPassword]);
+  // Серверные агрегаты по ПОЛНОМУ набору + метаданные окна (total/hasMore).
+  const [aggState, setAggState] = useState<LeadsAggregates | null>(null);
+  const [pageInfo, setPageInfo] = useState<LeadsPageInfo | null>(null);
 
+  // ── Оконная загрузка («load best leads quickly first») ─────────────────────
+  // Сервер сам фильтрует/сортирует/режет окно (lib/leads-query-core): первый
+  // ответ несёт только LEADS_PAGE_SIZE ЛУЧШИХ лидов + агрегаты по ПОЛНОМУ
+  // набору (плитки/воронка/плейбук/достижения/лидерборд). «Показать ещё»
+  // дозагружает следующее окно. Режимы:
+  //   reset — окно с нуля (первая загрузка / смена фильтров / повтор);
+  //   more  — дозагрузка к уже показанным (offset = leadsState.length);
+  //   meta  — ТИХИЙ фон-рефреш: только агрегаты и счётчик total (окно и
+  //           скролл оператора не трогаются).
+  const fetchSeqRef = useRef(0);
+  const leadsStateRef = useRef<LeadRow[]>([]);
+  const todosStateRef = useRef<LeadTodoRow[]>([]);
   useEffect(() => {
-    if (!isAuthed || shouldShowPassword) return;
-    if (leadsFetchedRef.current) return;
+    leadsStateRef.current = leadsState;
+  }, [leadsState]);
+  useEffect(() => {
+    todosStateRef.current = todosState;
+  }, [todosState]);
 
-    // PERF (2026-09-07): stale-while-revalidate — paint instantly from the
-    // session cache when we have a payload for this slug; skip the network
-    // round entirely while it is fresher than the TTL.
-    const cached = leadsCache.get(slug);
+  // Зеркало фильтров для fetch-колбэка (обновляется эффектом ДО любых fetch).
+  const filtersRef = useRef<GetLeadsWindowOpts>({});
+  useEffect(() => {
+    filtersRef.current = {
+      q: debouncedSearchQuery.trim() || undefined,
+      source: filterSource,
+      stage: filterStage,
+      owner: filterOwner,
+      segment,
+      hidePlaceholders,
+      sort: sortMode,
+    };
+  }, [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode]);
+
+  const hashOfFilters = (o: GetLeadsWindowOpts): string =>
+    JSON.stringify([
+      o.q || "",
+      o.source || "all",
+      o.stage || "all",
+      o.owner || "all",
+      o.segment || "all",
+      !!o.hidePlaceholders,
+      o.sort || "priority",
+    ]);
+
+  const fetchWindow = useCallback(
+    async (mode: "reset" | "more" | "meta", isCancelled: () => boolean): Promise<boolean> => {
+      const initData = (() => {
+        try {
+          const tg = (window as any).Telegram?.WebApp;
+          return typeof tg?.initData === "string" && tg.initData.length > 0 ? tg.initData : undefined;
+        } catch {
+          return undefined;
+        }
+      })();
+      const base = filtersRef.current;
+      const opts: GetLeadsWindowOpts =
+        mode === "more"
+          ? { ...base, offset: leadsStateRef.current.length, limit: LEADS_PAGE_SIZE }
+          : { ...base, offset: 0, limit: LEADS_PAGE_SIZE, metaOnly: mode === "meta" };
+      const hash = hashOfFilters(base);
+      // reset инвалидирует все более старые ответы (смена фильтров/повтор);
+      // more/meta применяются, только пока не начался новый reset.
+      const seqAtStart = mode === "reset" ? ++fetchSeqRef.current : fetchSeqRef.current;
+      const stillRelevant = () =>
+        !isCancelled() &&
+        fetchSeqRef.current === seqAtStart &&
+        hashOfFilters(filtersRef.current) === hash;
+
+      // STATIC import — безопасно: leads.ts без module-level server-only.
+      const maxAttempts = mode === "reset" ? 3 : 1;
+      let lastError = "";
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const result = await getFranchizeLeads(
+            slug,
+            dbUser?.user_id || passwordAuthOwnerId || "",
+            false, // isPasswordAuth=false — сервер сначала пробует cookie-auth
+            initData,
+            // 2026-09-01: форвардим analytics-пароль для password-auth браузеров.
+            storedPassword || undefined,
+            opts,
+          );
+          if (!stillRelevant()) return false;
+          if (result.success) {
+            const freshAgg = result.agg ?? undefined;
+            const freshPage = result.page ?? undefined;
+            const freshOperators = result.operators || undefined;
+            const freshEvents = (result.leadEvents || []).filter(Boolean) as LeadEventRow[];
+            const freshBoard = (result.leaderboard || []).filter(Boolean) as LeadLeaderboardEntry[];
+
+            if (mode === "meta") {
+              // Тихий рефреш: ТОЛЬКО агрегаты и счётчик total.
+              if (freshAgg) setAggState(freshAgg);
+              if (freshPage) setPageInfo(freshPage);
+              return true;
+            }
+
+            const freshLeads = (result.leads || []).filter(Boolean) as LeadRow[];
+            const freshTodos = (result.todos || []).filter(Boolean) as LeadTodoRow[];
+
+            let accLeads = freshLeads;
+            let accTodos = freshTodos;
+            if (mode === "more") {
+              // Дозагрузка: дописываем хвост, дедуп на случай гонки.
+              const seenL = new Set(leadsStateRef.current.map((l) => l.user_id));
+              accLeads = [...leadsStateRef.current, ...freshLeads.filter((l) => !seenL.has(l.user_id))];
+              const seenT = new Set(
+                todosStateRef.current.map((t) => t.id).filter(Boolean) as string[],
+              );
+              accTodos = [...todosStateRef.current, ...freshTodos.filter((t) => !t.id || !seenT.has(t.id))];
+            }
+            setLeadsState(accLeads);
+            setTodosState(accTodos);
+            if (freshAgg) setAggState(freshAgg);
+            if (freshPage) setPageInfo(freshPage);
+            if (freshOperators) setOperators(freshOperators);
+            setLeadEvents(freshEvents);
+            setLeaderboard(freshBoard);
+            setLeadsLoadError(null);
+
+            // Кэш-сквозная запись: память (LRU) + sessionStorage (перезагрузка).
+            const entry: LeadsCacheEntry = {
+              at: Date.now(),
+              hash,
+              leads: accLeads,
+              todos: accTodos,
+              operators: freshOperators,
+              leadEvents: freshEvents,
+              leaderboard: freshBoard,
+              agg: freshAgg,
+              pageInfo: freshPage,
+            };
+            writeMemoryCache(slug, hash, entry);
+            writeSessionCache(slug, entry);
+            return true;
+          }
+          lastError = result.error || "неизвестная ошибка";
+          console.error(`[LeadsClient] getFranchizeLeads failed (attempt ${attempt}/${maxAttempts}):`, lastError);
+        } catch (e) {
+          lastError = e instanceof Error ? e.message : String(e);
+          if (isCancelled()) return false;
+          console.error(`[LeadsClient] getFranchizeLeads error (attempt ${attempt}/${maxAttempts}):`, e);
+        }
+        if (attempt < maxAttempts) {
+          // growing backoff: 1.5s → 4s (cookie-set races, cold starts)
+          await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 1500 : 4000));
+          if (!stillRelevant()) return false;
+        }
+      }
+      if (mode === "reset") setLeadsLoadError(lastError);
+      else if (mode === "more") showToast(`Не удалось догрузить лиды: ${lastError}`, "error", 4200);
+      return false;
+    },
+    [slug, dbUser?.user_id, passwordAuthOwnerId, storedPassword, showToast],
+  );
+
+  // ── Auth headers (rate/handling/prefs REST routes) ──
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (dbUser?.user_id) h["x-telegram-user-id"] = dbUser.user_id;
+    else if (storedPassword) h["x-auth-password"] = storedPassword;
+    return h;
+  }, [dbUser?.user_id, storedPassword]);
+
+  // ── Prefs: фильтры и «Путь оператора» в users.metadata (jsonb) ────────────
+  // КЛИЕНТСКАЯ ПРОСЬБА: «save filters settings upon page reload». Хук читает
+  // metadata.leads_ui/leads_path при авторизации (fallback — localStorage),
+  // сохранение — debounced-эффект ниже.
+  const { prefsResolution, saveFilters, savePath } = useLeadsUserPrefs({
+    slug,
+    isAuthed,
+    hasTelegramIdentity: !!dbUser?.user_id,
+    authHeaders,
+    retryTick: manualRetryTick,
+  });
+  const prefsRef = useRef({ saveFilters, savePath });
+  useEffect(() => {
+    prefsRef.current = { saveFilters, savePath };
+  }, [saveFilters, savePath]);
+
+  const [pathState, setPathState] = useState<LeadPathState>(DEFAULT_LEAD_PATH_STATE);
+  const [prefsSettled, setPrefsSettled] = useState(false);
+  const appliedPrefsRef = useRef<PrefsResolution | null>(null);
+  const prefsSettledRef = useRef(false);
+  // Применяем восстановленные настройки РОВНО ОДИН раз на каждую резолюцию —
+  // ДО первого сетевого fetch (эффект загрузки гейтится prefsSettled).
+  useEffect(() => {
+    if (!prefsResolution || appliedPrefsRef.current === prefsResolution) return;
+    appliedPrefsRef.current = prefsResolution;
+    const p = prefsResolution.prefs;
+    if (p) {
+      if (typeof p.q === "string") {
+        setSearchQuery(p.q);
+        setDebouncedSearchQuery(p.q);
+      }
+      if (p.source) setFilterSource(p.source);
+      if (p.stage) setFilterStage(p.stage);
+      if (p.owner) setFilterOwner(p.owner);
+      if (p.segment === "all" || p.segment === "hot" || p.segment === "verified" || p.segment === "warm" || p.segment === "troubled") {
+        setSegment(p.segment);
+      }
+      if (typeof p.hidePlaceholders === "boolean") setHidePlaceholders(p.hidePlaceholders);
+      if (p.sortMode === "priority" || p.sortMode === "recent" || p.sortMode === "urgent" || p.sortMode === "name" || p.sortMode === "spent") {
+        setSortMode(p.sortMode);
+      }
+      if (p.viewMode === "list" || p.viewMode === "board" || p.viewMode === "table") setViewMode(p.viewMode);
+    }
+    setPathState(prefsResolution.path);
+    if (!prefsSettledRef.current) {
+      prefsSettledRef.current = true;
+      setPrefsSettled(true);
+    }
+  }, [prefsResolution]);
+
+  // ── Загрузка: первая (после применения prefs) и при смене фильтров ────────
+  // SWR: мгновенно рисуем из кэша (память → sessionStorage); свежий (< TTL) —
+  // сети нет, устаревший — красим и тихо перевалидируем.
+  useEffect(() => {
+    if (!isAuthed || shouldShowPassword || !prefsSettled) return;
+    const hash = hashOfFilters(filtersRef.current);
+    const cached = readMemoryCache(slug, hash) ?? readSessionCache(slug, hash);
     if (cached) {
       setLeadsState(cached.leads);
       setTodosState(cached.todos);
+      if (cached.agg) setAggState(cached.agg);
+      if (cached.pageInfo) setPageInfo(cached.pageInfo);
       if (cached.operators) setOperators(cached.operators);
       if (cached.leadEvents) setLeadEvents(cached.leadEvents);
       if (cached.leaderboard) setLeaderboard(cached.leaderboard);
+      writeMemoryCache(slug, hash, cached);
       if (Date.now() - cached.at < LEADS_CACHE_TTL_MS) {
-        leadsFetchedRef.current = true;
-        return;
+        setIsFetchingLeads(false);
+        return; // свежий кэш — сеть не нужна вовсе
       }
     }
-
     let cancelled = false;
     setIsFetchingLeads(true);
     (async () => {
-      const ok = await fetchLeads(() => cancelled);
-      if (!cancelled && ok) leadsFetchedRef.current = true;
+      await fetchWindow("reset", () => cancelled);
       if (!cancelled) setIsFetchingLeads(false);
     })();
-    return () => { cancelled = true; };
-  }, [isAuthed, shouldShowPassword, slug, dbUser?.user_id, storedPassword, passwordAuthed, manualRetryTick, fetchLeads]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isAuthed,
+    shouldShowPassword,
+    prefsSettled,
+    slug,
+    fetchWindow,
+    debouncedSearchQuery,
+    filterSource,
+    filterStage,
+    filterOwner,
+    segment,
+    hidePlaceholders,
+    sortMode,
+    manualRetryTick,
+  ]);
+
+  // ── Debounced-сохранение фильтров в metadata jsonb + localStorage ──────────
+  useEffect(() => {
+    if (!prefsSettled) return; // не сохраняем, пока не восстановили
+    const t = setTimeout(() => {
+      prefsRef.current.saveFilters({
+        q: debouncedSearchQuery || undefined,
+        source: filterSource,
+        stage: filterStage,
+        owner: filterOwner,
+        segment,
+        hidePlaceholders,
+        sortMode,
+        viewMode,
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [prefsSettled, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode, viewMode]);
+
+  // ── «Показать ещё»: дозагрузка следующего окна с сервера ───────────────────
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreLeads = useCallback(() => {
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+    (async () => {
+      try {
+        await fetchWindow("more", () => false);
+      } finally {
+        setIsLoadingMore(false);
+      }
+    })();
+  }, [fetchWindow, isLoadingMore]);
+
+  // ── Тихий рефреш агрегатов (90 c, только в видимой вкладке) ────────────────
+  // KPI/воронка/плейбук/лидерборд и счётчик total остаются честными, пока
+  // оператор держит страницу открытой; окно и скролл не трогаются.
+  useEffect(() => {
+    if (!isAuthed || shouldShowPassword || !prefsSettled) return;
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void fetchWindow("meta", () => false);
+    };
+    const iv = setInterval(tick, 90_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [isAuthed, shouldShowPassword, prefsSettled, fetchWindow]);
 
   // Todo mapping — use writable state so TodoList callbacks sync the parent array
   const { getTodosForLead } = useTodosMapping(todosState);
 
-  // Priority Score (ТЗ): карта индексов 0–100 для всех лидов — ею пользуются
-  // сортировка «priority» и лайбочки (⚡ свежий / 🔥 счёт) во всех видах.
-  // nowTick раз в минуту перевычисляет индексы — просроченные перезвоны
-  // вовремя получают +30 и поднимаются в очереди без перезагрузки страницы.
+  // Priority Score лейблы (⚡ свежий / 🔥 счёт) — считаются по ОКНУ. Полные
+  // метрики (KPI/скорость/плейбук) считает СЕРВЕР по всему набору (agg) —
+  // окно в 50 карточек не должно искажать «Всего лидов» и очередь SOP.
+  // nowTick раз в минуту перевычисляет лейблы — просроченные перезвоны
+  // вовремя получают буст без перезагрузки.
   const priorityMap = usePriorityMap(leadsState, getTodosForLead, nowTick);
-
-  // Default filter flags — LeadsToolbar expects these props but root LeadsClient
-  // doesn't use useLeadFilters (it uses useFilteredSortedLeads instead).
 
   /** Called by TodoList after toggle/add/delete — keeps todosState in sync */
   const handleTodoUpdate = useCallback((action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => {
@@ -460,88 +731,30 @@ export function LeadsClient({
     });
   }, []);
 
-  // Filtered, sorted, categorized leads (source + segment + search + sort)
-  const {
-    sortedLeads: baseSortedLeads,
-    hot,
-    verified,
-    warm,
-    availableSources,
-    hasFilters: baseHasFilters,
-  } = useFilteredSortedLeads(leadsState, debouncedSearchQuery, filterSource, segment, getTodosForLead, sortMode, hidePlaceholders, priorityMap);
+  // ── Окно = список. Фильтрация и сортировка «лучшие сверху» выполнены
+  // СЕРВЕРОМ теми же чистыми функциями (lib/leads-query-core) — порядок
+  // глобальный, конкатенация окон («Показать ещё») его сохраняет.
+  const sortedLeads = leadsState;
+  const visibleLeads = sortedLeads;
+  const hiddenCount = pageInfo ? Math.max(0, pageInfo.total - visibleLeads.length) : 0;
 
-  // ── Stage + Owner filters (applied AFTER useFilteredSortedLeads) ──
-  // These are new filters that the v2-style toolbar exposes. They narrow
-  // the already-sorted leads list without re-running the full pipeline.
-  // FIX: stage filter now matches the COMPUTED pipeline stage (stageKey, set
-  // server-side by computeLeadStage) — it used to compare against the raw DB
-  // stage, so most options matched nothing and the filter looked broken.
-  // "avito" — виртуальное значение: все лиды канала Авито независимо от стадии.
-  // ── OWNER FILTER (по id, а не по имени) ──
-  // Значение фильтра — telegram id оператора из серверного ростера. Лид
-  // матчится, если оператор — его assignee (туду), создатель (/doc) или
-  // автор последней заметки (lastTouchedBy — сравниваем и по имени тоже,
-  // т.к. сервер возвращает уже резолвленное имя). Это позволяет отфильтровать
-  // «только лиды, которые вёл конкретный оператор» — даже если он ещё ни
-  // одного лида не создал (опция теперь есть у ВСЕГО ростера экипажа).
-  const operatorNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const o of operators) map.set(o.id, o.name);
-    return map;
-  }, [operators]);
-
-  const sortedLeads = useMemo(() => {
-    let result = baseSortedLeads;
-    if (filterStage === "avito") {
-      result = result.filter(isAvitoLead);
-    } else if (filterStage !== "all") {
-      result = result.filter((l) => (l.stageKey || "new") === filterStage);
-    }
-    if (filterOwner !== "all") {
-      const ownerName = operatorNameById.get(filterOwner) || filterOwner;
-      result = result.filter((l) =>
-        l.assigneeId === filterOwner ||
-        l.ownerId === filterOwner ||
-        l.originalOperatorChatId === filterOwner ||
-        // lastTouchedBy приходит строкой-именем; сравниваем по ней, если
-        // сервер вернул имя этого оператора.
-        (ownerName && l.lastTouchedBy === ownerName) ||
-        // легаси-фоллбек: старый фильтр хранил ИМЯ в filterOwner
-        (l.assigneeName || l.ownerName || "—") === filterOwner,
-      );
-    }
-    return result;
-  }, [baseSortedLeads, filterStage, filterOwner, operatorNameById]);
-
-  // ── Пагинация: окно видимых лидов + сброс при смене фильтров ──
-  const visibleLeads = useMemo(
-    () => sortedLeads.slice(0, visibleCount),
-    [sortedLeads, visibleCount],
+  // ── Ответственный: серверный ростер + легаси-имена (agg.availableOwners).
+  // Пока agg не пришёл — только ростер (значение появится через мгновение).
+  const availableOwners = useMemo(
+    () => aggState?.availableOwners ?? operators.map((o) => ({ value: o.id, label: o.name })),
+    [aggState, operators],
   );
-  useEffect(() => {
-    setVisibleCount(LEADS_PAGE_SIZE);
-  }, [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders]);
-  const hiddenCount = sortedLeads.length - visibleLeads.length;
 
-  // ── Ответственный: серверный ростер экипажа + те, кто встречается на лидах ──
-  // Раньше список строился ТОЛЬКО из имён на лидах — новый оператор без лидов
-  // в выпадашку не попадал. Теперь сервер возвращает всех (owner + члены),
-  // а лиды-имена добавляем на случай легаси-значений без id.
-  const availableOwners = useMemo(() => {
-    const opts = operators.map((o) => ({ value: o.id, label: o.name }));
-    const seenIds = new Set(opts.map((o) => o.value));
-    const seenNames = new Set(opts.map((o) => o.label));
-    for (const l of leadsState) {
-      const name = l.assigneeName || l.ownerName;
-      if (name && !seenNames.has(name) && !(l.assigneeId && seenIds.has(l.assigneeId))) {
-        opts.push({ value: name, label: name });
-        seenNames.add(name);
-      }
-    }
-    return opts.sort((a, b) => a.label.localeCompare(b.label, "ru"));
-  }, [operators, leadsState]);
+  // Опции «Источник» — по ПОЛНОМУ набору с сервера (фильтры не исчезают).
+  const availableSources = useMemo(
+    () => aggState?.availableSources ?? [],
+    [aggState],
+  );
 
-  const hasFilters = baseHasFilters || filterStage !== "all" || filterOwner !== "all";
+  const hasFilters =
+    !!(debouncedSearchQuery || filterSource !== "all") ||
+    filterStage !== "all" ||
+    filterOwner !== "all";
 
   // Референс-дизайн §3: оранжевый бейдж «N» на кнопке фильтров — считаем
   // ВСЕ активные сужения списка (поиск, источник, стадия, ответственный,
@@ -560,11 +773,8 @@ export function LeadsClient({
   );
 
   // FIX (mobile wave 3, dead button): EmptyState рисует «Сбросить фильтры»,
-  // но onReset никто не передавал — кнопка была мёртвой (клик ничего не
-  // делал). Сбрасываем ВСЁ, что участвует в hasFilters: поиск, источник,
-  // стадию, ответственного, сегмент и флаг заглушек. Сортировку не трогаем —
-  // это не фильтр, оператор выбирал её осознанно. Пагинация пересчитывается
-  // сама (effect выше следит за этими же зависимостями).
+  // но onReset никто не передавал — кнопка была мёртвой. Сбрасываем ВСЁ,
+  // что участвует в hasFilters. Сортировку не трогаем — это не фильтр.
   const resetAllFilters = useCallback(() => {
     setSearchQuery("");
     setDebouncedSearchQuery("");
@@ -575,62 +785,55 @@ export function LeadsClient({
     setHidePlaceholders(false);
   }, []);
 
-  // Filter out operator placeholders from segment counts for cleaner metrics
-  const activeLeads = useMemo(() => 
-    hidePlaceholders 
-      ? leadsState.filter((l) => l.identityState !== 'operator_placeholder')
-      : leadsState,
-    [leadsState, hidePlaceholders]
-  );
-
-  // ── KPI-воронка + скорость (протокол встречи + просьба босса) ──
-  // Воронка Лиды → Диалог → КЭВ → Сделки, активность дня, «горячие ждут»,
-  // юнит-экономика лайт + встроенные скоростные метрики (lead-speed.ts) —
-  // всё за ОДИН проход по данным. Считается по activeLeads (заглушки
-  // операторов не портят метрики), перевычисляется с nowTick раз в минуту.
-  const kpiMetrics = useMemo(
-    () => computeLeadKpi(activeLeads, todosState, nowTick),
-    [activeLeads, todosState, nowTick],
-  );
-  // Достижения — геймификация тех же цифр (бронза/серебро/золото/легенда).
-  // CREW ONLY: для обычных пользователей не считаем ВООБЩЕ (нулевой CPU на
-  // ~27 бейджей × каждый пересчёт лидов) и не показываем панель.
+  // ── Панели аналитики — СЕРВЕРНЫЕ агрегаты по ПОЛНОМУ набору (agg).
+  // kpi включает speed (lib/lead-kpi.ts); null — первая загрузка идёт.
+  const kpiMetrics = aggState?.kpi ?? null;
+  // Достижения — CREW ONLY: для не-crew даже не читаем из agg.
   const achievements = useMemo(
-    () => (isCrew ? computeLeadAchievements(kpiMetrics) : []),
-    [kpiMetrics, isCrew],
+    () => (isCrew ? aggState?.achievements ?? [] : []),
+    [aggState, isCrew],
   );
-  // Плейбук смены — очередь «что делать сейчас» (off-the-call SOP из курса
-  // The Ultimate Sales Training 2026): горячие в золотом окне, просроченные
-  // перезвоны, свежие «кто первый», висящие договоры, pull-up броней,
-  // реанимация «пропавших». Чистый расчёт от тех же данных, тот же nowTick.
-  // Лимит 6 (потолок lib): панель сама покажет компактные 2 на сложенном
-  // мобильном виде и всё остальное — по «ещё N».
-  const playbookActions = useMemo(
-    () => buildNextActions(activeLeads, todosState, nowTick, 6),
-    [activeLeads, todosState, nowTick],
-  );
-  // ВОРОНКА ПАЙПЛАЙНА (референс-дизайн §2): распределение лидов по стадиям
-  // для кликабельной полосы в LeadsFunnelPanel — сегменты с счётчиками,
-  // клик = stage-фильтр списка (тот же filterStage, что у дропдауна).
-  const stageBreakdown = useMemo(
-    () =>
-      PIPELINE_STAGES.map((s) => ({
-        key: s.key as string,
-        label: s.label,
-        color: s.color,
-        count: activeLeads.filter((l) => ((l.stageKey as StageKey | undefined) || "new") === s.key).length,
-      })).filter((s) => s.count > 0),
-    [activeLeads],
+  // Плейбук смены — очередь «что делать сейчас», посчитана сервером по всем
+  // лидам (перезвоны и горячие за окном не выпадают из SOP).
+  const playbookActions = useMemo(() => aggState?.playbook ?? [], [aggState]);
+  // ВОРОНКА ПАЙПЛАЙНА (референс §2): распределение по стадиям, клик = фильтр.
+  const stageBreakdown = useMemo(() => aggState?.stageBreakdown ?? [], [aggState]);
+
+  // Segment counts for toolbar tabs — сервер (паритет с прежним поведением:
+  // «all» по базовому набору, остальные с учётом поиска/источника/сегмента).
+  const segmentCounts = useMemo(
+    () => aggState?.segmentCounts ?? { all: 0, hot: 0, warm: 0, verified: 0, troubled: 0 },
+    [aggState],
   );
 
-  // Segment counts for toolbar tabs
-  const segmentCounts = useMemo(() => ({
-    all: activeLeads.length,
-    hot: hot.length,
-    warm: warm.length,
-    verified: verified.length,
-    troubled: activeLeads.filter((l) => l.troubled).length,
-  }), [activeLeads, hot, warm, verified]);
+  // ── «Путь оператора» (crew-only): по одному новому шагу за смену (drip),
+  // завершения открывают следующий сразу (catch-up). Состояние — в
+  // users.metadata.leads_path (см. prefs выше) + localStorage-зеркало.
+  const pathHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!isCrew || !prefsSettled || pathHydratedRef.current) return;
+    pathHydratedRef.current = true;
+    const { state: next, advanced } = applyLeadPathDrip(pathState, LEAD_PATH_STEPS.length);
+    if (advanced) {
+      setPathState(next);
+      prefsRef.current.savePath(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCrew, prefsSettled]);
+
+  const pathStats = useMemo(() => {
+    const meId = dbUser?.user_id || null;
+    const idx = meId ? leaderboard.findIndex((e) => e.id === meId) : -1;
+    return {
+      myPoints: idx >= 0 ? leaderboard[idx].points : 0,
+      myRank: idx >= 0 ? idx + 1 : null,
+      crewSize: leaderboard.length,
+    };
+  }, [leaderboard, dbUser?.user_id]);
+  const pathProgress = useMemo(
+    () => computeLeadPathProgress(pathState, LEAD_PATH_STEPS, pathStats),
+    [pathState, pathStats],
+  );
 
   // Scroll to selected lead
   useEffect(() => {
@@ -693,6 +896,9 @@ export function LeadsClient({
       // Close the dialog
       setDismissTarget(null);
       router.refresh();
+      // Тихий meta-рефреш: счётчик total и агрегаты (плитки/воронка/плейбук)
+      // без сброса окна и скролла оператора.
+      void fetchWindow("meta", () => false);
     } catch (e) {
       showToast("Ошибка сети — лид не убран", "error");
     } finally {
@@ -820,12 +1026,7 @@ export function LeadsClient({
   }, [selectedId, leadsState, showToast, slug, router]);
 
   // ── Sheet todo handlers (REST API — same route the dismiss flow uses) ──
-  const authHeaders = useMemo<Record<string, string>>(() => {
-    const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (dbUser?.user_id) h["x-telegram-user-id"] = dbUser.user_id;
-    else if (storedPassword) h["x-auth-password"] = storedPassword;
-    return h;
-  }, [dbUser?.user_id, storedPassword]);
+  // (authHeaders определён выше, в блоке оконной загрузки — нужен и prefs.)
 
   const handleCreateTodo = useCallback(async (title: string) => {
     const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
@@ -1071,7 +1272,9 @@ export function LeadsClient({
   return (
     <div className="space-y-5">
       <div id="leads-kpi" className={flashCls("leads-kpi")}>
-        <LeadsKPICards leads={activeLeads} hot={hot} verified={verified} todos={todosState.filter((t) => !isHandlingTodo(t))} T={T} />
+        {/* Плиты — готовые числа с сервера (agg.kpiCards по ПОЛНОМУ набору);
+            скелет рисуется, пока первый ответ в пути. */}
+        <LeadsKPICards stats={aggState?.kpiCards} T={T} />
       </div>
 
       {/* Плейбук смены — ВСЕГДА на виду (и на телефоне тоже): это не
@@ -1116,19 +1319,21 @@ export function LeadsClient({
         {/* Скорость обработки: медиана ответа, очередь «ждут», SLA-просрочки,
             распределение времени ответа и перезвоны — см. lib/lead-speed.ts.
             speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
-        <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />
+        {kpiMetrics && <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />}
 
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
             конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек.
             Наверху — кликабельная полоса стадий пайплайна (референс §2):
             клик по сегменту = фильтр списка по стадии. */}
-        <LeadsFunnelPanel
-          kpi={kpiMetrics}
-          T={T}
-          stageBreakdown={stageBreakdown}
-          activeStage={filterStage}
-          onStageSelect={setFilterStage}
-        />
+        {kpiMetrics && (
+          <LeadsFunnelPanel
+            kpi={kpiMetrics}
+            T={T}
+            stageBreakdown={stageBreakdown}
+            activeStage={filterStage}
+            onStageSelect={setFilterStage}
+          />
+        )}
 
         {/* Достижения экипажа — CREW ONLY (путь оператора не для обычных
             пользователей; для не-crew панель даже не считается). storageKey —
@@ -1145,6 +1350,22 @@ export function LeadsClient({
               currentActorId={dbUser?.user_id || null}
               T={T}
             />
+            {/* «ПУТЬ ОПЕРАТОРА»: геймификационная лестница — по одному новому
+                шагу за смену (drip), завершение текущего шага открывает
+                следующий сразу (catch-up по очкам прозрачного лидерборда).
+                Состояние — в users.metadata.leads_path (см. prefs). */}
+            <div className="mt-5">
+              <LeadsPathPanel
+                progress={pathProgress}
+                state={pathState}
+                myPoints={pathStats.myPoints}
+                onStatePatch={(next) => {
+                  setPathState(next);
+                  prefsRef.current.savePath(next);
+                }}
+                T={T}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -1251,22 +1472,31 @@ export function LeadsClient({
         />
       )}
 
-      {/* ── Пагинация: «показано X из Y» + «Показать ещё» ──
-          Все вьюхи получают только visibleLeads; скрытые лиды догружаются
-          по LEADS_PAGE_SIZE за клик. У оператора всегда честный счётчик —
-          сколько лидов совпало с фильтрами и сколько ещё не показано. */}
-      {hiddenCount > 0 && (
+      {/* ── Серверная пагинация: «показано X из Y» + «Показать ещё» ──
+          Первая порция — только LEADS_PAGE_SIZE лучших лидов (сортировка
+          «лучшие сверху» на сервере); остальное дозагружается окнами.
+          Счётчик честный: pageInfo.total приходит с сервера по отфильтрованному
+          набору и тихо обновляется фоновым meta-рефрешем. */}
+      {pageInfo && pageInfo.hasMore && (
         <div className="flex flex-col items-center gap-2 py-4">
           <button
             type="button"
-            onClick={() => setVisibleCount((c) => c + LEADS_PAGE_SIZE)}
-            className="flex min-h-[44px] items-center rounded-xl border px-5 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99]"
+            onClick={loadMoreLeads}
+            disabled={isLoadingMore}
+            className="flex min-h-[44px] items-center gap-2 rounded-xl border px-5 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
             style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
           >
-            Показать ещё {Math.min(LEADS_PAGE_SIZE, hiddenCount)}
+            {isLoadingMore ? (
+              <>
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
+                Догружаю…
+              </>
+            ) : (
+              <>Показать ещё {Math.min(LEADS_PAGE_SIZE, pageInfo.total - visibleLeads.length)}</>
+            )}
           </button>
           <span className="text-[11px]" style={{ color: T.textFaint }}>
-            Показано {visibleLeads.length} из {sortedLeads.length} лидов
+            Показано {visibleLeads.length} из {pageInfo.total} лидов — лучшие уже наверху
           </span>
         </div>
       )}

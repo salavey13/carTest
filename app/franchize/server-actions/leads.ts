@@ -6,7 +6,24 @@ import { unstable_noStore as noStore } from "next/cache";
 import { computeLeadStage, computeQrStatus, computeAssignee, STAGE_NEXT_ACTION, matchTodosToLead } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { computeLeadLeaderboard, type LeadLeaderboardRow } from "@/app/franchize/lib/lead-events";
-import type { LeadRentalRow, LeadEventRow } from "@/app/franchize/[slug]/leads/leads-types";
+import type { LeadRentalRow, LeadSaleRow, LeadEventRow, LeadRow, LeadTodoRow, GetFranchizeLeadsResult, GetRentalDocVerificationResult, GetLeadsWindowOpts, LeadsAggregates, LeadsPageInfo } from "@/app/franchize/[slug]/leads/leads-types";
+// Изоморфное ядро запросов: ТЕ ЖЕ правила фильтрации/сортировки, что и на
+// клиенте, но применяются сервером при оконной выдаче (load best leads first).
+import {
+  filterLeads,
+  buildPriorityMap,
+  sortLeads,
+  categorizeLeads,
+  getAvailableSources,
+  matchStageFilter,
+  matchOwnerFilter,
+  placeholderHasActivity,
+  computeLeadsKpiCardsStats,
+} from "@/app/franchize/[slug]/leads/lib/leads-query-core";
+import { computeLeadKpi } from "@/app/franchize/[slug]/leads/lib/lead-kpi";
+import { buildNextActions } from "@/app/franchize/[slug]/leads/lib/lead-playbook";
+import { computeLeadAchievements } from "@/app/franchize/[slug]/leads/lib/lead-achievements";
+import { PIPELINE_STAGES } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 // NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
 // are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
 // poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
@@ -342,6 +359,14 @@ export async function getFranchizeLeads(
    * by itself.
    */
   authPassword?: string,
+  /**
+   * Оконная выдача (wave «load best leads first»): сервер фильтрует,
+   * сортирует («лучшие сверху») и отрезает окно offset..offset+limit,
+   * а агрегаты (KPI/воронка/плейбук/достижения) считает по ПОЛНОМУ
+   * набору — клиент не скачивает все 500+ лидов ради шести плиток.
+   * Без opts (или limit≤0) — легаси-режим «отдать всё».
+   */
+  windowOpts?: GetLeadsWindowOpts,
 ): Promise<GetFranchizeLeadsResult> {
   noStore();
   const safeSlug = slug.trim();
@@ -477,13 +502,13 @@ export async function getFranchizeLeads(
       // НАКОПИТЕЛЬНЫЕ факты клиента + лог чата (Lead Game wave) —
       // «подготовка за 5 минут» без открытия Авито.
       const clientFactsRaw = meta["clientFacts"];
-      const clientFacts =
+      const clientFacts: Record<string, string> | null =
         clientFactsRaw && typeof clientFactsRaw === "object" && !Array.isArray(clientFactsRaw)
           ? Object.fromEntries(
               Object.entries(clientFactsRaw as Record<string, unknown>)
                 .filter(([, v]) => typeof v === "string" && (v as string).trim())
                 .slice(0, 12),
-            )
+            ) as Record<string, string>
           : null;
       const messagesRaw = meta["messages"];
       const messages = Array.isArray(messagesRaw)
@@ -1929,13 +1954,178 @@ export async function getFranchizeLeads(
       logger.warn("[getFranchizeLeads] lead_events unavailable (migration pending?)", eventsError);
     }
 
+    // ── Оконная выдача (wave «load best leads first») ─────────────────────
+    // КЛИЕНТСКАЯ ПРОСЬБА: «too many leads to load all at once — load best
+    // leads quickly first with ability to load more». Раньше экшен отдавал
+    // ВСЕ лиды (~1MB JSON: 533 интента + 1000 туду) и клиент сам фильтрал/
+    // сортировал/резал страницы. Теперь при windowOpts.limit>0:
+    //   1) агрегаты (KPI/скорость/плейбук/воронка/достижения/счётчики)
+    //      считаются здесь, по ПОЛНОМУ набору — как раньше считал клиент;
+    //   2) список фильтруется и сортируется ТЕМИ ЖЕ чистыми функциями
+    //      (leads-query-core), и наружу уходит только окно offset..limit;
+    //   3) туду — только относящиеся к окну (карточки и шторка).
+    // Порядок сортировки детерминирован → конкатенация окон («Показать ещё»)
+    // остаётся глобально отсортированной.
+    let windowLeads: LeadRow[] | null = null;
+    let windowTodos: LeadTodoRow[] = dedupedTodos;
+    let pageInfo: LeadsPageInfo | undefined;
+    let agg: LeadsAggregates | undefined;
+
+    if (windowOpts && (windowOpts.limit ?? 0) > 0) {
+      const nowMs = Date.now();
+      const allLeads = Array.from(leadMap.values());
+
+      // Ведра «лид → его туду» — семантика 1:1 с клиентским useTodosMapping
+      // (rental_id сильнее; иначе — ЛЮБОЙ identity-кандидат туду ∈ ключей лида).
+      const todosByLead = new Map<string, LeadTodoRow[]>();
+      const pushTodoToLead = (leadId: string, t: LeadTodoRow): void => {
+        const bucket = todosByLead.get(leadId);
+        if (bucket) bucket.push(t);
+        else todosByLead.set(leadId, [t]);
+      };
+      for (const t of dedupedTodos) {
+        const todoRentalId = getTodoRentalId(t);
+        if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) {
+          pushTodoToLead(rentalIdToLeadId.get(todoRentalId) as string, t);
+          continue;
+        }
+        const matched = getTodoLeadIds(t).filter((id) => leadUserIds.has(id));
+        for (const id of matched) pushTodoToLead(id, t);
+      }
+      const getTodosForLeadSrv = (lead: LeadRow): LeadTodoRow[] => todosByLead.get(lead.user_id) ?? [];
+
+      // Базовый набор агрегатов = «активные лиды» (заглушки скрываются
+      // только когда оператор включил тумблер — паритет с клиентом).
+      const baseSet = windowOpts.hidePlaceholders
+        ? allLeads.filter((l) => placeholderHasActivity(l, getTodosForLeadSrv(l)))
+        : allLeads;
+
+      const kpi = computeLeadKpi(baseSet, dedupedTodos, nowMs);
+      // Плейбук — очередь «что делать сейчас» по ПОЛНОМУ набору (перезвоны
+      // и горячие за окном не должны исчезать из SOP).
+      const playbook = buildNextActions(baseSet, dedupedTodos, nowMs, 6);
+
+      // Счётчики сегментов тулбара: паритет с клиентом — «all» по базовому
+      // набору, остальные с учётом поиска/источника/сегмента.
+      const qSourceSegSet = filterLeads(
+        allLeads,
+        windowOpts.q || "",
+        windowOpts.source || "all",
+        windowOpts.segment || "all",
+        getTodosForLeadSrv,
+        !!windowOpts.hidePlaceholders,
+      );
+      const segCats = categorizeLeads(qSourceSegSet, getTodosForLeadSrv);
+
+      const stageBreakdown = PIPELINE_STAGES
+        .map((s) => ({
+          key: s.key as string,
+          label: s.label,
+          color: s.color,
+          count: baseSet.filter((l) => ((l.stageKey || "new") === s.key) ? true : false).length,
+        }))
+        .filter((s) => s.count > 0);
+
+      // Опции «Ответственный»: ростер + легаси-имена с лидов (паритет).
+      const ownerOpts = operators.map((o) => ({ value: o.id, label: o.name }));
+      const seenOwnerIds = new Set(ownerOpts.map((o) => o.value));
+      const seenOwnerNames = new Set(ownerOpts.map((o) => o.label));
+      for (const l of allLeads) {
+        const name = l.assigneeName || l.ownerName;
+        if (name && !seenOwnerNames.has(name) && !(l.assigneeId && seenOwnerIds.has(l.assigneeId))) {
+          ownerOpts.push({ value: name, label: name });
+          seenOwnerNames.add(name);
+        }
+      }
+      ownerOpts.sort((a, b) => a.label.localeCompare(b.label, "ru"));
+
+      agg = {
+        kpi,
+        kpiCards: computeLeadsKpiCardsStats(baseSet, dedupedTodos, nowMs),
+        playbook,
+        stageBreakdown,
+        segmentCounts: {
+          all: baseSet.length,
+          hot: segCats.hot.length,
+          warm: segCats.warm.length,
+          verified: segCats.verified.length,
+          troubled: qSourceSegSet.filter((l) => l.troubled).length,
+        },
+        availableSources: getAvailableSources(allLeads),
+        availableOwners: ownerOpts,
+        achievements: computeLeadAchievements(kpi),
+        totalActive: baseSet.length,
+      };
+
+      if (!windowOpts.metaOnly) {
+        // 1) Фильтры (те же чистые функции, что у клиента) …
+        let filtered = filterLeads(
+          allLeads,
+          windowOpts.q || "",
+          windowOpts.source || "all",
+          windowOpts.segment || "all",
+          getTodosForLeadSrv,
+          !!windowOpts.hidePlaceholders,
+        );
+        filtered = filtered.filter((l) => matchStageFilter(l, windowOpts.stage || "all"));
+        const ownerName = (windowOpts.owner && operators.find((o) => o.id === windowOpts.owner)?.name) || null;
+        filtered = filtered.filter((l) => matchOwnerFilter(l, windowOpts.owner || "all", ownerName));
+        // Счётчик «Показано X из Y» — по отфильтрованному набору (сортация
+        // на счётчик не влияет, для total достаточно длины).
+        const filteredTotal = filtered.length;
+        // 2) Сортировка «лучшие сверху» (по умолчанию — priority-индекс) …
+        const pMap = buildPriorityMap(filtered, getTodosForLeadSrv, nowMs);
+        filtered = sortLeads(filtered, windowOpts.sort || "priority", getTodosForLeadSrv, pMap, nowMs);
+        // 3) … и окно.
+        const offset = Math.max(0, Math.floor(windowOpts.offset ?? 0));
+        const limit = Math.max(1, Math.floor(windowOpts.limit as number));
+        windowLeads = filtered.slice(offset, offset + limit);
+
+        // Туду — только для лидов окна (дедуп по id, затем по ключу).
+        const collected = new Map<string, LeadTodoRow>();
+        for (const l of windowLeads) {
+          for (const t of todosByLead.get(l.user_id) ?? []) {
+            collected.set(t.id || `${t.lead_id || "?"}|${t.title}`, t);
+          }
+        }
+        windowTodos = Array.from(collected.values());
+
+        pageInfo = {
+          offset,
+          limit,
+          total: filteredTotal,
+          hasMore: offset + limit < filteredTotal,
+        };
+      } else {
+        // metaOnly: тихий фоновый рефреш агрегатов/счётчиков — окно не трогаем,
+        // но total пересчитываем (бейдж «+N новых» на «Показать ещё»).
+        const filteredForCount = filterLeads(
+          allLeads,
+          windowOpts.q || "",
+          windowOpts.source || "all",
+          windowOpts.segment || "all",
+          getTodosForLeadSrv,
+          !!windowOpts.hidePlaceholders,
+        ).filter((l) => matchStageFilter(l, windowOpts.stage || "all"));
+        windowTodos = [];
+        pageInfo = {
+          offset: Math.max(0, Math.floor(windowOpts.offset ?? 0)),
+          limit: Math.max(1, Math.floor(windowOpts.limit as number)),
+          total: filteredForCount.length,
+          hasMore: true, // точность не критична: окно клиента не заменяется
+        };
+      }
+    }
+
     return {
       success: true,
-      leads: Array.from(leadMap.values()),
-      todos: dedupedTodos,
+      leads: windowLeads ?? Array.from(leadMap.values()),
+      todos: windowTodos,
       operators,
       leadEvents,
       leaderboard,
+      ...(pageInfo ? { page: pageInfo } : {}),
+      ...(agg ? { agg } : {}),
     };
   } catch (error) {
     logger.error("[getFranchizeLeads] failed:", error);
