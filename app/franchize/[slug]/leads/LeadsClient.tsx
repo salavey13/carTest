@@ -13,6 +13,7 @@ import {
   applyLeadPathDrip,
   computeLeadPathProgress,
   DEFAULT_LEAD_PATH_STATE,
+  mergeLeadPathState,
   type LeadPathState,
 } from "./lib/lead-path";
 import { LeadsPathPanel } from "./components/LeadsPathPanel";
@@ -394,6 +395,9 @@ export function LeadsClient({
   const [leadsLoadError, setLeadsLoadError] = useState<string | null>(null);
   const [isFetchingLeads, setIsFetchingLeads] = useState(false);
   const [manualRetryTick, setManualRetryTick] = useState(0);
+  // «Обновлено HH:MM» — тихий 90-секундный meta-рефреш невидим, штамп возвращает
+  // оператору доверие: данные живые, хотя список не перерисовывается.
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   // Серверные агрегаты по ПОЛНОМУ набору + метаданные окна (total/hasMore).
   const [aggState, setAggState] = useState<LeadsAggregates | null>(null);
   const [pageInfo, setPageInfo] = useState<LeadsPageInfo | null>(null);
@@ -492,6 +496,7 @@ export function LeadsClient({
               // Тихий рефреш: ТОЛЬКО агрегаты и счётчик total.
               if (freshAgg) setAggState(freshAgg);
               if (freshPage) setPageInfo(freshPage);
+              setLastSyncAt(Date.now());
               return true;
             }
 
@@ -517,6 +522,7 @@ export function LeadsClient({
             setLeadEvents(freshEvents);
             setLeaderboard(freshBoard);
             setLeadsLoadError(null);
+            setLastSyncAt(Date.now()); // штамп «обновлено HH:MM» в футере списка
 
             // Кэш-сквозная запись: память (LRU) + sessionStorage (перезагрузка).
             const entry: LeadsCacheEntry = {
@@ -564,9 +570,10 @@ export function LeadsClient({
 
   // ── Prefs: фильтры и «Путь оператора» в users.metadata (jsonb) ────────────
   // КЛИЕНТСКАЯ ПРОСЬБА: «save filters settings upon page reload». Хук читает
-  // metadata.leads_ui/leads_path при авторизации (fallback — localStorage),
-  // сохранение — debounced-эффект ниже.
-  const { prefsResolution, saveFilters, savePath } = useLeadsUserPrefs({
+  // metadata.leads_ui/leads_path при авторизации (fallback — localStorage) и
+  // владеет всей логикой записи: debounce 800 мс, флэш при уходе со страницы
+  // (keepalive), ретрай сбоя, защита серверных настроек от дефолтов.
+  const { prefsResolution, saveFilters, savePath, saveFlash } = useLeadsUserPrefs({
     slug,
     isAuthed,
     hasTelegramIdentity: !!dbUser?.user_id,
@@ -587,7 +594,20 @@ export function LeadsClient({
   useEffect(() => {
     if (!prefsResolution || appliedPrefsRef.current === prefsResolution) return;
     appliedPrefsRef.current = prefsResolution;
-    const p = prefsResolution.prefs;
+    // CODE REVIEW FIX: если оператор успел потрогать фильтры до прихода
+    // резолюции (медленная сеть, ручной повтор) — его живое состояние
+    // важнее приехавшего снимка: фильтры не затираем.
+    const touched =
+      searchQuery !== "" ||
+      debouncedSearchQuery !== "" ||
+      filterSource !== "all" ||
+      filterStage !== "all" ||
+      filterOwner !== "all" ||
+      segment !== "all" ||
+      hidePlaceholders !== false ||
+      sortMode !== "priority" ||
+      viewMode !== "list";
+    const p = touched ? null : prefsResolution.prefs;
     if (p) {
       if (typeof p.q === "string") {
         setSearchQuery(p.q);
@@ -605,12 +625,15 @@ export function LeadsClient({
       }
       if (p.viewMode === "list" || p.viewMode === "board" || p.viewMode === "table") setViewMode(p.viewMode);
     }
-    setPathState(prefsResolution.path);
+    // CODE REVIEW FIX: путь МЕРЖИМ, а не перезаписываем — drip/празднования,
+    // случившиеся локально (или на другом устройстве), не откатываются
+    // старым снимком при повторной резолюции («Повторить загрузку»).
+    setPathState((prev) => mergeLeadPathState(prev, prefsResolution.path));
     if (!prefsSettledRef.current) {
       prefsSettledRef.current = true;
       setPrefsSettled(true);
     }
-  }, [prefsResolution]);
+  }, [prefsResolution, searchQuery, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode, viewMode]);
 
   // ── Загрузка: первая (после применения prefs) и при смене фильтров ────────
   // SWR: мгновенно рисуем из кэша (память → sessionStorage); свежий (< TTL) —
@@ -659,21 +682,20 @@ export function LeadsClient({
   ]);
 
   // ── Debounced-сохранение фильтров в metadata jsonb + localStorage ──────────
+  // Дебаунс (800 мс), флэш при уходе со страницы (keepalive) и ретрай сбоя —
+  // внутри useLeadsUserPrefs. Здесь только отражение текущего состояния.
   useEffect(() => {
     if (!prefsSettled) return; // не сохраняем, пока не восстановили
-    const t = setTimeout(() => {
-      prefsRef.current.saveFilters({
-        q: debouncedSearchQuery || undefined,
-        source: filterSource,
-        stage: filterStage,
-        owner: filterOwner,
-        segment,
-        hidePlaceholders,
-        sortMode,
-        viewMode,
-      });
-    }, 800);
-    return () => clearTimeout(t);
+    prefsRef.current.saveFilters({
+      q: debouncedSearchQuery || undefined,
+      source: filterSource,
+      stage: filterStage,
+      owner: filterOwner,
+      segment,
+      hidePlaceholders,
+      sortMode,
+      viewMode,
+    });
   }, [prefsSettled, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode, viewMode]);
 
   // ── «Показать ещё»: дозагрузка следующего окна с сервера ───────────────────
@@ -844,6 +866,23 @@ export function LeadsClient({
     }, 100);
     return () => clearTimeout(timer);
   }, [selectedId]);
+
+  // «/» — мгновенный фокус в поиск (привычка операторов-десктопщиков).
+  // Не мешаем, если фокус уже в поле ввода/редакторе.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const el = document.getElementById("leads-search-input");
+      if (el) {
+        e.preventDefault();
+        (el as HTMLInputElement).focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Dismiss lead — opens the DismissLeadDialog confirmation modal first.
   // The actual DELETE call happens in `confirmDismissLead` after the operator
@@ -1425,6 +1464,19 @@ export function LeadsClient({
         />
       </div>
 
+      {/* Однократная подсказка после первого успешного сохранения настроек:
+          оператор видит, что фильтры/вид запоминаются между сменами. */}
+      {saveFlash && (
+        <div className="flex justify-end px-1 pt-1">
+          <span
+            className="rounded-full border px-2.5 py-1 text-[11px]"
+            style={{ borderColor: T.border, color: T.textFaint, backgroundColor: T.bgCard }}
+          >
+            ✓ Фильтры и вид запоминаются автоматически
+          </span>
+        </div>
+      )}
+
       {viewMode === "board" ? (
         <LeadBoard
           leads={visibleLeads}
@@ -1476,27 +1528,35 @@ export function LeadsClient({
           Первая порция — только LEADS_PAGE_SIZE лучших лидов (сортировка
           «лучшие сверху» на сервере); остальное дозагружается окнами.
           Счётчик честный: pageInfo.total приходит с сервера по отфильтрованному
-          набору и тихо обновляется фоновым meta-рефрешем. */}
-      {pageInfo && pageInfo.hasMore && (
+          набору и тихо обновляется фоновым meta-рефрешем. Строка видна
+          всегда (не только при hasMore) — она же даёт штамп «обновлено
+          HH:MM» от тихого 90-секундного рефреша. */}
+      {pageInfo && (
         <div className="flex flex-col items-center gap-2 py-4">
-          <button
-            type="button"
-            onClick={loadMoreLeads}
-            disabled={isLoadingMore}
-            className="flex min-h-[44px] items-center gap-2 rounded-xl border px-5 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
-            style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
-          >
-            {isLoadingMore ? (
-              <>
-                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
-                Догружаю…
-              </>
-            ) : (
-              <>Показать ещё {Math.min(LEADS_PAGE_SIZE, pageInfo.total - visibleLeads.length)}</>
-            )}
-          </button>
+          {pageInfo.hasMore && (
+            <button
+              type="button"
+              onClick={loadMoreLeads}
+              disabled={isLoadingMore}
+              className="flex min-h-[44px] items-center gap-2 rounded-xl border px-5 py-2 text-sm font-semibold transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+              style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
+            >
+              {isLoadingMore ? (
+                <>
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
+                  Догружаю…
+                </>
+              ) : (
+                <>Показать ещё {Math.min(LEADS_PAGE_SIZE, pageInfo.total - visibleLeads.length)}</>
+              )}
+            </button>
+          )}
           <span className="text-[11px]" style={{ color: T.textFaint }}>
-            Показано {visibleLeads.length} из {pageInfo.total} лидов — лучшие уже наверху
+            Показано {visibleLeads.length} из {pageInfo.total} лидов
+            {pageInfo.hasMore ? " — лучшие уже наверху" : ""}
+            {lastSyncAt
+              ? ` · обновлено ${new Date(lastSyncAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+              : ""}
           </span>
         </div>
       )}

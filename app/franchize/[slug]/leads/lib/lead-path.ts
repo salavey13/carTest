@@ -105,6 +105,27 @@ export function applyLeadPathDrip(
   };
 }
 
+/**
+ * Слияние двух состояний пути — защита прогресса от регрессии. Приходит
+ * старый снимок с сервера (ручной «Повторить загрузку», второе устройство,
+ * зеркало localStorage) — локальные достижения не откатываются:
+ *   • revealed — МАКСИМУМ (открытые шаги не закрываются обратно);
+ *   • lastRevealDay — более поздняя дата (свежий drip приоритетнее);
+ *   • celebrated — объединение (шаг празднуется ровно один раз).
+ */
+export function mergeLeadPathState(a: LeadPathState, b: LeadPathState): LeadPathState {
+  const dayNum = (d: string | null): number => (d ? Number(d.replace(/-/g, "")) : 0);
+  let lastRevealDay: string | null;
+  if (!a.lastRevealDay) lastRevealDay = b.lastRevealDay;
+  else if (!b.lastRevealDay) lastRevealDay = a.lastRevealDay;
+  else lastRevealDay = dayNum(b.lastRevealDay) >= dayNum(a.lastRevealDay) ? b.lastRevealDay : a.lastRevealDay;
+  return {
+    revealed: Math.max(a.revealed || 0, b.revealed || 0),
+    lastRevealDay,
+    celebrated: Array.from(new Set([...(a.celebrated || []), ...(b.celebrated || [])])),
+  };
+}
+
 /** Сколько шагов завершено по статистике (пороговые, подряд с начала). */
 export function countLeadPathDone(steps: LeadPathStep[], stats: LeadPathStats): number {
   let done = 0;

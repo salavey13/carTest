@@ -159,8 +159,10 @@ export function LeadsToolbar({
             style={{ color: T.textFaint }}
           />
           <input
+            id="leads-search-input"
             type="text"
             placeholder="Имя, телефон, байк, Telegram…"
+            title="Быстрый поиск · клавиша /"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border py-2.5 pl-10 pr-9 text-sm outline-none transition focus:ring-2 focus:ring-offset-0"

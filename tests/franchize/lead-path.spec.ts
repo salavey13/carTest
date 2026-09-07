@@ -12,6 +12,7 @@ import {
   DEFAULT_LEAD_PATH_STATE,
   isLeadPathStepDone,
   leadPathTodayKey,
+  mergeLeadPathState,
   type LeadPathStats,
   type LeadPathState,
 } from "@/app/franchize/[slug]/leads/lib/lead-path";
@@ -161,5 +162,44 @@ describe("computeLeadPathProgress: видимость и catch-up", () => {
     // Шаг 1 — текущий (первый незакрытый), шаги 2–4 — открытые подсказки.
     expect(res.views[1]).toBe("current");
     expect(res.views[2]).toBe("open");
+  });
+});
+
+describe("mergeLeadPathState: прогресс не откатывается старым снимком", () => {
+  it("revealed — максимум из двух состояний", () => {
+    const local: LeadPathState = { revealed: 4, lastRevealDay: "2026-09-08", celebrated: ["first-touch"] };
+    const remote: LeadPathState = { revealed: 2, lastRevealDay: "2026-09-05", celebrated: [] };
+    const merged = mergeLeadPathState(local, remote);
+    expect(merged.revealed).toBe(4);
+    // Обратный порядок — тот же результат (коммутативность).
+    expect(mergeLeadPathState(remote, local).revealed).toBe(4);
+  });
+
+  it("lastRevealDay — более поздняя дата; null не затирает значение", () => {
+    const local: LeadPathState = { revealed: 2, lastRevealDay: "2026-09-08", celebrated: [] };
+    const remote: LeadPathState = { revealed: 2, lastRevealDay: "2026-09-10", celebrated: [] };
+    expect(mergeLeadPathState(local, remote).lastRevealDay).toBe("2026-09-10");
+    expect(mergeLeadPathState(remote, local).lastRevealDay).toBe("2026-09-10");
+    // null с одной стороны — берём ненулевое значение
+    const fresh: LeadPathState = { revealed: 1, lastRevealDay: null, celebrated: [] };
+    expect(mergeLeadPathState(local, fresh).lastRevealDay).toBe("2026-09-08");
+    expect(mergeLeadPathState(fresh, local).lastRevealDay).toBe("2026-09-08");
+    // оба null — остаётся null
+    expect(mergeLeadPathState(fresh, fresh).lastRevealDay).toBeNull();
+  });
+
+  it("celebrated — объединение без дублей", () => {
+    const local: LeadPathState = { revealed: 3, lastRevealDay: null, celebrated: ["start", "first-touch"] };
+    const remote: LeadPathState = { revealed: 2, lastRevealDay: null, celebrated: ["first-touch", "call-back"] };
+    const merged = mergeLeadPathState(local, remote);
+    expect(merged.celebrated).toEqual(["start", "first-touch", "call-back"]);
+  });
+
+  it("дефолт + серверное состояние → серверный прогресс сохраняется", () => {
+    const remote: LeadPathState = { revealed: 6, lastRevealDay: "2026-09-07", celebrated: ["start", "first-touch", "call-back"] };
+    const merged = mergeLeadPathState(DEFAULT_LEAD_PATH_STATE, remote);
+    expect(merged.revealed).toBe(6);
+    expect(merged.lastRevealDay).toBe("2026-09-07");
+    expect(merged.celebrated).toHaveLength(3);
   });
 });
