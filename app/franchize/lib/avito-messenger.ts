@@ -43,53 +43,127 @@ const AVITO_TOKEN_SCOPE = "messenger:read messenger:write";
 /** Avito режет слишком длинные сообщения — страхуемся на своей стороне. */
 export const AVITO_MESSAGE_MAX_LENGTH = 3000;
 
-// ── Token cache (in-memory, per serverless instance) ────────────────────────
+// ── Multi-account (несколько кабинетов Авито) ───────────────────────────────
+//
+// Сегодняшний аккаунт аренды (rental) — дефолт: AVITO_CLIENT_ID/SECRET/USER_ID.
+// Когда подключится второй аккаунт (например продажи, «sale»), webhook начнёт
+// помечать лиды metadata.avitoAccount=<key> (ключ берётся из ?acc=<key> в URL
+// вебхука), а в env добавляются ТРИ переменные на аккаунт:
+//   AVITO_ACCOUNT_<KEY>_CLIENT_ID / _CLIENT_SECRET / _USER_ID
+// (например AVITO_ACCOUNT_SALE_USER_ID). Ответ в чат уходит от имени того
+// аккаунта, которому принадлежит чат, — фолбэка на дефолт нет сознательно:
+// чужой аккаунт всё равно фейлится на стороне Авито, а явная ошибка конфига
+// быстрее приведёт к правильным env.
 
-let tokenCache: { token: string; expiresAt: number } | null = null;
+const DEFAULT_AVITO_ACCOUNT = "rental";
+
+export interface AvitoAccountCreds {
+  /** Нормализованный ключ аккаунта ("rental", "sale", …). */
+  key: string;
+  clientId: string;
+  clientSecret: string;
+  userId: string;
+  /** Имена ОТСУТСТВУЮЩИХ env-переменных для этого аккаунта. */
+  missing: string[];
+}
+
+export function normalizeAvitoAccountKey(raw?: string | null): string {
+  const key = (raw || "").trim().toLowerCase();
+  return key || DEFAULT_AVITO_ACCOUNT;
+}
+
+function accountEnvNames(key: string): [string, string, string] {
+  const upper = key.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  return [
+    `AVITO_ACCOUNT_${upper}_CLIENT_ID`,
+    `AVITO_ACCOUNT_${upper}_CLIENT_SECRET`,
+    `AVITO_ACCOUNT_${upper}_USER_ID`,
+  ];
+}
+
+/**
+ * Креды для аккаунта: "rental" (или пусто — старые лиды без метки) →
+ * дефолтные AVITO_*; любой другой ключ → AVITO_ACCOUNT_<KEY>_*. missing
+ * перечисляет, каких env не хватает (роут отдаст понятную 503).
+ */
+export function resolveAvitoAccountCreds(rawKey?: string | null): AvitoAccountCreds {
+  const key = normalizeAvitoAccountKey(rawKey);
+  if (key === DEFAULT_AVITO_ACCOUNT) {
+    const missing: string[] = [];
+    if (!process.env.AVITO_CLIENT_ID) missing.push("AVITO_CLIENT_ID");
+    if (!process.env.AVITO_CLIENT_SECRET) missing.push("AVITO_CLIENT_SECRET");
+    if (!process.env.AVITO_USER_ID) missing.push("AVITO_USER_ID");
+    return {
+      key,
+      clientId: process.env.AVITO_CLIENT_ID || "",
+      clientSecret: process.env.AVITO_CLIENT_SECRET || "",
+      userId: process.env.AVITO_USER_ID || "",
+      missing,
+    };
+  }
+  const [idEnv, secretEnv, userEnv] = accountEnvNames(key);
+  const clientId = process.env[idEnv] || "";
+  const clientSecret = process.env[secretEnv] || "";
+  const userId = process.env[userEnv] || "";
+  const missing: string[] = [];
+  if (!clientId) missing.push(idEnv);
+  if (!clientSecret) missing.push(secretEnv);
+  if (!userId) missing.push(userEnv);
+  return { key, clientId, clientSecret, userId, missing };
+}
+
+// ── Token cache (in-memory, per serverless instance, per account) ──────────
+
+const tokenCacheByAccount = new Map<string, { token: string; expiresAt: number }>();
 
 /**
  * Возвращает человекочитаемое описание НЕДОСТАЮЩЕЙ конфигурации или null,
  * если исходящая отправка настроена. Используется роутом, чтобы отдать
- * оператору понятную ошибку вместо сырости «500».
+ * оператору понятную ошибку вместо сырости «500». accountKey — метка
+ * аккаунта из metadata лида (см. resolveAvitoAccountCreds).
  */
-export function avitoReplyConfigError(): string | null {
-  const missing: string[] = [];
-  if (!process.env.AVITO_CLIENT_ID) missing.push("AVITO_CLIENT_ID");
-  if (!process.env.AVITO_CLIENT_SECRET) missing.push("AVITO_CLIENT_SECRET");
-  if (!process.env.AVITO_USER_ID) missing.push("AVITO_USER_ID");
-  if (missing.length === 0) return null;
+export function avitoReplyConfigError(accountKey?: string | null): string | null {
+  const creds = resolveAvitoAccountCreds(accountKey);
+  if (creds.missing.length === 0) return null;
+  const suffix =
+    creds.key === DEFAULT_AVITO_ACCOUNT ? "" : ` для аккаунта «${creds.key}»`;
   return (
-    `Отправка в Авито не настроена: нет ${missing.join(", ")} в окружении. ` +
-    "Добавьте client_id/client_secret приложения с developers.avito.ru " +
-    "(скоп messenger:write) и user_id профиля продавца."
+    `Отправка в Авито не настроена${suffix}: нет ${creds.missing.join(", ")} в окружении. ` +
+    "Добавьте client_id/client_secret приложения с нужным скоупом " +
+    "messenger:write и user_id профиля продавца — владельца чата."
   );
 }
 
 /** Токен есть и не истечёт в ближайшие 60 секунд. */
-function cachedToken(): string | null {
-  if (!tokenCache) return null;
-  if (Date.now() >= tokenCache.expiresAt - 60_000) return null;
-  return tokenCache.token;
+function cachedToken(accountKey: string): string | null {
+  const entry = tokenCacheByAccount.get(accountKey);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt - 60_000) return null;
+  return entry.token;
 }
 
 /**
  * client_credentials → access_token. force=true — перевыпустить, игнорируя
  * кеш (используется после 401: токен могли отозвать/перевыпустить скоупы).
  */
-export async function getAvitoAccessToken(force = false): Promise<string> {
+export async function getAvitoAccessToken(
+  force = false,
+  accountKey?: string | null,
+): Promise<string> {
+  const creds = resolveAvitoAccountCreds(accountKey);
   if (!force) {
-    const cached = cachedToken();
+    const cached = cachedToken(creds.key);
     if (cached) return cached;
   }
-  const clientId = process.env.AVITO_CLIENT_ID;
-  const clientSecret = process.env.AVITO_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    throw new Error(avitoReplyConfigError() || "AVITO_CLIENT_ID/SECRET не настроены");
+  if (!creds.clientId || !creds.clientSecret) {
+    throw new Error(
+      avitoReplyConfigError(creds.key) || "AVITO_CLIENT_ID/SECRET не настроены",
+    );
   }
   const credentials = {
     grant_type: "client_credentials",
-    client_id: clientId,
-    client_secret: clientSecret,
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
   };
   const headers = { "Content-Type": "application/x-www-form-urlencoded" };
   // Попытка 1 — со скоупами (обязательно для новых API-ключей из кабинета).
@@ -118,13 +192,13 @@ export async function getAvitoAccessToken(force = false): Promise<string> {
   const token = json.access_token;
   if (!token) throw new Error("Avito token response has no access_token");
   const expiresIn = typeof json.expires_in === "number" ? json.expires_in : 86_400;
-  tokenCache = { token, expiresAt: Date.now() + expiresIn * 1000 };
+  tokenCacheByAccount.set(creds.key, { token, expiresAt: Date.now() + expiresIn * 1000 });
   return token;
 }
 
 /** Только для тестов: сбросить кеш токена между кейсами. */
 export function resetAvitoTokenCacheForTests(): void {
-  tokenCache = null;
+  tokenCacheByAccount.clear();
 }
 
 // ── Send message ────────────────────────────────────────────────────────────
@@ -168,9 +242,10 @@ function friendlySendError(status: number, bodyText: string): string {
 export async function sendAvitoChatMessage(
   chatId: string,
   text: string,
+  accountKey?: string | null,
 ): Promise<AvitoSendResult> {
-  const userId = process.env.AVITO_USER_ID;
-  const configError = avitoReplyConfigError();
+  const userId = resolveAvitoAccountCreds(accountKey).userId;
+  const configError = avitoReplyConfigError(accountKey);
   if (configError) return { ok: false, error: configError };
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: "Пустой текст сообщения" };
@@ -184,9 +259,12 @@ export async function sendAvitoChatMessage(
   for (let attempt = 0; attempt < 2; attempt++) {
     let token: string;
     try {
-      token = await getAvitoAccessToken(attempt > 0);
+      token = await getAvitoAccessToken(attempt > 0, accountKey);
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "Ошибка получения токена Avito" };
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Ошибка получения токена Avito",
+      };
     }
     try {
       const res = await fetch(

@@ -129,6 +129,20 @@ function secretProvided(request: NextRequest): string | null {
   );
 }
 
+/**
+ * Ключ аккаунта Авито (?acc=<key> в URL вебхука). Когда подключается второй
+ * аккаунт (например «sale»), его вебхук регистрируется со своим ?acc= — лид
+ * получает metadata.avitoAccount, и ответ в чат уходит от кредов этого
+ * аккаунта (AVITO_ACCOUNT_<KEY>_* env, см. avito-messenger.ts).
+ * Пусто/невалидно → «rental» (аккаунт аренды, дефолтные AVITO_* env).
+ */
+function accountKeyFromRequest(request: NextRequest): string {
+  const raw = (request.nextUrl.searchParams.get("acc") || "").trim().toLowerCase();
+  if (!raw) return "rental";
+  // Ключ попадает и в metadata, и в имена env — разрешаем только безопасные.
+  return /^[a-z0-9_-]{1,32}$/.test(raw) ? raw : "rental";
+}
+
 function checkSecret(request: NextRequest): boolean {
   const expected = process.env.AVITO_WEBHOOK_SECRET;
   if (!expected) {
@@ -181,8 +195,10 @@ async function createLead(input: {
   client?: AvitoWebhookBody["client"];
   /** AI-анализ сообщения (санитизированный) — в metadata.analysis. */
   analysis?: Record<string, unknown> | null;
+  /** Ключ аккаунта Авито (?acc= вебхука) — в metadata.avitoAccount. */
+  accountKey?: string;
 }): Promise<void> {
-  const { value, eventId, now, extra, phone, client, analysis } = input;
+  const { value, eventId, now, extra, phone, client, analysis, accountKey } = input;
   const leadScore = sanitizeScore(client?.score);
   // Avito никогда не отдаёт телефон покупателя через API (privacy) — но часто
   // покупатель сам пишет его в чате. Достаём из текста, если явно не передан
@@ -206,6 +222,8 @@ async function createLead(input: {
     avitoUserId: value.buyer_id ?? null,
     avitoItemId: value.item_id ?? null,
     avitoChatType: value.chat_type ?? null,
+    // Какой кабинет Авито владеет чатом (ответ в чат уходит его кредами).
+    ...(accountKey ? { avitoAccount: accountKey } : {}),
     bikeTitle: truncate(value.item_title, 200),
     itemPrice: typeof value.item_price === "number" ? value.item_price : null,
     firstMessage: truncate(value.text, 1000),
@@ -693,7 +711,14 @@ export async function POST(request: NextRequest) {
 
     if (!fromBuyer) return ack();
 
-    await createLead({ value, eventId: body.id ?? null, now, client: body.client, analysis });
+    await createLead({
+      value,
+      eventId: body.id ?? null,
+      now,
+      client: body.client,
+      analysis,
+      accountKey: accountKeyFromRequest(request),
+    });
     notifyCrewOwnerAsync({
       name: buyerDisplayName(value, body.client?.name),
       bikeTitle: truncate(value.item_title, 200),

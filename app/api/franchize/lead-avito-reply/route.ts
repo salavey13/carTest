@@ -94,13 +94,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Конфиг проверяем ДО похода в БД: не настроено — честная 503 с подсказкой.
-    const configError = avitoReplyConfigError();
-    if (configError) {
-      return NextResponse.json({ success: false, error: configError }, { status: 503 });
-    }
-
     // Лид должен существовать, быть авито-лидом этого экипажа и этого чата.
+    // АККАУНТ: metadata.avitoAccount определяет, ЧЬИ креды отправят ответ
+    // (несколько кабинетов Авито: аренда/продажа, см. avito-messenger.ts).
     const { data: intent, error: lookupError } = await supabaseAdmin
       .from("franchize_intents")
       .select("id, slug, contact_channel, metadata")
@@ -125,8 +121,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Отправка ──────────────────────────────────────────────────────────
-    const sent = await sendAvitoChatMessage(chatId, trimmed);
+    // Конфиг (с учётом аккаунта лида) проверяем перед отправкой: не настроено —
+    // честная 503 с подсказкой, каких именно env не хватает.
+    const prevMeta =
+      intent.metadata && typeof intent.metadata === "object"
+        ? (intent.metadata as Record<string, unknown>)
+        : {};
+    const accountKey =
+      typeof prevMeta.avitoAccount === "string" && prevMeta.avitoAccount.trim()
+        ? prevMeta.avitoAccount.trim()
+        : null;
+    const configError = avitoReplyConfigError(accountKey);
+    if (configError) {
+      return NextResponse.json({ success: false, error: configError }, { status: 503 });
+    }
+
+    const sent = await sendAvitoChatMessage(chatId, trimmed, accountKey);
     if (!sent.ok) {
       logger.warn("[lead-avito-reply] avito send failed", { chatId, error: sent.error });
       return NextResponse.json({ success: false, error: sent.error }, { status: 502 });
@@ -134,10 +144,6 @@ export async function POST(request: NextRequest) {
 
     // ── Лог чата + метка последнего ответа ────────────────────────────────
     const nowIso = new Date().toISOString();
-    const prevMeta =
-      intent.metadata && typeof intent.metadata === "object"
-        ? (intent.metadata as Record<string, unknown>)
-        : {};
     const prevMessages = Array.isArray(prevMeta.messages) ? prevMeta.messages : [];
     // Дедуп: режем ПРОШЛЫЕ seller-реплики с тем же текстом (webhook-эхо могло
     // уже дописать её между отправкой и нашим апдейтом) и аппендим свежую.

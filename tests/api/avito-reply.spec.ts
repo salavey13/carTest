@@ -67,12 +67,25 @@ import {
   getAvitoAccessToken,
 } from "@/app/franchize/lib/avito-messenger";
 
-const ENV_KEYS = ["AVITO_CLIENT_ID", "AVITO_CLIENT_SECRET", "AVITO_USER_ID"] as const;
+const ENV_KEYS = [
+  "AVITO_CLIENT_ID",
+  "AVITO_CLIENT_SECRET",
+  "AVITO_USER_ID",
+  "AVITO_ACCOUNT_SALE_CLIENT_ID",
+  "AVITO_ACCOUNT_SALE_CLIENT_SECRET",
+  "AVITO_ACCOUNT_SALE_USER_ID",
+] as const;
 
 function setAvitoEnv() {
   process.env.AVITO_CLIENT_ID = "cid";
   process.env.AVITO_CLIENT_SECRET = "csecret";
   process.env.AVITO_USER_ID = "167526519";
+}
+
+function setSaleAccountEnv() {
+  process.env.AVITO_ACCOUNT_SALE_CLIENT_ID = "sale-cid";
+  process.env.AVITO_ACCOUNT_SALE_CLIENT_SECRET = "sale-csecret";
+  process.env.AVITO_ACCOUNT_SALE_USER_ID = "363186771";
 }
 
 function postRequest(body: unknown): NextRequest {
@@ -255,6 +268,50 @@ describe("POST /api/franchize/lead-avito-reply", () => {
     expect(tokenCallCount).toBe(2); // токен перевыпущен
     expect(sendCalls).toHaveLength(2); // отправка повторена
   });
+
+  test("второй аккаунт: metadata.avitoAccount=sale → отправка кредами sale-аккаунта", async () => {
+    setSaleAccountEnv();
+    mocks.existingIntent = {
+      ...mocks.existingIntent!,
+      metadata: {
+        avitoAccount: "sale",
+        messages: [{ at: "2026-09-07T10:00:00Z", from: "buyer", text: "Свободен?" }],
+      },
+    };
+    const tokenBodies: string[] = [];
+    (global.fetch as any).mockImplementation(async (url: string, init?: any) => {
+      if (String(url).endsWith("/token")) {
+        tokenBodies.push(String(init?.body));
+        return new Response(JSON.stringify({ access_token: "tok-sale", expires_in: 86400 }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: "msg-sale" }), { status: 200 });
+    });
+    const res = await POST(postRequest(BASE_BODY));
+    expect(res.status).toBe(200);
+    // Токен минтился с sale-кредов
+    expect(tokenBodies).toHaveLength(1);
+    expect(new URLSearchParams(tokenBodies[0]).get("client_id")).toBe("sale-cid");
+    // Отправка — от user_id sale-аккаунта
+    const sendCall = (global.fetch as any).mock.calls.find(([url]: any) =>
+      String(url).includes("/messenger/v1/accounts/363186771/chats/"),
+    );
+    expect(sendCall).toBeTruthy();
+  });
+
+  test("второй аккаунт без env → 503 с именами AVITO_ACCOUNT_SALE_*", async () => {
+    mocks.existingIntent = {
+      ...mocks.existingIntent!,
+      metadata: {
+        avitoAccount: "sale",
+        messages: [{ at: "2026-09-07T10:00:00Z", from: "buyer", text: "Свободен?" }],
+      },
+    };
+    const res = await POST(postRequest(BASE_BODY));
+    expect(res.status).toBe(503);
+    const json = await res.json();
+    expect(json.error).toContain("AVITO_ACCOUNT_SALE_CLIENT_ID");
+    expect(json.error).toContain("sale");
+  });
 });
 
 describe("avito-messenger: token cache", () => {
@@ -310,5 +367,29 @@ describe("avito-messenger: token cache", () => {
     expect(tokenBodies).toHaveLength(2);
     expect(new URLSearchParams(tokenBodies[0]).get("scope")).toBe("messenger:read messenger:write");
     expect(new URLSearchParams(tokenBodies[1]).get("scope")).toBeNull();
+  });
+
+  test("кеш токена ПЕР-АККАУНТНЫЙ: rental и sale минтятся независимо, креды не путаются", async () => {
+    setSaleAccountEnv();
+    const tokenBodies: string[] = [];
+    (global.fetch as any).mockImplementation(async (url: string, init?: any) => {
+      if (String(url).endsWith("/token")) {
+        tokenBodies.push(String(init?.body));
+        return new Response(JSON.stringify({ access_token: `tok-${tokenBodies.length}`, expires_in: 86400 }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: "m" }), { status: 200 });
+    });
+    resetAvitoTokenCacheForTests();
+    const rental1 = await getAvitoAccessToken();
+    const sale1 = await getAvitoAccessToken(false, "sale");
+    const rental2 = await getAvitoAccessToken(); // из кеша rental
+    const sale2 = await getAvitoAccessToken(false, "sale"); // из кеша sale
+    expect(rental1).toBe("tok-1");
+    expect(sale1).toBe("tok-2");
+    expect(rental2).toBe("tok-1");
+    expect(sale2).toBe("tok-2");
+    expect(tokenBodies).toHaveLength(2);
+    expect(new URLSearchParams(tokenBodies[0]).get("client_id")).toBe("cid");
+    expect(new URLSearchParams(tokenBodies[1]).get("client_id")).toBe("sale-cid");
   });
 });
