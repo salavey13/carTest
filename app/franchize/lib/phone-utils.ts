@@ -41,3 +41,38 @@ export function normalizePhoneDigits(rawPhone: string | null | undefined): strin
   }
   return digits;
 }
+
+/**
+ * Best-effort phone extraction from free text (Avito chat messages, forwards).
+ *
+ * Avito never exposes the buyer's phone via the messenger API (privacy), but
+ * buyers very often type it into the chat ("звоните +7 912 345-67-89").
+ * This helper pulls the first plausible RU phone out of that text so the
+ * webhook can backfill the lead's `phone` column.
+ *
+ * Conservative by design — a wrong phone is worse than no phone:
+ *  - only digit runs of 10-11 digits (with spaces/dashes/parens allowed);
+ *  - the run must not be glued to letters (otherwise ids like "u2i-…" or
+ *    "abc89001234567" would produce junk);
+ *  - after normalization it must be a RU MOBILE number (+79XXXXXXXXX) —
+ *    buyers give mobiles, and this single rule also rejects Avito item ids
+ *    (10 digits starting with 3), order numbers and glued timestamps.
+ * Returns the normalized "+79XXXXXXXXX" or null.
+ */
+export function extractPhoneFromText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const candidates = String(text).match(
+    /(?<![\dA-Za-zА-Яа-яЁё])\+?\d[\d\s\-().]{7,18}\d(?![\dA-Za-zА-Яа-яЁё])/g,
+  );
+  if (!candidates) return null;
+  for (const candidate of candidates) {
+    const normalized = normalizePhone(candidate);
+    if (!normalized) continue;
+    // RU mobiles only: +7 followed by 9 and 9 more digits. One rule rejects
+    // everything else plausibly phone-shaped: Avito item ids (3XXXXXXXXX),
+    // order numbers, timestamps, hotline/city numbers (a "lead phone" of
+    // 8-800-… would be useless anyway).
+    if (/^\+79\d{9}$/.test(normalized)) return normalized;
+  }
+  return null;
+}

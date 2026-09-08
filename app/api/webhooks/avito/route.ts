@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 
 import { logger } from "@/lib/logger";
-import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+import {
+  extractPhoneFromText,
+  normalizePhone,
+} from "@/app/franchize/lib/phone-utils";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
 import {
@@ -181,6 +184,11 @@ async function createLead(input: {
 }): Promise<void> {
   const { value, eventId, now, extra, phone, client, analysis } = input;
   const leadScore = sanitizeScore(client?.score);
+  // Avito никогда не отдаёт телефон покупателя через API (privacy) — но часто
+  // покупатель сам пишет его в чате. Достаём из текста, если явно не передан
+  // (bot_forward от оператора приоритетнее), и честно помечаем источник.
+  const textPhone = phone ? null : extractPhoneFromText(value.text);
+  const resolvedPhone = phone || textPhone;
   // НАКОПИТЕЛЬНЫЕ факты клиента («подготовка за 5 минут»): агент присылает
   // их вместе с сообщением, webhook кладёт в metadata.clientFacts. Здесь —
   // первый пасс: мерджим мониторный `client` + агентские client_facts.
@@ -191,7 +199,8 @@ async function createLead(input: {
   const leadKey = `avito:${value.chat_id ?? eventId ?? now}`;
   const metadata: Record<string, unknown> = {
     name: buyerDisplayName(value, client?.name),
-    phone: null,
+    phone: resolvedPhone || null,
+    ...(textPhone && !phone ? { phoneSource: "message_text" } : {}),
     source: "avito",
     avitoChatId: value.chat_id ?? null,
     avitoUserId: value.buyer_id ?? null,
@@ -224,7 +233,7 @@ async function createLead(input: {
     source_route: "avito_webhook",
     contact_channel: "avito",
     urgency_score: 50,
-    phone: phone || null,
+    phone: resolvedPhone || null,
     last_seen_at: value.created || now,
     metadata,
   });
@@ -294,10 +303,27 @@ async function updateLead(
   if (merged.itemPrice == null && typeof value.item_price === "number") {
     merged.itemPrice = value.item_price;
   }
+  // Backfill phone: покупатель мог назвать номер поздним сообщением, хотя
+  // первое было без него. Заполняем только пустой номер (переписанный
+  // оператором не трогаем) и помечаем источник.
+  if (!merged.phone) {
+    const backfill = extractPhoneFromText(value.text);
+    if (backfill) {
+      merged.phone = backfill;
+      merged.phoneSource = "message_text";
+    }
+  }
 
+  const leadPatch: Record<string, unknown> = {
+    metadata: merged,
+    last_seen_at: value.created || now,
+  };
+  // Колонку phone заполняем только когда она была пуста (merge-правило:
+  // явные значения не перетираются автоматикой).
+  if (merged.phone && !prevMetadata.phone) leadPatch.phone = merged.phone;
   const { error } = await supabaseAdmin
     .from("franchize_intents")
-    .update({ metadata: merged, last_seen_at: value.created || now })
+    .update(leadPatch)
     .eq("id", intentId);
 
   if (error) throw error;
@@ -517,7 +543,10 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
   }
   const now = new Date().toISOString();
   const chatId = forwardChatId(body);
-  const phone = normalizePhone(body.phone);
+  const operatorPhone = normalizePhone(body.phone);
+  // Оператор не выписал телефон — пробуем вытащить его из текста сообщения.
+  const textPhone = operatorPhone ? null : extractPhoneFromText(text);
+  const phone = operatorPhone || textPhone;
   const analysis = sanitizeAnalysis((body as BotForwardBody & { analysis?: unknown }).analysis);
   const value: AvitoMessageValue = {
     chat_id: chatId,
@@ -528,7 +557,8 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
   const extra: Record<string, unknown> = {
     // Spread last in createLead metadata → overrides v3 defaults.
     name: body.name || null,
-    phone: body.phone || null,
+    phone: phone || null,
+    ...(operatorPhone ? { phoneSource: "operator" } : textPhone ? { phoneSource: "message_text" } : {}),
     capturedVia: "bot_forward",
     forwardManager: body.manager || null,
     sourceUrl: body.url || null,

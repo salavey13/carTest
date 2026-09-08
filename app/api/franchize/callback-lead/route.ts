@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { logger } from "@/lib/logger";
@@ -14,6 +19,31 @@ const MAX_BODY_BYTES = 32_000;
 const DUPLICATE_WINDOW_MS = 2 * 60 * 1_000;
 const FALLBACK_RATE_WINDOW_MS = 10 * 60 * 1_000;
 const FALLBACK_NOTIFICATION_LOCK_MS = 2 * 60 * 1_000;
+
+/**
+ * Shared secret for trusted server-to-server ingests (e.g. the marketing
+ * site vip-bike.ru proxying its form into this endpoint). When the request
+ * carries the matching `x-callback-ingest-secret` header:
+ *  - the local per-IP rate limit is skipped (the proxy is ONE fixed IP —
+ *    real customers would otherwise share its 4/min budget),
+ *  - the per-IP RPC quota is neutralized via a per-request hash (the global
+ *    30/10min RPC cap still applies),
+ *  - metadata gets ingest="site_proxy" for traceability.
+ * Absent env → trusted mode is off, behavior is byte-identical to before.
+ */
+const TRUSTED_INGEST_HEADER = "x-callback-ingest-secret";
+
+function isTrustedIngest(request: NextRequest): boolean {
+  const expected = process.env.CALLBACK_INGEST_SECRET;
+  if (!expected) return false;
+  const provided = request.headers.get(TRUSTED_INGEST_HEADER);
+  if (!provided) return false;
+  // Timing-safe compare via sha256 digests (fixed length, no early exit).
+  return timingSafeEqual(
+    createHash("sha256").update(provided).digest(),
+    createHash("sha256").update(expected).digest(),
+  );
+}
 
 type CallbackCaptureStatus =
   | "created"
@@ -442,14 +472,16 @@ function sourceRouteFromRequest(request: NextRequest) {
 
 async function handleVipBikeRentalCallback(request: NextRequest) {
   try {
-    const clientIp = clientIpFromRequest(request);
-    const localLimit = enforceRateLimit(
-      `vip-bike-callback:${clientIp}`,
-      4,
-      60_000,
-    );
-    if (!localLimit.allowed) {
-      return rateLimitResponse(localLimit.retryAfterSeconds);
+    const trusted = isTrustedIngest(request);
+    if (!trusted) {
+      const localLimit = enforceRateLimit(
+        `vip-bike-callback:${clientIpFromRequest(request)}`,
+        4,
+        60_000,
+      );
+      if (!localLimit.allowed) {
+        return rateLimitResponse(localLimit.retryAfterSeconds);
+      }
     }
 
     const contentLength = Number(request.headers.get("content-length") || "0");
@@ -498,7 +530,19 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       );
     }
 
-    const ipHash = hashClientIp(clientIp);
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    const requestId = deterministicIntentId(normalizedPhone, nowDate);
+    const notificationAttemptId = randomUUID();
+    // Trusted server-to-server ingests get a per-request hash: the proxy is
+    // a single fixed IP, and a shared hash would trip the RPC's 5-per-10min
+    // per-IP quota and reject REAL customers. The global 30/10min cap still
+    // applies (it counts all callback intents regardless of hash).
+    const ipHash = trusted
+      ? createHash("sha256")
+          .update(`trusted:${requestId}:${notificationAttemptId}`)
+          .digest("hex")
+      : hashClientIp(clientIpFromRequest(request));
     if (!ipHash) {
       logger.error("[callback-lead] no server secret for IP hashing");
       return NextResponse.json(
@@ -507,11 +551,15 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       );
     }
 
-    const nowDate = new Date();
-    const now = nowDate.toISOString();
-    const requestId = deterministicIntentId(normalizedPhone, nowDate);
-    const notificationAttemptId = randomUUID();
-    const sourceRoute = sourceRouteFromRequest(request);
+    // Server-to-server POSTs carry no browser Referer — trusted proxies pass
+    // the real landing page explicitly; anything path-like and safe wins.
+    const landingPath =
+      input.landingPath &&
+      input.landingPath.startsWith("/") &&
+      !/[\s\u0000-\u001F]/.test(input.landingPath)
+        ? input.landingPath
+        : null;
+    const sourceRoute = landingPath || sourceRouteFromRequest(request);
     // Validate bikeId against the DB (not a hard-coded allowlist).
     // Previously this used VIP_BIKE_RENTAL_CATALOG (lib/vip-bike-rental-catalog.ts)
     // — that allowlist was removed 2026-08-21 because it required manual sync
@@ -550,6 +598,9 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       consentAt: now,
       capturedAt: now,
       ipHash,
+      ...(input.nick ? { nick: input.nick } : {}),
+      ...(input.formSource ? { formSource: input.formSource } : {}),
+      ...(trusted ? { ingest: "site_proxy" } : {}),
     };
 
     const { data: captureRows, error: captureRpcError } = await supabaseAdmin.rpc(
@@ -657,6 +708,8 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
             phone: normalizedPhone,
             bikeTitle: bikeTitle ?? undefined,
             sourceRoute,
+            nick: input.nick,
+            formSource: input.formSource,
             attribution: input.attribution,
             createdAt: now,
           }),

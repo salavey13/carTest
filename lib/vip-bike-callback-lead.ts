@@ -30,6 +30,20 @@ export const callbackLeadRequestSchema = z
     name: z.string().trim().min(2).max(100),
     phone: z.string().trim().min(10).max(40),
     consent: z.literal(true),
+    /** Telegram-ник клиента (форма на маркетинговом сайте, поле «@username»). */
+    nick: optionalText(80),
+    /**
+     * Метка формы-источника с маркетингового сайта (data-ym-form-source,
+     * например "home-final"). Только для отображения — атрибуция живёт в
+     * attribution/utm.
+     */
+    formSource: optionalText(80),
+    /**
+     * Реальная посадочная страница клиента с сайта-источника. Сервер
+     * подставляет её в source_route, т.к. server-to-server POST не несёт
+     * Referer браузера. Пропускаем только path+query-подобные строки.
+     */
+    landingPath: optionalText(500),
     attribution: z
       .object({
         first_touch: marketingTouchSchema,
@@ -64,16 +78,25 @@ export function buildVipBikeCallbackMessage(input: {
   phone: string;
   bikeTitle?: string;
   sourceRoute?: string;
+  nick?: string;
+  formSource?: string;
   attribution?: CallbackLeadRequest["attribution"];
   createdAt: string;
 }): string {
   const touch = input.attribution?.last_touch;
+  // Заявки, проксируемые с маркетингового сайта, помечаем отдельным заголовком,
+  // чтобы оператор сразу видел источник (форма сайта ≠ лендинг аренды).
+  const header = input.formSource
+    ? "Новая заявка с сайта vip-bike.ru"
+    : "Новая заявка с rental.vip-bike.ru";
   const message = [
-    "Новая заявка с rental.vip-bike.ru",
+    header,
     "",
     line("Байк", input.bikeTitle || "Не выбран"),
     line("Имя", input.name),
     line("Телефон", input.phone),
+    line("Ник", input.nick),
+    line("Форма", input.formSource),
     line("Страница", input.sourceRoute || touch?.landing_path || "/"),
     line("Источник", touch?.utm_source || touch?.referrer_host || "прямой переход"),
     line("Канал", touch?.utm_medium),
