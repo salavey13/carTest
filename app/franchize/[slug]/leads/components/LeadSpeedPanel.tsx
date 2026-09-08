@@ -8,7 +8,10 @@
 // SLA-суток. Под ней — стопка-бар распределения времени ответа (зелёный →
 // красный) и чипы перезвонов. Оператор за секунду видит, где застревает
 // скорость, и кого спасать первым (подсказка «дольше всех ждут» — в
-// tooltip плитки «Ждут ответа»).
+// tooltip плитки «Ждут ответа»). Ниже — «Общие факторы побед» (wave
+// «Hormozi Blueprint», шаг 9 common factors analysis): честное сравнение
+// закрытых побед/потерь по скорости/каналу/выходным/диалогу — только когда
+// в обеих группах достаточно данных (n-гварды в lib/lead-win-patterns.ts).
 //
 // Все цифры приходят из lib/lead-speed.ts (чистый расчёт); компонент только
 // визуализирует. nowTick родителя обновляет метрики раз в минуту.
@@ -16,12 +19,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Timer, CheckCheck, Hourglass, AlarmClock, PhoneCall } from "lucide-react";
+import { Timer, CheckCheck, Hourglass, AlarmClock, PhoneCall, TrendingUp } from "lucide-react";
 import type { LeadSpeedMetrics } from "../lib/lead-speed";
 import { fmtDurationMs } from "../lib/lead-speed";
+import type { WinPattern } from "../lib/lead-win-patterns";
 
 interface LeadSpeedPanelProps {
   metrics: LeadSpeedMetrics;
+  /** «Общие факторы побед» из kpi-агрегата (могут отсутствовать — блок молчит). */
+  winPatterns?: WinPattern[];
   T: any;
 }
 
@@ -35,7 +41,7 @@ interface Tile {
   pulse?: boolean;
 }
 
-export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
+export function LeadSpeedPanel({ metrics, winPatterns = [], T }: LeadSpeedPanelProps) {
   const totalHandledTimed = metrics.buckets.reduce((s, b) => s + b.count, 0);
 
   const tiles: Tile[] = [
@@ -173,6 +179,44 @@ export function LeadSpeedPanel({ metrics, T }: LeadSpeedPanelProps) {
           </span>
         )}
       </div>
+
+      {/* Общие факторы побед (Hormozi, common factors analysis): показываем
+          только когда данных достаточно — иначе честно молчим. */}
+      {winPatterns.length > 0 && (
+        <div
+          className="mt-3 rounded-xl border px-3 py-2"
+          style={{ borderColor: "#f5b3012e", backgroundColor: "#f5b3010a" }}
+        >
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <TrendingUp className="h-3 w-3 shrink-0" style={{ color: "#f5b301" }} aria-hidden />
+            <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "#f5b301" }}>
+              Общие факторы побед
+            </span>
+            <span className="text-[10px]" style={{ color: T.textFaint }}>
+              что отличает закрытые сделки от потерь
+            </span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {winPatterns.map((p) => (
+              <div
+                key={p.key}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]"
+                title={p.hint}
+              >
+                <span className="font-semibold" style={{ color: T.text }}>
+                  {p.label}
+                </span>
+                <span style={{ color: "#22c55e" }}>у побед {Math.round(p.wonShare * 100)}%</span>
+                <span style={{ color: T.textFaint }}>vs</span>
+                <span style={{ color: T.textMuted }}>у потерь {Math.round(p.lostShare * 100)}%</span>
+                <span className="text-[10px]" style={{ color: T.textFaint }}>
+                  (n={p.wonN}/{p.lostN})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

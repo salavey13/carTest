@@ -37,6 +37,7 @@ import {
   Hash,
   FileText,
   PenLine,
+  Drama,
   type LucideIcon,
 } from "lucide-react";
 import type { LeadRow, LeadTodoRow } from "../leads-types";
@@ -79,6 +80,7 @@ import { LeadHandlingSection } from "./LeadHandlingSection";
 import { getLeadHandling, isHandlingTodo } from "../lib/lead-handling";
 import { buildSuggestedResponse } from "../lib/lead-scripts";
 import { buildLeadPrep } from "../lib/lead-prep";
+import { buildCloserCoach, type CloserObjectionHit } from "../lib/lead-closer";
 
 export interface LeadDrawerNote {
   id: string;
@@ -235,6 +237,12 @@ export function LeadDetailDrawer(props: Props) {
   // факты диалога + эхо-строка. Чистая функция от лида; для лидов без
   // фактов hasPrep=false → секция не рендерится.
   const prep = useMemo(() => (lead ? buildLeadPrep(lead) : null), [lead]);
+  // 🎭 CLOSER-коуч (wave «Hormozi Blueprint»): структура продающего разговора
+  // + возражения, поднятые по сигналам (AI-агент/слова). null — заглушка;
+  // reinforceOnly — сделка уже есть, показываем только «закрепи решение».
+  const closer = useMemo(() => (lead ? buildCloserCoach(lead) : null), [lead]);
+  const [openCloserObjection, setOpenCloserObjection] = useState<string | null>(null);
+  const [openCloser, setOpenCloser] = useState(false);
 
   // «Прочитать заметки» — раскрыть секцию заметок и прокрутить к ней.
   // Ждём 350 мс: шторка успевает отыграть входную анимацию (иначе
@@ -1036,6 +1044,168 @@ export function LeadDetailDrawer(props: Props) {
                 </div>
               )}
             </div>
+          </Section>
+        </div>
+      )}
+
+      {/* 1b++. CLOSER-коуч (wave «Hormozi Blueprint»): структура продающего
+          разговора C→L→O→S→E→R + возражения, поднятые по сигналам лида.
+          Работает для ВСЕХ каналов (у «Готового ответа» это только Авито):
+          у не-авито лида секция единственная «как говорить». Возражение
+          раскрывается кликом, ответ копируется кнопкой. */}
+      {closer && (
+        <div className="mt-5">
+          <Section
+            title={closer.reinforceOnly ? "Закрепи решение" : "Разговор по CLOSER"}
+            icon={Drama}
+            expanded={closer.reinforceOnly ? true : openCloser}
+            onToggle={() => setOpenCloser(!openCloser)}
+            T={T}
+          >
+            {!closer.reinforceOnly && (
+              <p className="mb-2 text-[11px] leading-snug" style={{ color: T.textFaint }}>
+                Структура разговора (Хормози): выясни зачем → верни словами → что пробовал →
+                продай поездку → сними возражение → закрепи решение.
+              </p>
+            )}
+            {/* Шаги: компактная лестница C→R */}
+            <div className="flex flex-col gap-1.5">
+              {closer.steps.map((step, i) => (
+                <div
+                  key={step.key}
+                  className="rounded-xl border px-3 py-2"
+                  style={{ borderColor: T.border, backgroundColor: T.borderSoft }}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black"
+                      style={{ backgroundColor: "#8b5cf61f", color: "#a78bfa" }}
+                      aria-hidden
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="shrink-0" aria-hidden>{step.emoji}</span>
+                    <span className="text-[12px] font-bold" style={{ color: T.text }}>
+                      {step.title}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug" style={{ color: T.textMuted }}>
+                    {step.goal}
+                  </p>
+                  {step.moves.length > 0 && (
+                    <div className="mt-1.5 flex flex-col gap-1">
+                      {step.moves.map((m, mi) => (
+                        <div
+                          key={mi}
+                          className="flex items-stretch gap-2 rounded-lg border px-2.5 py-1.5"
+                          style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+                        >
+                          <p className="min-w-0 flex-1 self-center text-[11.5px] leading-snug" style={{ color: T.text }}>
+                            {m}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void copyText(m, `шаг CLOSER «${step.title}»`);
+                              flashCopied(`closer-step-${step.key}-${mi}`);
+                            }}
+                            aria-label="Скопировать фразу"
+                            className="flex h-6 w-6 shrink-0 self-center items-center justify-center rounded-md border transition-colors"
+                            style={{
+                              borderColor: copiedKey === `closer-step-${step.key}-${mi}` ? "rgba(34,197,94,0.5)" : T.border,
+                              color: copiedKey === `closer-step-${step.key}-${mi}` ? "#22c55e" : T.textMuted,
+                              backgroundColor: copiedKey === `closer-step-${step.key}-${mi}` ? "rgba(34,197,94,0.08)" : "transparent",
+                            }}
+                          >
+                            {copiedKey === `closer-step-${step.key}-${mi}` ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Возражения: топ по сигналам, раскрытие — кликом */}
+            {closer.objections.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: T.textFaint }}>
+                  {closer.reinforceOnly ? "Возражения уже сняты" : "Возражения — подсказано по переписке"}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {closer.objections.map((hit: CloserObjectionHit) => {
+                    const isOpen = openCloserObjection === hit.objection.key;
+                    return (
+                      <div
+                        key={hit.objection.key}
+                        className="rounded-xl border"
+                        style={{ borderColor: isOpen ? "#f59e0b55" : T.border, backgroundColor: T.bgCard }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenCloserObjection(isOpen ? null : hit.objection.key)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                          aria-expanded={isOpen}
+                        >
+                          <span className="shrink-0 text-[14px]" aria-hidden>{hit.objection.emoji}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[12px] font-bold" style={{ color: T.text }}>
+                              «{hit.objection.label}»
+                            </span>
+                            {hit.reason && (
+                              <span className="block truncate text-[10px]" style={{ color: T.textFaint }}>
+                                {hit.reason}
+                              </span>
+                            )}
+                          </span>
+                          <ChevronDown
+                            className="h-3.5 w-3.5 shrink-0 transition-transform"
+                            style={{ color: T.textMuted, transform: isOpen ? "rotate(180deg)" : "none" }}
+                          />
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-2.5">
+                            <p className="mb-1.5 border-l-2 pl-2 text-[11px] italic leading-snug" style={{ borderColor: "#f59e0b66", color: T.textMuted }}>
+                              {hit.objection.principle}
+                            </p>
+                            <div className="flex items-stretch gap-2 rounded-lg border px-2.5 py-2" style={{ borderColor: T.border, backgroundColor: T.borderSoft }}>
+                              <p className="min-w-0 flex-1 self-center text-[11.5px] leading-snug" style={{ color: T.text }}>
+                                {hit.objection.response}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void copyText(hit.objection.response, `ответ на «${hit.objection.label}»`);
+                                  flashCopied(`closer-obj-${hit.objection.key}`);
+                                }}
+                                aria-label="Скопировать ответ"
+                                className="flex h-6 w-6 shrink-0 self-center items-center justify-center rounded-md border transition-colors"
+                                style={{
+                                  borderColor: copiedKey === `closer-obj-${hit.objection.key}` ? "rgba(34,197,94,0.5)" : T.border,
+                                  color: copiedKey === `closer-obj-${hit.objection.key}` ? "#22c55e" : T.textMuted,
+                                  backgroundColor: copiedKey === `closer-obj-${hit.objection.key}` ? "rgba(34,197,94,0.08)" : "transparent",
+                                }}
+                              >
+                                {copiedKey === `closer-obj-${hit.objection.key}` ? (
+                                  <Check className="h-3 w-3" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </Section>
         </div>
       )}

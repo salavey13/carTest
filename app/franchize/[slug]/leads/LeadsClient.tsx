@@ -1443,8 +1443,12 @@ export function LeadsClient({
       <div id="leads-analytics" className={analyticsOpen ? "space-y-5" : "hidden sm:block sm:space-y-5"}>
         {/* Скорость обработки: медиана ответа, очередь «ждут», SLA-просрочки,
             распределение времени ответа и перезвоны — см. lib/lead-speed.ts.
-            speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным. */}
-        {kpiMetrics && <LeadSpeedPanel metrics={kpiMetrics.speed} T={T} />}
+            speed встроен в kpiMetrics (lib/lead-kpi.ts) — один проход по данным.
+            winPatterns — «общие факторы побед» (lead-win-patterns.ts): панель
+            молчит, когда данных мало. */}
+        {kpiMetrics && (
+          <LeadSpeedPanel metrics={kpiMetrics.speed} winPatterns={kpiMetrics.winPatterns} T={T} />
+        )}
 
         {/* Воронка KPI из протокола встречи: Активность → Диалог → КЭВ → Сделка,
             конверсии, норма дня, «горячие ждут», тест-драйвы, ср. чек.

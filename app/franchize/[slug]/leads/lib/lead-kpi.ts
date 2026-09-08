@@ -54,6 +54,7 @@ import {
 import { computeLeadStage, matchTodosToLead } from "./pipeline-stages";
 import { isAvitoLead } from "./lead-identity";
 import { isCallbackTodo, isHandledTodo } from "./lead-handling";
+import { computeWinPatterns, type WinPattern } from "./lead-win-patterns";
 
 /**
  * Порог тишины, после которого авито-диалог считается «пропавшим»
@@ -153,6 +154,10 @@ export interface LeadKpiMetrics {
   normProgress: number;
   /** Встроенные скоростные метрики (lead-speed.ts) — один источник правды. */
   speed: LeadSpeedMetrics;
+  /** «Общие факторы побед» (lead-win-patterns.ts, common factors analysis
+   *  Хормози): честное сравнение закрытых побед/потерь. Пустой массив —
+   *  данных мало, панель молчит. */
+  winPatterns: WinPattern[];
 }
 
 // ── Хелперы ────────────────────────────────────────────────────────────────
@@ -326,6 +331,7 @@ export function computeLeadKpi(
     dealRate,
     normProgress: speed.handledToday / NORM_HANDLED_PER_DAY,
     speed,
+    winPatterns: computeWinPatterns(leads, allTodos),
   };
 }
 

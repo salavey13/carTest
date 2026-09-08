@@ -264,10 +264,10 @@ describe("«Теория» (wave next-step-reveal): структура лест�
     expect(none.currentPct).toBe(0);
   });
 
-  it("OPERATOR_GUIDES: три гайда с уникальными id и офлайн-ссылками /docs/", () => {
-    expect(OPERATOR_GUIDES).toHaveLength(3);
+  it("OPERATOR_GUIDES: четыре гайда с уникальными id и офлайн-ссылками /docs/", () => {
+    expect(OPERATOR_GUIDES).toHaveLength(4);
     const ids = new Set(OPERATOR_GUIDES.map((g) => g.id));
-    expect(ids.size).toBe(3);
+    expect(ids.size).toBe(4);
     for (const g of OPERATOR_GUIDES) {
       expect(g.href).toMatch(/^\/docs\/.+\.html$/);
       expect(g.title.length).toBeGreaterThan(0);
@@ -276,6 +276,7 @@ describe("«Теория» (wave next-step-reveal): структура лест�
       "/docs/avito-leads-guide.html",
       "/docs/brutal-business-truths-2026.html",
       "/docs/ultimate-sales-playbook-2026.html",
+      "/docs/hormozi-closer-2026.html",
     ]);
   });
 
