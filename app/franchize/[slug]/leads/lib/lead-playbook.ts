@@ -96,6 +96,44 @@ const CONTRACT_HANG_MS = 24 * 60 * 60 * 1000;
 export const GHOST_LONG_SILENCE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Аренда стартует позже чем через… — кандидат на «подтянуть на сегодня». */
 const PULLUP_HORIZON_MS = 36 * 60 * 60 * 1000;
+//
+// ── 2026-09-09 RECENCY POLISH («the recenter the better», просьба босса) ────
+//
+// Раньше у «ожидающих» вёдер не было потолка давности: hot-лид (температура
+// фиксируется при ingest и не переоценивается) висел «Спасти горячего»
+// неделями, просроченный перезвон двухмесячной давности занимал топ очереди
+// с весом 100, а «Договор висит» мог быть полугодовым. Очередь превращалась
+// в музей древностей вместо «что делать СЕГОДНЯ».
+//
+// Теперь у каждого операционного окна есть потолок: после него ситуация —
+// уже не оперативка, а реанимация (ведро ghost 👻) или вообще вне очереди
+// (туду остаётся в колонке «Работа», но не мигает в плейбуке).
+
+/**
+ * Потолок «Спасти горячего»: сутки тишины — и горячий лид перестаёт быть
+ * операционной срочностью. Avito-диалоги дальше автоматически подхватывает
+ * ведро ghost (≥ GHOST_SILENCE_MS) с честным тоном реанимации.
+ */
+export const HOT_WAIT_MAX_MS = 24 * 60 * 60 * 1000;
+/**
+ * Просроченный перезвон ≤ суток — свежее нарушенное обещание (полный вес 100,
+ * «слитый доверие» — курс). Демотированный вес для перезвона возрастом
+ * сутки–неделя: обещание старое, но живое — ниже «договора висит» (70).
+ */
+export const CALLBACK_OVERDUE_FRESH_MS = 24 * 60 * 60 * 1000;
+export const CALLBACK_OVERDUE_STALE_WEIGHT = 65;
+/**
+ * Потолок просрочки перезвона (неделя): старше — «перезвоню» уже мёртв,
+ * таскать его наверху очереди — ложная срочность. Туду «Перезвонить»
+ * продолжает висеть в колонке «Работа» до явного решения оператора.
+ */
+export const CALLBACK_OVERDUE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Потолок «Договора висит» (2 недели): договор без движения месяц — это не
+ * очередь, это архивная пыль; оператору нужно закрыть лид (Потеряно/Отказ),
+ * а не ежедневно видеть его в «что делать сейчас».
+ */
+export const CONTRACT_HANG_MAX_MS = 14 * 24 * 60 * 60 * 1000;
 /**
  * Окно просьбы о рекомендации после закрытой аренды («1+1=11», 10 Steps
  * To Become A Sales Machine): лучшее время — сразу после успешного опыта,
@@ -206,8 +244,10 @@ function action(
 
 /**
  * Очередь «что делать сейчас» по всем лидам (off-the-call SOP).
- * Возвращает до `limit` действий, отсортированных по весу (курс-приоритеты),
- * при равном весе — старые ситуации раньше свежих.
+ * Возвращает до `limit` действий, отсортированных по весу (курс-приоритеты);
+ * при равном весе — СВЕЖАЯ ситуация раньше старой («the recenter the
+ * better», 2026-09-09: внутри одного ведра оператор сначала закрывает
+ * то, что ещё тёплое).
  */
 export function buildNextActions(
   leadsInput: LeadRow[],
@@ -245,18 +285,28 @@ export function buildNextActions(
       !isConverted
     ) {
       const due = safeMs(handling.callback.dueAt);
-      if (Number.isFinite(due) && due < now) {
+      const overdueFor = Number.isFinite(due) ? now - due : NaN;
+      // 2026-09-09 recency polish: ≤ суток просрочки — свежее нарушенное
+      // обещание (полный вес, danger); до недели — демотированное (warning,
+      // ниже «договора висит»); старше недели — не мигаем вовсе (туду
+      // остаётся в «Работе», но топ очереди не занимает).
+      if (
+        Number.isFinite(overdueFor) &&
+        overdueFor > 0 &&
+        overdueFor <= CALLBACK_OVERDUE_MAX_MS
+      ) {
+        const freshPromise = overdueFor <= CALLBACK_OVERDUE_FRESH_MS;
         found.push(
           action(
             "callback-overdue",
             "📞",
             `Позвонить: ${who}`,
-            `Перезвон просрочен на ${fmtAge(now - due)} — обещание уже нарушено${handling.callback.note ? ` (${handling.callback.note})` : ""}`,
+            `Перезвон просрочен на ${fmtAge(overdueFor)} — обещание уже нарушено${handling.callback.note ? ` (${handling.callback.note})` : ""}`,
             "Здравствуйте! Перезваниваю по вашему вопросу — подскажу наличие и посчитаю стоимость на ваши даты. Удобно сейчас поговорить пару минут?",
             leadId,
-            "danger",
-            WEIGHT.callbackOverdue,
-            now - due,
+            freshPromise ? "danger" : "warning",
+            freshPromise ? WEIGHT.callbackOverdue : CALLBACK_OVERDUE_STALE_WEIGHT,
+            overdueFor,
           ),
         );
         continue; // у лида активный перезвон — «ждёт ответа» это не перекрывает
@@ -268,6 +318,9 @@ export function buildNextActions(
     const ageMs = Number.isFinite(createdMs) ? Math.max(0, now - createdMs) : NaN;
 
     // ── Ждёт первого ответа (не обработан, не конверт, без перезвона) ──
+    // 2026-09-09 recency polish: у «Спасти горячего» появился потолок
+    // HOT_WAIT_MAX_MS (сутки) — дальше лид уже не «горячий ждёт», а тихий
+    // ghost (его подхватывает ведро 👻 ниже, если был диалог).
     if (!handling.handled && !isConverted && !handling.callback) {
       if (isHot && Number.isFinite(ageMs)) {
         if (ageMs <= GOLD_WINDOW_MS) {
@@ -284,7 +337,7 @@ export function buildNextActions(
               ageMs,
             ),
           );
-        } else {
+        } else if (Number.isFinite(ageMs) && ageMs <= HOT_WAIT_MAX_MS) {
           found.push(
             action(
               "hot-waiting",
@@ -344,19 +397,26 @@ export function buildNextActions(
         );
       } else if (futureStarts.length === 0 && lead.rentals.length === 0) {
         // Договор без аренды и без ближайшего старта: висит?
+        // 2026-09-09 recency polish: потолок CONTRACT_HANG_MAX_MS — договор
+        // без движения 2+ недели это архивная пыль, а не «что делать сейчас».
         const modMs = safeMs(lead.lastModifiedAt || lead.createdAt);
-        if (Number.isFinite(modMs) && now - modMs >= CONTRACT_HANG_MS) {
+        const hangFor = Number.isFinite(modMs) ? now - modMs : NaN;
+        if (
+          Number.isFinite(hangFor) &&
+          hangFor >= CONTRACT_HANG_MS &&
+          hangFor <= CONTRACT_HANG_MAX_MS
+        ) {
           found.push(
             action(
               "contract-hanging",
               "🧾",
               `Договор висит: ${who}`,
-              `без движения ${fmtAge(now - modMs)} — помочь принять договор/QR, пока интерес не остыл`,
+              `без движения ${fmtAge(hangFor)} — помочь принять договор/QR, пока интерес не остыл`,
               "Здравствуйте! Высылали вам договор на аренду — помогу его принять и оформить за пару минут. Когда удобно подъехать за байком?",
               leadId,
               "warning",
               WEIGHT.contractHanging,
-              now - modMs,
+              hangFor,
             ),
           );
         }
@@ -495,6 +555,6 @@ export function buildNextActions(
   }
 
   return found
-    .sort((a, b) => b.weight - a.weight || b.ageMs - a.ageMs)
+    .sort((a, b) => b.weight - a.weight || a.ageMs - b.ageMs)
     .slice(0, cap);
 }

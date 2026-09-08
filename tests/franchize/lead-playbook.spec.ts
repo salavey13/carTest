@@ -15,6 +15,10 @@
  *  8. Договор висит >24 ч без аренды → contract-hanging.
  *  9. Лимит действий и сортировка по весу; заглушки и битые данные — чисто.
  * 10. Бенчмарки курса присутствуют (60 сек / 5 мин / 50% / +29%).
+ * 11. Recency polish (2026-09-09, «the recenter the better»): потолки
+ *     давности у ожидающих вёдер (hot 24 ч, перезвон неделя, договор
+ *     2 недели), демотировка старого перезвона до 65, tie-break
+ *     «свежее — раньше» при равном весе.
  */
 
 import { describe, expect, it } from "vitest";
@@ -484,5 +488,123 @@ describe("lead-playbook: рекомендация (referral, «10 Steps» Squibb
     const lead = closedLead(end);
     lead.identityState = "operator_placeholder";
     expect(buildNextActions([lead], [], NOW, 6)).toHaveLength(0);
+  });
+});
+
+// ── 2026-09-09 recency polish: «the recenter the better» ────────────────────
+// Раньше у ожидающих вёдер не было потолка давности: старые hot-лиды,
+// недельные просроченные перезвоны и полугодовые «висящие договоры»
+// занимали топ очереди, а при равном весе старые ситуации вставали ПЕРЕД
+// свежими. Теперь: потолки давности + демотировка старых обещаний +
+// свежее-раньше внутри одного веса.
+describe("lead-playbook: recency polish (2026-09-09)", () => {
+  const hotAvito = (createdAtIso: string) => ({
+    createdAt: createdAtIso,
+    avito: {
+      chatId: "chat-1", itemUrl: null, profileUrl: null, itemId: null,
+      lastMessage: "Беру сегодня!", firstMessage: "Беру сегодня!",
+      itemPrice: 2500, messagesCount: 3, lastMessageAt: createdAtIso,
+      analysis: { intent: "availability", confidence: 90, temperature: "hot" as const },
+    },
+  });
+
+  it("hot-лид ждёт 25 ч → «Спасти горячего» НЕТ: он уже ghost 👻, не оперативка", () => {
+    const old = new Date(NOW - 25 * 60 * 60 * 1000).toISOString();
+    const lead = buildLead(hotAvito(old));
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "hot-waiting")).toBeUndefined();
+    const ghost = actions.find((a) => a.key === "ghost");
+    expect(ghost).toBeDefined();
+    expect(ghost!.weight).toBe(55);
+  });
+
+  it("hot-лид ждёт 23 ч — ещё «Спасти горячего» (граница потолка)", () => {
+    const almostOld = new Date(NOW - 23 * 60 * 60 * 1000).toISOString();
+    const lead = buildLead(hotAvito(almostOld));
+    const actions = buildNextActions([lead], [], NOW, 6);
+    const hot = actions.find((a) => a.key === "hot-waiting");
+    expect(hot).toBeDefined();
+    expect(hot!.weight).toBe(90);
+    expect(actions.find((a) => a.key === "ghost")).toBeUndefined();
+  });
+
+  it("перезвон просрочен на 3 дня → демотирован: вес 65 (ниже «договора висит»), warning", () => {
+    const lead = buildLead({ createdAt: "2026-09-01T09:00:00.000Z" });
+    const todo = callbackTodo(lead.user_id, new Date(NOW - 3 * 24 * 60 * 60 * 1000).toISOString());
+    const actions = buildNextActions([lead], [todo], NOW, 6);
+    const cb = actions.find((a) => a.key === "callback-overdue");
+    expect(cb).toBeDefined();
+    expect(cb!.weight).toBe(65);
+    expect(cb!.tone).toBe("warning");
+  });
+
+  it("перезвон просрочен на 8 дней → в очереди его НЕТ (туду остаётся в «Работе»)", () => {
+    const lead = buildLead({ createdAt: "2026-08-20T09:00:00.000Z" });
+    const todo = callbackTodo(lead.user_id, new Date(NOW - 8 * 24 * 60 * 60 * 1000).toISOString());
+    const actions = buildNextActions([lead], [todo], NOW, 6);
+    expect(actions.find((a) => a.key === "callback-overdue")).toBeUndefined();
+    // С активным перезвоном лид не попадает и в ghost — очередь по нему пуста.
+    expect(actions).toHaveLength(0);
+  });
+
+  it("перезвон просрочен на 2 часа → по-прежнему полный вес 100 (свежее обещание)", () => {
+    const lead = buildLead({ createdAt: "2026-09-03T09:00:00.000Z" });
+    const todo = callbackTodo(lead.user_id, "2026-09-04T10:00:00.000Z");
+    const actions = buildNextActions([lead], [todo], NOW, 6);
+    const cb = actions.find((a) => a.key === "callback-overdue");
+    expect(cb!.weight).toBe(100);
+    expect(cb!.tone).toBe("danger");
+  });
+
+  it("договор без движения 20 дней → НЕ «Договор висит» (архивная пыль)", () => {
+    const lead = buildLead({
+      createdAt: new Date(NOW - 20 * 24 * 60 * 60 * 1000).toISOString(),
+      stageKey: "contract_sent",
+      contractCount: 1,
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "contract-hanging")).toBeUndefined();
+  });
+
+  it("договор без движения 3 дня → «Договор висит» на месте (регресс)", () => {
+    const lead = buildLead({
+      createdAt: new Date(NOW - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      stageKey: "contract_sent",
+      contractCount: 1,
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "contract-hanging")).toBeDefined();
+  });
+
+  it("равный вес → СВЕЖАЯ ситуация раньше старой (tie-break перевёрнут)", () => {
+    const fresh = buildLead({ user_id: "avito:fresh", full_name: "Свежий Свеж", ...hotAvito("2026-09-04T11:58:00.000Z") });
+    const older = buildLead({ user_id: "avito:older", full_name: "Старый Стар", ...hotAvito("2026-09-04T11:56:00.000Z") });
+    const actions = buildNextActions([older, fresh], [], NOW, 6);
+    expect(actions[0].leadId).toBe("avito:fresh");
+    expect(actions[1].leadId).toBe("avito:older");
+  });
+
+  it("демотированный перезвон (65) всё ещё выше ghost (55) — обещание важнее реанимации", () => {
+    const cbLead = buildLead({
+      user_id: "avito:cb",
+      full_name: "Обещалка Обещ",
+      createdAt: "2026-09-01T09:00:00.000Z",
+    });
+    const ghostLead = buildLead({
+      user_id: "avito:ghost",
+      full_name: "Тихий Тих",
+      createdAt: new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      avito: {
+        chatId: "ghost", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Ну что, думает?", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 2,
+        lastMessageAt: new Date(NOW - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    const todos = [callbackTodo(cbLead.user_id, new Date(NOW - 3 * 24 * 60 * 60 * 1000).toISOString())];
+    const actions = buildNextActions([cbLead, ghostLead], todos, NOW, 6);
+    expect(actions[0].key).toBe("callback-overdue");
+    expect(actions[0].leadId).toBe("avito:cb");
+    expect(actions[1].key).toBe("ghost");
   });
 });
