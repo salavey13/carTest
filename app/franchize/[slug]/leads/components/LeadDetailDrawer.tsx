@@ -407,19 +407,21 @@ export function LeadDetailDrawer(props: Props) {
     if (!lead?.originalOperatorChatId)
       return { label: "Не требуется", tone: "good" };
     if (isClaimed) return { label: "Принят", tone: "good" };
-    const s = signals.find((x) => x.key === "qr_age");
-    if (s)
-      return {
-        label: `${s.value} не принят`,
-        tone:
-          s.tone === "danger"
-            ? "danger"
-            : s.tone === "warning"
-              ? "warning"
-              : "neutral",
-      };
+    // 2026-09-09: SLA-сигнал «QR не принят» удалён (sla-signals) — QR — не
+    // состояние: срок непринятия в шторке не мигает, оператор при желании
+    // просто переотправит код кнопкой ниже.
     return { label: "Не принят", tone: "warning" };
   })();
+
+  // 2026-09-09 (решение босса): секция «Документы» показывается только когда
+  // есть что показать: чек-лист строится лишь для состоявшейся аренды, а QR-строка
+  // — только когда код реально НЕ принят (кнопка переотправки может пригодиться).
+  // Иначе секция целиком скрыта — «just don't mention docs».
+  const qrUnclaimed =
+    !!lead?.originalOperatorChatId &&
+    lead?.identityState !== "claimed_user" &&
+    lead?.identityState !== "merged";
+  const showDocuments = docs.length > 0 || qrUnclaimed;
 
   const primaryActions: Array<{
     icon: LucideIcon;
@@ -1482,7 +1484,8 @@ export function LeadDetailDrawer(props: Props) {
         </Section>
       </div>
 
-      {/* 6. Documents */}
+      {/* 6. Documents — только когда есть что показать (см. showDocuments выше) */}
+      {showDocuments && (
       <div className="mt-5">
         <LeadDocumentsSection
           documents={docs}
@@ -1493,6 +1496,7 @@ export function LeadDetailDrawer(props: Props) {
           T={T}
         />
       </div>
+      )}
 
       {/* 7. Tasks */}
       <div className="mt-5">

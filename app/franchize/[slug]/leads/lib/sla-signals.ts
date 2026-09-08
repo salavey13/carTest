@@ -1,5 +1,5 @@
 import type { LeadRow, LeadTodoRow } from "../leads-types";
-import { matchTodosToLead, pickRelevantRental, getDocsVerification } from "./pipeline-stages";
+import { matchTodosToLead } from "./pipeline-stages";
 import { getLeadHandling, isHandlingTodo, isCallbackOverdue, callbackInMinutes } from "./lead-handling";
 
 export interface LeadSignal {
@@ -91,27 +91,15 @@ export function computeLeadSignals(lead: LeadRow, allTodos: LeadTodoRow[]): Lead
     const ms = new Date(future[0].startDate!).getTime() - now, d = ms / 864e5;
     signals.push({ key: "rental_start_proximity", label: "До начала аренды", value: fmt(ms), tone: d > 7 ? "neutral" : d > 1 ? "warning" : "danger", priority: d > 7 ? 0 : d > 1 ? 2 : 4 });
   }
-  if (lead.qrStatus === "unclaimed" || lead.qrStatus === "sent") {
-    if (lead.createdAt) {
-      const ms = now - new Date(lead.createdAt).getTime(), h = ms / 36e5;
-      signals.push({ key: "unclaimed_qr_age", label: "QR не принят", value: fmt(ms), tone: h < 17 ? "neutral" : h < 48 ? "warning" : "danger", priority: h < 17 ? 1 : h < 48 ? 2 : 4 });
-    }
-  }
+  // 2026-09-09 (решение босса): сигналы «QR не принят» (unclaimed_qr_age) и
+  // «Документы отсутствуют» (document_missing_age) УДАЛЕНЫ — QR-скан и
+  // фото-чеклист больше не являются состоянием/срочностью: клиент не сканил
+  // код «на лету» → это деталь диалога, а не красная плашка; документы
+  // упоминаются только когда аренда успешно состоялась.
   const active = lead.rentals.filter((r) => r.status === "active" && r.endDate).sort((a, b) => new Date(a.endDate!).getTime() - new Date(b.endDate!).getTime());
   if (active.length > 0) {
     const ms = new Date(active[0].endDate!).getTime() - now, d = ms / 864e5;
     signals.push({ key: "time_until_return", label: "До возврата", value: fmt(ms), tone: d > 3 ? "good" : d > 1 ? "warning" : "danger", priority: d > 3 ? 0 : d > 1 ? 2 : 4 });
-  }
-  // document_missing_age
-  // FIX: читать РЕЛЕВАНТНУЮ аренду (а не rentals[0]) и учитывать полную
-  // картину верификации (checklist + contract_verifier + фото) — аренды,
-  // созданные через /doc или веб-чек аут, документами обеспечены, фото после
-  // проверки УДАЛЯЮТСЯ (152-ФЗ), поэтому «нет фото» ≠ «нет документов».
-  if (lead.stageKey === "documents_missing" && lead.rentals.length > 0) {
-    const r = pickRelevantRental(lead);
-    if (r && getDocsVerification(r) === "missing") {
-      signals.push({ key: "document_missing_age", label: "Документы отсутствуют", value: "⚠", tone: "warning", priority: 2 });
-    }
   }
   // days_since_stage_change («Без движения») — та же политика честного
   // простоя: прокси считаем от ПОСЛЕДНЕЙ АКТИВНОСТИ (max(lastSeenAt,

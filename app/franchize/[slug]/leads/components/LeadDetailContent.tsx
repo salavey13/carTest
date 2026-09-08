@@ -11,7 +11,6 @@ import {
   computeLeadStage,
   computeQrStatus,
   pickRelevantRental,
-  getFlowType,
 } from "../lib/pipeline-stages";
 import { computeLeadSignals } from "../lib/sla-signals";
 import { computeLeadHistory } from "../lib/lead-history";
@@ -255,53 +254,39 @@ function buildDocuments(
   const rental = pickRelevantRental(lead) ?? lead.rentals[0];
   if (!rental) return [];
 
-  // /doc flow: the operator collected and checked the physical documents
-  // in person when creating the contract — verified by construction.
-  const isDocFlow = getFlowType(lead) === "doc";
-
-  // Read verification checklist from rental metadata (set by /api/verify-rental-checklist).
-  // Double cast through unknown — LeadRentalRow and Record<string, unknown>
-  // don't sufficiently overlap for a direct `as` (TS2352), but the metadata
-  // field is genuinely a JSON object at runtime.
-  const meta = (rental as unknown as Record<string, unknown>).metadata as Record<string, unknown> | null;
-  const checklist = (meta?.checklist as Record<string, unknown>) || {};
-  const verifier = (meta?.contract_verifier as Record<string, unknown> | null) || null;
-  const passportVerified = !!checklist.passport_verified || verifier?.status === "verified" || isDocFlow;
-  const licenseVerified = !!checklist.license_verified || verifier?.status === "verified" || isDocFlow;
-
-  // Active/completed rentals are always verified (activation requires verification todos done)
+  // 2026-09-09 (решение босса: «only mention that docs are fine in case
+  // rental was successful, otherwise just don't mention docs»): чек-лист
+  // строится ТОЛЬКО когда аренда состоялась (active/completed) — тогда все
+  // строки честно зелёные (активация невозможна без проверенных документов).
+  // Пока сделка не состоялась — о документах МОЛЧИМ: ни «Отсутствует», ни
+  // «На проверке» в шторке нет; оператор ведёт сделку диалогом, а не
+  // бумажным чеклистом.
   const isActivated = rental.status === "active" || rental.status === "completed";
+  if (!isActivated) return [];
 
   const items: DocumentItem[] = [
     {
       key: "passport_main",
       name: "Паспорт — основная страница",
-      status: (passportVerified || isActivated || rental.passportMainpagePhoto) ? "verified" : "missing",
-      actionLabel: rental.passportMainpagePhoto ? "Открыть" : (passportVerified || isActivated ? "" : "Запросить"),
+      status: "verified",
+      actionLabel: rental.passportMainpagePhoto ? "Открыть" : "",
       onAction: () => onDocumentAction("passport_main", rental.passportMainpagePhoto ? "open" : "request"),
     },
     {
       key: "passport_registration",
       name: "Паспорт — прописка",
-      status: (passportVerified || isActivated || rental.passportRegistrationPhoto) ? "verified" : "missing",
-      actionLabel: rental.passportRegistrationPhoto ? "Открыть" : (passportVerified || isActivated ? "" : "Запросить"),
+      status: "verified",
+      actionLabel: rental.passportRegistrationPhoto ? "Открыть" : "",
       onAction: () => onDocumentAction("passport_registration", rental.passportRegistrationPhoto ? "open" : "request"),
     },
     {
       key: "licence_front",
       name: "Водительское удостоверение",
-      status: (licenseVerified || isActivated || rental.driversLicenceFrontalPhoto) ? "verified" : "missing",
-      actionLabel: rental.driversLicenceFrontalPhoto ? "Открыть" : (licenseVerified || isActivated ? "" : "Запросить"),
+      status: "verified",
+      actionLabel: rental.driversLicenceFrontalPhoto ? "Открыть" : "",
       onAction: () => onDocumentAction("licence_front", rental.driversLicenceFrontalPhoto ? "open" : "request"),
     },
   ];
-
-  // If the rental is pending_confirmation, mark docs as "pending" instead of "missing"
-  if (rental.status === "pending_confirmation") {
-    return items.map((it) =>
-      it.status === "missing" ? { ...it, status: "pending" as const } : it
-    );
-  }
 
   return items;
 }

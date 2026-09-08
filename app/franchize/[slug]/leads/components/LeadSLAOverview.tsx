@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, QrCode, Bike, AlertCircle, Activity } from "lucide-react";
+import { Clock, Bike, AlertCircle, Activity } from "lucide-react";
 import type { LeadSignal } from "../leads-constants";
 import type { ThemeTokens } from "../hooks/useTheme";
 
@@ -10,11 +10,12 @@ interface Props {
   T: ThemeTokens;
 }
 
+// 2026-09-09: запись qr_age удалена вместе с сигналом «QR не принят»
+// (sla-signals.ts) — QR-скан больше не является состоянием/срочностью.
 const SIGNAL_ICONS: Record<string, typeof Clock> = {
   no_response: Clock,
   first_contact: Clock,
   overdue_todos: AlertCircle,
-  qr_age: QrCode,
   rental_start: Bike,
   until_return: Bike,
 };

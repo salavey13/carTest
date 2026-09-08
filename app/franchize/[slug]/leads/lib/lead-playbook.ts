@@ -146,10 +146,46 @@ export const REFERRAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * горизонт: раньше ещё горячий, позже — сезон может уйти.
  */
 export const LOST_REACTIVATE_MS = 30 * 24 * 60 * 60 * 1000;
+//
+// ── 2026-09-09 SUPER DUPER («todays work = super duper leads», просьба босса) ─
+//
+// Потолки давности для оставшихся «вечных» вёдер: очередь «что делать
+// сейчас» — это РАБОТА СЕГОДНЯ, а не музей древностей. Ситуация старше
+// своего потолка уходит из очереди (в работу по мере жизни данных) —
+// реально перезвонить/реанимировать можно у ситуации, которая ещё тёплая.
+
+/**
+ * Потолок тишины для вёдер ghost 👻 / ghost-long 🍂 (30 дней): авито-диалог,
+ * молчащий дольше месяца, — не «сегодняшняя работа», а архив. Реанимация
+ * такого диалога — фоновая кампания, а не очередь смены.
+ */
+export const GHOST_MAX_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * Потолок реактивации «Потеряно» (90 дней): лид, потерянный квартал назад,
+ * ещё помнит нас; потерянный год назад — нет. Старше — не мигаем в очереди.
+ */
+export const LOST_REACTIVATE_MAX_MS = 90 * 24 * 60 * 60 * 1000;
+/**
+ * Горизонт «Подтянуть на сегодня» (7 дней): бронь, стартующая через месяц,
+ * не подтягивается на сегодня — оператор просто пугает клиента планами.
+ * Потолок препятствует ложной срочности далёких броней.
+ */
+export const PULLUP_MAX_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * ВЕСО 105 — «ДЕНЬГИ НА СТОЛЕ» (money-on-table): самая денежная ситуация
+ * дня, сразу после «горячего ждёт < 5 мин» (110) и ВЫШЕ просроченного
+ * перезвона (100). Два случая:
+ *   1. частичная оплата зафиксирована (metadata.saleProgress.status =
+ *      "partial_paid") — деньги УЖЕ у нас, дожимаем остаток;
+ *   2. подтверждённая бронь стартует ≤ PULLUP_HORIZON_MS (36 ч) — клиент
+ *      вот-вот приедет: принять оплату и выдать байк.
+ */
+export const MONEY_ON_TABLE_WEIGHT = 105;
 
 // ── Типы ───────────────────────────────────────────────────────────────────
 
 export type NextActionKey =
+  | "money-on-table"
   | "hot-waiting"
   | "callback-overdue"
   | "fresh-waiting"
@@ -180,6 +216,8 @@ export interface NextAction {
 // ── Веса (см. шапку модуля) ────────────────────────────────────────────────
 
 const WEIGHT = {
+  // «Деньги на столе» — самая денежная ситуация дня (см. константу выше).
+  moneyOnTable: MONEY_ON_TABLE_WEIGHT,
   hotFresh: 110,
   callbackOverdue: 100,
   hotLate: 90,
@@ -198,8 +236,8 @@ const WEIGHT = {
 
 const PRE_RENTAL_STAGES: ReadonlySet<string> = new Set([
   "contract_sent",
-  "awaiting_qr_claim",
-  "documents_missing",
+  // 2026-09-09: awaiting_qr_claim/documents_missing удалены из пайплайна
+  // (pipeline-stages) — преддоговорная стадия теперь одна.
 ]);
 
 // ── Внутренние хелперы ─────────────────────────────────────────────────────
@@ -224,6 +262,11 @@ function fmtAge(ms: number): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} ч`;
   return `${Math.floor(h / 24)} д`;
+}
+
+/** 300000 → «300 000 ₽» (сообщения ведра «Деньги на столе»). */
+function fmtRub(n: number): string {
+  return `${new Intl.NumberFormat("ru-RU").format(Math.round(n))} ₽`;
 }
 
 function action(
@@ -317,6 +360,62 @@ export function buildNextActions(
     const createdMs = safeMs(lead.createdAt);
     const ageMs = Number.isFinite(createdMs) ? Math.max(0, now - createdMs) : NaN;
 
+    // ── «ДЕНЬГИ НА СТОЛЕ» (105) — самая денежная ситуация дня ──
+    // 1) Частичная оплата (metadata.saleProgress.status = "partial_paid"):
+    //    деньги уже у нас, клиент уже согласился — дожать остаток проще и
+    //    дешевле, чем закрывать нового. Без потолка давности: частичный
+    //    платёж — это не «старый мусор», а реальное незакрытое обязательство,
+    //    но свежие ситуации внутри ведра идут раньше (tie-break по ageMs).
+    const sp = lead.saleProgress;
+    if (sp && sp.status === "partial_paid") {
+      const paid = typeof sp.paidRub === "number" && sp.paidRub > 0 ? sp.paidRub : 0;
+      const total = typeof sp.totalRub === "number" && sp.totalRub > 0 ? sp.totalRub : 0;
+      const rest = total > paid && paid > 0 ? total - paid : 0;
+      found.push(
+        action(
+          "money-on-table",
+          "💰",
+          `Деньги на столе: ${who}`,
+          rest > 0
+            ? `внесено ${fmtRub(paid)} из ${fmtRub(total)} — осталось ${fmtRub(rest)}; дожми сделку, пока клиент сам не передумал`
+            : `частичная оплата внесена${paid > 0 ? ` (${fmtRub(paid)})` : ""} — свяжись и закрой остаток сделки`,
+          rest > 0
+            ? `Здравствуйте${name ? `, ${name}` : ""}! Видим, что часть суммы по вашему байку уже внесена (${fmtRub(paid)}). Осталось ${fmtRub(rest)} — как подтвердим, сразу готовим к выдаче. Удобно закрыть вопрос сегодня?`
+            : `Здравствуйте${name ? `, ${name}` : ""}! Видим, что часть суммы по вашему байку уже внесена${paid > 0 ? ` (${fmtRub(paid)})` : ""}. Давайте закроем остаток и подготовим байк к выдаче — удобно сегодня?`,
+          leadId,
+          "warning",
+          WEIGHT.moneyOnTable,
+          Number.isFinite(createdMs) ? Math.max(0, now - createdMs) : 0,
+        ),
+      );
+    }
+    // 2) Подтверждённая бронь стартует ≤ 36 ч: клиент вот-вот приедет —
+    //    принять оплату и выдать байк СЕГОДНЯ. Ниже PULLUP_HORIZON_MS,
+    //    поэтому с «Подтянуть на сегодня» не пересекается (там старт
+    //    ДАЛЬШЕ горизонта, до PULLUP_MAX_HORIZON_MS).
+    if (lead.rentals.length > 0) {
+      const soonStarts = lead.rentals
+        .filter((r) => r.status === "confirmed" || r.status === "pending_confirmation")
+        .map((r) => safeMs(r.startDate))
+        .filter((t) => Number.isFinite(t) && t > now && t <= now + PULLUP_HORIZON_MS)
+        .sort((a, b) => a - b);
+      if (soonStarts.length > 0) {
+        found.push(
+          action(
+            "money-on-table",
+            "💰",
+            `Встретить клиента: ${who}`,
+            `бронь стартует через ${fmtAge(soonStarts[0] - now)} — принять оплату и выдать байк`,
+            `Здравствуйте${name ? `, ${name}` : ""}! Напоминаю: ваша бронь стартует уже скоро. Подъезжайте — встретим, примем оплату и выдадим байк. Если планы изменились, напишите — перенесём.`,
+            leadId,
+            "warning",
+            WEIGHT.moneyOnTable,
+            soonStarts[0] - now,
+          ),
+        );
+      }
+    }
+
     // ── Ждёт первого ответа (не обработан, не конверт, без перезвона) ──
     // 2026-09-09 recency polish: у «Спасти горячего» появился потолок
     // HOT_WAIT_MAX_MS (сутки) — дальше лид уже не «горячий ждёт», а тихий
@@ -382,19 +481,23 @@ export function buildNextActions(
         .sort((a, b) => a - b);
       if (futureStarts.length > 0) {
         const startMs = futureStarts[0];
-        found.push(
-          action(
-            "pull-up",
-            "⏩",
-            `Подтянуть на сегодня: ${who}`,
-            `бронь стартует через ${fmtAge(startMs - now)} — same-day визиты дают заметно более высокую явку`,
-            pullUpLine(),
-            leadId,
-            "info",
-            WEIGHT.pullUp,
-            startMs - now,
-          ),
-        );
+        // 2026-09-09 super duper: потолок горизонта PULLUP_MAX_HORIZON_MS —
+        // бронь через месяц не «подтягивается на сегодня».
+        if (startMs <= now + PULLUP_MAX_HORIZON_MS) {
+          found.push(
+            action(
+              "pull-up",
+              "⏩",
+              `Подтянуть на сегодня: ${who}`,
+              `бронь стартует через ${fmtAge(startMs - now)} — same-day визиты дают заметно более высокую явку`,
+              pullUpLine(),
+              leadId,
+              "info",
+              WEIGHT.pullUp,
+              startMs - now,
+            ),
+          );
+        }
       } else if (futureStarts.length === 0 && lead.rentals.length === 0) {
         // Договор без аренды и без ближайшего старта: висит?
         // 2026-09-09 recency polish: потолок CONTRACT_HANG_MAX_MS — договор
@@ -411,7 +514,7 @@ export function buildNextActions(
               "contract-hanging",
               "🧾",
               `Договор висит: ${who}`,
-              `без движения ${fmtAge(hangFor)} — помочь принять договор/QR, пока интерес не остыл`,
+              `без движения ${fmtAge(hangFor)} — помочь принять договор, пока интерес не остыл`,
               "Здравствуйте! Высылали вам договор на аренду — помогу его принять и оформить за пару минут. Когда удобно подъехать за байком?",
               leadId,
               "warning",
@@ -440,7 +543,9 @@ export function buildNextActions(
       const silenceFrom = safeMs(avito.lastMessageAt || lead.lastSeenAt || lead.createdAt);
       if (hadDialog && Number.isFinite(silenceFrom)) {
         const silence = now - silenceFrom;
-        if (silence >= GHOST_LONG_SILENCE_MS) {
+        // 2026-09-09 super duper: потолок GHOST_MAX_MS — диалог, молчащий
+        // дольше месяца, не «сегодняшняя работа», а архив (см. константу).
+        if (silence >= GHOST_LONG_SILENCE_MS && silence <= GHOST_MAX_MS) {
           found.push(
             action(
               "ghost-long",
@@ -454,7 +559,9 @@ export function buildNextActions(
               silence,
             ),
           );
-        } else if (silence >= GHOST_SILENCE_MS) {
+        } else if (silence >= GHOST_SILENCE_MS && silence <= GHOST_MAX_MS) {
+          // 2026-09-09 super duper: потолок GHOST_MAX_MS действует и здесь —
+          // тишина дольше месяца из очереди «сегодня» уходит в архив.
           found.push(
             action(
               "ghost",
@@ -534,7 +641,9 @@ export function buildNextActions(
     const lostAtMs = safeMs(lead.lastModifiedAt || lead.lastSeenAt || lead.createdAt);
     if (!Number.isFinite(lostAtMs)) continue;
     const lostFor = now - lostAtMs;
-    if (lostFor < LOST_REACTIVATE_MS) continue;
+    // 2026-09-09 super duper: потолок LOST_REACTIVATE_MAX_MS — потерянный
+    // квартал назад лид ещё помнит нас, потерянный год назад — нет.
+    if (lostFor < LOST_REACTIVATE_MS || lostFor > LOST_REACTIVATE_MAX_MS) continue;
 
     const mode: "rent" | "sale" | "generic" =
       lead.sales.length > 0 ? "sale" : lead.rentals.length > 0 ? "rent" : "generic";

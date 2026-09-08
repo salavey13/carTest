@@ -55,8 +55,6 @@ const STAGE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "new", label: "Новые" },
   { value: "needs_contact", label: "Нужен контакт" },
   { value: "contract_sent", label: "Договор отправлен" },
-  { value: "awaiting_qr_claim", label: "QR не принят" },
-  { value: "documents_missing", label: "Нет документов" },
   { value: "active_rental", label: "Активные" },
   { value: "return_due", label: "Возврат" },
   { value: "closed_won", label: "Закрыто" },

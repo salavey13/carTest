@@ -12,7 +12,7 @@ import { CheckCircle, Lock } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { FranchizeOperatorPanel, franchizeOperatorInputClassName, franchizeOperatorInputStyle } from "@/app/franchize/components/FranchizeOperatorSurface";
 import { RentalDocsForm } from "@/app/franchize/components/RentalDocsForm";
-import { PhotoUploadButton } from "@/app/franchize/components/PhotoUploadButton";
+import { PhotoUploadButton, DOC_PHOTO_UPLOAD_ENABLED } from "@/app/franchize/components/PhotoUploadButton";
 import { withAlpha } from "@/app/franchize/lib/theme";
 import type { FranchizeFormPrefill, } from "@/app/franchize/profile-actions";
 import {
@@ -123,6 +123,9 @@ export function DocumentPhotosPanel({
   onDocsStatus: (next: ProfileDocsStatusState) => void;
   T: CrewTokens;
 }) {
+  // SECRET FEATURE (2026-09-09): панель «Мои документы» (фото + OCR) скрыта —
+  // флоу не тестировался; оживет с DOC_PHOTO_UPLOAD_ENABLED = true.
+  if (!DOC_PHOTO_UPLOAD_ENABLED) return null;
   const refresh = () => {
     if (!userId) return;
     getProfileDocsStatusAction({ slug, userId }).then((res) => {

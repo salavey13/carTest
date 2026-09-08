@@ -29,7 +29,7 @@ import {
   durationDaysFromDateTime,
 } from "../lib/date-utils";
 import { ruPluralDays } from "../lib/catalog-utils";
-import { PhotoUploadButton } from "./PhotoUploadButton";
+import { PhotoUploadButton, DOC_PHOTO_UPLOAD_ENABLED } from "./PhotoUploadButton";
 
 interface OrderPageClientProps {
   crew: FranchizeCrewVM;
@@ -1567,8 +1567,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 </p>
               )}
               <div className="mt-3 space-y-3">
-                {/* Passport - 2 photos */}
-                {user?.id && (
+                {/* Passport - 2 photos — SECRET FEATURE (2026-09-09):
+                    OCR-загрузка фото документов скрыта (флоу не тестировался);
+                    ручной ввод ниже остаётся единственным путём. Оживет с
+                    DOC_PHOTO_UPLOAD_ENABLED = true. */}
+                {DOC_PHOTO_UPLOAD_ENABLED && user?.id && (
                   <>
                     <PhotoUploadButton
                       docType="passport_mainpage"
@@ -1696,7 +1699,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 </div>
                 {hasLicense && (
                   <div className="space-y-3">
-                    {user?.id && (
+                    {/* SECRET FEATURE (2026-09-09): OCR-загрузка фото ВУ скрыта
+                        (флоу не тестировался); оживет с DOC_PHOTO_UPLOAD_ENABLED. */}
+                    {DOC_PHOTO_UPLOAD_ENABLED && user?.id && (
                       <PhotoUploadButton
                         docType="drivers_licence"
                         rentalId={orderId}

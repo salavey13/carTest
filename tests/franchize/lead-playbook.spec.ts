@@ -247,7 +247,7 @@ describe("lead-playbook: ghost и договоры", () => {
       user_id: "avito:pullup",
       full_name: "Бронь Сергеев",
       createdAt: "2026-09-03T06:00:00.000Z",
-      stageKey: "awaiting_qr_claim",
+      stageKey: "contract_sent",
       contractCount: 1,
       rentals: [
         {
@@ -606,5 +606,182 @@ describe("lead-playbook: recency polish (2026-09-09)", () => {
     expect(actions[0].key).toBe("callback-overdue");
     expect(actions[0].leadId).toBe("avito:cb");
     expect(actions[1].key).toBe("ghost");
+  });
+});
+
+// ── 2026-09-09 SUPER DUPER («todays work = super duper leads») ──────────────
+// Потолки давности у оставшихся «вечных» вёдер + новое ведро
+// «💰 Деньги на столе» (частичная оплата / бронь вот-вот стартует).
+
+describe("Playbook — super duper caps (the recenter the better, wave 2)", () => {
+  it("ghost-тишина старше GHOST_MAX_MS (30 д) — не сегодняшняя работа: действия нет", () => {
+    const lead = buildLead({
+      user_id: "avito:archeology",
+      full_name: "Древний Древ",
+      createdAt: "2026-05-01T06:00:00.000Z",
+      lastSeenAt: new Date(NOW - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      avito: {
+        chatId: "archeology", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Ну что?", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 4,
+        lastMessageAt: new Date(NOW - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "ghost")).toBeUndefined();
+    expect(actions.find((a) => a.key === "ghost-long")).toBeUndefined();
+  });
+
+  it("ghost-тишина 10 дней — внутри потолка: ghost-long на месте", () => {
+    const lead = buildLead({
+      user_id: "avito:ten-days",
+      full_name: "Тихий Десять",
+      createdAt: "2026-08-20T06:00:00.000Z",
+      avito: {
+        chatId: "ten-days", itemUrl: null, profileUrl: null, itemId: null,
+        lastMessage: "Подумаю", firstMessage: "Здравствуйте!",
+        itemPrice: 2500, messagesCount: 3,
+        lastMessageAt: new Date(NOW - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "ghost-long")).toBeDefined();
+  });
+
+  it("реактивация «Потеряно» старше LOST_REACTIVATE_MAX_MS (90 д) — молчим", () => {
+    const lead = buildLead({
+      user_id: "lost-year-ago",
+      full_name: "Потеряшка Год",
+      createdAt: "2025-06-01T06:00:00.000Z",
+      intentStage: "closed",
+      lastModifiedAt: new Date(NOW - 180 * 24 * 60 * 60 * 1000).toISOString(),
+      stageKey: "closed_lost",
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "reactivation")).toBeUndefined();
+  });
+
+  it("pull-up: бронь дальше PULLUP_MAX_HORIZON_MS (7 д) — не «подтягиваем на сегодня»", () => {
+    const lead = buildLead({
+      user_id: "avito:far-pullup",
+      full_name: "Дальний Далёк",
+      createdAt: "2026-09-01T06:00:00.000Z",
+      stageKey: "contract_sent",
+      contractCount: 1,
+      rentals: [
+        {
+          rentalId: "r-far", status: "confirmed", paymentStatus: "unpaid",
+          startDate: "2026-09-20T10:00:00.000Z", // через 16 дней
+          endDate: "2026-09-23T10:00:00.000Z",
+          bikeTitle: "79BIKE Falcon GT", totalCost: 21000,
+        },
+      ],
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    expect(actions.find((a) => a.key === "pull-up")).toBeUndefined();
+  });
+
+  it("частичная оплата (saleProgress.partial_paid) → «💰 Деньги на столе» весом 105 на вершине очереди", () => {
+    const money = buildLead({
+      user_id: "y-volt-buyer",
+      full_name: "Покупатель Вольт",
+      createdAt: "2026-09-03T09:00:00.000Z",
+      saleProgress: { status: "partial_paid", paidRub: 300000, totalRub: 450000, note: "ждёт остаток" },
+    });
+    const hot = buildLead({
+      user_id: "avito:hot-distractor",
+      full_name: "Горячий Мешающий",
+      createdAt: new Date(NOW - 3 * 60_000).toISOString(),
+      avito: {
+        ...buildLead().avito!,
+        analysis: { temperature: "hot", confidence: 90, suggestedReply: null, shortReply: null, nextBestAction: null, objection: null, entities: null, notes: null, model: null, analyzedAt: null },
+      },
+    });
+    const actions = buildNextActions([hot, money], [], NOW, 6);
+    const moneyAction = actions.find((a) => a.key === "money-on-table");
+    expect(moneyAction).toBeDefined();
+    expect(moneyAction!.weight).toBe(105);
+    expect(moneyAction!.detail).toContain("300\u00A0000");
+    expect(moneyAction!.detail).toContain("450\u00A0000");
+    // Деньги на столе (105) — сразу после «горячего <5 мин» (110), выше всех остальных.
+    expect(actions[0].key).toBe("hot-waiting");
+    expect(actions[1].key).toBe("money-on-table");
+    // Готовое сообщение называет остаток.
+    expect(moneyAction!.message).toContain("150\u00A0000");
+  });
+
+  it("частичная оплата без totalRub — сообщение без остатка, но ведро на месте", () => {
+    const lead = buildLead({
+      user_id: "y-volt-min",
+      full_name: "Покупатель Мин",
+      createdAt: "2026-09-03T09:00:00.000Z",
+      saleProgress: { status: "partial_paid", paidRub: 300000 },
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    const moneyAction = actions.find((a) => a.key === "money-on-table");
+    expect(moneyAction).toBeDefined();
+    expect(moneyAction!.message).toContain("300\u00A0000");
+  });
+
+  it("подтверждённая бронь стартует через 12 ч → «💰 Встретить клиента» (принять оплату и выдать)", () => {
+    const lead = buildLead({
+      user_id: "web:meet",
+      full_name: "Скорый Скор",
+      createdAt: "2026-09-03T09:00:00.000Z",
+      contractCount: 1,
+      rentals: [
+        {
+          rentalId: "r-soon", status: "confirmed", paymentStatus: "unpaid",
+          startDate: new Date(NOW + 12 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date(NOW + 60 * 60 * 60 * 1000).toISOString(),
+          bikeTitle: "Kawasaki EX650", totalCost: 18000,
+        },
+      ],
+    });
+    const actions = buildNextActions([lead], [], NOW, 6);
+    const meet = actions.find((a) => a.key === "money-on-table");
+    expect(meet).toBeDefined();
+    expect(meet!.title).toContain("Встретить клиента");
+    expect(meet!.detail).toContain("12 ч");
+  });
+
+  it("ведро «Деньги на столе» и «Подтянуть» не пересекаются: 12 ч → деньги, 3 дня → подтянуть", () => {
+    const soon = buildLead({
+      user_id: "web:soon",
+      full_name: "Скорый Ранний",
+      createdAt: "2026-09-03T09:00:00.000Z",
+      stageKey: "contract_sent",
+      contractCount: 1,
+      rentals: [
+        {
+          rentalId: "r-soon2", status: "confirmed", paymentStatus: "unpaid",
+          startDate: new Date(NOW + 12 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date(NOW + 60 * 60 * 60 * 1000).toISOString(),
+          bikeTitle: "Kawasaki EX650", totalCost: 18000,
+        },
+      ],
+    });
+    const mid = buildLead({
+      user_id: "web:mid",
+      full_name: "Средний Срок",
+      createdAt: "2026-09-03T09:00:00.000Z",
+      stageKey: "contract_sent",
+      contractCount: 1,
+      rentals: [
+        {
+          rentalId: "r-mid", status: "confirmed", paymentStatus: "unpaid",
+          startDate: new Date(NOW + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date(NOW + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          bikeTitle: "Kawasaki EX650", totalCost: 18000,
+        },
+      ],
+    });
+    const soonActions = buildNextActions([soon], [], NOW, 6);
+    expect(soonActions.find((a) => a.key === "money-on-table")).toBeDefined();
+    expect(soonActions.find((a) => a.key === "pull-up")).toBeUndefined();
+
+    const midActions = buildNextActions([mid], [], NOW, 6);
+    expect(midActions.find((a) => a.key === "pull-up")).toBeDefined();
+    expect(midActions.find((a) => a.key === "money-on-table")).toBeUndefined();
   });
 });

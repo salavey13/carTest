@@ -191,6 +191,9 @@ export function detectRankUp(prevXp: number, nextXp: number): OperatorRank | nul
 // Проверяется тестом: каждый id существует в computeLeadAchievements().
 
 export const PLAYBOOK_FEEDS: Record<NextActionKey, readonly string[]> = {
+  // «Деньги на столе» → касса/дожим: частичная оплата доведена до конца,
+  // визит за байком состоялся — кормим те же сделки/норму дня.
+  "money-on-table": ["closer", "cashier", "squeeze"],
   // Горячий ждёт → скорость первого ответа: «Молния» (≤60 сек, +391%),
   // «Пять минут» (правило 5 минут) и доля отвеченных горячих.
   "hot-waiting": ["lightning", "five-minutes", "hot-rescuer"],
@@ -223,6 +226,7 @@ export function actionsFeedingAchievement(achievementId: string): NextActionKey[
 
 /** Короткие подписи шагов плейбука для чипов (без имён лидов — они меняются). */
 export const PLAYBOOK_STEP_META: Record<NextActionKey, { emoji: string; label: string }> = {
+  "money-on-table": { emoji: "💰", label: "Закрыть деньги на столе" },
   "hot-waiting": { emoji: "🔥", label: "Ответить горячему" },
   "callback-overdue": { emoji: "📞", label: "Позвонить по перезвону" },
   "fresh-waiting": { emoji: "⚡", label: "Ответить первым" },

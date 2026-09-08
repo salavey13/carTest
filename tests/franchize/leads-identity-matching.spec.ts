@@ -132,15 +132,30 @@ describe("Leads identity matching — operator-origin lead classification", () =
     }
   });
 
-  it("treats a doc-flow lead (operator origin) with a pending rental as verified (RULE 2)", () => {
+  it("doc-flow lead (operator origin) with a pending rental does NOT mention docs (silence until rental succeeded)", () => {
     const lead = buildLead({ user_id: "+79991234567", originalOperatorChatId: OPERATOR, rentals: [rental] });
     expect(getFlowType(lead)).toBe("doc");
-    expect(getVerificationStatus(lead)).toBe("verified");
+    // 2026-09-09 (решение босса): «docs are fine» упоминается ТОЛЬКО когда
+    // аренда состоялась (active/completed); иначе — молчание (not_needed).
+    expect(getVerificationStatus(lead)).toBe("not_needed");
   });
 
-  it("webapp-flow lead without photos is unverified (RULE 3)", () => {
+  it("webapp-flow lead without photos is silent too (no more «Фото не загружены»)", () => {
     const lead = buildLead({ user_id: "111222333", rentals: [rental] });
     expect(getFlowType(lead)).toBe("webapp");
-    expect(getVerificationStatus(lead)).toBe("unverified");
+    expect(getVerificationStatus(lead)).toBe("not_needed");
+  });
+
+  it("verification badge fires only for a SUCCESSFUL rental (active/completed)", () => {
+    const activated = {
+      rentalId: "rental-2", status: "active", paymentStatus: "paid",
+      startDate: "2026-09-01T10:00:00.000Z", endDate: "2026-09-03T10:00:00.000Z",
+      bikeTitle: "BMW F800R", totalCost: 20000,
+    };
+    const leadActive = buildLead({ user_id: "111222333", rentals: [activated] });
+    expect(getVerificationStatus(leadActive)).toBe("verified");
+
+    const completedLead = buildLead({ user_id: "111222333", rentals: [{ ...activated, status: "completed" }] });
+    expect(getVerificationStatus(completedLead)).toBe("verified");
   });
 });

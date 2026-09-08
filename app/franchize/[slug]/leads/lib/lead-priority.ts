@@ -85,18 +85,51 @@ const JUST_NOW_MINUTES = 15;
 export const FRESHNESS_TTL_MS = 72 * 60 * 60 * 1000; // 72 ч
 
 // ── Этапы воронки: чем ближе к деньгам / операционке, тем выше вес ──────────
+// 2026-09-09: стадии awaiting_qr_claim/documents_missing удалены из
+// пайплайна (см. pipeline-stages) — весов для них больше нет.
 const STAGE_WEIGHTS: Record<string, number> = {
   needs_contact: 95,     // ждёт первого ответа — мяч на нашей стороне
   new: 80,
-  documents_missing: 75, // документы — наша зона ответственности
   contract_sent: 70,
-  awaiting_qr_claim: 60,
   active_rental: 55,
   return_due: 90,        // возврат сегодня-завтра — оперативка
   closed_won: 20,
   closed_lost: 0,
   dismissed: 0,
 };
+
+/**
+ * ЗАТУХАНИЕ ТЕМПЕРАТУРЫ (2026-09-09, «the recenter the better» — продолжение
+ * recency-полировки): urgencyScore — статическая температура из БД, она
+ * фиксируется при ingest и НЕ переоценивается. Без затухания двухнедельный
+ * «горячий» авито-лид вечно таскал 0.25×100 = 25 баллов (+×2 канала) и висел
+ * в топе основного списка рядом с реально живыми клиентами.
+ *
+ * Множитель по давности ПОСЛЕДНЕЙ АКТИВНОСТИ КЛИЕНТА (lastSeenAt — входящие
+ * сообщения вебхука его обновляют):
+ *   ≤ 24 ч → ×1.0 (живой интерес)
+ *   ≤ 72 ч → ×0.75 (ещё тёплый)
+ *   ≤ 7 д → ×0.45 (остывает)
+ *   ≤ 30 д → ×0.2 (почти остывший)
+ *   дальше → ×0.1 (архивная температура не создаёт ложной срочности)
+ */
+export const URGENCY_DECAY_WINDOWS: Array<{ maxMs: number; factor: number }> = [
+  { maxMs: 24 * 60 * 60 * 1000, factor: 1.0 },
+  { maxMs: 72 * 60 * 60 * 1000, factor: 0.75 },
+  { maxMs: 7 * 24 * 60 * 60 * 1000, factor: 0.45 },
+  { maxMs: 30 * 24 * 60 * 60 * 1000, factor: 0.2 },
+];
+export const URGENCY_DECAY_FLOOR = 0.1;
+
+export function urgencyDecayFactor(lead: LeadRow, now: number): number {
+  const t = new Date(lead.lastSeenAt || lead.createdAt || 0).getTime();
+  if (!Number.isFinite(t) || t <= 0) return URGENCY_DECAY_FLOOR;
+  const since = Math.max(0, now - t);
+  for (const w of URGENCY_DECAY_WINDOWS) {
+    if (since <= w.maxMs) return w.factor;
+  }
+  return URGENCY_DECAY_FLOOR;
+}
 
 // ── Компоненты ───────────────────────────────────────────────────────────────
 
@@ -248,7 +281,9 @@ export function computeLeadPriority(
 ): LeadPriority {
   const ageMs = leadAgeMs(lead, now);
   const freshness = freshnessScore(ageMs);
-  const urgency = Math.max(0, Math.min(100, lead.urgencyScore ?? 0));
+  // Температура гаснет вместе с активностью клиента (см. urgencyDecayFactor):
+  // старый «горячий» лид не должен вечно занимать топ у свежих обращений.
+  const urgency = Math.max(0, Math.min(100, lead.urgencyScore ?? 0)) * urgencyDecayFactor(lead, now);
   const tasks = taskPressure(pendingTodos);
   const value = valuePressure(lead.totalSpent ?? 0);
   const stage = stagePressure(lead.stageKey);

@@ -17,6 +17,7 @@ import {
   compareByPriority,
   freshnessScore,
   leadAgeMs,
+  urgencyDecayFactor,
   AVITO_MULTIPLIER,
   HOT_THRESHOLD,
   FRESH_LEAD_MINUTES,
@@ -310,5 +311,50 @@ describe("Заметки лида (флажок + буст)", () => {
     });
     const sorted = sortLeads([plain, noted], "priority", () => [], undefined, NOW);
     expect(sorted[0].user_id).toBe("noted");
+  });
+});
+
+// ── 2026-09-09: затухание температуры (the recenter the better, wave 2) ─────
+
+describe("Urgency decay (старый «горячий» лид тонет)", () => {
+  it("фактор затухания: ≤24 ч ×1.0, ≤72 ч ×0.75, ≤7 д ×0.45, ≤30 д ×0.2, дальше ×0.1", () => {
+    const mk = (sinceMs: number) =>
+      buildLead({ lastSeenAt: new Date(NOW - sinceMs).toISOString() });
+    expect(urgencyDecayFactor(mk(2 * 60 * 60 * 1000), NOW)).toBe(1.0);
+    expect(urgencyDecayFactor(mk(48 * 60 * 60 * 1000), NOW)).toBe(0.75);
+    expect(urgencyDecayFactor(mk(5 * 24 * 60 * 60 * 1000), NOW)).toBe(0.45);
+    expect(urgencyDecayFactor(mk(20 * 24 * 60 * 60 * 1000), NOW)).toBe(0.2);
+    expect(urgencyDecayFactor(mk(60 * 24 * 60 * 60 * 1000), NOW)).toBe(0.1);
+    // Нет даты — минимум (не даём бонуса за отсутствие данных).
+    expect(urgencyDecayFactor(buildLead({ lastSeenAt: null, createdAt: null }), NOW)).toBe(0.1);
+  });
+
+  it("двухнедельный «горячий» (urgency 100) проигрывает свежему нейтральному", () => {
+    const staleHot = computeLeadPriority(
+      buildLead({
+        lastSeenAt: new Date(NOW - 14 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(NOW - 14 * 24 * 60 * 60 * 1000).toISOString(),
+        urgencyScore: 100,
+        source: "avito-ish",
+      }),
+      0,
+      NOW,
+    );
+    const freshCalm = computeLeadPriority(
+      buildLead({ lastSeenAt: new Date(NOW - 5 * 60 * 1000).toISOString(), urgencyScore: 0 }),
+      0,
+      NOW,
+    );
+    expect(staleHot.score).toBeLessThan(freshCalm.score);
+  });
+
+  it("живой интерес сохраняет температуру полностью: ≤24 ч фактор не роняет балл", () => {
+    const liveHot = computeLeadPriority(
+      buildLead({ lastSeenAt: new Date(NOW - 2 * 60 * 60 * 1000).toISOString(), urgencyScore: 80 }),
+      0,
+      NOW,
+    );
+    // freshness ≈ 87..97 (2 ч), urgency 80×1.0 — score должен быть высоким.
+    expect(liveHot.score).toBeGreaterThanOrEqual(80);
   });
 });

@@ -542,6 +542,28 @@ export async function getFranchizeLeads(
       };
     };
 
+    /**
+     * Прогресс оплаты сделки из metadata.saleProgress (пишут ассистент/
+     * оператор для «upcoming sales»). partial_paid = деньги на столе —
+     * плейбук смены обязан показывать такое ведро первым (вес 105).
+     * Мягкий парсинг: битые/чужие типы — null, не падаем.
+     */
+    const saleProgressFromMeta = (
+      meta: Record<string, unknown> | null | undefined,
+    ): LeadRow["saleProgress"] => {
+      const raw = meta?.["saleProgress"];
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+      const sp = raw as Record<string, unknown>;
+      const num = (v: unknown): number | null =>
+        typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
+      const status = typeof sp.status === "string" && sp.status.trim() ? sp.status.trim() : null;
+      const paidRub = num(sp.paidRub);
+      const totalRub = num(sp.totalRub);
+      const note = typeof sp.note === "string" && sp.note.trim() ? sp.note.trim() : null;
+      if (!status && paidRub === null && totalRub === null && !note) return null;
+      return { status, paidRub, totalRub, note };
+    };
+
     const addOrMerge = (row: MutableLead) => {
       const existing = leadMap.get(row.user_id);
       if (!existing) {
@@ -567,6 +589,9 @@ export async function getFranchizeLeads(
       // Avito deep-link metadata — keep the first non-empty block (the webhook
       // enriches it on repeat messages, so any captured copy is the good one).
       if (row.avito && !existing.avito) existing.avito = row.avito;
+      // Прогресс оплаты — keep the first non-empty block (частичная оплата
+      // фиксируется один раз и дальше только уточняется нотами).
+      if (row.saleProgress && !existing.saleProgress) existing.saleProgress = row.saleProgress;
       // Preserve operator origin across merges — keep the first non-null value we see.
       if (row.originalOperatorChatId && !existing.originalOperatorChatId) {
         existing.originalOperatorChatId = row.originalOperatorChatId;
@@ -803,6 +828,7 @@ export async function getFranchizeLeads(
           sourceRoute: i.source_route,
           contactChannel: i.contact_channel,
           avito: avitoBlockFromMeta(meta),
+          saleProgress: saleProgressFromMeta(meta),
           originalOperatorChatId: originalOp,
           rentals: [],
           sales: [],

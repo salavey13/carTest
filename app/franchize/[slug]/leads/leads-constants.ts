@@ -62,7 +62,9 @@ export type Mode = "rent" | "sale" | "service";
 // ./lib/pipeline-stages.ts (groupLeadsForBoard groups by stageKey and falls
 // back to "new" for unknown keys). The old set (new/contacted/configured/
 // contract_generated/completed) matched raw DB stages, so real pipeline stages
-// like awaiting_qr_claim/active_rental/return_due never had a column.
+// like active_rental/return_due never had a column.
+// 2026-09-09: колонки «QR не принят»/«Нет документов» удалены вместе со
+// стадиями (pipeline-stages) — QR и документы больше не состояния.
 //
 // "avito" — ВИРТУАЛЬНАЯ колонка (не стадия воронки): все лиды из чатов Авито
 // на дотрудовой стадии (new/needs_contact) собираются сюда, чтобы босс видел
@@ -73,8 +75,6 @@ export const BOARD_COLUMNS: { key: string; label: string; color: string }[] = [
   { key: "new",                label: "Новые",            color: "#64748b" },
   { key: "needs_contact",      label: "Нужен контакт",    color: "#3b82f6" },
   { key: "contract_sent",      label: "Договор отправлен", color: "#06b6d4" },
-  { key: "awaiting_qr_claim",  label: "QR не принят",     color: "#eab308" },
-  { key: "documents_missing",  label: "Нет документов",   color: "#f97316" },
   { key: "active_rental",      label: "Активные",         color: "#22c55e" },
   { key: "return_due",         label: "Возврат",          color: "#f97316" },
   { key: "closed_won",         label: "Закрыто",          color: "#166534" },

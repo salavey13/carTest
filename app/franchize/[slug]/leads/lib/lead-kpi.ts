@@ -12,9 +12,10 @@
 //      ИЛИ конверсия в аренду/покупку (та же логика, что в lead-speed.ts).
 //   В. КЭВ — КЛЮЧЕВОЕ СОБЫТИЕ воронки («существенно повышает вероятность
 //      покупки»): для vip-bike это договор/бронь — аренда создана и ждёт
-//      активации (contract_sent / awaiting_qr_claim / documents_missing),
-//      уже идёт (active_rental / return_due) или успешно закрыта
-//      (closed_won). Аналог «тест-драйва / визита в шоу-рум» из протокола.
+//      активации (contract_sent), уже идёт (active_rental / return_due)
+//      или успешно закрыта (closed_won). Аналог «тест-драйва / визита
+//      в шоу-рум» из протокола. 2026-09-09: стадии «QR не принят»/
+//      «Документы отсутствуют» удалены из пайплайна (см. pipeline-stages).
 //   Г. СДЕЛКА — деньги: активная/успешная аренда или продажа.
 //
 // Плюс «не допустить слива целевых лидов»: счётчик ГОРЯЧИХ лидов, которые
@@ -83,8 +84,6 @@ export const NORM_KEV_PER_WEEK = NORM_HANDLED_PER_DAY * 5;
  */
 const KEV_STAGES: ReadonlySet<string> = new Set([
   "contract_sent",
-  "awaiting_qr_claim",
-  "documents_missing",
   "active_rental",
   "return_due",
   "closed_won",

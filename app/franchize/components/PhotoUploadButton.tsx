@@ -7,6 +7,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+/**
+ * SECRET FEATURE SWITCH (2026-09-09, решение босса).
+ *
+ * Загрузка фото документов (паспорт/прописка/права) с OCR-распознаванием
+ * (`/api/docphotoocr`) — ЗАКРЫТАЯ функциональность: флоу никогда не был
+ * протестирован end-to-end и скрыт из UI профиля («Мои документы») и
+ * страницы заказа (паспорт + права). Код и API сохранены: чтобы вернуть
+ * флоу в строй, выставь `true` — оба места рендера оживут автоматически.
+ */
+export const DOC_PHOTO_UPLOAD_ENABLED = false;
+
 interface PhotoUploadButtonProps {
   docType: "passport_mainpage" | "passport_registration" | "drivers_licence";
   rentalId: string;

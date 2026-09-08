@@ -123,35 +123,33 @@ describe('Web-App Rental Flow — Stage Bottlenecks', () => {
   });
 
   describe('Flow-specific bottlenecks', () => {
-    it('webapp flow at contract_sent should show "Загрузить фото" (not "Показать QR")', () => {
-      const flowType = 'webapp';
-      const stage = 'contract_sent';
-
-      // QR stages don't apply to webapp flow
-      if (flowType === 'webapp' && (stage === 'contract_sent' || stage === 'awaiting_qr_claim')) {
-        const bottleneck = { label: 'Загрузить фото', color: '#f97316' };
-        expect(bottleneck.label).toBe('Загрузить фото');
-      }
+    // 2026-09-09: QR и документы больше не узкие места — для обоих потоков
+    // bottleneck на contract_sent один: «Связаться» (написать клиенту).
+    it('webapp flow at contract_sent should show "Связаться" (no QR, no photo nag)', async () => {
+      const { getStageBottleneck } = await import('@/app/franchize/[slug]/leads/lib/pipeline-stages');
+      const lead = { originalOperatorChatId: null, rentals: [{ status: 'confirmed' }], stageKey: 'contract_sent' } as any;
+      expect(getStageBottleneck(lead).label).toBe('Связаться');
+      expect(getStageBottleneck(lead).action).toBe('telegram');
     });
 
-    it('doc flow at contract_sent should show "Показать QR" (not "Загрузить фото")', () => {
-      const flowType = 'doc';
-      const stage = 'contract_sent';
-
-      if (flowType === 'doc' && stage === 'contract_sent') {
-        const bottleneck = { label: 'Показать QR', color: '#eab308' };
-        expect(bottleneck.label).toBe('Показать QR');
-      }
+    it('doc flow at contract_sent should show "Связаться" (QR is no longer a state)', async () => {
+      const { getStageBottleneck } = await import('@/app/franchize/[slug]/leads/lib/pipeline-stages');
+      const lead = { originalOperatorChatId: '413553377', rentals: [{ status: 'confirmed' }], stageKey: 'contract_sent' } as any;
+      expect(getStageBottleneck(lead).label).toBe('Связаться');
     });
 
-    it('doc flow at documents_missing should show "Ожидает QR" (docs already verified)', () => {
-      const flowType = 'doc';
-      const stage = 'documents_missing';
-
-      if (flowType === 'doc' && stage === 'documents_missing') {
-        const bottleneck = { label: 'Ожидает QR', color: '#eab308' };
-        expect(bottleneck.label).toBe('Ожидает QR');
-      }
+    it('computeLeadStage: confirmed rental with UNCLAIMED QR still lands at contract_sent', async () => {
+      const { computeLeadStage } = await import('@/app/franchize/[slug]/leads/lib/pipeline-stages');
+      const lead = {
+        sales: [],
+        rentals: [{
+          rentalId: 'r1', status: 'confirmed', paymentStatus: 'unpaid',
+          startDate: null, endDate: null, bikeTitle: null, totalCost: 0,
+        }],
+        originalOperatorChatId: '413553377',
+        identityState: 'phone_only',
+      } as any;
+      expect(computeLeadStage(lead)).toBe('contract_sent');
     });
   });
 });

@@ -565,7 +565,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
                 </span>
               )
             )}
-            {topSignal && topSignal.key !== "document_missing_age" && (
+            {topSignal && (
               <span
                 className="rounded-full px-2.5 py-1 text-[10px] font-medium"
                 style={{ background: `${slaColor}26`, color: slaColor }}
@@ -580,7 +580,7 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
               под другом на всю ширину — карточка вытягивалась в 2 лишних
               экрана-строки, а SLA-цифра Alone-in-the-corner выглядела
               потерянной. На md+ прежняя вертикаль (там карточки шире). */}
-          {(lead.bikeTitle || rental || (topSignal && topSignal.key !== "document_missing_age")) && (
+          {(lead.bikeTitle || rental || topSignal) && (
             <div className="flex items-stretch gap-2">
               {(lead.bikeTitle || rental) && (
                 <div
@@ -611,9 +611,8 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
               )}
 
               {/* SLA — компактная правая колонка той же строки (на мобиле
-                  видна сразу, без «под сгибом»). signal document_missing_age
-                  — шум: та же мысль в бейдже стадии и «Следующем шаге». */}
-              {topSignal && topSignal.key !== "document_missing_age" && (
+                  видна сразу, без «под сгибом»). */}
+              {topSignal && (
                 <div
                   className="flex w-[92px] shrink-0 flex-col items-center justify-center rounded-xl border p-2 text-center md:w-auto md:flex-none md:px-3 md:py-2.5 md:text-right"
                   style={{
