@@ -5,7 +5,10 @@
 // ВХОДЯЩИЙ канал (webhook v3 + VPS-поллер scripts/avito-monitor) живёт в
 // app/api/webhooks/avito/route.ts. ЭТОТ файл — ИСХОДЯЩИЙ: оператор жмёт
 // «Отправить в Авито» на странице лидов, текст улетает в реальный чат
-// покупателя через POST /messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/.
+// покупателя через POST /messenger/v1/accounts/{user_id}/chats/{chat_id}/messages/.
+// ВАЖНО: отправка — только v1! У v3 нет POST-роута (405, живая проба
+// 2026-09-09), тело — {"type":"text","message":{"text":…}} (вложенное
+// message; плоский {"text":…} даёт 400).
 //
 // Креды: client_credentials-пара приложения (developers.avito.ru ИЛИ новые
 // «API-ключи» из кабинета: Настройки → Для профессионалов). Права (scopes)
@@ -171,9 +174,10 @@ export async function sendAvitoChatMessage(
   if (configError) return { ok: false, error: configError };
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: "Пустой текст сообщения" };
+  // v1-схема: type на верхнем уровне, текст внутри вложенного message.
   const payload = {
-    text: trimmed.slice(0, AVITO_MESSAGE_MAX_LENGTH),
     type: "text" as const,
+    message: { text: trimmed.slice(0, AVITO_MESSAGE_MAX_LENGTH) },
   };
 
   // Один автоматический retry после 401 (перевыпуск токена).
@@ -186,7 +190,7 @@ export async function sendAvitoChatMessage(
     }
     try {
       const res = await fetch(
-        `${AVITO_API_BASE}/messenger/v3/accounts/${userId}/chats/${encodeURIComponent(chatId)}/messages/`,
+        `${AVITO_API_BASE}/messenger/v1/accounts/${userId}/chats/${encodeURIComponent(chatId)}/messages/`,
         {
           method: "POST",
           headers: {
@@ -198,10 +202,12 @@ export async function sendAvitoChatMessage(
         },
       );
       if (res.ok) {
-        // v3 отвечает { id: "...", ... } для созданного сообщения; некоторые
+        // v1 отвечает { id: "…", … } для созданного сообщения; некоторые
         // версии API возвращают uuid — тянем любой из известных id-полей.
-        const json = (await res.json().catch(() => null)) as { id?: string; uuid?: string } | null;
-        return { ok: true, messageId: json?.id ?? json?.uuid ?? null };
+        const json = (await res.json().catch(() => null)) as
+          | { id?: string; uuid?: string; message?: { id?: string } }
+          | null;
+        return { ok: true, messageId: json?.id ?? json?.uuid ?? json?.message?.id ?? null };
       }
       const bodyText = await res.text().catch(() => "");
       if (res.status === 401 && attempt === 0) continue; // refresh + retry once

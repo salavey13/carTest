@@ -173,14 +173,16 @@ describe("POST /api/franchize/lead-avito-reply", () => {
     expect(mocks.insertCalls[0].actor).toBe("413553377");
     expect(mocks.insertCalls[0].points).toBe(2);
 
-    // В Авито ушёл правильный payload
+    // В Авито ушёл правильный payload (v1-схема: POST /messenger/v1/...,
+    // тело {type:"text", message:{text}} — у v3 нет POST-роута, плоский
+    // {"text":…} даёт 400; проверено живой пробой 2026-09-09)
     const sendCall = (global.fetch as any).mock.calls.find(
-      ([url]: any) => String(url).includes("/messenger/v3/accounts/167526519/chats/a1b2c3d4/messages/"),
+      ([url]: any) => String(url).includes("/messenger/v1/accounts/167526519/chats/a1b2c3d4/messages/"),
     );
     expect(sendCall).toBeTruthy();
     const payload = JSON.parse(sendCall[1].body);
-    expect(payload.text).toBe(BASE_BODY.text);
     expect(payload.type).toBe("text");
+    expect(payload.message.text).toBe(BASE_BODY.text);
   });
 
   test("дедуп: повторная seller-реплика с тем же текстом не задваивается", async () => {
