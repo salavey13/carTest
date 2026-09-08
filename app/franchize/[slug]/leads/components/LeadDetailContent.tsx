@@ -47,6 +47,10 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /** Отправить ответ в реальный чат Авито (проксируется в LeadDetailDrawer). */
+  onSendAvitoReply?: (
+    text: string,
+  ) => Promise<{ ok: boolean; error?: string; message?: { at: string; from: string; text: string } }>;
   /** «Отработан» / «Перезвонить в ...» — проксируется в LeadHandlingSection. */
   onMarkHandled?: (handled: boolean) => void;
   onSetCallback?: (iso: string, note: string) => void;
@@ -99,6 +103,7 @@ export function LeadDetailContent({
   onDeleteTodo,
   onAddNote,
   onDismissLead,
+  onSendAvitoReply,
   onMarkHandled,
   onSetCallback,
   onCompleteCallback,
@@ -210,6 +215,7 @@ export function LeadDetailContent({
       onDeleteTodo={onDeleteTodo}
       onAddNote={onAddNote}
       onDismissLead={onDismissLead}
+      onSendAvitoReply={onSendAvitoReply}
       onMarkHandled={onMarkHandled}
       onSetCallback={onSetCallback}
       onCompleteCallback={onCompleteCallback}

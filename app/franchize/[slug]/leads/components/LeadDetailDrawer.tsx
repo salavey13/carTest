@@ -125,6 +125,14 @@ interface Props {
   onDeleteTodo: (id: string) => void;
   onAddNote: (text: string) => void;
   onDismissLead: () => void;
+  /**
+   * Отправить ответ покупателю в РЕАЛЬНЫЙ чат Авито (Messenger API v3,
+   * POST /api/franchize/lead-avito-reply). Наличие пропа = фича включена;
+   * отсутствие — композер не рендерится (другие вызывающие не тронуты).
+   */
+  onSendAvitoReply?: (
+    text: string,
+  ) => Promise<{ ok: boolean; error?: string; message?: { at: string; from: string; text: string } }>;
   /** «Отработан» / «Перезвонить в ...» — панель и колбэки (см. LeadHandlingSection). */
   onMarkHandled?: (handled: boolean) => void;
   onSetCallback?: (iso: string, note: string) => void;
@@ -178,6 +186,7 @@ export function LeadDetailDrawer(props: Props) {
     onDeleteTodo,
     onAddNote,
     onDismissLead,
+    onSendAvitoReply,
     onMarkHandled,
     onSetCallback,
     onCompleteCallback,
@@ -227,6 +236,12 @@ export function LeadDetailDrawer(props: Props) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 📤 Композер «Отправить в Авито»: состояние черновика (синхронизация
+  // с активным скриптом — в useEffect после объявления activeScript ниже).
+  const [avitoDraft, setAvitoDraft] = useState("");
+  const [avitoSending, setAvitoSending] = useState(false);
+  const [avitoSentAt, setAvitoSentAt] = useState<string | null>(null);
+
   // 🎯 Готовый ответ — скрипт продажи под интент вопроса покупателя.
   // Только для авито-лидов (иначе null → секция скрыта). Считается на лету
   // из metadata webhook'а: чистая функция, в БД не пишется, работает
@@ -243,6 +258,20 @@ export function LeadDetailDrawer(props: Props) {
   const closer = useMemo(() => (lead ? buildCloserCoach(lead) : null), [lead]);
   const [openCloserObjection, setOpenCloserObjection] = useState<string | null>(null);
   const [openCloser, setOpenCloser] = useState(false);
+
+  // 📤 Композер «Отправить в Авито» — синхронизация черновика с активным
+  // скриптом. Вычисление ДО null-guard'а: hooks нельзя ставить после раннего
+  // return (rules-of-hooks). activeScript ниже — ровно то же выражение.
+  // Смена вкладки/скрипта перезаписывает черновик; ручные правки оператора
+  // живут, пока скрипт не меняется.
+  const syncScript = suggested
+    ? scriptTab === "short"
+      ? suggested.short
+      : suggested.script
+    : "";
+  useEffect(() => {
+    setAvitoDraft(syncScript);
+  }, [syncScript]);
 
   // «Прочитать заметки» — раскрыть секцию заметок и прокрутить к ней.
   // Ждём 350 мс: шторка успевает отыграть входную анимацию (иначе
@@ -431,14 +460,40 @@ export function LeadDetailDrawer(props: Props) {
 
   // ── Данные для читаемого «Готового ответа» ──
   // Какой текст сейчас читаем (полный скрипт или короткий вариант).
-  const activeScript = suggested
-    ? scriptTab === "short"
-      ? suggested.short
-      : suggested.script
-    : "";
+  // = syncScript (объявлен выше ДО null-guard'а ради useEffect).
+  const activeScript = syncScript;
   // Порог «длинного» текста: сворачиваем с градиентным фейдом и кнопкой
   // «Показать полностью» — вместо вложенного скролла внутри шторки.
   const scriptIsLong = activeScript.length > 260;
+
+  // 📤 Композер «Отправить в Авито» — логика отправки (не hook, поэтому
+  // после null-guard'а).
+  const canReplyToAvito =
+    !!onSendAvitoReply &&
+    lead?.contactChannel === "avito" &&
+    !!avito?.chatId &&
+    !avito.chatId.startsWith("fwd-");
+  const isSyntheticAvitoChat = !!avito?.chatId && avito.chatId.startsWith("fwd-");
+
+  const sendAvitoReply = async () => {
+    const text = avitoDraft.trim();
+    if (!text || !onSendAvitoReply || avitoSending) return;
+    setAvitoSending(true);
+    try {
+      const res = await onSendAvitoReply(text);
+      if (res.ok) {
+        toast.success("Ответ отправлен в чат Авито ✓");
+        setAvitoSentAt(new Date().toISOString());
+        setAvitoDraft(activeScript);
+      } else {
+        toast.error(res.error || "Не удалось отправить в Авито");
+      }
+    } catch {
+      toast.error("Ошибка сети при отправке в Авито");
+    } finally {
+      setAvitoSending(false);
+    }
+  };
   // Вопрос покупателя — что именно он написал (последнее сообщение,
   // фолбэк на первое). Показываем над ответом: вопрос → ответ читается
   // одним взглядом, без переключения в чат Авито.
@@ -945,6 +1000,67 @@ export function LeadDetailDrawer(props: Props) {
                 {copiedKey === `script-${scriptTab}` ? "Скопировано" : "Скопировать ответ"}
               </button>
             </div>
+
+            {/* 📤 Отправить в Авито — ответ улетает в РЕАЛЬНЫЙ чат покупателя
+                (Messenger API v3, POST /api/franchize/lead-avito-reply).
+                Черновик синхронизирован с активным скриптом (полный/короткий),
+                правится перед отправкой. Для форвард-лидов (fwd-…) реального
+                чата нет — вместо композера показываем подсказку. Лимит 3000
+                символов дублирует серверный AVITO_MESSAGE_MAX_LENGTH. */}
+            {canReplyToAvito && (
+              <div
+                className="mt-3 rounded-2xl border p-3"
+                style={{ borderColor: T.border, background: T.bgCard }}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p
+                    className="text-[11px] font-semibold uppercase tracking-wide"
+                    style={{ color: T.textFaint }}
+                  >
+                    Отправить в чат Авито
+                  </p>
+                  <span className="shrink-0 text-[10px]" style={{ color: T.textFaint }}>
+                    {avitoDraft.trim().length}/3000
+                  </span>
+                </div>
+                <textarea
+                  value={avitoDraft}
+                  onChange={(e) => setAvitoDraft(e.target.value)}
+                  maxLength={3000}
+                  rows={4}
+                  aria-label="Текст ответа покупателю в Авито"
+                  placeholder="Текст ответа покупателю…"
+                  className="w-full resize-y rounded-xl border bg-transparent p-3 text-[14px] leading-relaxed outline-none"
+                  style={{ borderColor: T.border, color: T.text }}
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void sendAvitoReply()}
+                    disabled={avitoSending || !avitoDraft.trim()}
+                    className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ background: "#22c55e", color: "#052e16" }}
+                  >
+                    <Send className="h-4 w-4" aria-hidden />
+                    {avitoSending ? "Отправляем…" : "Отправить в Авито"}
+                  </button>
+                  {avitoSentAt && (
+                    <span className="text-[11px] font-medium" style={{ color: "#16a34a" }}>
+                      ✓ доставлено в Авито {relativeTime(avitoSentAt)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            {isSyntheticAvitoChat && (
+              <div
+                className="mt-3 rounded-xl px-3 py-2 text-xs leading-relaxed"
+                style={{ background: "#64748b14", color: T.textMuted }}
+              >
+                💬 Этот лид из ручного форварда — реального чата Авито нет. Ответьте
+                вручную через avito.ru / мобильное приложение Авито.
+              </div>
+            )}
 
             {/* Next Best Action — подсказка колл-центра «что после ответа» */}
             <div

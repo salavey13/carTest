@@ -16,6 +16,7 @@ export type LeadEventType =
   | "todo_completed"
   | "note_added"
   | "notify_sent" // оператор отправил TG-уведомление клиенту
+  | "avito_reply" // оператор отправил ответ в чат Авито прямо из CRM
   | "stage_changed"
   | "closed_won"
   | "closed_lost";
@@ -32,6 +33,7 @@ export const LEAD_EVENT_POINTS: Record<LeadEventType, number> = {
   todo_completed: 2,
   note_added: 1,
   notify_sent: 1,
+  avito_reply: 2, // ответ покупателю — активная работа с лидом (но меньше, чем «обработан»=3)
   stage_changed: 2, // движение по воронке
   closed_won: 10, // закрытие — вершина, но не единственное
   closed_lost: 0, // потери не штрафуем очками (причины важнее)

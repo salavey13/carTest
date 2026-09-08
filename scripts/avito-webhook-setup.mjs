@@ -11,8 +11,10 @@
  *   node scripts/avito-webhook-setup.mjs unsubscribe
  *
  * Env:
- *   AVITO_CLIENT_ID / AVITO_CLIENT_SECRET — client_credentials pair with
- *   `messenger:read` scope (auto-refreshed per run; nothing is stored).
+ *   AVITO_CLIENT_ID / AVITO_CLIENT_SECRET — client_credentials pair.
+ *   Scopes: `messenger:read` for this script; для ОТВЕТОВ из CRM нужен
+ *   дополнительно `messenger:write` (см. app/franchize/lib/avito-messenger.ts).
+ *   AVITO_USER_ID — id профиля продавца (для ответов из CRM).
  *
  * Notes:
  *   - Avito validates the URL at registration: it must respond 200 OK within

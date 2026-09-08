@@ -1193,6 +1193,42 @@ export function LeadsClient({
     await handleCreateTodo(`Запросить фото: ${docName}`);
   }, [selectedId, leadsState, router, slug, handleCreateTodo, showToast]);
 
+  // ── Отправка ответа в реальный чат Авито (Messenger API v3 через наш роут).
+  // chatId — единственный стабильный идентификатор чата (ключ лида может
+  // быть алиас-мерджнут: avito:<id> → телефон → opdoc:<id>). После успеха
+  // оптимистично дописываем реплику в лог чата карточки (сервер уже записал
+  // свою копию — дубль не попадёт: nextMessages на клиенте и сервере
+  // сходятся по одному тексту/времени отправки).
+  const handleSendAvitoReply = useCallback(async (text: string) => {
+    const lead = selectedId ? leadsState.find((l) => l.user_id === selectedId) : null;
+    const chatId = lead?.avito?.chatId;
+    if (!lead || !chatId) {
+      return { ok: false, error: "Лид не привязан к чату Авито" };
+    }
+    try {
+      const resp = await fetch("/api/franchize/lead-avito-reply", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ crewId, slug, chatId, leadId: lead.user_id, text }),
+      });
+      const body = await resp.json().catch(() => null);
+      if (!resp.ok || !body?.success) {
+        return { ok: false, error: body?.error || `Не удалось отправить (HTTP ${resp.status})` };
+      }
+      const message = body.message as { at: string; from: string; text: string };
+      setLeadsState((prev) =>
+        prev.map((l) =>
+          l.user_id === lead.user_id && l.avito
+            ? { ...l, avito: { ...l.avito, messages: [...(l.avito.messages || []), message].slice(-12) } }
+            : l,
+        ),
+      );
+      return { ok: true, message };
+    } catch {
+      return { ok: false, error: "Ошибка сети при отправке в Авито" };
+    }
+  }, [selectedId, leadsState, crewId, slug, authHeaders]);
+
   const handleToggleTodo = useCallback(async (todoId: string) => {
     const current = todosState.find((t) => t.id === todoId);
     if (!current) return;
@@ -1692,6 +1728,7 @@ export function LeadsClient({
               onDeleteTodo={handleDeleteTodo}
               onAddNote={handleAddNote}
               onDismissLead={() => handleDismissLead(selectedLead.user_id)}
+              onSendAvitoReply={handleSendAvitoReply}
               onMarkHandled={(handled) => applyHandlingAction(handled ? "handled" : "unhandled")}
               onSetCallback={(iso, note) => applyHandlingAction("set_callback", { callbackAt: iso, note })}
               onCompleteCallback={() => applyHandlingAction("complete_callback")}
