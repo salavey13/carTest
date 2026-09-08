@@ -19,19 +19,54 @@ function fmt(ms: number): string {
   return `${m} м`;
 }
 
+/** Позднейшая из ISO-дат (null — ни одной валидной). Битые строки игнорируем. */
+function maxIso(...vals: Array<string | null | undefined>): string | null {
+  let best: string | null = null;
+  let bestMs = -Infinity;
+  for (const v of vals) {
+    if (!v) continue;
+    const ms = new Date(v).getTime();
+    if (!Number.isFinite(ms)) continue;
+    if (ms > bestMs) {
+      bestMs = ms;
+      best = v;
+    }
+  }
+  return best;
+}
+
+/**
+ * «Последняя активность» по лиду = max(lastSeenAt, lastModifiedAt).
+ *
+ * Босс: SLA-счётчик «не трогали N» не сбрасывался, когда лида обновляли
+ * (заметка, смена стадии, туду), потому что он читал только lastSeenAt —
+ * входящую активность КЛИЕНТА. Отдельный счётчик касаний lastModifiedAt
+ * («изм. N назад») операторские касания уже учитывает; теперь и SLA-сигналы
+ * сбрасываются любым касанием: и ответ клиента, и работа оператора
+ * обнуляют «простой» — счётчик больше не вводит в заблуждение.
+ */
+function lastActivityAtOf(lead: LeadRow): string | null {
+  return maxIso(lead.lastSeenAt, lead.lastModifiedAt);
+}
+
 export function computeLeadSignals(lead: LeadRow, allTodos: LeadTodoRow[]): LeadSignal[] {
   const signals: LeadSignal[] = [];
   const now = Date.now();
   const todos = matchTodosToLead(lead, allTodos);
   const handling = getLeadHandling(todos);
+  const lastActivityAt = lastActivityAtOf(lead);
 
   if (lead.createdAt) {
     const ms = now - new Date(lead.createdAt).getTime(), h = ms / 36e5;
     signals.push({ key: "time_since_first_contact", label: "С первого контакта", value: fmt(ms), tone: h < 24 ? "neutral" : h < 72 ? "warning" : "danger", priority: h < 24 ? 0 : h < 72 ? 1 : 2 });
   }
-  if (lead.lastSeenAt) {
-    const ms = now - new Date(lead.lastSeenAt).getTime(), h = ms / 36e5;
-    signals.push({ key: "time_since_last_action", label: "Без отклика", value: fmt(ms), detail: h > 24 ? "ОТКЛИКА НЕТ" : undefined, tone: h < 1 ? "good" : h < 4 ? "neutral" : h < 24 ? "warning" : "danger", priority: h < 1 ? 0 : h < 4 ? 1 : h < 24 ? 2 : 4 });
+  // «Без активности» — простой по лиду: ни ответа клиента (lastSeenAt),
+  // ни касания оператора (lastModifiedAt — заметка/стадия/туду). Раньше
+  // сигнал тикал от lastSeenAt и после работы оператора показывал
+  // «не трогали 2 д» — misleading; теперь любое касание сбрасывает счётчик.
+  if (lastActivityAt) {
+    const ms = now - new Date(lastActivityAt).getTime(), h = ms / 36e5;
+    signals.push({ key: "time_since_last_action", label: "Без активности", value: fmt(ms), detail: h > 24 ? "АКТИВНОСТИ НЕТ" : undefined, tone: h < 1 ? "good" : h < 4 ? "neutral" : h < 24 ? "warning" : "danger", priority: h < 1 ? 0 : h < 4 ? 1 : h < 24 ? 2 : 4 });
   }
   // Handling-строки («отработан»/«перезвонить») не считаются «задачами» —
   // у перезвона собственный сигнал ниже + собственные плашки в списках.
@@ -78,9 +113,12 @@ export function computeLeadSignals(lead: LeadRow, allTodos: LeadTodoRow[]): Lead
       signals.push({ key: "document_missing_age", label: "Документы отсутствуют", value: "⚠", tone: "warning", priority: 2 });
     }
   }
-  // days_since_stage_change (proxy: time since lastSeenAt when stage hasn't changed)
-  if (lead.lastSeenAt && lead.stageKey && lead.stageKey !== "new" && lead.stageKey !== "closed_won" && lead.stageKey !== "closed_lost") {
-    const ms = now - new Date(lead.lastSeenAt).getTime();
+  // days_since_stage_change («Без движения») — та же политика честного
+  // простоя: прокси считаем от ПОСЛЕДНЕЙ АКТИВНОСТИ (max(lastSeenAt,
+  // lastModifiedAt)), а не от lastSeenAt, иначе лид, который активно
+  // ведут, висел с «Без движения» по неделям без смены стадии.
+  if (lastActivityAt && lead.stageKey && lead.stageKey !== "new" && lead.stageKey !== "closed_won" && lead.stageKey !== "closed_lost") {
+    const ms = now - new Date(lastActivityAt).getTime();
     const d = ms / 864e5;
     if (d > 3) {
       signals.push({ key: "days_since_stage_change", label: "Без движения", value: fmt(ms), tone: d > 7 ? "warning" : "neutral", priority: d > 7 ? 2 : 1 });

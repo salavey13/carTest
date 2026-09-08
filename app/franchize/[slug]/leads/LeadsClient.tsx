@@ -1331,6 +1331,14 @@ export function LeadsClient({
                   notesCount: (l.notesCount ?? 0) + 1,
                   lastNoteAt: res.data?.created_at || new Date().toISOString(),
                   lastTouchedBy: actorName || l.lastTouchedBy,
+                  // SLA-счётчик «Без активности» читает lastModifiedAt —
+                  // касание только что было, сбрасываем его локально сразу,
+                  // а не после следующего рефетча (иначе карточка до
+                  // обновления списка продолжает показывать старый простой).
+                  lastModifiedAt:
+                    !l.lastModifiedAt || (res.data?.created_at && res.data.created_at > l.lastModifiedAt)
+                      ? res.data?.created_at || l.lastModifiedAt
+                      : l.lastModifiedAt,
                 }
               : l,
           ),

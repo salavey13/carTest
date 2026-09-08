@@ -283,13 +283,13 @@ Implement `computeLeadSignals(lead, todos): LeadSignal[]` in `app/franchize/[slu
 | Signal key | Label (RU) | Computation | Tone thresholds |
 |---|---|---|---|
 | `time_since_first_contact` | Время с первого контакта | `now() - lead.createdAt` | gray <24h, yellow 24–72h, orange >72h |
-| `time_since_last_action` | Без отклика | `now() - lead.lastSeenAt` | green <1h, yellow 1–4h, orange 4–24h, **red >24h** ("ОТКЛИКА НЕТ") |
+| `time_since_last_action` | Без активности | `now() - max(lead.lastSeenAt, lead.lastModifiedAt)` — любое касание (ответ клиента, заметка/стадия/туду оператора) сбрасывает счётчик | green <1h, yellow 1–4h, orange 4–24h, **red >24h** ("АКТИВНОСТИ НЕТ") |
 | `overdue_todo_count` | Просроченные задачи | `todos.filter(t => t.due_date < now() && t.status !== 'done').length` | gray 0, yellow 1, **red ≥2** |
 | `rental_start_proximity` | До начала аренды | `min(rentals[].startDate) - now()` (only for future rentals) | gray >7d, yellow 1–7d, orange <24h, **red past** |
 | `unclaimed_qr_age` | QR не принят | `now() - artifact.created_at` when `qrStatus === 'unclaimed'` | gray <1h, yellow 1–17h, orange 17–48h, **red >48h** |
 | `time_until_return` | До возврата | `min(rentals[].endDate) - now()` for active rentals | green >3d, yellow 1–3d, orange <24h, **red past** |
 | `document_missing_age` | Документы отсутствуют | `now() - rental.created_at` when `documentsMissing` | gray <1h, yellow 1–24h, orange >24h |
-| `days_since_stage_change` | Без движения | `now() - lead.lastSeenAt` when stage hasn't changed | gray <3d, yellow 3–7d, orange >7d |
+| `days_since_stage_change` | Без движения | `now() - max(lead.lastSeenAt, lead.lastModifiedAt)` when stage hasn't changed | gray <3d, yellow 3–7d, orange >7d |
 
 **Hotness derivation:** a lead is "hot" (`isHot(lead) === true`) when **any** signal has tone `red`, OR `lead.urgencyScore >= 80`, OR `overdue_todo_count >= 2`. This replaces the current `categorizeLeads()` logic in `leads-utils.tsx`.
 

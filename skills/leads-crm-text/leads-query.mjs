@@ -349,6 +349,7 @@ function addOrMerge(leadMap, row) {
   if ((row.urgencyScore ?? 0) > (existing.urgencyScore ?? 0)) existing.urgencyScore = row.urgencyScore;
   if (row.createdAt && (!existing.createdAt || row.createdAt > existing.createdAt)) existing.createdAt = row.createdAt;
   if (row.lastSeenAt && (!existing.lastSeenAt || row.lastSeenAt > existing.lastSeenAt)) existing.lastSeenAt = row.lastSeenAt;
+  if (row.lastModifiedAt && (!existing.lastModifiedAt || row.lastModifiedAt > existing.lastModifiedAt)) existing.lastModifiedAt = row.lastModifiedAt;
   if (row.telegramChatId && !existing.telegramChatId) existing.telegramChatId = row.telegramChatId;
   if (row.sourceRoute && !existing.sourceRoute) existing.sourceRoute = row.sourceRoute;
   if (row.contactChannel && !existing.contactChannel) existing.contactChannel = row.contactChannel;
@@ -374,7 +375,7 @@ async function buildLeadMap() {
   const [intentLeads, artifactUsers, secretUsers, rentals, saleArtifacts] = await Promise.all([
     // 1. franchize_intents (crew-filtered by slug, stage != dismissed)
     supabaseQuery("franchize_intents", {
-      select: "id,telegram_user_id,phone,intent_type,stage,urgency_score,source_route,contact_channel,last_seen_at,created_at,metadata,bike_id",
+      select: "id,telegram_user_id,phone,intent_type,stage,urgency_score,source_route,contact_channel,last_seen_at,created_at,updated_at,metadata,bike_id",
       filters: [`slug=eq.${CREW_SLUG}`, `stage=neq.dismissed`],
       order: "last_seen_at.desc",
       limit: 800,
@@ -474,6 +475,12 @@ async function buildLeadMap() {
       bikeTitle: meta?.bikeTitle || null,
       createdAt: i.created_at,
       lastSeenAt: i.last_seen_at,
+      // «Когда лида последний раз трогали» (server parity: leads.ts
+      // lastModifiedAt). Для текстового порта — intent.updated_at (смена
+      // стадии, merge metadata, импорт); заметки/туду дороже читаются в
+      // signal-логике ниже (todos уже есть в руках). SLA-счётчик простоя
+      // сбрасывается касанием, а не только ответом клиента.
+      lastModifiedAt: i.updated_at || null,
       verified: ["rent", "sale", "test_drive"].includes(i.intent_type || "")
                 && i.stage === "contract_generated",
       intentType: i.intent_type,
@@ -1082,14 +1089,23 @@ function computeLeadSignals(lead, allTodos) {
       priority: h < 24 ? 0 : h < 72 ? 1 : 2,
     });
   }
-  if (lead.lastSeenAt) {
-    const ms = now - new Date(lead.lastSeenAt).getTime();
+  // «Без активности» (server parity: sla-signals.ts) — простой по лиду
+  // = max(lastSeenAt, lastModifiedAt, туду-касания). Любое касание
+  // (ответ клиента, заметка/стадия/туду оператора) сбрасывает счётчик.
+  const lastTouchCandidates = [
+    lead.lastSeenAt,
+    lead.lastModifiedAt,
+    ...todos.map((t) => t.completed_at || t.created_at),
+  ].filter(Boolean);
+  const lastActivityAt = lastTouchCandidates.sort().pop() || null;
+  if (lastActivityAt) {
+    const ms = now - new Date(lastActivityAt).getTime();
     const h = ms / 36e5;
     signals.push({
       key: "no_response",
-      label: "Без отклика",
+      label: "Без активности",
       value: fmtDuration(ms),
-      detail: h > 24 ? "ОТКЛИКА НЕТ" : undefined,
+      detail: h > 24 ? "АКТИВНОСТИ НЕТ" : undefined,
       tone: h < 1 ? "good" : h < 4 ? "neutral" : h < 24 ? "warning" : "danger",
       priority: h < 1 ? 0 : h < 4 ? 1 : h < 24 ? 2 : 4,
     });

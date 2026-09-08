@@ -166,7 +166,7 @@ Computed by `computeLeadStage()` in `app/franchize/[slug]/leads/lib/pipeline-sta
 | Signal | Tone thresholds |
 |---|---|
 | time_since_first_contact | gray<24h, yellow<72h, red>72h |
-| time_since_last_action | green<1h, yellow<4h, orange<24h, red>24h |
+| time_since_last_action («Без активности») | green<1h, yellow<4h, orange<24h, red>24h. Считается от ПОСЛЕДНЕЙ АКТИВНОСТИ = max(lastSeenAt, lastModifiedAt): любое касание (ответ клиента, заметка/стадия/туду оператора) сбрасывает счётчик |
 | todo_in_focus_count | gray=0, yellow=1, red≥2 |
 | rental_start_proximity | gray>7d, yellow>1d, red<1d |
 | unclaimed_qr_age | gray<1h, yellow<17h, red>48h |
