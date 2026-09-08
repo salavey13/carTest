@@ -32,7 +32,14 @@
 // что важно для стабильности рендера и мемоизации.
 
 import type { LeadRow } from "../leads-types";
-import { isAvitoLead } from "../leads-utils";
+// 2026-09-08 BUGFIX: импорт был из "../leads-utils" — а этот файл под
+// директивой "use client". В серверной сборке getFranchizeLeads (leads.ts →
+// leads-query-core → этот модуль) такой импорт превращается в
+// createClientModuleProxy("…#isAvitoLead"): вызов из серверного кода падает
+// «TypeError: g is not a function», и страница лидов целиком не грузится.
+// Каноничная ЧИСТАЯ реализация живёт в ./lead-identity (leads-utils просто
+// ре-экспортирует её) — импортируем напрямую, семантика 1:1.
+import { isAvitoLead } from "./lead-identity";
 import { type LeadHandling, isCallbackOverdue } from "./lead-handling";
 
 // ── Канальные мультипликаторы (базовый вес ×) ───────────────────────────────
