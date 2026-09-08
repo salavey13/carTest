@@ -1,4 +1,22 @@
 ---
+Task ID: 6
+Agent: main (Super Z)
+Task: Fix lead-card SLA counter — «was not touched since» must reset when the lead is touched (boss report: counter not updated on lead update, misleading).
+
+Work Log:
+- Root cause: `sla-signals.ts` computed the card SLA counter («Без отклика», time_since_last_action) from `lastSeenAt` only — входящая активность КЛИЕНТА. Operator touches (note, stage change, todo) update `lastModifiedAt` («изм. N назад» chip) but never reset the SLA counter → card kept showing «не трогали 2 д» right after a touch.
+- `sla-signals.ts`: added `maxIso()` + `lastActivityAtOf()` — last activity = max(lastSeenAt, lastModifiedAt), invalid date strings ignored. `time_since_last_action` now reads lastActivityAt; relabeled «Без отклика»→«Без активности», detail «ОТКЛИКА НЕТ»→«АКТИВНОСТИ НЕТ» (label reflects merged semantics: no client reply AND no operator touch). Thresholds/priorities unchanged. Same policy for `days_since_stage_change` («Без движения») — actively worked leads no longer sit on it for weeks.
+- `LeadsClient.tsx`: optimistic `lastModifiedAt` bump in the add-note flow (note created_at is newer by definition) — SLA counter on the card resets instantly, without waiting for refetch.
+- `skills/leads-crm-text/leads-query.mjs` (text port): parity — added `updated_at` to intents select, `lastModifiedAt` carried + merged in `addOrMerge`, `no_response` signal now = max(lastSeenAt, lastModifiedAt, todo completed_at/created_at), same relabel.
+- Docs: `docs/leads_redesign_PRD.md` signal table + `skills/vip-bike-ops/SKILL.md` threshold table updated to the new formula.
+- Checks: vitest franchize suite 1352 passed / 0 failed (incl. leads 40, priority 25, handling 22, speed 13, achievements 54); `typecheck:franchize` strict slice passed (15 pre-existing transitive debt files, unchanged); eslint --max-warnings=0 clean on all touched files; `node --check` on the port; smoke script (scripts/sla-smoke.mjs in workspace) verified the 4 cases: note 5m ago + seen 2d ago → «5 м», untouched 3d → red «АКТИВНОСТИ НЕТ», legacy null lastModifiedAt → lastSeenAt fallback, invalid dates ignored.
+- Committed d1662c422, pushed origin/main (Vercel auto-deploy).
+
+Stage Summary:
+- Lead-card SLA counter is now honest: any touch (operator note/stage/todo via lastModifiedAt, or client reply via lastSeenAt) resets it. «С первого контакта» intentionally untouched (factual). Queue metrics in lead-speed.ts intentionally untouched (they measure never-handled leads from createdAt by design).
+- Deploy: push to main triggers Vercel build for v0-car-test.
+
+---
 Task ID: 1
 Agent: main (Super Z)
 Task: Pull main, fix testdrive pricing (5000 → free), verify testdrive docx is saved to storage, implement leads-page SPA rental links properly, list biggest files in repo for removal.
