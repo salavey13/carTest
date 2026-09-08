@@ -7,12 +7,13 @@
 // «Отправить в Авито» на странице лидов, текст улетает в реальный чат
 // покупателя через POST /messenger/v3/accounts/{user_id}/chats/{chat_id}/messages/.
 //
-// Креды: client_credentials-пара приложения с developers.avito.ru. Для
-// отправки приложению нужен скоуп `messenger:write` (для чтения —
-// `messenger:read`, он уже используется поллером). Токен минтится на лету
-// и кешируется в памяти инстанса до истечения (expires_in, обычно 24ч) —
-// как в поллере: ~2 token-запроса в день на тёплый инстанс, холодный
-// просто минтит новый. Никаких секретов в коде/репо — только env.
+// Креды: client_credentials-пара приложения (developers.avito.ru ИЛИ новые
+// «API-ключи» из кабинета: Настройки → Для профессионалов). Права (scopes)
+// в кабинете НЕ настраиваются — они запрашиваются в token-запросе (см.
+// AVITO_TOKEN_SCOPE ниже). Токен минтится на лету и кешируется в памяти
+// инстанса до истечения (expires_in, обычно 24ч) — как в поллере: ~2
+// token-запроса в день на тёплый инстанс, холодный просто минтит новый.
+// Никаких секретов в коде/репо — только env.
 //
 // Env (Vercel → Settings → Environment Variables):
 //   AVITO_CLIENT_ID / AVITO_CLIENT_SECRET — пара приложения (те же, что на
@@ -26,6 +27,15 @@
 
 const AVITO_API_BASE = "https://api.avito.ru";
 const TOKEN_URL = `${AVITO_API_BASE}/token`;
+
+/**
+ * Скоупы запрашиваются В ТОКЕН-ЗАПРОСЕ (в кабинете Авито галочек для прав
+ * нет — подтверждено владельцем и живой пробой 2026-09-09): новые «API-ключи»
+ * без явного scope выдают токен БЕЗ мессенджер-прав, и все вызовы отвечают
+ * 403 permission denied. Старым приложениям (developers.avito.ru) параметр
+ * безвреден; если Авито вдруг отвергнет scope — ретраим без него.
+ */
+const AVITO_TOKEN_SCOPE = "messenger:read messenger:write";
 
 /** Avito режет слишком длинные сообщения — страхуемся на своей стороне. */
 export const AVITO_MESSAGE_MAX_LENGTH = 3000;
@@ -73,16 +83,28 @@ export async function getAvitoAccessToken(force = false): Promise<string> {
   if (!clientId || !clientSecret) {
     throw new Error(avitoReplyConfigError() || "AVITO_CLIENT_ID/SECRET не настроены");
   }
-  const res = await fetch(TOKEN_URL, {
+  const credentials = {
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+  };
+  const headers = { "Content-Type": "application/x-www-form-urlencoded" };
+  // Попытка 1 — со скоупами (обязательно для новых API-ключей из кабинета).
+  let res = await fetch(TOKEN_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
+    headers,
+    body: new URLSearchParams({ ...credentials, scope: AVITO_TOKEN_SCOPE }),
     cache: "no-store",
   });
+  // Попытка 2 (фолбэк для старых приложений) — без scope.
+  if (!res.ok) {
+    res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers,
+      body: new URLSearchParams(credentials),
+      cache: "no-store",
+    });
+  }
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
     throw new Error(
@@ -122,7 +144,10 @@ function friendlySendError(status: number, bodyText: string): string {
     case 402:
       return "Нужна подписка «API Мессенджера» на аккаунте Авито (HTTP 402)";
     case 403:
-      return "У приложения нет права messenger:write — включите скоуп на developers.avito.ru (HTTP 403)";
+      return (
+        "У приложения нет права messenger:write, либо оно зарегистрировано " +
+        "не под тем аккаунтом Авито (нужен профиль продавца, владеющий чатами) — HTTP 403"
+      );
     case 404:
       return "Чат не найден в Авито (HTTP 404) — возможно, диалог удалён";
     case 429:

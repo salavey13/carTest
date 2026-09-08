@@ -272,4 +272,41 @@ describe("avito-messenger: token cache", () => {
     expect(t2).toBe("tok-cached");
     expect(tokenCalls).toBe(1);
   });
+
+  test("token-запрос шлёт scope messenger:read+write (новые API-ключи без scope дают пустой токен)", async () => {
+    const tokenBodies: string[] = [];
+    (global.fetch as any).mockImplementation(async (url: string, init?: any) => {
+      if (String(url).endsWith("/token")) {
+        tokenBodies.push(String(init?.body));
+        return new Response(
+          JSON.stringify({ access_token: "tok-scope", expires_in: 86400, scope: "messenger:read messenger:write" }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ id: "m" }), { status: 200 });
+    });
+    resetAvitoTokenCacheForTests();
+    const token = await getAvitoAccessToken();
+    expect(token).toBe("tok-scope");
+    expect(tokenBodies).toHaveLength(1);
+    expect(new URLSearchParams(tokenBodies[0]).get("scope")).toBe("messenger:read messenger:write");
+  });
+
+  test("если Авито отверг scope — token-запрос ретраится без него (совместимость со старыми приложениями)", async () => {
+    const tokenBodies: string[] = [];
+    (global.fetch as any).mockImplementation(async (url: string, init?: any) => {
+      if (String(url).endsWith("/token")) {
+        tokenBodies.push(String(init?.body));
+        if (tokenBodies.length === 1) return new Response("invalid scope", { status: 400 });
+        return new Response(JSON.stringify({ access_token: "tok-plain", expires_in: 86400 }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: "m" }), { status: 200 });
+    });
+    resetAvitoTokenCacheForTests();
+    const token = await getAvitoAccessToken();
+    expect(token).toBe("tok-plain");
+    expect(tokenBodies).toHaveLength(2);
+    expect(new URLSearchParams(tokenBodies[0]).get("scope")).toBe("messenger:read messenger:write");
+    expect(new URLSearchParams(tokenBodies[1]).get("scope")).toBeNull();
+  });
 });
