@@ -394,4 +394,116 @@ describe("recordPayoutForPeriod", () => {
     expect(shiftLte?.fn).toBe("lte");
     expect(shiftLte?.val).toBe("2026-08-25T23:59:59.999Z");
   });
+
+  it("2026-09-09 refine: mirrors the payout into owner_cash_entries (double-entry)", async () => {
+    // Формальная выплата (expense_salary) должна попадать и в кошелёк
+    // владельца (owner_cash_entries) — иначе кошелёк молчит об ушедших
+    // деньгах, а выплаты, занесённые только через бота, не вычитаются из
+    // «к выплате» (риск двойной выплаты).
+    setAuthMocks({ isOwner: true });
+    const walletInserts: any[] = [];
+    let txCallCount = 0;
+    setMockImpl((table: string) => {
+      if (table === "users") return buildChain({ data: { metadata: { role: "admin" } } });
+      if (table === "crews") return buildChain({ data: { id: CREW_ID, owner_id: OWNER_ID } });
+      // Таблица запрашивается ДВАЖДЫ: verifyCrewAccess (role/membership_status)
+      // и зеркало (users(...)) — возвращаем объединённую форму.
+      if (table === "crew_members")
+        return buildChain({
+          data: {
+            role: "admin",
+            membership_status: "active",
+            users: { full_name: "Салавей", username: "salavey13", metadata: {} },
+          },
+        });
+      if (table === "crew_member_shifts")
+        return buildChain({
+          data: [
+            {
+              clock_in_time: "2026-08-19T10:00:00.000Z",
+              clock_out_time: "2026-08-19T14:00:00.000Z",
+              hourly_rate: 169,
+              salary_amount: 676,
+            },
+          ],
+        });
+      if (table === "cash_transactions") {
+        txCallCount++;
+        if (txCallCount <= 2) return buildChain({ data: [] });
+        const insertChain = buildChain();
+        insertChain.insert = vi.fn(() => insertChain);
+        insertChain.select = vi.fn(() => insertChain);
+        insertChain.single = vi.fn(() => ({ data: { id: "tx-1" }, error: null }));
+        return insertChain;
+      }
+      if (table === "owner_cash_entries") {
+        const chain = buildChain({ data: { id: "wallet-1" } });
+        chain.insert = vi.fn((payload: any) => {
+          walletInserts.push(payload);
+          return chain;
+        });
+        return chain;
+      }
+      return buildChain();
+    });
+    const res = await recordPayoutForPeriod({
+      slug: "vip-bike",
+      memberId: "413553377",
+      periodStart: "2026-08-01",
+      periodEnd: "2026-09-01",
+    });
+    expect(res.success).toBe(true);
+    expect(walletInserts).toHaveLength(1);
+    const w = walletInserts[0];
+    expect(w.crew_id).toBe(CREW_ID);
+    expect(w.owner_user_id).toBe(OWNER_ID);
+    expect(w.direction).toBe("out");
+    expect(w.kind).toBe("other");
+    expect(w.amount).toBe(676);
+    expect(w.title).toBe("Зарплата Салавей");
+    expect(w.person).toContain("413553377");
+    expect(w.source).toBe("profile");
+    expect(w.created_by).toBe(OWNER_ID);
+    expect(w.entry_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("2026-09-09 refine: wallet mirror failure does NOT fail the payout (best-effort)", async () => {
+    setAuthMocks({ isOwner: true });
+    let txCallCount = 0;
+    setMockImpl((table: string) => {
+      if (table === "users") return buildChain({ data: { metadata: { role: "admin" } } });
+      if (table === "crews") return buildChain({ data: { id: CREW_ID, owner_id: OWNER_ID } });
+      if (table === "crew_members") return buildChain({ data: { role: "admin", membership_status: "active" } });
+      if (table === "crew_member_shifts")
+        return buildChain({
+          data: [
+            {
+              clock_in_time: "2026-08-19T10:00:00.000Z",
+              clock_out_time: "2026-08-19T14:00:00.000Z",
+              hourly_rate: 169,
+              salary_amount: 676,
+            },
+          ],
+        });
+      if (table === "cash_transactions") {
+        txCallCount++;
+        if (txCallCount <= 2) return buildChain({ data: [] });
+        const insertChain = buildChain();
+        insertChain.insert = vi.fn(() => insertChain);
+        insertChain.select = vi.fn(() => insertChain);
+        insertChain.single = vi.fn(() => ({ data: { id: "tx-2" }, error: null }));
+        return insertChain;
+      }
+      if (table === "owner_cash_entries") return buildChain({ data: null, error: { message: "wallet down" } });
+      return buildChain();
+    });
+    const res = await recordPayoutForPeriod({
+      slug: "vip-bike",
+      memberId: "413553377",
+      periodStart: "2026-08-01",
+      periodEnd: "2026-09-01",
+    });
+    // Выплата уже зафиксирована в формальной таблице — ошибка зеркала её не отменяет.
+    expect(res.success).toBe(true);
+  });
 });

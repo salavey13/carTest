@@ -33,6 +33,95 @@ import {
   type AttributionSource,
 } from "@/app/franchize/lib/operator-attribution";
 
+// ── 2026-09-09 salary refine: double-entry payout mirror ───────────────────
+//
+// The crew keeps TWO money ledgers: the formal salary ledger
+// (cash_transactions, transaction_type='expense_salary', to_user_id=member)
+// and the OWNER WALLET (owner_cash_entries) — the de-facto cash book the
+// assistant bot writes every real-world money move into («занеси выплату
+// механику 2500» → owner_cash_entries).
+//
+// Before this refinement the two ledgers never met:
+//   • payouts recorded here were invisible in the wallet (cash physically
+//     left the owner, wallet stayed silent), and
+//   • payouts logged ONLY via the wallet/bot were invisible to the
+//     «already paid» math below (it sums expense_salary rows only) → the
+//     salary page kept showing a balance for money already handed out in
+//     cash — a double-pay risk.
+//
+// mirrorPayoutToOwnerWallet() writes the wallet side of every formal payout.
+// Best-effort by design: the formal ledger row is the source of truth and a
+// wallet hiccup must never fail a payout that already happened. (The reverse
+// direction — bot wallet entries with salary titles — is deliberately NOT
+// auto-mirrored: titles like «Вывод себе» vs «Зарплата …» are free text and
+// unreliable to classify; backfill such rows manually.)
+async function mirrorPayoutToOwnerWallet(args: {
+  crewId?: string;
+  memberId: string;
+  amount: number;
+  actorUserId?: string;
+}): Promise<void> {
+  const { crewId, memberId, amount } = args;
+  // Best-effort guard: without a crew id there is no wallet to mirror into
+  // (cannot happen on the success path — verifyCrewAccess returns crewId).
+  if (!crewId || !(amount > 0)) return; // wallet CHECK constraint is amount > 0
+  try {
+    const { data: crewRow } = await supabaseAdmin
+      .from("crews")
+      .select("owner_id")
+      .eq("id", crewId)
+      .maybeSingle();
+
+    // Same name-resolution preference as getTeamEarnings:
+    // users.full_name → users.username → metadata.name → metadata.username.
+    const { data: memberRow } = await supabaseAdmin
+      .from("crew_members")
+      .select("users(full_name, username, metadata)")
+      .eq("crew_id", crewId)
+      .eq("user_id", memberId)
+      .maybeSingle();
+    const users = (
+      memberRow as {
+        users?: {
+          full_name?: string | null;
+          username?: string | null;
+          metadata?: Record<string, unknown> | null;
+        } | null;
+      } | null
+    )?.users ?? null;
+    const meta = (users?.metadata ?? {}) as Record<string, unknown>;
+    const memberName =
+      users?.full_name ||
+      users?.username ||
+      (typeof meta.name === "string" && meta.name) ||
+      (typeof meta.username === "string" && meta.username) ||
+      `member ${memberId}`;
+
+    // Wallet entry_date uses the Moscow calendar date (same convention as
+    // addOwnerCashEntryAction's todayMskIsoDate).
+    const entryDate = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const { error: walletError } = await supabaseAdmin.from("owner_cash_entries").insert({
+      crew_id: crewId,
+      owner_user_id: crewRow?.owner_id ? String(crewRow.owner_id) : null,
+      direction: "out",
+      kind: "other",
+      amount,
+      title: `Зарплата ${memberName}`,
+      person: `${memberName} (${memberId})`,
+      entry_date: entryDate,
+      created_by: args.actorUserId ?? memberId,
+      source: "profile",
+    });
+
+    if (walletError) {
+      logger.warn("[mirrorPayoutToOwnerWallet] wallet insert failed (payout stands):", walletError);
+    }
+  } catch (mirrorErr) {
+    logger.warn("[mirrorPayoutToOwnerWallet] exception (payout stands):", mirrorErr);
+  }
+}
+
 /**
  * I5 — Salary calculations server actions.
  * Plan: docs/superpowers/plans/2026-08-12-i5-commissions-salary.md (Task 3)
@@ -783,6 +872,14 @@ export async function recordPayout(params: {
       return { success: false, error: "Не удалось обновить статус." };
     }
 
+    // 2026-09-09 refine: wallet side of the double entry (see helper docs).
+    await mirrorPayoutToOwnerWallet({
+      crewId: plan.crew_id,
+      memberId: plan.member_id,
+      amount: Number(calc.total_income || 0),
+      actorUserId: access.actorUserId,
+    });
+
     logger.info("[recordPayout] Recorded payout", {
       salaryCalcId,
       transactionId: tx.id,
@@ -932,6 +1029,14 @@ export async function recordPayoutForPeriod(params: {
       logger.error("[recordPayoutForPeriod] Failed to create transaction:", txError);
       return { success: false, error: "Не удалось создать транзакцию." };
     }
+
+    // 2026-09-09 refine: wallet side of the double entry (see helper docs).
+    await mirrorPayoutToOwnerWallet({
+      crewId: access.crewId,
+      memberId,
+      amount: balanceDue,
+      actorUserId: access.actorUserId,
+    });
 
     logger.info("[recordPayoutForPeriod] Recorded payout", {
       memberId,
