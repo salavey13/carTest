@@ -44,6 +44,18 @@ export const callbackLeadRequestSchema = z
      * Referer браузера. Пропускаем только path+query-подобные строки.
      */
     landingPath: optionalText(500),
+    /**
+     * Название модели с формы маркетингового сайта (поле «model», свободный
+     * текст — НЕ id каталога). Падает в metadata.bikeTitle для отображения.
+     */
+    bikeTitle: optionalText(160),
+    /**
+     * Ответы квиза с формы сайта ({"права": "есть", ...}) — только примитивы,
+     * кладётся в metadata.quiz. Санитизация — в normalizeSiteLeadPayload.
+     */
+    quiz: z
+      .record(z.union([z.string().max(200), z.number(), z.boolean(), z.null()]))
+      .optional(),
     attribution: z
       .object({
         first_touch: marketingTouchSchema,

@@ -470,6 +470,135 @@ function sourceRouteFromRequest(request: NextRequest) {
   }
 }
 
+/**
+ * Форма маркетингового сайта vip-bike.ru шлёт СВОЙ нативный payload:
+ *   { name, contact, nick?, source?, model?, quiz?, requestId,
+ *     attribution: {utm_*, yclid, pageUrl, landingUrl, capturedAt, ...},
+ *     consent, _website }
+ * (обратная разработка чанка формы 2026-09-09: /api/lead → fetch POST).
+ * Наша каноническая схема — { name, phone, formSource?, landingPath?,
+ * attribution: {first_touch, last_touch, expires_at}? , bikeTitle?, quiz? }.
+ *
+ * normalizeSiteLeadPayload превращает нативный формат в канонический ДО
+ * валидации, чтобы прокси на стороне сайта был «глупым» форвардом (один POST
+ * без переписывания полей). Детекция — наличие `contact` / `source` /
+ * плоской attribution. Канонический payload проходит насквозь без изменений.
+ */
+export function normalizeSiteLeadPayload(body: unknown): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+  const raw = body as Record<string, unknown>;
+  const attributionIsFlat =
+    !!raw.attribution &&
+    typeof raw.attribution === "object" &&
+    !Array.isArray(raw.attribution) &&
+    !("first_touch" in (raw.attribution as object));
+  const isSiteShape =
+    typeof raw.contact === "string" ||
+    typeof raw.source === "string" ||
+    attributionIsFlat;
+  if (!isSiteShape) return body;
+
+  const out: Record<string, unknown> = {};
+  // Прямые поля
+  if (typeof raw.slug === "string") out.slug = raw.slug;
+  if (typeof raw.bikeId === "string") out.bikeId = raw.bikeId;
+  out.name = raw.name;
+  out.phone = typeof raw.phone === "string" ? raw.phone : raw.contact;
+  if (raw.consent !== undefined) out.consent = raw.consent;
+  if (typeof raw.nick === "string") out.nick = raw.nick;
+  if (typeof raw.formSource === "string") out.formSource = raw.formSource;
+  else if (typeof raw.source === "string") out.formSource = raw.source;
+  if (typeof raw.model === "string") out.bikeTitle = raw.model;
+  else if (typeof raw.bikeTitle === "string") out.bikeTitle = raw.bikeTitle;
+
+  // Квиз: только примитивы, ≤10 ключей, ключи ≤60 символов.
+  if (raw.quiz && typeof raw.quiz === "object" && !Array.isArray(raw.quiz)) {
+    const quiz: Record<string, string | number | boolean | null> = {};
+    for (const [k, v] of Object.entries(raw.quiz as Record<string, unknown>)) {
+      if (Object.keys(quiz).length >= 10) break;
+      const key = k.slice(0, 60);
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean" || v === null) {
+        quiz[key] = v;
+      }
+    }
+    if (Object.keys(quiz).length > 0) out.quiz = quiz;
+  }
+
+  // Атрибуция: плоский объект сайта → first_touch/last_touch + expires_at.
+  if (raw.attribution && typeof raw.attribution === "object" && !Array.isArray(raw.attribution)) {
+    const flat = raw.attribution as Record<string, unknown>;
+    if (typeof flat.first_touch === "object") {
+      out.attribution = raw.attribution; // уже канонический вид
+    } else {
+      const pageUrl =
+        typeof flat.pageUrl === "string" && flat.pageUrl
+          ? flat.pageUrl
+          : typeof flat.landingUrl === "string"
+            ? flat.landingUrl
+            : "";
+      let landingPath = "";
+      try {
+        if (pageUrl) {
+          const u = new URL(pageUrl);
+          landingPath = `${u.pathname}${u.search}`.slice(0, 500);
+        }
+      } catch {
+        landingPath = "";
+      }
+      if (landingPath && !out.landingPath) out.landingPath = landingPath;
+      const capturedAt =
+        typeof flat.capturedAt === "string" && flat.capturedAt
+          ? flat.capturedAt
+          : new Date().toISOString();
+      const referrerHost =
+        typeof flat.referrer_host === "string"
+          ? flat.referrer_host
+          : typeof flat.referrer === "string" && flat.referrer
+            ? (() => {
+                try {
+                  return new URL(flat.referrer).host;
+                } catch {
+                  return undefined;
+                }
+              })()
+            : undefined;
+      const touch: Record<string, unknown> = {
+        landing_path: landingPath || "/unknown-site",
+        captured_at: capturedAt,
+      };
+      for (const key of [
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_content",
+        "utm_term",
+        "yclid",
+        "campaign_id",
+        "ad_id",
+        "adgroup_id",
+        "gbid",
+        "keyword",
+        "device",
+        "region_name",
+      ]) {
+        const v = flat[key];
+        if (typeof v === "string" && v) touch[key] = v.slice(0, 500);
+      }
+      if (referrerHost) touch.referrer_host = referrerHost.slice(0, 500);
+      let expiresAt: string;
+      try {
+        expiresAt = new Date(Date.parse(capturedAt) + 90 * 24 * 60 * 60 * 1000).toISOString();
+      } catch {
+        expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      }
+      out.attribution = { first_touch: touch, last_touch: touch, expires_at: expiresAt };
+    }
+  }
+
+  // requestId/_website и прочий мусор канонической схемой не нужны — молча роняем.
+  return out;
+}
+
 async function handleVipBikeRentalCallback(request: NextRequest) {
   try {
     const trusted = isTrustedIngest(request);
@@ -509,6 +638,10 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Нативный payload формы vip-bike.ru (contact/source/model/flat utm)
+    // → каноническая схема; канонический payload проходит насквозь.
+    requestBody = normalizeSiteLeadPayload(requestBody);
 
     const parsed = callbackLeadRequestSchema.safeParse(requestBody);
     if (!parsed.success) {
@@ -590,7 +723,7 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       name: input.name,
       phone: normalizedPhone,
       requestId,
-      bikeTitle: bikeTitle || null,
+      bikeTitle: bikeTitle || input.bikeTitle || null,
       sourceRoute,
       attribution: input.attribution || null,
       attributionTrust: "client_supplied",
@@ -600,6 +733,7 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       ipHash,
       ...(input.nick ? { nick: input.nick } : {}),
       ...(input.formSource ? { formSource: input.formSource } : {}),
+      ...(input.quiz && Object.keys(input.quiz).length > 0 ? { quiz: input.quiz } : {}),
       ...(trusted ? { ingest: "site_proxy" } : {}),
     };
 

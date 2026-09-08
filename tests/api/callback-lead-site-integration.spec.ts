@@ -230,4 +230,103 @@ describe("vip-bike.ru site form → callback-lead", () => {
     // Unsafe path fell back to the default source route.
     expect(capture![1].p_source_route).toBe("/franchize/vip-bike");
   });
+
+  test("site-NATIVE payload (contact/source/model/quiz/flat utm) is normalized before validation", async () => {
+    vi.stubGlobal("fetch", fetchMock());
+    // Точный формат, который шлёт форма vip-bike.ru (обратная разработка
+    // чанка 0p02d2fpu3t22.js, 2026-09-09): contact вместо phone, source вместо
+    // formSource, модель свободным текстом, плоская attribution, requestId и
+    // _website, которых в канонической схеме нет.
+    const response = await POST(
+      new NextRequest("https://rental.vip-bike.ru/api/franchize/vip-bike/callback-lead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-real-ip": "203.0.113.77",
+          "x-callback-ingest-secret": "site-shared-secret",
+        },
+        body: JSON.stringify({
+          name: "Клиент Сайта",
+          contact: "+7 903 555-00-11",
+          nick: "@site_dude",
+          source: "home-final",
+          model: "Y-VOLT Surge V",
+          quiz: { "права": "категория A", "город": "НН" },
+          requestId: "8e2f1c5a-0000-4000-8000-000000000000",
+          attribution: {
+            utm_source: "yandex",
+            utm_medium: "cpc",
+            utm_campaign: "brand",
+            utm_content: "banner-1",
+            utm_term: "электромотоцикл",
+            yclid: "1234567890",
+            pageUrl: "https://vip-bike.ru/?utm_source=yandex",
+            landingUrl: "https://vip-bike.ru/",
+            capturedAt: "2026-09-09T10:00:00.000Z",
+          },
+          consent: true,
+          _website: "vb-main",
+        }),
+      }),
+    );
+    const payload = await response.json();
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({ success: true });
+
+    const capture = mocks.rpcCalls.find(([name]) => name === "capture_vip_bike_callback_intent");
+    expect(capture).toBeTruthy();
+    const meta = capture![1].p_metadata as Record<string, unknown>;
+    expect(meta).toMatchObject({
+      name: "Клиент Сайта",
+      phone: "+79035550011",
+      nick: "@site_dude",
+      formSource: "home-final",
+      bikeTitle: "Y-VOLT Surge V",
+      quiz: { "права": "категория A", "город": "НН" },
+    });
+    // pageUrl (path+query) стал source_route; utm-карта легла в last_touch.
+    expect(capture![1].p_source_route).toBe("/?utm_source=yandex");
+    const attribution = meta.attribution as {
+      first_touch: Record<string, string>;
+      last_touch: Record<string, string>;
+      expires_at: string;
+    };
+    expect(attribution.first_touch).toMatchObject({
+      utm_source: "yandex",
+      utm_medium: "cpc",
+      utm_campaign: "brand",
+      utm_term: "электромотоцикл",
+      yclid: "1234567890",
+      landing_path: "/?utm_source=yandex",
+      captured_at: "2026-09-09T10:00:00.000Z",
+    });
+    expect(attribution.last_touch).toMatchObject({ utm_source: "yandex" });
+    expect(attribution.expires_at).toBeTruthy();
+  });
+
+  test("canonically-shaped payload passes through normalization untouched", async () => {
+    vi.stubGlobal("fetch", fetchMock());
+    const response = await POST(
+      new NextRequest("https://rental.vip-bike.ru/api/franchize/vip-bike/callback-lead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-real-ip": "203.0.113.77",
+        },
+        body: JSON.stringify({
+          slug: "vip-bike",
+          name: "Олег",
+          phone: "+7 903 123-45-67",
+          consent: true,
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const capture = mocks.rpcCalls.find(([name]) => name === "capture_vip_bike_callback_intent");
+    const meta = capture![1].p_metadata as Record<string, unknown>;
+    expect(meta).toMatchObject({ phone: "+79031234567" });
+    // Без formSource атрибуции нет → metadata.attribution === null (как раньше).
+    expect(meta.formSource).toBeUndefined();
+    expect(meta.bikeTitle).toBeNull();
+  });
 });
