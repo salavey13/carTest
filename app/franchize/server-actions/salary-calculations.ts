@@ -8,6 +8,8 @@ import {
   handleError,
   successResponse,
   errorResponse,
+  normalizePeriodStart,
+  normalizePeriodEnd,
   type ActionResponse,
 } from "./shared/auth-helpers";
 import {
@@ -817,12 +819,23 @@ export async function recordPayoutForPeriod(params: {
   const { slug, memberId, periodStart, periodEnd } = params;
 
   // Validate period
-  const startDate = new Date(periodStart);
-  const endDate = new Date(periodEnd);
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+  // 2026-09-09 review fix: normalize date-only inputs the SAME way as
+  // getOwnerSalaryOverview does. Previously `new Date("YYYY-MM-DD")` made
+  // periodEnd a UTC MIDNIGHT, so the last day of the pay period (e.g. the
+  // 25th itself — a payout-schedule day!) was silently EXCLUDED from the
+  // accrued/already-paid math, while the overview page included it
+  // (23:59:59.999). Result: overview shows a balance, the payout paid a
+  // smaller amount, and the leftover balance could never be paid out
+  // (second click → «Баланс к выплате равен нулю»).
+  const normalizedStartMs = Date.parse(normalizePeriodStart(periodStart));
+  const normalizedEndMs = Date.parse(normalizePeriodEnd(periodEnd));
+  if (
+    !Number.isFinite(normalizedStartMs) ||
+    !Number.isFinite(normalizedEndMs)
+  ) {
     return { success: false, error: "Некорректный формат дат периода." };
   }
-  if (startDate >= endDate) {
+  if (normalizedStartMs >= normalizedEndMs) {
     return { success: false, error: "Дата начала должна быть раньше даты окончания." };
   }
 
@@ -835,17 +848,18 @@ export async function recordPayoutForPeriod(params: {
       };
     }
 
-    const periodStartIso = startDate.toISOString();
-    const periodEndIso = endDate.toISOString();
+    const periodStartIso = new Date(normalizedStartMs).toISOString();
+    const periodEndIso = new Date(normalizedEndMs).toISOString();
 
     // Compute accrued for this member in this period (shifts + commissions)
+    // 2026-09-09: lte на конце периода — 1:1 с getOwnerSalaryOverview.
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
       .eq("crew_id", access.crewId)
       .eq("member_id", memberId)
       .gte("clock_in_time", periodStartIso)
-      .lt("clock_in_time", periodEndIso);
+      .lte("clock_in_time", periodEndIso);
 
     const shiftAccrued = (shifts || []).reduce((sum: number, s: any) => {
       const stored = Number(s.salary_amount || 0);
@@ -865,7 +879,7 @@ export async function recordPayoutForPeriod(params: {
       .eq("to_user_id", memberId)
       .eq("transaction_type", "expense_commission")
       .gte("transaction_date", periodStartIso)
-      .lt("transaction_date", periodEndIso);
+      .lte("transaction_date", periodEndIso);
     const commissionAccrued = (commissions || []).reduce(
       (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
       0,
@@ -881,7 +895,7 @@ export async function recordPayoutForPeriod(params: {
       .eq("to_user_id", memberId)
       .eq("transaction_type", "expense_salary")
       .gte("transaction_date", periodStartIso)
-      .lt("transaction_date", periodEndIso);
+      .lte("transaction_date", periodEndIso);
     const alreadyPaid = (payouts || []).reduce(
       (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
       0,

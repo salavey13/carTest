@@ -339,4 +339,59 @@ describe("recordPayoutForPeriod", () => {
       expect(res.data.transactionId).toBe("tx-1");
     }
   });
+
+  it("2026-09-09 regression: date-only periodEnd is END-OF-DAY (matches getOwnerSalaryOverview), not UTC midnight", async () => {
+    // Баг: `new Date("2026-08-25")` = полночь → целый последний день периода
+    // (выплатной день по расписанию!) выпадал из начисления при выплате,
+    // хотя страница зарплат его показывала. Теперь период нормализуется теми
+    // же хелперами, что и обзор: end = 23:59:59.999, фильтры .lte.
+    setAuthMocks({ isOwner: true });
+    const filterCalls: Array<{ fn: string; col: string; val: string }> = [];
+    let txCallCount = 0;
+    setMockImpl((table: string) => {
+      if (table === "users") return buildChain({ data: { metadata: { role: "admin" } } });
+      if (table === "crews") return buildChain({ data: { id: CREW_ID, owner_id: OWNER_ID } });
+      if (table === "crew_members") return buildChain({ data: { role: "admin", membership_status: "active" } });
+      const chain = buildChain({
+        data: table === "crew_member_shifts"
+          ? [{ clock_in_time: "2026-08-25T10:00:00.000Z", clock_out_time: "2026-08-25T14:00:00.000Z", hourly_rate: 500, salary_amount: 2000 }]
+          : [],
+      });
+      for (const fn of ["gte", "lte", "lt", "gt"] as const) {
+        const orig = chain[fn];
+        chain[fn] = (col: string, val: string) => {
+          filterCalls.push({ fn, col, val });
+          return orig(col, val);
+        };
+      }
+      if (table === "cash_transactions") {
+        txCallCount++;
+        if (txCallCount <= 2) return chain;
+        const insertChain = buildChain();
+        insertChain.insert = vi.fn(() => insertChain);
+        insertChain.select = vi.fn(() => insertChain);
+        insertChain.single = vi.fn(() => ({ data: { id: "tx-2" }, error: null }));
+        return insertChain;
+      }
+      return chain;
+    });
+    const res = await recordPayoutForPeriod({
+      slug: "vip-bike",
+      memberId: OWNER_ID,
+      periodStart: "2026-08-10",
+      periodEnd: "2026-08-25",
+    });
+    expect(res.success).toBe(true);
+    // Смена 25-го числа 10:00–14:00 по 500 ₽/ч = 2000 ₽ — БЕЗ регрессии
+    // она выпадала бы из периода (periodEnd = полночь 25-го).
+    if (res.success && res.data) {
+      expect(res.data.paidAmount).toBe(2000);
+    }
+    // Границы периода: начало 00:00:00.000, конец 23:59:59.999 (как в обзоре).
+    const shiftGte = filterCalls.find((c) => c.col === "clock_in_time" && c.fn === "gte");
+    const shiftLte = filterCalls.find((c) => c.col === "clock_in_time" && (c.fn === "lte" || c.fn === "lt"));
+    expect(shiftGte?.val).toBe("2026-08-10T00:00:00.000Z");
+    expect(shiftLte?.fn).toBe("lte");
+    expect(shiftLte?.val).toBe("2026-08-25T23:59:59.999Z");
+  });
 });
