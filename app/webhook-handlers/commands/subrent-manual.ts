@@ -32,7 +32,7 @@ import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franc
 import { createHash } from "crypto";
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
-import { getCrewBikes, getAllBikes, loadTemplateForCrew } from "../lib/crew-access";
+import { getCrewBikes, getAllBikes, loadTemplateForCrewWithOverrides } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
@@ -1925,7 +1925,7 @@ async function generateAndSendContract(context: SubrentFlowContext, userId: stri
     };
 
     // Load template — check crew-specific first
-    const template = loadTemplateForCrew("subrental", resolvedCrewSlug);
+    const template = await loadTemplateForCrewWithOverrides("subrental", resolvedCrewSlug);
 
     // Generate DOCX
     const docFileName = `subrental-${context.bikeMake}-${context.bikeModel}-${now.toISOString().split("T")[0]}.docx`

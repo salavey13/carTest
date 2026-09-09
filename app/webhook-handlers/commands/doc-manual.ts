@@ -62,7 +62,7 @@ import { buildDocSuccessMessage, buildDocAdminAuditMessage } from "@/app/franchi
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 import { createRentalVerificationTodos } from "@/app/franchize/server-actions/rental-verification-todos";
-import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
+import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrewWithOverrides } from "../lib/crew-access";
 
 // ── escapeHtml: HTML-escape user-provided strings for safe embedding in Telegram HTML messages ──
 function escapeHtml(s: unknown): string {
@@ -1577,6 +1577,14 @@ async function createRentalFromDocContract(
       return null;
     }
 
+    // iter21: deposit mirror values (same math as insertDepositEntries below).
+    // СТС-pledge means no cash deposit was taken → columns stay unset (0/NULL).
+    const rentalDepositAmount = context.stsPledgeUsed ? 0 : Number(context.depositOverride || "20000");
+    const depCashPortion = context.depositCashAmount || 0;
+    const depCardPortion = context.depositCardAmount || 0;
+    // No destination info (legacy flows) defaults to cash — matches insertDepositEntries.
+    const rentalDepositMethod = depCardPortion > 0 ? "bank_transfer" : "cash";
+
     // Create rentals row
     const rentalInsert = {
       user_id: crewOwnerChatId,
@@ -1591,6 +1599,17 @@ async function createRentalFromDocContract(
       status: 'active',
       payment_status: 'fully_paid',
       total_cost: Math.round(totalCost),
+      // iter21: real table-column mirror of the collected deposit — same shape
+      // the web checkout writes (actions-runtime.ts iter20). Without this the
+      // cron CSV (rentals.deposit_amount / .deposit_method) showed 0 /
+      // «способ не указан» for EVERY /doc rental, hiding unpaid pledges.
+      // rentals.deposit_method CHECK allows only cash|bank_transfer|telegram_stars|none,
+      // so tbank/sber card portions map to 'bank_transfer'.
+      ...(rentalDepositAmount > 0 ? {
+        deposit_amount: rentalDepositAmount,
+        deposit_method: rentalDepositMethod,
+        deposit_collected_at: new Date().toISOString(),
+      } : {}),
       metadata: {
         source: 'doc_command',
         daily_price: dailyPrice,
@@ -1930,7 +1949,7 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
     const templateKey = isRent ? "rental" : "sale";
     let htmlTemplate: string;
     try {
-      htmlTemplate = loadTemplateForCrew(templateKey, resolvedSlug);
+      htmlTemplate = await loadTemplateForCrewWithOverrides(templateKey, resolvedSlug);
     } catch (templateErr) {
       logger.error("[/doc] Failed to load template:", templateErr);
       await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден. Обратитесь к администратору.", [], { removeKeyboard: true });

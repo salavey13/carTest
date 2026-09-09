@@ -118,7 +118,9 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                         member_id: userId,
                         crew_id: crew_id,
                         clock_in_time: clockInIso,
-                        hourly_rate: 169,
+                        // hourly_rate намеренно не передаём: триггер
+                        // sync_hourly_rate_on_shift_start проставит ставку
+                        // из users.metadata.hourly_rate (дефолт 500).
                     });
                     // iter24: clock-in achievements — first shift (classic) +
                     // early bird (<10:00 МСК), dawn patrol (<07:00 МСК),
@@ -161,7 +163,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                             const clockOut = Date.now();
                             const clockOutIso = new Date(clockOut).toISOString();
                             const durationMinutes = Math.round((clockOut - clockIn) / 60000);
-                            const rate = shiftData.hourly_rate || 169;
+                            const rate = shiftData.hourly_rate || 500;
                             const salaryAmount = (durationMinutes / 60) * rate;
                             // 2026-08-19 review: stash the earned amount + duration
                             // so we can include it in the user-facing message.

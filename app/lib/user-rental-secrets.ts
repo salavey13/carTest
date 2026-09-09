@@ -108,12 +108,15 @@ export async function isCrewMember(chatId: string, crewSlug: string): Promise<bo
       return true;
     }
 
-    // Then check if chat_id is a member of this crew
+    // Then check if chat_id is a member of this crew.
+    // membership_status='active' — pending/kicked members must not count
+    // (parity with getUserCrews in webhook-handlers/lib/crew-access.ts).
     const { data: member, error: memberError } = await supabaseAdmin
       .from("crew_members")
       .select("user_id")
       .eq("crew_id", crew.id)
       .eq("user_id", chatId)
+      .eq("membership_status", "active")
       .maybeSingle();
 
     if (memberError) {

@@ -45,7 +45,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
-import { loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
+import { loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrewWithOverrides } from "../lib/crew-access";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
 
 // Reuse utilities from doc-manual
@@ -1791,7 +1791,7 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
     const templateKey = isRent ? "equipment_rental" : "equipment_sale";
     let htmlTemplate: string;
     try {
-      htmlTemplate = loadTemplateForCrew(templateKey, crewSlug);
+      htmlTemplate = await loadTemplateForCrewWithOverrides(templateKey, crewSlug);
     } catch (templateErr) {
       logger.error("[/ekip] Failed to load template:", templateErr);
       await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден. Обратитесь к администратору.", [], { removeKeyboard: true });

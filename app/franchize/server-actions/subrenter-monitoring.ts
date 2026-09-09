@@ -1081,8 +1081,8 @@ export async function generateSubrenterWeeklyReportAction(
     };
 
     // Template: crew-specific first, general fallback (same loader as /subrent)
-    const { loadTemplateForCrew } = await import("@/app/webhook-handlers/lib/crew-access");
-    const template = loadTemplateForCrew("subrent_weekly_report", slug);
+    const { loadTemplateForCrewWithOverrides } = await import("@/app/webhook-handlers/lib/crew-access");
+    const template = await loadTemplateForCrewWithOverrides("subrent_weekly_report", slug);
 
     const { buildFranchizeDocxFromTemplate } = await import("@/app/franchize/lib/docx-capability");
     const fileName = `subrent-weekly-report-${slug}-${chatId}-${from}.docx`;

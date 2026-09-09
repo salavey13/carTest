@@ -32,7 +32,7 @@ import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-tod
 import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrew } from "../lib/crew-access";
+import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrewWithOverrides } from "../lib/crew-access";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
@@ -668,7 +668,7 @@ async function generateContract(chatId: number, userId: string, context: TestDri
     // Load template — check crew-specific first
     let htmlTemplate: string;
     try {
-      htmlTemplate = loadTemplateForCrew("testdrive", crewSlug);
+      htmlTemplate = await loadTemplateForCrewWithOverrides("testdrive", crewSlug);
     } catch (templateErr) {
       logger.error("[/testdrive] Failed to load template:", templateErr);
       await sendComplexMessage(chatId, "🚨 Ошибка: шаблон договора не найден.", [], { removeKeyboard: true });

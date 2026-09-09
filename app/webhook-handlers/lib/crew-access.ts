@@ -247,6 +247,73 @@ const CREW_DOCS_DIR = "docs/crewDocs";
 const GENERAL_DOCS_DIR = "docs";
 
 /**
+ * templateKey → ключ(и) в `private.crew_secrets.doc_templates` — том же JSONB,
+ * который пишет веб-редактор шаблонов (см. actions-runtime.ts:2034:
+ * rentalDealTemplate / saleDealTemplate / serviceDealTemplate / equipmentDealTemplate).
+ * Бот обязан читать СНАЧАЛА его, иначе шаблон, отредактированный в UI,
+ * не попадает в /doc, /testdrive, /subrent, /ekip.
+ */
+const SECURE_TEMPLATE_KEYS: Record<string, string[]> = {
+  rental: ["rentalDealTemplate"],
+  sale: ["saleDealTemplate"],
+  testdrive: ["testdriveDealTemplate"],
+  subrental: ["subrentalDealTemplate"],
+  commercial_proposal: ["commercialProposalDealTemplate"],
+  equipment_rental: ["equipmentDealTemplate", "equipmentRentalDealTemplate"],
+  equipment_sale: ["equipmentDealTemplate", "equipmentSaleDealTemplate"],
+  subrent_weekly_report: ["subrentWeeklyReportTemplate"],
+};
+
+function parseTemplatesRecord(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+/**
+ * Priority (mirrors the web flow, actions-runtime loadContractTemplate):
+ *   0. `private.crew_secrets.doc_templates` (what the web template editor writes)
+ *   1. `docs/crewDocs/{crewSlug}_{templateFile}` — crew-specific file override
+ *   2. `docs/{templateFile}` — general fallback
+ */
+export async function loadTemplateForCrewWithOverrides(
+  templateKey: string,
+  crewSlug?: string,
+): Promise<string> {
+  if (crewSlug) {
+    const candidates = SECURE_TEMPLATE_KEYS[templateKey] ?? [];
+    if (candidates.length > 0) {
+      try {
+        const { data } = await privateSchema()
+          .from("crew_secrets")
+          .select("doc_templates")
+          .eq("crew_slug", crewSlug)
+          .maybeSingle();
+        const templates = parseTemplatesRecord(data?.doc_templates);
+        for (const key of candidates) {
+          const value = templates[key];
+          if (typeof value === "string" && value.trim().length > 0) {
+            logger.info(`[crew-access] Using doc_templates override: ${key} (${crewSlug})`);
+            return value;
+          }
+        }
+      } catch (error) {
+        logger.warn(`[crew-access] doc_templates read failed for ${crewSlug}, falling back to files:`, error);
+      }
+    }
+  }
+  return loadTemplateForCrew(templateKey, crewSlug);
+}
+
+/**
  * Template names mapped to their file names.
  */
 const TEMPLATE_FILES: Record<string, string> = {

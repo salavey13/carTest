@@ -372,25 +372,21 @@ export interface CallbackLeadInput {
 }
 
 /**
- * Занести CUSTOMER callback-лид (CTA с vip-bike.ru, пришёл форвардом в Telegram).
+ * Занести CUSTOMER callback-лид (CTA с сайта/Avito, пришёл форвардом в Telegram).
  *
- * Semantics: intent_type='contact_click', stage='contacted' — клиент оставил
- * заявку «перезвоните мне» (контакт установлен, ждёт звонка). Это единственный
- * combo из разрешённых CHECK-констрейнтом, который подходит под CTA-форму.
+ * Semantics: intent_type='callback_request', stage='lead_captured' — тот же
+ * combo, что пишет сайт-роут /api/franchize/callback-lead/route.ts (канон
+ * с 20260722010000: оба значения входят в CHECK). Раньше писали
+ * contact_click/contacted — из-за этого лиды бота падали в SOURCE_META.unknown
+ * («Клиент») в UI и дедуп не ловил сайт-лиды → дубли.
  *
- * ВАЖНО про сайт: роут /api/franchize/callback-lead/route.ts шлёт
- * intent_type='callback_request', stage='lead_captured' — НИ ТО НИ ДРУГОЕ не входит
- * в franchize_intents_intent_type_allowed / _stage_allowed → сайтый insert МОЛЧА
- * падает на констрейнте (warn в лог). Поэтому сайт эти лиды НЕ сохраняет, и роль
- * бота — единственный надёжный источник записей. (Сайт шлёт только forward-telegram.)
- *
- * contact_channel='telegram_forward' — отличаем от сайтовой задуманной 'web_callback'
+ * contact_channel='telegram_forward' — отличаем от сайтовой 'web_callback'
  * и от UI-клика кнопки 'telegram_bot'.
  *
- * Дедупликация: если за последние `dedupeHours` (default 2ч) уже есть callback-лид
- * с тем же телефоном — НЕ создаём новый, возвращаем существующий id. Ловит и по
- * phone, и по telegram_user_id (или-фильтром). Защищает от дублей при двойном
- * форварде сообщения.
+ * Дедупликация: если за последние `dedupeHours` (default 2ч) уже есть лид
+ * с тем же телефоном (любой intent/stage — сайт-лиды тоже ловим) — НЕ создаём
+ * новый, возвращаем существующий id. Ловит и по phone, и по telegram_user_id
+ * (или-фильтром). Защищает от дублей при двойном форварде сообщения.
  */
 export async function addCallbackLead(
   input: CallbackLeadInput,
@@ -405,8 +401,6 @@ export async function addCallbackLead(
     const { data: existing, error } = await sb
       .from('franchize_intents')
       .select('id')
-      .eq('intent_type', 'contact_click')
-      .eq('stage', 'contacted')
       .or(`phone.eq.${phone},telegram_user_id.eq.${phone}`)
       .gte('created_at', since)
       .order('created_at', { ascending: false })
@@ -424,8 +418,8 @@ export async function addCallbackLead(
     .insert({
       slug: input.crewSlug,
       bike_id: input.bikeId ?? null,
-      intent_type: 'contact_click',
-      stage: 'contacted',
+      intent_type: 'callback_request',
+      stage: 'lead_captured',
       source_route: input.sourceRoute ?? '/telegram/cta-forward',
       contact_channel: 'telegram_forward',
       telegram_user_id: phone || null,
@@ -510,8 +504,8 @@ export async function addAvitoLead(
     .insert({
       slug: input.crewSlug,
       bike_id: input.bikeId ?? null,
-      intent_type: 'contact_click',
-      stage: 'contacted',
+      intent_type: 'callback_request',
+      stage: 'lead_captured',
       source_route: input.avitoUrl ?? '/avito/forward',
       contact_channel: 'avito',
       telegram_user_id: phone || null,
