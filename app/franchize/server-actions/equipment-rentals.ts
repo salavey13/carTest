@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import {
   verifyCrewAccess,
   handleError,
@@ -11,15 +12,30 @@ import {
   type ActionResponse,
   type CrewAccessResult,
 } from "./shared/auth-helpers";
+import {
+  itemDailyPrice,
+  conditionToUnifiedStatus,
+  conditionToEquipmentCondition,
+  unifiedToLegacyStatus,
+  pickCrewEquipmentByCategory,
+  EQUIPMENT_FLAG_TO_CATEGORY,
+  type EquipmentCatalogItem,
+} from "@/app/franchize/lib/equipment-shared";
 
 /**
- * I5 — Equipment rentals server actions.
- * Plan: docs/superpowers/plans/2026-08-12-i5-equipment-rentals.md (Task 2)
- * Contract: PLAN-I5-SERVICE-OPERATIONS.md п.6 (server actions pattern)
+ * I5 — Equipment rentals server actions (2026-09-10 UNIFIED STORAGE).
  *
- * Equipment = cars rows with type='equipment' (helmets, jackets, gloves, etc.)
- * Rentals stored in equipment_rentals table, optionally linked to bike rental via
- * primary_rental_id (NULL = standalone rental).
+ * Equipment = cars rows with type='equipment' (helmets, jackets, gloves, etc.).
+ * Since migration 20260815000001 (+ 20260910120000) equipment rentals live in
+ * the SAME `rentals` table as bike rentals, marked with
+ * `metadata.item_type='equipment'` — one pipeline, one money ledger, one
+ * analytics surface. The legacy `equipment_rentals` table is a read-only
+ * archive; this module no longer writes to it.
+ *
+ * Metadata vocabulary (keep in sync with bot /ekip + web checkout):
+ *   item_type: 'equipment' | 'bike'
+ *   crew_id, daily_price, equipment_size, equipment_condition, damage_reports[]
+ *   primary_rental_id (equipment issued together with a bike rental)
  */
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -57,20 +73,18 @@ export interface EquipmentRental {
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 /**
- * Create a new equipment rental.
+ * Create a new equipment rental (unified `rentals` row).
  *
- * Validates that the equipment exists and has type='equipment', then creates a rental record.
- * Total cost is automatically calculated based on the daily price and rental duration.
- *
- * @param input - Rental parameters including equipment ID, pricing, and dates
- * @returns Success with rental ID, or error with message
+ * Validates that the equipment exists and has type='equipment', then creates
+ * a rental record with metadata.item_type='equipment'. Total cost is
+ * automatically calculated based on the daily price and rental duration.
  *
  * @example
  * ```ts
  * const result = await createEquipmentRental({
  *   slug: "my-crew",
  *   actorUserId: "user-123",
- *   equipmentId: "equip-helmet-m",
+ *   equipmentId: "equip-helmet-street-pro-vip-bike",
  *   dailyPrice: 200,
  *   expectedReturnDate: "2026-08-15"
  * });
@@ -95,7 +109,7 @@ export async function createEquipmentRental(
     // Verify equipment exists and is type='equipment'
     const { data: equipment, error: equipError } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, type")
+      .select("id, make, model, type, daily_price, specs")
       .eq("id", equipmentId)
       .maybeSingle();
 
@@ -118,37 +132,58 @@ export async function createEquipmentRental(
 
     const totalCost = dailyPrice * days;
 
-    // Create rental
+    // Owner placeholder (same approach as bot /doc and /ekip flows)
+    const ownerChatId = await resolveCrewOwnerChatId(supabaseAdmin, access.crewId) || actorUserId;
+
+    const startIso = new Date().toISOString();
+    const endIso = expectedReturnDate
+      ? new Date(expectedReturnDate).toISOString()
+      : null;
+
+    // Create unified rental row
     const { data: rental, error: insertError } = await supabaseAdmin
-      .from("equipment_rentals")
+      .from("rentals")
       .insert({
+        user_id: renterUserId || ownerChatId,
+        owner_id: ownerChatId,
+        created_by_operator_chat_id: actorUserId,
         crew_id: access.crewId,
-        equipment_id: equipmentId,
-        renter_user_id: renterUserId || null,
-        primary_rental_id: primaryRentalId || null,
-        expected_return_date: expectedReturnDate || null,
-        daily_price: dailyPrice,
-        total_cost: totalCost,
+        vehicle_id: equipmentId,
+        requested_start_date: startIso,
+        requested_end_date: endIso,
+        agreed_start_date: startIso,
+        agreed_end_date: endIso,
         status: "active",
-        issued_by: access.actorUserId,  // CR fix M6: cookie-derived, not client-supplied
-        issued_at: new Date().toISOString(),
-        created_by: access.actorUserId,  // CR fix M6: cookie-derived
+        payment_status: "fully_paid",
+        total_cost: totalCost,
+        metadata: {
+          source: "web_equipment_client",
+          item_type: "equipment",
+          crew_id: access.crewId,
+          daily_price: dailyPrice,
+          equipment_title: `${equipment.make} ${equipment.model}`,
+          equipment_condition: "Выдан",
+          damage_reports: [],
+          primary_rental_id: primaryRentalId || null,
+          issued_by: actorUserId,
+          issued_at: startIso,
+        },
       })
-      .select("id")
-      .single();
+      .select("rental_id")
+      .maybeSingle();
 
     if (insertError || !rental) {
       logger.error("[createEquipmentRental] Insert failed:", insertError);
       return { success: false, error: "Не удалось создать аренду." };
     }
 
-    logger.info("[createEquipmentRental] Created equipment rental", {
-      id: rental.id,
+    logger.info("[createEquipmentRental] Created unified equipment rental", {
+      id: rental.rental_id,
       equipmentId,
       crewId: access.crewId,
     });
 
-    return { success: true, data: { id: rental.id } };
+    return { success: true, data: { id: rental.rental_id } };
   } catch (err) {
     logger.error("[createEquipmentRental] Exception:", err);
     return errorResponse(handleError(err, "createEquipmentRental"));
@@ -157,7 +192,11 @@ export async function createEquipmentRental(
 
 /**
  * Return an equipment rental.
- * Sets status, returned_at, received_by, and condition_notes.
+ * Maps the legacy condition vocabulary onto the unified rentals pipeline:
+ *   returned → completed, damaged/lost → disputed
+ * and records the return in metadata (equipment_condition + damage_reports).
+ * The money trigger (auto_create_rental_transaction) writes income_equipment
+ * on this transition — idempotently.
  */
 export async function returnEquipmentRental(
   input: ReturnEquipmentRentalInput,
@@ -174,29 +213,71 @@ export async function returnEquipmentRental(
       return { success: false, error: access.error };
     }
 
-    // Update rental
-    const { data: rental, error: updateError } = await supabaseAdmin
-      .from("equipment_rentals")
+    // Read the current row so metadata can be patched (not replaced)
+    const { data: current, error: readError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, metadata, status")
+      .eq("rental_id", id)
+      .eq("crew_id", access.crewId)
+      .eq("metadata->>item_type", "equipment")
+      .maybeSingle();
+
+    if (readError) {
+      logger.error("[returnEquipmentRental] Read failed:", readError);
+      return { success: false, error: "Не удалось обновить аренду." };
+    }
+
+    if (!current) {
+      return { success: false, error: "Аренда не найдена или уже закрыта." };
+    }
+
+    if (current.status === "completed" || current.status === "disputed") {
+      return { success: false, error: "Аренда не найдена или уже закрыта." };
+    }
+
+    const meta = (current.metadata || {}) as Record<string, unknown>;
+    const damageReports = Array.isArray(meta.damage_reports) ? meta.damage_reports : [];
+    const nextMetadata = {
+      ...meta,
+      equipment_condition: conditionToEquipmentCondition(condition),
+      received_by: actorUserId,
+      returned_at: new Date().toISOString(),
+      damage_reports: conditionNotes
+        ? [...damageReports, {
+            phase: "return",
+            severity: condition === "returned" ? "minor" : "major",
+            notes: conditionNotes,
+            created_at: new Date().toISOString(),
+            created_by: actorUserId,
+          }]
+        : damageReports,
+    };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("rentals")
       .update({
-        status: condition,
-        returned_at: new Date().toISOString(),
-        received_by: access.actorUserId,  // CR fix M6: cookie-derived
-        condition_notes: conditionNotes || null,
+        status: conditionToUnifiedStatus(condition),
+        agreed_end_date: new Date().toISOString(),
+        metadata: nextMetadata,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", id)
-      .eq("crew_id", access.crewId)
-      .eq("status", "active")
-      .select("id")
-      .maybeSingle();
+      .eq("rental_id", id)
+      .eq("crew_id", access.crewId);
 
     if (updateError) {
       logger.error("[returnEquipmentRental] Update failed:", updateError);
       return { success: false, error: "Не удалось обновить аренду." };
     }
 
-    if (!rental) {
-      return { success: false, error: "Аренда не найдена или уже закрыта." };
+    // Close the linked return todo (same crew_todos the issuing flow created)
+    try {
+      await supabaseAdmin
+        .from("crew_todos")
+        .update({ status: "done", completed_at: new Date().toISOString() })
+        .eq("rental_id", id)
+        .eq("status", "pending");
+    } catch (todoErr) {
+      logger.warn("[returnEquipmentRental] Failed to close return todos (non-fatal):", todoErr);
     }
 
     logger.info("[returnEquipmentRental] Returned equipment rental", {
@@ -213,8 +294,8 @@ export async function returnEquipmentRental(
 }
 
 /**
- * List equipment rentals for a crew.
- * Optionally filter by status.
+ * List equipment rentals for a crew (unified `rentals` rows).
+ * Optionally filter by legacy status; returned in the legacy API shape.
  */
 export async function listEquipmentRentals(params: {
   slug: string;
@@ -230,27 +311,33 @@ export async function listEquipmentRentals(params: {
     }
 
     let query = supabaseAdmin
-      .from("equipment_rentals")
+      .from("rentals")
       .select(`
-        id,
-        equipment_id,
+        rental_id,
+        vehicle_id,
         status,
-        daily_price,
         total_cost,
-        start_date,
-        expected_return_date,
-        returned_at,
-        renter_user_id,
-        primary_rental_id,
+        requested_start_date,
+        agreed_start_date,
+        agreed_end_date,
+        updated_at,
+        metadata,
+        user_id,
         equipment:cars(id, make, model)
       `)
-      .eq("crew_id", access.crewId);
+      .eq("crew_id", access.crewId)
+      .eq("metadata->>item_type", "equipment");
 
-    if (statusFilter) {
-      query = query.eq("status", statusFilter);
+    // Legacy status filter → unified statuses
+    if (statusFilter === "active") {
+      query = query.in("status", ["pending_confirmation", "confirmed", "active"]);
+    } else if (statusFilter === "returned") {
+      query = query.eq("status", "completed");
+    } else if (statusFilter === "damaged" || statusFilter === "lost") {
+      query = query.eq("status", "disputed");
     }
 
-    query = query.order("created_at", { ascending: false });
+    query = query.order("created_at", { ascending: false }).limit(200);
 
     const { data: rentals, error } = await query;
 
@@ -259,19 +346,22 @@ export async function listEquipmentRentals(params: {
       return { success: false, error: "Не удалось загрузить список." };
     }
 
-    const formatted = (rentals || []).map((r: any) => ({
-      id: r.id,
-      equipmentId: r.equipment_id,
-      equipmentLabel: r.equipment ? `${r.equipment.make} ${r.equipment.model}` : r.equipment_id,
-      status: r.status,
-      dailyPrice: Number(r.daily_price),
-      totalCost: Number(r.total_cost),
-      startDate: r.start_date,
-      expectedReturnDate: r.expected_return_date,
-      returnedAt: r.returned_at,
-      renterUserId: r.renter_user_id,
-      primaryRentalId: r.primary_rental_id,
-    }));
+    const formatted = (rentals || []).map((r: any) => {
+      const meta = (r.metadata || {}) as Record<string, any>;
+      return {
+        id: r.rental_id,
+        equipmentId: r.vehicle_id,
+        equipmentLabel: r.equipment ? `${r.equipment.make} ${r.equipment.model}` : (meta.equipment_title || r.vehicle_id),
+        status: unifiedToLegacyStatus(r.status, meta.equipment_condition),
+        dailyPrice: Number(meta.daily_price ?? r.total_cost ?? 0),
+        totalCost: Number(r.total_cost ?? 0),
+        startDate: meta.issued_at || r.requested_start_date || r.agreed_start_date,
+        expectedReturnDate: r.requested_end_date,
+        returnedAt: meta.returned_at || (r.status === "completed" ? r.updated_at : null),
+        renterUserId: r.user_id,
+        primaryRentalId: meta.primary_rental_id || null,
+      };
+    });
 
     return { success: true, data: formatted };
   } catch (err) {
@@ -345,23 +435,6 @@ export interface EquipmentItem {
 // ── Doc-manual integration (I5 Equipment T4) ─────────────────────────────────────
 
 /**
- * Mapping from equipment flags in DocFlowContext to cars equipment IDs.
- * These IDs are seeded in migration 20260812000006_seed_equipment.sql.
- */
-const EQUIPMENT_FLAG_TO_CAR_ID: Record<string, string> = {
-  // Helmets (default: Street Pro - mid-range versatile helmet)
-  helmets: 'equip-helmet-street-pro',
-  // Gloves (default: Summer X - lightweight summer gloves)
-  gloves: 'equip-gloves-summer-x',
-  // Jacket (default: Trail Guard - versatile adventure jacket)
-  jacket: 'equip-jacket-trail-guard',
-  // Pants (default: Trail Adv - versatile adventure pants)
-  pants: 'equip-pants-trail-adv',
-  // Boots (default: Street Sport - urban comfortable boots)
-  boots: 'equip-boots-street-sport',
-};
-
-/**
  * DocFlowContext subset for equipment rental creation.
  */
 export interface DocFlowEquipmentContext {
@@ -377,16 +450,19 @@ export interface DocFlowEquipmentContext {
 }
 
 /**
- * Create equipment_rentals rows for equipment rented with a bike.
- * Called from doc-manual after successful rental creation.
+ * Create equipment rental rows for equipment issued together with a bike
+ * rental (called from doc-manual after successful rental creation).
  *
- * Maps equipment flags (helmets, gloves, jacket, boots) to equipment_rentals rows
- * with primary_rental_id linking to the bike rental.
- *
- * @param rentalId - The bike rental ID
- * @param context - DocFlowContext with equipment flags
- * @param operatorChatId - Operator who created the rental
- * @param crewId - Crew ID for the rentals
+ * 2026-09-10 FIXES vs the legacy implementation:
+ *  • Resolves REAL per-crew catalog ids by specs.category — the old
+ *    EQUIPMENT_FLAG_TO_CAR_ID map used slug-less seed ids
+ *    (`equip-helmet-street-pro`) plus a non-existent boots id, so every
+ *    insert failed the FK and equipment rows were silently skipped.
+ *  • Prices come from cars.daily_price (seed: helmet 1000₽, rest 500₽),
+ *    not hardcoded 200/300₽ constants.
+ *  • Writes unified `rentals` rows (metadata.item_type='equipment',
+ *    primary_rental_id link) instead of the archived equipment_rentals
+ *    table, with total_cost = daily_price × rental days.
  */
 export async function createEquipmentRowsForRental(params: {
   rentalId: string;
@@ -397,89 +473,116 @@ export async function createEquipmentRowsForRental(params: {
   const { rentalId, context, operatorChatId, crewId } = params;
 
   try {
-    const rowsToCreate: Array<{
-      equipment_id: string;
-      daily_price: number;
-      total_cost: number;
-    }> = [];
+    // Read the primary (bike) rental for dates + owner placeholder
+    const { data: primary, error: primaryError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, agreed_start_date, agreed_end_date, requested_start_date, requested_end_date, user_id, owner_id, created_by_operator_chat_id")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
 
-    // Helmets (0-2 helmets)
-    const helmetCount = context.helmets || 0;
-    for (let i = 0; i < helmetCount; i++) {
-      rowsToCreate.push({
-        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.helmets,
-        daily_price: 200,
-        total_cost: 200, // TODO: calculate based on rental duration
-      });
+    if (primaryError || !primary) {
+      logger.warn("[createEquipmentRowsForRental] Primary rental not found:", primaryError?.message);
+      return errorResponse("primary rental not found");
     }
 
-    // Gloves (0-2 pairs)
-    const glovesCount = context.gloves || 0;
-    for (let i = 0; i < glovesCount; i++) {
-      rowsToCreate.push({
-        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.gloves,
-        daily_price: 100,
-        total_cost: 100,
-      });
+    // Resolve the crew's equipment catalog (REAL ids, REAL prices)
+    const { data: catalog, error: catalogError } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model, daily_price, specs")
+      .eq("type", "equipment")
+      .eq("crew_id", crewId);
+
+    if (catalogError) {
+      logger.warn("[createEquipmentRowsForRental] Catalog query failed:", catalogError.message);
+      return errorResponse(catalogError.message);
     }
 
-    // Jacket (1 if true)
-    if (context.jacket) {
-      rowsToCreate.push({
-        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.jacket,
-        daily_price: 300,
-        total_cost: 300,
-      });
-    }
-
-    // Pants (1 if true)
-    if (context.pants) {
-      rowsToCreate.push({
-        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.pants,
-        daily_price: 300,
-        total_cost: 300,
-      });
-    }
-
-    // Boots (1 if true)
-    if (context.boots) {
-      rowsToCreate.push({
-        equipment_id: EQUIPMENT_FLAG_TO_CAR_ID.boots,
-        daily_price: 150,
-        total_cost: 150,
-      });
-    }
-
-    // Skip if no equipment
-    if (rowsToCreate.length === 0) {
+    const crewCatalog = (catalog || []) as unknown as EquipmentCatalogItem[];
+    if (crewCatalog.length === 0) {
+      logger.info("[createEquipmentRowsForRental] Crew has no equipment catalog — skipping", { crewId });
       return successResponse({ created: 0 });
     }
 
-    // Insert all rows in one batch
-    const { data, error } = await supabaseAdmin
-      .from('equipment_rentals')
-      .insert(
-        rowsToCreate.map((row) => ({
+    // Build the (item, quantity) plan from the doc flags
+    const plan: Array<{ item: EquipmentCatalogItem; qty: number }> = [];
+    for (const [flag, category] of Object.entries(EQUIPMENT_FLAG_TO_CATEGORY)) {
+      const raw = (context as Record<string, unknown>)[flag];
+      const qty = typeof raw === "number" ? raw : raw === true ? 1 : 0;
+      if (qty <= 0) continue;
+      const item = pickCrewEquipmentByCategory(crewCatalog, category);
+      if (!item) {
+        logger.warn(`[createEquipmentRowsForRental] No crew equipment for category "${category}" — flag ${flag} skipped`, { crewId });
+        continue;
+      }
+      plan.push({ item, qty });
+    }
+
+    if (plan.length === 0) {
+      return successResponse({ created: 0 });
+    }
+
+    // Rental days from the primary rental dates (fallback 1)
+    const startRaw = primary.agreed_start_date || primary.requested_start_date;
+    const endRaw = primary.agreed_end_date || primary.requested_end_date;
+    let days = 1;
+    if (startRaw && endRaw) {
+      try {
+        const diffMs = new Date(endRaw).getTime() - new Date(startRaw).getTime();
+        days = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+      } catch {
+        days = 1;
+      }
+    }
+
+    const ownerChatId = primary.created_by_operator_chat_id || primary.owner_id || primary.user_id || operatorChatId;
+    const startIso = startRaw || new Date().toISOString();
+    const endIso = endRaw || null;
+
+    const rowsToInsert = plan.flatMap(({ item, qty }) =>
+      Array.from({ length: qty }, () => {
+        const daily = itemDailyPrice(item);
+        return {
+          user_id: ownerChatId,
+          owner_id: ownerChatId,
+          created_by_operator_chat_id: operatorChatId,
           crew_id: crewId,
-          equipment_id: row.equipment_id,
-          primary_rental_id: rentalId,
-          daily_price: row.daily_price,
-          total_cost: row.total_cost,
-          status: 'active',
-          issued_by: operatorChatId,
-          issued_at: new Date().toISOString(),
-          created_by: operatorChatId,
-        }))
-      )
-      .select('id');
+          vehicle_id: item.id,
+          requested_start_date: startIso,
+          requested_end_date: endIso,
+          agreed_start_date: startIso,
+          agreed_end_date: endIso,
+          status: "active",
+          payment_status: "fully_paid",
+          total_cost: daily * days,
+          metadata: {
+            source: "doc_command",
+            item_type: "equipment",
+            crew_id: crewId,
+            daily_price: daily,
+            equipment_title: `${item.make} ${item.model}`,
+            equipment_size: (item.specs?.size as string) || (Array.isArray(item.specs?.sizes) ? String((item.specs!.sizes as string[])[0]) : null) || null,
+            equipment_condition: "Выдан",
+            damage_reports: [],
+            primary_rental_id: rentalId,
+            issued_by: operatorChatId,
+            issued_at: new Date().toISOString(),
+          },
+        };
+      }),
+    );
+
+    const { data, error } = await supabaseAdmin
+      .from("rentals")
+      .insert(rowsToInsert)
+      .select("rental_id");
 
     if (error) {
-      logger.warn('[createEquipmentRowsForRental] Failed to insert rows:', error);
+      logger.warn("[createEquipmentRowsForRental] Failed to insert rows:", error);
       // Continue — rental is more important than equipment rows (contract over breakdown)
       return errorResponse(error.message);
     }
 
-    logger.info('[createEquipmentRowsForRental] Created equipment rentals', {
+    logger.info("[createEquipmentRowsForRental] Created unified equipment rentals", {
       rentalId,
       crewId,
       created: data?.length || 0,
@@ -487,7 +590,7 @@ export async function createEquipmentRowsForRental(params: {
 
     return successResponse({ created: data?.length || 0 });
   } catch (err) {
-    logger.error('[createEquipmentRowsForRental] Exception:', err);
-    return errorResponse(handleError(err, 'createEquipmentRowsForRental'));
+    logger.error("[createEquipmentRowsForRental] Exception:", err);
+    return errorResponse(handleError(err, "createEquipmentRowsForRental"));
   }
 }

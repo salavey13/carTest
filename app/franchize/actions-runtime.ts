@@ -2469,7 +2469,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // === MULTI-BIKE DOCUMENT GENERATION ===
     // Generate one DOCX per bike in cart (equipment-only lines are merged
     // into a SINGLE equipment document — see equipmentLineIndices below).
-    const bikeDocs: Array<{ bytes: Uint8Array; fileName: string; bikeName: string; bikeId: string; documentKey: string; sha256: string; cartLineIndex: number }> = [];
+    const bikeDocs: Array<{ bytes: Uint8Array; fileName: string; bikeName: string; bikeId: string; documentKey: string; sha256: string; cartLineIndex: number; isEquipmentOnlyLine?: boolean; equipmentItems?: Array<{ id: string; make: string; model: string; dailyPrice: number }> }> = [];
     // Collect per-bike equipment data for todo creation after the loop
     const bikeEquipment: Array<{ bikeId: string; bikeName: string; equipment: { helmets: number; gloves: number; jacket: boolean; boots: boolean; net: boolean; backpack: boolean; bag: boolean; charger: boolean } }> = [];
 
@@ -2945,10 +2945,22 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         bikeName: isEquipmentOnlyLine
           ? `Оборудование (${equipmentLineIndices.length} шт.)`
           : `${car.make} ${car.model}`,
-        bikeId: isEquipmentOnlyLine ? "equipment" : car.id,
+        // FIX (2026-09-10): equipment-only lines previously got the literal
+        // string "equipment" here, which the rentals insert used as
+        // vehicle_id — a guaranteed FK violation (rentals.vehicle_id →
+        // cars.id NOT NULL), so EVERY equipment-only web order lost its
+        // rental row (insert error was warn-only). Use the first REAL
+        // equipment cars.id from the merged items instead.
+        bikeId: isEquipmentOnlyLine
+          ? (mergedEquipmentItems?.find((i) => i.id && i.id !== "equipment")?.id || car.id || "equipment")
+          : car.id,
         documentKey: variables.document_key,
         sha256,
         cartLineIndex: bikeIndex,
+        isEquipmentOnlyLine,
+        // Snapshot for the rentals insert (out of the doc-generation scope):
+        // unified metadata.equipment_items + money trigger item_type marker.
+        ...(isEquipmentOnlyLine && mergedEquipmentItems ? { equipmentItems: mergedEquipmentItems } : {}),
       });
     }
 
@@ -3507,6 +3519,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   renter_telegram_id: payload.telegramUserId,
                   flow_type: flowType,
                   bike_name: doc.bikeName,
+                  // 2026-09-10: canonical equipment marker (same as /ekip and
+                  // bot /doc) — the money trigger keys off metadata.item_type
+                  // to write income_equipment instead of income_rental.
+                  ...(doc.isEquipmentOnlyLine ? { item_type: "equipment" as const } : {}),
+                  ...(doc.isEquipmentOnlyLine && crewId ? { crew_id: crewId } : {}),
+                  // Snapshot of the merged equipment lines (ids + titles) so the
+                  // rental card / CSV can render what was actually issued.
+                  ...(doc.isEquipmentOnlyLine && doc.equipmentItems
+                    ? {
+                        equipment_items: doc.equipmentItems.map((i) => ({
+                          id: i.id,
+                          title: `${i.make} ${i.model}`.trim(),
+                          daily_price: i.dailyPrice,
+                        })),
+                        equipment_count: doc.equipmentItems.length,
+                      }
+                    : {}),
                   // iter15: real expected deposit from bike specs + split shape
                   // aligned with /doc (never the 500₽ reservation hold).
                   // iter20: + deposit_method so the analytics sheet shows the
@@ -3953,7 +3982,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // ── Create crew_todos for equipment return (aligned with /doc-manual flow) ──
     // Todos are PER BIKE — each bike has its own equipment to return.
     // One lead, many todos. Pattern follows doc-manual.ts lines 1705-1751.
-    if (flowType === "rental" || flowType === "mixed") {
+    // 2026-09-10: equipment-only orders (flowType "equipment") now get return
+    // todos too — previously the gate silently skipped them, so equipment
+    // issued via the web catalog had NO return reminder at all.
+    if (flowType === "rental" || flowType === "mixed" || flowType === "equipment") {
       try {
         // Resolve crew from slug (no hardcoded fallback)
         const { data: crewRowForTodos } = await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle();
@@ -3991,6 +4023,51 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           };
 
           const bikeLabel = `${bikeMake} ${bikeModel}`;
+
+          // 2026-09-10: equipment-only doc → return todos per equipment item
+          // (no ТС/ключи/одометр — that list is bike-specific).
+          if (doc.isEquipmentOnlyLine) {
+            const eqItems = doc.equipmentItems || [];
+            const eqLabel = eqItems.length > 0
+              ? eqItems.map((i) => `${i.make} ${i.model}`.trim()).join(", ")
+              : bikeLabel;
+            const equipTodos: Array<{ title: string; priority: string }> = [
+              { title: `📦 Принять экипировку: ${eqLabel} (${rentEndDate} ${rentEndTime})`, priority: "high" },
+              { title: `🔍 Осмотр состояния экипировки: ${eqLabel}`, priority: "high" },
+            ];
+            for (let ti = 0; ti < equipTodos.length; ti++) {
+              const todo = equipTodos[ti];
+              const todoId = `todo-${(baseTs + bikeIndex * 1000).toString(36)}-${ti}-eq-${Math.random().toString(36).slice(2, 5)}`;
+              allTodoPromises.push(
+                Promise.resolve(supabaseAdmin.from("crew_todos").insert({
+                  id: todoId,
+                  crew_id: crewId,
+                  lead_id: leadId,
+                  rental_id: todoRentalId,
+                  title: todo.title,
+                  status: "pending",
+                  priority: todo.priority,
+                  assigned_to: null,
+                  category: "lead_followup",
+                  description: JSON.stringify({
+                    lead_id: leadId,
+                    lead_phone: payload.phone || "",
+                    lead_name: payload.recipient || "",
+                    equipment_id: doc.bikeId,
+                    equipment_items: eqItems.map((i) => i.id),
+                    rental_id: todoRentalId,
+                    rent_end_date: rentEndDate || null,
+                    order_id: payload.orderId,
+                    source: "web_app_checkout_equipment",
+                  }),
+                }).then(({ error }) => {
+                  if (error) logger.warn("[franchize] Failed to create crew_todo:", todo.title, error);
+                }))
+              );
+            }
+            continue; // bike-specific todo list does not apply to equipment docs
+          }
+
           const todos: Array<{ title: string; priority: string }> = [
             { title: `🔧 Проверить ТС при возврате: ${bikeLabel} (${rentEndDate} ${rentEndTime})`, priority: "high" },
             { title: `🔑 Принять ключи от ${bikeLabel}`, priority: "high" },

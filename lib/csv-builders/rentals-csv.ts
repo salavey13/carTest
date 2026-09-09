@@ -227,6 +227,16 @@ export async function buildRentalsCsv(
     if (eq.net) equipParts.push("сет");
     if (eq.backpack) equipParts.push("рюк");
     if (eq.charger) equipParts.push("заряд↔");
+    // 2026-09-10: standalone equipment rentals (metadata.item_type=equipment —
+    // bot /ekip or web equipment catalog) don't carry bike-style equipment
+    // flags; render the «Экип» cell from the item snapshot instead of blank.
+    if (meta.item_type === "equipment") {
+      const eqItems = Array.isArray(meta.equipment_items) ? meta.equipment_items : [];
+      const eqLabel = eqItems.length > 0
+        ? eqItems.map((i: any) => i.title || i.id).join("+")
+        : (meta.equipment_title || "экип");
+      equipParts.push(eqItems.length > 1 ? `${eqLabel} (${eqItems.length} шт.)` : eqLabel);
+    }
     const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost}${equipExact ? "" : "~"})` : "";
 
     const depositAmount = Number(meta.deposit_amount || 0);

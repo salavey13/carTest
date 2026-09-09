@@ -43,10 +43,29 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
-import { sendTelegramDocument } from "@/app/actions";
+import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrewWithOverrides } from "../lib/crew-access";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
+import { privateSchema } from "@/lib/private-secrets";
+import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
+import {
+  EQUIPMENT_CATEGORY_LABELS,
+  categoryEmoji,
+  normalizeMaterialKey,
+  materialDisplay,
+  itemDailyPrice,
+  itemSalePrice,
+  itemSize,
+  sumDailyPrices,
+  sumSalePrices,
+  equipmentTitle,
+  parseRuDateTime,
+  rentDaysBetween,
+  apportionTotal,
+  normalizePaymentMethod,
+  normalizeDepositMethod,
+} from "@/app/franchize/lib/equipment-shared";
 
 // Reuse utilities from doc-manual
 function escapeHtml(s: unknown): string {
@@ -63,64 +82,16 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CURRENT_YEAR = 2026;
 const EKIP_STATE_EXPIRY_MINUTES = 30;
 
-// Russian labels for equipment categories (mirrors actions-runtime.ts)
-const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
-  helmet: "Шлемы",
-  jacket: "Куртки",
-  pants: "Штаны",
-  gloves: "Перчатки",
-  boots: "Боты",
-  security: "Безопасность",
-  electronics: "Электроника",
-  suit: "Комбинезоны",
-};
-
 // Items per page in the equipment selection keyboard
 const EKIP_PAGE_SIZE = 10;
 
-// B.1 review fix: normalize materials to short English keys for callback_data
-// (Telegram 64-byte limit + case-insensitive matching). Maps Russian material
-// strings to stable short keys used in callback_data and filtering.
-const MATERIAL_KEY_MAP: Record<string, string> = {
-  "кожа": "leather",
-  "текстиль": "textile",
-  "эндуро": "enduro",
-  "полиэстер": "polyester",
-};
-const MATERIAL_LABEL_MAP: Record<string, { label: string; emoji: string }> = {
-  leather: { label: "Кожа", emoji: "🟤" },
-  textile: { label: "Текстиль", emoji: "🔵" },
-  enduro: { label: "Эндуро", emoji: "🟢" },
-  polyester: { label: "Полиэстер", emoji: "🟣" },
-  other: { label: "Другое", emoji: "📦" },
-};
-
-/**
- * Normalize a Russian material string to a short English key.
- * "Кожа" → "leather", "Текстиль" → "textile", etc.
- * Strings containing "кожа" but also "текстиль" → "combo" (composite).
- * Unknown strings → "other".
- */
-function normalizeMaterialKey(material: string | undefined | null): string {
-  if (!material || typeof material !== "string") return "other";
-  const lower = material.toLowerCase();
-  const hasLeather = lower.includes("кож");
-  const hasTextile = lower.includes("текстил") || lower.includes("полиэстер") || lower.includes("polyester");
-  if (hasLeather && hasTextile) return "combo";
-  if (hasLeather) return "leather";
-  if (hasTextile) return "textile";
-  if (lower.includes("эндуро") || lower.includes("enduro")) return "enduro";
-  // Try exact map match
-  for (const [ru, key] of Object.entries(MATERIAL_KEY_MAP)) {
-    if (lower === ru || lower.includes(ru)) return key;
-  }
-  return "other";
-}
-
-/** Get display label + emoji for a material key */
-function materialDisplay(key: string): { label: string; emoji: string } {
-  return MATERIAL_LABEL_MAP[key] || MATERIAL_LABEL_MAP.other;
-}
+// ══════════════════════════════════════════════════════════════════════════
+// 2026-09-10 EQUIPMENT PARITY: /ekip now writes to the SAME tables as /doc
+// and the web checkout — unified `rentals` (metadata.item_type='equipment'),
+// deposit_entries, crew_todos return reminders and sale_contract_artifacts.
+// Before this fix the command only generated a DOCX: equipment deals were
+// invisible to the CRM (no pipeline, no money ledger, no return flow).
+// ══════════════════════════════════════════════════════════════════════════
 
 // ── Equipment catalog ────────────────────────────────────────────────────────
 
@@ -129,6 +100,7 @@ interface EquipmentItem {
   make: string;
   model: string;
   image_url?: string;
+  daily_price?: number | null; // cars-table column (seed 20260812000006); wins over specs copy
   specs: {
     daily_price?: number;
     rent_weekday?: number;
@@ -148,13 +120,34 @@ interface EquipmentItem {
   crew_id?: string;
 }
 
+/**
+ * Crew-scoped equipment catalog.
+ *
+ * FIX (2026-09-10): the previous implementation ignored its `crewSlug` param
+ * and loaded EVERY crew's equipment (cross-tenant leak), and didn't select
+ * `cars.daily_price` — so seeded 500₽ items were quoted at the 1000₽ fallback
+ * (sumDailyPrices fallback). Now: resolve crew by slug, filter by crew_id,
+ * select the price column.
+ */
 async function getEquipmentCatalog(crewSlug?: string): Promise<EquipmentItem[]> {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("cars")
-      .select("id, make, model, specs, crew_id, image_url")
-      .eq("type", "equipment")
-      .order("make, model");
+      .select("id, make, model, specs, crew_id, daily_price, image_url")
+      .eq("type", "equipment");
+
+    if (crewSlug) {
+      const { data: crew } = await supabaseAdmin
+        .from("crews")
+        .select("id")
+        .eq("slug", crewSlug)
+        .maybeSingle();
+      if (crew?.id) {
+        query = query.eq("crew_id", crew.id);
+      }
+    }
+
+    const { data, error } = await query.order("make, model");
 
     if (error) {
       logger.error("[/ekip] Failed to load equipment catalog:", error);
@@ -172,7 +165,7 @@ async function resolveEquipmentById(equipmentId: string): Promise<EquipmentItem 
   try {
     const { data, error } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model, specs, crew_id, image_url")
+      .select("id, make, model, specs, crew_id, daily_price, image_url")
       .eq("type", "equipment")
       .eq("id", equipmentId)
       .maybeSingle();
@@ -183,6 +176,15 @@ async function resolveEquipmentById(equipmentId: string): Promise<EquipmentItem 
     logger.error("[/ekip] Failed to resolve equipment:", error);
     return null;
   }
+}
+
+/**
+ * Crew-scoped catalog for the CURRENT flow: prefers the crew selected in the
+ * context (multi-crew operator support) and falls back to user_states.
+ */
+async function catalogFor(userId: string, context: EkipFlowContext): Promise<EquipmentItem[]> {
+  const slug = context.selectedCrew || await getEkipCrewSlug(userId);
+  return getEquipmentCatalog(slug);
 }
 
 // ── Crew slug resolution ────────────────────────────────────────────────────
@@ -247,20 +249,6 @@ function buildEquipmentKeyboard(equipmentList: EquipmentItem[], selectedId?: str
   ]);
 
   return rows;
-}
-
-function categoryEmoji(category: string): string {
-  switch (category) {
-    case "helmet": return "🪖";
-    case "jacket": return "🧥";
-    case "pants": return "👖";
-    case "gloves": return "🧤";
-    case "boots": return "👢";
-    case "suit": return "🧥";
-    case "security": return "🔒";
-    case "electronics": return "📡";
-    default: return "📦";
-  }
 }
 
 function buildCategoryKeyboard(equipmentList: EquipmentItem[], selectedIds: string[]): KeyboardButton[][] {
@@ -649,16 +637,11 @@ function parseEndDate(text: string, startDate?: string): { date: string; time: s
   return null;
 }
 
-function parseRuDateTime(dateStr: string | undefined, timeStr: string | undefined): Date {
-  if (!dateStr) return new Date(NaN);
-  const dmy = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-  const iso = dmy
-    ? `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
-    : dateStr;
-  return new Date(`${iso}T${timeStr || '10:00'}`);
-}
-
-// ── Summary builders ─────────────────────────────────────────────────────────
+// ── Summary builders ─────────────────────────────────────────────────────
+// NOTE: parseRuDateTime / sumDailyPrices / sumSalePrices / equipmentTitle now
+// come from @/app/franchize/lib/equipment-shared. Price helpers are catalog
+// aware: cars.daily_price (seed 20260812000006) wins over the legacy 1000₽
+// fallback, so seeded 500₽ items are quoted correctly.
 
 function selectedEquipmentIds(context: EkipFlowContext): string[] {
   const ids = context.equipmentIds?.length ? context.equipmentIds : (context.equipmentId ? [context.equipmentId] : []);
@@ -673,20 +656,6 @@ async function resolveAllEquipment(context: EkipFlowContext): Promise<EquipmentI
     if (item) items.push(item);
   }
   return items;
-}
-
-function sumDailyPrices(items: EquipmentItem[]): number {
-  return items.reduce((acc, i) => acc + Number(i.specs?.daily_price || i.specs?.rent_weekday || 1000), 0);
-}
-
-function sumSalePrices(items: EquipmentItem[]): number {
-  return items.reduce((acc, i) => acc + Number(i.specs?.sale_price || 5000), 0);
-}
-
-function equipmentTitle(items: EquipmentItem[]): string {
-  if (items.length === 0) return "";
-  if (items.length === 1) return `${items[0].make} ${items[0].model}`;
-  return items.map((i) => `${i.make} ${i.model}`).join(", ");
 }
 
 function buildRentSummary(context: EkipFlowContext, items?: EquipmentItem[]): string {
@@ -1163,7 +1132,7 @@ export async function handleEkipCallback(
     await sendComplexMessage(
       chatId,
       `📋 *Аренда*\n\n📦 *Выберите тип оборудования*`,
-      buildCategoryKeyboard(await getEquipmentCatalog(), selectedEquipmentIds(context)),
+      buildCategoryKeyboard(await catalogFor(userId, context), selectedEquipmentIds(context)),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
@@ -1175,7 +1144,7 @@ export async function handleEkipCallback(
     await sendComplexMessage(
       chatId,
       `💰 *Продажа*\n\n📦 *Выберите тип оборудования*`,
-      buildCategoryKeyboard(await getEquipmentCatalog(), selectedEquipmentIds(context)),
+      buildCategoryKeyboard(await catalogFor(userId, context), selectedEquipmentIds(context)),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
@@ -1193,7 +1162,7 @@ export async function handleEkipCallback(
       await sendComplexMessage(
         chatId,
         `📦 *Выберите тип оборудования*`,
-        buildCategoryKeyboard(await getEquipmentCatalog(), selectedEquipmentIds(context)),
+        buildCategoryKeyboard(await catalogFor(userId, context), selectedEquipmentIds(context)),
         { keyboardType: 'inline', parseMode: 'Markdown' },
       );
       return true;
@@ -1211,7 +1180,7 @@ export async function handleEkipCallback(
     // Review fix: use normalizeMaterialKey() for case-insensitive matching +
     // short English keys in callback_data (avoids Telegram 64-byte limit).
     const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
-    const allItems = await getEquipmentCatalog();
+    const allItems = await catalogFor(userId, context);
     const categoryItems = allItems.filter(i => i.specs?.category === category);
     // Collect distinct material keys (normalized)
     const distinctKeys = [...new Set(
@@ -1263,7 +1232,7 @@ export async function handleEkipCallback(
     const category = context.equipmentCategory;
     if (!category) return true;
     const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
-    const allItems = await getEquipmentCatalog();
+    const allItems = await catalogFor(userId, context);
     const chosen = selectedEquipmentIds(context).length;
     const chosenNote = chosen > 0 ? `\n\n✅ Уже выбрано: ${chosen} шт. — кликайте ещё или «Готово».` : "";
     const subDisplay = subKey === "all" ? "" : ` (${materialDisplay(subKey).label})`;
@@ -1288,7 +1257,7 @@ export async function handleEkipCallback(
     await sendComplexMessage(
       chatId,
       `📦 *${label}* — страница ${page + 1}`,
-      buildCategoryItemsKeyboard(await getEquipmentCatalog(), category, selectedEquipmentIds(context), page, context.equipmentSubcategory),
+      buildCategoryItemsKeyboard(await catalogFor(userId, context), category, selectedEquipmentIds(context), page, context.equipmentSubcategory),
       { keyboardType: 'inline', parseMode: 'Markdown' },
     );
     return true;
@@ -1351,7 +1320,7 @@ export async function handleEkipCallback(
 
       const category = context.equipmentCategory;
       const page = context.equipmentPage || 0;
-      const catalog = await getEquipmentCatalog();
+      const catalog = await catalogFor(userId, context);
       if (category) {
         const label = EQUIPMENT_CATEGORY_LABELS[category] || category;
         const added = idx >= 0 ? "➖ Убрано" : "➕ Добавлено";
@@ -1660,6 +1629,275 @@ async function loadEkipCrewSecrets(crewSlug: string): Promise<RentalCrewSecrets>
   };
 }
 
+// ── DB persistence (equipment parity with /doc) ─────────────────────────────
+
+interface PersistEkipRentalsInput {
+  context: EkipFlowContext;
+  equipmentItems: EquipmentItem[];
+  crewSlug: string;
+  operatorChatId: string;
+  docSha256: string;
+  documentKey: string;
+}
+
+/**
+ * Insert ONE unified `rentals` row per selected equipment item
+ * (metadata.item_type='equipment' — canonical storage since migration
+ * 20260815000001), then persist the deposit (rentals mirror columns +
+ * deposit_entries) and create a crew_todos return reminder per row.
+ *
+ * Money: the auto_create_rental_transaction trigger writes income_equipment
+ * when the row is closed (completed/disputed) — same idempotent pattern as
+ * bike rentals.
+ */
+async function persistEkipRentals(
+  input: PersistEkipRentalsInput,
+): Promise<{ rentalIds: string[]; error: string | null }> {
+  const { context, equipmentItems, crewSlug, operatorChatId, docSha256, documentKey } = input;
+  try {
+    // Resolve crew: equipment rows carry crew_id; fall back to the slug.
+    let crewId = equipmentItems.find((i) => i.crew_id)?.crew_id || null;
+    if (!crewId && crewSlug) {
+      const { data: crew } = await supabaseAdmin
+        .from("crews")
+        .select("id")
+        .eq("slug", crewSlug)
+        .maybeSingle();
+      crewId = crew?.id || null;
+    }
+    if (!crewId) {
+      return { rentalIds: [], error: "crew_id not resolved (no crew for slug " + (crewSlug || "—") + ")" };
+    }
+
+    // Owner placeholder (same approach as /doc): crew owner or the operator.
+    const crewOwnerChatId = await resolveCrewOwnerChatId(supabaseAdmin, crewId) || operatorChatId;
+
+    // Dates → TIMESTAMPTZ (same helper/convention as /doc)
+    const startIso = context.rentStartDate && context.rentStartTime
+      ? convertTextDateToTimestamp(context.rentStartDate, context.rentStartTime, 3)
+      : null;
+    const endIso = context.rentEndDate && context.rentEndTime
+      ? convertTextDateToTimestamp(context.rentEndDate, context.rentEndTime, 3)
+      : null;
+    if (!startIso || !endIso) {
+      return { rentalIds: [], error: `date conversion failed (${context.rentStartDate} ${context.rentStartTime} → ${context.rentEndDate} ${context.rentEndTime})` };
+    }
+
+    // Deal money: same math the operator saw in the payment step
+    const { days } = rentDaysBetween(
+      parseRuDateTime(context.rentStartDate, context.rentStartTime),
+      parseRuDateTime(context.rentEndDate, context.rentEndTime),
+    );
+    const totalCost = context.priceOverridden
+      ? (context.cashAmount || 0) + (context.bankAmount || 0)
+      : sumDailyPrices(equipmentItems) * days;
+    const parts = apportionTotal(totalCost, equipmentItems);
+
+    // Deposit: single amount (no destination question in /ekip) — default cash,
+    // same mapping /doc uses when no destination info exists.
+    const depositNum = Number(context.depositOverride || equipmentItems[0]?.specs?.deposit_rub || 5000);
+    const depositMethod = normalizeDepositMethod("cash");
+    const paymentMethod = normalizePaymentMethod(
+      (context.bankAmount || 0) > 0 ? (context.paymentCardDestination || "card") : "cash",
+    );
+
+    const nowIso = new Date().toISOString();
+    const rentalIds: string[] = [];
+
+    for (let idx = 0; idx < equipmentItems.length; idx++) {
+      const item = equipmentItems[idx];
+      const itemTotal = parts[idx] || 0;
+      const insert = {
+        user_id: crewOwnerChatId,
+        owner_id: crewOwnerChatId,
+        created_by_operator_chat_id: operatorChatId || crewOwnerChatId,
+        crew_id: crewId,
+        vehicle_id: item.id, // real cars.id (type='equipment') — FK-safe
+        requested_start_date: startIso,
+        requested_end_date: endIso,
+        agreed_start_date: startIso,
+        agreed_end_date: endIso,
+        status: "active" as const,
+        payment_status: "fully_paid" as const,
+        total_cost: Math.round(itemTotal),
+        ...(depositNum > 0 && idx === 0 ? {
+          deposit_amount: depositNum,
+          deposit_method: depositMethod,
+          deposit_collected_at: nowIso,
+        } : {}),
+        metadata: {
+          source: "ekip_command",
+          item_type: "equipment",
+          crew_id: crewId,
+          daily_price: itemDailyPrice(item),
+          equipment_title: `${item.make} ${item.model}`,
+          equipment_size: itemSize(item),
+          equipment_condition: "Выдан",
+          damage_reports: [],
+          equipment_count: equipmentItems.length,
+          document_key: documentKey,
+          doc_sha256: docSha256,
+          renter_name: context.mpFullName || "",
+          renter_phone: context.clientPhone || "",
+          payment_method: paymentMethod,
+          payment_split: {
+            cash: context.cashAmount || 0,
+            bank: context.bankAmount || 0,
+            card_destination: context.paymentCardDestination || null,
+          },
+          price_overridden: context.priceOverridden || false,
+          contract_verifier: {
+            status: "verified",
+            verified_at: nowIso,
+            source: "ekip_command",
+            doc_sha256: docSha256,
+          },
+        },
+      };
+
+      const { data: rentalRow, error: rentalError } = await supabaseAdmin
+        .from("rentals")
+        .insert(insert)
+        .select("rental_id")
+        .maybeSingle();
+
+      if (rentalError || !rentalRow?.rental_id) {
+        const msg = rentalError?.message || "no rental_id returned";
+        logger.error("[/ekip] Failed to create equipment rental:", { error: msg, item: item.id });
+        if (rentalIds.length === 0) {
+          return { rentalIds: [], error: `rentals insert failed for ${item.make} ${item.model}: ${msg}` };
+        }
+        break; // some rows saved — report partial success
+      }
+
+      rentalIds.push(rentalRow.rental_id);
+
+      // crew_todos return reminder (parity with web-checkout return todos)
+      try {
+        await supabaseAdmin.from("crew_todos").insert({
+          id: `ekip-ret-${Date.now().toString(36)}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+          crew_id: crewId,
+          rental_id: rentalRow.rental_id,
+          title: `📦 Принять ${item.make} ${item.model} (${context.rentEndDate || ""} ${context.rentEndTime || ""})`.trim(),
+          status: "pending",
+          priority: "high",
+          category: "lead_followup",
+          description: JSON.stringify({
+            source: "ekip_command",
+            rental_id: rentalRow.rental_id,
+            rent_end_date: context.rentEndDate || null,
+            rent_end_time: context.rentEndTime || null,
+            renter_name: context.mpFullName || "",
+            renter_phone: context.clientPhone || "",
+          }),
+        });
+      } catch (todoErr) {
+        logger.warn("[/ekip] Failed to create return crew_todo (non-fatal):", todoErr);
+      }
+    }
+
+    // deposit_entries: one row for the deal (linked to the first rental),
+    // same shape /doc writes when no destination was specified.
+    if (depositNum > 0 && rentalIds.length > 0) {
+      try {
+        await supabaseAdmin.from("deposit_entries").insert({
+          rental_id: rentalIds[0],
+          entry_type: "deposit_collected",
+          amount: depositNum,
+          direction: "in",
+          destination: "cash",
+          operator_chat_id: crewOwnerChatId || null,
+          notes: "Deposit collected via /ekip (no destination specified, defaulted to cash)",
+        });
+      } catch (depErr) {
+        logger.warn("[/ekip] Failed to insert deposit_entries (non-fatal):", depErr);
+      }
+    }
+
+    logger.info("[/ekip] Equipment rentals persisted:", { crewId, count: rentalIds.length, totalCost, days });
+    return { rentalIds, error: rentalIds.length === 0 ? "no rentals inserted" : null };
+  } catch (error: any) {
+    logger.error("[/ekip] persistEkipRentals exception:", error);
+    return { rentalIds: [], error: error?.message || String(error) };
+  }
+}
+
+interface PersistEkipSaleInput {
+  context: EkipFlowContext;
+  equipmentItems: EquipmentItem[];
+  crewSlug: string;
+  operatorChatId: string;
+  docSha256: string;
+  documentKey: string;
+  docStoragePath: string | null;
+  salePrice: string;
+}
+
+/**
+ * Insert private.sale_contract_artifacts for an /ekip SALE deal.
+ * The trg_auto_sale_transaction trigger then auto-records income_sale +
+ * commission — the exact same money path the /doc sale flow uses.
+ * Dedup: same buyer + same first item = retry, update storage instead.
+ */
+async function persistEkipSaleArtifact(
+  input: PersistEkipSaleInput,
+): Promise<{ error: string | null }> {
+  const { context, equipmentItems, crewSlug, operatorChatId, docSha256, documentKey, docStoragePath, salePrice } = input;
+  try {
+    const firstItem = equipmentItems[0];
+
+    const { data: existingSale } = await privateSchema()
+      .from("sale_contract_artifacts")
+      .select("id, storage_path")
+      .eq("crew_slug", crewSlug)
+      .eq("buyer_full_name", context.mpFullName || "")
+      .eq("requested_bike_id", firstItem.id)
+      .maybeSingle();
+
+    if (existingSale) {
+      logger.info("[/ekip] Duplicate sale detected (same buyer+item), skipping insert. existing id:", existingSale.id);
+      if (!existingSale.storage_path && docStoragePath) {
+        await privateSchema()
+          .from("sale_contract_artifacts")
+          .update({ storage_path: docStoragePath })
+          .eq("id", existingSale.id);
+      }
+      return { error: null };
+    }
+
+    const { error: saleError } = await privateSchema().from("sale_contract_artifacts").insert({
+      contract_key: documentKey,
+      crew_slug: crewSlug,
+      storage_path: docStoragePath,
+      original_sha256: docSha256,
+      requested_bike_id: firstItem.id,
+      resolved_bike_id: firstItem.id,
+      telegram_chat_id: operatorChatId, // operator's chat (QR claim re-links later — same as /doc)
+      buyer_phone: context.clientPhone || null,
+      telegram_message_id: null,
+      buyer_full_name: context.mpFullName || null,
+      buyer_passport_number: `${context.mpSeries || ""} ${context.mpNumber || ""}`.trim() || null,
+      buyer_passport_issued_by: context.mpIssuedBy || null,
+      buyer_passport_issue_date: context.mpIssueDate || null,
+      buyer_registration: context.mpRegistration || null,
+      sale_price: salePrice,
+      total_sum: Number(salePrice) || 0,
+      warranty_months: "0",
+      template_version: 1,
+      created_by_operator_chat_id: operatorChatId || null,
+    });
+    if (saleError) {
+      logger.error("[/ekip] Failed to save sale_contract_artifacts:", saleError);
+      return { error: `sale_contract_artifacts insert failed: ${saleError.message}` };
+    }
+    logger.info("[/ekip] Sale artifact saved:", { crewSlug, buyer: context.mpFullName, salePrice });
+    return { error: null };
+  } catch (error: any) {
+    logger.error("[/ekip] persistEkipSaleArtifact exception:", error);
+    return { error: error?.message || String(error) };
+  }
+}
+
 async function generateContract(chatId: number, userId: string, context: EkipFlowContext): Promise<boolean> {
   try {
     const equipmentItems = await resolveAllEquipment(context);
@@ -1844,10 +2082,86 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
       logger.error("[/ekip] sendTelegramDocument failed:", e);
     }
 
+    // ── DB persistence (2026-09-10 equipment parity — same tables as /doc) ──
+    // RENT  → unified `rentals` rows (metadata.item_type='equipment'), one per
+    //         item + deposit mirror + deposit_entries + crew_todos return todo.
+    // SALE  → private.sale_contract_artifacts (money trigger auto-records
+    //         income_sale + commission exactly like the /doc sale flow).
+    // Failure is surfaced to the operator AND the admin chat (a lost deal that
+    // exists only as a docx is how equipment deals used to disappear).
+    let dealPersistenceError: string | null = null;
+    let createdRentalIds: string[] = [];
+    try {
+      if (isRent) {
+        const rentResult = await persistEkipRentals({
+          context,
+          equipmentItems,
+          crewSlug,
+          operatorChatId: String(userId),
+          docSha256,
+          documentKey: vars.document_key,
+        });
+        createdRentalIds = rentResult.rentalIds;
+        dealPersistenceError = rentResult.error;
+      } else {
+        const saleResult = await persistEkipSaleArtifact({
+          context,
+          equipmentItems,
+          crewSlug,
+          operatorChatId: String(userId),
+          docSha256,
+          documentKey: vars.document_key,
+          docStoragePath,
+          salePrice: context.salePrice || String(sumSalePrices(equipmentItems)),
+        });
+        dealPersistenceError = saleResult.error;
+      }
+    } catch (persistErr: any) {
+      dealPersistenceError = persistErr?.message || String(persistErr);
+      logger.error("[/ekip] Persistence exception:", persistErr);
+    }
+
+    if (dealPersistenceError) {
+      const warnMsg =
+        `⚠️ *ВНИМАНИЕ: договор создан, но ${isRent ? "аренда" : "продажа"} НЕ сохранена в CRM!*\n\n` +
+        `📦 ${equipmentTitle(equipmentItems)}\n` +
+        `👤 ${context.mpFullName || "—"}\n` +
+        `📱 ${context.clientPhone || "—"}\n` +
+        `📄 Договор: ${docFileName}\n\n` +
+        `🔍 _Ошибка:_ ${dealPersistenceError}`;
+      try {
+        await sendComplexMessage(chatId, warnMsg, [], { parseMode: "Markdown" });
+      } catch (e) {
+        logger.error("[/ekip] Failed to send persistence warning to operator:", e);
+      }
+      try {
+        await notifyAdmin(
+          `⚠️ [/ekip] Сделка не сохранена\n` +
+          `Operator: ${userId}\n` +
+          `Items: ${equipmentTitle(equipmentItems)}\n` +
+          `Client: ${context.mpFullName || "—"} (${context.clientPhone || "—"})\n` +
+          `Error: ${dealPersistenceError}`
+        );
+      } catch (e) {
+        logger.warn("[/ekip] Admin persistence notify failed:", e);
+      }
+    }
+
     // Success message
     const successItems = equipmentTitle(equipmentItems);
+    // FIX: was `sumDailyPrices(...) * Math.max(1, 0)` — a placeholder that
+    // always showed the DAILY rate. Show the real deal total instead.
     const successTotal = isRent
-      ? `${sumDailyPrices(equipmentItems) * Math.max(1, 0)} ₽/сутки` // placeholder replaced below
+      ? (() => {
+          const { days } = rentDaysBetween(
+            parseRuDateTime(context.rentStartDate, context.rentStartTime),
+            parseRuDateTime(context.rentEndDate, context.rentEndTime),
+          );
+          const total = context.priceOverridden
+            ? (context.cashAmount || 0) + (context.bankAmount || 0)
+            : sumDailyPrices(equipmentItems) * days;
+          return `${total.toLocaleString("ru-RU")} ₽ (${days} дн.)`;
+        })()
       : `${Number(context.salePrice || sumSalePrices(equipmentItems)).toLocaleString("ru-RU")} ₽`;
     const successText = [
       `✅ *Договор ${isRent ? 'аренды' : 'продажи'} оборудования готов!*`,
@@ -1855,6 +2169,7 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
       `📦 ${successItems}${equipmentItems.length > 1 ? ` (${equipmentItems.length} шт.)` : ""}`,
       `👤 ${context.mpFullName || ""}`,
       isRent ? `📅 ${context.rentStartDate || ""} ${context.rentStartTime || ""} → ${context.rentEndDate || ""} ${context.rentEndTime || ""}` : `💰 ${successTotal}`,
+      ...(createdRentalIds.length > 0 ? [`🆔 Аренда в CRM: ${createdRentalIds.map((id) => id.slice(0, 8)).join(", ")}`] : []),
     ].join("\n");
 
     await sendComplexMessage(
@@ -1864,23 +2179,18 @@ async function generateContract(chatId: number, userId: string, context: EkipFlo
       { removeKeyboard: true, parseMode: 'Markdown' },
     );
 
-    // Notify admin
+    // Notify admin (env-routed, same channel as /doc — no hardcoded chat id)
     try {
-      const adminChatId = "413553377"; // salavey13
       const adminMessage = [
-        `📦 *${isRent ? 'Аренда' : 'Продажа'} оборудования*`,
+        `📦 *${isRent ? 'Аренда' : 'Продажа'} оборудования* (/ekip${crewSlug ? `, ${crewSlug}` : ""})`,
         "",
         `📦 ${successItems}${equipmentItems.length > 1 ? ` (${equipmentItems.length} шт.)` : ""}`,
         `👤 ${context.mpFullName || ""}`,
         isRent ? `📅 ${context.rentStartDate || ""} ${context.rentStartTime || ""} → ${context.rentEndDate || ""} ${context.rentEndTime || ""}` : `💰 ${successTotal}`,
+        ...(createdRentalIds.length > 0 ? [`🆔 ${createdRentalIds.map((id) => id.slice(0, 8)).join(", ")}`] : []),
       ].join("\n");
 
-      await sendComplexMessage(
-        adminChatId,
-        adminMessage,
-        [],
-        { parseMode: 'Markdown' },
-      );
+      await notifyAdmin(adminMessage);
     } catch (adminErr) {
       logger.warn("[/ekip] Admin notify failed:", adminErr);
     }
