@@ -127,7 +127,7 @@ Read the repo source code, find interesting patterns, suggest improvements.
 
 ```bash
 # Read the actual rental pricing calculator to understand price computation
-curl -s "https://raw.githubusercontent.com/salavey13/carTest/main/lib/rental-pricing-calculator.ts" | head -50
+curl -s "https://raw.githubusercontent.com/salavey13/carTest/main/app/franchize/lib/pricing-calculator.ts" | head -50
 
 # Read doc-manual.ts to understand how rentals are created
 curl -s "https://raw.githubusercontent.com/salavey13/carTest/main/app/webhook-handlers/commands/doc-manual.ts" | grep -A5 'createRentalFromDocContract'
@@ -192,7 +192,7 @@ Every week (Monday 10:00, before weekly-revenue):
    ⚠️ Pattern: Supabase 525 SSL errors spiking on weekends
 
    📚 I learned:
-   • New table: crew_shifts (shift tracking) — I can now track work hours
+   • New table: crew_member_shifts (shift tracking) — I can now track work hours
    • New column: rentals.deposit_amount — I can now track deposits
    • New skill: deposit-tracker-text — I can query deposit status
 

@@ -82,7 +82,7 @@ crew_id            — crew ID (always vip-bike for this export)
 The script includes rentals that match ANY of:
 1. **Active today**: `start_date <= tomorrow AND end_date >= today` (overlaps today)
 2. **Upcoming**: `start_date` is within the next 30 days (after today)
-3. **Active status**: status is `pending_confirmation`, `active`, `ongoing`, `confirmed`, `started`, or `pending`
+3. **Active status**: status is `pending_confirmation`, `confirmed`, or `active` (полный CHECK: `pending_confirmation / confirmed / active / completed / cancelled / disputed`; значений `ongoing` / `started` / `pending` в БД НЕ существует)
 
 Excludes: `completed` and `cancelled` rentals that don't overlap today (historical).
 

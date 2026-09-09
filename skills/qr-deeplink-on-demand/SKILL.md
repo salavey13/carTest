@@ -101,7 +101,7 @@ node skills/qr-deeplink-on-demand/scripts/generate-qr.mjs \
 
 | Type | Payload | Target route (useStartParamRouter.ts) |
 |------|---------|----------------------------------------|
-| `create_crew` | `create_crew` | `/wblanding#create-crew-form` (real create form) |
+| `create_crew` | `create_crew` | `/franchize/create#create-crew-form` (роутер `hooks/useStartParamRouter.ts` ведёт прямо на инлайн-форму «Создать экипаж»; старый путь `/wblanding#create-crew-form` устарел) |
 | `join_crew` | `crew_<slug>_join_crew` | `/franchize/<slug>?join_crew=true` (auto-join) |
 | `profile` | `franchize/<slug>/profile` | `/franchize/<slug>/profile` (user profile page) |
 | `lead` | `lead_<userId>` | `/franchize/<slug>/leads?leadId=<userId>` (lead detail) |

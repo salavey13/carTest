@@ -384,9 +384,9 @@ rental_web_url "94b5b41d-..."   # → ?ui=v2&rentalId=94b5b41d-...
 - `app/franchize/server-actions/rental-verification-todos.ts`
 - `app/franchize/server-actions/rental-secrets-claim.ts` — QR claim
 - `app/franchize/server-actions/rental-handoffs.ts` — handoff flow
-- `app/franchize/server-actions/approve-contract.ts`
 - `app/franchize/server-actions/decline-contract.ts`
 - `app/franchize/server-actions/submit-contract-draft.ts`
+- (`approve-contract.ts` НЕ существует — approve логика живёт в contract-draft-text напрямую через REST)
 
 **Schema migrations:**
 

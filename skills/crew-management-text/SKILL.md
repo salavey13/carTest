@@ -208,20 +208,28 @@ select=id,title,due_date,status\
 
 ### 5. `change-role <userId> --role <role>` — сменить роль оператора
 
+**Матрица прав (синхронизирована с `app/franchize/lib/crew-roles.ts` + server action `update-crew-member-role.ts` + UI `/franchize/<slug>/crew/members`):**
+
+- Иерархия: `owner(4) > co_owner(3) > admin(2) > mechanic(1) > member(0)`.
+- Менять роли могут **owner / co_owner / admin** — и только участникам СТРОГО ниже себя (admin → mechanic/member; co_owner → admin/mechanic/member; owner → все, кроме owner-ов).
+- Effective owner = `crews.owner_id` ИЛИ `crew_members.role='owner'` (защищён от изменений через UI/action, сам-себе сменить роль нельзя).
+- Назначаемые роли: всё строго ниже своей (`co_owner|admin|mechanic|member`; разжаловать owner-а нельзя).
+
 ```bash
 USER_ID="7813830016"
-NEW_ROLE="admin"   # owner | co_owner | admin | mechanic | member
-ACTOR="${OP_OWNER}"  # кто меняет (только owner может менять роли)
+NEW_ROLE="admin"     # co_owner | admin | mechanic | member (owner через UI/action не назначается)
+ACTOR="${OP_ADMIN}"  # чьи права проверяются: owner/co_owner/admin экипажа
 
-# Validate role
+# Validate role (assignable set)
 case "$NEW_ROLE" in
-  owner|co_owner|admin|mechanic|member) ;;
-  *) echo "ERROR: invalid role '$NEW_ROLE'"; exit 2 ;;
+  co_owner|admin|mechanic|member) ;;
+  *) echo "ERROR: invalid role '$NEW_ROLE' (owner не назначается через UI)"; exit 2 ;;
 esac
 
-# PATCH crew_members
+# Direct PATCH допустим для service-бота, но повторяет логику
+# update-crew-member-role.ts: строго НИЖЕ своей роли, owner-ы не трогаются.
 MEMBER_ID=$(curl -sS "${SUPABASE_URL}/rest/v1/crew_members?\
-select=id&crew_id=eq.${CREW_ID}&user_id=eq.${USER_ID}&limit=1" \
+select=id,role&crew_id=eq.${CREW_ID}&user_id=eq.${USER_ID}&limit=1" \
   "${HDR_PUBLIC[@]}" | jq -r '.[0].id')
 
 curl -sS -X PATCH "${SUPABASE_URL}/rest/v1/crew_members?id=eq.${MEMBER_ID}" \
@@ -232,7 +240,7 @@ curl -sS -X PATCH "${SUPABASE_URL}/rest/v1/crew_members?id=eq.${MEMBER_ID}" \
   -d "$(jq -n --arg role "$NEW_ROLE" '{role: $role}')"
 ```
 
-**Логика:** PATCH `crew_members.role`. Допустимые роли (CHECK constraint `crew_members_role_check`): `owner`, `co_owner`, `admin`, `mechanic`, `member`. Аудит-лог ведётся через server-action `update-crew-member-role.ts`.
+**Логика:** PATCH `crew_members.role`. Допустимые роли (CHECK `crew_members_role_check`): `owner`, `co_owner`, `admin`, `mechanic`, `member`. Таблицы аудита нет — веб-экшен после смены отправляет участнику best-effort TG-уведомление «⚙️ Обновлена роль: …»; при прямом PATCH сделай то же сам (сообщение участнику + упомяни кто поменял).
 
 **Пример вывода:**
 
@@ -242,8 +250,9 @@ curl -sS -X PATCH "${SUPABASE_URL}/rest/v1/crew_members?id=eq.${MEMBER_ID}" \
   Crew:        vip-bike
   Old role:    member
   New role:    admin
-  Changed by:  356282674 (I_O_S_NN, owner)
+  Changed by:  413553377 (salavey13, admin экипажа)
   At:          2026-07-21T23:50:00.000Z
+  TG:          уведомление участнику отправлено
 ```
 
 🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/crew/members`
@@ -255,7 +264,7 @@ curl -sS -X PATCH "${SUPABASE_URL}/rest/v1/crew_members?id=eq.${MEMBER_ID}" \
 ### Public schema
 
 - `crews` — `id` (uuid PK), `name`, `description`, `logo_url`, `owner_id`, `created_at`, `updated_at`, `slug`, `hq_location`, `metadata` (jsonb — `is_provider` и т.д.).
-- `crew_members` — `id` (uuid PK), `crew_id`, `user_id`, `role` (`owner` / `co_owner` / `admin` / `mechanic` / `member`), `joined_at`, `membership_status` (`pending` / `active` / `inactive`), `last_location` (geography), `live_status` (`online` / `offline`).
+- `crew_members` — `id` (uuid PK), `crew_id`, `user_id`, `role` (`owner` / `co_owner` / `admin` / `mechanic` / `member`), `joined_at`, `membership_status` (`pending` / `active` / `inactive`), `last_location` (geography), `live_status` (`online` / `offline`; третий статус «riding / на байке» НЕ хранится в колонке — веб выводит его, когда у участника есть открытая смена, см. `app/franchize/lib/shift-crew-status.ts`).
 - `users` — `user_id` (text PK), `username`, `full_name`, `avatar_url`, `website`, `status`, `role`, `metadata`, `language_code`, `created_at`.
 - `crew_todos` — `id`, `crew_id`, `assigned_to`, `title`, `description`, `status`, `priority`, `due_date`, `category`, `rental_id`, `lead_id`, `completed_at`, `created_by`.
 - `rentals` — `rental_id`, `user_id`, `vehicle_id`, `status`, `total_cost`, `created_at`, `crew_id`, `created_by_operator_chat_id`.

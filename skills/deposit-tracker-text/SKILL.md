@@ -35,6 +35,15 @@ Now the `rentals` table has 7 new columns for deposit tracking:
 
 Plus `deposit_log` table for audit trail.
 
+> ⚠️ **Legacy model — читай, но новые записи делай через `deposit_entries`.**
+> С миграции `20260810000010` движения залогов (в т.ч. КУДА ушли деньги:
+> cash / tbank / sber, штрафы, сплиты) пишутся в таблицу **`deposit_entries`**
+> (`entry_type`: deposit_collected / deposit_returned / penalty; `direction` in/out;
+> `destination` cash/tbank/sber) — см. скилл **`deposit-tracer-text`** и
+> `app/franchize/server-actions/deposit-entries.ts`. Колонки `rentals.deposit_*`
+> и `deposit_log` остаются как legacy read-модель/аудит; источник правды про
+> «был ли возвращён залог» — записи в `deposit_entries`.
+
 ## Commands
 
 ### 1. deposits-status [--date YYYY-MM-DD]

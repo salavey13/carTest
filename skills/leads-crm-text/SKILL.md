@@ -28,7 +28,7 @@ Skill использует только `curl` к Supabase REST API (PostgREST) 
 Use this skill when:
 
 - Нужно быстро увидеть список лидов без открытия браузера / Telegram WebApp.
-- Нужно отфильтровать горячих / в фокусе / QR-не-принятых лидов из CLI (для утреннего standup).
+- Нужно отфильтровать горячих / в фокусе лидов из CLI (для утреннего standup).
 - Нужно показать детали одного лида (контакты, аренды, задачи, документы, QR-claim).
 - Нужно закрыть / отклонить лид с указанием причины (`dismiss-lead`).
 - Нужно вывести KPI (конверсия, выручка, горячие) или воронку по стадиям.
@@ -82,7 +82,7 @@ select=id,telegram_user_id,phone,intent_type,stage,urgency_score,metadata\
   "${HDR_PUBLIC[@]}"
 ```
 
-**Stage filter** (e.g. `awaiting_qr_claim` requires joining with `rentals` — see `lead-detail` for stage derivation logic):
+**Stage filter** (фильтр идёт по «сырому» значению `franchize_intents.stage`; UI-стадии пайплайна выводятся из него + аренд/задач через `computeLeadStage()` в `app/franchize/[slug]/leads/lib/pipeline-stages.ts` — валидные значения см. раздел CHECK constraints ниже):
 
 ```bash
 curl -sS "${SUPABASE_URL}/rest/v1/franchize_intents?\
@@ -96,16 +96,16 @@ select=id,telegram_user_id,phone,stage,urgency_score\
 
 ```
 === Лиды VIP Bike (48 всего, 48 горячих) ===
-Фильтр: стадия: QR ждёт активации → показано 13
+Фильтр: стадия: Договор отправлен → показано 13
 
 Имя                     Телефон           Стадия                SLA               Назначен                Байк                  Выручка
 ──────────────────────  ────────────────  ────────────────────  ────────────────  ──────────────────────  ────────────────────  ──────────
-Логунов Егор            +79861720402      QR ждёт активации          60 🔴             Джордан (member)        BMW F800R             4704k₽
-Шевчук Эдуард           +74929993333      QR ждёт активации          2д 3ч 🔴          Артур С. (admin)        Regulmoto Nibbler …   2970k₽
-Молев Георгий           +79307020134      QR ждёт активации          9д 4ч 🔴          Илья О. (owner)         BMW F800R             25k₽
+Логунов Егор            +79861720402      Договор отправлен          60 🔴             Джордан (member)        BMW F800R             4704k₽
+Шевчук Эдуард           +74929993333      Договор отправлен          2д 3ч 🔴          Артур С. (admin)        Regulmoto Nibbler …   2970k₽
+Молев Георгий           +79307020134      Договор отправлен          9д 4ч 🔴          Илья О. (owner)         BMW F800R             25k₽
 
 === Воронка ===
-Новые: 16 | Нужен контакт: 1 | Договор отправлен: 8 | QR ждёт активации: 13 | Документы отсутствуют: 6 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
+Новые: 16 | Нужен контакт: 1 | Договор отправлен: 27 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
 ```
 
 🌐 Web: `https://v0-car-test-salavey13s-projects.vercel.app/franchize/vip-bike/leads`
@@ -154,10 +154,10 @@ select=source_rental_id,verification_status,renter_full_name,renter_phone,qr_fir
 ```
 === Лид: +79861720402 (Логунов Егор) ===
 Identity state:     claimed_user
-Pipeline stage:     awaiting_qr_claim
-QR status:          unclaimed (sent 9д 4ч ago)
-SLA signals:        🔴 qr_age (9д 4ч), 🔴 first_contact (10д)
-Next action:        Позвонить клиенту — QR-ссылка ждёт активацииа уже 9 дней
+Pipeline stage:     contract_sent
+QR status:          unclaimed (sent 9д 4ч ago) — деталь диалога, НЕ стадия
+SLA signals:        🔴 first_contact (10д)
+Next action:        Связаться с клиентом — помочь принять договор
 
 — Контакты —
 Телефон:   +79 861 720 402
@@ -173,7 +173,7 @@ Source:    market_bmw_f800r
   документы:   паспорт ✓ / регистрация ✗ / права ✓
 
 — Задачи (2) —
-  #1  ⚠️ overdue  Позвонить по QR-claim         due: 22.07
+  #1  ⚠️ overdue  Связаться с клиентом            due: 22.07
   #2              Отправить contract-draft        due: 25.07
 
 — QR-claim —
@@ -327,7 +327,7 @@ select=stage,intent_type\
 
 ```
 === Воронка ===
-Новые: 16 | Нужен контакт: 1 | Договор отправлен: 8 | QR ждёт активации: 13 | Документы отсутствуют: 6 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
+Новые: 16 | Нужен контакт: 1 | Договор отправлен: 27 | Активные: 0 | Возврат: 2 | Закрыто: 2 | Потеряно: 0
 
 Всего лидов: 48
 Горячих:     48
@@ -423,46 +423,38 @@ lead_segment_web_url "hot"      # → ?segment=hot
 | `dismiss_reason_missing`    | `--reason is required`                          | `dismiss-lead` без `--reason`                                                  | 2    | Передать `--reason <value>` (список валидных причин в таблице выше)         |
 | `dismiss_reason_invalid`    | `invalid reason "<value>"`                       | `--reason bogus`                                                               | 2    | Использовать одно из значений `DISMISS_REASONS`                              |
 | `dismiss_note_required`     | `reason "<value>" requires --note`               | `--reason operator_error` или `--reason other` без `--note`                    | 2    | Добавить `--note "<text>"`                                                  |
-| `dismiss_constraint_23514`  | `CHECK constraint 'franchize_intents_stage_allowed' rejected 'dismissed'` | DB constraint не включает `'dismissed'` в список разрешённых стадий | 2    | Запустить миграцию (SQL ниже)                                                |
+| `dismiss_constraint_23514`  | `CHECK constraint 'franchize_intents_stage_allowed' rejected '<value>'` | Пишемое stage-значение не входит в constraint | 2    | С 2026-07-22 constraint включает все значения кода (миграция `20260722010000`) — если ошибка возникла, ты пишешь мусорное значение; свериться со списком ниже |
 | `dismiss_patch_no_rows`     | `PATCH returned no rows`                        | Intent удалён между SELECT и PATCH, или RLS                                    | 2    | Проверить что intent ещё существует через REST                               |
 | `mode_invalid`              | `invalid mode "<value>"`                         | `kpis --mode bogus`                                                            | 2    | Использовать `rent` / `sale` / `service`                                    |
 | `unknown_command`           | `unknown command "<value>"`                     | Опечатка в подкоманде                                                          | 2    | Запустить `--help` для списка команд                                         |
 
-### CHECK constraint fix для `dismiss-lead`
+### CHECK constraints — актуальное состояние (⚠️ ручной SQL больше не нужен)
 
-Production DB `franchize_intents_stage_allowed` (из миграции `20260508120000`) **не включает** значение `'dismissed'`. SQL для починки:
+Оба constraint'а приведены к кодовой реальности миграцией
+`20260722010000_fix_callback_lead_check_constraints.sql`. **Не запускай старый
+«фикс»-SQL** (он сужал constraint и содержал опечатку `'payment_retry needed'`).
 
-```sql
-ALTER TABLE public.franchize_intents
-  DROP CONSTRAINT IF EXISTS franchize_intents_stage_allowed;
-ALTER TABLE public.franchize_intents
-  ADD CONSTRAINT franchize_intents_stage_allowed CHECK (
-    stage IN (
-      'discovered','clicked','prebuy_started','checkout_started',
-      'hold_created','payment_failed','payment_confirmed',
-      'contacted','test_ride_requested','viewed','configured',
-      'contract_generated','alternative_offered','offer_sent',
-      'manual_reserved','closed','dismissed'
-    )
-  );
+`franchize_intents_stage_allowed` (значения, принимаемые БД):
+
+```
+alternative_offered, checkout_started, clicked, closed, configured, contacted,
+contract_generated, discovered, dismissed, finance_requested, hold_created,
+lead_captured, manual_reserved, offer_sent, payment_confirmed, payment_failed,
+prebuy_started, test_ride_requested, trade_in_requested, viewed
 ```
 
-Запустить через Supabase SQL Editor или `psql` к production DB.
+`franchize_intents_intent_type_allowed`:
 
-### Service-mode constraint
-
-`franchize_intents_intent_type_allowed` в дампе не включает `'service'`. Migration:
-
-```sql
-ALTER TABLE public.franchize_intents DROP CONSTRAINT IF EXISTS franchize_intents_intent_type_allowed;
-ALTER TABLE public.franchize_intents ADD CONSTRAINT franchize_intents_intent_type_allowed CHECK (
-  intent_type = ANY (ARRAY[
-    'checkout_start', 'payment_retry needed', 'payment_success', 'hold_created',
-    'map_click', 'contact_click', 'test_ride_click', 'test_ride',
-    'prebuy', 'trade_in', 'finance', 'rent', 'sale', 'service'
-  ])
-);
 ```
+callback_request, checkout_start, contact_click, finance, hold_created,
+map_click, payment_failure, payment_success, prebuy, rent, sale, service,
+test_drive, test_ride, test_ride_click, trade_in
+```
+
+UI-стадии пайплайна (7 шт., `app/franchize/[slug]/leads/lib/pipeline-stages.ts`):
+`new → needs_contact → contract_sent → active_rental → return_due → closed_won / closed_lost`.
+Стадии `awaiting_qr_claim` и `documents_missing` **УДАЛЕНЫ из пайплайна 2026-09-09**
+(QR-скан и фото документов — детали диалога, а не стадии; см. Changelog mirror).
 
 ## Security
 
@@ -506,7 +498,7 @@ ALTER TABLE public.franchize_intents ADD CONSTRAINT franchize_intents_intent_typ
 - `app/franchize/server-actions/lead-notes.ts` — lead notes CRUD
 - `app/franchize/server-actions/intents.ts` — franchize_intents upsert
 
-**Pipeline / SLA implementations (in `/impl/new_files/`):**
+**Pipeline / SLA implementations (in `app/franchize/[slug]/leads/lib/`):**
 
 - `pipeline-stages.ts` — `computeLeadStage()`, `matchTodosToLead()`, `computeAssignee()`, `computeQrStatus()`
 - `sla-signals.ts` — `computeLeadSignals()`, `isHotLead()`
@@ -537,6 +529,13 @@ ALTER TABLE public.franchize_intents ADD CONSTRAINT franchize_intents_intent_typ
 
 - `/home/z/my-project/upload/secrets.txt` — `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_CHAT_ID`
 - `/home/z/my-project/upload/supabase.txt` — full schema dump
+
+## Changelog mirror (что изменилось в вебе — не отставай)
+
+- **2026-09-09 — стадии `awaiting_qr_claim` («QR ждёт активации») и `documents_missing` («Документы отсутствуют») УДАЛЕНЫ** из UI-пайплайна и из SLA-сигналов (`unclaimed_qr_age`, `document_missing_age` тоже удалены). QR-скан и фото документов — детали диалога, а не стадии; документы в UI упоминаются только когда аренда успешно состоялась (`active`/`completed`), иначе молчание. Воронка теперь: Новые / Нужен контакт / Договор отправлен / Активные / Возврат / Закрыто / Потеряно.
+- **2026-09 — quiz-подбор с сайта → лид CRM**: квиз на витрине создаёт intent + комментарий-заметку (`lead_notes`) — обрабатывай такие лиды как обычные, источник виден в `source_route`.
+- **2026-09 — superlist-ачивка**: если оператор закрыл ВЕСЬ список «todays tasks» — экипажу улетает TG-поздравление, оператор получает +25 очков и ачивку (fanfare). Хвали закрытые списки!
+- Скорость обработки лидов (медиана ответа, бакеты ≤15м/>24ч, очередь «ждут») считается в `lib/lead-speed.ts` и показана панелью LeadSpeedPanel на странице лидов — при вопросах «как быстро отвечаем» используй её метрики.
 
 ## Known limitations
 

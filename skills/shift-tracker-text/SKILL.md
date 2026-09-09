@@ -91,14 +91,29 @@ Total: 80.5h · 40,250₽
 ### 3. shift-set-rate <operatorChatId> --rate <rub>
 Set hourly rate for an operator (admin only). Updates future shifts.
 
+⚠️ **Source of truth — `users.metadata.hourly_rate`** (миграция `20260819000003`:
+поле `crew_members.hourly_rate` и `crew_members.metadata.default_hourly_rate`
+УДАЛЕНЫ как мёртвые — запись туда НЕ применяется ни вебом, ни триггером).
+Для новых смен значение в `crew_member_shifts.hourly_rate` проставляется триггером из `users.metadata.hourly_rate`.
+
+PostgREST не умеет jsonb-merge, поэтому read-modify-write (иначе затрёшь остальной metadata):
+
 ```bash
-# Update the operator's default rate on crew_members
-curl -s -X PATCH "$URL/rest/v1/crew_members?crew_id=eq.$CREW_ID&user_id=eq.$OP_ID" \
+# 1. Прочитать текущий metadata юзера
+ROW=$(curl -s "$URL/rest/v1/users?select=user_id,metadata&user_id=eq.$OP_ID" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+# 2. Смержить hourly_rate и PATCH целиком
+MERGED=$(echo "$ROW" | jq -c '.[0].metadata // {} | . + {"hourly_rate": '"${RATE}"'}')
+curl -s -X PATCH "$URL/rest/v1/users?user_id=eq.$OP_ID" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
-  -d '{"metadata": {"default_hourly_rate": '${RATE}'}}'
+  -d "{\"metadata\": ${MERGED}}"
 ```
+
+Веб-эквивалент: `POST /api/crew/shifts/rate` `{slug, memberId, hourlyRate}` — пишет тот же ключ через `jsonb_set` (не затирая metadata).
+
+Зарплатная подсистема: планы и расчёты зарплат живут в таблицах `salary_plans` / `salary_calculations` / `salary_coefficients` и страницах `/salary` (+ server actions `salary-calculations.ts`, `salary-coefficients.ts`) — отдельного text-skill пока нет, при вопросах про оклады/коэффициенты смотри их и `owner_cash_entries` (выплаты).
 
 ### 4. shift-weekly-report
 Monday morning salary summary — sent by boss command.

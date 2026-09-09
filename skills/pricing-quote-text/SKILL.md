@@ -42,14 +42,33 @@ node scripts/pricing-quote-skill.mjs tiers --bike "MT-07"
 node scripts/pricing-quote-skill.mjs list-prices
 ```
 
-## Pricing rules
+## Pricing rules (tier model — зеркало `app/franchize/lib/pricing-calculator.ts`)
+
+В вебе НЕТ процентных скидок (-10% / -15% — legacy-модель, НЕ использовать).
+Цена считается по тарифам из `specs` карточки байка; каждая ставка — СУТОЧНАЯ/ПОЧАСОВАЯ и умножается на фактическую длительность.
+
+**Почасово (< 24h):**
 
 | Duration | Rule |
 |----------|------|
-| ≤ 3 hours | = daily price |
-| 1-6 days | daily × days |
-| 7-13 days | -10% |
-| 14+ days | -15% |
+| ≤ 1 час | `price_per_hour` × часы (fallback: `dailyPrice`) |
+| 2 часа | точный тариф `price_per_2h`, если задан |
+| 2–3 часа | интерполяция `price_per_hour` → `price_per_3h` |
+| 3 часа | точный тариф `price_per_3h`, если задан |
+| 3–6 ч / 6–12 ч | интерполяция между соседними тарифами (`price_per_6h`, `price_per_12h`) |
+| 12–24 часа | интерполяция `price_per_12h` → дневная ставка |
+
+**Посуточно (≥ 24h):** ставка выбирается по длительности и умножается на дни:
+
+| Days | Rate (per-day) |
+|------|----------------|
+| 1 день | `rent_weekend` (если выходной) / `rent_weekday` / `daily_price` |
+| 2–4 дня | `rent_2_4d` × дни |
+| 5–10 дней | `rent_5_10d` × дни |
+| 11–30 дней | `rent_11_30d` × дни |
+| без тарифа | `daily_price` × дни |
+
+Шлем: 500 ₽ при аренде < 24ч, 1000 ₽ при ≥ 24ч (`getHelmetPrice()`).
 
 ## Related files
 

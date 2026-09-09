@@ -136,12 +136,15 @@ Output: 10 service items (production data):
 Get assigned mechanic for a service rental.
 
 ```bash
-# v1 CrewTodo doesn't carry rental_id directly. Best-effort match: find
-# the most recent crew_todo where assigned_to = rental.created_by_operator_chat_id.
+# crew_todos.rental_id существует с миграции 20260720120200 — фильтруй прямо по нему:
+curl -s "$URL/rest/v1/crew_todos?select=id,title,assigned_to,status,assigned_to_user:users!assigned_to(full_name,username)&crew_id=eq.$CREW_ID&rental_id=eq.${rentalId}&category=eq.maintenance&order=created_at.desc&limit=5" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+
+# Fallback для legacy-туду без rental_id: по оператору аренды
 OPERATOR=$(curl -s "$URL/rest/v1/rentals?select=created_by_operator_chat_id&rental_id=eq.${rentalId}" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | jq -r '.[0].created_by_operator_chat_id')
 
-curl -s "$URL/rest/v1/crew_todos?select=id,title,assigned_to,status,assigned_to_user:users!assigned_to(full_name,username)&crew_id=eq.$CREW_ID&assigned_to=eq.${OPERATOR}&order=created_at.desc&limit=5" \
+curl -s "$URL/rest/v1/crew_todos?select=id,title,assigned_to,status,assigned_to_user:users!assigned_to(full_name,username)&crew_id=eq.$CREW_ID&rental_id=is.null&assigned_to=eq.${OPERATOR}&order=created_at.desc&limit=5" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
 
@@ -255,7 +258,7 @@ analytics_web_url "sales"       # → web URL with tab=sales
 ## Anti-hallucination
 - ~~--json~~, ~~--outFile~~, ~~--crew~~
 - Always check both `vehicle_id LIKE 'vip-bike-svc-%'` AND `vehicle_id IN (cars.type='service')` — some legacy services use one convention, some the other
-- Mechanic assignment is best-effort (v1 CrewTodo doesn't carry rental_id); note this caveat in output
+- Mechanic assignment is best-effort; новые туду создаются с `rental_id` (миграция 20260720120200) — legacy-строки матчатся по оператору, note this caveat in output
 
 ## Security
 - PII: mask client phone (`+7…XX-12`)

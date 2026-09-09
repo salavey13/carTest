@@ -147,15 +147,18 @@ Sections (in order):
 10. **Sticky footer** — Open rental → link
 
 ### 4. rental-todos <rentalId>
-All todos for this rental. v1 CrewTodo doesn't carry `rental_id` directly, so this command queries `crew_todos` filtered by `category` matching rental context and `assigned_to = rental.created_by_operator_chat_id`.
+All todos for this rental. `crew_todos.rental_id` существует с миграции `20260720120200` — фильтруй прямо по нему. Fallback для старых туду (без `rental_id`): `category` rental-контекста + `assigned_to = rental.created_by_operator_chat_id`.
 
 ```bash
-# Step 1: get the operator chat id for the rental
+# Primary: todos linked to the rental directly
+curl -s "$URL/rest/v1/crew_todos?select=id,title,status,category,priority,due_date,assigned_to,created_at&crew_id=eq.$CREW_ID&rental_id=eq.${rentalId}&order=created_at.desc" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+
+# Fallback (legacy rows without rental_id): via operator chat id
 OPERATOR=$(curl -s "$URL/rest/v1/rentals?select=created_by_operator_chat_id&rental_id=eq.${rentalId}" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | jq -r '.[0].created_by_operator_chat_id')
 
-# Step 2: todos assigned to that operator
-curl -s "$URL/rest/v1/crew_todos?select=id,title,status,category,priority,due_date,assigned_to,created_at&crew_id=eq.$CREW_ID&assigned_to=eq.${OPERATOR}&order=created_at.desc" \
+curl -s "$URL/rest/v1/crew_todos?select=id,title,status,category,priority,due_date,assigned_to,created_at&crew_id=eq.$CREW_ID&rental_id=is.null&assigned_to=eq.${OPERATOR}&order=created_at.desc" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
 ```
 

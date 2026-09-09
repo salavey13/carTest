@@ -1,5 +1,5 @@
 ---
-description: "[ops] VIP Bike operations super-skill — leads, analytics, catalog, rentals, crew, services, reviews, contracts, orders, admin, leaderboard, crew customization. 16 text skills + GitHub + Supabase + VPS + Telegram bot."
+description: "[ops] VIP Bike operations super-skill — leads, analytics, catalog, rentals, crew, services, reviews, contracts, orders, admin, leaderboard, crew customization, testdrives, deposits, shifts, pricing. 25+ text skills + GitHub + Supabase + VPS + Telegram bot."
 mode: primary
 permission:
   skill:
@@ -21,6 +21,17 @@ permission:
     "leaderboard-text": "allow"
     "crew-info-text": "allow"
     "crew-customization-text": "allow"
+    "testdrive-analytics-text": "allow"
+    "deposit-tracker-text": "allow"
+    "deposit-tracer-text": "allow"
+    "rental-ops-text": "allow"
+    "shift-tracker-text": "allow"
+    "pricing-quote-text": "allow"
+    "pdf-bike-sheet-on-demand": "allow"
+    "qr-deeplink-on-demand": "allow"
+    "send-document-by-email": "allow"
+    "deal-contract-from-photos": "allow"
+    "extract-rental-info": "allow"
   bash: "allow"
   edit: "allow"
   read: "allow"
@@ -40,23 +51,32 @@ permission:
 
 | Ключевые слова | Skill | Команды | Web-ссылка |
 |---|---|---|---|
-| лиды, воронка, KPI, dismiss, QR ждёт активации, горячие | `leads-crm-text` | list-leads, lead-detail, dismiss-lead, list-todos, kpis, pipeline-funnel | /leads |
+| лиды, воронка, KPI, dismiss, горячие, квиз | `leads-crm-text` | list-leads, lead-detail, dismiss-lead, list-todos, kpis, pipeline-funnel | /leads |
 | аренды сегодня, возвраты, ждёт оформленияные, активировать, kpi аренд, документы аренды, передача байка, история аренды | `rental-analytics-text` | rentals-day, rental-kpis, rental-detail, rental-todos, rental-documents, rental-handoff, rental-history, activate-rental, complete-rental, returns-due, rentals-awaiting-return | /rentals-analytics?ui=v2 |
+| закрыть аренду, продлить аренду, одометр, залог возвращён | `rental-ops-text` | list-rentals, show-rental, returns-today, stuck, extend, close | /rentals-analytics?ui=v2 |
 | продажи, статистика продаж, детали продажи, kpi продаж, статус договора, доставка, гарантия | `sale-analytics-text` | sales-list, sale-kpis, sale-detail, sale-contract-status, sale-delivery-status, sale-warranty, sale-stats, sale-update-status | /rentals-analytics?ui=v2 (Продажа tab) |
 | сервис, обслуживание, нормо-час, услуги, kpi сервиса, механик, каталог услуг | `service-analytics-text` | services-list, service-kpis, service-detail, service-catalog, service-mechanic, service-assign-mechanic, service-stats, service-activate, service-complete | /rentals-analytics?ui=v2 (Сервис tab) |
-| аналитика, дашборд задач, выручка, статистика экипажа | `analytics-text` | rentals-dashboard, sales-dashboard, todos-dashboard, crew-stats, service-dashboard, commercial-offers, subrent | /rentals-analytics |
-| каталог байков, цена, доступность, какие байки | `franchize-catalog-text` | list-bikes, bike-detail, bike-pricing, check-availability | / |
+| тест-драйвы, конверсия тест-драйвов | `testdrive-analytics-text` | testdrives-list, testdrive-kpis, testdrive-detail, testdrive-conversion, testdrive-stats | /leads (бейдж тест-драйвов) |
+| смены, /shift, кто на смене, часовая ставка | `shift-tracker-text` | shift-status, shift-salary, shift-set-rate, shift-weekly-report | /crew/shifts |
+| залоги, куда ушли залоги, кэш/банк | `deposit-tracer-text` | deposit-list, deposit-balance, deposit-rental, deposit-card | — |
+| аналитика, дашборд задач, выручка, статистика экипажа | `analytics-text` | rentals-dashboard, sales-dashboard, todos-dashboard, crew-stats, revenue-summary | /rentals-analytics |
+| каталог байков, цена, доступность, какие байки | `franchize-catalog-text` | list-bikes, bike-detail, bike-pricing, check-availability, find-bike | / |
 | добавить байк, новый байк в каталог, выложи байк, добавить услугу, выставить на продажу, шаблон байка | `catalog-adder-text` | add-bike, add-service, add-sale-item, list-catalog, get-reference | /admin |
-| карточка аренды, детали аренды, документы, QR-claim | `rental-card-text` | rental-card, rental-todos, rental-documents, rental-handoff, activate, complete, update-status, send-message, list-rentals, rental-history | /rental/[id] |
-| экипаж, участники, роли, задачи оператора, смены | `crew-management-text` | crew-info, crew-members, crew-member-detail, crew-stats, crew-todos, crew-todo-stats, update-member-role, crew-shifts | /crew |
-| профиль клиента, история аренд, достижения, документы | `rider-profile-text` | profile, profile-rentals, profile-achievements, profile-activity, profile-documents, profile-secrets | /profile |
-| отзывы, рейтинг, модерация отзывов | `reviews-text` | list-reviews, review-detail, moderate-review, review-stats | /review/[id] |
-| договор, черновик, одобрить, отклонить, STS | `contract-draft-text` | contract-draft, submit-draft, approve-contract, decline-contract, contract-status | /contract-draft/[id] |
-| заказы, корзина, чекаут, счёт, уведомления | `orders-checkout-text` | order-detail, list-orders, create-checkout, create-invoice, order-notifications, retry-notification | /order/[id] |
-| админка, цены, доступность, конфигурация, промо | `crew-admin-text` | admin-config, admin-prices, admin-update-price, admin-toggle-availability, admin-bikes | /admin |
-| лидерборд, топ клиентов, топ операторов | `leaderboard-text` | leaderboard, leaderboard-rider, leaderboard-stats | /leaderboard |
-| о экипаже, контакты, сообщество, онбординг | `crew-info-text` | crew-about, crew-contacts, crew-community, crew-onboarding | /about |
+| прайс-квота, сколько стоит аренда, депозит байка | `pricing-quote-text` | quote, deposit, tiers, list-prices | / (configurator) |
+| карточка аренды, детали аренды, документы, QR-claim (read-only) | `rental-card-text` | rental-detail, rental-documents, rental-qr-status, rental-contract, rental-todos | /rental/[id] |
+| экипаж, участники, роли, задачи оператора | `crew-management-text` | list-members, member-detail, online-members, member-todos, change-role | /crew |
+| профиль клиента, история аренд, верификация | `rider-profile-text` | find-rider, rider-detail, rider-rentals, rider-verification, rider-troubled | /profile |
+| отзывы, рейтинг | `reviews-text` | list-reviews, review-detail, reviews-summary, bad-reviews | /review/[id] |
+| договор, черновик, одобрить, отклонить, STS | `contract-draft-text` | rental-contract, sale-contract, list-contracts, submit-draft, approve-contract, decline-contract, sts-pledge | /contract-draft/[id] |
+| заказы, корзина, чекаут, провалы оплат (read-only) | `orders-checkout-text` | list-orders, order-detail, cart-detail, payment-failures, checkout-funnel | /order/[id] |
+| админка, цены, доступность, конфигурация, промо | `crew-admin-text` | prices-list, price-set, promotions-list, promotion-create, message-templates-list, palette-list, palette-set | /admin |
+| лидерборд, топ клиентов, топ операторов | `leaderboard-text` | top-riders, top-operators, top-bikes, hall-of-fame, riders-with-reviews | /leaderboard |
+| о экипаже, контакты, сообщество | `crew-info-text` | crew-info, crew-contacts, crew-stats, crew-about, crew-resolve | /about |
 | настрой экипаж, измени конфиг, поменяй цвет/телефон/адрес, реквизиты, кастомизируй сайт экипажа | `crew-customization-text` | list-crews, get-config, show-field, set-field, set-contract-default, validate-config, get-readiness | /franchize/[slug]/admin |
+| PDF прайс-лист продажи, buy-sheet | `pdf-bike-sheet-on-demand` | buy-sheet-pdf | /market/[bike_id]/buy |
+| QR-код, deep link, vCard | `qr-deeplink-on-demand` | qr-png, qr-vcard, qr-pdf | — |
+| договор из фото (rent/sale/subrent) | `deal-contract-from-photos` | make-deal-contract | — |
+| отправить документ на email | `send-document-by-email` | send-document | — |
 
 ### Быстрый роутинг (по первым словам запроса)
 
@@ -76,14 +96,14 @@ permission:
 | "каталог услуг" / "нормо-час" | service-analytics-text | service-catalog |
 | "механик сервис" / "назначить механика" | service-analytics-text | service-mechanic / service-assign-mechanic |
 | "байки" / "каталог" / "цена" | franchize-catalog-text | list-bikes / bike-pricing |
-| "карточка аренды" / "документы аренды" | rental-card-text | rental-card / rental-documents |
-| "команда" / "кто онлайн" | crew-management-text | crew-members / crew-stats |
-| "профиль клиента" | rider-profile-text | profile |
+| "карточка аренды" / "документы аренды" | rental-card-text | rental-detail / rental-documents |
+| "команда" / "кто онлайн" | crew-management-text | list-members / online-members |
+| "профиль клиента" | rider-profile-text | find-rider |
 | "отзывы" | reviews-text | list-reviews |
-| "договор" / "контракт" | contract-draft-text | contract-status |
+| "договор" / "контракт" | contract-draft-text | rental-contract / sale-contract |
 | "заказ" / "оплата" | orders-checkout-text | order-detail |
-| "админка" / "цены" | crew-admin-text | admin-prices |
-| "лидерборд" / "топ" | leaderboard-text | leaderboard |
+| "админка" / "цены" | crew-admin-text | prices-list / price-set |
+| "лидерборд" / "топ" | leaderboard-text | top-riders |
 | "контакты" / "адрес" | crew-info-text | crew-contacts |
 
 ### Composite queries (мульти-skill)
@@ -100,12 +120,12 @@ permission:
 4. `testdrive-analytics-text testdrive-kpis --date <today>` — 4 KPI по тест-драйвам
 
 **"Статус по экипажу"** → 2 навыка:
-1. `crew-management-text crew-stats` — участники + задачи
+1. `crew-management-text list-members` — участники + роли
 2. `analytics-text todos-dashboard` — все задачи
 
 **"Найди клиента Рудометов"** → 2 навыка:
 1. `leads-crm-text list-leads --search Рудометов` — в лидax
-2. `rental-card-text list-rentals` — в арендах
+2. `rider-profile-text find-rider "Рудометов"` — по клиентам/арендам
 
 **"Сколько заработали за месяц?"** → 4 навыка параллельно (аренды + продажи + сервис + конверсия тест-драйвов):
 1. `rental-analytics-text rentals-day --date <30d-ago>` (агрегируй по дню)
@@ -135,15 +155,17 @@ permission:
 - **Key:** `SUPABASE_SERVICE_ROLE_KEY` from `/home/z/my-project/upload/secrets.txt`
 - **Crew slug:** `vip-bike`
 - **Crew ID:** `2d5fde70-1dd3-4f0d-8d72-66ccf6908746`
-- **Operators:** `356282674` (owner I_O_S_NN), `244736261` (co_owner Roman), `413553377` (admin salavey13), `7813830016` (member DJORUDJOV)
+- **Operators:** `356282674` (owner I_O_S_NN), `244736261` (co_owner Roman), `413553377` (admin salavey13), `7813830016` (admin DJORUDJOV)
 - **Headers:** `apikey` + `Authorization: Bearer` for public; add `Accept-Profile: private` + `Content-Profile: private` for private schema
 
 ### Tables (quick reference)
 
 | Schema | Table | Used by |
 |---|---|---|
-| public | crews, crew_members, users, cars, rentals, crew_todos, lead_notes, franchize_intents, orders, rental_reviews | Most skills |
-| private | rental_contract_artifacts, sale_contract_artifacts, testdrive_contract_artifacts, user_rental_secrets, subrent_contract_artifacts | rental-card, contract-draft, rental-analytics, testdrive-analytics |
+| public | crews, crew_members, users, cars, rentals, crew_todos (с `rental_id`/`lead_id` с 2026-07), lead_notes, franchize_intents, deposit_entries | Most skills |
+| private | rental_contract_artifacts, sale_contract_artifacts, testdrive_contract_artifacts, subrent_contract_artifacts, user_rental_secrets | rental-card, contract-draft, rental-analytics, testdrive-analytics |
+
+⚠️ Таблиц `orders` и `rental_reviews` НЕ существует (отзывы — в `rentals.metadata.review_*`; заказы — это `franchize_intents`). Залоги — `deposit_entries` (entry_type deposit_collected/deposit_returned/penalty; destination cash/tbank/sber); колонки `rentals.deposit_*` + `deposit_log` — legacy-read.
 
 ## 🐙 GitHub Access
 
@@ -153,15 +175,19 @@ permission:
 - **Write:** `PUT https://api.github.com/repos/salavey13/carTest/contents/<path>` with base64 content + token
 - **Vercel auto-deploys** on push to main
 
-## 📊 Pipeline Stage Model (9 stages)
+## 📊 Pipeline Stage Model (7 stages)
 
 ```
-new → needs_contact → contract_sent → awaiting_qr_claim → documents_missing → active_rental → return_due → closed_won / closed_lost
+new → needs_contact → contract_sent → active_rental → return_due → closed_won / closed_lost
 ```
 
 Computed by `computeLeadStage()` in `app/franchize/[slug]/leads/lib/pipeline-stages.ts`.
 
-## ⏱️ SLA Signal Model (8 signals)
+⚠️ 2026-09-09: стадии `awaiting_qr_claim` и `documents_missing` УДАЛЕНЫ из пайплайна
+(и SLA-сигналы `unclaimed_qr_age` / `document_missing_age` тоже) — QR-скан и фото
+документов теперь детали диалога, а не стадии. НЕ упоминай их в ответах как стадии.
+
+## ⏱️ SLA Signal Model (6 signals)
 
 | Signal | Tone thresholds |
 |---|---|
@@ -169,9 +195,7 @@ Computed by `computeLeadStage()` in `app/franchize/[slug]/leads/lib/pipeline-sta
 | time_since_last_action («Без активности») | green<1h, yellow<4h, orange<24h, red>24h. Считается от ПОСЛЕДНЕЙ АКТИВНОСТИ = max(lastSeenAt, lastModifiedAt): любое касание (ответ клиента, заметка/стадия/туду оператора) сбрасывает счётчик |
 | todo_in_focus_count | gray=0, yellow=1, red≥2 |
 | rental_start_proximity | gray>7d, yellow>1d, red<1d |
-| unclaimed_qr_age | gray<1h, yellow<17h, red>48h |
 | time_until_return | green>3d, yellow>1d, red<1d |
-| document_missing_age | yellow<24h, orange>24h |
 | days_since_stage_change | gray<3d, yellow<7d, orange>7d |
 
 ## 🏗️ VPS Deployment
@@ -377,7 +401,7 @@ analytics_web_url "rentals" "2026-07-24"
 ### Пример
 
 ```
-🔥 Рудометов Михаил — urgency 95 — QR ждёт активации 17ч
+🔥 Рудометов Михаил — urgency 95 — Договор отправлен, без активности 17ч
 🏍 Ducati Panigale S Electro
 
 📋 Открыть: https://t.me/oneBikePlsBot/app?startapp=lead_425868767
@@ -398,8 +422,10 @@ analytics_web_url "rentals" "2026-07-24"
 ### Local skills (15 text-based)
 - `skills/leads-crm-text/` — leads CRM (leads-query.mjs)
 - `skills/rental-analytics-text/` — rental analytics
+- `skills/rental-ops-text/` — rental lifecycle ops (extend/close)
 - `skills/sale-analytics-text/` — sales analytics
 - `skills/service-analytics-text/` — service analytics
+- `skills/testdrive-analytics-text/` — testdrive analytics
 - `skills/analytics-text/` — general analytics dashboard
 - `skills/franchize-catalog-text/` — bike catalog (catalog-query.mjs)
 - `skills/rental-card-text/` — rental card detail (rental-query.mjs)
@@ -412,6 +438,9 @@ analytics_web_url "rentals" "2026-07-24"
 - `skills/leaderboard-text/` — rider leaderboard
 - `skills/crew-info-text/` — crew info (about/contacts/community)
 - `skills/crew-customization-text/` — crew config read/edit + contract defaults (crew-customization-skill.mjs)
+- `skills/shift-tracker-text/` — shifts + hourly rates (source of truth: users.metadata.hourly_rate)
+- `skills/deposit-tracer-text/` — deposit movements (deposit_entries)
+- `skills/pricing-quote-text/` — price quotes (tier model, mirror pricing-calculator.ts)
 
 ### Local reference files
 - `/home/z/my-project/upload/secrets.txt` — Supabase key + bot token + crew members
@@ -431,11 +460,8 @@ analytics_web_url "rentals" "2026-07-24"
 
 ## ⚠️ Known limitations
 
-1. Service leads (`intent_type='service'`) blocked by CHECK constraint — migration SQL documented in leads-crm-text
-2. `dismissed` stage blocked by CHECK constraint — migration SQL documented in leads-crm-text
-3. `rental_handoffs` table may not exist in production — rental-card-text handles gracefully
-4. `rentals.metadata.statusChanges` not populated — history events use `created_at` as fallback
-5. 45 of 57 artifacts have NULL `renter_phone` — leads keyed by `name:ФИО` fallback
-6. GitHub token may be rate-limited (4000 req/hour) — batch pushes
-7. VPS SSH access requires key file at `/opt/vip-bike-electro-factory/secrets/clients_vps`
-8. Vercel preview deploys take ~2 min — don't push+test in tight loops
+1. `rentals.metadata.statusChanges` not populated — history events use `created_at` as fallback
+2. 45 of 57 artifacts have NULL `renter_phone` — leads keyed by `name:ФИО` fallback
+3. GitHub token may be rate-limited (4000 req/hour) — batch pushes
+4. VPS SSH access requires key file at `/opt/vip-bike-electro-factory/secrets/clients_vps`
+5. Vercel preview deploys take ~2 min — don't push+test in tight loops

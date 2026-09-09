@@ -29,7 +29,7 @@ const CREW_SLUG = "vip-bike";
 const CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
 
 // Equipment prices (mirrors app/franchize/lib/pricing-calculator.ts)
-const HELMET_PRICE = 1000;     // ₽ per rental
+// Helmet is duration-dependent: <24h = 500₽, ≥24h = 1000₽ (see helmetPrice())
 const GLOVES_PRICE = 500;      // ₽ per rental
 const NET_PRICE = 500;         // ₽ per rental
 const BACKPACK_PRICE = 500;    // ₽ per rental
@@ -135,30 +135,114 @@ async function findBike(query) {
   return data;
 }
 
-// ─── Pricing logic (mirrors pricing-calculator.ts) ──────────────────────────
+// ─── Pricing logic (mirrors pricing-calculator.ts, tier model) ──────────────
+// 2026-09-10: aligned with app/franchize/lib/pricing-calculator.ts.
+// The web app NEVER uses percentage discounts — it uses per-day tier rates
+// from specs (rent_2_4d / rent_5_10d / rent_11_30d) and hourly tiers
+// (price_per_hour / price_per_2h / price_per_3h / price_per_6h / price_per_12h).
+// The old "7+ days -10%, 14+ days -15%" model was legacy and misquoted prices.
 
-function calculatePrice(dailyPrice, days, hours) {
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+function isWeekendDate(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+function calculatePrice(dailyPrice, days, hours, specs = {}, startDateStr = null) {
+  const perHour = num(specs.price_per_hour) ?? dailyPrice;
+  const per2h = num(specs.price_per_2h);
+  const per3h = num(specs.price_per_3h);
+  const per6h = num(specs.price_per_6h);
+  const per12h = num(specs.price_per_12h);
+
   if (hours && hours > 0) {
-    // Hourly pricing: up to 3h = daily price, then +daily per day
-    if (hours <= 3) return { base: dailyPrice, tier: "/ 3 часа", tierPrice: 0, hours, days: 1 };
-    const extraDays = Math.ceil((hours - 3) / 24);
-    const total = dailyPrice * (1 + extraDays);
-    return { base: total, tier: `${hours} часов`, tierPrice: 0, hours, days: 1 + extraDays };
+    if (hours < 24) {
+      if (hours <= 1) return { base: Math.round(perHour * hours), tier: "/ час", tierPrice: perHour, hours, days: 0 };
+      if (hours < 3) {
+        if (hours === 2 && per2h !== undefined) return { base: per2h, tier: "/ 2 часа", tierPrice: per2h / 2, hours, days: 0 };
+        if (perHour !== undefined && per3h !== undefined) {
+          const price = Math.round(perHour + (per3h - perHour) * (hours - 1) / 2);
+          return { base: price, tier: `/ ${hours} ч`, tierPrice: price / hours, hours, days: 0 };
+        }
+        const fallback = per3h !== undefined ? per3h / 3 : perHour;
+        return { base: Math.round(fallback * hours), tier: `/ ${hours} ч`, tierPrice: fallback, hours, days: 0 };
+      }
+      if (hours === 3) {
+        const rate = per3h !== undefined ? per3h / 3 : perHour;
+        return { base: per3h !== undefined ? per3h : Math.round(perHour * 3), tier: "/ 3 часа", tierPrice: rate, hours, days: 0 };
+      }
+      if (hours < 6) {
+        if (per3h !== undefined && per6h !== undefined) {
+          const price = Math.round(per3h + (per6h - per3h) * (hours - 3) / 3);
+          return { base: price, tier: `/ ${hours} часов`, tierPrice: price / hours, hours, days: 0 };
+        }
+        const rate = per3h !== undefined ? per3h / 3 : perHour;
+        return { base: Math.round(rate * hours), tier: `/ ${hours} часов`, tierPrice: rate, hours, days: 0 };
+      }
+      if (hours === 6) {
+        if (per6h !== undefined) return { base: per6h, tier: "/ 6 часов", tierPrice: per6h / 6, hours, days: 0 };
+        const rate = per3h !== undefined ? per3h / 3 : perHour;
+        return { base: Math.round(rate * 6), tier: "/ 6 часов", tierPrice: rate, hours, days: 0 };
+      }
+      if (hours < 12) {
+        if (per6h !== undefined && per12h !== undefined) {
+          const price = Math.round(per6h + (per12h - per6h) * (hours - 6) / 6);
+          return { base: price, tier: `/ ${hours} часов`, tierPrice: price / hours, hours, days: 0 };
+        }
+        const rate = per6h !== undefined ? per6h / 6 : perHour;
+        return { base: Math.round(rate * hours), tier: `/ ${hours} часов`, tierPrice: rate, hours, days: 0 };
+      }
+      if (hours === 12) {
+        if (per12h !== undefined) return { base: per12h, tier: "/ 12 часов", tierPrice: per12h / 12, hours, days: 0 };
+        const rate = per6h !== undefined ? per6h / 6 : perHour;
+        return { base: Math.round(rate * 12), tier: "/ 12 часов", tierPrice: rate, hours, days: 0 };
+      }
+      // 12–24h: interpolate between 12h tier and daily
+      const daily = num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? dailyPrice;
+      if (per12h !== undefined) {
+        const price = Math.round(per12h + (daily - per12h) * (hours - 12) / 12);
+        return { base: price, tier: `/ ${hours} часов`, tierPrice: price / hours, hours, days: 0 };
+      }
+      return { base: daily, tier: "/ день", tierPrice: daily, hours, days: 0 };
+    }
+    // 24+ hours → count as days
+    days = Math.ceil(hours / 24);
   }
-  // Daily pricing
-  const base = dailyPrice * days;
-  // Volume discount: 7+ days = 10% off, 14+ days = 15% off
-  let discount = 0;
-  if (days >= 14) discount = 0.15;
-  else if (days >= 7) discount = 0.10;
-  const discounted = Math.round(base * (1 - discount));
-  return { base: discounted, tier: days >= 14 ? "14+ дней (-15%)" : days >= 7 ? "7+ дней (-10%)" : `${days} дн.`, tierPrice: 0, days };
+
+  // ── Daily tiers: per-day rates × actual days (mirrors calculatePriceForDays) ──
+  const d11 = num(specs.rent_11_30d);
+  const d5 = num(specs.rent_5_10d);
+  const d2 = num(specs.rent_2_4d);
+  const weekday = num(specs.rent_weekday);
+  const weekend = num(specs.rent_weekend);
+
+  if (days >= 11 && d11 !== undefined) return { base: d11 * days, tier: "/ 11-30 дней", tierPrice: d11, days };
+  if (days >= 5 && d5 !== undefined) return { base: d5 * days, tier: "/ 5-10 дней", tierPrice: d5, days };
+  if (days >= 2 && d2 !== undefined) return { base: d2 * days, tier: "/ 2-4 дня", tierPrice: d2, days };
+  if (days === 1 && startDateStr && isWeekendDate(startDateStr) && weekend !== undefined) {
+    return { base: weekend, tier: "/ день (выходные)", tierPrice: weekend, days };
+  }
+  if (days === 1 && weekday !== undefined) return { base: weekday, tier: weekday < dailyPrice ? "/ день (будни)" : "/ день", tierPrice: weekday, days };
+  return { base: dailyPrice * days, tier: "/ день", tierPrice: dailyPrice, days };
+}
+
+function helmetPrice(hours) {
+  // Mirrors getHelmetPrice(): hourly rentals (<24h) = 500₽, daily+ (≥24h) = 1000₽
+  return hours && hours > 0 && hours < 24 ? 500 : 1000;
 }
 
 function calculateEquipment(opts) {
   const items = [];
   let total = 0;
-  if (opts.helmets && opts.helmets > 0) { items.push({ name: `Шлем ×${opts.helmets}`, price: HELMET_PRICE * opts.helmets }); total += HELMET_PRICE * opts.helmets; }
+  const helmetUnit = helmetPrice(opts.hours);
+  if (opts.helmets && opts.helmets > 0) { items.push({ name: `Шлем ×${opts.helmets}`, price: helmetUnit * opts.helmets }); total += helmetUnit * opts.helmets; }
   if (opts.gloves && opts.gloves > 0) { items.push({ name: `Перчатки ×${opts.gloves}`, price: GLOVES_PRICE * opts.gloves }); total += GLOVES_PRICE * opts.gloves; }
   if (opts.net) { items.push({ name: "Сетка", price: NET_PRICE }); total += NET_PRICE; }
   if (opts.backpack) { items.push({ name: "Рюкзак", price: BACKPACK_PRICE }); total += BACKPACK_PRICE; }
@@ -185,8 +269,11 @@ async function cmdQuote() {
   const dailyPrice = Number(bike.daily_price) || 0;
   if (dailyPrice <= 0) fail({ stage: "quote", reason: "no_price", details: { bikeId: bike.id, hint: "Bike has no daily_price set" } });
 
-  const pricing = calculatePrice(dailyPrice, days, hours);
+  const startDate = arg("from") || null;
+  const specs = bike.specs || {};
+  const pricing = calculatePrice(dailyPrice, days, hours, specs, startDate);
   const equipment = calculateEquipment({
+    hours: hours > 0 ? hours : 0,
     helmets: parseInt(arg("helmets") || "0", 10),
     gloves: parseInt(arg("gloves") || "0", 10),
     net: hasFlag("net"),
@@ -198,7 +285,6 @@ async function cmdQuote() {
   });
 
   const grandTotal = pricing.base + equipment.total;
-  const specs = bike.specs || {};
   const deposit = Number(specs.deposit_rub || specs.deposit || 20000);
 
   done({
@@ -217,7 +303,8 @@ async function cmdQuote() {
     pricing: {
       dailyPrice: fmtMoney(dailyPrice),
       base: fmtMoney(pricing.base),
-      ...(pricing.tier.includes("-") ? { discount: pricing.tier } : {}),
+      tier: pricing.tier,
+      ...(pricing.tierPrice && pricing.tierPrice !== dailyPrice ? { rate: fmtMoney(pricing.tierPrice) } : {}),
     },
     equipment: equipment.items.length > 0 ? {
       items: equipment.items.map((i) => ({ name: i.name, price: fmtMoney(i.price) })),
@@ -263,12 +350,17 @@ async function cmdTiers() {
   const dailyPrice = Number(bike.daily_price) || 0;
   if (dailyPrice <= 0) fail({ stage: "tiers", reason: "no_price" });
 
+  // Mirror the web tier model: read tier rates from specs, fallback to daily_price
+  const specs = bike.specs || {};
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+  const perHour = num(specs.price_per_hour) ?? dailyPrice;
   const tiers = [
-    { duration: "3 часа", price: dailyPrice, note: "базовая ставка" },
-    { duration: "1 день", price: dailyPrice, note: "" },
-    { duration: "3 дня", price: dailyPrice * 3, note: "" },
-    { duration: "7 дней", price: Math.round(dailyPrice * 7 * 0.9), note: "-10%" },
-    { duration: "14 дней", price: Math.round(dailyPrice * 14 * 0.85), note: "-15%" },
+    { duration: "2 часа", price: num(specs.price_per_2h) ?? Math.round(perHour * 2), note: num(specs.price_per_2h) ? "тариф 2ч" : "≈ почасовая × 2" },
+    { duration: "3 часа", price: num(specs.price_per_3h) ?? Math.round(perHour * 3), note: num(specs.price_per_3h) ? "тариф 3ч" : "≈ почасовая × 3" },
+    { duration: "1 день", price: num(specs.rent_weekday) ?? dailyPrice, note: num(specs.rent_weekday) && num(specs.rent_weekday) < dailyPrice ? "будни" : "" },
+    { duration: "2-4 дня (за день)", price: num(specs.rent_2_4d) ?? dailyPrice, note: num(specs.rent_2_4d) ? "тариф, × дни" : "нет тарифа — дневная" },
+    { duration: "5-10 дней (за день)", price: num(specs.rent_5_10d) ?? dailyPrice, note: num(specs.rent_5_10d) ? "тариф, × дни" : "нет тарифа — дневная" },
+    { duration: "11-30 дней (за день)", price: num(specs.rent_11_30d) ?? dailyPrice, note: num(specs.rent_11_30d) ? "тариф, × дни" : "нет тарифа — дневная" },
   ];
 
   done({
