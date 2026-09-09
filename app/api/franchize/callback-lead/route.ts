@@ -7,12 +7,16 @@ import {
 } from "node:crypto";
 
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
 import { logger } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import {
   buildVipBikeCallbackMessage,
   callbackLeadRequestSchema,
+  formatQuizComment,
+  QUIZ_NOTE_AUTHOR,
+  type CallbackLeadRequest,
 } from "@/lib/vip-bike-callback-lead";
 
 const MAX_BODY_BYTES = 32_000;
@@ -422,6 +426,58 @@ async function captureCallbackFallback(input: {
   };
 }
 
+/**
+ * Заметка с ответами квиза на лид (lead_notes) — то, что оператор видит в CRM
+ * как комментарий лида («Прочитать заметки» в списке лидов + шторка лида).
+ *
+ * Best-effort и идемпотентно: сбой записи не влияет на заявку (only warn),
+ * повторная доставка того же лида (retry_claimed в окне дедупа) не создаёт
+ * вторую заметку — проверяем существование по автору QUIZ_NOTE_AUTHOR.
+ */
+async function saveQuizNote(input: {
+  slug: string;
+  crewId: string | null;
+  leadId: string;
+  quiz: NonNullable<CallbackLeadRequest["quiz"]>;
+  bikeTitle?: string;
+}): Promise<void> {
+  if (!input.crewId) return;
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from("lead_notes")
+      .select("id")
+      .eq("lead_id", input.leadId)
+      .eq("crew_id", input.crewId)
+      .eq("created_by", QUIZ_NOTE_AUTHOR)
+      .maybeSingle();
+    if (existing?.id) return;
+
+    const text = formatQuizComment(input.quiz, input.bikeTitle);
+    if (!text) return;
+
+    const { error } = await supabaseAdmin.from("lead_notes").insert({
+      lead_id: input.leadId,
+      crew_id: input.crewId,
+      text,
+      created_by: QUIZ_NOTE_AUTHOR,
+    });
+    if (error) throw error;
+
+    // Событие в историю лида (best-effort, never-throws; actor не числовой →
+    // 0 очков — служебная заметка не влияет на лидерборд).
+    await recordLeadEvent({
+      crewSlug: input.slug,
+      leadId: input.leadId,
+      type: "note_added",
+      actor: null,
+      actorName: "Подбор с сайта",
+      label: "Ответы квиза-подбора с сайта",
+    });
+  } catch (error) {
+    logger.warn("[callback-lead] quiz note save failed (best-effort)", error);
+  }
+}
+
 async function notifyCrewOwner(input: {
   ownerChatId: string;
   message: string;
@@ -828,12 +884,24 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
 
     const { data: crew, error: crewError } = await supabaseAdmin
       .from("crews")
-      .select("owner_id")
+      .select("id, owner_id")
       .eq("slug", input.slug)
       .maybeSingle();
 
     if (crewError) {
       logger.warn("[callback-lead] crew owner lookup failed", crewError);
+    }
+
+    // Ответы квиза → комментарий лида (lead_notes). Только для лида с квизом;
+    // заметка не влияет на доставку уведомления и ответ клиенту.
+    if (input.quiz && Object.keys(input.quiz).length > 0) {
+      await saveQuizNote({
+        slug: input.slug,
+        crewId: crew?.id ?? null,
+        leadId: requestId,
+        quiz: input.quiz,
+        bikeTitle: bikeTitle ?? input.bikeTitle ?? undefined,
+      });
     }
 
     const ownerChatId = crew?.owner_id ? String(crew.owner_id) : "";
@@ -848,6 +916,7 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
             sourceRoute,
             nick: input.nick,
             formSource: input.formSource,
+            quiz: input.quiz,
             attribution: input.attribution,
             createdAt: now,
           }),

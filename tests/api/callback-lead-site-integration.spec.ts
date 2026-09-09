@@ -19,6 +19,8 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   rpcCalls: [] as Array<[string, Record<string, unknown>]>,
+  noteInserts: [] as Array<Record<string, unknown>>,
+  existingQuizNote: null as { id: string } | null,
   rateLimit: { allowed: true, remaining: 3, retryAfterSeconds: 60, limit: 4 },
   captureResult: {
     data: [
@@ -37,12 +39,33 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/supabase-server", () => ({
   supabaseAdmin: {
     from: (table: string) => {
-      if (table !== "crews") throw new Error(`Unexpected table: ${table}`);
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = () => builder;
-      builder.maybeSingle = async () => ({ data: { owner_id: "413553377" }, error: null });
-      return builder;
+      if (table === "crews") {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.maybeSingle = async () => ({
+          data: { id: "11111111-1111-4111-8111-111111111111", owner_id: "413553377" },
+          error: null,
+        });
+        return builder;
+      }
+      if (table === "lead_notes") {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.maybeSingle = async () => ({ data: mocks.existingQuizNote, error: null });
+        builder.insert = (row: Record<string, unknown>) => {
+          mocks.noteInserts.push(row);
+          return { select: () => ({ single: async () => ({ data: row, error: null }) }) };
+        };
+        return builder;
+      }
+      if (table === "lead_events") {
+        const builder: any = {};
+        builder.insert = () => ({ error: null });
+        return builder;
+      }
+      throw new Error(`Unexpected table: ${table}`);
     },
     rpc: async (name: string, args?: Record<string, unknown>) => {
       mocks.rpcCalls.push([name, args || {}]);
@@ -90,6 +113,8 @@ function fetchMock() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.rpcCalls.length = 0;
+  mocks.noteInserts.length = 0;
+  mocks.existingQuizNote = null;
   mocks.rateLimit = { allowed: true, remaining: 3, retryAfterSeconds: 60, limit: 4 };
   mocks.captureResult = {
     data: [
@@ -328,5 +353,81 @@ describe("vip-bike.ru site form → callback-lead", () => {
     // Без formSource атрибуции нет → metadata.attribution === null (как раньше).
     expect(meta.formSource).toBeUndefined();
     expect(meta.bikeTitle).toBeNull();
+  });
+
+  test("quiz answers become a readable lead comment in lead_notes (RU quiz /podbor)", async () => {
+    const fetchStub = fetchMock();
+    vi.stubGlobal("fetch", fetchStub);
+    const response = await POST(
+      new NextRequest("https://rental.vip-bike.ru/api/franchize/vip-bike/callback-lead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-real-ip": "203.0.113.77",
+          "x-callback-ingest-secret": "site-shared-secret",
+        },
+        body: JSON.stringify({
+          slug: "vip-bike",
+          name: "Квизовый Клиент",
+          phone: "+7 903 777-00-01",
+          formSource: "quiz",
+          bikeTitle: "falcon-gt",
+          quiz: { budget: "350-500", experience: "rode", goal: "city" },
+          consent: true,
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+
+    // Одна заметка, привязанная к intent_id и crew_id, с человекочитаемыми
+    // ответами и рекомендацией модели.
+    expect(mocks.noteInserts).toHaveLength(1);
+    const note = mocks.noteInserts[0] as Record<string, unknown>;
+    const capture = mocks.rpcCalls.find(
+      ([name]) => name === "capture_vip_bike_callback_intent",
+    );
+    expect(note.lead_id).toBe(capture![1].p_intent_id);
+    expect(note.crew_id).toBe("11111111-1111-4111-8111-111111111111");
+    expect(note.created_by).toBe("подбор с сайта");
+    expect(String(note.text)).toContain("Бюджет: 350–500 000 ₽");
+    expect(String(note.text)).toContain("Опыт: есть базовый опыт");
+    expect(String(note.text)).toContain("Цель: город и пробки");
+    expect(String(note.text)).toContain("Рекомендация квиза: falcon-gt");
+
+    // Telegram-уведомление получило компактную строку квиза.
+    const body = JSON.parse((fetchStub.mock.calls[0] as unknown as any[])[1].body as string);
+    expect(body.text).toContain("Квиз: 350–500 000 ₽ · есть базовый опыт · город и пробки");
+  });
+
+  test("quiz note is idempotent across a duplicate retry (no second note)", async () => {
+    vi.stubGlobal("fetch", fetchMock());
+    const request = () =>
+      new NextRequest("https://rental.vip-bike.ru/api/franchize/vip-bike/callback-lead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-real-ip": "203.0.113.77",
+          "x-callback-ingest-secret": "site-shared-secret",
+        },
+        body: JSON.stringify({
+          slug: "vip-bike",
+          name: "Квизовый Клиент",
+          phone: "+7 903 777-00-01",
+          quiz: { budget: "500+", goal: "sport" },
+          consent: true,
+        }),
+      });
+
+    await POST(request());
+    // Retry того же лида: заметка уже существует → insert не вызывается снова.
+    mocks.existingQuizNote = { id: "existing-note-id" };
+    await POST(request());
+    expect(mocks.noteInserts).toHaveLength(1);
+  });
+
+  test("lead without quiz gets no lead_notes row", async () => {
+    vi.stubGlobal("fetch", fetchMock());
+    await POST(siteProxyRequest({ "x-callback-ingest-secret": "site-shared-secret" }));
+    expect(mocks.noteInserts).toHaveLength(0);
   });
 });

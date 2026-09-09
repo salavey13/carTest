@@ -74,6 +74,82 @@ export const callbackLeadRequestSchema = z
 
 export type CallbackLeadRequest = z.infer<typeof callbackLeadRequestSchema>;
 
+/** Автор служебной заметки с ответами квиза (не числовой → без очков и без резолва в users). */
+export const QUIZ_NOTE_AUTHOR = "подбор с сайта";
+
+type QuizValue = string | number | boolean | null;
+export type QuizAnswers = Record<string, QuizValue>;
+
+/**
+ * Человекочитаемые подписи квиза-подбора с сайта (ru.vip-bike.ru/podbor).
+ * Форма шлёт коды ({"budget":"350-500","experience":"rode","goal":"city"}) —
+ * оператор в CRM должен видеть «Бюджет: 350–500 000 ₽», а не сырой slug.
+ * Незнакомые ключи/значения (delivery-формы шлют {"город":…,"модель":…})
+ * проходят как есть: «ключ: значение».
+ */
+const QUIZ_FIELD_LABELS: Record<string, string> = {
+  budget: "Бюджет",
+  experience: "Опыт",
+  goal: "Цель",
+};
+
+const QUIZ_VALUE_LABELS: Record<string, Record<string, string>> = {
+  budget: {
+    "<350": "до 350 000 ₽",
+    "350-500": "350–500 000 ₽",
+    "500+": "от 500 000 ₽",
+  },
+  experience: {
+    novice: "новичок",
+    rode: "есть базовый опыт",
+    pro: "опытный",
+  },
+  goal: {
+    city: "город и пробки",
+    dacha: "дача и природа",
+    sport: "драйв и скорость",
+    status: "статус и стиль",
+  },
+};
+
+function quizValueToText(key: string, value: QuizValue): string {
+  const raw = value === null ? "" : String(value).trim();
+  if (!raw) return "";
+  return QUIZ_VALUE_LABELS[key]?.[raw] ?? raw;
+}
+
+/** Компактная строка для ТГ-уведомления: «350–500 000 ₽ · базовый опыт · город». */
+export function quizSummaryLine(quiz: QuizAnswers): string {
+  return Object.entries(quiz)
+    .map(([key, value]) => quizValueToText(key, value))
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 200);
+}
+
+/**
+ * Текст заметки лида (lead_notes) с ответами квиза. bikeTitle — рекомендация
+ * квиза (slug модели с сайта), в карточке лида он сырой, поэтому дублируем
+ * человекочитаемо в заметку.
+ */
+export function formatQuizComment(
+  quiz: QuizAnswers,
+  bikeTitle?: string,
+): string {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(quiz).slice(0, 10)) {
+    const text = quizValueToText(key, value);
+    if (!text) continue;
+    const label = QUIZ_FIELD_LABELS[key] ?? key;
+    lines.push(`${label}: ${text}`.slice(0, 260));
+  }
+  const parts = lines.length > 0 ? [`Ответы квиза-подбора:\n${lines.join("\n")}`] : [];
+  if (bikeTitle && bikeTitle.trim()) {
+    parts.push(`Рекомендация квиза: ${bikeTitle.trim().slice(0, 160)}`);
+  }
+  return parts.join("\n\n").slice(0, 5_000);
+}
+
 const TELEGRAM_MESSAGE_MAX_LENGTH = 4_096;
 const TELEGRAM_MESSAGE_SAFE_LENGTH = 3_900;
 
@@ -96,6 +172,7 @@ export function buildVipBikeCallbackMessage(input: {
   sourceRoute?: string;
   nick?: string;
   formSource?: string;
+  quiz?: QuizAnswers;
   attribution?: CallbackLeadRequest["attribution"];
   createdAt: string;
 }): string {
@@ -119,6 +196,7 @@ export function buildVipBikeCallbackMessage(input: {
     line("Телефон", input.phone),
     line("Ник", input.nick),
     line("Форма", input.formSource),
+    line("Квиз", input.quiz ? quizSummaryLine(input.quiz) : ""),
     line("Страница", input.sourceRoute || touch?.landing_path || "/"),
     line("Источник", touch?.utm_source || touch?.referrer_host || "прямой переход"),
     line("Канал", touch?.utm_medium),
