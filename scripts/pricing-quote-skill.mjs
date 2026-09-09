@@ -19,6 +19,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY   (fallback: read from --secrets=<path>)
 
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -80,12 +81,18 @@ const secretsMap = loadSecrets();
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPA_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || secretsMap.SUPABASE_SERVICE_ROLE_KEY || secretsMap.SUPABASE_SERVICE_KEY;
 
+// Import-safe: when imported as a module (unit tests) the DB client is not
+// needed — only pure pricing math is exported. Direct execution keeps old behavior.
+const IS_MAIN = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+
 if (!supabaseKey) {
-  console.error(JSON.stringify({ ok: false, stage: "env", reason: "missing_supabase_key" }));
-  process.exit(2);
+  if (IS_MAIN) {
+    console.error(JSON.stringify({ ok: false, stage: "env", reason: "missing_supabase_key" }));
+    process.exit(2);
+  }
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // ─── Output helpers ──────────────────────────────────────────────────────────
 
@@ -408,4 +415,10 @@ async function main() {
   }
 }
 
-main().catch((e) => fail({ stage: "unhandled", reason: "exception", details: { message: e.message } }));
+// Run only when executed directly; also export pure math for unit tests
+// (tests/lib/pricing-quote-skill-math.spec.ts pins this to the web tier model).
+if (IS_MAIN) {
+  main().catch((e) => fail({ stage: "unhandled", reason: "exception", details: { message: e.message } }));
+}
+
+export { calculatePrice, helmetPrice, calculateEquipment, isWeekendDate };
