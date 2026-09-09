@@ -19,7 +19,8 @@ export type LeadEventType =
   | "avito_reply" // оператор отправил ответ в чат Авито прямо из CRM
   | "stage_changed"
   | "closed_won"
-  | "closed_lost";
+  | "closed_lost"
+  | "superlist_cleared"; // ВЕСЬ список «что делать сейчас» отработан под ноль (редко, дорого)
 
 /** Очки лидерборда за одно событие (атрибуция обязательна). */
 export const LEAD_EVENT_POINTS: Record<LeadEventType, number> = {
@@ -37,6 +38,10 @@ export const LEAD_EVENT_POINTS: Record<LeadEventType, number> = {
   stage_changed: 2, // движение по воронке
   closed_won: 10, // закрытие — вершина, но не единственное
   closed_lost: 0, // потери не штрафуем очками (причины важнее)
+  // 25: закрыть ВЕСЬ суперлист — событие уровня «десять закрытий», но
+  // случается в разы реже (редкость = цена). Начисляется closer'у — актору
+  // последнего операторского действия перед тем, как очередь опустела.
+  superlist_cleared: 25,
 };
 
 export interface LeadLeaderboardRow {

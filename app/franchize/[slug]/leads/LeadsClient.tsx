@@ -1451,6 +1451,7 @@ export function LeadsClient({
           doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
           compactPrefKey={`leads-playbook-expanded:${slug}`}
           guidesKey={guidesKey}
+          superlist={aggState?.superlist ?? null}
         />
       </div>
 

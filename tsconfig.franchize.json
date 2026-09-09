@@ -19,6 +19,8 @@
     "components/map-riders/RidersDrawer.tsx",
     "app/franchize/lib/bike-wall.ts",
     "app/franchize/server-actions/bike-wall.ts",
+    "app/franchize/lib/superlist-clear.ts",
+    "app/franchize/lib/superlist-clear-core.ts",
     "app/franchize/[slug]/bikes/page.tsx",
     "app/franchize/[slug]/bikes/BikesWallClient.tsx",
     "app/franchize/[slug]/bikes/[bikeId]/page.tsx",

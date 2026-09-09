@@ -300,6 +300,35 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
+  // 2026-09-09: SUPERLIST badges — «закрыл ВЕСЬ список "что делать сейчас"
+  // под ноль» (owner: «when somebody actually covered whole superlead list —
+  // notify admin and owner, give a fucking achievement to the dude»). Грантит
+  // сервер (lib/superlist-clear.ts) оператору, чьё действие оказалось
+  // последним перед пустой очередью плейбука. Вехи — по ЛИЧНЫМ закрытиям
+  // (profile counters.superlistClears), как у смен.
+  const superlistAchievements: FranchizeAchievementDefinition[] = [
+    {
+      id: "superlist_clear",
+      title: "Суперлист под ноль 🧹",
+      description: "Закрыл ВЕСЬ список «что делать сейчас»: горячие отвечены, перезвоны сделаны, молчуны реанимированы — очередь пуста.",
+      category: "operations",
+      triggerSources: ["leads:superlist_cleared"],
+    },
+    {
+      id: "superlist_clear_5",
+      title: "Хозяин суперлиста 🦾",
+      description: "Пять полных закрытий суперлиста. Список тебя боится!",
+      category: "operations",
+      triggerSources: ["leads:superlist_cleared"],
+    },
+    {
+      id: "superlist_clear_15",
+      title: "Суперлист — легенда 🐐",
+      description: "Пятнадцать полных закрытий суперлиста. Это уже не работа, это стиль жизни.",
+      category: "operations",
+      triggerSources: ["leads:superlist_cleared"],
+    },
+  ];
   // FIX (iter7): Exploration achievements — award crew members for DISCOVERING
   // the crew's working tools in the web app ("opened analytics page" etc.).
   // Granted from AchievementExplorer (client) via
@@ -366,8 +395,8 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
-  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...explorationAchievements, ...vipBikeOnly];
-  return [...shared, ...workAchievements, ...rentalAchievements, ...explorationAchievements];
+  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...superlistAchievements, ...explorationAchievements, ...vipBikeOnly];
+  return [...shared, ...workAchievements, ...rentalAchievements, ...superlistAchievements, ...explorationAchievements];
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {

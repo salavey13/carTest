@@ -22,6 +22,7 @@ import {
 } from "@/app/franchize/[slug]/leads/lib/leads-query-core";
 import { computeLeadKpi } from "@/app/franchize/[slug]/leads/lib/lead-kpi";
 import { buildNextActions } from "@/app/franchize/[slug]/leads/lib/lead-playbook";
+import { maybeCelebrateSuperlistClear } from "@/app/franchize/lib/superlist-clear";
 import { computeLeadAchievements } from "@/app/franchize/[slug]/leads/lib/lead-achievements";
 import { PIPELINE_STAGES } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 // NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
@@ -2031,6 +2032,21 @@ export async function getFranchizeLeads(
       // и горячие за окном не должны исчезать из SOP).
       const playbook = buildNextActions(baseSet, dedupedTodos, nowMs, 6);
 
+      // ── «Суперлист закрыт» (2026-09-09, просьба босса: «when somebody
+      // actually covered whole superlead list — notify admin and owner, give
+      // a fucking achievement to the dude») ──
+      // Сравниваем очередь со снапшотом прошлого среза: каждая позиция ушла
+      // + была реальная работа оператора = бейдж closer'у, +25 очков,
+      // фанфары владельцу/админам/глобальному админу (lib/superlist-clear.ts).
+      // Best-effort: детекция никогда не бросает и не ломает выдачу страницы.
+      const superlistState = await maybeCelebrateSuperlistClear({
+        slug,
+        crewId,
+        queue: playbook,
+        events: leadEvents,
+        nowMs,
+      });
+
       // Счётчики сегментов тулбара: паритет с клиентом — «all» по базовому
       // набору, остальные с учётом поиска/источника/сегмента.
       const qSourceSegSet = filterLeads(
@@ -2082,6 +2098,7 @@ export async function getFranchizeLeads(
         achievements: computeLeadAchievements(kpi),
         totalActive: baseSet.length,
       };
+      if (superlistState) agg.superlist = superlistState;
 
       if (!windowOpts.metaOnly) {
         // 1) Фильтры (те же чистые функции, что у клиента) …

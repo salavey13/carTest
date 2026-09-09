@@ -277,6 +277,19 @@ export interface LeadsPageInfo {
 }
 
 /**
+ * Состояние механики «Суперлист закрыт» (lib/superlist-clear.ts) для UI:
+ * панель плейбука празднует полное покрытие списка «что делать сейчас».
+ */
+export interface LeadsSuperlistState {
+  /** Праздник случился ИМЕННО в этом ответе (этот срез закрыл список). */
+  justCleared: boolean;
+  /** ISO последнего праздника экипажа (баннер показывается ~2 ч после). */
+  lastClearedAt: string | null;
+  /** Сколько раз экипаж закрывал суперлист за всё время. */
+  totalClears: number;
+}
+
+/**
  * Агрегаты по ПОЛНОМУ набору лидов экипажа (не по окну!). Считаются на
  * сервере за один проход в момент загрузки, чтобы клиенту не пришлось
  * скачивать все 500+ лидов ради шести плиток и воронки.
@@ -288,6 +301,8 @@ export interface LeadsAggregates {
   kpiCards: LeadsKpiCardsStats;
   /** Очередь «что делать сейчас» (lib/lead-playbook.ts, ≤6 действий). */
   playbook: NextAction[];
+  /** Механика «Суперлист закрыт» — золотой баннер панели плейбука. */
+  superlist?: LeadsSuperlistState;
   /** Распределение по стадиям пайплайна — кликабельная полоса-воронка. */
   stageBreakdown: Array<{ key: string; label: string; color: string; count: number }>;
   /** Счётчики сегментов тулбара (all/hot/warm/verified/troubled). */

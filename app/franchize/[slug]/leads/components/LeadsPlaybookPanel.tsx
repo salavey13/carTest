@@ -34,9 +34,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ListChecks, Copy, Check, Sparkles, ChevronRight, ChevronDown } from "lucide-react";
+import { ListChecks, Copy, Check, Sparkles, ChevronRight, ChevronDown, Trophy } from "lucide-react";
 import type { NextAction } from "../lib/lead-playbook";
 import { PLAYBOOK_BENCHMARKS } from "../lib/lead-playbook";
+import type { LeadsSuperlistState } from "../leads-types";
 import {
   applyPlaybookDoneToggle,
   msUntilNextMidnight,
@@ -77,6 +78,10 @@ interface LeadsPlaybookPanelProps {
    *  личная полезность для любого пользователя, а шаг пути закрывается
    *  только у экипажа (путь просто не монтируется не-crew). */
   guidesKey?: string;
+  /** Механика «Суперлист закрыт» (сервер, lib/superlist-clear.ts): золотой
+   *  баннер «весь список отработан под ноль». justCleared — праздник в ЭТОМ
+   *  ответе; в течение 2 ч после — приглушённый вариант баннера. */
+  superlist?: LeadsSuperlistState | null;
 }
 
 const TONE_COLOR: Record<NextAction["tone"], string> = {
@@ -109,7 +114,7 @@ function buzz(ms = 10): void {
   }
 }
 
-export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey, compactPrefKey, guidesKey }: LeadsPlaybookPanelProps) {
+export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey, compactPrefKey, guidesKey, superlist }: LeadsPlaybookPanelProps) {
   // Какая строка только что скопирована — галочка вместо иконки на 2 секунды.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -461,6 +466,43 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
           </div>
         </div>
       )}
+
+      {/* СУПЕРЛИСТ ЗАКРЫТ: золотой баннер полного покрытия списка. Сервер
+          празднует с кулдауном 12 ч; баннер живёт 2 ч после праздника, чтобы
+          вернувшиеся операторы тоже увидели. */}
+      {(() => {
+        if (!superlist) return null;
+        const justCleared = !!superlist.justCleared;
+        const recentMs = superlist.lastClearedAt ? Date.now() - new Date(superlist.lastClearedAt).getTime() : NaN;
+        const recent = justCleared || (Number.isFinite(recentMs) && recentMs >= 0 && recentMs < 2 * 60 * 60 * 1000);
+        if (!recent) return null;
+        return (
+          <motion.div
+            initial={justCleared ? { opacity: 0, scale: 0.96 } : false}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.35, type: "spring", bounce: 0.35 }}
+            className="mb-3 flex items-center gap-2.5 rounded-xl border px-3 py-2.5"
+            style={{
+              borderColor: "rgba(245,158,11,0.45)",
+              background: justCleared
+                ? "linear-gradient(90deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))"
+                : "rgba(245,158,11,0.08)",
+            }}
+          >
+            <Trophy className="h-5 w-5 shrink-0" style={{ color: "#f59e0b" }} aria-hidden />
+            <div className="min-w-0">
+              <p className="text-xs font-bold" style={{ color: "#f59e0b" }}>
+                {justCleared ? "Суперлист закрыт под ноль! 🏆" : "Суперлист закрыт недавно"}
+              </p>
+              <p className="mt-0.5 text-[10px] leading-snug" style={{ color: T.textMuted }}>
+                {justCleared
+                  ? `Весь список «что делать сейчас» отработан — закрытие №${superlist.totalClears} экипажа. Бейдж и +25 очков — closer'у, фанфары — владельцу и админам.`
+                  : `Полных закрытий суперлиста у экипажа: ${superlist.totalClears}. Держим планку!`}
+              </p>
+            </div>
+          </motion.div>
+        );
+      })()}
 
       {/* Очередь действий */}
       {active.length === 0 ? (
