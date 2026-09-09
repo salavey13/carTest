@@ -155,9 +155,19 @@ describe("VIP BIKE callback lead payload", () => {
         unexpected: true,
       }).success,
     ).toBe(false);
+    // Multitenant contract: any well-formed crew slug is accepted.
     expect(
       callbackLeadRequestSchema.safeParse({
         slug: "another-crew",
+        name: "Иван",
+        phone: "+79991234567",
+        consent: true,
+      }).success,
+    ).toBe(true);
+    // Malformed slug formats are still rejected.
+    expect(
+      callbackLeadRequestSchema.safeParse({
+        slug: "Bad Slug",
         name: "Иван",
         phone: "+79991234567",
         consent: true,

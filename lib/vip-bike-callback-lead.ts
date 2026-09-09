@@ -25,7 +25,10 @@ const marketingTouchSchema = z
 
 export const callbackLeadRequestSchema = z
   .object({
-    slug: z.literal("vip-bike").default("vip-bike"),
+    // Slug экипажа-владельца заявки. Дефолт сохранён для обратной совместимости
+    // с первой формой маркетингового сайта, но любой другой crew теперь
+    // может слать заявки в свой crew-контур без изменений кода.
+    slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9][a-z0-9-]*$/).default("vip-bike"),
     bikeId: optionalText(160),
     name: z.string().trim().min(2).max(100),
     phone: z.string().trim().min(10).max(40),
@@ -86,6 +89,7 @@ function line(label: string, value: unknown): string | null {
 }
 
 export function buildVipBikeCallbackMessage(input: {
+  slug?: string;
   name: string;
   phone: string;
   bikeTitle?: string;
@@ -98,9 +102,15 @@ export function buildVipBikeCallbackMessage(input: {
   const touch = input.attribution?.last_touch;
   // Заявки, проксируемые с маркетингового сайта, помечаем отдельным заголовком,
   // чтобы оператор сразу видел источник (форма сайта ≠ лендинг аренды).
-  const header = input.formSource
-    ? "Новая заявка с сайта vip-bike.ru"
-    : "Новая заявка с rental.vip-bike.ru";
+  // Фирменный заголовок — только у экипажа-владельца маркетингового сайта;
+  // остальные экипажи получают нейтральный заголовок со своим slug.
+  const crewSlug = input.slug?.trim() || "vip-bike";
+  const header =
+    crewSlug !== "vip-bike"
+      ? `Новая заявка · экипаж ${crewSlug}`
+      : input.formSource
+        ? "Новая заявка с сайта vip-bike.ru"
+        : "Новая заявка с rental.vip-bike.ru";
   const message = [
     header,
     "",

@@ -191,6 +191,7 @@ function existingCaptureState(
 async function claimExistingFallback(input: {
   requestId: string;
   notificationAttemptId: string;
+  slug: string;
   now: string;
 }): Promise<CallbackCaptureOutcome> {
   const readExisting = () =>
@@ -198,7 +199,7 @@ async function claimExistingFallback(input: {
       .from("franchize_intents")
       .select("id, metadata")
       .eq("id", input.requestId)
-      .eq("slug", "vip-bike")
+      .eq("slug", input.slug)
       .maybeSingle();
 
   const firstRead = await readExisting();
@@ -297,6 +298,7 @@ async function claimExistingFallback(input: {
 async function captureCallbackFallback(input: {
   requestId: string;
   notificationAttemptId: string;
+  slug: string;
   bikeId?: string;
   phone: string;
   sourceRoute: string;
@@ -308,7 +310,7 @@ async function captureCallbackFallback(input: {
     .from("franchize_intents")
     .select("id")
     .eq("id", input.requestId)
-    .eq("slug", "vip-bike")
+    .eq("slug", input.slug)
     .maybeSingle();
   if (existing.error) return { capture: null, error: existing.error };
   if (existing.data?.id) {
@@ -380,7 +382,7 @@ async function captureCallbackFallback(input: {
     .from("franchize_intents")
     .insert({
       id: input.requestId,
-      slug: "vip-bike",
+      slug: input.slug,
       bike_id: input.bikeId || null,
       intent_type: "callback_request",
       stage: "lead_captured",
@@ -769,6 +771,7 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       const fallback = await captureCallbackFallback({
         requestId,
         notificationAttemptId,
+        slug: input.slug,
         bikeId: input.bikeId,
         phone: normalizedPhone,
         sourceRoute,
@@ -838,6 +841,7 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
       ? await notifyCrewOwner({
           ownerChatId,
           message: buildVipBikeCallbackMessage({
+            slug: input.slug,
             name: input.name,
             phone: normalizedPhone,
             bikeTitle: bikeTitle ?? undefined,
