@@ -6,12 +6,22 @@ import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppContext } from '@/contexts/AppContext';
 import Link from "next/link";
-import { Users, Crown, Shield, ArrowLeft, UserCog, ChevronUp } from "lucide-react";
+import { Users, Crown, Shield, ArrowLeft, UserCog, Wrench } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { updateCrewMemberRole } from '../../server-actions/update-crew-member-role';
+import {
+    updateCrewMemberRole,
+    type AssignableRole,
+} from '../../server-actions/update-crew-member-role';
+import {
+    roleLabel,
+    roleRank,
+    assignableRolesFor,
+    type CrewRole,
+} from '../../lib/crew-roles';
 import { UserPlus, Trash2 } from 'lucide-react';
 
 type LiveStatus = 'online' | 'riding' | 'offline';
@@ -20,7 +30,7 @@ interface CrewMember {
     user_id: string;
     username: string;
     avatar_url?: string;
-    role: 'owner' | 'co_owner' | 'admin' | 'mechanic' | 'member';
+    role: CrewRole;
     live_status: LiveStatus;
     membership_status: 'active' | 'pending';
 }
@@ -29,43 +39,45 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
     const { dbUser, userCrewMemberships } = useAppContext();
     const [crew, setCrew] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [promotingId, setPromotingId] = useState<string | null>(null);
+    const [busyId, setBusyId] = useState<string | null>(null);
+
+    const refreshCrew = async () => {
+        const res = await getCrewLiveDetails(crewSlug);
+        if (res.success) setCrew(res.data);
+        return res;
+    };
 
     useEffect(() => {
         if (!crewSlug) return;
-        getCrewLiveDetails(crewSlug).then(res => {
-            if (res.success) setCrew(res.data);
-            setLoading(false);
-        });
+        refreshCrew().finally(() => setLoading(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [crewSlug]);
 
     // Current user's effective role in this crew
-    const myCrewRole: string | null = (() => {
+    const myCrewRole: CrewRole | null = (() => {
         if (!dbUser?.user_id || !crew?.id) return null;
         // Check owner field (JSON: { user_id, username, avatar_url })
         if (crew.owner?.user_id === dbUser.user_id) return 'owner';
         const membership = userCrewMemberships.find((m) => m.crewId === crew.id);
-        return membership?.role || null;
+        return (membership?.role as CrewRole) || null;
     })();
 
-    const canPromoteToAdmin = (member: CrewMember) => {
-        if (!myCrewRole) return false;
-        if (myCrewRole === 'owner') return member.role === 'member' || member.role === 'mechanic';
-        if (myCrewRole === 'co_owner') return member.role === 'member' || member.role === 'mechanic';
-        return false;
+    // Mirror of the server-side matrix: you manage only ranks strictly below you.
+    const canManageMember = (member: CrewMember) => {
+        if (!myCrewRole || !dbUser?.user_id) return false;
+        if (member.user_id === dbUser.user_id) return false;
+        return roleRank(member.role) < roleRank(myCrewRole);
     };
 
-    const canPromoteToCoOwner = (member: CrewMember) => {
-        if (!myCrewRole) return false;
-        return myCrewRole === 'owner' && member.role === 'admin';
-    };
+    const myAssignableRoles: AssignableRole[] = myCrewRole ? assignableRolesFor(myCrewRole) : [];
 
-    const handlePromote = async (member: CrewMember, newRole: 'admin' | 'co_owner') => {
-        if (!dbUser?.user_id) {
-            toast.error("Нужна авторизация");
-            return;
+    const handleRoleChange = async (member: CrewMember, newRole: AssignableRole) => {
+        if (!dbUser?.user_id || newRole === member.role) return;
+        if (roleRank(newRole) < roleRank(member.role)) {
+            const ok = confirm(`Понизить @${member.username} до «${roleLabel(newRole)}»?`);
+            if (!ok) return;
         }
-        setPromotingId(member.user_id);
+        setBusyId(member.user_id);
         try {
             const result = await updateCrewMemberRole({
                 crewSlug,
@@ -74,25 +86,23 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                 actorTelegramUserId: dbUser.user_id,
             });
             if (result.success) {
-                toast.success(`@${member.username} повышен до ${newRole === 'co_owner' ? 'совладельца' : 'администратора'}`);
-                // Refresh crew data
-                const res = await getCrewLiveDetails(crewSlug);
-                if (res.success) setCrew(res.data);
+                toast.success(`Роль @${member.username} обновлена: ${roleLabel(newRole)}`);
+                await refreshCrew();
             } else {
                 toast.error(result.error);
             }
         } catch {
-            toast.error("Ошибка при повышении");
+            toast.error("Ошибка при обновлении роли");
         } finally {
-            setPromotingId(null);
+            setBusyId(null);
         }
     };
 
     if (loading) return <Loading variant="bike" text="Загрузка состава..." />;
     if (!crew) return <div className="text-center text-destructive font-bold text-4xl py-20">ЭКИПАЖ НЕ НАЙДЕН</div>;
 
-    const members = crew.members || [];
-    const onlineCount = members.filter((m: CrewMember) => m.live_status === 'online' || m.live_status === 'riding').length;
+    const members: CrewMember[] = crew.members || [];
+    const onlineCount = members.filter((m) => m.live_status === 'online' || m.live_status === 'riding').length;
     const totalCount = members.length;
 
     const getRoleIcon = (role: string) => {
@@ -100,18 +110,8 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
             case 'owner': return <Crown className="h-4 w-4 text-yellow-500" />;
             case 'co_owner': return <Shield className="h-4 w-4 text-blue-400" />;
             case 'admin': return <UserCog className="h-4 w-4 text-purple-400" />;
+            case 'mechanic': return <Wrench className="h-4 w-4 text-orange-400" />;
             default: return null;
-        }
-    };
-
-    const getRoleLabel = (role: string) => {
-        switch (role) {
-            case 'owner': return 'Владелец';
-            case 'co_owner': return 'Совладелец';
-            case 'admin': return 'Администратор';
-            case 'mechanic': return 'Механик';
-            case 'member': return 'Участник';
-            default: return role;
         }
     };
 
@@ -150,6 +150,7 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
 
     const handleRemoveMember = async (userId: string, name: string) => {
         if (!confirm(`Удалить ${name} из экипажа?\n\nУчастник потеряет доступ к экипажу.`)) return;
+        setBusyId(userId);
         try {
             // Use the existing shifts API with a custom action
             const res = await fetch(`/api/crew/shifts`, {
@@ -158,14 +159,16 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                 body: JSON.stringify({ slug: crewSlug, removeMember: true, userId }),
             });
             if (res.ok) {
-                // Optimistic: remove from local state
-                setMembers(prev => prev.filter(m => m.user_id !== userId));
+                toast.success(`${name} удалён из экипажа`);
+                await refreshCrew();
             } else {
                 const err = await res.json().catch(() => ({}));
-                alert(err.error || "Не удалось удалить участника");
+                toast.error(err.error || "Не удалось удалить участника");
             }
         } catch (e) {
-            alert("Ошибка: " + (e instanceof Error ? e.message : "unknown"));
+            toast.error("Ошибка: " + (e instanceof Error ? e.message : "unknown"));
+        } finally {
+            setBusyId(null);
         }
     };
 
@@ -196,10 +199,9 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
 
             {/* Members List */}
             <div className="space-y-2">
-                {members.map((member: CrewMember) => {
-                    const isPromoting = promotingId === member.user_id;
-                    const showPromoteToAdmin = canPromoteToAdmin(member);
-                    const showPromoteToCoOwner = canPromoteToCoOwner(member);
+                {members.map((member) => {
+                    const isBusy = busyId === member.user_id;
+                    const manageable = canManageMember(member);
 
                     return (
                         <Card key={member.user_id} className="hover:border-primary transition-colors">
@@ -236,7 +238,7 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                                             {getRoleIcon(member.role)}
                                         </div>
                                         <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                                            <span className="uppercase">{getRoleLabel(member.role)}</span>
+                                            <span className="uppercase">{roleLabel(member.role)}</span>
                                             <Badge
                                                 variant="outline"
                                                 className={cn(
@@ -256,47 +258,48 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                                         {member.user_id?.slice(0, 8).toUpperCase()}
                                     </div>
 
-                                    {/* Promote actions */}
-                                    {(showPromoteToAdmin || showPromoteToCoOwner) && (
-                                        <div className="flex gap-1 shrink-0">
-                                            {showPromoteToAdmin && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isPromoting}
-                                                    onClick={() => handlePromote(member, 'admin')}
-                                                    className="inline-flex items-center gap-1 rounded-lg border border-purple-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-purple-400 transition-colors hover:bg-purple-500/10 disabled:opacity-40"
-                                                >
-                                                    <ChevronUp className="h-3 w-3" />
-                                                    Admin
-                                                </button>
-                                            )}
-                                            {showPromoteToCoOwner && (
-                                                <button
-                                                    type="button"
-                                                    disabled={isPromoting}
-                                                    onClick={() => handlePromote(member, 'co_owner')}
-                                                    className="inline-flex items-center gap-1 rounded-lg border border-blue-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-blue-400 transition-colors hover:bg-blue-500/10 disabled:opacity-40"
-                                                >
-                                                    <ChevronUp className="h-3 w-3" />
-                                                    Co-Owner
-                                                </button>
-                                            )}
-                                        </div>
+                                    {/* Role management — owner / co_owner / admin manage ranks below */}
+                                    {manageable && myAssignableRoles.length > 0 && (
+                                        <Select
+                                            value={member.role}
+                                            disabled={isBusy}
+                                            onValueChange={(v) => handleRoleChange(member, v as AssignableRole)}
+                                        >
+                                            <SelectTrigger
+                                                className="w-[150px] h-9 text-xs uppercase tracking-wide shrink-0"
+                                                aria-label={`Роль @${member.username}`}
+                                            >
+                                                <SelectValue placeholder="Роль" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {/* current role always visible in the list */}
+                                                {[...new Set([member.role as string, ...myAssignableRoles] as string[])]
+                                                    .sort((a, b) => roleRank(b) - roleRank(a))
+                                                    .map((r) => (
+                                                        <SelectItem key={r} value={r}>
+                                                            {roleLabel(r)}
+                                                        </SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
                                     )}
                                 </div>
 
-                            {/* Remove member — owner/co_owner only, can't remove other owners */}
-                            {(myCrewRole === 'owner' || myCrewRole === 'co_owner') && member.role !== 'owner' && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveMember(member.user_id, member.username || member.user_id)}
-                                    className="ml-auto inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/10 min-h-[28px]"
-                                    aria-label="Удалить из экипажа"
-                                >
-                                    <Trash2 className="h-3 w-3" />
-                                    Удалить
-                                </button>
-                            )}
+                                {/* Remove member — owner/co_owner only, can't remove other owners */}
+                                {(myCrewRole === 'owner' || myCrewRole === 'co_owner') && member.role !== 'owner' && (
+                                    <div className="flex justify-end mt-3">
+                                        <button
+                                            type="button"
+                                            disabled={isBusy}
+                                            onClick={() => handleRemoveMember(member.user_id, member.username || member.user_id)}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-40 min-h-[28px]"
+                                            aria-label="Удалить из экипажа"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                            Удалить
+                                        </button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     );
