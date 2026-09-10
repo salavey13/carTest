@@ -22,6 +22,7 @@ import {
   EQUIPMENT_UNIT_PRICES_RUB,
   EQUIPMENT_UNIT_PRICE_FALLBACK_RUB,
   getRentalEquipmentPart,
+  isEquipmentOnlyRental,
 } from "./rental-price-split";
 
 /** Default owner share of the bike part (subrent contract §5.5). */
@@ -59,7 +60,23 @@ function toFiniteNumber(value: unknown): number {
  */
 export function getEquipmentCostPart(
   metadata: Record<string, unknown> | null | undefined,
+  totalCost?: number | string | null,
 ): number {
+  // iter32 (equipment parity): standalone gear rentals (bot /ekip, web
+  // equipment-only checkout, unified server actions) have NO bike part —
+  // the whole total IS gear revenue. Without this branch their revenue used
+  // to be counted as BIKE revenue by the KPI cards, the weekly partner
+  // report and the activation message (estimate had no basis → 0).
+  // Callers that know the total pass it; legacy one-arg calls keep the old
+  // stored → estimate fallback chain (fallbacks kept, signature backward
+  // compatible).
+  if (isEquipmentOnlyRental(metadata)) {
+    if (totalCost != null) {
+      const total = toFiniteNumber(totalCost);
+      if (total > 0) return total;
+    }
+    return getRentalEquipmentPart(metadata);
+  }
   return getRentalEquipmentPart(metadata);
 }
 
@@ -246,7 +263,9 @@ export function summarizeSubrenterMonth(
 ): SubrenterMonthSummary {
   const pct = opts?.pct ?? SUBRENTER_SHARE_PCT;
   const out: SubrenterMonthRentalRow[] = rows.map((r) => {
-    const equipmentRub = getEquipmentCostPart(r.metadata);
+    // iter32: pass the total so a stray standalone gear row in a partner's
+    // month is counted as GEAR revenue (not split), not bike revenue.
+    const equipmentRub = getEquipmentCostPart(r.metadata, r.totalCost);
     const total = toFiniteNumber(r.totalCost);
     const bikePartRub = getBikeRevenuePart(total, equipmentRub);
     return {
@@ -272,6 +291,57 @@ export function summarizeSubrenterMonth(
     bikePartRub: out.reduce((s, r) => s + r.bikePartRub, 0),
     cutRub: out.reduce((s, r) => s + r.cutRub, 0),
   };
+}
+
+// ── Completion notification (iter32, ExO «Engagement») ──────────────────────
+
+export interface SubrenterCompletionMessageInput {
+  bikeTitle: string;
+  renterName?: string | null;
+  totalRub: number | string | null | undefined;
+  equipmentRub: number;
+  cutRub: number;
+  shortRentalId?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  crewName?: string | null;
+}
+
+/**
+ * Close-the-loop TG message for the partner: his bike is BACK, the deal is
+ * done and here is the final amount he earned on it. Complements the
+ * activation message (start of the rental) — the partner now sees the full
+ * cycle start → finish without asking the crew (ExO «Autonomy»). Equipment
+ * is explicitly excluded, same split rule as everywhere.
+ */
+export function buildSubrenterCompletionMessage(
+  input: SubrenterCompletionMessageInput,
+): string {
+  const bikePart = getBikeRevenuePart(input.totalRub, input.equipmentRub);
+  const lines: string[] = [
+    "✅ <b>Байк вернулся из аренды</b>",
+    "",
+    `Байк: <b>${escapeHtml(input.bikeTitle || "байк")}</b>`,
+  ];
+  if (input.renterName) lines.push(`Арендатор: ${escapeHtml(input.renterName)}`);
+  if (input.startDate) {
+    const end = input.endDate ? ` → ${formatRuDate(input.endDate)}` : "";
+    lines.push(`Период: ${formatRuDate(input.startDate)}${end}`);
+  }
+  lines.push(
+    "",
+    `Сумма аренды: <b>${formatRub(toFiniteNumber(input.totalRub))}</b>`,
+  );
+  if (input.equipmentRub > 0) {
+    lines.push(`Экипировка (не делится): ${formatRub(input.equipmentRub)}`);
+  }
+  lines.push(
+    `Ваш заработок (50% от аренды байка ${formatRub(bikePart)}): <b>${formatRub(input.cutRub)}</b>`,
+  );
+  if (input.shortRentalId) lines.push("", `ID аренды: <code>${escapeHtml(input.shortRentalId)}</code>`);
+  if (input.crewName) lines.push(`Экипаж: ${escapeHtml(input.crewName)}`);
+  lines.push("", "Следующая выплата — по графику экипажа. Следите за начислениями в разделе «Мои байки в парке».");
+  return lines.join("\n");
 }
 
 // ── Achievement notification message (bonus task) ────────────────────────────

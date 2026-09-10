@@ -21,6 +21,7 @@ import {
   getEquipmentCostPart,
   getSubrenterCut,
   buildSubrenterActivationMessage,
+  buildSubrenterCompletionMessage,
 } from "@/app/franchize/lib/subrenter-economics";
 
 export interface SubrenterNotifyInput {
@@ -68,7 +69,7 @@ export async function notifySubrenterOfRentalActivation(
         .eq("rental_id", input.rentalId)
         .maybeSingle();
       if (!rental) return "";
-      vehicle = (rental as { vehicle?: SubrenterNotifyInput["vehicle"] }).vehicle ?? null;
+      vehicle = (rental as unknown as { vehicle?: SubrenterNotifyInput["vehicle"] }).vehicle ?? null;
       totalCost = (rental as { total_cost?: number | null }).total_cost ?? null;
       metadata = (rental as { metadata?: Record<string, unknown> | null }).metadata ?? null;
       startDate = (rental as { agreed_start_date?: string | null }).agreed_start_date ?? null;
@@ -93,7 +94,9 @@ export async function notifySubrenterOfRentalActivation(
 
     // Never notify the acting crew about their own internal rows (e.g. the
     // partner renting his own bike) — still returns the chat id.
-    const equipmentRub = getEquipmentCostPart(md);
+    // iter32: pass the total — equipment-only rows (if a partner's bike ever
+    // produces one) must not shift the split base.
+    const equipmentRub = getEquipmentCostPart(md, totalCost);
     const cutRub = getSubrenterCut(totalCost, equipmentRub);
     const bikeTitle = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.id);
 
@@ -125,6 +128,98 @@ export async function notifySubrenterOfRentalActivation(
     return subrenterChatId;
   } catch (error) {
     logger.warn("[subrenter-notify] non-fatal failure", { rentalId: input.rentalId, error });
+    return "";
+  }
+}
+
+// ── iter32: completion notification (ExO «Engagement» + «Autonomy») ─────────
+
+/**
+ * Notify the partner-owner that a rental of HIS bike just finished. Mirrors
+ * notifySubrenterOfRentalActivation: same data resolution, same non-fatal
+ * contract, but the close-the-loop message with the FINAL earned amount.
+ *
+ * Called from updateRentalStatus when the status flips to "completed" (the
+ * drawer's «Завершить», the rental page, API callers) — every completion
+ * path funnels through it. A missing notification must never break a return.
+ */
+export async function notifySubrenterOfRentalCompletion(
+  input: SubrenterNotifyInput,
+): Promise<string> {
+  try {
+    let vehicle = input.vehicle ?? null;
+    let totalCost = input.totalCost;
+    let metadata = input.metadata ?? null;
+    let renterName = input.renterName ?? null;
+    let startDate = input.startDate ?? null;
+    let endDate = input.endDate ?? null;
+
+    if (!vehicle) {
+      const { data: rental } = await supabaseAdmin
+        .from("rentals")
+        .select(`
+          rental_id, total_cost, metadata,
+          agreed_start_date, agreed_end_date,
+          vehicle:cars(id, make, model, specs)
+        `)
+        .eq("rental_id", input.rentalId)
+        .maybeSingle();
+      if (!rental) return "";
+      vehicle = (rental as unknown as { vehicle?: SubrenterNotifyInput["vehicle"] }).vehicle ?? null;
+      totalCost = (rental as { total_cost?: number | null }).total_cost ?? null;
+      metadata = (rental as { metadata?: Record<string, unknown> | null }).metadata ?? null;
+      startDate = (rental as { agreed_start_date?: string | null }).agreed_start_date ?? null;
+      endDate = (rental as { agreed_end_date?: string | null }).agreed_end_date ?? null;
+    }
+    if (!vehicle) return "";
+
+    const md = metadata ?? {};
+    if (!renterName) {
+      const rn = md["renter_name"];
+      if (typeof rn === "string" && rn.trim()) renterName = rn.trim();
+    }
+
+    const subrenterChatIdRaw = (vehicle.specs ?? {})["subrenter_chat_id"];
+    const subrenterChatId =
+      typeof subrenterChatIdRaw === "string" && subrenterChatIdRaw.trim().length > 0
+        ? subrenterChatIdRaw.trim()
+        : typeof subrenterChatIdRaw === "number" && Number.isFinite(subrenterChatIdRaw)
+          ? String(subrenterChatIdRaw)
+          : "";
+    if (!subrenterChatId) return "";
+
+    const equipmentRub = getEquipmentCostPart(md, totalCost);
+    const cutRub = getSubrenterCut(totalCost, equipmentRub);
+    const bikeTitle = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.id);
+
+    const text = buildSubrenterCompletionMessage({
+      bikeTitle,
+      renterName,
+      totalRub: totalCost ?? 0,
+      equipmentRub,
+      cutRub,
+      shortRentalId: input.rentalId.slice(0, 8),
+      startDate,
+      endDate,
+      crewName: input.crewName ?? null,
+    });
+
+    const { sendComplexMessage } = await import(
+      "@/app/webhook-handlers/actions/sendComplexMessage"
+    );
+    const result = await sendComplexMessage(subrenterChatId, text, [], {
+      parseMode: "HTML",
+    });
+    if (!result?.success) {
+      logger.warn("[subrenter-notify] completion message failed", {
+        rentalId: input.rentalId,
+        subrenterChatId,
+        error: result?.error,
+      });
+    }
+    return subrenterChatId;
+  } catch (error) {
+    logger.warn("[subrenter-notify] completion non-fatal failure", { rentalId: input.rentalId, error });
     return "";
   }
 }

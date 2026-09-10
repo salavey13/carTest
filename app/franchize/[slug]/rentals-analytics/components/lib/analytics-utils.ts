@@ -30,7 +30,7 @@ import {
   SUBRENTER_EQUIPMENT_UNIT_PRICES as UNIT_PRICES,
   SUBRENTER_EQUIPMENT_PRICE_FALLBACK as UNIT_PRICE_FALLBACK,
 } from "@/app/franchize/lib/subrenter-economics";
-import { getStoredEquipmentPrice } from "@/app/franchize/lib/rental-price-split";
+import { getStoredEquipmentPrice, isEquipmentOnlyRental, splitRentalPrice } from "@/app/franchize/lib/rental-price-split";
 
 // ── Status metadata ──────────────────────────────────────────────────────────
 
@@ -379,41 +379,234 @@ export interface EquipmentSummary {
   items: EquipmentItem[];
 }
 
-/** Parse metadata.equipment into a readable list with quantities.
- *  Numeric values are quantities (helmets: 2 → "2 шлема"), booleans are on/off.
- *  iter25: `cost` prefers the PERSISTED charged amount (metadata.equipment_price)
- *  — exact; the unit-price estimate remains the fallback for legacy rows. */
-export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummary {
+// ── iter32: unified GEAR view — ONE reader for all three metadata dialects ───
+//
+// Writers (all grounded in the codebase):
+//   1. equipment_items[]  — web equipment-only checkout (actions-runtime.ts):
+//                           {id, title, daily_price} per catalog item.
+//   2. equipment_title    — bot /ekip (one rentals row per unit) + the unified
+//                           server actions (equipment-rentals.ts), plus
+//                           daily_price / equipment_size / equipment_condition /
+//                           damage_reports / issued_by / received_by /
+//                           issued_at / returned_at / primary_rental_id.
+//   3. equipment flags    — legacy bike rentals: metadata.equipment =
+//                           {helmets: 2, gloves: true, charger: true, ...}
+//                           (unit-price table / persisted equipment_price).
+// Before iter32 the web UI read ONLY the legacy flags, so standalone gear
+// rentals rendered as fake bike rentals with the «Экипировка: не включена»
+// tile and zero-cost split.
+
+export type GearItemSource = "snapshot" | "title" | "flags";
+
+export interface GearItemView extends EquipmentItem {
+  /** Which metadata dialect the row came from (for UI badges + tests). */
+  source: GearItemSource;
+  /** True when unitPrice is unknown (legacy rows without a price basis). */
+  priceUnknown: boolean;
+}
+
+export interface GearDamageReportView {
+  phase: string;
+  severity: string;
+  notes: string;
+  createdAt: string | null;
+}
+
+export interface GearPanelData {
+  items: GearItemView[];
+  /** Human-readable list, e.g. "2 шлема, перчатки". */
+  text: string;
+  /** Gear revenue of this rental (₽) — exact for standalone rows (the whole
+   *  total) and for rows with a persisted equipment_price; estimate otherwise. */
+  cost: number;
+  exact: boolean;
+  /** True for STANDALONE gear rentals (metadata.item_type === "equipment"):
+   *  bot /ekip rows, web equipment-only checkout, unified server actions. */
+  standalone: boolean;
+  /** metadata.equipment_condition: Выдан | Норм | Есть повреждения | Утерян. */
+  condition: string | null;
+  /** metadata.equipment_size (first of cars.specs.sizes at issue time). */
+  size: string | null;
+  issuedAt: string | null;
+  returnedAt: string | null;
+  /** When this gear rental is part of a bike deal (unified actions). */
+  primaryRentalId: string | null;
+  damageReports: GearDamageReportView[];
+}
+
+const CONDITION_TONE: Record<string, string> = {
+  "Выдан": "#3b82f6",
+  "Норм": "#22c55e",
+  "Есть повреждения": "#f59e0b",
+  "Утерян": "#ef4444",
+};
+
+/** Color for an equipment_condition value (status whitelist §0.6). */
+export function equipmentConditionColor(condition: string | null | undefined): string | null {
+  if (!condition) return null;
+  return CONDITION_TONE[condition] ?? "#64748b";
+}
+
+function gearTextFromItems(items: GearItemView[]): string {
+  return items
+    .map((it) => {
+      if (it.qty > 1) {
+        // crude Russian plural: шлем → шлема (2-4) / шлемов (5+)
+        const base = it.label;
+        const plural = it.qty >= 5 ? `${base}ов` : `${base}а`;
+        return `${it.qty} ${plural}`;
+      }
+      return it.label;
+    })
+    .join(", ");
+}
+
+/**
+ * Unified gear view of a rental — the ONE function the drawer gear panel, the
+ * «Экипировка» tile and the title should read. Priority: snapshot → title →
+ * legacy flags (fallbacks kept: older rows keep working exactly as before).
+ */
+export function getGearPanelData(rental: AnalyticsRentalRow): GearPanelData {
   const md = (rental.metadata || {}) as Record<string, unknown>;
-  const eq = md["equipment"];
-  const items: EquipmentItem[] = [];
-  if (eq && typeof eq === "object") {
-    for (const [key, value] of Object.entries(eq as Record<string, unknown>)) {
-      const unitPrice = UNIT_PRICES[key] ?? UNIT_PRICE_FALLBACK;
-      const free = unitPrice === 0;
-      if (typeof value === "number" && value > 0) {
-        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: value, unitPrice, free });
-      } else if (value === true) {
-        items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: 1, unitPrice, free });
+  const standalone = isEquipmentOnlyRental(md);
+  const items: GearItemView[] = [];
+
+  // 1. Web checkout snapshot: equipment_items = [{id, title, daily_price}]
+  const snap = Array.isArray(md["equipment_items"]) ? md["equipment_items"] : [];
+  for (const raw of snap) {
+    if (!raw || typeof raw !== "object") continue;
+    const it = raw as Record<string, unknown>;
+    const title = typeof it.title === "string" && it.title.trim() ? it.title.trim() : "";
+    if (!title) continue;
+    const price =
+      typeof it.daily_price === "number" && Number.isFinite(it.daily_price)
+        ? it.daily_price
+        : null;
+    items.push({
+      key: typeof it.id === "string" && it.id ? it.id : `snap-${items.length}`,
+      label: title,
+      qty: 1,
+      unitPrice: price ?? 0,
+      free: price === 0,
+      source: "snapshot",
+      priceUnknown: price == null,
+    });
+  }
+
+  // 2. Bot /ekip + unified actions: equipment_title (+daily_price, count)
+  if (items.length === 0 && typeof md["equipment_title"] === "string" && md["equipment_title"].trim()) {
+    const price =
+      typeof md["daily_price"] === "number" && Number.isFinite(md["daily_price"])
+        ? md["daily_price"]
+        : null;
+    const countRaw = md["equipment_count"];
+    const count =
+      typeof countRaw === "number" && Number.isFinite(countRaw) && countRaw > 0
+        ? Math.floor(countRaw)
+        : 1;
+    items.push({
+      key: "equipment_title",
+      label: (md["equipment_title"] as string).trim(),
+      qty: count,
+      unitPrice: price ?? 0,
+      free: false,
+      source: "title",
+      priceUnknown: price == null,
+    });
+  }
+
+  // 3. Legacy flags — metadata.equipment (bike rentals with gear add-ons)
+  if (items.length === 0) {
+    const eq = md["equipment"];
+    if (eq && typeof eq === "object") {
+      for (const [key, value] of Object.entries(eq as Record<string, unknown>)) {
+        if (key.endsWith("_gift")) continue;
+        const unitPrice = UNIT_PRICES[key] ?? UNIT_PRICE_FALLBACK;
+        const free = unitPrice === 0;
+        if (typeof value === "number" && value > 0) {
+          items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: value, unitPrice, free, source: "flags", priceUnknown: false });
+        } else if (value === true) {
+          items.push({ key, label: EQUIPMENT_LABELS[key] || key, qty: 1, unitPrice, free, source: "flags", priceUnknown: false });
+        }
       }
     }
   }
-  const stored = getStoredEquipmentPrice(md);
-  const exact = stored != null;
-  const cost = exact
-    ? stored!
-    : items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
 
-  const parts = items.map((it) => {
-    if (it.qty > 1) {
-      // crude Russian plural: шлем → шлема (2-4) / шлемов (5+)
-      const base = it.label;
-      const plural = it.qty >= 5 ? `${base}ов` : `${base}а`;
-      return `${it.qty} ${plural}`;
-    }
-    return it.label;
-  });
-  return { text: parts.join(", "), cost, exact, items };
+  // Money: standalone rows are exact (the whole total is gear revenue);
+  // bike rentals keep the iter25 stored → estimate fallback chain.
+  let cost: number;
+  let exact: boolean;
+  if (standalone) {
+    const split = splitRentalPrice(rental.total_cost, md);
+    cost = split.equipmentPartRub;
+    exact = true;
+  } else {
+    const stored = getStoredEquipmentPrice(md);
+    exact = stored != null;
+    cost = exact
+      ? stored!
+      : items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
+  }
+
+  // Damage reports ({phase, severity, notes, created_at, created_by})
+  const damageReports: GearDamageReportView[] = (
+    Array.isArray(md["damage_reports"]) ? md["damage_reports"] : []
+  )
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object")
+    .map((d) => ({
+      phase: typeof d.phase === "string" ? d.phase : "",
+      severity: typeof d.severity === "string" ? d.severity : "",
+      notes: typeof d.notes === "string" ? d.notes : "",
+      createdAt: typeof d.created_at === "string" ? d.created_at : null,
+    }));
+
+  const cond = typeof md["equipment_condition"] === "string" ? (md["equipment_condition"] as string) : null;
+  const size = typeof md["equipment_size"] === "string" && md["equipment_size"].trim() ? (md["equipment_size"] as string).trim() : null;
+
+  return {
+    items,
+    text: gearTextFromItems(items),
+    cost,
+    exact,
+    standalone,
+    condition: cond,
+    size,
+    issuedAt: typeof md["issued_at"] === "string" ? (md["issued_at"] as string) : null,
+    returnedAt: typeof md["returned_at"] === "string" ? (md["returned_at"] as string) : null,
+    primaryRentalId: typeof md["primary_rental_id"] === "string" ? (md["primary_rental_id"] as string) : null,
+    damageReports,
+  };
+}
+
+/** Parse metadata.equipment into a readable list with quantities.
+ *  Numeric values are quantities (helmets: 2 → "2 шлема"), booleans are on/off.
+ *  iter25: `cost` prefers the PERSISTED charged amount (metadata.equipment_price)
+ *  — exact; the unit-price estimate remains the fallback for legacy rows.
+ *  iter32: now a thin wrapper over getGearPanelData (the unified 3-source
+ *  view) — the flag-based rows keep their exact old shape. */
+export function getEquipmentSummary(rental: AnalyticsRentalRow): EquipmentSummary {
+  const gear = getGearPanelData(rental);
+  return {
+    text: gear.text,
+    cost: gear.cost,
+    exact: gear.exact,
+    items: gear.items.map(({ key, label, qty, unitPrice, free }) => ({ key, label, qty, unitPrice, free })),
+  };
+}
+
+/** Drawer/list title for a rental: gear rentals get their subject from the
+ *  gear snapshot (equipment_items / equipment_title), bike rentals keep the
+ *  bike title. Fallback chain ends with «Снаряжение» / «Байк». */
+export function getRentalSubjectTitle(rental: AnalyticsRentalRow): string {
+  const md = (rental.metadata || {}) as Record<string, unknown>;
+  if (isEquipmentOnlyRental(md)) {
+    const gear = getGearPanelData(rental);
+    if (gear.items.length === 0) return "Снаряжение";
+    const first = gear.items[0].label;
+    if (gear.items.length === 1) return first;
+    return `${first} + ещё ${gear.items.length - 1}`;
+  }
+  return getRentalBikeTitle(rental);
 }
 
 // ── Payment split ────────────────────────────────────────────────────────────
@@ -677,13 +870,15 @@ export function computeAnalyticsKpis(
   const revenueToday = revenueRows
     .reduce((sum, r) => sum + (Number(r.total_cost) || 0), 0);
   // Equipment part of the day's real revenue (gift items excluded — they
-  // were not charged, so they are not crew money either).
+  // were not charged, so they are not crew money either). iter32: the total
+  // is passed so standalone gear rentals (bot /ekip, equipment-only checkout)
+  // count as GEAR revenue instead of inflating the bike part.
   const equipmentPartToday = revenueRows
-    .reduce((sum, r) => sum + getEquipmentCostPart(r.metadata), 0);
+    .reduce((sum, r) => sum + getEquipmentCostPart(r.metadata, r.total_cost), 0);
   // Subrenter cut: 50% of the BIKE part (total − equipment) of subrented bikes.
   const owedToSubrentersToday = revenueRows
     .filter((r) => typeof r.subrenterChatId === "string" && r.subrenterChatId)
-    .reduce((sum, r) => sum + getSubrenterCut(r.total_cost, getEquipmentCostPart(r.metadata)), 0);
+    .reduce((sum, r) => sum + getSubrenterCut(r.total_cost, getEquipmentCostPart(r.metadata, r.total_cost)), 0);
   return {
     totalToday: startedToday.length,
     revenueToday,

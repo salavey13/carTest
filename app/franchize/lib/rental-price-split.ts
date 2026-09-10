@@ -111,18 +111,32 @@ export function estimateEquipmentPrice(metadata: Metadata): number {
  * total IS known — it additionally clamps the gear part to the total.
  */
 export function getRentalEquipmentPart(metadata: Metadata): number {
+  // iter32: for standalone gear rows (item_type="equipment") the stored/
+  // estimate chain has no basis (no flags, no persisted split) and returns 0.
+  // Without the total we cannot know the exact gear amount — callers that DO
+  // know the total must use getEquipmentCostPart(metadata, total) from
+  // subrenter-economics, which returns the full total for equipment-only rows.
   return getStoredEquipmentPrice(metadata) ?? estimateEquipmentPrice(metadata);
 }
 
-export type PriceSplitSource = "stored" | "estimated";
+export type PriceSplitSource = "stored" | "estimated" | "equipment_total";
 
 export interface RentalPriceSplit {
   totalRub: number;
   bikePartRub: number;
   equipmentPartRub: number;
   /** "stored" — exact amounts persisted at creation; "estimated" — unit-price
-   *  estimate (legacy rows / price-overridden deals). */
+   *  estimate (legacy rows / price-overridden deals); "equipment_total" —
+   *  standalone gear rental (metadata.item_type="equipment", iter32): the
+   *  whole total IS gear revenue, exact by definition. */
   source: PriceSplitSource;
+}
+
+/** True when the rental row is a STANDALONE gear rental (bot /ekip, web
+ *  equipment-only checkout or the unified server actions) — not a bike rent
+ *  with gear flags. Equipment handling parity (iter32). */
+export function isEquipmentOnlyRental(metadata: Metadata): boolean {
+  return metadata?.["item_type"] === "equipment";
 }
 
 /**
@@ -134,6 +148,13 @@ export function splitRentalPrice(
   metadata: Metadata,
 ): RentalPriceSplit {
   const totalRub = clampNonNegative(toFiniteNumber(totalCost));
+  // iter32 (equipment parity): a standalone gear rental has no bike part —
+  // the whole total_cost is equipment revenue. Before this branch, gear-only
+  // rows fell through to estimate=0 and their revenue was counted as BIKE
+  // revenue by the KPI cards and the «Мот / Экип» tile.
+  if (isEquipmentOnlyRental(metadata)) {
+    return { totalRub, bikePartRub: 0, equipmentPartRub: totalRub, source: "equipment_total" };
+  }
   const stored = getStoredEquipmentPrice(metadata);
   if (stored != null) {
     const equipmentPartRub = Math.min(Math.round(stored), totalRub);

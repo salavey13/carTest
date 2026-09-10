@@ -12,6 +12,7 @@ import {
   normalizePeriodEnd,
   type ActionResponse,
 } from "./shared/auth-helpers";
+import { DEFAULT_HOURLY_RATE } from "@/app/franchize/lib/salary-constants";
 
 /**
  * Get team members' earnings for a period.
@@ -113,7 +114,7 @@ export async function getTeamEarnings(params: {
           const end = shift.clock_out_time ? new Date(shift.clock_out_time) : new Date();
           const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
           shiftHours += hours;
-          shiftIncome += hours * (shift.hourly_rate || 169);
+          shiftIncome += hours * (shift.hourly_rate || DEFAULT_HOURLY_RATE);
         });
 
         // Get commissions for period (expense_commission: money flowing OUT to employees)
@@ -223,7 +224,7 @@ export async function getMemberEarnings(params: {
       const end = shift.clock_out_time ? new Date(shift.clock_out_time) : new Date();
       const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       shiftHours += hours;
-      const amount = hours * (shift.hourly_rate || 169);
+      const amount = hours * (shift.hourly_rate || DEFAULT_HOURLY_RATE);
       shiftIncome += amount;
 
       breakdown.push({

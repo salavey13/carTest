@@ -14,15 +14,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Bike, ChevronRight, Wallet } from "lucide-react";
+import { Bike, ChevronRight, Wallet, BadgeCheck, Clock3 } from "lucide-react";
 import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 import { MonthPickerBar } from "@/app/franchize/components/FranchizeMonthPicker";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import {
   getSubrenterMonthlyEarningsAction,
   type SubrenterOwnedBikesData,
+  type SubrenterEarningsData,
 } from "@/app/franchize/server-actions/subrenter-monitoring";
-import type { SubrenterMonthSummary } from "@/app/franchize/lib/subrenter-economics";
 import {
   formatCurrency,
   isLiveRentalStatus,
@@ -54,7 +54,7 @@ export function SubrenterMyBikesPanel({
   // iter31: the panel owns its monthly earnings fetch — runs on mount and
   // whenever the partner switches the month. Failures are silent (the panel
   // keeps the previous data).
-  const [earnings, setEarnings] = useState<SubrenterMonthSummary | null>(null);
+  const [earnings, setEarnings] = useState<SubrenterEarningsData | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(false);
 
   useEffect(() => {
@@ -186,6 +186,75 @@ export function SubrenterMyBikesPanel({
                 Аренд за месяц: {earnings.rentalCount} · Суммарно оплачено:{" "}
                 {formatCurrency(earnings.totalRub)} · Экипировка целиком остаётся экипажу.
               </p>
+
+              {/* iter32 (ExO «Autonomy» + «Dashboards»): the partner sees his
+                  payout bookkeeping without asking the crew — how much of the
+                  month's cut is already recorded in the owner's wallet and
+                  how much is still owed. Same wallet data the owner's sheet
+                  uses, so the numbers always agree. */}
+              {earnings.cutRub > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{ backgroundColor: "#22c55e15", color: "#22c55e" }}
+                  >
+                    <BadgeCheck className="h-3 w-3" aria-hidden />
+                    выплачено: {formatCurrency(earnings.paidRub ?? 0)}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{
+                      backgroundColor: (earnings.remainingRub ?? 0) > 0 ? "#f59e0b15" : "#64748b15",
+                      color: (earnings.remainingRub ?? 0) > 0 ? "#f59e0b" : "#64748b",
+                    }}
+                  >
+                    <Clock3 className="h-3 w-3" aria-hidden />
+                    осталось: {formatCurrency(earnings.remainingRub ?? 0)}
+                  </span>
+                </div>
+              )}
+
+              {/* iter32 (ExO «Dashboards» + «Interfaces»): 6-month earnings
+                  trend — the raw rental history filtered into what matters:
+                  the partner's cut per month. Bars scale to the best month. */}
+              {earnings.trend && earnings.trend.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: T.textMuted }}>
+                    Динамика за полгода
+                  </p>
+                  <div className="mt-1.5 flex items-end gap-1.5">
+                    {earnings.trend.map((pt) => {
+                      const max = Math.max(...earnings.trend.map((p) => p.cutRub), 1);
+                      const h = Math.max(4, Math.round((pt.cutRub / max) * 44));
+                      const isCurrent = pt.month === earnings.month;
+                      return (
+                        <div key={pt.month} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${pt.month}: ${formatCurrency(pt.cutRub)} · ${pt.rentalCount} аренд`}>
+                          <span className="text-[9px] tabular-nums" style={{ color: pt.cutRub > 0 ? T.textMuted : T.textFaint }}>
+                            {pt.cutRub > 0 ? Math.round(pt.cutRub / 1000) + "к" : "—"}
+                          </span>
+                          <div
+                            className="w-full rounded-t"
+                            style={{
+                              height: `${h}px`,
+                              backgroundColor: isCurrent
+                                ? T.accent
+                                : pt.cutRub > 0
+                                  ? `color-mix(in srgb, ${T.accent} 45%, transparent)`
+                                  : T.bgElevated,
+                            }}
+                          />
+                          <span
+                            className="text-[9px] tabular-nums"
+                            style={{ color: isCurrent ? T.text : T.textMuted, fontWeight: isCurrent ? 600 : 400 }}
+                          >
+                            {pt.month.slice(5)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* iter31: per-bike breakdown — which bike earned what this month. */}
               {byBike.length > 1 && (

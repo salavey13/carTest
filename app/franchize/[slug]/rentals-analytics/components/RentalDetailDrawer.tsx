@@ -10,8 +10,12 @@
 //   3. SLA overview     — days in rental (FIX F8: start→end), until return
 //   4. Info grid        — bike, renter, phone (F2), status, payment, start, end,
 //                          cost, equipment part (F4), deposit (F3), operator (F11)
+//   4b. Gear panel      — iter32: unified «Снаряжение» section (equipment_items
+//                          snapshot → equipment_title → legacy flags; condition,
+//                          size, issued/returned, damage reports, cost)
 //   5. Todos            — this rental's todos linked via crew_todos.rental_id (F12)
-//   6. Handoff          — odometer before/after (F5), equipment checklist, damage notes
+//   6. Handoff          — odometer before/after (F5), damage notes (gear rentals:
+//                          «Выдача и возврат» without odometer)
 //   7. Deposit          — deposit_entries live tracking + metadata fallback (F3)
 //   8. Notes            — this rental's notes + add-note input + return notes
 //   9. History          — timeline of events
@@ -20,6 +24,12 @@
 // FIX (F11): the documents checklist section is removed — rentals created via
 // the /doc command already have verified documents; a photo-upload checklist
 // is not relevant for this flow.
+//
+// iter32 (equipment parity): standalone gear rentals (bot /ekip, web
+// equipment-only checkout, unified server actions) are first-class in the
+// drawer — subject title from the gear snapshot, «Снаряжение» tile instead of
+// «Байк», no odometer, the dedicated gear panel. All three metadata dialects
+// keep working (fallbacks kept).
 //
 // Mobile: rendered inside AnalyticsMobileSheet (slide-up, 88vh).
 // Desktop: right-side panel (max-w-[640px]) — backdrop handled by parent.
@@ -34,6 +44,8 @@ import {
   StickyNote,
   History as HistoryIcon,
   ExternalLink,
+  Package,
+  ArrowRight,
 } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
@@ -60,13 +72,16 @@ import {
   formatDateTime,
   getDepositInfo,
   getEquipmentSummary,
+  getGearPanelData,
   getHandoffStatus,
   getInitials,
   getPaymentSplit,
   getRentalBikeTitle,
+  getRentalSubjectTitle,
   getRenterName,
   getRenterPhone,
   getRentalStatusMeta,
+  equipmentConditionColor,
 } from "./lib/analytics-utils";
 // iter25: shared moto/gear + company/partner split (pure, client-safe)
 import { computePartnerSplit } from "@/app/franchize/lib/rental-price-split";
@@ -80,6 +95,11 @@ interface RentalDetailDrawerProps {
   T: ThemeTokens;
   /** When true, render as the inner content of AnalyticsMobileSheet (no backdrop). */
   asSheetChild?: boolean;
+  /** iter32: crew slug — required by /api/franchize/deposit-summary (2026-08-19
+   *  hardening) and used to link a gear rental back to its primary bike deal.
+   *  Optional to keep every existing call site compiling; when absent the
+   *  deposit fetch falls back to the metadata-only view (old behavior). */
+  crewSlug?: string;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
@@ -118,10 +138,12 @@ export function RentalDetailDrawer({
   onAddNote,
   T,
   asSheetChild = false,
+  crewSlug,
 }: RentalDetailDrawerProps) {
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newNote, setNewNote] = useState("");
   const [openTasks, setOpenTasks] = useState(true);
+  const [openGear, setOpenGear] = useState(true);
   const [openHandoff, setOpenHandoff] = useState(true);
   const [openDeposit, setOpenDeposit] = useState(true);
   const [openNotes, setOpenNotes] = useState(true);
@@ -135,7 +157,14 @@ export function RentalDetailDrawer({
   const [depositSummary, setDepositSummary] = useState<DepositSummaryLite | null>(null);
   const loadDepositSummary = useCallback(async () => {
     try {
-      const resp = await fetch(`/api/franchize/deposit-summary?rentalId=${rental.rental_id}`);
+      // iter32 FIX: the route started requiring `slug` during the 2026-08-19
+      // auth hardening, but the drawer callers never sent it — every fetch
+      // got a 400 and the deposit panel silently fell back to metadata.
+      // `crewSlug` is optional (fallback kept): without it we keep the old
+      // metadata-only behavior instead of a dead request.
+      const qs = new URLSearchParams({ rentalId: rental.rental_id });
+      if (crewSlug) qs.set("slug", crewSlug);
+      const resp = await fetch(`/api/franchize/deposit-summary?${qs.toString()}`);
       if (resp.ok) {
         const data = (await resp.json()) as DepositSummaryLite;
         setDepositSummary(data);
@@ -143,11 +172,14 @@ export function RentalDetailDrawer({
     } catch {
       // silent — falls back to metadata deposit
     }
-  }, [rental.rental_id]);
+  }, [rental.rental_id, crewSlug]);
   useEffect(() => { void loadDepositSummary(); }, [loadDepositSummary]);
 
   const statusMeta = getRentalStatusMeta(rental.status);
   const bikeTitle = getRentalBikeTitle(rental);
+  // iter32: gear rentals get their subject from the gear snapshot —
+  // «Шлем LS2», «Шлем + ещё 2» instead of a fake bike title.
+  const subjectTitle = getRentalSubjectTitle(rental);
   const renterName = getRenterName(rental);
   const initials = getInitials(renterName);
   const cost = Number(rental.total_cost) || 0;
@@ -157,8 +189,13 @@ export function RentalDetailDrawer({
   const md = (rental.metadata || {}) as Record<string, unknown>;
   // FIX (F3): deposit from metadata / contract artifact
   const deposit = getDepositInfo(rental);
-  // FIX (F4): equipment included in this rent
+  // FIX (F4): equipment included in this rent (iter32: unified 3-source view)
   const equipment = getEquipmentSummary(rental);
+  // iter32: the dedicated gear panel — standalone flag, condition, size,
+  // issued/returned dates, damage reports, per-item prices.
+  const gear = getGearPanelData(rental);
+  const isGearRental = gear.standalone;
+  const gearConditionColor = equipmentConditionColor(gear.condition);
   // iter25: moto-vs-gear split + company-vs-partner split of this rental.
   // Stored amounts (exact) when the rental carries them; estimate fallback.
   const moneySplit = computePartnerSplit({
@@ -212,7 +249,8 @@ export function RentalDetailDrawer({
   // FIX (F11): «Экипаж» tile removed (we are already inside the crew context);
   // operator shows a resolved username instead of a raw chat id.
   const infoItems: InfoTile[] = [
-    { label: "Байк",            value: bikeTitle },
+    // iter32: standalone gear rows are not bikes — name the tile honestly
+    { label: isGearRental ? "Снаряжение" : "Байк", value: isGearRental ? subjectTitle : bikeTitle },
     { label: "Арендатор",       value: renterName },
     { label: "Телефон",         value: phone || "—", copyable: !!phone },
     { label: "Статус",          value: statusMeta.label, tone: statusMeta.color === "#22c55e" ? "good" : statusMeta.color === "#ef4444" ? "danger" : "neutral" },
@@ -233,7 +271,8 @@ export function RentalDetailDrawer({
           value: `${formatRubles(moneySplit.companyRub)} / ${formatRubles(moneySplit.partnerRub)} (50%)`,
         }]
       : []),
-    // FIX (F4): equipment part of the total as a separate field
+    // FIX (F4): equipment part of the total as a separate field (iter32:
+    // unified view — standalone gear rows now show their items, not «не включена»)
     equipment.text
       ? { label: "Экипировка",     value: equipment.cost > 0 ? `${equipment.text} (${formatRubles(equipment.cost)}${equipment.exact ? "" : " ~"})` : equipment.text }
       : { label: "Экипировка",     value: "не включена" },
@@ -318,7 +357,7 @@ export function RentalDetailDrawer({
               className="truncate text-lg font-semibold tracking-tight md:text-xl"
               style={{ color: T.text }}
             >
-              {bikeTitle}
+              {subjectTitle}
             </h2>
             <div className="mt-1 text-sm" style={{ color: T.textMuted }}>
               {renterName}
@@ -372,6 +411,146 @@ export function RentalDetailDrawer({
       <div className="mt-5">
         <DrawerInfoGrid items={infoItems} T={T} />
       </div>
+
+      {/* 4b. Gear panel (iter32) — the single surface for everything gear:
+          per-item rows from the equipment_items snapshot / equipment_title /
+          legacy flags (fallback chain), condition, size, issue/return dates,
+          damage reports and the link back to the primary bike deal. */}
+      {gear.items.length > 0 && (
+        <div className="mt-5">
+          <DrawerSection
+            title="Снаряжение"
+            icon={Package}
+            count={gear.items.length}
+            expanded={openGear}
+            onToggle={() => setOpenGear(!openGear)}
+            T={T}
+            rightAction={
+              gear.condition && gearConditionColor ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ backgroundColor: `${gearConditionColor}15`, color: gearConditionColor }}
+                >
+                  {gear.condition}
+                </span>
+              ) : gear.cost > 0 ? (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums"
+                  style={{ backgroundColor: T.bgElevated, color: T.textMuted }}
+                >
+                  {formatRubles(gear.cost)}{gear.exact ? "" : " ~"}
+                </span>
+              ) : undefined
+            }
+          >
+            {/* Per-item rows (price per day for catalog snapshots/titles,
+                per-rental operator prices for legacy flags) */}
+            <div className="space-y-1.5">
+              {gear.items.map((it) => (
+                <div
+                  key={it.key}
+                  className="flex min-h-[40px] items-center justify-between gap-2 rounded-lg border p-2 text-xs"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+                >
+                  <span className="min-w-0 truncate" style={{ color: T.text }}>
+                    {it.label}
+                    {it.qty > 1 ? ` × ${it.qty}` : ""}
+                  </span>
+                  {it.free ? (
+                    <span
+                      className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                      style={{ backgroundColor: "#22c55e15", color: "#22c55e" }}
+                    >
+                      бесплатно
+                    </span>
+                  ) : it.unitPrice > 0 ? (
+                    <span className="shrink-0 whitespace-nowrap font-medium tabular-nums" style={{ color: T.textMuted }}>
+                      {formatRubles(it.unitPrice)}
+                      {it.source !== "flags" ? "/сут" : ""}
+                    </span>
+                  ) : it.priceUnknown ? (
+                    <span className="shrink-0 text-[10px]" style={{ color: T.textFaint }}>
+                      цена не указана
+                    </span>
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#22c55e" }} aria-hidden />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Gear revenue row — exact for standalone rows (the whole total
+                is gear), estimate marker for legacy flag rows */}
+            {gear.cost > 0 && (
+              <div
+                className="mt-2 flex items-center justify-between rounded-lg border p-2 text-xs"
+                style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+              >
+                <span style={{ color: T.textMuted }}>Стоимость снаряжения</span>
+                <span className="font-semibold tabular-nums" style={{ color: T.text }}>
+                  {formatRubles(gear.cost)}
+                  {!gear.exact && <span className="ml-1 font-normal" style={{ color: T.textFaint }}>~ оценка</span>}
+                </span>
+              </div>
+            )}
+
+            {/* Condition / size / issue-return meta */}
+            {(gear.size || gear.issuedAt || gear.returnedAt) && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {gear.size && (
+                  <div className="rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+                    <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>Размер</p>
+                    <p className="mt-0.5 text-sm font-medium" style={{ color: T.text }}>{gear.size}</p>
+                  </div>
+                )}
+                {gear.issuedAt && (
+                  <div className="rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+                    <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>Выдано</p>
+                    <p className="mt-0.5 text-sm font-medium" style={{ color: T.text }}>{formatDateTime(gear.issuedAt)}</p>
+                  </div>
+                )}
+                {gear.returnedAt && (
+                  <div className="rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+                    <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>Возвращено</p>
+                    <p className="mt-0.5 text-sm font-medium" style={{ color: T.text }}>{formatDateTime(gear.returnedAt)}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Damage reports from the return flow (bot /ekip + unified actions) */}
+            {gear.damageReports.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {gear.damageReports.map((d, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl border p-2.5"
+                    style={{ borderColor: "#ef444433", backgroundColor: "#ef444408" }}
+                  >
+                    <p className="text-[10px] uppercase tracking-wider" style={{ color: "#ef4444" }}>
+                      Повреждение{d.phase ? ` · ${d.phase}` : ""}{d.severity ? ` · ${d.severity}` : ""}
+                    </p>
+                    {d.notes && <p className="mt-0.5 text-sm" style={{ color: T.text }}>{d.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Link back to the primary bike deal (unified actions create one
+                gear row per item linked to the parent rental) */}
+            {gear.primaryRentalId && crewSlug && (
+              <a
+                href={`/franchize/${crewSlug}/rental/${gear.primaryRentalId}`}
+                className="mt-2 flex min-h-[44px] items-center justify-between gap-2 rounded-xl border p-2.5 text-xs transition hover:opacity-85"
+                style={{ borderColor: T.border, backgroundColor: T.bgCard, color: T.text }}
+              >
+                <span>Часть аренды байка — открыть основную сделку</span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: T.textMuted }} aria-hidden />
+              </a>
+            )}
+          </DrawerSection>
+        </div>
+      )}
 
       {/* 5. Todos (FIX F12: linked via crew_todos.rental_id) */}
       <div className="mt-5">
@@ -432,10 +611,11 @@ export function RentalDetailDrawer({
         </DrawerSection>
       </div>
 
-      {/* 6. Handoff */}
+      {/* 6. Handoff — iter32: for gear rentals this is «Выдача и возврат»
+          (no odometer: gear has no mileage; condition lives in the panel) */}
       <div className="mt-4">
         <DrawerSection
-          title="Передача байка"
+          title={isGearRental ? "Выдача и возврат" : "Передача байка"}
           icon={ClipboardCheck}
           expanded={openHandoff}
           onToggle={() => setOpenHandoff(!openHandoff)}
@@ -465,68 +645,43 @@ export function RentalDetailDrawer({
             )
           }
         >
-          <div className="grid grid-cols-2 gap-2">
-            <div
-              className="rounded-xl border p-2.5"
-              style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
-            >
-              <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
-                Одометр до
-              </p>
-              <p className="mt-0.5 text-sm font-medium tabular-nums" style={{ color: T.text }}>
-                {handoff?.odometer_before != null
-                  ? `${handoff.odometer_before} км`
-                  : handoff?.odometer_before_hint != null
-                    // Order-creation hint (bike's last known mileage) — real value appears after pickup freeze
-                    ? `≈${handoff.odometer_before_hint} км`
-                    : "—"}
-              </p>
-            </div>
-            <div
-              className="rounded-xl border p-2.5"
-              style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
-            >
-              <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
-                Одометр после
-              </p>
-              <p className="mt-0.5 text-sm font-medium tabular-nums" style={{ color: T.text }}>
-                {handoff?.odometer_after != null ? `${handoff.odometer_after} км` : "—"}
-              </p>
-            </div>
-          </div>
-
-          {/* FIX (F4): equipment included in this rent — readable list with
-              quantities + estimated cost part, from metadata.equipment.
-              FIX (F2-iter2): charger shows "бесплатно" because it's free. */}
-          {equipment.items.length > 0 && (
-            <div className="mt-2 space-y-1">
-              <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
-                Снаряжение включено{equipment.cost > 0 ? ` · ~${equipment.cost.toLocaleString("ru-RU")} ₽` : ""}
-              </p>
-              {equipment.items.map((it) => (
-                <div
-                  key={it.key}
-                  className="flex min-h-[36px] items-center justify-between rounded-lg border p-2 text-xs"
-                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
-                >
-                  <span style={{ color: T.text }}>
-                    {it.label}
-                    {it.qty > 1 ? ` × ${it.qty}` : ""}
-                  </span>
-                  {it.free ? (
-                    <span
-                      className="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-                      style={{ backgroundColor: "#22c55e15", color: "#22c55e" }}
-                    >
-                      бесплатно
-                    </span>
-                  ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#22c55e" }} aria-hidden />
-                  )}
-                </div>
-              ))}
+          {/* FIX (F5): odometer — bikes only. Gear has no mileage, and
+              rendering «Одометр —» tiles for a helmet rental was noise. */}
+          {!isGearRental && (
+            <div className="grid grid-cols-2 gap-2">
+              <div
+                className="rounded-xl border p-2.5"
+                style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+              >
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
+                  Одометр до
+                </p>
+                <p className="mt-0.5 text-sm font-medium tabular-nums" style={{ color: T.text }}>
+                  {handoff?.odometer_before != null
+                    ? `${handoff.odometer_before} км`
+                    : handoff?.odometer_before_hint != null
+                      // Order-creation hint (bike's last known mileage) — real value appears after pickup freeze
+                      ? `≈${handoff.odometer_before_hint} км`
+                      : "—"}
+                </p>
+              </div>
+              <div
+                className="rounded-xl border p-2.5"
+                style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}
+              >
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
+                  Одометр после
+                </p>
+                <p className="mt-0.5 text-sm font-medium tabular-nums" style={{ color: T.text }}>
+                  {handoff?.odometer_after != null ? `${handoff.odometer_after} км` : "—"}
+                </p>
+              </div>
             </div>
           )}
+
+          {/* FIX (F4) equipment mini-list — moved to the dedicated «Снаряжение»
+              panel (iter32), which shows the same flags-based items plus the
+              snapshot/title sources with per-item prices, condition and dates. */}
 
           {/* Return notes from the /doc flow (e.g. damage description) */}
           {((typeof md.return_notes === "string" && md.return_notes) || handoff?.damage_notes) ? (
@@ -574,6 +729,7 @@ export function RentalDetailDrawer({
           onToggle={() => setOpenDeposit(!openDeposit)}
           metadataDeposit={deposit}
           initialSummary={depositSummary}
+          crewSlug={crewSlug}
         />
       </div>
 

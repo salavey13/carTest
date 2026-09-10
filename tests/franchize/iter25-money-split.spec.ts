@@ -285,7 +285,9 @@ describe('iter25: weekly partner report', () => {
     expect(s).toContain('const payout = Math.round((totalBikePart * pct) / 100);');
     expect(s).not.toContain('const payout = Math.round((totalPayments * pct) / 100);');
     // per-row split + new template vars + summary fields
-    expect(s).toContain('getEquipmentCostPart(r.metadata)');
+    // iter32: the call now passes the row total (rub) so standalone gear rows
+    // count as gear revenue — see iter32-gear-subrenter.spec.ts.
+    expect(s).toContain('getEquipmentCostPart(r.metadata, rub)');
     expect(s).toContain('bike_part_rub');
     expect(s).toContain('equipment_part_rub');
     expect(s).toContain('bikePartRub: totalBikePart');

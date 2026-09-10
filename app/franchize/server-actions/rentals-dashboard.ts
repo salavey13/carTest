@@ -2431,6 +2431,42 @@ export async function updateRentalStatus(input: {
       }
     }
 
+    // ── iter32: subrenter completion notification (close the loop) ──
+    // The partner got the «bike is out + your cut» message on activation —
+    // now he gets the «bike is back + final amount» message on completion.
+    // Same non-fatal contract as the activation notify above.
+    // (`as` on old_status: the select's `status as old_status` alias breaks
+    // the inferred Supabase type — same cast class as every other access.)
+    if (
+      status === "completed" &&
+      rental &&
+      (rental as { old_status?: string | null }).old_status !== "completed"
+    ) {
+      try {
+        const { notifySubrenterOfRentalCompletion } = await import(
+          "@/app/franchize/lib/subrenter-notify"
+        );
+        const subRental = rental as {
+          total_cost?: number | null;
+          metadata?: Record<string, unknown> | null;
+          agreed_start_date?: string | null;
+          agreed_end_date?: string | null;
+          vehicle?: { id: string | number; make?: string | null; model?: string | null; specs?: Record<string, unknown> | null } | null;
+        };
+        await notifySubrenterOfRentalCompletion({
+          rentalId,
+          vehicle: subRental.vehicle ?? null,
+          totalCost: subRental.total_cost ?? null,
+          metadata: subRental.metadata ?? null,
+          startDate: subRental.agreed_start_date ?? null,
+          endDate: subRental.agreed_end_date ?? null,
+          crewName: (crew.metadata as { name?: string } | null)?.name || slug || null,
+        });
+      } catch (subrentErr) {
+        console.warn("[update-rental-status] Subrenter completion notify failed (non-fatal):", subrentErr);
+      }
+    }
+
     // ── If completed with odometer → save to bike specs for next-rental prefill ──
     if (status === "completed" && odometerAfter != null && rental) {
       try {

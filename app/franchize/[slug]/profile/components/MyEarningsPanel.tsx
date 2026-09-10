@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import { getCurrentPayPeriod } from "@/lib/salary-period";
-import { getMyEarnings } from "@/app/franchize/server-actions/salary-calculations";
+import { getMyEarnings, getMyPayoutHistory } from "@/app/franchize/server-actions/salary-calculations";
 import { formatCurrency, itemVariants, type CrewTokens } from "./profile-shared";
 
 type PeriodEarnings = {
@@ -30,6 +30,12 @@ type PeriodEarnings = {
 type LegacyEarnings = {
   currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
   recentCommissions: Array<{ amount: number; date: string; description: string }>;
+};
+
+// iter32: the member's own payout ledger — «когда и сколько выплачено».
+type PayoutHistory = {
+  payouts: Array<{ id: string; amount: number; date: string; description: string; paymentMethod: string | null }>;
+  paidThisMonth: number;
 };
 
 type TeamEarningsRow = {
@@ -59,6 +65,8 @@ export function MyEarningsPanel({
   const [earningsPeriod, setEarningsPeriod] = useState(() => getCurrentPayPeriod());
   const [legacy, setLegacy] = useState<LegacyEarnings | null>(null);
   const [legacyLoading, setLegacyLoading] = useState(true);
+  // iter32: payout history (cash_transactions expense_salary → me)
+  const [payoutHistory, setPayoutHistory] = useState<PayoutHistory | null>(null);
   const [periodEarnings, setPeriodEarnings] = useState<PeriodEarnings | null>(null);
   const [periodEarningsLoading, setPeriodEarningsLoading] = useState(false);
   const [periodEarningsError, setPeriodEarningsError] = useState<string | null>(null);
@@ -158,6 +166,13 @@ export function MyEarningsPanel({
       .finally(() => {
         if (!cancelled) setLegacyLoading(false);
       });
+    // iter32: same-bar payout visibility — the member sees the actual
+    // payouts, not only accruals (the subrenter got the same in his panel).
+    getMyPayoutHistory({ slug, actorUserId: userId })
+      .then((res) => {
+        if (!cancelled && res.success && res.data) setPayoutHistory(res.data);
+      })
+      .catch(() => undefined);
     void fetchPeriodEarnings();
     return () => {
       cancelled = true;
@@ -379,6 +394,61 @@ export function MyEarningsPanel({
                       </div>
                       <span className="font-mono font-semibold" style={{ color: T.accent }}>
                         {formatCurrency(comm.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* iter32: payout history — the member sees the actual salary
+                payouts from the formal ledger (cash_transactions,
+                expense_salary, to_user_id = him), not only accruals. Same
+                visibility bar the subrenter payout panel now has. */}
+            {payoutHistory && payoutHistory.payouts.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
+                    История выплат
+                  </p>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{
+                      backgroundColor:
+                        payoutHistory.paidThisMonth > 0 ? "#22c55e15" : T.bgElevated,
+                      color: payoutHistory.paidThisMonth > 0 ? "#22c55e" : T.textMuted,
+                    }}
+                  >
+                    за месяц: {formatCurrency(payoutHistory.paidThisMonth)}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {payoutHistory.payouts.slice(0, 6).map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                      style={{ borderColor: T.borderSoft }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate" style={{ color: T.text }}>{p.description}</p>
+                        <p className="text-xs" style={{ color: T.textMuted }}>
+                          {new Date(p.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          {p.paymentMethod && (
+                            <span className="ml-1.5">
+                              ·{" "}
+                              {p.paymentMethod === "cash"
+                                ? "наличные"
+                                : p.paymentMethod === "card"
+                                  ? "карта"
+                                  : p.paymentMethod === "transfer"
+                                    ? "перевод"
+                                    : "другое"}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <span className="whitespace-nowrap font-mono font-semibold" style={{ color: "#22c55e" }}>
+                        +{formatCurrency(p.amount)}
                       </span>
                     </div>
                   ))}

@@ -41,6 +41,10 @@ interface DepositSectionProps {
    *  deposit summary, accept it as the initial value to avoid a second
    *  network request. The component still owns the live refetch logic. */
   initialSummary?: DepositSummary | null;
+  /** iter32: crew slug — /api/franchize/deposit-summary requires it since the
+   *  2026-08-19 auth hardening; without it every refetch returned 400 and the
+   *  section silently fell back to the parent's metadata-only summary. */
+  crewSlug?: string;
 }
 
 const DEST_META: Record<string, { label: string; icon: string; color: string }> = {
@@ -67,7 +71,7 @@ const ENTRY_LABELS: Record<string, string> = {
  * Fetches from /api/franchize/deposit-summary?rentalId=<id>
  * Penalty POST to /api/franchize/deposit-penalty
  */
-export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, metadataDeposit, initialSummary }: DepositSectionProps) {
+export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, metadataDeposit, initialSummary, crewSlug }: DepositSectionProps) {
   // FIX (F13): seed with the parent's initial summary (if any) so we don't
   // show a loading flash when the drawer already has the data.
   const [summary, setSummary] = useState<DepositSummary | null>(initialSummary ?? null);
@@ -81,7 +85,11 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, 
   const loadDeposit = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await fetch(`/api/franchize/deposit-summary?rentalId=${rentalId}`);
+      // iter32: send slug when known (the route 400s without it) — fallback
+      // kept for call sites that do not pass the prop yet.
+      const qs = new URLSearchParams({ rentalId });
+      if (crewSlug) qs.set("slug", crewSlug);
+      const resp = await fetch(`/api/franchize/deposit-summary?${qs.toString()}`);
       if (resp.ok) {
         const data = await resp.json();
         setSummary(data);
@@ -91,7 +99,7 @@ export function DepositSection({ rentalId, rentalStatus, T, expanded, onToggle, 
     } finally {
       setLoading(false);
     }
-  }, [rentalId]);
+  }, [rentalId, crewSlug]);
 
   useEffect(() => {
     // If the parent already gave us a summary, skip the initial fetch but

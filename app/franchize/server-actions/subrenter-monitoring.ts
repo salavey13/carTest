@@ -21,9 +21,11 @@ import { resolveServerActorUserId } from "./shared/auth-helpers";
 import {
   normalizeMonthKey,
   currentMskMonthKey,
+  shiftMonthKey,
   summarizeSubrenterMonth,
   getEquipmentCostPart,
   getBikeRevenuePart,
+  getSubrenterCut,
   type SubrenterMonthSummary,
 } from "@/app/franchize/lib/subrenter-economics";
 
@@ -413,7 +415,7 @@ export async function getSubrenterMonthlyEarningsAction(input: {
   userId: string;
   month?: string;
   initData?: string;
-}): Promise<{ success: boolean; data?: SubrenterMonthSummary; error?: string }> {
+}): Promise<{ success: boolean; data?: SubrenterEarningsData; error?: string }> {
   const parsed = z
     .object({
       slug: z.string().trim().min(1),
@@ -502,16 +504,127 @@ export async function getSubrenterMonthlyEarningsAction(input: {
       metadata: r.metadata ?? null,
     }));
 
+    const summary = summarizeSubrenterMonth(month, rows, {
+      docLinkBase: `/franchize/${slug}/rental`,
+    });
+
+    // ── iter32 (ExO «Autonomy»): the partner sees his payout bookkeeping —
+    // how much of this month's cut is already recorded as paid in the crew
+    // owner's wallet (owner_cash_entries, kind="subrenter_payout") and how
+    // much is still owed. Same matching rule as the owner's payout sheet:
+    // «id <chatId>» in the title OR his name/@username in person.
+    let paidRub = 0;
+    try {
+      const { from, to } = monthDateBounds(month);
+      const { data: payoutEntries } = await supabaseAdmin
+        .from("owner_cash_entries")
+        .select("amount,person,title")
+        .eq("crew_id", crew.id)
+        .eq("kind", "subrenter_payout")
+        .eq("direction", "out")
+        .gte("entry_date", from)
+        .lt("entry_date", to)
+        .limit(500);
+      const { data: selfUser } = await supabaseAdmin
+        .from("users")
+        .select("username, full_name")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const norm = (s: string | null | undefined): string =>
+        (s || "").trim().toLowerCase().replace(/^@+/, "");
+      const selfName = norm((selfUser?.full_name as string | null) ?? null);
+      const selfUsername = norm((selfUser?.username as string | null) ?? null);
+      const chatIdLower = userId.toLowerCase();
+      for (const e of (payoutEntries ?? []) as Array<{ amount?: number | string | null; person?: string | null; title?: string | null }>) {
+        const person = norm(e.person);
+        const personMatched =
+          (selfName && person === selfName) ||
+          (selfUsername && (person === selfUsername || person === norm(`@${selfUsername}`)));
+        const titleLower = (e.title || "").toLowerCase();
+        const titleMatched =
+          titleLower.includes(`id ${chatIdLower}`) || titleLower.includes(`id${chatIdLower}`);
+        if (personMatched || titleMatched) paidRub += Number(e.amount) || 0;
+      }
+    } catch (payoutErr) {
+      // Non-fatal: the payout block is an enhancement — the earnings math
+      // above must never fail because of a wallet hiccup.
+      logger.warn("[getSubrenterMonthlyEarningsAction] payout lookup failed:", payoutErr);
+    }
+
+    // ── iter32 (ExO «Dashboards» + «Interfaces»): 6-month earnings trend —
+    // the raw rental history (abundance) filtered into what matters for the
+    // partner: his cut per MSK month, oldest → newest, requested month last.
+    const trend: Array<{ month: string; cutRub: number; rentalCount: number }> = [];
+    try {
+      const firstTrendMonth = shiftMonthKey(month, -5);
+      const win = monthWindowIso(firstTrendMonth);
+      const winEnd = monthWindowIso(month);
+      const { data: trendRentals } = await supabaseAdmin
+        .from("rentals")
+        .select("vehicle_id,status,total_cost,agreed_start_date,requested_start_date,metadata")
+        .in("vehicle_id", Array.from(bikeLabel.keys()))
+        .gte("created_at", win.fromIso)
+        .lte("created_at", winEnd.toIso)
+        .in("status", ["completed", "active", "confirmed", "pending_confirmation"])
+        .limit(2000);
+      const buckets = new Map<string, { cutRub: number; rentalCount: number }>();
+      for (const m of Array.from({ length: 6 }, (_, i) => shiftMonthKey(month, i - 5))) {
+        buckets.set(m, { cutRub: 0, rentalCount: 0 });
+      }
+      for (const r of (trendRentals ?? []) as Array<{
+        vehicle_id?: string | null;
+        status?: string | null;
+        total_cost?: number | string | null;
+        agreed_start_date?: string | null;
+        requested_start_date?: string | null;
+        metadata?: Record<string, unknown> | null;
+      }>) {
+        const start = r.agreed_start_date || r.requested_start_date;
+        const m = mskLocalMonth(start);
+        const bucket = buckets.get(m);
+        if (!bucket) continue;
+        const equipmentRub = getEquipmentCostPart(r.metadata, r.total_cost);
+        bucket.cutRub += getSubrenterCut(r.total_cost ?? 0, equipmentRub);
+        bucket.rentalCount += 1;
+      }
+      for (const [m, v] of buckets) trend.push({ month: m, cutRub: v.cutRub, rentalCount: v.rentalCount });
+      trend.sort((a, b) => a.month.localeCompare(b.month));
+    } catch (trendErr) {
+      // Non-fatal: without a trend the panel still shows the month itself.
+      logger.warn("[getSubrenterMonthlyEarningsAction] trend failed:", trendErr);
+    }
+
     return {
       success: true,
-      data: summarizeSubrenterMonth(month, rows, {
-        docLinkBase: `/franchize/${slug}/rental`,
-      }),
+      data: {
+        ...summary,
+        paidRub,
+        remainingRub: Math.max(0, summary.cutRub - paidRub),
+        trend,
+      },
     };
   } catch (error) {
     logger.warn("[getSubrenterMonthlyEarningsAction] failed:", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** iter32: response of getSubrenterMonthlyEarningsAction — the month summary
+ *  plus the partner's payout bookkeeping and the 6-month trend. Additive
+ *  extension of SubrenterMonthSummary, so every existing consumer keeps
+ *  working. */
+export interface SubrenterTrendPoint {
+  month: string;
+  cutRub: number;
+  rentalCount: number;
+}
+export interface SubrenterEarningsData extends SubrenterMonthSummary {
+  /** Already recorded as paid this month (owner wallet, subrenter_payout). */
+  paidRub: number;
+  /** Still owed: cutRub − paidRub (floored at 0). */
+  remainingRub: number;
+  /** Last 6 MSK months of cuts, oldest → newest. */
+  trend: SubrenterTrendPoint[];
 }
 
 export interface SubrenterPayoutRow {
@@ -954,8 +1067,9 @@ export async function generateSubrenterWeeklyReportAction(
       // iter25: moto / gear split per rental — the client's wish
       // («стоимость мота и экипа отдельно»). Stored amounts (exact) when the
       // rental carries them, unit-price estimate for legacy rows.
-      const equipmentRub = getEquipmentCostPart(r.metadata);
+      // iter32: pass the total so standalone gear rows count as gear revenue.
       const rub = Math.round(Number(r.total_cost) || 0);
+      const equipmentRub = getEquipmentCostPart(r.metadata, rub);
       const bikeRub = getBikeRevenuePart(rub, equipmentRub);
       return {
         bike: bikeLabel.get(String(r.vehicle_id ?? "")) ?? String(r.vehicle_id ?? ""),

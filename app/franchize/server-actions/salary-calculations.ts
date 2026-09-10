@@ -1213,6 +1213,93 @@ export async function getMyEarnings(params: {
   }
 }
 
+/**
+ * iter32 — the member's own PAYOUT HISTORY («когда и сколько выплачено»).
+ *
+ * Until now the formal salary ledger rows (cash_transactions,
+ * transaction_type='expense_salary', to_user_id=member) were visible only in
+ * the owner's /salary page; a regular crew member could see his accrued
+ * numbers but never the actual payouts. This action closes that gap (same
+ * bar as the subrenter payout visibility — "different things on same level").
+ *
+ * Returns the last 12 payouts + the total paid in the current MSK month.
+ * Access: verifyCrewAccess (cookie-derived actor, CR fix H2 discipline) —
+ * a member can only ever read his OWN payout history.
+ */
+export async function getMyPayoutHistory(params: {
+  slug: string;
+  actorUserId: string;
+}): Promise<
+  ActionResponse<{
+    payouts: Array<{
+      id: string;
+      amount: number;
+      date: string;
+      description: string;
+      paymentMethod: string | null;
+    }>;
+    paidThisMonth: number;
+  }>
+> {
+  const { slug, actorUserId } = params;
+  try {
+    const access = await verifyCrewAccess(slug);
+    if (!access.allowed) {
+      return { success: false, error: access.error };
+    }
+    const secureUserId = access.actorUserId;
+
+    const { data: rows, error: rowsErr } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("id, amount, transaction_date, description, payment_method")
+      .eq("crew_id", access.crewId)
+      .eq("to_user_id", secureUserId)
+      .eq("transaction_type", "expense_salary")
+      .order("transaction_date", { ascending: false })
+      .limit(12);
+    if (rowsErr) {
+      logger.warn("[getMyPayoutHistory] Query failed:", rowsErr);
+      return errorResponse("Не удалось загрузить историю выплат.");
+    }
+
+    const payouts = (rows || []).map((r: any) => ({
+      id: String(r.id),
+      amount: Number(r.amount) || 0,
+      date: r.transaction_date,
+      description: r.description || "Выплата зарплаты",
+      paymentMethod: (r.payment_method as string | null) ?? null,
+    }));
+
+    // MSK month window (the app-wide convention — MSK everywhere).
+    const nowMsk = new Date(Date.now() + 3 * 3600 * 1000);
+    const y = nowMsk.getUTCFullYear();
+    const m = nowMsk.getUTCMonth();
+    const monthStart = new Date(Date.UTC(y, m, 1, 0, 0, 0) - 3 * 3600 * 1000).toISOString();
+    const monthEnd = new Date(Date.UTC(y, m + 1, 1, 0, 0, 0) - 3 * 3600 * 1000).toISOString();
+
+    const { data: monthRows, error: monthErr } = await supabaseAdmin
+      .from("cash_transactions")
+      .select("amount")
+      .eq("crew_id", access.crewId)
+      .eq("to_user_id", secureUserId)
+      .eq("transaction_type", "expense_salary")
+      .gte("transaction_date", monthStart)
+      .lt("transaction_date", monthEnd);
+    if (monthErr) {
+      logger.warn("[getMyPayoutHistory] Month total query failed:", monthErr);
+    }
+    const paidThisMonth = (monthRows || []).reduce(
+      (sum: number, r: any) => sum + (Number(r.amount) > 0 ? Number(r.amount) : 0),
+      0,
+    );
+
+    return successResponse({ payouts, paidThisMonth });
+  } catch (err) {
+    logger.error("[getMyPayoutHistory] Exception:", err);
+    return errorResponse(handleError(err, "getMyPayoutHistory"));
+  }
+}
+
 function getNextPayoutDate(schedule: string[]): string | null {
   const now = new Date();
   const today = now.getDate();

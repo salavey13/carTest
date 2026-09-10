@@ -31,6 +31,7 @@ import {
 import { useFranchizeTheme } from "../../hooks/useFranchizeTheme";
 import { useCrewTokens } from "../../lib/use-crew-tokens";
 import { fallbackCrew } from "../../lib/fallback-crew";
+import { DEFAULT_HOURLY_RATE } from "../../lib/salary-constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -320,8 +321,10 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
   }
 
   // Calculate earnings for active shift
+  // iter32: the fallback is the shared DEFAULT_HOURLY_RATE (500, the DB
+  // default) — the old literal 169 under-reported open shifts.
   const activeShiftEarnings = myActiveShift
-    ? (elapsedSec / 3600) * (myActiveShift.hourly_rate || myMemberInfo?.hourly_rate || 169)
+    ? (elapsedSec / 3600) * (myActiveShift.hourly_rate || myMemberInfo?.hourly_rate || DEFAULT_HOURLY_RATE)
     : 0;
 
   return (
@@ -525,7 +528,7 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
             </div>
             <div className="flex items-center gap-3">
               <span className="text-lg font-mono font-bold" style={{ color: T.accent }}>
-                {formatCurrency(myMemberInfo?.hourly_rate || 169)}
+                {formatCurrency(myMemberInfo?.hourly_rate || DEFAULT_HOURLY_RATE)}
                 <span className="text-xs font-normal" style={{ color: T.textMuted }}> /ч</span>
               </span>
               <Button
@@ -701,7 +704,7 @@ export function FranchizeCrewShiftsClient({ crewSlug, crew }: { crewSlug: string
                 type="number"
                 value={newHourlyRate}
                 onChange={(e) => setNewHourlyRate(e.target.value)}
-                placeholder={String(myMemberInfo?.hourly_rate || 169)}
+                placeholder={String(myMemberInfo?.hourly_rate || DEFAULT_HOURLY_RATE)}
                 className="font-mono"
               />
             </div>
