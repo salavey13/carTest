@@ -29,15 +29,18 @@ const DEFAULT_SECRETS_PATH = "/home/z/my-project/upload/secrets.txt";
 const CREW_SLUG = "vip-bike";
 const CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
 
-// Equipment prices (mirrors app/franchize/lib/pricing-calculator.ts)
-// Helmet is duration-dependent: <24h = 500₽, ≥24h = 1000₽ (see helmetPrice())
-const GLOVES_PRICE = 500;      // ₽ per rental
-const NET_PRICE = 500;         // ₽ per rental
-const BACKPACK_PRICE = 500;    // ₽ per rental
-const BAG_PRICE = 500;         // ₽ per rental
+// Equipment prices (mirrors lib/rental-pricing-calculator.ts — ONE canon)
+// BASE prices are fixed per tariff: helmet 1000₽, other gear 500₽. They
+// PRO-RATE with the rental duration (2026-09-11 owner rule, see
+// gearUnitPrice()): <24h = half price; multi-day = day 1 full + every
+// following day half.
+const GLOVES_PRICE = 500;      // ₽ base per unit
+const NET_PRICE = 500;         // ₽ base per unit
+const BACKPACK_PRICE = 500;    // ₽ base per unit
+const BAG_PRICE = 500;         // ₽ base per unit
 const CHARGER_PRICE = 0;       // free (returnable)
-const JACKET_PRICE = 500;      // ₽ per rental
-const BOOTS_PRICE = 500;       // ₽ per rental
+const JACKET_PRICE = 500;      // ₽ base per unit
+const BOOTS_PRICE = 500;       // ₽ base per unit
 
 // ─── Arg parsing ─────────────────────────────────────────────────────────────
 
@@ -240,28 +243,39 @@ function calculatePrice(dailyPrice, days, hours, specs = {}, startDateStr = null
   return { base: dailyPrice * days, tier: "/ день", tierPrice: dailyPrice, days };
 }
 
-function helmetPrice(_hours) {
-  // FLAT since 2026-09-10 (owner fix «equipment is half priced for hourly
-  // rents»): the old `hours < 24 ? 500 : 1000` halving stored a half-priced
-  // helmet into metadata.equipment_price and shifted the subrenter split.
-  // One canon: 1000₽ per helmet on every tier, mirrors getHelmetPrice() and
-  // EQUIPMENT_UNIT_PRICES_RUB (rental-price-split.ts). Argument ignored.
-  void _hours;
-  return 1000;
+/**
+ * Per-unit gear price for a WHOLE rental — 2026-09-11 owner canon, mirrored
+ * from getEquipmentUnitPriceForRental() in lib/rental-pricing-calculator.ts:
+ *   hours < 24 (or 0/undefined) → base / 2 for hourly quotes handled by the
+ *   caller passing real hours; missing duration → full single-day price;
+ *   multi-day → base + base/2 × (days − 1).
+ * MUST stay digit-equal with the web calculators, /doc and the contract.
+ */
+function gearUnitPrice(baseRub, hours) {
+  const h = Number(hours);
+  if (!Number.isFinite(h) || h <= 0) return baseRub;
+  if (h < 24) return Math.round(baseRub / 2);
+  const days = Math.max(1, Math.ceil(h / 24));
+  return baseRub + Math.round(baseRub / 2) * (days - 1);
+}
+
+function helmetPrice(hours) {
+  return gearUnitPrice(1000, hours);
 }
 
 function calculateEquipment(opts) {
   const items = [];
   let total = 0;
   const helmetUnit = helmetPrice(opts.hours);
+  const gearUnit = gearUnitPrice(500, opts.hours); // one unit price for all 500₽ gear
   if (opts.helmets && opts.helmets > 0) { items.push({ name: `Шлем ×${opts.helmets}`, price: helmetUnit * opts.helmets }); total += helmetUnit * opts.helmets; }
-  if (opts.gloves && opts.gloves > 0) { items.push({ name: `Перчатки ×${opts.gloves}`, price: GLOVES_PRICE * opts.gloves }); total += GLOVES_PRICE * opts.gloves; }
-  if (opts.net) { items.push({ name: "Сетка", price: NET_PRICE }); total += NET_PRICE; }
-  if (opts.backpack) { items.push({ name: "Рюкзак", price: BACKPACK_PRICE }); total += BACKPACK_PRICE; }
-  if (opts.bag) { items.push({ name: "Сумка", price: BAG_PRICE }); total += BAG_PRICE; }
+  if (opts.gloves && opts.gloves > 0) { items.push({ name: `Перчатки ×${opts.gloves}`, price: gearUnit * opts.gloves }); total += gearUnit * opts.gloves; }
+  if (opts.net) { items.push({ name: "Сетка", price: gearUnit }); total += gearUnit; }
+  if (opts.backpack) { items.push({ name: "Рюкзак", price: gearUnit }); total += gearUnit; }
+  if (opts.bag) { items.push({ name: "Сумка", price: gearUnit }); total += gearUnit; }
   if (opts.charger) { items.push({ name: "Зарядка (бесплатно)", price: 0 }); }
-  if (opts.jacket) { items.push({ name: "Куртка", price: JACKET_PRICE }); total += JACKET_PRICE; }
-  if (opts.boots) { items.push({ name: "Боты", price: BOOTS_PRICE }); total += BOOTS_PRICE; }
+  if (opts.jacket) { items.push({ name: "Куртка", price: gearUnit }); total += gearUnit; }
+  if (opts.boots) { items.push({ name: "Боты", price: gearUnit }); total += gearUnit; }
   return { items, total };
 }
 
@@ -285,7 +299,9 @@ async function cmdQuote() {
   const specs = bike.specs || {};
   const pricing = calculatePrice(dailyPrice, days, hours, specs, startDate);
   const equipment = calculateEquipment({
-    hours: hours > 0 ? hours : 0,
+    // Duration-aware gear canon: days-based quotes map to hours so the
+    // "2nd+ day half price" pro-rating applies (hours=0 would disable it).
+    hours: hours > 0 ? hours : (days > 0 ? days * 24 : 0),
     helmets: parseInt(arg("helmets") || "0", 10),
     gloves: parseInt(arg("gloves") || "0", 10),
     net: hasFlag("net"),

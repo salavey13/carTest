@@ -1913,6 +1913,34 @@ function parseDurationDays(rawDuration: string): number {
   return days;
 }
 
+/**
+ * Testdrive doc rule (2026-09-11, mirrors the battle-tested bot /testdrive):
+ * a testdrive contract must carry AT LEAST ONE identity document — a passport
+ * (series + number) OR a driver's license (series + number). Rental contracts
+ * keep their own operator-driven identity flow.
+ * Thrown from the checkout entries BEFORE any notification-log write so a
+ * failed attempt can be fixed and retried without tripping the idempotency
+ * guard (a pending franchize_order_notifications row would swallow the retry).
+ */
+function assertTestdriveIdentityDocs(payload: {
+  flowType?: string;
+  passportSeries?: unknown;
+  passportNumber?: unknown;
+  hasLicense?: unknown;
+  licenseSeries?: unknown;
+  licenseNumber?: unknown;
+}): void {
+  if (payload.flowType !== "testdrive") return;
+  const tdPassportFilled = String(payload.passportSeries || "").trim().length > 0
+    && String(payload.passportNumber || "").trim().length > 0;
+  const tdLicenseFilled = payload.hasLicense !== false
+    && String(payload.licenseSeries || "").trim().length > 0
+    && String(payload.licenseNumber || "").trim().length > 0;
+  if (!tdPassportFilled && !tdLicenseFilled) {
+    throw new FranchizeOrderDocValidationError(["testdrive_passport_or_license"]);
+  }
+}
+
 type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
   totalAmount: number;
   subtotal: number;
@@ -1920,7 +1948,7 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
 };
 
 type FranchizeOrderDocContactField = "renterBirthDate" | "renterPhone" | "renterEmail";
-type FranchizeOrderDocRequiredField = "renterPhone";
+type FranchizeOrderDocRequiredField = "renterPhone" | "testdrive_passport_or_license";
 const FRANCHIZE_DOC_REQUIRED_FIELDS: FranchizeOrderDocRequiredField[] = ["renterPhone"];
 
 type FranchizeOrderDocVariables = {
@@ -1933,7 +1961,14 @@ class FranchizeOrderDocValidationError extends Error {
   readonly missingFields: FranchizeOrderDocRequiredField[];
 
   constructor(missingFields: FranchizeOrderDocRequiredField[]) {
-    super(`Для генерации договора не заполнены обязательные поля: ${missingFields.join(", ")}.`);
+    // 2026-09-11: the testdrive field gets a human phrase — the message goes
+    // straight to the renter's toast (submitFranchizeOrderNotification maps
+    // DocValidationError → error.message).
+    super(
+      missingFields.includes("testdrive_passport_or_license")
+        ? "Для договора тест-драйва заполните паспорт или водительское удостоверение (серия и номер) — достаточно одного."
+        : `Для генерации договора не заполнены обязательные поля: ${missingFields.join(", ")}.`,
+    );
     this.name = "FranchizeOrderDocValidationError";
     this.missingFields = missingFields;
   }
@@ -2014,7 +2049,10 @@ function resolveAndValidateFranchizeDocVariables(
     logger.warn("[franchize-doc] renterBirthDate missing in payload/userSensitive; using fallback placeholder");
   }
 
-  const requiredValues: Record<FranchizeOrderDocRequiredField, string> = {
+  // NOTE: keys are the REQUIRED subset (FRANCHIZE_DOC_REQUIRED_FIELDS) —
+  // optional rule fields like testdrive_passport_or_license are enforced by
+  // assertTestdriveIdentityDocs before the builder is reached.
+  const requiredValues: Record<string, string> = {
     renterPhone: phone,
   };
   const missing = FRANCHIZE_DOC_REQUIRED_FIELDS.filter((field) => !requiredValues[field]);
@@ -2248,6 +2286,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const isTestdrive = flowType === "testdrive";
     const isServiceFlow = flowType === "service";
+    // Testdrive identity is validated EARLIER (assertTestdriveIdentityDocs) —
+    // before the notification-log write — so a failed attempt can be fixed
+    // and retried without tripping the idempotency guard.
 
     // For mixed flow, determine each bike's individual flow type
     // based on whether it has rental pricing or sale pricing
@@ -3486,6 +3527,31 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             };
           })();
 
+          // ── 2026-09-11: persist the ACTUAL charged bike/gear split ──
+          // Before today the cash/card checkout path (this insert) never
+          // wrote equipment_price/bike_price — only the invoice webhook did.
+          // The subrenter split then fell back to the FLAT unit-price
+          // estimate, which drifts from reality now that gear pro-rates with
+          // the rental duration (hourly half price, day 1 full + 2nd+ day
+          // half). The stored values are the ONE truth the split, the
+          // profile and analytics read (iter25 contract).
+          const chargedSplit = (() => {
+            const line = payload.cartLines[bikeIndex];
+            const lineTotalRub = Math.round(Number(line?.lineTotal || 0));
+            if (doc.isEquipmentOnlyLine) {
+              // standalone gear rental: the whole total IS gear revenue
+              return lineTotalRub > 0 ? { equipment_price: lineTotalRub, bike_price: 0 } : {};
+            }
+            const pb = (line as { priceBreakdown?: { helmetRub?: unknown; extrasRub?: unknown } })?.priceBreakdown;
+            if (!pb) return {};
+            const helmetRub = Number(pb.helmetRub);
+            const extrasRub = Number(pb.extrasRub);
+            if (!Number.isFinite(helmetRub) && !Number.isFinite(extrasRub)) return {};
+            const gearRub = Math.max(0, Math.round((Number.isFinite(helmetRub) ? helmetRub : 0) + (Number.isFinite(extrasRub) ? extrasRub : 0)));
+            const equipmentPrice = Math.min(gearRub, Math.max(0, lineTotalRub));
+            return { equipment_price: equipmentPrice, bike_price: Math.max(0, lineTotalRub - equipmentPrice) };
+          })();
+
           try {
             const { data: rentalRow, error: rentalInsertError } = await supabaseAdmin
               .from("rentals")
@@ -3545,6 +3611,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   ...(expectedDepositMethod ? { deposit_method: expectedDepositMethod } : {}),
                   payment_split: rentalPaymentSplit,
                   equipment: rentalEquipment,
+                  ...(chargedSplit as Record<string, number>),
                   ...(Number.isFinite(lastKnownOdometer)
                     ? { last_known_odometer: lastKnownOdometer, odometer_before_hint: lastKnownOdometer }
                     : {}),
@@ -4549,6 +4616,9 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   }
 
   const payload = parsed.data;
+  // Testdrive doc rule (2026-09-11): passport OR license required — validated
+  // before any writes so the renter can fix the data and retry.
+  assertTestdriveIdentityDocs(payload);
   const totalResult = await resolveFranchizeCheckoutTotal(payload);
   if (!totalResult.success) return totalResult;
   const effectiveTotal = totalResult.totalAmount;
@@ -5523,6 +5593,11 @@ export async function createFranchizeOrderCheckout(
   const payload = parsed.data;
   const now = Date.now();
 
+  // Testdrive doc rule (2026-09-11): passport OR license required — run BEFORE
+  // the idempotency/notification-log writes so the renter can fix the data and
+  // resubmit the SAME orderId (a pending log row would swallow the retry).
+  assertTestdriveIdentityDocs(payload);
+
   // ── iter35: DB-backed idempotency — the durable duplicate guard ─────────
   // The in-memory cooldown Map below does NOT survive Vercel lambda rotation:
   // 4 concurrent taps can land on 4 warm instances, each with an empty Map
@@ -5592,6 +5667,12 @@ export async function createFranchizeOrderCheckout(
     return { success: true };
   } catch (error) {
     logFranchizeCheckoutFailure("createFranchizeOrderCheckout", { slug: payload.slug, orderId: payload.orderId }, error);
+    // Doc validation errors carry a renter-actionable message (e.g. the
+    // testdrive «заполните паспорт или ВУ») — pass it through instead of the
+    // generic safe error so the renter knows what to fix.
+    if (error instanceof FranchizeOrderDocValidationError) {
+      return { success: false, error: error.message };
+    }
     return {
       success: false,
       error: FRANCHIZE_RENTAL_DOCS_SAFE_ERROR,

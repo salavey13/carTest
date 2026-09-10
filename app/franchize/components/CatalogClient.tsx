@@ -1643,9 +1643,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             trigger: "modal_testdrive_cta",
             options: { ...selectedOptions, action: "testdrive" },
           });
-          // Testdrive: add to cart with testdrive action — duration is 10min (hardcoded)
+          // Testdrive: add to cart with testdrive action — duration is 10min
+          // (hardcoded). Dates/times are meaningless for a testdrive (it is
+          // scheduled on-site) — strip them so the cart line stays clean.
+          const { rentStartDate: _sd, rentEndDate: _ed, rentStartTime: _st, rentEndTime: _et, ...restOptions } = selectedOptions;
           addItem(selectedItem.id, {
-            ...selectedOptions,
+            ...restOptions,
             action: "testdrive",
             duration: "10 минут",
           }, 1);

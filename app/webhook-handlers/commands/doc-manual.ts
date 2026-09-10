@@ -57,6 +57,7 @@ import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } f
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
+import { getOtherGearUnitPrice } from "@/lib/rental-pricing-calculator";
 // v3 polish: centralized notification templates (HTML-escaped, Russian-ized, with deep links)
 import { buildDocSuccessMessage, buildDocAdminAuditMessage } from "@/app/franchize/lib/notification-templates";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
@@ -1238,24 +1239,48 @@ function buildRentSummary(context: DocFlowContext): string {
 
   // ── Equipment list ──
   // Show selected equipment with prices so the operator can verify.
-  // Helmet price is FLAT (2026-09-10 owner fix «equipment is half priced for
-  // hourly rents»): 1000₽ on every tier — mirrors getHelmetPrice() and
-  // EQUIPMENT_UNIT_PRICES_RUB. rentalHours is kept for display context only.
-  const helmetUnitPrice = 1000;
+  // 2026-09-11 gear canon (duration-aware): fixed base prices (helmet 1000 ₽,
+  // other gear 500 ₽), HALF price for hourly rentals (< 24h) and day-1-full +
+  // every following day HALF for multi-day — mirrors getHelmetPrice() /
+  // getOtherGearUnitPrice() so the preview shows EXACTLY what /doc will book.
+  const previewHours = (() => {
+    try {
+      const parseDmy = (s: unknown) => {
+        const p = String(s || "").trim().split(".");
+        return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : "";
+      };
+      const sd = parseDmy(context.rentStartDate);
+      const ed = parseDmy(context.rentEndDate);
+      if (!sd || !ed) return undefined;
+      const start = new Date(`${sd}T${context.rentStartTime || "10:00"}`);
+      const end = new Date(`${ed}T${context.rentEndTime || "10:00"}`);
+      const h = (end.getTime() - start.getTime()) / 3600000;
+      return Number.isFinite(h) && h > 0 ? Math.round(h * 10) / 10 : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  const helmetUnitPrice = getHelmetPrice(previewHours);
+  const gearUnitPrice = getOtherGearUnitPrice(previewHours);
+  const gearUnitLabel = previewHours != null && previewHours < 24
+    ? `${gearUnitPrice}₽ (почасовая — половина цены)`
+    : gearUnitPrice !== 500
+      ? `${gearUnitPrice}₽ (1-е сутки 500₽, далее — половина цены)`
+      : `${gearUnitPrice}₽`;
 
   const eqLines: string[] = [];
   if (context.helmets && context.helmets > 0) {
     eqLines.push(`🪖 Шлемы: ${context.helmets} × ${helmetUnitPrice}₽ = ${(context.helmets * helmetUnitPrice).toLocaleString("ru-RU")} ₽`);
   }
   if (context.gloves && context.gloves > 0) {
-    eqLines.push(`🧤 Перчатки: ${context.gloves} × 500₽ = ${(context.gloves * 500).toLocaleString("ru-RU")} ₽`);
+    eqLines.push(`🧤 Перчатки: ${context.gloves} × ${gearUnitLabel} = ${(context.gloves * gearUnitPrice).toLocaleString("ru-RU")} ₽`);
   }
-  if (context.jacket) eqLines.push("🧥 Куртка: 500₽");
-  if (context.pants) eqLines.push("👖 Штаны: 500₽");
-  if (context.boots) eqLines.push("👢 Боты: 500₽");
-  if (context.net) eqLines.push("🌐 Сетка: 500₽");
-  if (context.backpack) eqLines.push("🎒 Рюкзак: 500₽");
-  if (context.bag) eqLines.push("👜 Сумка: 500₽");
+  if (context.jacket) eqLines.push(`🧥 Куртка: ${gearUnitLabel}`);
+  if (context.pants) eqLines.push(`👖 Штаны: ${gearUnitLabel}`);
+  if (context.boots) eqLines.push(`👢 Боты: ${gearUnitLabel}`);
+  if (context.net) eqLines.push(`🌐 Сетка: ${gearUnitLabel}`);
+  if (context.backpack) eqLines.push(`🎒 Рюкзак: ${gearUnitLabel}`);
+  if (context.bag) eqLines.push(`👜 Сумка: ${gearUnitLabel}`);
   if (context.charger) eqLines.push("🔌 Зарядка: бесплатно");
   if (eqLines.length > 0) {
     lines.push("", "📦 Оборудование:");
@@ -1521,7 +1546,7 @@ async function createRentalFromDocContract(
     const netEq = context.net ? 1 : 0;
     const backpackEq = context.backpack ? 1 : 0;
     const bagEq = context.bag ? 1 : 0;
-    const equipmentCostTotal = helmetsEq * getHelmetPrice(hours) + glovesEq * 500 + jacketEq * 500 + pantsEq * 500 + bootsEq * 500 + netEq * 500 + backpackEq * 500 + bagEq * 500;
+    const equipmentCostTotal = helmetsEq * getHelmetPrice(hours) + glovesEq * getOtherGearUnitPrice(hours) + jacketEq * getOtherGearUnitPrice(hours) + pantsEq * getOtherGearUnitPrice(hours) + bootsEq * getOtherGearUnitPrice(hours) + netEq * getOtherGearUnitPrice(hours) + backpackEq * getOtherGearUnitPrice(hours) + bagEq * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
     // CR fix: if operator overrode the price, use the overridden value
     // (cashAmount + bankAmount) instead of the recalculated total.
     const totalCost = context.priceOverridden
@@ -2886,7 +2911,7 @@ async function gotoPaymentSplit(chatId: number, userId: string, context: DocFlow
   const backpack = context.backpack ? 1 : 0;
   const bag = context.bag ? 1 : 0;
 
-  const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+  const equipmentCost = helmets * getHelmetPrice(hours) + gloves * getOtherGearUnitPrice(hours) + jacket * getOtherGearUnitPrice(hours) + boots * getOtherGearUnitPrice(hours) + net * getOtherGearUnitPrice(hours) + backpack * getOtherGearUnitPrice(hours) + bag * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
   const calculatedTotal = rentalCost + equipmentCost;
 
   // CR fix: if operator overrode the price, use the overridden value instead
@@ -3476,7 +3501,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * getOtherGearUnitPrice(hours) + jacket * getOtherGearUnitPrice(hours) + boots * getOtherGearUnitPrice(hours) + net * getOtherGearUnitPrice(hours) + backpack * getOtherGearUnitPrice(hours) + bag * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
     const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -3531,7 +3556,7 @@ export async function handleDocText(userId: string, chatId: number, text: string
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * getOtherGearUnitPrice(hours) + jacket * getOtherGearUnitPrice(hours) + boots * getOtherGearUnitPrice(hours) + net * getOtherGearUnitPrice(hours) + backpack * getOtherGearUnitPrice(hours) + bag * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
     const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = Math.min(cashAmount, totalAmount);
     context.bankAmount = Math.max(0, totalAmount - cashAmount);
@@ -4141,7 +4166,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * getOtherGearUnitPrice(hours) + jacket * getOtherGearUnitPrice(hours) + boots * getOtherGearUnitPrice(hours) + net * getOtherGearUnitPrice(hours) + backpack * getOtherGearUnitPrice(hours) + bag * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
     const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = totalAmount;
     context.bankAmount = 0;
@@ -4198,7 +4223,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * getOtherGearUnitPrice(hours) + jacket * getOtherGearUnitPrice(hours) + boots * getOtherGearUnitPrice(hours) + net * getOtherGearUnitPrice(hours) + backpack * getOtherGearUnitPrice(hours) + bag * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
     const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     context.cashAmount = 0;
     context.bankAmount = totalAmount;
@@ -4246,7 +4271,7 @@ export async function handleDocCallback(
     const net = context.net ? 1 : 0;
     const backpack = context.backpack ? 1 : 0;
     const bag = context.bag ? 1 : 0;
-    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * 500 + jacket * 500 + boots * 500 + net * 500 + backpack * 500 + bag * 500;
+    const equipmentCost = helmets * getHelmetPrice(hours) + gloves * getOtherGearUnitPrice(hours) + jacket * getOtherGearUnitPrice(hours) + boots * getOtherGearUnitPrice(hours) + net * getOtherGearUnitPrice(hours) + backpack * getOtherGearUnitPrice(hours) + bag * getOtherGearUnitPrice(hours); // 2026-09-11 gear canon: duration-aware
     const totalAmount = context.priceOverridden ? (context.cashAmount || 0) + (context.bankAmount || 0) : (rentalCost + equipmentCost);
     logger.info(`[/doc] paydest_split: ${userId} → asking for cash portion (total=${totalAmount})`);
     // Use payment_split_cash state (separate from payment_cash) so we can ask

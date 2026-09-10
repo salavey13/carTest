@@ -3,6 +3,7 @@
  */
 
 import { parseISODate } from "@/app/franchize/lib/date-utils";
+import { getEquipmentUnitPriceForRental } from "@/lib/rental-pricing-calculator";
 
 export interface BikePricingSpecs {
   price_per_hour?: number | string;
@@ -33,17 +34,14 @@ function validatePositiveNumber(value: number | string | undefined): number | un
 }
 
 /**
- * Helmet price per rental — FLAT, duration-independent (2026-09-10 owner fix
- * «equipment is half priced for hourly rents»): every hourly halving used to
- * store a HALF-priced helmet into metadata.equipment_price, which then
- * shifted the subrenter revenue split. One price everywhere: 1000 ₽ per
- * helmet, matching EQUIPMENT_UNIT_PRICES_RUB (rental-price-split.ts) — the
- * table the split, the profile and analytics read. The rentalHours argument
- * is kept for call-site compatibility and intentionally ignored.
+ * Helmet price per rental — DURATION-AWARE (2026-09-11 owner rule):
+ * hourly (< 24h) → 500 ₽ (half), multi-day → day 1 at 1000 ₽ + 500 ₽ for
+ * every following day. One canon with getHelmetPrice() in
+ * lib/rental-pricing-calculator.ts — both MUST stay digit-equal with the
+ * contract builder, /doc, the Item modal and the bot quoter.
  */
-export function getHelmetPrice(_rentalHours?: number): number {
-  void _rentalHours;
-  return 1000;
+export function getHelmetPrice(rentalHours?: number): number {
+  return getEquipmentUnitPriceForRental(1000, rentalHours);
 }
 
 /**

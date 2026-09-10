@@ -31,9 +31,10 @@ describe("rental pricing calculator", () => {
       1
     );
 
-    expect(result.totalRub).toBe(6000);
+    expect(result.totalRub).toBe(5500);
     expect(result.basePriceRub).toBe(5000);
-    expect(result.helmetRub).toBe(1000);
+    // 2026-09-11 gear canon: hourly (< 24h) helmet is HALF price (500).
+    expect(result.helmetRub).toBe(500);
     expect(result.depositRub).toBe(15000);
     expect(result.savingsRub).toBe(1000); // 3h price (5000) vs hourly (2000×3=6000)
     expect(result.savingsPercent).toBe(17); // 1000/6000 ≈ 17%
@@ -86,9 +87,10 @@ describe("rental pricing calculator", () => {
       2
     );
 
-    expect(result.totalRub).toBe(15950);
+    expect(result.totalRub).toBe(17950);
     expect(result.basePriceRub).toBe(13950);
-    expect(result.helmetRub).toBe(2000);
+    // 2026-09-11 gear canon: multi-day helmet = 1000 (day 1) + 500 × 2 = 2000 ₽/шт.
+    expect(result.helmetRub).toBe(4000);
     expect(result.depositRub).toBe(20000);
     expect(result.savingsRub).toBe(1050);
     expect(result.savingsPercent).toBe(7);

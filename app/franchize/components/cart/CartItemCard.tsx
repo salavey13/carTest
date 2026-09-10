@@ -25,6 +25,10 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
   const T = useCrewTokens(crew.theme);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const destructiveColor = T.isLight ? "#FF3B30" : "#FF6B6B";
+  // Testdrive lines (2026-09-11): marked in the modal / added via the
+  // testdrive CTA — free 10-minute ride, no dates.
+  const isTestdriveLine = String((line.options as { action?: string })?.action ?? "") === "testdrive"
+    || String((line.options as { duration?: string })?.duration ?? "") === "10 минут";
 
   return (
     <motion.article
@@ -171,11 +175,12 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                 : T.styles.accentPill
             }
           >
-            {line.flowType === "sale" ? "Покупка" : line.flowType === "service" ? "Сервис" : "Аренда"}
+            {isTestdriveLine ? "Тест-драйв" : line.flowType === "sale" ? "Покупка" : line.flowType === "service" ? "Сервис" : "Аренда"}
           </span>
 
-          {/* Rental period (date + time) inline on the card */}
-          {line.flowType === "rental" && line.options.rentStartDate && line.options.rentEndDate && (
+          {/* Rental period (date + time) inline on the card — testdrive lines
+              have no window (scheduled on-site), so no dates there */}
+          {!isTestdriveLine && line.flowType === "rental" && line.options.rentStartDate && line.options.rentEndDate && (
             <p className="mt-1 text-[11px] font-medium" style={{ color: T.text }}>
               <Calendar className="inline h-3 w-3 mr-1 opacity-60" />
               {(() => {
@@ -218,9 +223,11 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
               // RENT flow: dynamic price label (hour-aware) + line total
               <>
                 <p className="text-xs" style={{ color: T.textMuted }}>
-                  {line.pricePerDay === 0 && line.rentalPeriod
-                    ? `Цена за ${line.rentalPeriod}`
-                    : "Цена за 1 день"}
+                  {isTestdriveLine
+                    ? "Бесплатное время тест-драйва"
+                    : line.pricePerDay === 0 && line.rentalPeriod
+                      ? `Цена за ${line.rentalPeriod}`
+                      : "Цена за 1 день"}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <AnimatePresence mode="popLayout">
@@ -248,8 +255,9 @@ export function CartItemCard({ line, crew, onDecreaseQty, onIncreaseQty, onDelet
                     </span>
                   )}
                 </div>
-                {/* For hour rentals, show the per-day reference */}
-                {line.pricePerDay === 0 && line.item?.rentPriceLabel && (
+                {/* For hour rentals, show the per-day reference (not for
+                    testdrive lines — the tariff is meaningless for a free ride) */}
+                {!isTestdriveLine && line.pricePerDay === 0 && line.item?.rentPriceLabel && (
                   <p className="mt-0.5 text-[10px]" style={{ color: T.textMuted }}>
                     базовый тариф {line.item.rentPriceLabel}
                   </p>

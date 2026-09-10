@@ -153,7 +153,8 @@ export function useFranchizeCartLines(
           };
         }
 
-        // ── Testdrive flow: flat 0 ₽ (test is free, only deposit is held) ──
+        // ── Testdrive flow: flat 0 ₽ (free 10-minute ride, mirrors the bot
+        // /testdrive reference — no rent, no deposit step) ──
       const isTestdrive = line.options.action === "testdrive" || (line.options as any).duration === "10 минут";
       if (isTestdrive) {
         return {
@@ -167,7 +168,7 @@ export function useFranchizeCartLines(
           saleAvailable: false,
           salePrice: null,
           flowType: "rental" as const,
-          displayPriceLabel: "Тест-драйв · 0 ₽ (только залог)",
+          displayPriceLabel: "Тест-драйв · бесплатно (10 минут)",
           rentalPeriod: "10 минут",
           options: line.options,
         };

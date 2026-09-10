@@ -9,6 +9,10 @@ export type FranchizeCartOptions = {
   duration: string;
   perk: string;
   auction: string;
+  /** Line flow marker: "buy" | "testdrive" | "service" | "rent" — survives
+   *  localStorage round-trips (sanitizeCartState keeps it) so the cart, the
+   *  cart page and the order page agree on the flow after a reload. */
+  action?: string;
   buyConfigId?: string;
   buyPriceDelta?: number;
   /** YYYY-MM-DD — start of the rental window. */
@@ -91,6 +95,10 @@ const sanitizeCartState = (value: unknown): FranchizeCartState => {
       duration: typeof rawOptions.duration === "string" ? rawOptions.duration : DEFAULT_OPTIONS.duration,
       perk: typeof rawOptions.perk === "string" ? rawOptions.perk : DEFAULT_OPTIONS.perk,
       auction: typeof rawOptions.auction === "string" ? rawOptions.auction : DEFAULT_OPTIONS.auction,
+      // FIX (2026-09-11): the flow marker (buy/testdrive/service) used to be
+      // dropped on every read — a reloaded order page downgraded a testdrive
+      // (or buy) line back to a rental. Preserve it.
+      action: typeof rawOptions.action === "string" ? rawOptions.action : undefined,
       buyConfigId: typeof rawOptions.buyConfigId === "string" ? rawOptions.buyConfigId : undefined,
       buyPriceDelta: typeof rawOptions.buyPriceDelta === "number" && Number.isFinite(rawOptions.buyPriceDelta) ? rawOptions.buyPriceDelta : undefined,
       rentStartDate: typeof rawOptions.rentStartDate === "string" ? rawOptions.rentStartDate : undefined,

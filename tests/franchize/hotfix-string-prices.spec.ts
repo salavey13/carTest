@@ -93,10 +93,11 @@ describe("HOTFIX string prices — calculatePrice with TEXT specs (yamaha-r7)", 
     expect(result.depositRub).toBe(20000);
   });
 
-  it("3-hour tier with string specs stays numeric (6000 + 1000 helmet)", () => {
+  it("3-hour tier with string specs stays numeric (6000 + 500 hourly helmet)", () => {
     const result = calculatePrice(YAMAHA_R7_STRING_SPECS, "2026-08-28", "2026-08-28", "10:00", "13:00", 1);
     expect(typeof result.totalRub).toBe("number");
-    expect(result.totalRub).toBe(7000);
+    // 2026-09-11 gear canon: < 24h → helmet is half price (500).
+    expect(result.totalRub).toBe(6500);
     expect(result.tier).toBe("3-hours");
   });
 
@@ -448,11 +449,12 @@ describe("HOTFIX contract builder — string priceBreakdown is not trusted", () 
     expect(vars.subtotal_rub).toBe("32000");
   });
 
-  it("trusts a numeric breakdown total (pre-existing override semantics)", () => {
-    // NOTE: documented pre-existing semantics — the breakdown total is the
-    // rent INCLUDING helmets, and equipment cost is added on top, so
-    // 12000 + 2×1000 + 20000 = 34000. Only numeric totals are trusted.
+  it("trusts a numeric breakdown total (2026-09-11: no gear double-count)", () => {
+    // 2026-09-11 fix: a trusted breakdown total ALREADY includes the gear
+    // part (calculator contract: totalRub = bike + helmet + extras), so the
+    // builder no longer adds equipmentCostTotal again:
+    // 12000 (incl. 2 helmets) + 20000 deposit = 32000. Was 34000 before.
     const vars = buildVars({ totalRub: 12000, basePriceRub: 10000, helmetRub: 2000, depositRub: 20000 });
-    expect(vars.subtotal_rub).toBe("34000");
+    expect(vars.subtotal_rub).toBe("32000");
   });
 });

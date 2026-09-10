@@ -14,6 +14,7 @@
 
 import { readPath } from "@/lib/readPath";
 import { calculatePriceForDuration } from "@/app/franchize/lib/pricing-calculator";
+import { getHelmetPrice, getOtherGearUnitPrice } from "@/lib/rental-pricing-calculator";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Types
@@ -727,31 +728,41 @@ export function buildRentalContractVariables(
   }
   const subtotalRounded = Math.round(subtotal);
 
-  // Equipment cost — FLAT per rental (2026-09-10 owner fix): helmet 1000₽
-  // on every tier; the old `hours < 24 ? 500 : 1000` halving stored a
-  // half-priced helmet into metadata.equipment_price and shifted the
-  // subrenter split. Mirrors getHelmetPrice() + EQUIPMENT_UNIT_PRICES_RUB.
+  // Equipment cost — DURATION-AWARE (2026-09-11 owner rule): fixed base
+  // prices per tariff (helmet 1000 ₽, other gear 500 ₽), HALF price for
+  // hourly rentals (< 24h: helmet 500 / other 250), and for multi-day rentals
+  // day 1 at full price with every following day HALF (helmet 1000 + 500 ×
+  // (days−1), other 500 + 250 × (days−1)). One canon with
+  // getHelmetPrice()/getOtherGearUnitPrice() in lib/rental-pricing-calculator.ts
+  // — the Item modal, the cart, the bot quoter and /doc all match it.
   const eq = options.equipment || {};
-  const helmetUnitPrice = 1000;
+  const helmetUnitPrice = getHelmetPrice(rentalHours);
+  const otherGearUnitPrice = getOtherGearUnitPrice(rentalHours);
   const equipmentCostTotal =
     (eq.helmets || 0) * helmetUnitPrice +
-    (eq.gloves || 0) * 500 +
-    (eq.jacket ? 500 : 0) +
-    (eq.pants ? 500 : 0) +
-    (eq.boots ? 500 : 0) +
-    (eq.net ? 500 : 0) +
-    (eq.backpack ? 500 : 0) +
-    (eq.bag ? 500 : 0) +
+    (eq.gloves || 0) * otherGearUnitPrice +
+    (eq.jacket ? otherGearUnitPrice : 0) +
+    (eq.pants ? otherGearUnitPrice : 0) +
+    (eq.boots ? otherGearUnitPrice : 0) +
+    (eq.net ? otherGearUnitPrice : 0) +
+    (eq.backpack ? otherGearUnitPrice : 0) +
+    (eq.bag ? otherGearUnitPrice : 0) +
     0;  // charger is free — tracked for return only, not priced
 
   // Total payable = base rent + equipment + deposit
   // 2026-08-19 review: when operator overrode the price, use the override
   // (cashAmount + bankAmount) as the rent+equipment total instead of
   // recalculating from tiers. Deposit is added on top either way.
+  // FIX (2026-09-11, gear double-count): a TRUSTED priceBreakdown's totalRub
+  // already includes the gear part (calculator contract: totalRub = bike +
+  // helmet + extras) — adding equipmentCostTotal again inflated the doc's
+  // «к оплате» by the whole gear sum (aprilia 14h: 10 500 + 1 000 again).
   const depositNum = Number(deposit);
   const rentAndEquipment = options.priceOverridden
     ? (options.paymentSplit?.cashAmount || 0) + (options.paymentSplit?.bankAmount || 0)
-    : subtotalRounded + equipmentCostTotal;
+    : trustedBreakdown
+      ? subtotalRounded
+      : subtotalRounded + equipmentCostTotal;
   const totalPayable = rentAndEquipment + depositNum;
 
   // Contract number - use meta or default format

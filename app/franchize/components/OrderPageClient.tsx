@@ -412,7 +412,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   }, [payment, setValue]);
   const normalizedPromoInput = normalizePromoCode(promo);
   const hasUnvalidatedPromo = normalizedPromoInput.length > 0 && appliedPromo?.code !== normalizedPromoInput;
-  const canSubmit = !isCartEmpty && !hasUnvalidatedPromo && recipient.trim().length > 1 && phone.trim().length > 5;
+  // ── Testdrive doc rule (2026-09-11) ──
+  // The bot /testdrive reference accepts passport OR driver's license (or
+  // both). A rental contract needs both; a testdrive doc must be generatable
+  // with AT LEAST ONE of them — enforce it here so the doc never leaves
+  // without any identity block.
+  const isTestdriveFlowType = flowType === "testdrive";
+  const hasTdPassport = passportSeries.trim().length > 0 && passportNumber.trim().length > 0;
+  const hasTdLicense = hasLicense && licenseSeries.trim().length > 0 && licenseNumber.trim().length > 0;
+  const testdriveDocsOk = !isTestdriveFlowType || hasTdPassport || hasTdLicense;
+  const canSubmit = !isCartEmpty && !hasUnvalidatedPromo && recipient.trim().length > 1 && phone.trim().length > 5 && testdriveDocsOk;
   const isServiceFlowType = flowType === "service";
   const checkoutMilestones = useMemo(
     () => {
@@ -420,10 +429,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         { id: "cart", label: isServiceFlowType ? "Услуга выбрана" : "Байк выбран", done: !isCartEmpty },
         { id: "contact", label: "Контакт заполнен", done: recipient.trim().length > 1 && phone.trim().length > 5 },
       ];
-      milestones.push({ id: "dates", label: isServiceFlowType ? "Дата визита выбрана" : `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) });
+      if (isTestdriveFlowType) {
+        // Testdrive has no rental window — the doc needs an ID instead.
+        milestones.push({ id: "docs", label: "Паспорт или ВУ указаны", done: hasTdPassport || hasTdLicense });
+      } else {
+        milestones.push({ id: "dates", label: isServiceFlowType ? "Дата визита выбрана" : `Период ${flowLabel} выбран`, done: Boolean(rentalStartDate) });
+      }
       return milestones;
     },
-    [flowLabel, isCartEmpty, phone, recipient, rentalStartDate, isServiceFlowType],
+    [flowLabel, hasTdLicense, hasTdPassport, isCartEmpty, isTestdriveFlowType, phone, recipient, rentalStartDate, isServiceFlowType],
   );
   const completedMilestones = checkoutMilestones.filter((step) => step.done).length;
   const readinessPercent = Math.round((completedMilestones / checkoutMilestones.length) * 100);
@@ -433,12 +447,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         { id: "cart", label: isServiceFlowType ? "Добавьте услуги в корзину" : "Добавьте хотя бы один байк в корзину", active: isCartEmpty },
         { id: "recipient", label: "Укажите имя получателя", active: recipient.trim().length <= 1 },
         { id: "phone", label: "Добавьте контактный номер", active: phone.trim().length <= 5 },
-        { id: "dates", label: isServiceFlowType ? "Выберите желаемую дату визита" : `Выберите период ${flowLabel}`, active: !rentalStartDate },
       ];
+      if (isTestdriveFlowType) {
+        // No dates for testdrive — the doc needs passport OR license instead.
+        blockers.push({ id: "docs", label: "Заполните паспорт или водительское удостоверение", active: !(hasTdPassport || hasTdLicense) });
+      } else {
+        blockers.push({ id: "dates", label: isServiceFlowType ? "Выберите желаемую дату визита" : `Выберите период ${flowLabel}`, active: !rentalStartDate });
+      }
       blockers.push({ id: "promo", label: "Примените введённый промокод или очистите поле", active: hasUnvalidatedPromo });
       return blockers.filter((item) => item.active);
     },
-    [flowLabel, hasUnvalidatedPromo, isCartEmpty, phone, recipient, rentalStartDate, isServiceFlowType],
+    [flowLabel, hasTdLicense, hasTdPassport, hasUnvalidatedPromo, isCartEmpty, isTestdriveFlowType, phone, recipient, rentalStartDate, isServiceFlowType],
   );
   const nextAction = checkoutBlockers[0];
   const holdAmountRub = crew.reservationHold.amountRub;
@@ -1494,12 +1513,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
             </div>
           </div>
 
-          {/* ── Testdrive flow: simplified — name + phone, passport/license optional ── */}
+          {/* ── Testdrive flow: simplified — name + phone, passport OR license ── */}
           {flowType === "testdrive" && (
             <div className="rounded-2xl border p-4" style={surface.card}>
               <p className="text-sm font-medium">Данные для тест-драйва</p>
               <p className="mt-1 text-xs" style={surface.mutedText}>
-                Для тест-драйва достаточно паспорта. Водительское удостоверение — если есть категория А.
+                Для договора тест-драйва заполните паспорт <b>или</b> водительское удостоверение — достаточно
+                одного (как в боте /testdrive). Даты не нужны: бесплатное время — 10 минут.
               </p>
               <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-2 gap-3">

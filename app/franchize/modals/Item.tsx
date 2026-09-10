@@ -728,10 +728,12 @@ function EquipmentPricingCalculator({
 // Additional Items — helmets, gloves, net, coat, backpack, charger
 // ───────────────────────────────────────────────────────────────────────────────
 
-/** All rentable extras with their prices (per rental, not per day).
- *  2026-09-10 owner fix «equipment is half priced for hourly rents»: helmet
- *  is FLAT 1000₽ on every tier — `hourlyPrice` is kept as an alias so older
- *  imports keep compiling, but it no longer differs from `price`. */
+/** All rentable extras with their BASE prices (fixed per tariff/day).
+ *  2026-09-11 owner rule: base prices are fixed (helmet 1000 ₽, other gear
+ *  500 ₽) but PRO-RATE with the rental duration — hourly (< 24h) is half
+ *  price (500/250), multi-day charges day 1 full + every following day half.
+ *  `hourlyPrice` is kept as an alias for older imports. The live unit price
+ *  comes from getAdditionalItemPrice() → getEquipmentUnitPriceForRental(). */
 export const ADDITIONAL_ITEMS = [
   { key: "helmet", label: "Шлем", price: 1000, hourlyPrice: 1000, type: "count" as const, max: 2 },
   { key: "gloves", label: "Перчатки", price: 500, type: "toggle" as const },
@@ -745,13 +747,14 @@ export const ADDITIONAL_ITEMS = [
 
 export type AdditionalItemsSelection = Record<string, number | boolean>;
 
-/** Get the effective price for an additional item. FLAT since 2026-09-10:
- *  the rental duration no longer changes gear prices (hourly halving retired
- *  — it shifted the subrenter revenue split). rentalHours kept for signature
- *  compatibility and intentionally ignored. */
-function getAdditionalItemPrice(item: typeof ADDITIONAL_ITEMS[number], _rentalHours?: number): number {
-  void _rentalHours;
-  return item.hourlyPrice ?? item.price;
+/** Get the effective per-rental price for an additional item (2026-09-11
+ *  canon): hourly (< 24h) → half of the base price; multi-day → day 1 full +
+ *  every following day half. Missing duration = full single-day price. */
+function getAdditionalItemPrice(item: typeof ADDITIONAL_ITEMS[number], rentalHours?: number): number {
+  const { getEquipmentUnitPriceForRental } = require("@/lib/rental-pricing-calculator") as {
+    getEquipmentUnitPriceForRental: (baseRub: number, rentalHours?: number) => number;
+  };
+  return getEquipmentUnitPriceForRental(item.price, rentalHours);
 }
 
 /** Calculate total extras cost from selection. rentalHours is accepted for
@@ -792,6 +795,10 @@ function AdditionalItems({
     <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
         <Package className="h-3.5 w-3.5" /> Доп. оборудование
+      </p>
+      {/* 2026-09-11 gear canon hint: prices pro-rate with the rental window */}
+      <p className="mb-2 text-[10px] leading-4 text-[var(--item-muted-text)] opacity-70">
+        Меньше суток — половина цены. Со 2-х суток — половина цены за каждые дополнительные сутки.
       </p>
       <div className="space-y-2">
         {ADDITIONAL_ITEMS.map((item) => {
@@ -971,9 +978,10 @@ function PriceCard({
                 {ADDITIONAL_ITEMS.filter((i) => i.key !== "helmet").map((item) => {
                   const val = extrasSelection[item.key];
                   if (val !== true && val !== 1) return null;
+                  const unitPrice = getAdditionalItemPrice(item, rentalHours);
                   return (
                     <p key={item.key}>
-                      • {item.label}: {item.price > 0 ? `${fmt(item.price)} ₽` : "бесплатно"}
+                      • {item.label}: {unitPrice > 0 ? `${fmt(unitPrice)} ₽` : "бесплатно"}
                     </p>
                   );
                 })}
@@ -1314,6 +1322,11 @@ export function ItemModal({
   const [priceCardExpanded, setPriceCardExpanded] = useState(false);
   const [rentStartTime, setRentStartTime] = useState("10:00");
   const [rentEndTime, setRentEndTime] = useState("10:00");
+  // ── Test-drive MODE switch (2026-09-11) ──
+  // When ON the modal simplifies: no dates, no equipment, free (0 ₽) —
+  // mirrors the battle-tested bot /testdrive flow (10 minutes, deposit-free).
+  // "Добавить в корзину" then adds a testdrive-marked cart line.
+  const [testdriveMode, setTestdriveMode] = useState(false);
   // Dynamic calculated price from franchize pricing calculator
   const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
 
@@ -1401,6 +1414,7 @@ export function ItemModal({
     setStartappBanner(null);
     setShareChoiceOpen(false);
     setShareNote(null);
+    setTestdriveMode(false);
     if (shareNoteTimerRef.current) {
       clearTimeout(shareNoteTimerRef.current);
       shareNoteTimerRef.current = null;
@@ -1496,6 +1510,17 @@ export function ItemModal({
 
       setIsAdding(true);
       try {
+        // Test-drive mode: skip the rental config entirely — the parent adds
+        // the line with action "testdrive" / duration "10 минут" (0 ₽).
+        if (testdriveMode) {
+          const result = onTestdrive?.();
+          if (result instanceof Promise) {
+            result.finally(() => setIsAdding(false));
+          } else {
+            setIsAdding(false);
+          }
+          return;
+        }
         // Store extras selection in perk field for cart
         // Format: "шлем×2,перчатки,сумка" or "стандарт" if nothing selected
         const extrasStr = extrasSummary(extrasSelection);
@@ -1515,7 +1540,7 @@ export function ItemModal({
         setIsAdding(false);
       }
     },
-    [isAdding, onAddToCart, helmetCount, onChangeOption, extrasSelection],
+    [isAdding, onAddToCart, onTestdrive, testdriveMode, onChangeOption, extrasSelection],
   );
 
   const handleBuyItem = useCallback(
@@ -1950,8 +1975,14 @@ export function ItemModal({
     });
 
   // ── CTA labels (browser vs Telegram) ──
+  // Test-drive mode renames the rent CTA — the same handler adds a
+  // testdrive-marked line (see handleAddToCart).
   const rentCtaLabel = isInTelegram
-    ? (isAdding ? "Бронируем..." : "Забронировать")
+    ? (isAdding
+        ? "Бронируем..."
+        : testdriveMode
+          ? "Записаться на тест-драйв"
+          : "Забронировать")
     : "Забронировать в Telegram";
   const buyCtaLabel = isInTelegram
     ? (isBuying ? "Покупаем..." : "Купить")
@@ -2323,6 +2354,58 @@ export function ItemModal({
             {/* ── Rental-only options (hidden for order flow) ── */}
             {isRental && (
               <>
+                {/* ── Test-drive MODE switch (2026-09-11) ──
+                    ON: dates / equipment / pricing disappear — the ride is
+                    free (10 minutes), mirrors the bot /testdrive flow. The
+                    same «В корзину» button adds a testdrive-marked line. */}
+                <label
+                  className="flex cursor-pointer items-center justify-between rounded-2xl border px-3 py-2.5 transition hover:opacity-90"
+                  style={{
+                    borderColor: testdriveMode ? "var(--item-accent)" : "var(--item-border)",
+                    backgroundColor: testdriveMode ? "color-mix(in srgb, var(--item-accent) 10%, transparent)" : "transparent",
+                  }}
+                >
+                  <span>
+                    <span className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Bike className="h-3.5 w-3.5" style={{ color: "var(--item-accent)" }} />
+                      Режим тест-драйва
+                    </span>
+                    <span className="mt-0.5 block text-[10px] leading-4 text-[var(--item-muted-text)]">
+                      Бесплатно · 10 минут · без даты и экипировки
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={testdriveMode}
+                    onChange={(e) => setTestdriveMode(e.target.checked)}
+                    className="h-4 w-4 accent-[var(--item-accent)]"
+                    aria-label="Переключить режим тест-драйва"
+                  />
+                </label>
+
+                {/* Simplified test-drive card — replaces the rental config */}
+                {testdriveMode && (
+                  <div
+                    className="rounded-2xl border p-3"
+                    style={{
+                      borderColor: "var(--item-accent)",
+                      backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+                    }}
+                  >
+                    <p className="text-sm font-bold" style={{ color: "var(--item-accent)" }}>
+                      Тест-драйв · 0 ₽
+                    </p>
+                    <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--item-muted-text)]">
+                      <li>• Бесплатное время тест-драйва — 10 минут</li>
+                      <li>• Дата и время согласуются на месте выдачи</li>
+                      <li>• Нужен паспорт или водительское удостоверение</li>
+                      <li>• Договор тест-драйва сформируется автоматически</li>
+                    </ul>
+                  </div>
+                )}
+
+                {!testdriveMode && (
+                <>
                 {/* ── Date + time pickers for rental window (SINGLE source of truth) ── */}
                 <RentalDatePickers
                   startDate={options.rentStartDate ?? ""}
@@ -2413,6 +2496,8 @@ export function ItemModal({
                       </>
                     )}
                   </>
+                )}
+                </> /* end !testdriveMode config block */
                 )}
 
               </>

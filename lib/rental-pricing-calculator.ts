@@ -38,6 +38,10 @@ export type PricingTier =
   | "3-hours"
   | "6-hours"
   | "12-hours"
+  /** 13–23h window: interpolated between the 12h tier and the daily rate
+   * (parity with calculatePriceForDuration in app/franchize/lib/pricing-calculator.ts
+   * — the calculator the contract builder uses). */
+  | "extended-hours"
   | "daily"
   | "multi-day-2-4"
   | "multi-day-5-10"
@@ -95,35 +99,62 @@ export type RentalExtraKey = "gloves" | "jacket" | "pants" | "boots" | "net" | "
 /** Extras selection passed to calculatePrice — booleans, mirrors the modal's toggles. */
 export type RentalExtrasSelection = Partial<Record<RentalExtraKey, boolean | number>>;
 
-/** Sum the priced extras (charger = 0). A truthy value counts as selected. */
-export function calculateExtrasRub(extras?: RentalExtrasSelection): number {
+/** Sum the priced extras (charger = 0). A truthy value counts as selected.
+ *  2026-09-11 canon: gear pro-rates with the rental duration — hourly (< 24h)
+ *  is half price, multi-day charges day 1 full + every following day half.
+ *  Without a duration the full single-day price applies. */
+export function calculateExtrasRub(extras?: RentalExtrasSelection, rentalHours?: number): number {
   if (!extras) return 0;
   let sum = 0;
   for (const key of Object.keys(RENTAL_EXTRAS_PRICES_RUB) as RentalExtraKey[]) {
     const val = extras[key];
     if (val === true || (typeof val === "number" && val > 0)) {
-      sum += RENTAL_EXTRAS_PRICES_RUB[key];
+      sum += getEquipmentUnitPriceForRental(RENTAL_EXTRAS_PRICES_RUB[key], rentalHours);
     }
   }
   return sum;
 }
 
 /**
- * Get helmet price per rental — FLAT, duration-independent.
+ * Get helmet price per rental — DURATION-AWARE (2026-09-11 owner rule).
  *
- * HISTORY: the original rule was `rentalHours < 3 ? 500 : 1000` (an earlier
- * fix on 2026-07-30 narrowed the 500₽ window from <24h to <3h). The owner
- * finally killed the whole halving idea on 2026-09-10: «equipment price … is
- * half priced: helmet 500 instead of 1000». A half-priced helmet stored in
- * metadata.equipment_price shifted the subrenter revenue split (less gear
- * deducted → more of the total split as the bike part). One canon now:
- * 1000 ₽ per helmet on EVERY tier, matching EQUIPMENT_UNIT_PRICES_RUB in
- * rental-price-split.ts. The rentalHours argument is kept for call-site
- * compatibility and intentionally ignored.
+ * Base (fixed) prices per tariff: helmet 1000 ₽, other gear 500 ₽ per unit.
+ * Pro-rating:
+ *   • rental shorter than a day (hourly, < 24h) → HALF price (helmet 500,
+ *     other gear 250) — the bike is back the same day, the gear is used once;
+ *   • multi-day → day 1 at FULL price, every following day HALF
+ *     (helmet 1000 + 500 × (days − 1), other gear 500 + 250 × (days − 1)).
+ *
+ * HISTORY: the original rule was `rentalHours < 3 ? 500 : 1000`; on
+ * 2026-09-10 the owner asked for FLAT 1000 everywhere to stop the split
+ * drift; on 2026-09-11 the canon was finalized as the pro-rating above —
+ * «проверь, что при почасовой аренде снаряжение всё ещё в половину цены
+ * (шлем 500 вместо 1000, остальное 250 вместо 500), а при нескольких сутках
+ * цена снаряжения уменьшается вдвое со 2-х суток». This function and
+ * getOtherGearUnitPrice() are the ONE canon — the contract builder, /doc,
+ * the Item modal and the bot quoter must all match it digit-for-digit.
  */
-export function getHelmetPrice(_rentalHours?: number): number {
-  void _rentalHours;
-  return HELMET_PRICE_DAILY_RUB;
+export function getHelmetPrice(rentalHours?: number): number {
+  return getEquipmentUnitPriceForRental(HELMET_PRICE_DAILY_RUB, rentalHours);
+}
+
+/**
+ * Per-unit price of a piece of gear for a WHOLE rental (2026-09-11 canon):
+ *   hourly (< 24h) → base / 2;  multi-day → base + base/2 × (days − 1).
+ * Missing/invalid duration falls back to a single full-price day (standalone
+ * gear rentals without a bike window).
+ */
+export function getEquipmentUnitPriceForRental(baseRub: number, rentalHours?: number): number {
+  const hours = Number(rentalHours);
+  if (!Number.isFinite(hours) || hours <= 0) return baseRub;
+  if (hours < 24) return Math.round(baseRub / 2);
+  const days = Math.max(1, Math.ceil(hours / 24));
+  return baseRub + Math.round(baseRub / 2) * (days - 1);
+}
+
+/** Base (fixed) unit price for non-helmet gear — one table with RENTAL_EXTRAS_PRICES_RUB. */
+export function getOtherGearUnitPrice(rentalHours?: number): number {
+  return getEquipmentUnitPriceForRental(500, rentalHours);
 }
 
 function normalizeHourlyRental(hours: number): {
@@ -155,7 +186,20 @@ function normalizeHourlyRental(hours: number): {
     return { tier: "12-hours", rounded: false, displayHours: 12 };
   }
 
-  // > 12 hours = daily mode
+  // FIX (2026-09-11, "final price showed only the helmet"): 13–23h rentals
+  // used to collapse into the daily bucket with displayHours = 24 while the
+  // calendar day count from differenceInDays() is 0 — calculateBasePrice then
+  // skipped the hourly branch (24 < 24 is false) and getDailyPrice returned
+  // dailyPrice × 0 = 0 ₽ for the BIKE part. The cart showed helmet-only totals
+  // (aprilia-shiver 14h + helmet displayed 1 000 ₽ while the contract showed
+  // 9 500 + 1 000). The 13–23h window now stays hour-aware and interpolates
+  // between price_per_12h and daily — exactly what the contract builder's
+  // calculatePriceForDuration does, so cart == contract == stored total.
+  if (hours < 24) {
+    return { tier: "extended-hours", rounded: false, displayHours: hours };
+  }
+
+  // ≥ 24 hours = daily mode
   const days = Math.ceil(hours / 24);
   return { tier: "daily", rounded: false, displayHours: days * 24 };
 }
@@ -199,6 +243,20 @@ function getHourlyPrice(specs: BikePricingSpecs, hours: number): number {
     return num(specs.price_per_12h) ?? baseHourly * hours;
   }
 
+  // FIX (2026-09-11): 13–23h window — interpolate between price_per_12h and
+  // the daily rate, mirroring calculatePriceForDuration() in
+  // app/franchize/lib/pricing-calculator.ts (the contract builder). Before
+  // this branch the window collapsed to a 0-day daily price (bike part 0 ₽).
+  if (hours < 24) {
+    const per12h = num(specs.price_per_12h);
+    const daily = num(specs.dailyPrice) ?? num(specs.rent_weekday);
+    if (per12h && daily) {
+      return Math.round(per12h + (daily - per12h) * (hours - 12) / 12);
+    }
+    if (daily) return daily; // no 12h tier → charge the full day
+    return baseHourly * hours;
+  }
+
   return baseHourly * hours;
 }
 
@@ -238,7 +296,11 @@ function getDailyPrice(
     return (num(specs.rent_11_30d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
   }
 
-  return (num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
+  // FIX (2026-09-11): days can be 0 for sub-24h rentals (differenceInDays
+  // floors a 14h rental to 0) — multiplying by 0 silently zeroed the whole
+  // bike part. At least one day is always charged (mirrors rentalDays =
+  // Math.max(1, ceil(hours/24)) in the contract builder).
+  return (num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * Math.max(1, days);
 }
 
 /**
@@ -340,7 +402,10 @@ export function calculatePrice(
   );
 
   const helmetRub = helmets * getHelmetPrice(hours);
-  const extrasRub = calculateExtrasRub(extras);
+  // 2026-09-11 canon: non-helmet gear pro-rates with the SAME duration rule
+  // as the helmet (half price under 24h, day-1-full + half from day 2) so the
+  // cart, the modal, /doc, the contract and the bot quoter stay digit-equal.
+  const extrasRub = calculateExtrasRub(extras, hours);
   const depositRub = num(specs.deposit_rub) ?? DEFAULT_DEPOSIT_RUB;
   // HOTFIX: `price` and `helmetRub` are guaranteed numbers now. Previously,
   // with string specs (dailyPrice: "10000") `price` was the raw string and
