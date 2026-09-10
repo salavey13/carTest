@@ -30,9 +30,9 @@ export type LeadsSortMode = "priority" | "recent" | "urgent" | "name" | "spent";
 
 /** Канонические группы источников — синхронно с leads-constants.SOURCE_GROUPS. */
 const SOURCE_GROUPS_SERVER: Record<string, string[]> = {
-  testdrive: ["test_drive", "testdrive_contract"],
-  rent: ["rental_contract", "rent"],
-  sale: ["sale_contract", "sale"],
+  testdrive: ["test_drive", "testdrive_contract", "test_ride", "test_ride_click"],
+  rent: ["rental_contract", "rent", "rental"],
+  sale: ["sale_contract", "sale", "prebuy", "hold_created"],
 };
 const RAW_SOURCE_TO_GROUP_SERVER: Record<string, string> = {};
 for (const [groupId, members] of Object.entries(SOURCE_GROUPS_SERVER)) {
@@ -58,6 +58,40 @@ export function placeholderHasActivity(lead: LeadRow, todosForLead: LeadTodoRow[
 // Правила 1:1 с прежним filterLeads (leads-utils): поиск по имени/телефону/
 // username/байку/маршруту, источник по канонической группе + виртуальный
 // канал «avito», сегменты hot/verified/warm/troubled.
+//
+// SEARCH QUALITY FIX (2026-09-10): запрос «89991234567»/«8 999 123-45-67»
+// раньше не находил лид с телефоном «+79991234567» (raw substring), и поиск
+// не смотрел в ключ лида (часто это телефон/tg-id) и тексты авито-диалога.
+// Теперь: если запрос похож на телефон (≥7 цифр после вычистки) — матчим по
+// последним 10 цифрам нормализованного номера (канон compare-ключ RU), плюс
+// расширено сено: user_id, авито lastMessage/firstMessage.
+const SEARCH_PHONE_MIN_DIGITS = 7;
+
+function searchDigitsOf(raw: string): string {
+  return (raw.match(/\d/g) || []).join("");
+}
+
+function leadPhoneDigits(lead: LeadRow): string {
+  const raw = lead.phone || "";
+  if (!raw) return "";
+  // Канон для сопоставления: последние 10 цифр (RU: 8/7/+7 → одинаковый ключ).
+  const digits = searchDigitsOf(raw);
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+function leadSearchHaystack(lead: LeadRow): string {
+  return [
+    (lead.full_name || "").toLowerCase(),
+    (lead.phone || ""),
+    (lead.username || "").toLowerCase(),
+    (lead.bikeTitle || "").toLowerCase(),
+    (lead.sourceRoute || "").toLowerCase(),
+    (lead.user_id || "").toLowerCase(),
+    (lead.avito?.lastMessage || "").toLowerCase(),
+    (lead.avito?.firstMessage || "").toLowerCase(),
+  ].filter(Boolean).join("\n");
+}
+
 export function filterLeads(
   leads: LeadRow[],
   searchQuery: string,
@@ -74,13 +108,20 @@ export function filterLeads(
 
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
-    result = result.filter((l) =>
-      (l.full_name || "").toLowerCase().includes(q) ||
-      (l.phone || "").includes(q) ||
-      (l.username || "").toLowerCase().includes(q) ||
-      (l.bikeTitle || "").toLowerCase().includes(q) ||
-      (l.sourceRoute || "").toLowerCase().includes(q)
-    );
+    const qDigits = searchDigitsOf(searchQuery);
+    const isPhoneQuery = qDigits.length >= SEARCH_PHONE_MIN_DIGITS;
+    const qPhoneKey = isPhoneQuery ? qDigits.slice(-10) : "";
+    result = result.filter((l) => {
+      if (leadSearchHaystack(l).includes(q)) return true;
+      if (isPhoneQuery) {
+        // Телефонный запрос: сравниваем канон «последние 10 цифр», чтобы
+        // «8999…» находил «+7 (999) …», и наоборот.
+        const leadDigits = searchDigitsOf(leadSearchHaystack(l));
+        if (leadDigits.length >= 10 && leadDigits.endsWith(qPhoneKey)) return true;
+        if (leadPhoneDigits(l) === qPhoneKey) return true;
+      }
+      return false;
+    });
   }
 
   // "avito" — виртуальный источник: выбор по КАНАЛУ (вебхук/форвард Авито),

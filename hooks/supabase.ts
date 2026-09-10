@@ -42,7 +42,11 @@ export const supabaseAdmin: SupabaseClient<Database> = (() => {
   if (!serviceRoleKey) {
     const warning = "SUPABASE_SERVICE_ROLE_KEY is missing. Admin operations will fail.";
     adminClientInitError = warning;
-    logger.warn(warning);
+    // 2026-09-10 (критик R1): warn ТОЛЬКО на сервере. В браузере service-role
+    // key не передаётся ПО ДИЗАЙНУ (приватность), и этот warn пугал оператора
+    // в консоли на каждой загрузке. Если клиентский код попытается использовать
+    // supabaseAdmin — Proxy ниже всё равно бросит внятную ошибку.
+    if (typeof window === "undefined") logger.warn(warning);
 
     return new Proxy({} as SupabaseClient<Database>, {
       get() {

@@ -226,11 +226,16 @@ export function useTelegramBackButton() {
       const webApp = getWebApp();
       const backButton = webApp?.BackButton;
 
-      // BackButton requires v6.1+
-      if (!backButton || !webApp?.isVersionAtLeast?.("6.1")) {
-        // Runtime not available or version too old — retry
+      // BackButton requires v6.1+. ВЕРСИЯ НЕ МЕНЯЕТСЯ В РАНТАЙМЕ: если SDK
+      // уже есть и версии < 6.1 — ретраить бессмысленно, сдаёмся сразу
+      // (критик R3: «10 retries × ~20 log lines» в обычном браузере).
+      if (webApp && typeof webApp.isVersionAtLeast === "function" && !webApp.isVersionAtLeast("6.1")) {
+        logger.debug?.("[Telegram BackButton] WebApp версии < 6.1 — BackButton недоступен, монтирование пропущено.");
+        return true; // «обработано» — не ретраим
+      }
+      if (!backButton) {
         if (!isSetupRef.current) {
-          logger.info("[Telegram BackButton] Runtime not available or version too old, will retry...");
+          logger.info("[Telegram BackButton] Runtime not available, will retry...");
         }
         return false;
       }
@@ -258,6 +263,12 @@ export function useTelegramBackButton() {
           // visibility immediately — otherwise the back button stays hidden
           // until the next route change.
           syncButtonVisibility();
+          return;
+        }
+        // 2026-09-10: SDK, который так и не поднялся за 2 попытки (обычный
+        // браузер), не поднимется и за 10 — тихо сдаёмся без warn-спама.
+        if (attempts >= 2 && typeof window !== "undefined" && !window.Telegram?.WebApp) {
+          logger.debug?.("[Telegram BackButton] Telegram SDK отсутствует (обычный браузер) — монтирование не требуется.");
           return;
         }
         if (attempts < maxAttempts) {

@@ -28,6 +28,10 @@ interface LeadBoardProps {
   /** История просмотров за смену: у лидов из множества — метка «👁». */
   viewedIds?: Set<string>;
   T: any;
+  /** BOARD WINDOW HINT (2026-09-10): канбан строится по ЗАГРУЖЕННОМУ окну
+   *  (50 из total) — без подписи оператор читал «Нужен контакт 0» при 115
+   *  таких лидов на сервере и не доверял доске. shown/total из pageInfo. */
+  windowInfo?: { shown: number; total: number } | null;
 }
 
 /**
@@ -50,7 +54,7 @@ interface LeadBoardProps {
  *   • Desktop (lg+): fixed 260px columns, column body scrolls vertically
  *     inside `lg:max-h-[calc(100vh-280px)]` — as before.
  */
-export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, onReadNotes, viewedIds, T }: LeadBoardProps) {
+export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForLead, priorityMap, onReadNotes, viewedIds, windowInfo, T }: LeadBoardProps) {
   const columns = useMemo(() => {
     // Group by the COMPUTED pipeline stage (stageKey), not the raw DB stage —
     // see groupLeadsForBoard(): raw stages like "viewed"/"clicked" used to
@@ -85,7 +89,17 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
   }, [leads, priorityMap]);
 
   return (
-    <div
+    <div>
+      {windowInfo && windowInfo.total > windowInfo.shown && (
+        <p
+          className="mb-2 px-1 text-[11px]"
+          style={{ color: T.textFaint }}
+          role="note"
+        >
+          Доска построена по загруженным {windowInfo.shown} из {windowInfo.total} лидов — остальное дозагрузите кнопкой «Показать ещё» ниже.
+        </p>
+      )}
+      <div
       // Mobile: snap-paged horizontal swipe, edge bleed; lg: free scroll.
       // items-start — колонки держат СВОЮ высоту (см. комментарий выше).
       className="-mx-4 flex items-start snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-4 pb-2 [scrollbar-width:thin] lg:mx-0 lg:snap-none lg:px-0"
@@ -260,6 +274,7 @@ export function LeadBoard({ leads, selectedId, onSelect, onDismiss, getTodosForL
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

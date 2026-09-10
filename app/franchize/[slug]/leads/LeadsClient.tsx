@@ -27,6 +27,10 @@ import {
 import { msUntilNextMidnight } from "./lib/lead-playbook-done";
 import { LeadsPathPanel } from "./components/LeadsPathPanel";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
+// Изоморфное ядро запросов (тот же filterLeads, что и на сервере) —
+// INSTANT SEARCH FEEDBACK 2026-09-10: локальная перетряска окна, пока
+// серверный reset в пути.
+import { filterLeads } from "./lib/leads-query-core";
 import { DISMISS_REASONS } from "./lib/dismiss-reasons";
 import { isHandlingTodo } from "./lib/lead-handling";
 import { computeLeadAchievements } from "./lib/lead-achievements";
@@ -402,6 +406,10 @@ export function LeadsClient({
   //  • a dismissible error banner with a manual retry button appears when all
   //    automatic attempts fail — no more silent empty page.
   const [leadsLoadError, setLeadsLoadError] = useState<string | null>(null);
+  const leadsLoadErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    leadsLoadErrorRef.current = leadsLoadError;
+  }, [leadsLoadError]);
   const [isFetchingLeads, setIsFetchingLeads] = useState(false);
   const [manualRetryTick, setManualRetryTick] = useState(0);
   // «Обновлено HH:MM» — тихий 90-секундный meta-рефреш невидим, штамп возвращает
@@ -410,6 +418,14 @@ export function LeadsClient({
   // Серверные агрегаты по ПОЛНОМУ набору + метаданные окна (total/hasMore).
   const [aggState, setAggState] = useState<LeadsAggregates | null>(null);
   const [pageInfo, setPageInfo] = useState<LeadsPageInfo | null>(null);
+  // Зеркала для колбэков fetchWindow (не зависят от его deps).
+  const pageInfoRef = useRef<LeadsPageInfo | null>(null);
+  // Режим последнего fetch (для скролла к новым карточкам после «Показать ещё»)
+  const lastFetchModeRef = useRef<"reset" | "more" | "meta">("reset");
+  const prevLeadsLenRef = useRef(0);
+  useEffect(() => {
+    pageInfoRef.current = pageInfo;
+  }, [pageInfo]);
 
   // ── Оконная загрузка («load best leads quickly first») ─────────────────────
   // Сервер сам фильтрует/сортирует/режет окно (lib/leads-query-core): первый
@@ -457,6 +473,7 @@ export function LeadsClient({
 
   const fetchWindow = useCallback(
     async (mode: "reset" | "more" | "meta", isCancelled: () => boolean): Promise<boolean> => {
+      lastFetchModeRef.current = mode;
       const initData = (() => {
         try {
           const tg = (window as any).Telegram?.WebApp;
@@ -469,7 +486,12 @@ export function LeadsClient({
       const opts: GetLeadsWindowOpts =
         mode === "more"
           ? { ...base, offset: leadsStateRef.current.length, limit: LEADS_PAGE_SIZE }
-          : { ...base, offset: 0, limit: LEADS_PAGE_SIZE, metaOnly: mode === "meta" };
+          : mode === "meta"
+            // 2026-09-10 FIX: meta-тихий рефреш сообщает серверу, сколько лидов
+            // уже показано (offset), — тот возвращает честный hasMore (раньше
+            // был захардкожен true, и «Показать ещё» оживала каждые 90 с).
+            ? { ...base, offset: leadsStateRef.current.length, limit: LEADS_PAGE_SIZE, metaOnly: true }
+            : { ...base, offset: 0, limit: LEADS_PAGE_SIZE };
       const hash = hashOfFilters(base);
       // reset инвалидирует все более старые ответы (смена фильтров/повтор);
       // more/meta применяются, только пока не начался новый reset.
@@ -504,7 +526,20 @@ export function LeadsClient({
             if (mode === "meta") {
               // Тихий рефреш: ТОЛЬКО агрегаты и счётчик total.
               if (freshAgg) setAggState(freshAgg);
-              if (freshPage) setPageInfo(freshPage);
+              if (freshPage) {
+                // NEW-LEAD SIGNAL (2026-09-10): если total вырос между тиками —
+                // оператор узнаёт сразу (toast), а не случайно заметив карточку.
+                const prevTotal = pageInfoRef.current?.total ?? null;
+                if (
+                  typeof prevTotal === "number" &&
+                  freshPage.total > prevTotal &&
+                  !leadsLoadErrorRef.current
+                ) {
+                  const delta = freshPage.total - prevTotal;
+                  showToast(`Поступило новых лидов: +${delta}`, "info", 4200);
+                }
+                setPageInfo(freshPage);
+              }
               setLastSyncAt(Date.now());
               return true;
             }
@@ -709,17 +744,78 @@ export function LeadsClient({
 
   // ── «Показать ещё»: дозагрузка следующего окна с сервера ───────────────────
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadMoreLeads = useCallback(() => {
-    if (isLoadingMore) return;
+  const isLoadingMoreRef = useRef(false);
+  // MOUNT GUARD: раньше передавался () => false — «more» в полёте при анмаунте
+  // продолжал setState. Теперь честный признак размонтирования.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  // Обещание-обёртка: и кнопка «Показать ещё», и открытие лида из плейбука
+  // (тот может жить за пределами загруженного окна) гоняют один и тот же
+  // дозагрузчик с общим busy-флагом.
+  const loadMoreAsync = useCallback(async (): Promise<boolean> => {
+    if (isLoadingMoreRef.current) return false;
+    isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
-    (async () => {
+    try {
+      return await fetchWindow("more", () => !mountedRef.current);
+    } finally {
+      isLoadingMoreRef.current = false;
+      if (mountedRef.current) setIsLoadingMore(false);
+    }
+  }, [fetchWindow]);
+  const loadMoreLeads = useCallback(() => {
+    void loadMoreAsync();
+  }, [loadMoreAsync]);
+
+  // ── PLAYBOOK → ШТОРКА (2026-09-10 FIX «мёртвой кнопки», v2) ──
+  // Очередь плейбука строится СЕРВЕРОМ по ПОЛНОМУ набору (384 лида), а окно
+  // клиента — первые 50. Дозагрузка окон (v1) не масштабируется: лид может
+  // стоять 200-м, и 3 окна его не достают (критик R3). Финальное решение —
+  // ОДНОКРАТНЫЙ серверный поиск точным ключом: filterLeads матчит user_id
+  // (сено включает ключ лида), поэтому q=leadId возвращает нужного лида из
+  // ПОЛНОГО набора за один вызов. Нашли → подкладываем в окно и открываем.
+  const openLeadById = useCallback((leadId: string) => {
+    if (leadsStateRef.current.some((l) => l.user_id === leadId)) {
+      setSelectedId(leadId);
+      return;
+    }
+    void (async () => {
+      showToast("Ищу лида на сервере…", "info", 1600);
       try {
-        await fetchWindow("more", () => false);
-      } finally {
-        setIsLoadingMore(false);
+        const initData = (() => {
+          try {
+            const tg = (window as any).Telegram?.WebApp;
+            return typeof tg?.initData === "string" && tg.initData.length > 0 ? tg.initData : undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+        const res = await getFranchizeLeads(
+          slug,
+          dbUser?.user_id || passwordAuthOwnerId || "",
+          false,
+          initData,
+          storedPassword || undefined,
+          { q: leadId, offset: 0, limit: 5 },
+        );
+        if (!mountedRef.current) return;
+        const found = res.success ? (res.leads || []).find((l) => l.user_id === leadId) : null;
+        if (found) {
+          setLeadsState((prev) => (prev.some((l) => l.user_id === leadId) ? prev : [found, ...prev]));
+          setSelectedId(leadId);
+          return;
+        }
+        showToast(`Лид не найден на сервере — попробуйте поиск по имени или телефону`, "error", 4200);
+      } catch {
+        showToast("Не удалось найти лида — проверьте связь и повторите", "error", 4200);
       }
     })();
-  }, [fetchWindow, isLoadingMore]);
+  }, [slug, dbUser?.user_id, passwordAuthOwnerId, storedPassword, showToast]);
 
   // ── Тихий рефреш агрегатов (90 c, только в видимой вкладке) ────────────────
   // KPI/воронка/плейбук/лидерборд и счётчик total остаются честными, пока
@@ -738,7 +834,54 @@ export function LeadsClient({
     };
   }, [isAuthed, shouldShowPassword, prefsSettled, fetchWindow]);
 
-  // Todo mapping — use writable state so TodoList callbacks sync the parent array
+  // ── Watchdog загрузки (2026-09-10, критик R2): зависший reset (мёртвая
+  // сеть/сервер) держал isFetchingLeads=true вечно — страница молчала без
+  // ошибки и без EmptyState. 25 c без ответа → честная ошибка + разблокировка.
+  const fetchWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isFetchingLeads) {
+      fetchWatchdogRef.current = setTimeout(() => {
+        setIsFetchingLeads(false);
+        setLeadsLoadError((prev) => prev ?? "Сервер не отвечает — проверьте связь и повторите.");
+      }, 25_000);
+    } else if (fetchWatchdogRef.current) {
+      clearTimeout(fetchWatchdogRef.current);
+      fetchWatchdogRef.current = null;
+    }
+    return () => {
+      if (fetchWatchdogRef.current) {
+        clearTimeout(fetchWatchdogRef.current);
+        fetchWatchdogRef.current = null;
+      }
+    };
+  }, [isFetchingLeads]);
+
+  // ── «Показать ещё» доводит новое до глаз (критик R2): после дозагрузки
+  // плавно скроллим к первой НОВОЙ карточке — пагинация больше не выглядит
+  // «нажал и ничего не изменилось» (новые карточки были ниже вьюпорта).
+  useEffect(() => {
+    const grew = leadsState.length > prevLeadsLenRef.current;
+    const wasMore = lastFetchModeRef.current === "more";
+    const oldLen = prevLeadsLenRef.current;
+    prevLeadsLenRef.current = leadsState.length;
+    if (grew && wasMore && oldLen > 0) {
+      // Даём виртуализатору кадр на отрисовку нового диапазона.
+      window.setTimeout(() => {
+        const anchor =
+          document.querySelector<HTMLElement>(`[data-index="${oldLen}"]`);
+        if (anchor) {
+          anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+        // Якорь ещё не отрисован (виртуализация) — скроллим контейнер вниз:
+        // последние старые карточки + первые новые сразу под ними.
+        const container = document.getElementById("leads-list-scroll");
+        if (container) {
+          container.scrollBy({ top: container.scrollHeight - container.clientHeight, behavior: "smooth" });
+        }
+      }, 60);
+    }
+  }, [leadsState]);
   const { getTodosForLead } = useTodosMapping(todosState);
 
   // Priority Score лейблы (⚡ свежий / 🔥 счёт) — считаются по ОКНУ. Полные
@@ -748,26 +891,34 @@ export function LeadsClient({
   // вовремя получают буст без перезагрузки.
   const priorityMap = usePriorityMap(leadsState, getTodosForLead, nowTick);
 
-  /** Called by TodoList after toggle/add/delete — keeps todosState in sync */
-  const handleTodoUpdate = useCallback((action: 'toggle' | 'delete' | 'add', todoId: string, todo?: LeadTodoRow) => {
-    setTodosState((prev) => {
-      if (action === 'toggle') {
-        return prev.map((t) =>
-          t.id === todoId ? { ...t, status: t.status === 'done' ? 'pending' : 'done' } : t
-        );
-      }
-      if (action === 'delete') return prev.filter((t) => t.id !== todoId);
-      if (action === 'add' && todo) return [todo, ...prev];
-      return prev;
-    });
-  }, []);
-
   // ── Окно = список. Фильтрация и сортировка «лучшие сверху» выполнены
   // СЕРВЕРОМ теми же чистыми функциями (lib/leads-query-core) — порядок
   // глобальный, конкатенация окон («Показать ещё») его сохраняет.
-  const sortedLeads = leadsState;
+  // INSTANT SEARCH FEEDBACK (2026-09-10): пока серверный reset в пути, окно
+  // мгновенно перетряхивается локально тем же filterLeads. NO-FLASH RULE
+  // (урок критика R2): если в ЗАГРУЖЕННОМ окне совпадений нет — НЕ гасим
+  // список в ноль (это выглядело как «поиск нашёл и не показывает»), а ждём
+  // честный ответ сервера, показывая в футере «обновляю…».
+  const sortedLeads = useMemo(() => {
+    const q = debouncedSearchQuery.trim();
+    if (!q) return leadsState;
+    const filtered = filterLeads(leadsState, q, "all", "all", getTodosForLead);
+    return filtered.length > 0 ? filtered : leadsState;
+  }, [leadsState, debouncedSearchQuery, getTodosForLead]);
   const visibleLeads = sortedLeads;
   const hiddenCount = pageInfo ? Math.max(0, pageInfo.total - visibleLeads.length) : 0;
+  // «Показать ещё N»: не меньше 0 и не больше размера страницы — раньше
+  // при уменьшении total (dismiss/meta) число могло уйти в минус.
+  const moreCount = Math.max(0, Math.min(LEADS_PAGE_SIZE, hiddenCount));
+
+  // ── SLA-будильник (2026-09-10): залипающая полоса «что горит прямо сейчас».
+  // Цифры уже посчитаны сервером по ПОЛНОМУ набору (agg.kpi.speed) — новая
+  // логика не добавляет ни запросов, ни пересчётов. Клик — сортировка
+  // «срочные» (urgent), чтобы горящее оказалось наверху одним тапом.
+  const speedAgg = aggState?.kpi?.speed;
+  const slaOver24h = speedAgg?.waitingOver24h ?? 0;
+  const slaOverdueCallbacks = speedAgg?.callbacksOverdue ?? 0;
+  const slaStripVisible = slaOver24h > 0 || slaOverdueCallbacks > 0;
 
   // ── Ответственный: серверный ростер + легаси-имена (agg.availableOwners).
   // Пока agg не пришёл — только ростер (значение появится через мгновение).
@@ -1011,7 +1162,8 @@ export function LeadsClient({
       setSelectedId((prev) => prev === leadId ? null : prev);
       // Close the dialog
       setDismissTarget(null);
-      router.refresh();
+      // 2026-09-10 FIX: router.refresh() гонял ПОЛНЫЙ RSC-раундтрип страницы
+      // ради данных, которые и так обновляет тихий meta-рефреш ниже.
       // Тихий meta-рефреш: счётчик total и агрегаты (плитки/воронка/плейбук)
       // без сброса окна и скролла оператора.
       void fetchWindow("meta", () => false);
@@ -1445,7 +1597,8 @@ export function LeadsClient({
       <div id="leads-playbook" className={flashCls("leads-playbook")}>
         <LeadsPlaybookPanel
           actions={playbookActions}
-          onOpenLead={(leadId) => setSelectedId(leadId)}
+          onOpenLead={openLeadById}
+          onToast={showToast}
           T={T}
           storageKey={isCrew ? `leads-achv:${slug}` : undefined}
           doneStorageKey={isCrew ? `leads-playbook-done:${slug}` : undefined}
@@ -1574,6 +1727,37 @@ export function LeadsClient({
         </div>
       )}
 
+      {/* SLA-будильник: горит только когда есть нарушенный SLA (ожидание >24 ч
+          или просроченный перезвон) — в спокойном состоянии полосы нет вовсе. */}
+      {slaStripVisible && (
+        <button
+          type="button"
+          onClick={() => {
+            setSortMode("urgent");
+            showToast("Сортировка: сначала срочные", "info", 2200);
+          }}
+          className="mb-3 flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-left text-xs font-semibold transition hover:brightness-110"
+          style={{
+            borderColor: "rgba(239,68,68,0.45)",
+            backgroundColor: "rgba(239,68,68,0.08)",
+            color: T.text,
+          }}
+          aria-label="Есть лиды с нарушенным сроком ответа — показать срочные первыми"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" style={{ color: "#ef4444" }} aria-hidden />
+            <span className="truncate">
+              {slaOver24h > 0
+                ? `${slaOver24h} ${slaOver24h === 1 ? "лид ждёт" : slaOver24h < 5 ? "лида ждут" : "лидов ждут"} ответа больше 24 ч`
+                : ""}
+              {slaOver24h > 0 && slaOverdueCallbacks > 0 ? " · " : ""}
+              {slaOverdueCallbacks > 0 ? `просроченных перезвонов: ${slaOverdueCallbacks}` : ""}
+            </span>
+          </span>
+          <span className="shrink-0 opacity-75">Срочные →</span>
+        </button>
+      )}
+
       <div id="leads-toolbar" className={flashCls("leads-toolbar")}>
         <LeadsToolbar
           searchQuery={searchQuery} setSearchQuery={setSearchQuery}
@@ -1615,13 +1799,14 @@ export function LeadsClient({
           priorityMap={priorityMap}
           onReadNotes={handleReadNotes}
           viewedIds={viewedIds}
+          windowInfo={pageInfo ? { shown: visibleLeads.length, total: pageInfo.total } : null}
           T={T}
         />
       ) : viewMode === "table" ? (
         // NEW (iter6): analytics-style table view — same interaction model as
         // the card list (click a row → detail panel on desktop / sheet on
         // mobile), but dense and scannable.
-        sortedLeads.length === 0 ? (
+        sortedLeads.length === 0 && !isFetchingLeads ? (
           <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} onReset={resetAllFilters} T={T} />
         ) : (
           <LeadTableView
@@ -1637,7 +1822,10 @@ export function LeadsClient({
             T={T}
           />
         )
-      ) : sortedLeads.length === 0 ? (
+      ) : sortedLeads.length === 0 && !isFetchingLeads ? (
+        // EMPTY-STATE vs LOADING (2026-09-10): раньше EmptyState «Живые лиды
+        // появятся здесь» рисовался ОДНОВРЕМЕННО с синей плашкой «Загружаю
+        // лиды…» — противоречивые состояния на холодном старте.
         <EmptyState hasFilters={hasFilters} searchQuery={debouncedSearchQuery} onReset={resetAllFilters} T={T} />
       ) : (
         <LeadList
@@ -1664,7 +1852,7 @@ export function LeadsClient({
           HH:MM» от тихого 90-секундного рефреша. */}
       {pageInfo && (
         <div className="flex flex-col items-center gap-2 py-4">
-          {pageInfo.hasMore && (
+          {pageInfo.hasMore && moreCount > 0 && (
             <button
               type="button"
               onClick={loadMoreLeads}
@@ -1678,17 +1866,22 @@ export function LeadsClient({
                   Догружаю…
                 </>
               ) : (
-                <>Показать ещё {Math.min(LEADS_PAGE_SIZE, pageInfo.total - visibleLeads.length)}</>
+                <>Показать ещё {moreCount}</>
               )}
             </button>
           )}
           <span className="text-[11px]" style={{ color: T.textFaint }}>
             Показано {visibleLeads.length} из {pageInfo.total} лидов
+            {(filterStage !== "all" || filterSource !== "all" || filterOwner !== "all" || debouncedSearchQuery.trim())
+              ? " · по текущим фильтрам (счётчики воронки — по всему экипажу)"
+              : ""}
             {pageInfo.hasMore ? " — лучшие уже наверху" : ""}
             {viewedIds.size > 0 ? ` · открыто за смену: ${viewedIds.size}` : ""}
-            {lastSyncAt
-              ? ` · обновлено ${new Date(lastSyncAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
-              : ""}
+            {isFetchingLeads && !leadsLoadError
+              ? " · обновляю…"
+              : lastSyncAt
+                ? ` · обновлено ${new Date(lastSyncAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`
+                : ""}
           </span>
         </div>
       )}
@@ -1707,7 +1900,35 @@ export function LeadsClient({
         const selectedLead =
           leadsState.find((l) => l.user_id === selectedId) ||
           sortedLeads.find((l) => l.user_id === selectedId);
-        if (!selectedLead) return null;
+        if (!selectedLead) {
+          // FIX (2026-09-10): тишина вместо шторки = «кнопка сломана».
+          // Лид мог уйти из окна (dismiss/фильтр/дозагрузка) — говорим честно
+          // и снимаем выделение вместо мёртвого клика.
+          return (
+            <LeadDetailSheet
+              open={true}
+              onClose={() => setSelectedId(null)}
+              title="Лид не найден"
+              T={T}
+            >
+              <div className="p-6 text-center text-sm" style={{ color: T.textFaint }}>
+                <p className="mb-3">Лид уже не в загруженном окне (фильтры, dismiss или дозагрузка).</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLeadsLoadError(null);
+                    setManualRetryTick((t) => t + 1);
+                    setSelectedId(null);
+                  }}
+                  className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
+                  style={{ borderColor: T.border, color: T.text }}
+                >
+                  Обновить список
+                </button>
+              </div>
+            </LeadDetailSheet>
+          );
+        }
         return (
           <LeadDetailSheet
             open={true}

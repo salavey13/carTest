@@ -181,9 +181,19 @@ export function LeadCard({ lead, signals, selected, onSelect, onDismiss, priorit
       whileTap={{ scale: 0.995 }}
       transition={{ type: "spring", damping: 22, stiffness: 320 }}
       onClick={onSelect}
+      // A11Y (2026-09-10): карточка — интерактивный элемент, но раньше была
+      // недоступна с клавиатуры (onClick на article без роли/tabIndex).
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       // pl-[18px] reserves space for the 3px left color stripe + breathing room.
       // p-3 (12px) on mobile, md:p-4 (16px) on desktop.
-      className="relative cursor-pointer overflow-hidden rounded-[24px] p-3 pl-[18px] md:p-4 md:pl-[22px]"
+      className="relative cursor-pointer overflow-hidden rounded-[24px] p-3 pl-[18px] outline-none focus-visible:ring-2 focus-visible:ring-amber-400 md:p-4 md:pl-[22px]"
       style={{
         background: T.bgCard,
         border: `1px solid ${selected ? stageColor : T.border}`,

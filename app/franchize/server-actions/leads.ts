@@ -203,12 +203,12 @@ export type { LeadRentalRow, LeadSaleRow, LeadRow, LeadTodoRow, GetFranchizeLead
  */
 async function getCrewOperatorIds(
   slug: string,
-): Promise<{ ids: Set<string>; crewId: string | null; ownerId: string | null }> {
+): Promise<{ ids: Set<string>; crewId: string | null; ownerId: string | null; dismissedLeads: Record<string, string> }> {
   const ids = new Set<string>();
   try {
     const { data: crew } = await supabaseAdmin
       .from("crews")
-      .select("id, owner_id")
+      .select("id, owner_id, metadata")
       .eq("slug", slug)
       .maybeSingle();
 
@@ -226,10 +226,15 @@ async function getCrewOperatorIds(
         }
       }
     }
-    return { ids, crewId: crew?.id ?? null, ownerId: crew?.owner_id ?? null };
+    // DISMISS STICKINESS (2026-09-10): metadata.dismissed_leads — key → ISO time
+    // written by /api/franchize/lead-todo DELETE (dismissLead). Read here so the
+    // lead build can drop dismissed cards (see applyDismissedLeadMarkers below).
+    const crewMeta = ((crew?.metadata as Record<string, unknown> | null) || {});
+    const dismissedLeads = (crewMeta.dismissed_leads as Record<string, string> | null) || {};
+    return { ids, crewId: crew?.id ?? null, ownerId: crew?.owner_id ?? null, dismissedLeads };
   } catch (error) {
     logger.warn("[getCrewOperatorIds] Failed to fetch crew operators:", error);
-    return { ids, crewId: null, ownerId: null };
+    return { ids, crewId: null, ownerId: null, dismissedLeads: {} };
   }
 }
 
@@ -378,14 +383,35 @@ export async function getFranchizeLeads(
     // Path 1b: initData fallback — same checks, Telegram-signed identity
     // Path 2: Password auth — verify actorUserId is the crew owner (server-side)
     // Previously: NO auth at all, then isPasswordAuth boolean bypass — both fixed.
-    const { ids: crewOperatorIds, crewId } = await getCrewOperatorIds(safeSlug);
+    const { ids: crewOperatorIds, crewId, dismissedLeads } = await getCrewOperatorIds(safeSlug);
     if (!crewId) {
       return { success: false, error: "Экипаж не найден" };
     }
 
     // Try Telegram cookie auth first (then signed initData fallback)
     const access = await verifyCrewAccess(crewId, initData, actorUserId);
-    if (!access.allowed) {
+    // DEV-MOCK PARITY (2026-09-10): intents.ts resolveFranchizeActorFromServerSession
+    // accepts a development/preview mock actor, but this action did not — so in the
+    // standard local-dev scenario (mock user, no cookie, no initData) the whole
+    // leads page was stuck on «Не авторизован» while the crew probe (intents.ts)
+    // already said isCrew=true. Same guard as the intents.ts precedent:
+    // NODE_ENV!=='production' + NEXT_PUBLIC_USE_MOCK_USER==='true' → production
+    // is untouched. checkUserCrewAccess still verifies real crew membership of
+    // the mock user, so this grants nothing beyond the probe already allowed.
+    let accessAllowed = access.allowed;
+    if (
+      !accessAllowed &&
+      process.env.NODE_ENV !== "production" &&
+      process.env.NEXT_PUBLIC_USE_MOCK_USER === "true"
+    ) {
+      const mockUserId = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
+      const mockCheck = await checkUserCrewAccess(mockUserId, crewId);
+      if (mockCheck.allowed) {
+        logger.warn("[getFranchizeLeads] development mock actor accepted:", mockUserId);
+        accessAllowed = true;
+      }
+    }
+    if (!accessAllowed) {
       // Cookie auth failed — try password auth (actorUserId must be crew owner)
       if (actorUserId && isPasswordAuth) {
         const ownerAccess = await verifyCrewOwnerAccess(actorUserId, crewId);
@@ -1690,6 +1716,49 @@ export async function getFranchizeLeads(
     // Operator-created todos (user_id = operator, phone = renter) match the
     // renter's phone-keyed lead via the phone candidate; the operator chat_id
     // candidate matches nothing because leads are never keyed by operator ids.
+    // ── DISMISS STICKINESS (2026-09-10) ──
+    // Drop leads the operator dismissed (crews.metadata.dismissed_leads, written
+    // by /api/franchize/lead-todo DELETE). Phone/name/synthetic-keyed leads are
+    // rebuilt from artifacts on every load, so intent-stage dismissal alone
+    // could not reach them — the card resurrected. A returning customer is NOT
+    // lost: any lead activity newer than the marker (new intent/rental/sale,
+    // last seen) beats the dismissal and the card reappears.
+    const applyDismissedLeadMarkers = (): void => {
+      if (!dismissedLeads || Object.keys(dismissedLeads).length === 0) return;
+      for (const [key, atIso] of Object.entries(dismissedLeads)) {
+        if (!key || !atIso) continue;
+        const lead = leadMap.get(key);
+        if (!lead) continue;
+        const dismissedMs = new Date(atIso).getTime();
+        if (!Number.isFinite(dismissedMs)) {
+          leadMap.delete(key);
+          continue;
+        }
+        // Last activity across every source merged into the lead.
+        let lastActivityMs = NaN;
+        const stamps = [
+          lead.lastModifiedAt,
+          lead.lastSeenAt,
+          lead.createdAt,
+          ...lead.rentals.map((r) => r.startDate),
+          ...lead.sales.map((s) => s.createdAt),
+        ];
+        for (const s of stamps) {
+          if (!s) continue;
+          const t = new Date(s).getTime();
+          if (Number.isFinite(t) && (!Number.isFinite(lastActivityMs) || t > lastActivityMs)) {
+            lastActivityMs = t;
+          }
+        }
+        // No readable activity → treat as old (stays hidden); anything NEWER
+        // than the dismissal wins and the lead comes back.
+        if (!Number.isFinite(lastActivityMs) || lastActivityMs <= dismissedMs) {
+          leadMap.delete(key);
+        }
+      }
+    };
+    applyDismissedLeadMarkers();
+
     const leadUserIds = new Set(Array.from(leadMap.keys()));
 
     // Build rental_id → lead user_id lookup for rental_id-based todo matching
@@ -1838,6 +1907,31 @@ export async function getFranchizeLeads(
       dedupedTodos.push(t);
     }
 
+    // ── PERF (2026-09-10): ведро «лид → его туду» строится ОДИН раз ──
+    // Раньше matchTodosToLead(lead, ВСЕ_туду) прогонялся для каждого лида в
+    // ЧЕТЫРЁХ местах (assignee, KPI/hotWaiting, speed, playbook) — на срезе
+    // 500 лидов × 1000 туду это миллионы итераций и JSON.parse на запрос.
+    // Ведро построено теми же правилами 1:1 с клиентским useTodosMapping
+    // (rental_id сильнее; иначе — ЛЮБЫЕ identity-кандидаты туду ∈ ключей
+    // лида) и передаётся во все потребители опциональным параметром
+    // (легаси-фолбэк matchTodosToLead в либах сохранён).
+    const todosByLead = new Map<string, LeadTodoRow[]>();
+    const pushTodoToLead = (leadId: string, t: LeadTodoRow): void => {
+      const bucket = todosByLead.get(leadId);
+      if (bucket) bucket.push(t);
+      else todosByLead.set(leadId, [t]);
+    };
+    for (const t of dedupedTodos) {
+      const todoRentalId = getTodoRentalId(t);
+      if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) {
+        pushTodoToLead(rentalIdToLeadId.get(todoRentalId) as string, t);
+        continue;
+      }
+      const matched = getTodoLeadIds(t).filter((id) => leadUserIds.has(id));
+      for (const id of matched) pushTodoToLead(id, t);
+    }
+    const getTodosForLeadSrv = (lead: LeadRow): LeadTodoRow[] => todosByLead.get(lead.user_id) ?? [];
+
     // Compute assignee/owner for each lead.
     // FIX: this whole block used to run ONLY when some todo had assigned_to —
     // crews without assigned todos got ownerId set but ownerName stayed null,
@@ -1867,7 +1961,7 @@ export async function getFranchizeLeads(
       }
     }
     for (const l of leadMap.values()) {
-      l.assigneeId = computeAssignee(l, dedupedTodos);
+      l.assigneeId = computeAssignee(l, dedupedTodos, todosByLead);
       if (l.assigneeId) {
         const a = assigneeMap.get(l.assigneeId);
         l.assigneeName = a?.full_name || a?.username || null;
@@ -2002,24 +2096,8 @@ export async function getFranchizeLeads(
       const nowMs = Date.now();
       const allLeads = Array.from(leadMap.values());
 
-      // Ведра «лид → его туду» — семантика 1:1 с клиентским useTodosMapping
-      // (rental_id сильнее; иначе — ЛЮБОЙ identity-кандидат туду ∈ ключей лида).
-      const todosByLead = new Map<string, LeadTodoRow[]>();
-      const pushTodoToLead = (leadId: string, t: LeadTodoRow): void => {
-        const bucket = todosByLead.get(leadId);
-        if (bucket) bucket.push(t);
-        else todosByLead.set(leadId, [t]);
-      };
-      for (const t of dedupedTodos) {
-        const todoRentalId = getTodoRentalId(t);
-        if (todoRentalId && rentalIdToLeadId.has(todoRentalId)) {
-          pushTodoToLead(rentalIdToLeadId.get(todoRentalId) as string, t);
-          continue;
-        }
-        const matched = getTodoLeadIds(t).filter((id) => leadUserIds.has(id));
-        for (const id of matched) pushTodoToLead(id, t);
-      }
-      const getTodosForLeadSrv = (lead: LeadRow): LeadTodoRow[] => todosByLead.get(lead.user_id) ?? [];
+      // Ведро «лид → его туду» (todosByLead / getTodosForLeadSrv) построено
+      // ОДИН раз выше (перед assignee) — здесь только переиспользуется.
 
       // Базовый набор агрегатов = «активные лиды» (заглушки скрываются
       // только когда оператор включил тумблер — паритет с клиентом).
@@ -2027,10 +2105,10 @@ export async function getFranchizeLeads(
         ? allLeads.filter((l) => placeholderHasActivity(l, getTodosForLeadSrv(l)))
         : allLeads;
 
-      const kpi = computeLeadKpi(baseSet, dedupedTodos, nowMs);
+      const kpi = computeLeadKpi(baseSet, dedupedTodos, nowMs, todosByLead);
       // Плейбук — очередь «что делать сейчас» по ПОЛНОМУ набору (перезвоны
       // и горячие за окном не должны исчезать из SOP).
-      const playbook = buildNextActions(baseSet, dedupedTodos, nowMs, 6);
+      const playbook = buildNextActions(baseSet, dedupedTodos, nowMs, 6, todosByLead);
 
       // ── «Суперлист закрыт» (2026-09-09, просьба босса: «when somebody
       // actually covered whole superlead list — notify admin and owner, give
@@ -2083,7 +2161,15 @@ export async function getFranchizeLeads(
 
       agg = {
         kpi,
-        kpiCards: computeLeadsKpiCardsStats(baseSet, dedupedTodos, nowMs),
+        // 2026-09-10 (критик R2): плитка «Горячие» раньше считала ТЕМПЕРАТУРУ
+        // авито-анализа (temperature=hot), а чип-сегмент тулбара «Горячие» —
+        // другую очередь (urgency/туду/выручка). Две «горячие» цифры на одном
+        // экране противоречили друг другу (0 vs 27). Теперь плитка показывает
+        // ТУ ЖЕ метрику, что и чип (клик по чипу фильтрует ровно это).
+        kpiCards: {
+          ...computeLeadsKpiCardsStats(baseSet, dedupedTodos, nowMs),
+          hot: segCats.hot.length,
+        },
         playbook,
         stageBreakdown,
         segmentCounts: {
@@ -2151,11 +2237,18 @@ export async function getFranchizeLeads(
           !!windowOpts.hidePlaceholders,
         ).filter((l) => matchStageFilter(l, windowOpts.stage || "all"));
         windowTodos = [];
+        // 2026-09-10 FIX: раньше hasMore был захардкожен в true — после того
+        // как оператор дозагрузил всё, тихий meta-рефреш каждые 90 с оживлял
+        // кнопку «Показать ещё» (вплоть до «Показать ещё 0»). Теперь клиент в
+        // meta-режиме сообщает в offset, сколько лидов он УЖЕ показал, и
+        // hasMore = total > показано. Легаси-вызов с offset=0 ведёт себя как
+        // раньше (hasMore=true — «точность не критична»).
+        const shownSoFar = Math.max(0, Math.floor(windowOpts.offset ?? 0));
         pageInfo = {
-          offset: Math.max(0, Math.floor(windowOpts.offset ?? 0)),
+          offset: shownSoFar,
           limit: Math.max(1, Math.floor(windowOpts.limit as number)),
           total: filteredForCount.length,
-          hasMore: true, // точность не критична: окно клиента не заменяется
+          hasMore: shownSoFar > 0 ? filteredForCount.length > shownSoFar : true,
         };
       }
     }

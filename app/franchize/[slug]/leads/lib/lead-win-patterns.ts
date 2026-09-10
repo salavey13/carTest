@@ -100,6 +100,11 @@ function share(count: number, n: number): number | null {
 export function computeWinPatterns(
   leadsInput: LeadRow[],
   allTodosInput: LeadTodoRow[],
+  /**
+   * PERF (2026-09-10): готовое ведро «лид → его туду» (сервер строит ОДИН
+   * раз). Без него — легаси-путь matchTodosToLead (фолбэк сохранён).
+   */
+  todosByLead?: Map<string, LeadTodoRow[]>,
 ): WinPattern[] {
   const leads = Array.isArray(leadsInput) ? leadsInput : [];
   const allTodos = Array.isArray(allTodosInput) ? allTodosInput : [];
@@ -130,7 +135,7 @@ export function computeWinPatterns(
     lostWithHandle = 0; // знаменатель для «скорости» (есть отметка времени)
 
   for (const lead of won) {
-    const todosForLead = matchTodosToLead(lead, allTodos);
+    const todosForLead = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, allTodos);
     const handledMs = earliestHandledAt(todosForLead);
     if (Number.isFinite(handledMs)) {
       wonWithHandle += 1;
@@ -143,7 +148,7 @@ export function computeWinPatterns(
   }
 
   for (const lead of lost) {
-    const todosForLead = matchTodosToLead(lead, allTodos);
+    const todosForLead = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, allTodos);
     const handledMs = earliestHandledAt(todosForLead);
     if (Number.isFinite(handledMs)) {
       lostWithHandle += 1;

@@ -59,6 +59,10 @@ interface LeadsPlaybookPanelProps {
    *  это только текст; курс 2026: SOP = «прочитал → сделал», а «сделал»
    *  начинается с открытия диалога). leadId отсутствует → строка статична. */
   onOpenLead?: (leadId: string) => void;
+  /** Тост-обратная связь для копирования (2026-09-10, критик R3): раньше
+   *  сбой clipboard (http/TG WebView/headless) гас молча — оператор не мог
+   *  понять, скопировалось или нет. */
+  onToast?: (msg: string, kind?: "info" | "success" | "error") => void;
   T: any;
   /** Ключ sticky-стора достижений (`leads-achv:<slug>`) — из него считается
    *  звание «пути оператора» для чипа в шапке. Связка замыкается там, где
@@ -114,7 +118,7 @@ function buzz(ms = 10): void {
   }
 }
 
-export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneStorageKey, compactPrefKey, guidesKey, superlist }: LeadsPlaybookPanelProps) {
+export function LeadsPlaybookPanel({ actions, onOpenLead, onToast, T, storageKey, doneStorageKey, compactPrefKey, guidesKey, superlist }: LeadsPlaybookPanelProps) {
   // Какая строка только что скопирована — галочка вместо иконки на 2 секунды.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -262,15 +266,39 @@ export function LeadsPlaybookPanel({ actions, onOpenLead, T, storageKey, doneSto
   const [doneOpen, setDoneOpen] = useState(false);
 
   const copyMessage = async (key: string, text: string) => {
+    // 2026-09-10 (критик R3): ЛЮБОЙ исход теперь виден оператору.
+    // 1) Clipboard API; 2) fallback textarea+execCommand (http/TG WebView);
+    // 3) если и это запрещено — явный тост, а не тишина.
     try {
       await navigator.clipboard.writeText(text);
       setCopiedKey(key);
       buzz(8);
+      onToast?.("Сообщение скопировано", "success");
       window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
+      return;
     } catch {
-      // Clipboard API может быть недоступен (http/TG WebView) — тихо игнорируем:
-      // текст остаётся виден в detail, оператор скопирует вручную.
+      /* фолбэк ниже */
     }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) {
+        setCopiedKey(key);
+        buzz(8);
+        onToast?.("Сообщение скопировано", "success");
+        window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
+        return;
+      }
+    } catch {
+      /* тост ниже */
+    }
+    onToast?.("Браузер не дал доступ к буферу — текст можно выделить и скопировать вручную", "error");
   };
 
   const renderRow = (a: NextAction, i: number, isDoneRow: boolean) => {

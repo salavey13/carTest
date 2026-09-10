@@ -381,9 +381,12 @@ export function LeadsAchievementsPanel({ achievements, storageKey, T }: LeadsAch
 
       {/* Тост-поздравление со свежим событием — по одному из очереди.
           Видно из любой точки страницы, т.к. бейджи живут внизу длинного
-          скролла. unlock — «Новое достижение», tier — «Новый уровень». */}
+          скролла. unlock — «Новое достижение», tier — «Новый уровень».
+          2026-09-10: НЕ показываем одновременно с гранд-баннером звания
+          (раньше стекались ДВЕ кнопки «Закрыть поздравление»); тост вернётся
+          сразу послеdismiss'а баннера. */}
       <AnimatePresence mode="wait">
-        {toast && (
+        {toast && !rankUp && (
           <motion.div
             key={`${toast.kind}:${toast.id}:${toast.tier}`}
             initial={{ opacity: 0, y: 16, scale: 0.95 }}

@@ -221,8 +221,21 @@ export function computeQrStatus(lead: LeadRow): "unclaimed" | "sent" | "claimed"
   return "unclaimed";
 }
 
-export function computeAssignee(lead: LeadRow, todos: LeadTodoRow[]): string | null {
-  const leadTodos = matchTodosToLead(lead, todos);
+/**
+ * Assignee лида: последний назначенный туду → последний завершённый →
+ * исходный оператор.
+ *
+ * PERF (2026-09-10): на серверном пути (getFranchizeLeads) передавайте
+ * `todosByLead` — готовое ведро «лид → его туду» (теми же правилами матчинга,
+ * построенное ОДИН раз за запрос). Без него — легаси-путь matchTodosToLead
+ * O(лиды×туду) на каждый вызов.
+ */
+export function computeAssignee(
+  lead: LeadRow,
+  todos: LeadTodoRow[],
+  todosByLead?: Map<string, LeadTodoRow[]>,
+): string | null {
+  const leadTodos = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, todos);
   const pending = leadTodos.filter((t) => t.status !== "done").sort((a, b) => b.created_at.localeCompare(a.created_at));
   if (pending.length > 0 && pending[0].assigned_to) return pending[0].assigned_to;
   const done = leadTodos.filter((t) => t.status === "done").sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""));

@@ -297,6 +297,11 @@ export function buildNextActions(
   allTodosInput: LeadTodoRow[],
   now: number = Date.now(),
   limit: number = 4,
+  /**
+   * PERF (2026-09-10): готовое ведро «лид → его туду» (сервер строит ОДИН
+   * раз). Без него — легаси-путь matchTodosToLead (фолбэк сохранён).
+   */
+  todosByLead?: Map<string, LeadTodoRow[]>,
 ): NextAction[] {
   const leads = Array.isArray(leadsInput) ? leadsInput : [];
   const allTodos = Array.isArray(allTodosInput) ? allTodosInput : [];
@@ -311,7 +316,7 @@ export function buildNextActions(
     const name = leadFirstName(lead);
     const who = name ? name : "Лид";
     const leadId = lead.user_id || null;
-    const todosForLead = matchTodosToLead(lead, allTodos);
+    const todosForLead = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, allTodos);
     const handling = getLeadHandling(todosForLead);
 
     const isConverted =

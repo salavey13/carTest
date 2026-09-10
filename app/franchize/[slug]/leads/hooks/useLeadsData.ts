@@ -3,14 +3,7 @@
 
 import { useMemo, useCallback, useRef } from "react";
 import type {LeadRow, LeadTodoRow} from "../leads-types";
-import { 
-  filterLeads, 
-  sortLeads, 
-  categorizeLeads, 
-  getAvailableSources,
-  groupLeadsForBoard,
-  buildPriorityMap 
-} from "../leads-utils";
+import { buildPriorityMap } from "../leads-utils";
 import type { LeadPriority } from "../lib/lead-priority";
 import { normalizePhone } from "@/app/franchize/lib/phone-utils";
 import { parseTodoDesc } from "../lib/lead-identity";
@@ -149,16 +142,29 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
     });
   }, [todos]);
 
-  /** Stable result cache: same lead + same todos → same array reference */
+  /** Stable result cache: same lead + same todos → same array reference.
+   *  2026-09-10 FIX: сравнение было только length+id+status — смена
+   *  due_date/title/assigned_to сохраняла СТАРЫЙ массив-референс, и плашки
+   *  перезвонов/назначенных лагали до следующей «другой формы» изменения. */
   const cache = useRef(new Map<string, LeadTodoRow[]>()).current;
   const getTodosForLeadStable = useCallback((lead: LeadRow): LeadTodoRow[] => {
     const cacheKey = lead.user_id;
     const prev = cache.get(cacheKey);
     const result = getTodosForLead(lead);
-    // Compare by length + each element id — only update cache if actually changed
-    if (prev && prev.length === result.length && prev.every((t, i) => t.id === result[i]?.id && t.status === result[i]?.status)) {
-      return prev; // same reference = no effect trigger in downstream components
-    }
+    const sameShape =
+      prev &&
+      prev.length === result.length &&
+      prev.every((t, i) => {
+        const n = result[i];
+        return (
+          t.id === n?.id &&
+          t.status === n?.status &&
+          (t.due_date || null) === (n?.due_date || null) &&
+          t.title === n?.title &&
+          (t.assigned_to || null) === (n?.assigned_to || null)
+        );
+      });
+    if (sameShape) return prev; // same reference = no effect trigger in downstream components
     cache.set(cacheKey, result);
     return result;
   }, [getTodosForLead, cache]);
@@ -166,58 +172,9 @@ export function useTodosMapping(todos: LeadTodoRow[]) {
   return { getTodosForLead: getTodosForLeadStable };
 }
 
-export function useFilteredSortedLeads(
-  leads: LeadRow[],
-  searchQuery: string,
-  filterSource: string,
-  segment: "all" | "hot" | "verified" | "warm" | "troubled",
-  getTodosForLead: (lead: LeadRow) => LeadTodoRow[],
-  sortMode: "priority" | "recent" | "urgent" | "name" | "spent",
-  hidePlaceholders: boolean = false,
-  priorityMap?: Map<string, LeadPriority>,
-) {
-  const filteredLeads = useMemo(
-    () => filterLeads(leads, searchQuery, filterSource, segment, getTodosForLead, hidePlaceholders),
-    [leads, searchQuery, filterSource, segment, getTodosForLead, hidePlaceholders]
-  );
-
-  const sortedLeads = useMemo(
-    () => sortLeads(filteredLeads, sortMode, getTodosForLead, priorityMap),
-    [filteredLeads, sortMode, getTodosForLead, priorityMap]
-  );
-
-  const { hot, verified, warm } = useMemo(
-    () => categorizeLeads(sortedLeads, getTodosForLead),
-    [sortedLeads, getTodosForLead]
-  );
-
-  // availableSources is based on the full leads set so filters don't disappear
-  const availableSources = useMemo(
-    () => getAvailableSources(leads),
-    [leads]
-  );
-
-  const hasFilters = useMemo(
-    () => !!(searchQuery || filterSource !== "all"),
-    [searchQuery, filterSource]
-  );
-
-  const boardColumns = useMemo(
-    () => groupLeadsForBoard(sortedLeads),
-    [sortedLeads]
-  );
-
-  return {
-    filteredLeads,
-    sortedLeads,
-    hot,
-    verified,
-    warm,
-    availableSources,
-    hasFilters,
-    boardColumns,
-  };
-}
+// DEAD CODE REMOVED (2026-09-10): useFilteredSortedLeads — клиентская
+// фильтрация/сортировка легаси-пути, не используется с серверного уиндоуинга
+// (LeadsClient фильтрует окно через изоморфный filterLeads напрямую).
 
 /**
  * Priority Score карта для всех лидов (ТЗ: индекс приоритета 0–100).

@@ -30,7 +30,8 @@ const ROOT = resolve(__dirname, "../..");
 const SERVER_ROOTS: string[] = [
   "app/franchize/server-actions/leads.ts",
   "app/franchize/server-actions/lead-notes.ts",
-  "app/franchize/server-actions/leads-kpis.ts",
+  // 2026-09-10: leads-kpis.ts (мёртвый легаси-экспорт getLeadsKpis) удалён —
+  // единственный «возврат всего без окна» оставался опасным вором вызовов.
   "app/franchize/lib/lead-events.ts",
   "app/franchize/lib/lead-event-core.ts",
   "app/api/webhooks/avito/route.ts",

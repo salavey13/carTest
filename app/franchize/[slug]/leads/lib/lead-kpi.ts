@@ -194,15 +194,21 @@ function rateOr(numerator: number, denominator: number): number | null {
 /**
  * KPI-воронка по всему срезу лидов. now — снаружи (чистота + тесты);
  * в клиенте передаётся nowTick (обновление раз в минуту вместе со speed).
+ *
+ * PERF (2026-09-10): опциональное ведро todosByLead (лид → его туду) убирает
+ * O(лиды×туду) перематчивание внутри speed/winPatterns/hotWaiting-проверок —
+ * сервер строит его ОДИН раз и передаёт сюда; клиент продолжает вызывать без
+ * него (легаси-путь matchTodosToLead сохранён как фолбэк).
  */
 export function computeLeadKpi(
   leadsInput: LeadRow[],
   allTodosInput: LeadTodoRow[],
   now: number = Date.now(),
+  todosByLead?: Map<string, LeadTodoRow[]>,
 ): LeadKpiMetrics {
   const leads = asArray(leadsInput);
   const allTodos = asArray(allTodosInput);
-  const speed = computeLeadSpeedMetrics(leads, allTodos, now);
+  const speed = computeLeadSpeedMetrics(leads, allTodos, now, todosByLead);
 
   let leadsTotal = 0;
   let leadsToday = 0;
@@ -255,7 +261,7 @@ export function computeLeadKpi(
     // «ждёт» = не обработан, не конвертирован, без назначенного перезвона.
     if (lead.avito?.analysis?.temperature === "hot") {
       hotTotal += 1;
-      if (isLeadUnhandledWaiting(lead, allTodos)) hotWaiting += 1;
+      if (isLeadUnhandledWaiting(lead, allTodos, todosByLead)) hotWaiting += 1;
     }
 
     if (lead.avito?.analysis?.intent === "testdrive") testdrives += 1;
@@ -269,7 +275,7 @@ export function computeLeadKpi(
       const day = new Date(createdMs).getDay();
       if (day === 0 || day === 6) {
         weekendLeads += 1;
-        if (isLeadHandledLike(lead, allTodos)) weekendHandled += 1;
+        if (isLeadHandledLike(lead, allTodos, todosByLead)) weekendHandled += 1;
       }
     }
 
@@ -277,7 +283,7 @@ export function computeLeadKpi(
     // этом лид не обработан, не конвертировался и без назначенного перезвона
     // — пул реанимации («нет — не навсегда», курс 2026).
     if (isAvitoLike && isGhostDialog(lead, now)) {
-      const waiting = isLeadUnhandledWaiting(lead, allTodos);
+      const waiting = isLeadUnhandledWaiting(lead, allTodos, todosByLead);
       if (waiting) ghostsTotal += 1;
     }
 
@@ -330,7 +336,7 @@ export function computeLeadKpi(
     dealRate,
     normProgress: speed.handledToday / NORM_HANDLED_PER_DAY,
     speed,
-    winPatterns: computeWinPatterns(leads, allTodos),
+    winPatterns: computeWinPatterns(leads, allTodos, todosByLead),
   };
 }
 
@@ -340,13 +346,18 @@ export function computeLeadKpi(
  * lead-speed.ts (matchTodosToLead + isHandledTodo + isCallbackTodo), —
  * горячие лиды просто получают отдельный счётчик, чтобы «не слить целевых».
  */
-export function isLeadUnhandledWaiting(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
+export function isLeadUnhandledWaiting(
+  lead: LeadRow,
+  allTodos: LeadTodoRow[],
+  todosByLead?: Map<string, LeadTodoRow[]>,
+): boolean {
   const isConverted = lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0;
   if (isConverted) return false;
 
   let hasHandledMark = false;
   let hasActiveCallback = false;
-  for (const t of matchTodosToLead(lead, allTodos)) {
+  const leadTodos = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, allTodos);
+  for (const t of leadTodos) {
     if (isHandledTodo(t)) hasHandledMark = true;
     if (isCallbackTodo(t) && t.status !== "done") hasActiveCallback = true;
   }
@@ -358,9 +369,14 @@ export function isLeadUnhandledWaiting(lead: LeadRow, allTodos: LeadTodoRow[]): 
  * времени. Используется для «обработанность выходных лидов» (покрытие
  * сб/вс), где время отметки не важно, важен факт.
  */
-function isLeadHandledLike(lead: LeadRow, allTodos: LeadTodoRow[]): boolean {
+function isLeadHandledLike(
+  lead: LeadRow,
+  allTodos: LeadTodoRow[],
+  todosByLead?: Map<string, LeadTodoRow[]>,
+): boolean {
   if (lead.rentals.length > 0 || lead.sales.length > 0 || (lead.contractCount ?? 0) > 0) return true;
-  for (const t of matchTodosToLead(lead, allTodos)) {
+  const leadTodos = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, allTodos);
+  for (const t of leadTodos) {
     if (isHandledTodo(t)) return true;
   }
   return false;

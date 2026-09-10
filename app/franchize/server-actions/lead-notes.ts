@@ -22,9 +22,20 @@ async function verifyNoteAccess(
   const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
 
   // Path 1: Telegram WebApp — read signed cookie
-  const cookieUserId = verifyTelegramActorCookieValue(
+  // DEV-MOCK PARITY (2026-09-10): in dev/preview the mock actor (intents.ts
+  // precedent) had no cookie → notes stayed «Не авторизован» while the leads
+  // page itself loaded. Same guard, production untouched.
+  let cookieUserId = verifyTelegramActorCookieValue(
     (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
   );
+  if (
+    !cookieUserId &&
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_USE_MOCK_USER === "true"
+  ) {
+    cookieUserId = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
+    logger.warn("[lead-notes] development mock actor accepted:", cookieUserId);
+  }
 
   if (cookieUserId) {
     const { data: crew } = await supabaseAdmin

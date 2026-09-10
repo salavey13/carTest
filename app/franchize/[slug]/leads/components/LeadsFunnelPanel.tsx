@@ -119,6 +119,16 @@ export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageS
           <span className="text-[10px]" style={{ color: T.textFaint }}>
             Активность → Диалог → КЭВ → Сделка
           </span>
+          {/* 2026-09-10 (критик R1): воронка считается по ПОЛНОМУ набору
+              экипажа и НЕ меняется с фильтрами списка — раньше это читали
+              как «цифры врут». Явная подпись снимает противоречие. */}
+          <span
+            className="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+            style={{ backgroundColor: T.borderSoft, color: T.textFaint }}
+            title="Цифры воронки считаются по всем лидам экипажа — фильтры списка на них не влияют"
+          >
+            весь экипаж, без фильтров
+          </span>
         </div>
         <span className="text-[10px]" style={{ color: T.textFaint }}>
           Ср. скорость ответа: {kpi.speed.medianMs != null ? fmtDurationMs(kpi.speed.medianMs) : "—"}
@@ -234,7 +244,12 @@ export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageS
               <p className="text-[10px] leading-tight" style={{ color: T.textFaint }}>
                 {s.rate != null ? `${pct(s.rate)} от лидов` : s.sub}
               </p>
-              {/* Конверсия с предыдущей ступени — бейдж справа */}
+              {/* Конверсия с предыдущей ступени — бейдж справа.
+                  2026-09-10 (критик R2): ступени считаются по РАЗНЫм правилам
+                  (КЭВ — по стадии «договор отправлен», Диалог — по отметке
+                  «обработан»), и часть доходит до договора без отметки —
+                  поэтому КЭВ/Диалог может быть >100%. Кэп 100% + честный
+                  тултип вместо дезориентирующей «115%». */}
               {i > 0 && steps[i - 1].value > 0 && (
                 <span
                   className="absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
@@ -242,9 +257,13 @@ export function LeadsFunnelPanel({ kpi, T, stageBreakdown, activeStage, onStageS
                     backgroundColor: `${steps[i - 1].color}22`,
                     color: steps[i - 1].color,
                   }}
-                  title={`Конверсия «${steps[i - 1].label}» → «${s.label}»`}
+                  title={
+                    s.value > steps[i - 1].value
+                      ? `Конверсия «${steps[i - 1].label}» → «${s.label}»: часть лидов доходит без отметки на предыдущем шаге`
+                      : `Конверсия «${steps[i - 1].label}» → «${s.label}»`
+                  }
                 >
-                  {Math.round((s.value / steps[i - 1].value) * 100)}%
+                  {Math.min(100, Math.round((s.value / steps[i - 1].value) * 100))}%
                 </span>
               )}
             </div>

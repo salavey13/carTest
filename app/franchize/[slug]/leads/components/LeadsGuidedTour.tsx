@@ -119,6 +119,12 @@ export function LeadsGuidedTour({ T, slug, isCrew, autoLaunch, onReveal }: Leads
   const autoTriedRef = useRef(false);
 
   // Автозапуск для новичка: один раз, когда страница реально готова.
+  // 2026-09-10 FIX «блокирующей стены»: раньше автозапуск открывал ПОЛНЫЙ
+  // модал (fixed inset-0 backdrop) — первые секунды страница не отвечала на
+  // клики, и новичок боролся с оверлеем вместо работы. Теперь автозапуск
+  // поднимает тур СРАЗУ СВЁРНУТЫМ (пилюля внизу) — страница полностью
+  // кликабельна, разворот по желанию. Ручной запуск кнопкой «?» — по-прежнему
+  // полный модал (юзер сам попросил).
   useEffect(() => {
     if (!autoLaunch || autoTriedRef.current) return;
     autoTriedRef.current = true;
@@ -131,7 +137,7 @@ export function LeadsGuidedTour({ T, slug, isCrew, autoLaunch, onReveal }: Leads
     if (seen) return;
     const t = window.setTimeout(() => {
       setStep(0);
-      setMinimized(false);
+      setMinimized(true);
       setOpen(true);
     }, 1500);
     return () => window.clearTimeout(t);

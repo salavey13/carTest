@@ -220,6 +220,12 @@ export function computeLeadSpeedMetrics(
   leadsInput: LeadRow[],
   allTodosInput: LeadTodoRow[],
   now: number = Date.now(),
+  /**
+   * PERF (2026-09-10): готовое ведро «lead.user_id → его туду» (сервер строит
+   * ОДИН раз за запрос). Без него — легаси-путь matchTodosToLead на каждый
+   * лид (O(лиды×туду), на срезе 500×1000 это миллионы итераций).
+   */
+  todosByLead?: Map<string, LeadTodoRow[]>,
 ): LeadSpeedMetrics {
   const leads = asArray(leadsInput);
   const allTodos = asArray(allTodosInput);
@@ -244,7 +250,7 @@ export function computeLeadSpeedMetrics(
     // Операторские заглушки — не входящие обращения, метрики не портим.
     if (lead.identityState === "operator_placeholder") continue;
 
-    const todosForLead = matchTodosToLead(lead, allTodos);
+    const todosForLead = todosByLead ? (todosByLead.get(lead.user_id) ?? []) : matchTodosToLead(lead, allTodos);
     const cb = scanCallback(todosForLead, now);
     callbacksPending += cb.pending;
     callbacksOverdue += cb.overdue;

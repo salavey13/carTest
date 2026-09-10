@@ -169,10 +169,30 @@ export async function DELETE(request: NextRequest) {
       const dismissedAt = new Date().toISOString();
       const dismissedBy = auth.userId || null;
 
-      // Also dismiss the user (mark as not a lead) so they disappear from all lead sources.
-      // We need to read the existing user.metadata first so we can MERGE our new fields
-      // instead of overwriting the whole metadata object (which would wipe things like
-      // the user's phone, bikeId, franchizeFormPrefill, etc.).
+      // DISMISS STICKINESS FIX (2026-09-10): leads on the page are keyed in
+      // several shapes (server: leads.ts) — numeric telegram id, "avito:<chat>",
+      // normalized phone, "name:<фамилия…>", "opdoc:/oprental:/opsale:/opsecret:/
+      // optestdrive:<id>". The old code matched ONLY telegram_user_id (or avito
+      // chat), so phone/name/synthetic-keyed leads matched nothing, the route
+      // still returned success, and the card resurrected on the next load.
+      // Now: 1) match intents by the RIGHT column for the key shape;
+      // 2) ALWAYS record the dismissal in crews.metadata.dismissed_leads
+      //    (key → dismissedAt) — the read path honors it for every key shape.
+      // A returning customer reappears: new intent activity newer than the
+      // marker beats the dismissal (see leadLastActivityMs in leads.ts).
+      const { normalizePhone } = await import("@/app/franchize/lib/phone-utils");
+      const isAvitoKey = typeof leadId === "string" && leadId.startsWith("avito:");
+      const avitoChatId = isAvitoKey ? leadId.slice("avito:".length) : null;
+      const isNumericTg = typeof leadId === "string" && /^\d{1,12}$/.test(leadId);
+      const isOpDocKey = typeof leadId === "string" && leadId.startsWith("opdoc:");
+      // Phone candidates: raw key + normalized form (dedup) — covers "+7…",
+      // "8…", "7…" shapes that leads.ts uses as identity keys.
+      const phoneCandidates = Array.from(
+        new Set([leadId, normalizePhone(leadId)].filter((v): v is string => !!v)),
+      );
+      const isPhoneKey =
+        !isAvitoKey && !isNumericTg && phoneCandidates.every((c) => /^(\+?\d{10,12})$/.test(c.replace(/[\s\-\(\)]/g, "")));
+
       const { data: existingUser } = await supabaseAdmin
         .from("users")
         .select("metadata")
@@ -190,62 +210,93 @@ export async function DELETE(request: NextRequest) {
         },
       }).eq("user_id", leadId);
 
-      // Same merge pattern for franchize_intents — read each intent's metadata,
-      // merge in the dismiss fields, then update.
-      // PostgREST doesn't support JSONB merge natively, so we do it in two steps.
-      //
-      // Avito chat leads are keyed "avito:<chat_id>" on the client (they have
-      // no telegram_user_id and no phone) — match them by the Avito chat id
-      // instead of telegram_user_id, and skip the users-table update above
-      // (there is no users row for them; the update above is a no-op anyway).
-      const isAvitoKey = typeof leadId === "string" && leadId.startsWith("avito:");
-      const avitoChatId = isAvitoKey ? leadId.slice("avito:".length) : null;
+      // Intents update, matched by key shape (avito chat / tg id / opdoc intent
+      // id / phone column). PostgREST doesn't support JSONB merge natively, so
+      // we read each intent's metadata, merge in the dismiss fields, then update.
+      let matchedIntents = 0;
+      let intentsQuery: ReturnType<typeof supabaseAdmin.from> | null = null;
+      if (avitoChatId) {
+        intentsQuery = supabaseAdmin
+          .from("franchize_intents")
+          .select("id, metadata")
+          .eq("slug", body.slug)
+          .eq("contact_channel", "avito")
+          .filter("metadata->>avitoChatId", "eq", avitoChatId);
+      } else if (isOpDocKey) {
+        // "opdoc:<intent id>" IS the intent id — the most precise match.
+        intentsQuery = supabaseAdmin
+          .from("franchize_intents")
+          .select("id, metadata")
+          .eq("id", leadId.slice("opdoc:".length))
+          .eq("slug", body.slug);
+      } else if (isNumericTg) {
+        intentsQuery = supabaseAdmin
+          .from("franchize_intents")
+          .select("id, metadata")
+          .eq("telegram_user_id", leadId)
+          .eq("slug", body.slug);
+      } else if (isPhoneKey) {
+        // Phone-keyed lead: intents store the renter phone in the `phone`
+        // column (bot /leads-bridge, callback capture). Match raw + normalized.
+        intentsQuery = supabaseAdmin
+          .from("franchize_intents")
+          .select("id, metadata")
+          .eq("slug", body.slug)
+          .in("phone", phoneCandidates);
+      }
+      if (intentsQuery) {
+        const { data: existingIntents } = await intentsQuery;
+        if (existingIntents && existingIntents.length > 0) {
+          matchedIntents = existingIntents.length;
+          await Promise.all(existingIntents.map((intent: { id: string; metadata: Record<string, unknown> | null }) => {
+            const intentMeta = intent.metadata || {};
+            return supabaseAdmin
+              .from("franchize_intents")
+              .update({
+                stage: "dismissed",
+                updated_at: dismissedAt,
+                metadata: {
+                  ...intentMeta,
+                  dismiss_reason: dismissReason,
+                  dismiss_note: dismissNote,
+                  dismissed_at: dismissedAt,
+                  dismissed_by: dismissedBy,
+                },
+              })
+              .eq("id", intent.id);
+          }));
+        }
+      }
 
-      const existingIntentsQuery = avitoChatId
-        ? supabaseAdmin
-            .from("franchize_intents")
-            .select("id, metadata")
-            .eq("slug", body.slug)
-            .eq("contact_channel", "avito")
-            .filter("metadata->>avitoChatId", "eq", avitoChatId)
-        : supabaseAdmin
-            .from("franchize_intents")
-            .select("id, metadata")
-            .eq("telegram_user_id", leadId)
-            .eq("slug", body.slug);
-      const { data: existingIntents } = await existingIntentsQuery;
-
-      if (existingIntents && existingIntents.length > 0) {
-        await Promise.all(existingIntents.map((intent: { id: string; metadata: Record<string, unknown> | null }) => {
-          const intentMeta = intent.metadata || {};
-          return supabaseAdmin
-            .from("franchize_intents")
+      // ── crews.metadata.dismissed_leads marker — the universal stickiness net ──
+      // Covers name:/oprental:/opsale:/opsecret:/optestdrive: keys (no intents
+      // at all) AND phone/tg leads rebuilt from artifacts regardless of intents
+      // stage. Read-modify-write, dedupe, cap 1000 (drop oldest on overflow).
+      {
+        const { data: crewRow } = await supabaseAdmin
+          .from("crews")
+          .select("id, metadata")
+          .eq("slug", String(body.slug))
+          .maybeSingle();
+        if (crewRow?.id) {
+          const crewMeta = (crewRow.metadata as Record<string, unknown> | null) || {};
+          const prevMap = (crewMeta.dismissed_leads as Record<string, string> | null) || {};
+          const nextMap: Record<string, string> = { ...prevMap, [String(leadId)]: dismissedAt };
+          const entries = Object.entries(nextMap);
+          if (entries.length > 1000) {
+            entries.sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
+            for (const [k] of entries.slice(0, entries.length - 1000)) delete nextMap[k];
+          }
+          await supabaseAdmin
+            .from("crews")
             .update({
-              stage: "dismissed",
-              updated_at: dismissedAt,
               metadata: {
-                ...intentMeta,
-                dismiss_reason: dismissReason,
-                dismiss_note: dismissNote,
-                dismissed_at: dismissedAt,
-                dismissed_by: dismissedBy,
+                ...crewMeta,
+                dismissed_leads: nextMap,
               },
             })
-            .eq("id", intent.id);
-        }));
-      } else if (!avitoChatId) {
-        // Fallback: no existing intents found — just do the bare update (matches old behavior)
-        const { error } = await supabaseAdmin.from("franchize_intents").update({
-          stage: "dismissed",
-          updated_at: dismissedAt,
-        }).eq("telegram_user_id", leadId).eq("slug", body.slug);
-
-        if (error) {
-          logger.error("[lead-todo] dismiss lead failed", error);
-          return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+            .eq("id", crewRow.id);
         }
-      } else {
-        return NextResponse.json({ success: false, error: "Avito лид не найден" }, { status: 404 });
       }
 
       // Журнал истории (Lead Game): отклонение лида с причиной —
@@ -260,7 +311,7 @@ export async function DELETE(request: NextRequest) {
         detail: [dismissReason, dismissNote].filter(Boolean).join(" · ") || null,
       });
 
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, matchedIntents });
     }
 
     if (!todoId) {

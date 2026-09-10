@@ -16,6 +16,22 @@ export const SOURCE_META: Record<string, { label: string; icon: LucideIcon; colo
   rental_secret:   { label: "Документы",    icon: FileText,     color: "#06b6d4", bg: "#06b6d420" },
   profile_prefill: { label: "Профиль",      icon: FileText,     color: "#6366f1", bg: "#6366f120" },
   unknown:         { label: "Клиент",       icon: Users,        color: "#64748b", bg: "#64748b20" },
+  // ── 2026-09-10: сырье из franchize_intents.intent_type, которое раньше
+  // просачивалось в фильтр «Источник» как английские slug'и (критик R1).
+  // Канонический список типов — intents.ts franchizeIntentTypes.
+  contact_click:   { label: "Клик по контакту", icon: Phone,        color: "#3b82f6", bg: "#3b82f620" },
+  map_click:       { label: "Клик по карте",    icon: Bike,         color: "#8b5cf6", bg: "#8b5cf620" },
+  test_ride:       { label: "Тест-драйв",       icon: Bike,         color: "#8b5cf6", bg: "#8b5cf620" },
+  test_ride_click: { label: "Клик по тест-драйву", icon: Bike,      color: "#8b5cf6", bg: "#8b5cf620" },
+  prebuy:          { label: "Интерес к покупке", icon: TrendingUp, color: "#f59e0b", bg: "#f59e0b20" },
+  finance:         { label: "Рассрочка",        icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },
+  trade_in:        { label: "Трейд-ин",         icon: TrendingUp,   color: "#f59e0b", bg: "#f59e0b20" },
+  hold_created:    { label: "Бронь",            icon: CheckCircle,  color: "#10b981", bg: "#10b98120" },
+  service:         { label: "Сервис",           icon: FileText,     color: "#06b6d4", bg: "#06b6d420" },
+  payment_success: { label: "Оплата прошла",    icon: CheckCircle,  color: "#10b981", bg: "#10b98120" },
+  payment_failure: { label: "Сбой оплаты",      icon: MessageSquare,color: "#0af",    bg: "#0af20" },
+  rental:          { label: "Аренда",           icon: Bike,         color: "#10b981", bg: "#10b98120" },
+  avito_webhook:   { label: "Авито",            icon: MessageSquare,color: "#0af",    bg: "#0af20" },
 };
 
 /**
@@ -31,9 +47,9 @@ export const SOURCE_META: Record<string, { label: string; icon: LucideIcon; colo
  * КАНОНИЧЕСКОЙ группе (sourceGroupOf), а filterLeads матчит группу целиком.
  */
 export const SOURCE_GROUPS: Record<string, { label: string; members: string[] }> = {
-  testdrive: { label: "Тест-драйв", members: ["test_drive", "testdrive_contract"] },
-  rent:      { label: "Аренда",    members: ["rental_contract", "rent"] },
-  sale:      { label: "Покупка",   members: ["sale_contract", "sale"] },
+  testdrive: { label: "Тест-драйв", members: ["test_drive", "testdrive_contract", "test_ride", "test_ride_click"] },
+  rent:      { label: "Аренда",    members: ["rental_contract", "rent", "rental"] },
+  sale:      { label: "Покупка",   members: ["sale_contract", "sale", "prebuy", "hold_created"] },
 };
 
 const RAW_SOURCE_TO_GROUP: Record<string, string> = {};
