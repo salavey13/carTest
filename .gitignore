@@ -51,3 +51,6 @@ upload/secrets_all.txt
 upload/DEAL_*.csv
 
 .critic-shots*/
+
+# critic loop throwaway harness + evidence
+.critic/
