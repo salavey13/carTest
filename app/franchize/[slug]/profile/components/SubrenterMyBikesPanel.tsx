@@ -176,7 +176,7 @@ export function SubrenterMyBikesPanel({
                   {formatCurrency(earnings.cutRub)}
                 </span>
                 <span className="text-[11px]" style={{ color: T.textMuted }}>
-                  ваша доля · 50% от аренды байков {formatCurrency(earnings.bikePartRub)}
+                  ваша доля · {earnings.pct ?? 50}% от аренды байков {formatCurrency(earnings.bikePartRub)}
                   {earnings.equipmentRub > 0 && (
                     <> · экипировка {formatCurrency(earnings.equipmentRub)} (не делится)</>
                   )}

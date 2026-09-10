@@ -18,6 +18,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import {
+  SUBRENTER_SHARE_PCT,
   getEquipmentCostPart,
   getSubrenterCut,
   buildSubrenterActivationMessage,
@@ -40,6 +41,46 @@ export interface SubrenterNotifyInput {
   startDate?: string | null;
   endDate?: string | null;
   crewName?: string | null;
+  /** Partner share resolved by the caller (skips the artifact lookup). */
+  pct?: number;
+}
+
+/**
+ * Partner share actually applied to this crew's subrent deals: the latest
+ * contract artifact's owner_percentage (private.subrent_contract_artifacts,
+ * crew_id column stores the crew SLUG) → clamped [1..99] → default 50.
+ * 2026-09-10 parity: the SAME pct must show in the TG messages, the profile
+ * «Мои байки в парке» panel and the weekly payout report — previously the
+ * messages and the profile hardcoded 50% while the report paid the artifact
+ * pct, so the numbers disagreed for non-50 contracts. Best-effort: any
+ * lookup failure falls back to 50 without throwing.
+ */
+export async function resolveSubrenterSharePct(crewId: string | null | undefined): Promise<number> {
+  if (!crewId) return SUBRENTER_SHARE_PCT;
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("slug")
+      .eq("id", crewId)
+      .maybeSingle();
+    const slug = typeof (crew as { slug?: string | null } | null)?.slug === "string"
+      ? (crew as { slug: string }).slug
+      : null;
+    if (!slug) return SUBRENTER_SHARE_PCT;
+    const { data: artifact } = await supabaseAdmin
+      .schema("private" as never)
+      .from("subrent_contract_artifacts")
+      .select("owner_percentage")
+      .eq("crew_id", slug)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const stored = Number((artifact as { owner_percentage?: string | null } | null)?.owner_percentage);
+    if (Number.isFinite(stored) && stored >= 1 && stored <= 99) return Math.round(stored);
+  } catch {
+    // non-fatal — the default split keeps working
+  }
+  return SUBRENTER_SHARE_PCT;
 }
 
 /**
@@ -57,12 +98,16 @@ export async function notifySubrenterOfRentalActivation(
     let renterName = input.renterName ?? null;
     let startDate = input.startDate ?? null;
     let endDate = input.endDate ?? null;
+    // 2026-09-10 parity: resolve the partner share ONCE and use it in BOTH
+    // the cut math and the message text (artifact owner_percentage → 50).
+    let crewIdResolved: string | null = null;
+    let pct = input.pct ?? null;
 
     if (!vehicle) {
       const { data: rental } = await supabaseAdmin
         .from("rentals")
         .select(`
-          rental_id, total_cost, metadata,
+          rental_id, total_cost, metadata, crew_id,
           agreed_start_date, agreed_end_date,
           vehicle:cars(id, make, model, specs)
         `)
@@ -74,8 +119,10 @@ export async function notifySubrenterOfRentalActivation(
       metadata = (rental as { metadata?: Record<string, unknown> | null }).metadata ?? null;
       startDate = (rental as { agreed_start_date?: string | null }).agreed_start_date ?? null;
       endDate = (rental as { agreed_end_date?: string | null }).agreed_end_date ?? null;
+      crewIdResolved = (rental as { crew_id?: string | null }).crew_id ?? null;
     }
     if (!vehicle) return "";
+    if (pct == null) pct = await resolveSubrenterSharePct(crewIdResolved);
 
     const md = metadata ?? {};
     if (!renterName) {
@@ -97,7 +144,7 @@ export async function notifySubrenterOfRentalActivation(
     // iter32: pass the total — equipment-only rows (if a partner's bike ever
     // produces one) must not shift the split base.
     const equipmentRub = getEquipmentCostPart(md, totalCost);
-    const cutRub = getSubrenterCut(totalCost, equipmentRub);
+    const cutRub = getSubrenterCut(totalCost, equipmentRub, pct);
     const bikeTitle = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.id);
 
     const text = buildSubrenterActivationMessage({
@@ -106,6 +153,7 @@ export async function notifySubrenterOfRentalActivation(
       totalRub: totalCost ?? 0,
       equipmentRub,
       cutRub,
+      pct,
       shortRentalId: input.rentalId.slice(0, 8),
       startDate,
       endDate,
@@ -153,12 +201,15 @@ export async function notifySubrenterOfRentalCompletion(
     let renterName = input.renterName ?? null;
     let startDate = input.startDate ?? null;
     let endDate = input.endDate ?? null;
+    // 2026-09-10 parity: same pct resolution as the activation message.
+    let crewIdResolved: string | null = null;
+    let pct = input.pct ?? null;
 
     if (!vehicle) {
       const { data: rental } = await supabaseAdmin
         .from("rentals")
         .select(`
-          rental_id, total_cost, metadata,
+          rental_id, total_cost, metadata, crew_id,
           agreed_start_date, agreed_end_date,
           vehicle:cars(id, make, model, specs)
         `)
@@ -170,8 +221,10 @@ export async function notifySubrenterOfRentalCompletion(
       metadata = (rental as { metadata?: Record<string, unknown> | null }).metadata ?? null;
       startDate = (rental as { agreed_start_date?: string | null }).agreed_start_date ?? null;
       endDate = (rental as { agreed_end_date?: string | null }).agreed_end_date ?? null;
+      crewIdResolved = (rental as { crew_id?: string | null }).crew_id ?? null;
     }
     if (!vehicle) return "";
+    if (pct == null) pct = await resolveSubrenterSharePct(crewIdResolved);
 
     const md = metadata ?? {};
     if (!renterName) {
@@ -189,7 +242,7 @@ export async function notifySubrenterOfRentalCompletion(
     if (!subrenterChatId) return "";
 
     const equipmentRub = getEquipmentCostPart(md, totalCost);
-    const cutRub = getSubrenterCut(totalCost, equipmentRub);
+    const cutRub = getSubrenterCut(totalCost, equipmentRub, pct);
     const bikeTitle = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.id);
 
     const text = buildSubrenterCompletionMessage({
@@ -198,6 +251,7 @@ export async function notifySubrenterOfRentalCompletion(
       totalRub: totalCost ?? 0,
       equipmentRub,
       cutRub,
+      pct,
       shortRentalId: input.rentalId.slice(0, 8),
       startDate,
       endDate,

@@ -727,9 +727,12 @@ export function buildRentalContractVariables(
   }
   const subtotalRounded = Math.round(subtotal);
 
-  // Equipment cost (helmet: 500₽ for hourly <24h, 1000₽ for daily ≥24h)
+  // Equipment cost — FLAT per rental (2026-09-10 owner fix): helmet 1000₽
+  // on every tier; the old `hours < 24 ? 500 : 1000` halving stored a
+  // half-priced helmet into metadata.equipment_price and shifted the
+  // subrenter split. Mirrors getHelmetPrice() + EQUIPMENT_UNIT_PRICES_RUB.
   const eq = options.equipment || {};
-  const helmetUnitPrice = rentalHours < 24 ? 500 : 1000;
+  const helmetUnitPrice = 1000;
   const equipmentCostTotal =
     (eq.helmets || 0) * helmetUnitPrice +
     (eq.gloves || 0) * 500 +

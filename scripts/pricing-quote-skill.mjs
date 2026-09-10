@@ -240,9 +240,14 @@ function calculatePrice(dailyPrice, days, hours, specs = {}, startDateStr = null
   return { base: dailyPrice * days, tier: "/ день", tierPrice: dailyPrice, days };
 }
 
-function helmetPrice(hours) {
-  // Mirrors getHelmetPrice(): hourly rentals (<24h) = 500₽, daily+ (≥24h) = 1000₽
-  return hours && hours > 0 && hours < 24 ? 500 : 1000;
+function helmetPrice(_hours) {
+  // FLAT since 2026-09-10 (owner fix «equipment is half priced for hourly
+  // rents»): the old `hours < 24 ? 500 : 1000` halving stored a half-priced
+  // helmet into metadata.equipment_price and shifted the subrenter split.
+  // One canon: 1000₽ per helmet on every tier, mirrors getHelmetPrice() and
+  // EQUIPMENT_UNIT_PRICES_RUB (rental-price-split.ts). Argument ignored.
+  void _hours;
+  return 1000;
 }
 
 function calculateEquipment(opts) {

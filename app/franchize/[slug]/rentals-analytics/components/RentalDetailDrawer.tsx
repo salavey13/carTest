@@ -268,7 +268,7 @@ export function RentalDetailDrawer({
     ...(moneySplit.isPartnerBike
       ? [{
           label: "Нам / Партнёру",
-          value: `${formatRubles(moneySplit.companyRub)} / ${formatRubles(moneySplit.partnerRub)} (50%)`,
+          value: `${formatRubles(moneySplit.companyRub)} / ${formatRubles(moneySplit.partnerRub)} (${moneySplit.ownerPct}%)`,
         }]
       : []),
     // FIX (F4): equipment part of the total as a separate field (iter32:

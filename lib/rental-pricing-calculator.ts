@@ -63,7 +63,9 @@ export interface PricingResult {
 }
 
 const HELMET_PRICE_DAILY_RUB = 1000;
-const HELMET_PRICE_HOURLY_RUB = 500;
+/** Kept for backward-compatible imports; the hourly helmet price is retired
+ *  (2026-09-10) — getHelmetPrice() now always returns HELMET_PRICE_DAILY_RUB. */
+export const HELMET_PRICE_HOURLY_RUB = HELMET_PRICE_DAILY_RUB;
 const DEFAULT_DEPOSIT_RUB = 20000;
 const DEFAULT_DAILY_PRICE = 10000;
 const DEFAULT_HOURLY_PRICE = 1000; // v2 formula: 10% of daily
@@ -107,18 +109,21 @@ export function calculateExtrasRub(extras?: RentalExtrasSelection): number {
 }
 
 /**
- * Get helmet price based on rental tier.
- * Pure hourly rentals (< 3h): 500 ₽ per helmet
- * Tiered rentals (3h+, 6h, 12h, daily+): 1000 ₽ per helmet
+ * Get helmet price per rental — FLAT, duration-independent.
  *
- * FIX (code review 2026-07-30): previously used `rentalHours < 24` which
- * charged 500 ₽ for 3-hour tiered rentals. The test expected 1000 ₽
- * because tiered rentals (3h, 6h) are effectively "half-day" or better
- * and should use the daily helmet price. Now we use the tier: if the
- * rental qualified for a 3h+ tier, charge the daily helmet price.
+ * HISTORY: the original rule was `rentalHours < 3 ? 500 : 1000` (an earlier
+ * fix on 2026-07-30 narrowed the 500₽ window from <24h to <3h). The owner
+ * finally killed the whole halving idea on 2026-09-10: «equipment price … is
+ * half priced: helmet 500 instead of 1000». A half-priced helmet stored in
+ * metadata.equipment_price shifted the subrenter revenue split (less gear
+ * deducted → more of the total split as the bike part). One canon now:
+ * 1000 ₽ per helmet on EVERY tier, matching EQUIPMENT_UNIT_PRICES_RUB in
+ * rental-price-split.ts. The rentalHours argument is kept for call-site
+ * compatibility and intentionally ignored.
  */
-export function getHelmetPrice(rentalHours: number): number {
-  return rentalHours < 3 ? HELMET_PRICE_HOURLY_RUB : HELMET_PRICE_DAILY_RUB;
+export function getHelmetPrice(_rentalHours?: number): number {
+  void _rentalHours;
+  return HELMET_PRICE_DAILY_RUB;
 }
 
 function normalizeHourlyRental(hours: number): {

@@ -1238,28 +1238,10 @@ function buildRentSummary(context: DocFlowContext): string {
 
   // ── Equipment list ──
   // Show selected equipment with prices so the operator can verify.
-  // Helmet price is dynamic: 500₽ for hourly (<24h), 1000₽ for daily (≥24h).
-  // This mirrors the getAdditionalItemPrice() logic in app/franchize/modals/Item.tsx:740.
-  const rentalHours = (() => {
-    try {
-      const parseDate = (dateStr?: string, timeStr?: string): Date | null => {
-        if (!dateStr) return null;
-        // dateStr format: "DD.MM.YYYY", timeStr format: "HH:MM"
-        const [d, m, y] = dateStr.split(".");
-        const time = timeStr || "10:00";
-        const [hh, mm] = time.split(":");
-        return new Date(`${y}-${m}-${d}T${hh}:${mm}:00+03:00`);
-      };
-      const start = parseDate(context.rentStartDate, context.rentStartTime);
-      const end = parseDate(context.rentEndDate, context.rentEndTime);
-      if (!start || !end) return undefined;
-      return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    } catch {
-      return undefined;
-    }
-  })();
-
-  const helmetUnitPrice = rentalHours !== undefined && rentalHours < 24 ? 500 : 1000;
+  // Helmet price is FLAT (2026-09-10 owner fix «equipment is half priced for
+  // hourly rents»): 1000₽ on every tier — mirrors getHelmetPrice() and
+  // EQUIPMENT_UNIT_PRICES_RUB. rentalHours is kept for display context only.
+  const helmetUnitPrice = 1000;
 
   const eqLines: string[] = [];
   if (context.helmets && context.helmets > 0) {

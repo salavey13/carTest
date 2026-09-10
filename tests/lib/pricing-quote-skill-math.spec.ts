@@ -79,10 +79,10 @@ describe("pricing-quote-skill: tier model parity with pricing-calculator.ts", ()
     expect(calculatePrice(DAILY, 0, 48, FULL_TIERS).base).toBe(2400 * 2);
   });
 
-  it("helmet is duration-dependent: 500₽ hourly, 1000₽ daily+", () => {
-    expect(helmetPrice(5)).toBe(500);
+  it("helmet is FLAT 1000₽ on every tier (hourly halving retired 2026-09-10)", () => {
+    expect(helmetPrice(5)).toBe(1000);
     expect(helmetPrice(0)).toBe(1000);
-    expect(calculateEquipment({ hours: 5, helmets: 2 }).total).toBe(1000);
+    expect(calculateEquipment({ hours: 5, helmets: 2 }).total).toBe(2000);
     expect(calculateEquipment({ hours: 0, helmets: 2 }).total).toBe(2000);
   });
 });

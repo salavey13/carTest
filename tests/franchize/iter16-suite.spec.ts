@@ -74,13 +74,13 @@ describe("iter16: extras pricing (gloves no longer free)", () => {
     });
   });
 
-  it("hourly rental: helmet priced hourly + flat extras still apply", () => {
+  it("hourly rental: helmet is FLAT 1000₽ (no hourly halving, 2026-09-10) + flat extras", () => {
     const r = calculatePrice(APRILIA_SPECS, "2026-08-28", "2026-08-28", "10:00", "12:00", 1, { gloves: true });
-    expect(r.helmetRub).toBe(500); // < 3h → hourly helmet price
+    expect(r.helmetRub).toBe(1000); // 2026-09-10: gear no longer half-priced on hourly tiers
     expect(r.extrasRub).toBe(500);
     // 2h interpolated base: 1200 + (5000−1200)×(2−1)/2 = 3100
     expect(r.basePriceRub).toBe(3100);
-    expect(r.totalRub).toBe(3100 + 500 + 500);
+    expect(r.totalRub).toBe(3100 + 1000 + 500);
   });
 
   it("no extras → identical to the previous (helmet-only) math", () => {

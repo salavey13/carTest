@@ -33,12 +33,17 @@ function validatePositiveNumber(value: number | string | undefined): number | un
 }
 
 /**
- * Get helmet price based on rental duration.
- * Hourly rentals (< 24h): 500 ₽ per helmet
- * Daily+ rentals (≥ 24h): 1000 ₽ per helmet
+ * Helmet price per rental — FLAT, duration-independent (2026-09-10 owner fix
+ * «equipment is half priced for hourly rents»): every hourly halving used to
+ * store a HALF-priced helmet into metadata.equipment_price, which then
+ * shifted the subrenter revenue split. One price everywhere: 1000 ₽ per
+ * helmet, matching EQUIPMENT_UNIT_PRICES_RUB (rental-price-split.ts) — the
+ * table the split, the profile and analytics read. The rentalHours argument
+ * is kept for call-site compatibility and intentionally ignored.
  */
-export function getHelmetPrice(rentalHours: number): number {
-  return rentalHours < 24 ? 500 : 1000;
+export function getHelmetPrice(_rentalHours?: number): number {
+  void _rentalHours;
+  return 1000;
 }
 
 /**

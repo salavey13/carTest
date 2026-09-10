@@ -133,9 +133,17 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
   useEffect(() => {
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => {
+      // 2026-09-10 hardening (once-seen runtime error): guard every photos[]
+      // access — an empty/stale array must never produce a NaN index or an
+      // undefined photo read ("Cannot read properties of undefined").
+      const len = lightbox.photos.length;
+      if (len === 0) {
+        setLightbox(null);
+        return;
+      }
       if (e.key === "Escape") setLightbox(null);
-      if (e.key === "ArrowLeft") setLightbox((lb) => (lb ? { ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length } : lb));
-      if (e.key === "ArrowRight") setLightbox((lb) => (lb ? { ...lb, index: (lb.index + 1) % lb.photos.length } : lb));
+      if (e.key === "ArrowLeft") setLightbox((lb) => (lb && lb.photos.length > 0 ? { ...lb, index: ((lb.index - 1) % lb.photos.length + lb.photos.length) % lb.photos.length } : null));
+      if (e.key === "ArrowRight") setLightbox((lb) => (lb && lb.photos.length > 0 ? { ...lb, index: (lb.index + 1) % lb.photos.length } : null));
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -383,7 +391,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
       )}
 
       {/* ── LIGHTBOX ──────────────────────────────────────────── */}
-      {lightbox ? (
+      {lightbox && lightbox.photos.length > 0 && lightbox.photos[lightbox.index] ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
           onClick={() => setLightbox(null)}
@@ -403,7 +411,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
                 className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition hover:bg-white/20"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLightbox((lb) => (lb ? { ...lb, index: (lb.index - 1 + lb.photos.length) % lb.photos.length } : lb));
+                  setLightbox((lb) => (lb && lb.photos.length > 0 ? { ...lb, index: ((lb.index - 1) % lb.photos.length + lb.photos.length) % lb.photos.length } : null));
                 }}
                 aria-label="Предыдущее фото"
               >
@@ -413,7 +421,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition hover:bg-white/20"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setLightbox((lb) => (lb ? { ...lb, index: (lb.index + 1) % lb.photos.length } : lb));
+                  setLightbox((lb) => (lb && lb.photos.length > 0 ? { ...lb, index: (lb.index + 1) % lb.photos.length } : null));
                 }}
                 aria-label="Следующее фото"
               >

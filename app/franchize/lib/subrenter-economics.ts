@@ -77,7 +77,18 @@ export function getEquipmentCostPart(
     }
     return getRentalEquipmentPart(metadata);
   }
-  return getRentalEquipmentPart(metadata);
+  const part = getRentalEquipmentPart(metadata);
+  // 2026-09-10 parity fix: when the total IS known, clamp the gear part to
+  // it — exactly what splitRentalPrice() does for the drawer/report view.
+  // Without the clamp a row whose stored equipment_price exceeded
+  // total_cost (price-override edge) produced DIFFERENT «Экипировка» numbers
+  // in the subrenter profile (unclamped) and the payment split (clamped) —
+  // the owner compares both views and they must agree.
+  if (totalCost != null) {
+    const total = toFiniteNumber(totalCost);
+    if (total > 0) return Math.min(part, Math.round(total));
+  }
+  return part;
 }
 
 /** Bike-only revenue part: total minus the equipment part, floored at 0. */
@@ -127,6 +138,9 @@ export interface SubrenterActivationMessageInput {
   totalRub: number | string | null | undefined;
   equipmentRub: number;
   cutRub: number;
+  /** Partner share actually applied (default 50) — shown in the message so
+   *  the number always matches the profile / payout report. */
+  pct?: number;
   shortRentalId?: string;
   startDate?: string | null;
   endDate?: string | null;
@@ -141,6 +155,7 @@ export function buildSubrenterActivationMessage(
   input: SubrenterActivationMessageInput,
 ): string {
   const bikePart = getBikeRevenuePart(input.totalRub, input.equipmentRub);
+  const pct = Number.isFinite(input.pct) && (input.pct as number) > 0 ? Math.round(input.pct as number) : SUBRENTER_SHARE_PCT;
   const lines: string[] = [
     "🏍 <b>Ваш байк в аренде</b>",
     "",
@@ -159,7 +174,7 @@ export function buildSubrenterActivationMessage(
     lines.push(`Экипировка (не делится): ${formatRub(input.equipmentRub)}`);
   }
   lines.push(
-    `Ваша доля (50% от аренды байка ${formatRub(bikePart)}): <b>${formatRub(input.cutRub)}</b>`,
+    `Ваша доля (${pct}% от аренды байка ${formatRub(bikePart)}): <b>${formatRub(input.cutRub)}</b>`,
   );
   if (input.shortRentalId) lines.push("", `ID аренды: <code>${escapeHtml(input.shortRentalId)}</code>`);
   if (input.crewName) lines.push(`Экипаж: ${escapeHtml(input.crewName)}`);
@@ -301,6 +316,9 @@ export interface SubrenterCompletionMessageInput {
   totalRub: number | string | null | undefined;
   equipmentRub: number;
   cutRub: number;
+  /** Partner share actually applied (default 50) — shown in the message so
+   *  the number always matches the profile / payout report. */
+  pct?: number;
   shortRentalId?: string;
   startDate?: string | null;
   endDate?: string | null;
@@ -318,6 +336,7 @@ export function buildSubrenterCompletionMessage(
   input: SubrenterCompletionMessageInput,
 ): string {
   const bikePart = getBikeRevenuePart(input.totalRub, input.equipmentRub);
+  const pct = Number.isFinite(input.pct) && (input.pct as number) > 0 ? Math.round(input.pct as number) : SUBRENTER_SHARE_PCT;
   const lines: string[] = [
     "✅ <b>Байк вернулся из аренды</b>",
     "",
@@ -336,7 +355,7 @@ export function buildSubrenterCompletionMessage(
     lines.push(`Экипировка (не делится): ${formatRub(input.equipmentRub)}`);
   }
   lines.push(
-    `Ваш заработок (50% от аренды байка ${formatRub(bikePart)}): <b>${formatRub(input.cutRub)}</b>`,
+    `Ваш заработок (${pct}% от аренды байка ${formatRub(bikePart)}): <b>${formatRub(input.cutRub)}</b>`,
   );
   if (input.shortRentalId) lines.push("", `ID аренды: <code>${escapeHtml(input.shortRentalId)}</code>`);
   if (input.crewName) lines.push(`Экипаж: ${escapeHtml(input.crewName)}`);

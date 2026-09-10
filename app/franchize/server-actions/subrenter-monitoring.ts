@@ -28,6 +28,7 @@ import {
   getSubrenterCut,
   type SubrenterMonthSummary,
 } from "@/app/franchize/lib/subrenter-economics";
+import { resolveSubrenterSharePct } from "@/app/franchize/lib/subrenter-notify";
 
 export interface SubrenterOwnedBike {
   bikeId: string;
@@ -504,8 +505,14 @@ export async function getSubrenterMonthlyEarningsAction(input: {
       metadata: r.metadata ?? null,
     }));
 
+    // 2026-09-10 parity: same pct the weekly payout report pays (latest
+    // contract artifact owner_percentage → 50) — previously the panel
+    // always computed a 50% cut while the report could pay a different
+    // share, so the partner's profile and his payouts disagreed.
+    const sharePct = await resolveSubrenterSharePct(crew.id);
     const summary = summarizeSubrenterMonth(month, rows, {
       docLinkBase: `/franchize/${slug}/rental`,
+      pct: sharePct,
     });
 
     // ── iter32 (ExO «Autonomy»): the partner sees his payout bookkeeping —
@@ -584,7 +591,7 @@ export async function getSubrenterMonthlyEarningsAction(input: {
         const bucket = buckets.get(m);
         if (!bucket) continue;
         const equipmentRub = getEquipmentCostPart(r.metadata, r.total_cost);
-        bucket.cutRub += getSubrenterCut(r.total_cost ?? 0, equipmentRub);
+        bucket.cutRub += getSubrenterCut(r.total_cost ?? 0, equipmentRub, sharePct);
         bucket.rentalCount += 1;
       }
       for (const [m, v] of buckets) trend.push({ month: m, cutRub: v.cutRub, rentalCount: v.rentalCount });
@@ -598,6 +605,7 @@ export async function getSubrenterMonthlyEarningsAction(input: {
       success: true,
       data: {
         ...summary,
+        pct: sharePct,
         paidRub,
         remainingRub: Math.max(0, summary.cutRub - paidRub),
         trend,
@@ -625,6 +633,10 @@ export interface SubrenterEarningsData extends SubrenterMonthSummary {
   remainingRub: number;
   /** Last 6 MSK months of cuts, oldest → newest. */
   trend: SubrenterTrendPoint[];
+  /** Partner share actually applied (artifact owner_percentage → 50) —
+   *  2026-09-10 parity: the panel shows THIS pct instead of a hardcoded 50,
+   *  so the profile always agrees with the weekly payout report. */
+  pct: number;
 }
 
 export interface SubrenterPayoutRow {

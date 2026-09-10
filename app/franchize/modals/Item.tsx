@@ -729,10 +729,11 @@ function EquipmentPricingCalculator({
 // ───────────────────────────────────────────────────────────────────────────────
 
 /** All rentable extras with their prices (per rental, not per day).
- *  Helmet price is dynamic: 500₽ for hourly (<24h), 1000₽ for daily+ (≥24h).
- *  The `price` field here is the daily rate (used as fallback). */
+ *  2026-09-10 owner fix «equipment is half priced for hourly rents»: helmet
+ *  is FLAT 1000₽ on every tier — `hourlyPrice` is kept as an alias so older
+ *  imports keep compiling, but it no longer differs from `price`. */
 export const ADDITIONAL_ITEMS = [
-  { key: "helmet", label: "Шлем", price: 1000, hourlyPrice: 500, type: "count" as const, max: 2 },
+  { key: "helmet", label: "Шлем", price: 1000, hourlyPrice: 1000, type: "count" as const, max: 2 },
   { key: "gloves", label: "Перчатки", price: 500, type: "toggle" as const },
   { key: "jacket", label: "Куртка", price: 500, type: "toggle" as const },
   { key: "pants", label: "Штаны", price: 500, type: "toggle" as const },
@@ -744,16 +745,17 @@ export const ADDITIONAL_ITEMS = [
 
 export type AdditionalItemsSelection = Record<string, number | boolean>;
 
-/** Get the effective price for an additional item based on rental duration. */
-function getAdditionalItemPrice(item: typeof ADDITIONAL_ITEMS[number], rentalHours?: number): number {
-  if (item.key === "helmet" && rentalHours !== undefined) {
-    return rentalHours < 24 ? (item.hourlyPrice ?? 500) : item.price;
-  }
-  return item.price;
+/** Get the effective price for an additional item. FLAT since 2026-09-10:
+ *  the rental duration no longer changes gear prices (hourly halving retired
+ *  — it shifted the subrenter revenue split). rentalHours kept for signature
+ *  compatibility and intentionally ignored. */
+function getAdditionalItemPrice(item: typeof ADDITIONAL_ITEMS[number], _rentalHours?: number): number {
+  void _rentalHours;
+  return item.hourlyPrice ?? item.price;
 }
 
-/** Calculate total extras cost from selection.
- *  @param rentalHours - if provided, helmet price is dynamic (500₽ for <24h, 1000₽ for ≥24h) */
+/** Calculate total extras cost from selection. rentalHours is accepted for
+ *  signature compatibility but ignored — gear prices are flat (2026-09-10). */
 export function calcExtrasTotal(sel: AdditionalItemsSelection, rentalHours?: number): number {
   return ADDITIONAL_ITEMS.reduce((sum, item) => {
     const val = sel[item.key];
@@ -963,7 +965,7 @@ function PriceCard({
             <p>• Период: {result.breakdown.period}</p>
             <p>• Тариф: {result.breakdown.ratePerPeriod}</p>
             <p>• Аренда: {fmt(result.basePriceRub)} ₽</p>
-            {result.helmetRub > 0 && <p>• Шлем ×{helmetCount}: {fmt(result.helmetRub)} ₽ ({fmt(helmetUnitPrice)} ₽/шт{rentalHours < 24 ? ", почасово" : ""})</p>}
+            {result.helmetRub > 0 && <p>• Шлем ×{helmetCount}: {fmt(result.helmetRub)} ₽ ({fmt(helmetUnitPrice)} ₽/шт)</p>}
             {nonHelmetExtras > 0 && extrasSelection && (
               <>
                 {ADDITIONAL_ITEMS.filter((i) => i.key !== "helmet").map((item) => {

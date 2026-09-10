@@ -68,7 +68,7 @@ node scripts/pricing-quote-skill.mjs list-prices
 | 11–30 дней | `rent_11_30d` × дни |
 | без тарифа | `daily_price` × дни |
 
-Шлем: 500 ₽ при аренде < 24ч, 1000 ₽ при ≥ 24ч (`getHelmetPrice()`).
+Шлем: 1000 ₽ за шт на любой длительности (`getHelmetPrice()`, flat с 2026-09-10 — почасовая половинная цена отменена владельцем).
 
 ## Related files
 
