@@ -92,6 +92,13 @@ export interface BikeWallStats {
   earnedThisMonth: number;
   /** Earning rentals counted into earnedThisMonth (same month scope). */
   monthRentals: number;
+  /** Month-scoped twins of the all-time tiles (critic R1: the story KPI band
+   *  promised «KPI месяца» while Аренд/Ср.чек/Дни/Пробег stayed all-time).
+   *  Same scope as earnedThisMonth; non-cancelled rows; positive deltas only. */
+  monthRentalsAll: number;
+  monthAvgCheck: number;
+  monthDaysInRent: number;
+  monthDistance: number;
   completedCount: number;
   activeCount: number;
   cancelledCount: number;
@@ -358,6 +365,10 @@ export function computeBikeStats(
     earnedTotal: 0,
     earnedThisMonth: 0,
     monthRentals: 0,
+    monthRentalsAll: 0,
+    monthAvgCheck: 0,
+    monthDaysInRent: 0,
+    monthDistance: 0,
     completedCount: 0,
     activeCount: 0,
     cancelledCount: 0,
@@ -374,6 +385,7 @@ export function computeBikeStats(
 
   const currentMonth = monthKey ?? mskMonthKey(null, nowMs);
   let earnedCount = 0;
+  let monthEarnedCount = 0;
   let latestOdo: number | null = null;
 
   for (const r of rows) {
@@ -385,25 +397,35 @@ export function computeBikeStats(
     if (eff === "completed") stats.completedCount++;
     if (eff === "active" || eff === "confirmed" || eff === "pending_confirmation") stats.activeCount++;
 
+    const inMonth = mskMonthKey(r.start || r.createdAt, nowMs) === currentMonth;
+    if (inMonth) {
+      stats.monthRentalsAll++;
+      stats.monthDaysInRent += rentalDays(r.start, r.end);
+    }
+
     const cost = Math.round(Number(r.totalCost) || 0);
     if (EARNING_STATUSES.has(eff) && cost > 0) {
       stats.earnedTotal += cost;
       earnedCount++;
-      if (mskMonthKey(r.start || r.createdAt, nowMs) === currentMonth) {
+      if (inMonth) {
         stats.earnedThisMonth += cost;
         stats.monthRentals++;
+        monthEarnedCount++;
       }
     }
     stats.daysInRent += rentalDays(r.start, r.end);
 
     const after = Number(r.odometerAfter);
     if (Number.isFinite(after) && after > 0) {
-      stats.distanceTotal += odometerDelta(r.odometerBefore, r.odometerAfter);
+      const delta = odometerDelta(r.odometerBefore, r.odometerAfter);
+      stats.distanceTotal += delta;
+      if (inMonth && delta > 0) stats.monthDistance += delta;
       if (latestOdo == null || after > latestOdo) latestOdo = after;
     }
   }
 
   stats.avgCheck = earnedCount > 0 ? Math.round(stats.earnedTotal / earnedCount) : 0;
+  stats.monthAvgCheck = monthEarnedCount > 0 ? Math.round(stats.earnedThisMonth / monthEarnedCount) : 0;
   stats.odometerLatest = latestOdo;
 
   const lastTs = rows.reduce<number>((acc, r) => {

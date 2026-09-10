@@ -50,6 +50,33 @@ function row(overrides: Record<string, unknown> = {}) {
 }
 
 describe("iter28: computeBikeStats money discipline", () => {
+  it("critic-R1 month-scoped KPI twins: Аренд/Ср.чек/Дни/Пробег follow the selected month", () => {
+    // NOW = 2026-08-31 MSK → current month = 2026-08.
+    const stats = computeBikeStats(
+      [
+        // August earning rental, 2 days, +109 km
+        row({ start: "2026-08-28T16:30:00+00:00", end: "2026-08-30T16:30:00+00:00", totalCost: 10000 }),
+        // July rental: all-time tiles include it, month tiles do not
+        row({ start: "2026-07-15T10:00:00+00:00", end: "2026-07-16T10:00:00+00:00", totalCost: 7000, odometerBefore: 4200, odometerAfter: 4356 }),
+        // Cancelled August rental: visible on the wall, never in any counter
+        row({ status: "cancelled", totalCost: 8000 }),
+      ],
+      NOW,
+    );
+    // all-time
+    expect(stats.earnedTotal).toBe(17000);
+    expect(stats.avgCheck).toBe(8500);
+    expect(stats.daysInRent).toBe(3);
+    expect(stats.distanceTotal).toBe(265); // (4465−4356) + (4356−4200)
+    // month twins (August slice only)
+    expect(stats.monthRentalsAll).toBe(1);
+    expect(stats.earnedThisMonth).toBe(10000);
+    expect(stats.monthRentals).toBe(1);
+    expect(stats.monthAvgCheck).toBe(10000);
+    expect(stats.monthDaysInRent).toBe(2);
+    expect(stats.monthDistance).toBe(109);
+  });
+
   it("cancelled rentals never earn, never count as completed, but stay visible on the wall", () => {
     const stats = computeBikeStats(
       [row({ status: "cancelled", totalCost: 8000 }), row({ totalCost: 10000 })],

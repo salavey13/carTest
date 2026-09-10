@@ -200,19 +200,30 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
 
   const s = bike.stats;
   const rentalCount = s.totalCount - s.cancelledCount;
+  // critic R1 fix: the caption promised «KPI месяца» while Аренд/Ср.чек/
+  // Дни/Пробег silently stayed all-time. When a month IS selected the whole
+  // band shows the month slice; without a selection it stays all-time and
+  // the month tile is labeled «Этот месяц». odometer is point-in-time —
+  // always all-time, honestly labeled.
+  const mScopes = !!month;
   const kpis: Array<{ label: string; value: string; accent?: boolean; sub?: string }> = [
-    { label: "Заработал", value: formatMoney(s.earnedTotal), accent: true },
     {
-      label: month ? monthLabelRu(month) : "Этот месяц",
-      value: formatMoney(s.earnedThisMonth),
-      sub: month ? `${s.monthRentals} аренд за месяц` : undefined,
+      label: mScopes ? `Заработал · ${monthLabelRu(month!)}` : "Заработал",
+      value: formatMoney(mScopes ? s.earnedThisMonth : s.earnedTotal),
+      accent: true,
+      sub: mScopes ? `за всё время: ${formatMoney(s.earnedTotal)}` : undefined,
     },
-    { label: "Аренд", value: String(rentalCount) },
-    { label: "Ср. чек", value: formatMoney(s.avgCheck) },
-    { label: "Дней в аренде", value: String(s.daysInRent) },
-    { label: "Пробег по арендам", value: formatKm(s.distanceTotal) },
-    { label: "Одометр", value: formatKm(s.odometerLatest) },
-    { label: "Сервис", value: s.serviceCount > 0 ? `${formatMoney(s.serviceTotal)} · ${s.serviceCount}` : "—" },
+    {
+      label: mScopes ? "Всё время" : "Этот месяц",
+      value: formatMoney(mScopes ? s.earnedTotal : s.earnedThisMonth),
+      sub: mScopes ? undefined : `${s.monthRentals} аренд за месяц`,
+    },
+    { label: "Аренд", value: String(mScopes ? s.monthRentalsAll : rentalCount) },
+    { label: "Ср. чек", value: formatMoney(mScopes ? s.monthAvgCheck : s.avgCheck) },
+    { label: "Дней в аренде", value: String(mScopes ? s.monthDaysInRent : s.daysInRent) },
+    { label: "Пробег по арендам", value: formatKm(mScopes ? s.monthDistance : s.distanceTotal) },
+    { label: "Одометр · всего", value: formatKm(s.odometerLatest) },
+    { label: "Сервис · всего", value: s.serviceCount > 0 ? `${formatMoney(s.serviceTotal)} · ${s.serviceCount}` : "—" },
   ];
 
   return (
@@ -399,7 +410,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
           aria-modal="true"
         >
           <button
-            className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30 transition hover:bg-black/80"
             onClick={(e) => { e.stopPropagation(); setLightbox(null); }}
             aria-label="Закрыть"
           >

@@ -1,0 +1,136 @@
+{
+  "name": "story",
+  "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+  "coldMs": 11115,
+  "warmMs": 7198,
+  "overflow": {
+    "diff": 0
+  },
+  "console": [
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    }
+  ],
+  "pageerrors": [],
+  "failed": [],
+  "reqfail": [
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green?_rsc=1xxyu",
+      "err": "net::ERR_ABORTED"
+    }
+  ],
+  "mobile": {
+    "console": [
+      {
+        "type": "warning",
+        "text": "motion() is deprecated. Use motion.create() instead."
+      },
+      {
+        "type": "warning",
+        "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+      }
+    ],
+    "pageerrors": [],
+    "failed": [],
+    "overflowBadEls": [
+      {
+        "tag": "BUTTON",
+        "cls": "shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide tran",
+        "right": 518
+      },
+      {
+        "tag": "SPAN",
+        "cls": "ml-1.5 inline-flex items-center justify-center rounded-full bg-black/1",
+        "right": 502
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide tran",
+        "right": 632
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "right": 556
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "right": 555
+      }
+    ]
+  }
+}

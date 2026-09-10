@@ -1,0 +1,269 @@
+{
+  "mode": "story",
+  "coldMs": 14894,
+  "warmMs": 10533,
+  "console": [
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    }
+  ],
+  "pageerrors": [],
+  "failed": [],
+  "reqfail": [
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green?_rsc=1xxyu",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green?_rsc=1xxyu",
+      "err": "net::ERR_ABORTED"
+    }
+  ],
+  "interactions": {},
+  "overflow": 0,
+  "mobile": {
+    "console": [
+      {
+        "type": "warning",
+        "text": "motion() is deprecated. Use motion.create() instead."
+      },
+      {
+        "type": "warning",
+        "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+      }
+    ],
+    "pageerrors": [],
+    "failed": [],
+    "reqfail": [
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://localhost:3000/franchize/vip-bike/bikes/ducati-panigale-s-electro-green",
+        "err": "net::ERR_ABORTED"
+      }
+    ],
+    "overflowBadEls": [
+      {
+        "tag": "BUTTON",
+        "cls": "shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking",
+        "right": 518
+      },
+      {
+        "tag": "SPAN",
+        "cls": "ml-1.5 inline-flex items-center justify-center rounded-full ",
+        "right": 502
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking",
+        "right": 632
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "right": 556
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "right": 555
+      },
+      {
+        "tag": "DIV",
+        "cls": "flex gap-2",
+        "right": 991
+      },
+      {
+        "tag": "DIV",
+        "cls": "rounded-2xl border px-3.5 py-2.5",
+        "right": 485
+      },
+      {
+        "tag": "P",
+        "cls": "text-[15px] font-bold leading-tight",
+        "right": 470
+      },
+      {
+        "tag": "P",
+        "cls": "mt-0.5 text-[10px] uppercase tracking-wide",
+        "right": 470
+      },
+      {
+        "tag": "DIV",
+        "cls": "rounded-2xl border px-3.5 py-2.5",
+        "right": 607
+      },
+      {
+        "tag": "P",
+        "cls": "text-[15px] font-bold leading-tight",
+        "right": 592
+      },
+      {
+        "tag": "P",
+        "cls": "mt-0.5 text-[10px] uppercase tracking-wide",
+        "right": 592
+      },
+      {
+        "tag": "DIV",
+        "cls": "rounded-2xl border px-3.5 py-2.5",
+        "right": 759
+      },
+      {
+        "tag": "P",
+        "cls": "text-[15px] font-bold leading-tight",
+        "right": 744
+      }
+    ]
+  }
+}

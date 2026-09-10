@@ -1,0 +1,127 @@
+{
+  "name": "profile",
+  "url": "http://localhost:3000/franchize/vip-bike/profile",
+  "coldMs": 8268,
+  "warmMs": 7385,
+  "overflow": {
+    "diff": 0
+  },
+  "console": [
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    },
+    {
+      "type": "warning",
+      "text": "Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key."
+    },
+    {
+      "type": "warning",
+      "text": "motion() is deprecated. Use motion.create() instead."
+    },
+    {
+      "type": "warning",
+      "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+    }
+  ],
+  "pageerrors": [],
+  "failed": [],
+  "reqfail": [
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/profile",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/profile",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/profile",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/profile",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/profile",
+      "err": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://localhost:3000/franchize/vip-bike/profile?_rsc=o6x2y",
+      "err": "net::ERR_ABORTED"
+    }
+  ],
+  "mobile": {
+    "console": [
+      {
+        "type": "warning",
+        "text": "motion() is deprecated. Use motion.create() instead."
+      },
+      {
+        "type": "warning",
+        "text": "Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key."
+      },
+      {
+        "type": "warning",
+        "text": "[Telegram.WebApp] Changing swipes behavior is not supported in version 6.0"
+      }
+    ],
+    "pageerrors": [],
+    "failed": [],
+    "overflowBadEls": [
+      {
+        "tag": "BUTTON",
+        "cls": "shrink-0 rounded-full px-4 py-2 text-xs font-medium tracking-wide tran",
+        "right": 489
+      },
+      {
+        "tag": "svg",
+        "cls": "[object SVGAnimatedString]",
+        "right": 413
+      },
+      {
+        "tag": "path",
+        "cls": "[object SVGAnimatedString]",
+        "right": 412
+      },
+      {
+        "tag": "OL",
+        "cls": "",
+        "right": 406
+      }
+    ]
+  }
+}
