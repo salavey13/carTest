@@ -9,6 +9,7 @@
 // big touch targets, lightbox for photos.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -60,6 +61,10 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ photos: WallPhoto[]; index: number } | null>(null);
+  // Portal guard: createPortal must only render client-side (document.body
+  // does not exist during SSR/hydration).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   // Month selector (2026-09-01): null = «Вся история» (wall shows everything,
   // month KPI shows the current month); a "YYYY-MM" key scopes BOTH the month
   // KPI and the wall feed to that month.
@@ -402,13 +407,21 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
       )}
 
       {/* ── LIGHTBOX ──────────────────────────────────────────── */}
-      {lightbox && lightbox.photos.length > 0 && lightbox.photos[lightbox.index] ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
-          onClick={() => setLightbox(null)}
-          role="dialog"
-          aria-modal="true"
-        >
+      {/* critic-R2 FAIL fix: this dialog used to render INSIDE the page shell
+          whose ancestor (FranchizePageShell) carries `backdrop-blur` — a
+          backdrop-filter ancestor is a containing block for position:fixed,
+          so the overlay sized to the 3000px+ page instead of the viewport
+          and the close button went off-screen when opened while scrolled.
+          Portal to document.body (mounted-guarded for SSR) + z-[90] above
+          the sticky CrewHeader (z-50). */}
+      {mounted && lightbox && lightbox.photos.length > 0 && lightbox.photos[lightbox.index]
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90"
+              onClick={() => setLightbox(null)}
+              role="dialog"
+              aria-modal="true"
+            >
           <button
             className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/30 transition hover:bg-black/80"
             onClick={(e) => { e.stopPropagation(); setLightbox(null); }}
@@ -454,8 +467,10 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
               </span>
             </div>
           </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
