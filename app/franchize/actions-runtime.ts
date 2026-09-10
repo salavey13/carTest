@@ -4009,15 +4009,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         : { last_error: "" }),
     });
 
-    // ── Create franchize_intents lead (aligned with /doc flow) ──────────
+    // ── Lead identity (boss-R1 fix 1 + follow-up): for testdrives the lead
+    // identity is the TELEGRAM id (numeric) — never the phone (bot bugfix
+    // 2026-09: phone-as-user_id pollutes users/crew_todos matching). Anonymous
+    // web orders (telegramUserId="manual-order") keep the phone fallback.
+    // Shared by the intents row AND the crew_todos so the leads page joins.
+    const isRealTgId = Boolean(payload.telegramUserId && /^\d+$/.test(payload.telegramUserId));
+    const leadUserId = flowType === "testdrive" && isRealTgId
+      ? payload.telegramUserId
+      : (payload.phone || payload.telegramUserId);
+
+    // ── Create franchize_intents lead (aligned with /doc flow) ──────
     // ONE lead per order (same person), even with multiple bikes.
     try {
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
       // boss-R1 fix 1: web testdrives are FIRST-CLASS test_drive leads (the
       // bot has always done this) — linkTestdriveIntentsToRental and the
-      // leads dashboard bucket on intent_type='test_drive'. Also: the lead
-      // identity is the TELEGRAM id, never the phone (bot bugfix 2026-09:
-      // phone stored as user_id pollutes users/crew_todos matching).
+      // leads dashboard bucket on intent_type='test_drive'.
       const resolvedIntentType = flowType === "sale"
         ? "sale"
         : flowType === "service"
@@ -4025,9 +4033,6 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           : flowType === "testdrive"
             ? "test_drive"
             : "rent";
-      const leadUserId = flowType === "testdrive"
-        ? (payload.telegramUserId || payload.phone)
-        : (payload.phone || payload.telegramUserId);
 
       // For service flow, resolve actual service item names for the lead title
       const serviceItemTitles = isServiceFlow
@@ -4087,7 +4092,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           logger.warn("[franchize] Cannot create crew_todos: crew not found for slug:", payload.slug);
         } else {
         const crewId = crewRowForTodos.id;
-        const leadId = payload.phone || payload.telegramUserId;
+        // Same identity as the intents row (see leadUserId above) — the leads
+        // page joins crew_todos.lead_id ↔ franchize_intents.telegram_user_id.
+        const leadId = leadUserId;
         const baseTs = Date.now();
         const allTodoPromises: Promise<unknown>[] = [];
 
