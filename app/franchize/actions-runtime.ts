@@ -2448,6 +2448,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       bankCity: readFirst(["bankCity", "bank_city"], "г. Нижний Новгород"),
       bankCorrAccount: readFirst(["bankCorrAccount", "bank_corr_account"], "30101810900000000603"),
       email: readFirst(["email"], "vip_bike@mail.ru"),
+      // boss-R1 fix 4: the testdrive template renders {{phone}} — the salon's
+      // public contact. The bot fills the same field with the fallback
+      // «+7 920 078 98 88» (crew_secrets has no phone key today), so the web
+      // doc degrades IDENTICALLY instead of rendering an empty row.
+      phone: readFirst(["phone", "contactPhone", "contact_phone"], "+7 920 078 98 88"),
       contractDefaults: defaults,
     };
 
@@ -2737,8 +2742,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           bike_model: car.model || "уточняется",
           bike_color: String(specs.color || "уточняется"),
           bike_year: String(specs.year || now.getFullYear()),
-          price_digits: String(payload.totalAmount || 5000),
-          price_words: numberToWords(payload.totalAmount || 5000),
+          // boss-R1 fixes 4+6: the testdrive is FREE — price vars must never
+          // fall back to 5000, and the salon phone row was ALWAYS empty
+          // (`crewSecrets.email ? "" : ""` — a literal no-op) while the bot
+          // fills crewSecrets.phone.
+          price_digits: String(payload.totalAmount ?? 0),
+          price_words: numberToWords(payload.totalAmount ?? 0),
           deposit_rub: "0",
           deposit_words: numberToWords(0),
           organization_name: crewSecrets.organizationName,
@@ -2749,7 +2758,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           inn: crewSecrets.inn,
           legal_address: crewSecrets.legalAddress,
           return_address: crewSecrets.returnAddress || crewSecrets.legalAddress,
-          phone: crewSecrets.email ? "" : "",
+          phone: crewSecrets.phone,
           email: crewSecrets.email,
           signature_timestamp: now.toLocaleString("ru-RU"),
           document_key: `testdrive-${payload.slug}-${payload.orderId}-bike${bikeIndex}`,
@@ -3380,11 +3389,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               daily_price: null,
               // iter15: real expected deposit from bike specs (NOT the 500₽
               // reservation hold in payload.depositAmount — different things).
-              deposit_rub: (() => {
-                const specs = ((byId.get(doc.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
-                const parsed = Number(String(specs.deposit_rub ?? specs.deposit ?? "").replace(/[^\d]/g, ""));
-                return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : null;
-              })(),
+              // boss-R1 fix 3: a testdrive is free — the bike's specs deposit
+              // (20 000 ₽) leaked into the artifact as a phantom charge.
+              deposit_rub: flowType === "testdrive"
+                ? "0"
+                : (() => {
+                    const specs = ((byId.get(doc.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
+                    const parsed = Number(String(specs.deposit_rub ?? specs.deposit ?? "").replace(/[^\d]/g, ""));
+                    return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : null;
+                  })(),
               total_sum: bikePrice,
               template_version: CURRENT_RENTAL_TEMPLATE_VERSION,
               // NOTE: rental_contract_artifacts has NO metadata column — the old
@@ -4000,7 +4013,21 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // ONE lead per order (same person), even with multiple bikes.
     try {
       const { upsertFranchizeLead } = await import("@/app/franchize/lib/leads");
-      const resolvedIntentType = flowType === "sale" ? "sale" : flowType === "service" ? "service" : "rent";
+      // boss-R1 fix 1: web testdrives are FIRST-CLASS test_drive leads (the
+      // bot has always done this) — linkTestdriveIntentsToRental and the
+      // leads dashboard bucket on intent_type='test_drive'. Also: the lead
+      // identity is the TELEGRAM id, never the phone (bot bugfix 2026-09:
+      // phone stored as user_id pollutes users/crew_todos matching).
+      const resolvedIntentType = flowType === "sale"
+        ? "sale"
+        : flowType === "service"
+          ? "service"
+          : flowType === "testdrive"
+            ? "test_drive"
+            : "rent";
+      const leadUserId = flowType === "testdrive"
+        ? (payload.telegramUserId || payload.phone)
+        : (payload.phone || payload.telegramUserId);
 
       // For service flow, resolve actual service item names for the lead title
       const serviceItemTitles = isServiceFlow
@@ -4012,7 +4039,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
       await upsertFranchizeLead({
         slug: payload.slug,
-        userId: payload.phone || payload.telegramUserId,
+        userId: leadUserId,
         intentType: resolvedIntentType,
         stage: "contract_generated",
         bikeId: isServiceFlow ? payload.cartLines[0]?.itemId : bikeDocs[0]?.bikeId,
@@ -4052,7 +4079,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // 2026-09-10: equipment-only orders (flowType "equipment") now get return
     // todos too — previously the gate silently skipped them, so equipment
     // issued via the web catalog had NO return reminder at all.
-    if (flowType === "rental" || flowType === "mixed" || flowType === "equipment") {
+    if (flowType === "rental" || flowType === "mixed" || flowType === "equipment" || flowType === "testdrive") {
       try {
         // Resolve crew from slug (no hardcoded fallback)
         const { data: crewRowForTodos } = await supabaseAdmin.from("crews").select("id").eq("slug", payload.slug).maybeSingle();
@@ -4090,6 +4117,46 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           };
 
           const bikeLabel = `${bikeMake} ${bikeModel}`;
+
+          // boss-R1 fix 2: testdrive orders get the bot's 3 follow-up todos
+          // (no equipment-return list — nothing was issued for a free ride).
+          if (flowType === "testdrive") {
+            const tdTodos: Array<{ title: string; priority: string }> = [
+              { title: `🔍 Проверить ТС после тест-драйва: ${bikeLabel}`, priority: "high" },
+              { title: `📝 Подтвердить возврат ТС после тест-драйва`, priority: "medium" },
+              { title: `📞 Связаться с клиентом для повторной аренды: ${payload.recipient || "—"}`, priority: "low" },
+            ];
+            for (let ti = 0; ti < tdTodos.length; ti++) {
+              const todo = tdTodos[ti];
+              const todoId = `todo-td-${(baseTs + bikeIndex * 1000).toString(36)}-${ti}-${Math.random().toString(36).slice(2, 5)}`;
+              allTodoPromises.push(
+                Promise.resolve(supabaseAdmin.from("crew_todos").insert({
+                  id: todoId,
+                  crew_id: crewId,
+                  lead_id: leadId,
+                  rental_id: todoRentalId,
+                  title: todo.title,
+                  status: "pending",
+                  priority: todo.priority,
+                  assigned_to: null,
+                  category: "lead_followup",
+                  description: JSON.stringify({
+                    lead_id: leadId,
+                    lead_phone: payload.phone || "",
+                    lead_name: payload.recipient || "",
+                    bike_id: doc.bikeId,
+                    rental_id: todoRentalId,
+                    order_id: payload.orderId,
+                    deal_type: "test_drive",
+                    source: "web_app_checkout_testdrive",
+                  }),
+                }).then(({ error }) => {
+                  if (error) logger.warn("[franchize] Failed to create crew_todo:", todo.title, error);
+                }))
+              );
+            }
+            continue; // testdrive todo list does not apply to rental/equipment docs
+          }
 
           // 2026-09-10: equipment-only doc → return todos per equipment item
           // (no ТС/ключи/одометр — that list is bike-specific).
@@ -4331,7 +4398,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       const emailFrom = process.env.EMAIL_FROM || smtpUser;
       const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
       if (smtpHost && smtpUser && smtpPass) {
-        const docType = flowType === "sale" ? "купли-продажи" : flowType === "service" ? "сервисных работ" : "аренды";
+        const docType = flowType === "sale" ? "купли-продажи" : flowType === "service" ? "сервисных работ" : flowType === "testdrive" ? "тест-драйва" : "аренды";
         const emailBody = [
           `Договор ${docType} №${bikeDocs[0]?.documentKey || payload.orderId}`,
           ``,

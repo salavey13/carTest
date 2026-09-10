@@ -187,6 +187,9 @@ export type CrewSecrets = {
   bankCity: string;
   bankCorrAccount: string;
   email: string;
+  /** Public contact phone for docs (testdrive template renders {{phone}}).
+   *  Optional — older secret blobs may not carry it. */
+  phone?: string;
   // Optional: contract defaults override
   contractDefaults?: Record<string, unknown>;
 };
