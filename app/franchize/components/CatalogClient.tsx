@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Search, ShoppingCart, Wrench } from "lucide-react";
+import { Search, ShoppingCart, Wrench, Layers } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
@@ -366,6 +366,153 @@ function getVisibleSpecChips(item: CatalogItemVM): Array<{ icon: string; text: s
   }
 
   return [];
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────
+// 2026-09-11: combo / collective offers get a special FULL-WIDTH card.
+// «Bonus task: on main catalog page, in equipment tab please create special
+// "full screen width" card style for special combo/collective offers/items;
+// for example image will contain "bunch of helmets" picture (we already have
+// meta helmet in supabase, lets show it in this special card)».
+//
+// Detection (data-driven, fallbacks kept):
+//   1. Explicit flag in specs: combo_offer: true / collective_offer: true.
+//   2. Fallback — collective stock: equipment item stocked in MULTIPLE units
+//      (specs.quantity / available_quantity > 1). One card sells the whole
+//      pool (e.g. the-meta-helmet: 20 helmets, all sizes & colors).
+// ──────────────────────────────────────────────────────────────────────────────────
+
+function isComboOfferItem(item: CatalogItemVM): boolean {
+  const rs = (item.rawSpecs ?? {}) as Record<string, unknown>;
+  if (rs.combo_offer === true || rs.collective_offer === true) return true;
+  if (item.type !== "equipment" && rs.category !== "helmet") {
+    // Non-equipment items need the explicit flag — no heuristics for bikes.
+    return false;
+  }
+  const qtyCandidates = [rs.quantity, rs.available_quantity];
+  const qty = qtyCandidates.find(
+    (v) => typeof v === "number" && Number.isFinite(v),
+  ) as number | undefined;
+  return typeof qty === "number" && qty > 1;
+}
+
+function ComboOfferCard({
+  item,
+  crew,
+  displayMode,
+  onOpen,
+  focused,
+  ringStyle,
+}: {
+  item: CatalogItemVM;
+  crew: FranchizeCrewVM;
+  displayMode: string;
+  onOpen: () => void;
+  focused: boolean;
+  ringStyle: ReturnType<typeof interactionRingStyle>;
+}) {
+  const rs = (item.rawSpecs ?? {}) as Record<string, unknown>;
+  const sizes = Array.isArray(rs.sizes) ? (rs.sizes as string[]) : [];
+  const colors = Array.isArray(rs.colors) ? (rs.colors as string[]) : [];
+  const features = Array.isArray(rs.features) ? (rs.features as string[]) : [];
+  const qtyCandidates = [rs.quantity, rs.available_quantity];
+  const stockQty = qtyCandidates.find(
+    (v) => typeof v === "number" && Number.isFinite(v) && (v as number) > 0,
+  ) as number | undefined;
+  const ctaLabel = displayMode === "service" ? "Выбрать" : displayMode === "sale" ? "Купить" : "Забронировать";
+
+  return (
+    <article
+      key={item.id}
+      data-catalog-item="true"
+      data-combo-offer="true"
+      className="group col-span-full overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)]"
+      style={catalogCardVariantStyles(crew.theme, crewPaletteSeed(item.id))}
+    >
+      <button
+        type="button"
+        aria-label={`Открыть комбо-предложение ${item.title}: ${item.rentPriceLabel}`}
+        data-catalog-item-button="true"
+        onClick={onOpen}
+        className="flex w-full flex-col text-left sm:flex-row"
+        style={focused ? ringStyle : undefined}
+      >
+        {/* Image — horizontal layout on ≥sm: left pane, full-bleed on mobile */}
+        <div className="relative w-full shrink-0 aspect-[16/9] sm:aspect-auto sm:w-2/5 sm:min-h-[15rem] lg:min-h-[17rem]">
+          {item.imageUrl ? (
+            <Image
+              src={localImageSrc(item.imageUrl)}
+              alt={item.title}
+              fill
+              sizes="(max-width: 639px) 100vw, 40vw"
+              className="object-cover"
+              onError={handleImageError(item.imageUrl)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[var(--catalog-card-bg)] text-xs" style={{ color: "var(--catalog-muted)" }}>
+              Фото загружается
+            </div>
+          )}
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-accent)] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)] shadow-sm">
+            <Layers className="h-3 w-3" aria-hidden />
+            Комбо · коллекция
+          </span>
+          {typeof stockQty === "number" && (
+            <span className="absolute right-2 top-2 inline-flex items-center rounded-full bg-[var(--catalog-bg)]/70 px-2 py-0.5 text-[9px] font-semibold text-[var(--catalog-text)] backdrop-blur-sm">
+              {stockQty} шт. в наличии
+            </span>
+          )}
+        </div>
+
+        {/* Info + CTA */}
+        <div className="flex flex-1 flex-col p-4 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+          <h3 className="text-base font-bold leading-6 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
+            {item.title}
+          </h3>
+          {item.description && (
+            <p className="mt-1 line-clamp-2 text-xs leading-5 opacity-70" style={{ color: "var(--catalog-muted)" }}>
+              {item.description}
+            </p>
+          )}
+
+          {/* Collective chips: sizes + colors + features — the whole pool in one card */}
+          {(sizes.length > 0 || colors.length > 0 || features.length > 0) && (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {sizes.length > 0 && (
+                <span className="inline-flex items-center rounded-lg border border-[var(--catalog-accent)]/40 px-2 py-0.5 text-[10px] font-bold text-[var(--catalog-accent)]">
+                  {sizes.join(" · ")}
+                </span>
+              )}
+              {colors.map((c) => (
+                <span key={c} className="rounded-lg bg-[var(--catalog-card-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--catalog-text)]">
+                  {c}
+                </span>
+              ))}
+              {features.slice(0, 2).map((f) => (
+                <span key={f} className="rounded-lg bg-[var(--catalog-card-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--catalog-text)]">
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+            <p className="text-lg font-bold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
+              {item.rentPriceLabel}
+            </p>
+            <span className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+              {ctaLabel}
+            </span>
+          </div>
+        </div>
+      </button>
+    </article>
+  );
+}
+
+/** Deterministic seed for the shared card variant styles. */
+function crewPaletteSeed(id: string): number {
+  return id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────────
@@ -1301,7 +1448,31 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   </span>
                 </div>
                 )}
-                {group.items.length <= 8 ? (
+                {(() => {
+                  // 2026-09-11: combo/collective offers render as full-width
+                  // feature cards ABOVE the regular carousel/grid (they span
+                  // every grid column; in carousel mode a full-width card
+                  // inside a snap carousel would fight the scroll snap).
+                  const comboItems = group.items.filter(isComboOfferItem);
+                  const regularItems = group.items.filter((it) => !isComboOfferItem(it));
+                  return (
+                    <>
+                      {comboItems.length > 0 && (
+                        <div className="mb-4 space-y-3">
+                          {comboItems.map((item) => (
+                            <ComboOfferCard
+                              key={item.id}
+                              item={item}
+                              crew={crew}
+                              displayMode={displayMode}
+                              onOpen={() => openItem(item)}
+                              focused={focusedItemId === item.id}
+                              ringStyle={interactionRingStyle(crew.theme)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {regularItems.length === 0 ? null : regularItems.length <= 8 ? (
                   <>
                     {/* ── CAROUSEL MODE (≤8 items) ── Cards aligned with reference design:
                         Image → Badges → Title → Specs (icon+text) → Price (large bold) → CTA */}
@@ -1322,7 +1493,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         root.scrollBy({ left: event.key === "ArrowRight" ? step : -step, behavior: "smooth" });
                       }}
                     >
-                      {group.items.map((item, index) => {
+                      {regularItems.map((item, index) => {
                         const rentalStrip = buildCatalogRentalStrip(item, crew);
                         const parallax = carouselParallaxByItem[item.id] ?? { x: 0, y: 0 };
                         const specChips = getVisibleSpecChips(item);
@@ -1449,7 +1620,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       {(() => {
                         const groupKey = group.category || group.title || "section";
                         const activeIndex = carouselActiveByCategory[groupKey] ?? 0;
-                        return group.items.map((item, index) => {
+                        return regularItems.map((item, index) => {
                           const isActive = activeIndex === index;
                           return (
                             <button
@@ -1485,7 +1656,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   </>
                 ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                  {group.items.map((item) => {
+                  {regularItems.map((item) => {
                     const rentalStrip = buildCatalogRentalStrip(item, crew);
                     const visibleSpecs = getVisibleSpecChips(item);
                     const isService = hasServicePrice(item);
@@ -1592,6 +1763,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   })}
                 </div>
                 )}
+                    </>
+                  );
+                })()}
               </section>
             ))}
           </div>

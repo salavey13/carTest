@@ -2613,8 +2613,9 @@ export function ItemModal({
             ) : null}
 
           </div>
+        </div>
 
-          {/* Footer Buttons — dual CTA when both rent + sale available */}
+        {/* Footer Buttons — dual CTA when both rent + sale available */}
           {/* In browser mode (no TG), CTAs become deep-links to the Telegram bot */}
           {!isInTelegram && (
             <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: "var(--item-border)" }}>
@@ -2755,7 +2756,6 @@ export function ItemModal({
               trackingEnabled={vipBikeRentalTrackingEnabled}
             />
           )}
-        </div>
       </div>
     </div>
   );

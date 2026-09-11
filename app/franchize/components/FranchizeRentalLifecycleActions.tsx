@@ -25,6 +25,12 @@ interface FranchizeRentalLifecycleActionsProps {
   hasPickupFreeze: boolean;
   // Fix: show how much cash/bank was collected at rental start
   paymentSplit?: { cash: number; bank: number; cardDestination?: string | null } | null;
+  // 2026-09-11: odometer moved to the main rental page — the closure modal is
+  // now PRE-FILLED with the draft the operator typed there (rental page shows
+  // start (readonly) + end (input) + live difference). The modal shows the
+  // delta so the operator instantly knows how much to deduct from the deposit.
+  odometerBefore?: number | null;
+  odometerAfterDraft?: number | null;
   palette: {
     accentMain: string;
     accentMainHover: string;
@@ -48,6 +54,8 @@ export function FranchizeRentalLifecycleActions({
   paymentStatus,
   hasPickupFreeze,
   paymentSplit,
+  odometerBefore,
+  odometerAfterDraft,
   palette,
   isAuto = false,
 }: FranchizeRentalLifecycleActionsProps) {
@@ -239,7 +247,7 @@ export function FranchizeRentalLifecycleActions({
               // calling confirmVehicleReturn. The modal collects odometer_after,
               // damage_notes, deposit_returned, return_notes — then the actual
               // confirmVehicleReturn call happens in handleSubmitClosure.
-              setClosureOdometer("");
+              setClosureOdometer(odometerAfterDraft != null ? String(odometerAfterDraft) : "");
               setClosureDamageNotes("");
               setClosureDamageLevel("none");
               setClosureDepositReturned(true);
@@ -381,6 +389,36 @@ export function FranchizeRentalLifecycleActions({
                     color: "var(--lifecycle-text)",
                   }}
                 />
+                {/* 2026-09-11: end odometer is normally typed on the main rental
+                    page (live difference there) — the modal opens pre-filled.
+                    Live delta + rollback guard so the deposit deduction is
+                    obvious without mental math. */}
+                {(() => {
+                  const beforeNum = typeof odometerBefore === "number" ? odometerBefore : null;
+                  const endNum = closureOdometer.trim() === "" ? null : Math.round(Number(closureOdometer));
+                  if (beforeNum == null && endNum == null) return null;
+                  if (endNum == null || Number.isNaN(endNum)) {
+                    return beforeNum != null ? (
+                      <span className="mt-1 block text-[11px]" style={{ color: "var(--lifecycle-muted)" }}>
+                        Выдача: {beforeNum.toLocaleString("ru-RU")} км — введите возврат, разница посчитается.
+                      </span>
+                    ) : null;
+                  }
+                  const delta = beforeNum != null ? endNum - beforeNum : null;
+                  const negative = delta != null && delta < 0;
+                  return (
+                    <span
+                      className="mt-1 block text-[11px] font-semibold"
+                      style={{ color: negative ? "#ef4444" : "#22c55e" }}
+                    >
+                      {negative
+                        ? "Одометр меньше значения при выдаче — проверьте данные."
+                        : delta != null
+                          ? `Разница: ${delta.toLocaleString("ru-RU")} км за аренду.`
+                          : `Возврат: ${endNum.toLocaleString("ru-RU")} км.`}
+                    </span>
+                  );
+              })()}
               </label>
 
               {/* Fix: show payment split from rental start — helps operator

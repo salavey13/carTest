@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { supabaseAnon } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { escapeMarkdown } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         
         const { rental_id, event_type, created_by, payload } = eventData;
         
-        const { data: rentalContext, error } = await supabaseAnon
+        const { data: rentalContext, error } = await supabaseAdmin
             .from('rentals')
             .select(`
                 user_id,
@@ -40,9 +40,18 @@ export async function POST(request: NextRequest) {
                             // when user_id is null (bot/QR-flow rentals where renter hasn't claimed yet).
                             // The renter:rentals_user_id_fkey and owner:rentals_owner_id_fkey joins
                             // return 0 rows for null FKs. .maybeSingle() returns null gracefully.
-        
+        //
+        // 2026-09-11 FIX: this route previously read through `supabaseAnon`, whose
+        // SELECT is subject to RLS on `rentals` (policies keyed to auth.sub()).
+        // A trigger-fired webhook has no user JWT → every policy evaluated false →
+        // silent empty result (data null, error null) → CRITICAL ERROR
+        // "Failed to fetch rental context …: undefined" and NO notification was
+        // delivered even though the rental flow itself worked fine. This is a
+        // trusted server-to-server endpoint (guarded by Bearer CRON_SECRET above),
+        // so it must read with the service role like every other internal path.
+
         if (error || !rentalContext) {
-            throw new Error(`Failed to fetch rental context for rental_id ${rental_id}: ${error?.message}`);
+            throw new Error(`Failed to fetch rental context for rental_id ${rental_id}: ${error?.message ?? (error ? JSON.stringify(error) : "row not found (rental deleted or id mismatch)")}`);
         }
 
         const { vehicle, renter, owner, owner_id } = rentalContext;

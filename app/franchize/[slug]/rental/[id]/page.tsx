@@ -31,6 +31,7 @@ import { RentalDepositTracker } from "../../../components/RentalDepositTracker";
 // P2 §1.5: prepayments/booking fees received against this rental
 import { RentalPrepaymentCard } from "../../../components/RentalPrepaymentCard";
 import { RentalOdometerDelta } from "../../../components/RentalOdometerDelta";
+import { RentalOdometerInput } from "../../../components/RentalOdometerInput";
 import { FranchizeRentalRoleGuard } from "../../../components/FranchizeRentalRoleGuard";
 // Polish v3 components (Phase 3: extend modal, Phase 5: renter + guest views)
 import { RentalExtendModal } from "../../../components/RentalExtendModal";
@@ -175,6 +176,12 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
     ?? rental.specsOdometer
     ?? null;
   const odometerAfter = closureData?.odometer_after ?? rentalMeta?.odometer_after ?? null;
+  // 2026-09-11: end-odometer typed on THIS page while the rental is active
+  // (moved out of the closure modal — owner request). Closure still writes the
+  // authoritative odometer_after; the draft pre-fills the closure modal so the
+  // operator opens it with the difference already computed.
+  const odometerAfterDraft =
+    typeof rentalMeta?.odometer_after_draft === "number" ? rentalMeta.odometer_after_draft : null;
   const depositReturned =
     typeof closureData?.deposit_returned === "boolean"
       ? closureData.deposit_returned
@@ -482,16 +489,48 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 textSecondary={textSecondary}
                 borderSoft={borderSoft}
               />
-              <RentalOdometerDelta
-                odometerBefore={odometerBefore}
-                odometerAfter={odometerAfter}
-                includedKm={rentalMeta?.included_km ?? null}
-                overageRatePerKm={rentalMeta?.overage_rate_per_km ?? null}
-                textPrimary={textPrimary}
-                textSecondary={textSecondary}
-                borderSoft={borderSoft}
-                accentColor={accent}
-              />
+              {/* 2026-09-11: odometer start → end moved to the main page.
+                  Active rental + operator: end odometer is a LIVE input with a
+                  dynamic difference (autosaved draft) so the closure modal is
+                  opened with the deposit deduction already known. Completed /
+                  no-edit rights: the passive start → end + delta card. */}
+              <FranchizeRentalRoleGuard
+                allowedRoles={["owner", "operator", "admin", "subrenter"]}
+                ownerId={rental.ownerId}
+                renterId={rental.renterId}
+                renterTelegramChatId={rental.renterTelegramChatId}
+                subrenterChatId={rental.subrenterChatId}
+                crewId={crew.id}
+                crewSlug={resolvedSlug}
+                fallback={
+                  <RentalOdometerDelta
+                    odometerBefore={odometerBefore}
+                    odometerAfter={odometerAfter}
+                    includedKm={rentalMeta?.included_km ?? null}
+                    overageRatePerKm={rentalMeta?.overage_rate_per_km ?? null}
+                    textPrimary={textPrimary}
+                    textSecondary={textSecondary}
+                    borderSoft={borderSoft}
+                    accentColor={accent}
+                  />
+                }
+              >
+                <RentalOdometerInput
+                  rentalId={rental.rentalId}
+                  crewSlug={resolvedSlug}
+                  status={status}
+                  odometerBefore={odometerBefore}
+                  odometerAfter={odometerAfter}
+                  odometerAfterDraft={odometerAfterDraft}
+                  canEdit={status === "active"}
+                  includedKm={rentalMeta?.included_km ?? null}
+                  overageRatePerKm={rentalMeta?.overage_rate_per_km ?? null}
+                  textPrimary={textPrimary}
+                  textSecondary={textSecondary}
+                  borderSoft={borderSoft}
+                  accentColor={accent}
+                />
+              </FranchizeRentalRoleGuard>
             </div>
           )}
         </section>
@@ -652,6 +691,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
                 // Fix: pass payment split so closure modal can show "Получено при выдаче"
                 paymentSplit={(rental.metadata as { payment_split?: { cash: number; bank: number; card_destination?: string | null } } | null)?.payment_split ?? null}
+                // 2026-09-11: closure modal pre-fills the end odometer typed on
+                // this page + shows the live difference vs the handover value.
+                odometerBefore={odometerBefore}
+                odometerAfterDraft={odometerAfterDraft}
                 palette={p}
                 isAuto={isAuto}
               />
