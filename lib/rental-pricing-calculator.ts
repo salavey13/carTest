@@ -1,4 +1,4 @@
-import { differenceInHours, differenceInDays } from "date-fns";
+import { differenceInHours } from "date-fns";
 
 export interface BikePricingSpecs {
   price_per_hour?: number | string;
@@ -36,11 +36,15 @@ export function num(value: unknown): number | undefined {
 export type PricingTier =
   | "hourly"
   | "3-hours"
+  /** 3–6h and 6–12h windows: interpolated between the surrounding tier
+   * anchors (owner 2026-09-11: «more complex interpolation is needed between
+   * prices of 3h, 6h, 12h, 1d, 2-4d, 5-13d and 14-30d» — see
+   * docs/gold-standard-ice-bike-spec-schema.md §1.8/§8.1 for the ladder). */
+  | "3-6-hours"
   | "6-hours"
+  | "6-12-hours"
   | "12-hours"
-  /** 13–23h window: interpolated between the 12h tier and the daily rate
-   * (parity with calculatePriceForDuration in app/franchize/lib/pricing-calculator.ts
-   * — the calculator the contract builder uses). */
+  /** 13–23h window: interpolated between the 12h tier and the daily rate. */
   | "extended-hours"
   | "daily"
   | "multi-day-2-4"
@@ -157,216 +161,178 @@ export function getOtherGearUnitPrice(rentalHours?: number): number {
   return getEquipmentUnitPriceForRental(500, rentalHours);
 }
 
-function normalizeHourlyRental(hours: number): {
-  tier: PricingTier;
-  rounded: boolean;
-  displayHours: number;
-} {
-  if (hours <= 2) {
-    return { tier: "hourly", rounded: false, displayHours: hours };
-  }
+// ─────────────────────────────────────────────────────────────────────────────────
+// CANONICAL BIKE-PART LADDER (2026-09-11, owner: «more complex interpolation
+// is needed between prices of 3h, 6h, 12h, 1d, 2-4d, 5-13d and 14-30d»)
+// ─────────────────────────────────────────────────────────────────────────────────
+//
+// ONE piecewise-linear ladder built on the golden-standard spec anchors
+// (docs/gold-standard-ice-bike-spec-schema.md §1.8 + §8.1):
+//
+//   price_per_hour (1h) → price_per_3h → price_per_6h → price_per_12h
+//   → dailyPrice (24h)  → rent_2_4d → rent_5_10d → rent_11_30d (per-day)
+//
+// Rules baked in here (cart == contract == DB, digit-for-digit):
+//   • 0 < h < 24 — linear interpolation between the two surrounding HOURLY
+//     anchors; missing anchors fall back to the contract builder's chains
+//     (per-hour × h, per-3h/3 × h, …) and the result is CLAMPED to the
+//     [prev-anchor, next-anchor] window so a fallback can never price a
+//     shorter rental above the next tier (the golden ladder must stay
+//     monotonic: per_hour < per_3h < per_6h < per_12h < daily).
+//   • h ≥ 24 — days = Math.ceil(h / 24) (the contract builder's rule; the
+//     old cart floored via differenceInDays, so a 30h rental was charged
+//     1 day in the cart but 2 days in the contract), then the per-day tier
+//     rate (rent_2_4d / rent_5_10d / rent_11_30d) × days; a single day
+//     checks the weekend rate on the START date. No weekend blending for
+//     multi-day — the contract charges tier rates as-is.
 
-  if (hours === 3) {
-    return { tier: "3-hours", rounded: false, displayHours: 3 };
-  }
-
-  if (hours <= 5) {
-    return { tier: "6-hours", rounded: true, displayHours: 6 };
-  }
-
-  if (hours === 6) {
-    return { tier: "6-hours", rounded: false, displayHours: 6 };
-  }
-
-  if (hours <= 11) {
-    return { tier: "12-hours", rounded: true, displayHours: 12 };
-  }
-
-  if (hours === 12) {
-    return { tier: "12-hours", rounded: false, displayHours: 12 };
-  }
-
-  // FIX (2026-09-11, "final price showed only the helmet"): 13–23h rentals
-  // used to collapse into the daily bucket with displayHours = 24 while the
-  // calendar day count from differenceInDays() is 0 — calculateBasePrice then
-  // skipped the hourly branch (24 < 24 is false) and getDailyPrice returned
-  // dailyPrice × 0 = 0 ₽ for the BIKE part. The cart showed helmet-only totals
-  // (aprilia-shiver 14h + helmet displayed 1 000 ₽ while the contract showed
-  // 9 500 + 1 000). The 13–23h window now stays hour-aware and interpolates
-  // between price_per_12h and daily — exactly what the contract builder's
-  // calculatePriceForDuration does, so cart == contract == stored total.
-  if (hours < 24) {
-    return { tier: "extended-hours", rounded: false, displayHours: hours };
-  }
-
-  // ≥ 24 hours = daily mode
-  const days = Math.ceil(hours / 24);
-  return { tier: "daily", rounded: false, displayHours: days * 24 };
-}
-
-function getHourlyPrice(specs: BikePricingSpecs, hours: number): number {
-  // Exact tier matches (num() coerces string specs — see HOTFIX note above)
-  if (hours === 2 && num(specs.price_per_2h)) return num(specs.price_per_2h)!;
-  if (hours === 3 && num(specs.price_per_3h)) return num(specs.price_per_3h)!;
-  if (hours === 6 && num(specs.price_per_6h)) return num(specs.price_per_6h)!;
-  if (hours === 12 && num(specs.price_per_12h)) return num(specs.price_per_12h)!;
-
-  const baseHourly = num(specs.price_per_hour) ?? DEFAULT_HOURLY_PRICE;
-
-  // Interpolation for non-exact hours between tiers
-  if (hours <= 1) return baseHourly * hours;
-  if (hours < 3) {
-    // Interpolate between price_per_hour and price_per_3h
-    const perHour = num(specs.price_per_hour);
-    const per3h = num(specs.price_per_3h);
-    if (per3h && perHour) {
-      return Math.round(perHour + (per3h - perHour) * (hours - 1) / 2);
-    }
-    return baseHourly * hours;
-  }
-  if (hours < 6) {
-    // Interpolate between price_per_3h and price_per_6h
-    const per3h = num(specs.price_per_3h);
-    const per6h = num(specs.price_per_6h);
-    if (per3h && per6h) {
-      return Math.round(per3h + (per6h - per3h) * (hours - 3) / 3);
-    }
-    return num(specs.price_per_6h) ?? baseHourly * hours;
-  }
-  if (hours < 12) {
-    // Interpolate between price_per_6h and price_per_12h
-    const per6h = num(specs.price_per_6h);
-    const per12h = num(specs.price_per_12h);
-    if (per6h && per12h) {
-      return Math.round(per6h + (per12h - per6h) * (hours - 6) / 6);
-    }
-    return num(specs.price_per_12h) ?? baseHourly * hours;
-  }
-
-  // FIX (2026-09-11): 13–23h window — interpolate between price_per_12h and
-  // the daily rate, mirroring calculatePriceForDuration() in
-  // app/franchize/lib/pricing-calculator.ts (the contract builder). Before
-  // this branch the window collapsed to a 0-day daily price (bike part 0 ₽).
-  if (hours < 24) {
-    const per12h = num(specs.price_per_12h);
-    const daily = num(specs.dailyPrice) ?? num(specs.rent_weekday);
-    if (per12h && daily) {
-      return Math.round(per12h + (daily - per12h) * (hours - 12) / 12);
-    }
-    if (daily) return daily; // no 12h tier → charge the full day
-    return baseHourly * hours;
-  }
-
-  return baseHourly * hours;
-}
-
-function getDailyPrice(
-  specs: BikePricingSpecs,
-  days: number,
-  weekendDayCount: number = 0,
-  startDateStr?: string,
-): number {
-  if (days === 1) {
-    // For single-day rentals: check if the START day is a weekend,
-    // NOT whether any day in [start, end] is a weekend.
-    // A rental from Friday 10am → Saturday 10am is a Friday rental
-    // (the bike is returned Saturday morning, the weekend hasn't started
-    // for rental purposes). The old logic used weekendDayCount which
-    // counts inclusively and would see Saturday in the range → wrong.
-    if (startDateStr) {
-      const startDay = new Date(startDateStr + "T00:00:00").getDay();
-      const isStartWeekend = startDay === 0 || startDay === 6;
-      const weekendRate = num(specs.rent_weekend);
-      if (isStartWeekend && weekendRate) {
-        return weekendRate;
-      }
-    }
-    return num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? DEFAULT_DAILY_PRICE;
-  }
-
-  if (days >= 2 && days <= 4) {
-    return (num(specs.rent_2_4d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
-  }
-
-  if (days >= 5 && days <= 10) {
-    return (num(specs.rent_5_10d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
-  }
-
-  if (days >= 11 && days <= 30) {
-    return (num(specs.rent_11_30d) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * days;
-  }
-
-  // FIX (2026-09-11): days can be 0 for sub-24h rentals (differenceInDays
-  // floors a 14h rental to 0) — multiplying by 0 silently zeroed the whole
-  // bike part. At least one day is always charged (mirrors rentalDays =
-  // Math.max(1, ceil(hours/24)) in the contract builder).
-  return (num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE) * Math.max(1, days);
-}
-
-/**
- * Count how many weekend days (Sat=6, Sun=0) fall within [startDate, endDate].
- * Used to apply rent_weekend rate proportionally for multi-day rentals.
- */
-function countWeekendDays(startDate: string, endDate: string): number {
-  const start = new Date(startDate + "T00:00:00");
-  const end = new Date(endDate + "T00:00:00");
-  let count = 0;
-  const d = new Date(start);
-  while (d <= end) {
-    const day = d.getDay(); // 0=Sun, 6=Sat
-    if (day === 0 || day === 6) count++;
-    d.setDate(d.getDate() + 1);
-  }
-  return count;
-}
-
-function getPricingTier(hours: number, days: number): PricingTier {
-  if (hours < 24) {
-    const normalized = normalizeHourlyRental(hours);
-    return normalized.tier;
-  }
-
-  if (days === 1) return "daily";
-  if (days >= 2 && days <= 4) return "multi-day-2-4";
-  if (days >= 5 && days <= 10) return "multi-day-5-10";
-  if (days >= 11 && days <= 30) return "multi-day-11-30";
-
-  return "daily";
-}
-
-function calculateBasePrice(
-  specs: BikePricingSpecs,
-  hours: number,
-  days: number,
-  weekendDayCount: number = 0,
-  startDateStr?: string,
-): {
+export interface BikePartCalculation {
   price: number;
   tier: PricingTier;
-  baseDailyRate: number;
-} {
+  /** Hourly: price/hours. Multi-day: the per-day tier rate that was charged. */
+  rate: number;
+  /** Charged days for h ≥ 24 (ceil), else 0. */
+  days: number;
+}
+
+/** Keep the ladder monotonic: never above the next anchor, never below the
+ *  previous one. Bad data (lower ≥ upper) skips the clamp instead of lying. */
+function clampToLadder(price: number, lower?: number, upper?: number): number {
+  if (lower !== undefined && upper !== undefined && lower >= upper) return price;
+  if (upper !== undefined && price > upper) return upper;
+  if (lower !== undefined && price < lower) return lower;
+  return price;
+}
+
+function isWeekendStartDate(startDateStr?: string): boolean {
+  if (!startDateStr) return false;
+  const day = new Date(startDateStr + "T00:00:00").getDay();
+  return day === 0 || day === 6;
+}
+
+export function calculateBikePartForRental(
+  specs: BikePricingSpecs,
+  hours: number,
+  startDateStr?: string,
+): BikePartCalculation {
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return { price: 0, tier: "hourly", rate: 0, days: 0 };
+  }
+
+  // num() coerces string specs — see the HOTFIX note above.
+  const perHour = num(specs.price_per_hour);
+  const per2h = num(specs.price_per_2h);
+  const per3h = num(specs.price_per_3h);
+  const per6h = num(specs.price_per_6h);
+  const per12h = num(specs.price_per_12h);
+  const daily = num(specs.dailyPrice) ?? num(specs.rent_weekday);
+  const hourlyFallback = perHour ?? daily ?? DEFAULT_HOURLY_PRICE;
+
   if (hours < 24) {
-    const normalized = normalizeHourlyRental(hours);
-    const price = getHourlyPrice(specs, normalized.displayHours);
-    return { price, tier: normalized.tier, baseDailyRate: price / normalized.displayHours };
+    let price: number;
+    let tier: PricingTier;
+    let lower: number | undefined;
+    let upper: number | undefined;
+
+    if (hours <= 1) {
+      price = Math.round(hourlyFallback * hours);
+      tier = "hourly";
+      upper = per3h;
+    } else if (hours < 3) {
+      if (hours === 2 && per2h) {
+        price = per2h;
+      } else if (perHour && per3h) {
+        price = Math.round(perHour + (per3h - perHour) * (hours - 1) / 2);
+      } else {
+        // Contract fallback chain: per-hour → pro-rated 3h tier → daily.
+        const rate = perHour ?? (per3h ? per3h / 3 : (daily ?? DEFAULT_HOURLY_PRICE));
+        price = Math.round(rate * hours);
+      }
+      tier = "hourly";
+      lower = perHour ?? (per3h ? per3h / 3 : undefined);
+      upper = per3h;
+    } else if (hours === 3) {
+      price = per3h ?? Math.round(hourlyFallback * 3);
+      tier = "3-hours";
+      lower = perHour;
+      upper = per6h;
+    } else if (hours < 6) {
+      if (per3h && per6h) {
+        price = Math.round(per3h + (per6h - per3h) * (hours - 3) / 3);
+      } else if (per3h) {
+        price = Math.round(per3h / 3 * hours);
+      } else {
+        price = Math.round(hourlyFallback * hours);
+      }
+      tier = "3-6-hours";
+      lower = per3h ?? perHour;
+      upper = per6h;
+    } else if (hours === 6) {
+      price = per6h ?? (per3h ? Math.round(per3h / 3 * 6) : Math.round(hourlyFallback * 6));
+      tier = "6-hours";
+      lower = per3h;
+      upper = per12h;
+    } else if (hours < 12) {
+      if (per6h && per12h) {
+        price = Math.round(per6h + (per12h - per6h) * (hours - 6) / 6);
+      } else if (per6h) {
+        price = Math.round(per6h / 6 * hours);
+      } else {
+        price = Math.round(hourlyFallback * hours);
+      }
+      tier = "6-12-hours";
+      lower = per6h ?? per3h ?? perHour;
+      upper = per12h;
+    } else if (hours === 12) {
+      price = per12h ?? (per6h ? Math.round(per6h / 6 * 12) : Math.round(hourlyFallback * 12));
+      tier = "12-hours";
+      lower = per6h;
+      upper = daily;
+    } else {
+      // 13–23h: interpolate 12h → daily (the aprilia-shiver 14h fix, now the
+      // general rule shared with the contract builder).
+      if (per12h && daily) {
+        price = Math.round(per12h + (daily - per12h) * (hours - 12) / 12);
+      } else if (daily) {
+        price = daily;
+      } else {
+        price = Math.round(hourlyFallback * hours);
+      }
+      tier = "extended-hours";
+      lower = per12h ?? per6h ?? perHour;
+      upper = daily;
+    }
+
+    price = clampToLadder(price, lower, upper);
+    return { price, tier, rate: price / hours, days: 0 };
   }
 
-  // Multi-day: blend weekend rate for weekend days + weekday rate for weekday days
-  if (days > 1 && weekendDayCount > 0 && specs.rent_weekend && specs.rent_weekday) {
-    const weekendRate = num(specs.rent_weekend)!;
-    const weekdayRate = num(specs.rent_weekday)!;
-    const weekdayDayCount = days - weekendDayCount;
-    const price = weekendDayCount * weekendRate + weekdayDayCount * weekdayRate;
-    const tier = getPricingTier(hours, days);
-    const baseDailyRate = (weekendDayCount * weekendRate + weekdayDayCount * weekdayRate) / days;
-    return { price, tier, baseDailyRate };
+  // ≥ 24 hours — day tiers, ceil (contract parity; see the block comment).
+  const days = Math.ceil(hours / 24);
+  let rate: number;
+  let tier: PricingTier;
+  if (days >= 11 && num(specs.rent_11_30d) !== undefined) {
+    rate = num(specs.rent_11_30d)!;
+    tier = "multi-day-11-30";
+  } else if (days >= 5 && num(specs.rent_5_10d) !== undefined) {
+    rate = num(specs.rent_5_10d)!;
+    tier = "multi-day-5-10";
+  } else if (days >= 2 && num(specs.rent_2_4d) !== undefined) {
+    rate = num(specs.rent_2_4d)!;
+    tier = "multi-day-2-4";
+  } else if (days === 1) {
+    // Single charged day: the weekend rate applies when the START day is a
+    // weekend (Fri 10am → Sat 10am is a Friday rental).
+    const weekendRate = num(specs.rent_weekend);
+    rate = isWeekendStartDate(startDateStr) && weekendRate
+      ? weekendRate
+      : num(specs.rent_weekday) ?? num(specs.dailyPrice) ?? DEFAULT_DAILY_PRICE;
+    tier = "daily";
+  } else {
+    rate = num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? DEFAULT_DAILY_PRICE;
+    tier = days >= 11 ? "multi-day-11-30" : days >= 5 ? "multi-day-5-10" : days >= 2 ? "multi-day-2-4" : "daily";
   }
-
-  const price = getDailyPrice(specs, days, weekendDayCount, startDateStr);
-  const tier = getPricingTier(hours, days);
-  const baseDailyRate = num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? DEFAULT_DAILY_PRICE;
-
-  return { price, tier, baseDailyRate };
+  return { price: Math.round(rate * days), tier, rate, days };
 }
 
 export function calculatePrice(
@@ -384,22 +350,17 @@ export function calculatePrice(
   const end = new Date(`${endDate}T${endTime}`);
 
   const hours = differenceInHours(end, start);
-  const days = differenceInDays(end, start);
 
   // HOTFIX: helmetCount must be numeric too — a string count ("2") would
   // make helmetRub = "2" * 1000 = 2000 via coercion today, but any future
   // `+` usage would concatenate. Coerce once at entry.
   const helmets = num(helmetCount) ?? 0;
 
-  const normalized = normalizeHourlyRental(hours);
-  const weekendDayCount = countWeekendDays(startDate, endDate);
-  const { price, tier, baseDailyRate } = calculateBasePrice(
-    specs,
-    normalized.displayHours,
-    days,
-    weekendDayCount,
-    startDate,
-  );
+  // 2026-09-11: ONE canonical ladder for the bike part — full interpolation
+  // between the golden-standard anchors for < 24h, ceil-day tier rates for
+  // ≥ 24h. Identical math now lives in the contract builder
+  // (calculatePriceForDuration delegates here), so cart == contract == DB.
+  const bike = calculateBikePartForRental(specs, hours, startDate);
 
   const helmetRub = helmets * getHelmetPrice(hours);
   // 2026-09-11 canon: non-helmet gear pro-rates with the SAME duration rule
@@ -407,57 +368,70 @@ export function calculatePrice(
   // cart, the modal, /doc, the contract and the bot quoter stay digit-equal.
   const extrasRub = calculateExtrasRub(extras, hours);
   const depositRub = num(specs.deposit_rub) ?? DEFAULT_DEPOSIT_RUB;
-  // HOTFIX: `price` and `helmetRub` are guaranteed numbers now. Previously,
+  // HOTFIX: bike.price and helmetRub are guaranteed numbers now. Previously,
   // with string specs (dailyPrice: "10000") `price` was the raw string and
-  // this line produced "100002000" — the string-sum bug every consumer
+  // the sum produced "100002000" — the string-sum bug every consumer
   // (modal, cart, order page, contract) inherited.
-  // FIX (2026-08-29): extrasRub joins the sum — gloves etc. are no longer free.
-  const totalRub = price + helmetRub + extrasRub;
+  const totalRub = bike.price + helmetRub + extrasRub;
 
   let savingsRub = 0;
   let savingsPercent = 0;
 
   if (hours < 24) {
-    // Hourly: compare vs hourly rate
-    const baseHourly = num(specs.price_per_hour) ?? DEFAULT_HOURLY_PRICE;
+    // Hourly: compare vs straight hourly multiplication
+    const baseHourly = num(specs.price_per_hour) ?? num(specs.dailyPrice) ?? DEFAULT_HOURLY_PRICE;
     const fullPrice = baseHourly * hours;
-    savingsRub = Math.max(0, fullPrice - price);
+    savingsRub = Math.max(0, Math.round(fullPrice - bike.price));
     if (fullPrice > 0) {
       savingsPercent = Math.round((savingsRub / fullPrice) * 100);
     }
   } else {
-    // Daily: compare vs base daily rate
-    const fullPrice = baseDailyRate * days;
-    savingsRub = Math.max(0, fullPrice - price);
+    // Daily: compare vs base daily rate × charged days
+    const baseDailyRate = num(specs.dailyPrice) ?? num(specs.rent_weekday) ?? DEFAULT_DAILY_PRICE;
+    const fullPrice = baseDailyRate * bike.days;
+    savingsRub = Math.max(0, fullPrice - bike.price);
     if (fullPrice > 0) {
       savingsPercent = Math.round((savingsRub / fullPrice) * 100);
     }
   }
 
-  let period = "";
-  if (hours < 24) {
-    period = `${normalized.displayHours} час${normalized.displayHours === 1 ? "" : "ов"}`;
-  } else {
-    period = `${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`;
-  }
+  const period = hours < 24
+    ? formatHoursLabel(hours)
+    : `${bike.days} ${bike.days === 1 ? "день" : bike.days < 5 ? "дня" : "дней"}`;
 
   return {
     totalRub,
-    basePriceRub: price,
+    basePriceRub: bike.price,
     helmetRub,
     extrasRub,
     depositRub,
     savingsRub,
     savingsPercent,
-    tier,
+    tier: bike.tier,
     breakdown: {
       period,
-      ratePerPeriod: `${Math.round(baseDailyRate).toLocaleString("ru-RU")} ₽/${hours < 24 ? "час" : "день"}`,
-      periods: hours < 24 ? normalized.displayHours : days,
+      ratePerPeriod: hours < 24
+        ? `${Math.round(bike.price / hours).toLocaleString("ru-RU")} ₽/час`
+        : `${Math.round(bike.rate).toLocaleString("ru-RU")} ₽/день`,
+      periods: hours < 24 ? hours : bike.days,
     },
-    rounded: normalized.rounded,
-    displayHours: normalized.displayHours,
+    // Legacy fields: the ladder no longer rounds up (4–5h no longer bills the
+    // 6h tier, 7–11h no longer bills the 12h tier) — `rounded` is always false
+    // and displayHours carries the ACTUAL rental window.
+    rounded: false,
+    displayHours: hours < 24 ? hours : bike.days * 24,
   };
+}
+
+function formatHoursLabel(hours: number): string {
+  const rounded = Math.round(hours * 10) / 10;
+  const value = Number.isInteger(rounded) ? String(rounded) : rounded.toLocaleString("ru-RU");
+  const mod10 = rounded % 10;
+  const mod100 = rounded % 100;
+  let unit = "часов";
+  if (mod10 === 1 && mod100 !== 11) unit = "час";
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) unit = "часа";
+  return `${value} ${unit}`;
 }
 
 export function validateBikePricing(specs: BikePricingSpecs): {

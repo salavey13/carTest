@@ -174,7 +174,7 @@
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: left;"><b>Подписано ПЭП:</b><br>
 {{renter_signature}}<br>
 Дата и время: {{signature_timestamp}}<br>
-Отпечаток подписи (SHA-256 initData): {{signature_fingerprint}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{renter_full_name}}</td>{{/if}}
+Отпечаток подписи (SHA-256 initData, первые 16 символов): {{signature_fingerprint}}</td>{{else}}<td style="border: none; width: 50%; text-align: center;">_________________ / {{renter_full_name}}</td>{{/if}}
 </tr>
 <tr>
 {{#if pep_signed}}<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(ПЭП Арендодателя — файл Договора, п. 12.3)</td>{{else}}<td style="border: none; width: 50%; text-align: center; font-size: 10pt;">(подпись)&emsp;(Ф.И.О.)</td>{{/if}}

@@ -129,8 +129,9 @@ interface ItemModalProps {
   onAddToCart: (extrasStr?: string) => void | Promise<void>;
   /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
   onBuyItem?: () => void | Promise<void>;
-  /** Called when "Тест-драйв" CTA is clicked — adds to cart with testdrive flow */
-  onTestdrive?: () => void | Promise<void>;
+  /** Called when "Тест-драйв" CTA is clicked — adds to cart with testdrive flow.
+   *  2026-09-11: receives the picked testdrive slot (defaults to now). */
+  onTestdrive?: (slot?: { date: string; time: string }) => void | Promise<void>;
   /** Shows "С возвращением!" badge for returning users */
   isReturningUser?: boolean;
   /** Display mode from catalog filter — overrides flowType for content visibility */
@@ -1323,10 +1324,25 @@ export function ItemModal({
   const [rentStartTime, setRentStartTime] = useState("10:00");
   const [rentEndTime, setRentEndTime] = useState("10:00");
   // ── Test-drive MODE switch (2026-09-11) ──
-  // When ON the modal simplifies: no dates, no equipment, free (0 ₽) —
-  // mirrors the battle-tested bot /testdrive flow (10 minutes, deposit-free).
+  // When ON the modal simplifies: no equipment, free (0 ₽) — mirrors the
+  // battle-tested bot /testdrive flow (10 minutes, deposit-free).
   // "Добавить в корзину" then adds a testdrive-marked cart line.
   const [testdriveMode, setTestdriveMode] = useState(false);
+  // 2026-09-11 (owner): «Testdrive date picker would be nice btw, default to
+  // "now" kinda, not 10 am though ;)» — a dedicated tdDate/tdTime pair (NOT
+  // the rental rentStart* options, so toggling the mode never clobbers a
+  // picked rental window) defaulting to the CURRENT time.
+  const [testdriveDate, setTestdriveDate] = useState(""); // YYYY-MM-DD
+  const [testdriveTime, setTestdriveTime] = useState(""); // HH:MM
+  useEffect(() => {
+    if (!testdriveMode) return;
+    // Default = now (real wall clock, NOT snapped to 10:00)
+    const now = new Date();
+    const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setTestdriveDate((prev) => prev || d);
+    setTestdriveTime((prev) => prev || t);
+  }, [testdriveMode]);
   // Dynamic calculated price from franchize pricing calculator
   const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
 
@@ -1512,8 +1528,9 @@ export function ItemModal({
       try {
         // Test-drive mode: skip the rental config entirely — the parent adds
         // the line with action "testdrive" / duration "10 минут" (0 ₽).
+        // The picked testdrive slot (default = now) rides along.
         if (testdriveMode) {
-          const result = onTestdrive?.();
+          const result = onTestdrive?.({ date: testdriveDate, time: testdriveTime });
           if (result instanceof Promise) {
             result.finally(() => setIsAdding(false));
           } else {
@@ -1540,7 +1557,7 @@ export function ItemModal({
         setIsAdding(false);
       }
     },
-    [isAdding, onAddToCart, onTestdrive, testdriveMode, onChangeOption, extrasSelection],
+    [isAdding, onAddToCart, onTestdrive, testdriveMode, testdriveDate, testdriveTime, onChangeOption, extrasSelection],
   );
 
   const handleBuyItem = useCallback(
@@ -2371,7 +2388,7 @@ export function ItemModal({
                       Режим тест-драйва
                     </span>
                     <span className="mt-0.5 block text-[10px] leading-4 text-[var(--item-muted-text)]">
-                      Бесплатно · 10 минут · без даты и экипировки
+                      Бесплатно · 10 минут · дата по вашему выбору
                     </span>
                   </span>
                   <input
@@ -2395,9 +2412,35 @@ export function ItemModal({
                     <p className="text-sm font-bold" style={{ color: "var(--item-accent)" }}>
                       Тест-драйв · 0 ₽
                     </p>
+                    {/* 2026-09-11: testdrive date + time picker — defaults to
+                        NOW (real wall clock, never snapped to 10:00). The
+                        chosen slot lands in the cart line and the generated
+                        testdrive doc instead of «по согласованию». */}
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text)]">
+                        Дата
+                        <input
+                          type="date"
+                          value={testdriveDate}
+                          onChange={(e) => setTestdriveDate(e.target.value)}
+                          className="rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]"
+                          aria-label="Дата тест-драйва"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text)]">
+                        Время
+                        <input
+                          type="time"
+                          value={testdriveTime}
+                          onChange={(e) => setTestdriveTime(e.target.value)}
+                          className="rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]"
+                          aria-label="Время тест-драйва"
+                        />
+                      </label>
+                    </div>
                     <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--item-muted-text)]">
                       <li>• Бесплатное время тест-драйва — 10 минут</li>
-                      <li>• Дата и время согласуются на месте выдачи</li>
+                      <li>• Точное время подтверждаем по телефону</li>
                       <li>• Нужен паспорт или водительское удостоверение</li>
                       <li>• Договор тест-драйва сформируется автоматически</li>
                     </ul>

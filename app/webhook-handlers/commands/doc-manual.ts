@@ -820,6 +820,10 @@ const RENT_STEPS: StepDef[] = [
   { num: 11, state: 'equipment', label: 'Оборудование' },
   { num: 12, state: 'odometer', label: 'Одометр' },
   { num: 13, state: 'payment_split', label: 'Способ оплаты' },
+  // 2026-09-11: the price override is now an explicit correctable step —
+  // «Исправить шаг» finally offers «Цена» (owner request). Routed to the
+  // existing price_override handler (sets cashAmount + priceOverridden).
+  { num: '13a', state: 'price_override', label: 'Цена' },
   { num: 14, state: 'deposit_choice', label: 'Депозит / СТС' },
   { num: 15, state: 'deposit_destination', label: 'Где получен депозит' },
   { num: '15a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' },
@@ -3424,6 +3428,8 @@ export async function handleDocText(userId: string, chatId: number, text: string
   }
 
   // I4 enhancement: price override — operator types a custom total price
+  // 2026-09-11: this state is ALSO reachable from «Исправить шаг» (RENT_STEPS
+  // now exposes a «Цена» entry) — the correction menu finally covers the price.
   if (state === "price_override") {
     const value = text.replace(/\D/g, '');
     if (!value || parseInt(value) < 100) {
@@ -3439,6 +3445,23 @@ export async function handleDocText(userId: string, chatId: number, text: string
     logger.info(`[/doc] price_override: ${userId} → new price=${newPrice}`);
     // Re-show the payment split with the new price
     await gotoPaymentSplit(chatId, userId, context);
+    return true;
+  }
+
+  // 2026-09-11 FIX: correcting SALE step 9 (Цена) used to dead-end — there was
+  // no `state === "price"` text handler, so the typed number fell through to
+  // the command-handler fallback and the operator got «Неизвестная команда».
+  // Same rules as the original gotoPrice → price_custom path (min 10 000 ₽).
+  if (state === "price") {
+    const price = text.replace(/\D/g, '');
+    if (!price || parseInt(price) < 10000) {
+      logger.info(`[/doc] price (sale correction): ${userId} → invalid input "${text.slice(0, 40)}"`);
+      await sendComplexMessage(chatId, "❌ Введите цену (руб)", [], { removeKeyboard: true });
+      return true;
+    }
+    context.salePrice = price;
+    logger.info(`[/doc] price (sale correction): ${userId} → salePrice=${price}`);
+    await gotoSaleDelivery(chatId, userId, context);
     return true;
   }
 
@@ -3795,6 +3818,13 @@ async function reAskStep(chatId: number, userId: string, context: DocFlowContext
     case 'sale_color': oldValue = context.saleColor || ""; break;
     case 'sale_vin': oldValue = context.saleVin || (context.saleVinSkipped ? "(пропущен)" : ""); break;
     case 'sale_transport': oldValue = context.saleTransportCompany || ""; break;
+    case 'price': oldValue = context.salePrice ? `${context.salePrice} ₽` : ""; break;
+    case 'price_override': {
+      // Show the currently calculated/overridden total as «Было»
+      const currentTotal = (context.cashAmount || 0) + (context.bankAmount || 0);
+      oldValue = currentTotal > 0 ? `${currentTotal.toLocaleString("ru-RU")} ₽` : "";
+      break;
+    }
   }
 
   const prefix = oldValue ? `Было: ${oldValue}\n\n` : '';
@@ -3866,7 +3896,11 @@ export async function handleDocCallback(
   // "odo_use_<km>" — accepts the last known odometer as the current reading.
   if (callbackData.startsWith("odo_use_")) {
     if (state !== "odometer") return false; // stale button from another step
-    const value = parseInt(callbackData.replace("odo_use_", ""), 10);
+    // 2026-09-11 FIX: strip EVERYTHING non-digit before parsing — the button
+    // payload is pure digits (odo_use_1940), but a formatting regression or a
+    // client that echoes the human text («1 940 км») must still parse to 1940
+    // instead of parseInt stopping at the first space/nbsp (→ 1).
+    const value = parseInt(callbackData.slice("odo_use_".length).replace(/[^\d]/g, ""), 10);
     if (!Number.isFinite(value) || value < 0 || value > 999999) {
       await sendComplexMessage(chatId, "❌ Некорректное значение одометра. Введите пробег в км (0-999999).", [], { removeKeyboard: true });
       return true;

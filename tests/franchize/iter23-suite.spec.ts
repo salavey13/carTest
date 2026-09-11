@@ -60,7 +60,7 @@ describe("iter23 · rental template renders ПЭП in ALL signature places", () 
         // the compact variant — together: 5 «Подписано ПЭП» occurrences.
         expect(count(rendered, "Подписано ПЭП")).toBe(5);
         // The full audit (timestamp + fingerprint) stays in the main block.
-        expect(rendered).toContain("Отпечаток подписи (SHA-256 initData)");
+        expect(rendered).toContain("Отпечаток подписи (SHA-256 initData, первые 16 символов)");
         expect(rendered).toContain(PEP_VARS.signature_fingerprint);
         // Compact places carry the timestamp too.
         expect(count(rendered, "30.08.2026 12:34 (МСК)")).toBeGreaterThanOrEqual(4);

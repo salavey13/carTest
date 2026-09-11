@@ -3,22 +3,20 @@
  */
 
 import { parseISODate } from "@/app/franchize/lib/date-utils";
-import { getEquipmentUnitPriceForRental } from "@/lib/rental-pricing-calculator";
+import {
+  calculateBikePartForRental,
+  getEquipmentUnitPriceForRental,
+} from "@/lib/rental-pricing-calculator";
+import type { BikePricingSpecs as SharedBikePricingSpecs } from "@/lib/rental-pricing-calculator";
 
-export interface BikePricingSpecs {
-  price_per_hour?: number | string;
-  price_per_2h?: number | string;
-  price_per_3h?: number | string;
-  price_per_6h?: number | string;
-  price_per_12h?: number | string;
-  dailyPrice?: number | string;
-  rent_weekday?: number | string;
-  rent_weekend?: number | string;
-  rent_2_4d?: number | string;
-  rent_5_10d?: number | string;
-  rent_11_30d?: number | string;
-  deposit_rub?: number | string;
-}
+// 2026-09-11: the bike-part math moved into ONE canonical ladder —
+// calculateBikePartForRental() in lib/rental-pricing-calculator.ts (full
+// interpolation between the golden-standard anchors 1h/3h/6h/12h/1d +
+// ceil-day tier rates 2-4d/5-10d/11-30d, monotonic clamp). This module keeps
+// its public { price, period, rate } API and labels but DELEGATES the math,
+// so the contract builder, /doc and the web cart are digit-equal by
+// construction (owner: «идентично в корзине = договор = DB»).
+export type BikePricingSpecs = SharedBikePricingSpecs;
 
 /**
  * Validate that a number is a positive value (or zero)
@@ -124,6 +122,11 @@ function countWeekendDays(startDate: string, endDate: string): number {
  *
  * The `rate` field consistently represents the per-hour or per-day rate
  * used for calculation, NOT the total price.
+ *
+ * 2026-09-11: the math DELEGATES to the shared canonical ladder
+ * (calculateBikePartForRental) — full interpolation between 1h/3h/6h/12h/1d
+ * anchors, monotonic clamp, ceil-day tier rates for ≥ 24h. Only the
+ * human-readable labels are produced here.
  */
 export function calculatePriceForDuration(
   specs: BikePricingSpecs,
@@ -135,207 +138,41 @@ export function calculatePriceForDuration(
     return { price: 0, period: 'Invalid duration', rate: 0 };
   }
 
-  // ── 1 hour or less ──
-  if (hours <= 1) {
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: Math.round(perHourRate * hours), period: '/ час', rate: perHourRate };
-  }
+  const bike = calculateBikePartForRental(specs, hours, startDateStr);
 
-  // ── Between 1 and 3 hours (exclusive of 3) ──
-  if (hours < 3) {
-    // Exact 2-hour tier: use price_per_2h if available
-    const per2h = validatePositiveNumber(specs.price_per_2h);
-    if (hours === 2 && per2h !== undefined) {
-      const rate = per2h / 2;
-      return { price: per2h, period: '/ 2 часа', rate };
-    }
-    // Linear interpolation between price_per_hour (at h=1) and price_per_3h (at h=3)
-    const perHour = validatePositiveNumber(specs.price_per_hour);
-    const per3h = validatePositiveNumber(specs.price_per_3h);
-    if (perHour !== undefined && per3h !== undefined) {
-      // Interpolate: price = perHour + (per3h - perHour) * (hours - 1) / 2
-      const price = Math.round(perHour + (per3h - perHour) * (hours - 1) / 2);
-      const rate = price / hours;
-      const hLabel = Number.isInteger(hours) ? `${hours} часа` : `${hours} ч`;
-      return { price, period: `/ ${hLabel}`, rate };
-    }
-    // Fallback: hourly rate × hours
-    // FIX (2026-08-28): the old `perHour ?? per3h !== undefined ? … : …` mixed
-    // `??` with the ternary — precedence made the condition `perHour ?? (per3h !== undefined)`,
-    // so a set price_per_hour with NO price_per_3h produced `undefined!/3` = NaN.
-    const fallbackRate = perHour !== undefined
-      ? perHour
-      : per3h !== undefined
-        ? per3h / 3
-        : (validatePositiveNumber(specs.dailyPrice) ?? 0);
-    return { price: Math.round(fallbackRate * hours), period: `/ ${hours} ч`, rate: fallbackRate };
-  }
-
-  // ── Exactly 3 hours ──
-  if (hours === 3) {
-    const per3h = validatePositiveNumber(specs.price_per_3h);
-    if (per3h !== undefined) {
-      const rate = per3h / 3;
-      return { price: per3h, period: '/ 3 часа', rate };
-    }
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: Math.round(perHourRate * 3), period: '/ 3 часа', rate: perHourRate };
-  }
-
-  // ── Between 3 and 6 hours (exclusive of 6) ──
-  if (hours < 6) {
-    const per3h = validatePositiveNumber(specs.price_per_3h);
-    const per6h = validatePositiveNumber(specs.price_per_6h);
-    if (per3h !== undefined && per6h !== undefined) {
-      // Interpolate between 3h and 6h tiers
-      const price = Math.round(per3h + (per6h - per3h) * (hours - 3) / 3);
-      const rate = price / hours;
-      return { price, period: `/ ${hours} часов`, rate };
-    }
-    // Fallback to 3h rate extrapolated
-    if (per3h !== undefined) {
-      const perHourRate = per3h / 3;
-      return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
-    }
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
-  }
-
-  // ── Exactly 6 hours ──
-  if (hours === 6) {
-    const per6h = validatePositiveNumber(specs.price_per_6h);
-    if (per6h !== undefined) {
-      const rate = per6h / 6;
-      return { price: per6h, period: '/ 6 часов', rate };
-    }
-    const per3hRate = validatePositiveNumber(specs.price_per_3h);
-    if (per3hRate !== undefined) {
-      const perHourRate = per3hRate / 3;
-      return { price: Math.round(perHourRate * 6), period: '/ 6 часов', rate: perHourRate };
-    }
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: Math.round(perHourRate * 6), period: '/ 6 часов', rate: perHourRate };
-  }
-
-  // ── Between 6 and 12 hours (exclusive of 12) ──
-  if (hours < 12) {
-    const per6h = validatePositiveNumber(specs.price_per_6h);
-    const per12h = validatePositiveNumber(specs.price_per_12h);
-    if (per6h !== undefined && per12h !== undefined) {
-      const price = Math.round(per6h + (per12h - per6h) * (hours - 6) / 6);
-      const rate = price / hours;
-      return { price, period: `/ ${hours} часов`, rate };
-    }
-    if (per6h !== undefined) {
-      const perHourRate = per6h / 6;
-      return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
-    }
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
-  }
-
-  // ── Exactly 12 hours ──
-  if (hours === 12) {
-    const per12h = validatePositiveNumber(specs.price_per_12h);
-    if (per12h !== undefined) {
-      const rate = per12h / 12;
-      return { price: per12h, period: '/ 12 часов', rate };
-    }
-    const per6hRate = validatePositiveNumber(specs.price_per_6h);
-    if (per6hRate !== undefined) {
-      const perHourRate = per6hRate / 6;
-      return { price: Math.round(perHourRate * 12), period: '/ 12 часов', rate: perHourRate };
-    }
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? validatePositiveNumber(specs.dailyPrice) ?? 0;
-    return { price: Math.round(perHourRate * 12), period: '/ 12 часов', rate: perHourRate };
-  }
-
-  // ── Between 12 and 24 hours: interpolate between 12h and daily ──
   if (hours < 24) {
-    const per12h = validatePositiveNumber(specs.price_per_12h);
-    const daily = validatePositiveNumber(specs.dailyPrice) ?? validatePositiveNumber(specs.rent_weekday);
-    if (per12h !== undefined && daily !== undefined) {
-      const price = Math.round(per12h + (daily - per12h) * (hours - 12) / 12);
-      const rate = price / hours;
-      return { price, period: `/ ${hours} часов`, rate };
-    }
-    // Fallback: daily rate
-    if (daily !== undefined) {
-      return { price: daily, period: '/ день', rate: daily };
-    }
-    const perHourRate = validatePositiveNumber(specs.price_per_hour) ?? 0;
-    return { price: Math.round(perHourRate * hours), period: `/ ${hours} часов`, rate: perHourRate };
+    let period: string;
+    if (hours <= 1) period = '/ час';
+    else if (hours < 3) period = hours === 2 ? '/ 2 часа' : `/ ${hours} часа`;
+    else if (hours === 3) period = '/ 3 часа';
+    else if (hours < 6) period = `/ ${hours} часов`;
+    else if (hours === 6) period = '/ 6 часов';
+    else if (hours < 12) period = `/ ${hours} часов`;
+    else if (hours === 12) period = '/ 12 часов';
+    else period = `/ ${hours} часов`;
+    return { price: bike.price, period, rate: bike.rate };
   }
 
-  // Daily pricing (24+ hours)
+  // Daily pricing (24+ hours) — reproduce the historical per-tier labels.
   const days = Math.ceil(hours / 24);
-  return calculatePriceForDays(specs, days, startDateStr);
-}
-
-/**
- * Calculate price for a specific number of days
- * Internal helper for daily/multi-day pricing
- *
- * Multi-day tier prices (rent_2_4d, rent_5_10d, rent_11_30d) are treated as PER-DAY rates
- * and multiplied by the actual number of days.
- *
- * The `rate` field consistently represents the per-day rate used.
- */
-function calculatePriceForDays(
-  specs: BikePricingSpecs,
-  days: number,
-  startDateStr?: string
-): { price: number; period: string; rate: number } {
-  if (days <= 0) {
-    return { price: 0, period: 'Invalid duration', rate: 0 };
-  }
-
-  // Determine the base per-day rate based on tier and weekday logic
-  let perDayRate: number;
-  let periodLabel: string;
-
-  // Multi-day tiered pricing (per-day rates, multiplied by actual days)
-  // HOTFIX (string prices): tier rates go through validatePositiveNumber —
-  // the OLD code guarded with it but returned the RAW spec value, so a
-  // string spec (rent_11_30d: "8000") leaked into `price` and any consumer
-  // summing `price + x` concatenated instead of adding.
-  if (days >= 11 && validatePositiveNumber(specs.rent_11_30d) !== undefined) {
-    perDayRate = validatePositiveNumber(specs.rent_11_30d)!;
-    periodLabel = '/ 11-30 дней';
-    return { price: perDayRate * days, period: periodLabel, rate: perDayRate };
-  }
-
-  if (days >= 5 && validatePositiveNumber(specs.rent_5_10d) !== undefined) {
-    perDayRate = validatePositiveNumber(specs.rent_5_10d)!;
-    periodLabel = '/ 5-10 дней';
-    return { price: perDayRate * days, period: periodLabel, rate: perDayRate };
-  }
-
-  if (days >= 2 && validatePositiveNumber(specs.rent_2_4d) !== undefined) {
-    perDayRate = validatePositiveNumber(specs.rent_2_4d)!;
-    periodLabel = '/ 2-4 дня';
-    return { price: perDayRate * days, period: periodLabel, rate: perDayRate };
-  }
-
-  // Single day or fallback to daily rate
-  const baseDaily = validatePositiveNumber(specs.dailyPrice) ?? 0;
-
-  if (days === 1) {
-    // For single-day: use weekend rate if the rental day is a weekend
+  const positive = (v: number | string | undefined) => validatePositiveNumber(v) !== undefined;
+  let period: string;
+  if (days >= 11 && positive(specs.rent_11_30d)) period = '/ 11-30 дней';
+  else if (days >= 5 && positive(specs.rent_5_10d)) period = '/ 5-10 дней';
+  else if (days >= 2 && positive(specs.rent_2_4d)) period = '/ 2-4 дня';
+  else if (days === 1) {
     const weekendRate = validatePositiveNumber(specs.rent_weekend);
+    const baseDaily = validatePositiveNumber(specs.dailyPrice) ?? 0;
     if (startDateStr && isWeekendDay(startDateStr) && weekendRate !== undefined) {
-      perDayRate = weekendRate;
-      periodLabel = '/ день (выходные)';
-      return { price: perDayRate, period: periodLabel, rate: perDayRate };
+      period = '/ день (выходные)';
+    } else {
+      const weekdayRate = validatePositiveNumber(specs.rent_weekday) ?? baseDaily;
+      period = weekdayRate < baseDaily ? '/ день (будни)' : '/ день';
     }
-    // Use weekday rate if available for single day
-    perDayRate = validatePositiveNumber(specs.rent_weekday) ?? baseDaily;
-    periodLabel = perDayRate < baseDaily ? '/ день (будни)' : '/ день';
-    return { price: perDayRate, period: periodLabel, rate: perDayRate };
+  } else {
+    period = `/ ${days} дн.`;
   }
-
-  // Fallback: daily rate × days
-  return { price: baseDaily * days, period: `/ ${days} дн.`, rate: baseDaily };
+  return { price: bike.price, period, rate: bike.rate };
 }
 
 /**

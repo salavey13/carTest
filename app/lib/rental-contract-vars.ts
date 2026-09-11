@@ -930,16 +930,32 @@ export function buildRentalContractVariables(
     // Rental terms defaults
     included_km_per_day: getContractDefault(crewSecrets, "included_km_per_day", DEFAULT_INCLUDED_KM_PER_DAY),
     extra_km_fee_rub: getBikeOverageRate(bike.id, getContractDefault(crewSecrets, "extra_km_fee_rub", DEFAULT_EXTRA_KM_FEE)),
-    late_return_penalty_rub: getContractDefault(crewSecrets, "late_return_penalty_rub", DEFAULT_LATE_RETURN_PENALTY),
+    // FIX (2026-09-11, reviewer R1: «простой 10000 vs тариф 12000 в одном
+    // документе»): the idle/downtime tariff must DEFAULT TO THE BIKE'S DAILY
+    // RATE — п. 6.6 and Прил. 3 п. 2 already quote {{daily_price_rub}}, so the
+    // unconfigured 10000 ₽ default contradicted the same contract. A crew can
+    // still override via contractDefaults.late_return_penalty_rub.
+    late_return_penalty_rub: getContractDefault(
+      crewSecrets,
+      "late_return_penalty_rub",
+      Math.round(Number(dailyPrice) || DEFAULT_LATE_RETURN_PENALTY),
+    ),
     late_return_penalty_max_days: getContractDefault(crewSecrets, "late_return_penalty_max_days", DEFAULT_LATE_RETURN_PENALTY_MAX_DAYS),
 
-    // Delivery/return defaults
+    // Delivery/return defaults — FIX (2026-09-11, reviewer R1: «мусорные
+    // строки-обрывки в Акте»): in the RENTAL Акт the handover condition /
+    // photo links are filled BY HAND on paper, so the defaults are EMPTY.
+    // Equipment-mode keeps the descriptive defaults (its template + coverage
+    // test treat them as critical non-empty rows).
+    // Battery rows: for ICE bikes the var stays EMPTY — the template's
+    // {{#if battery_level_start}} branch then prints the fuel note instead of
+    // a nonsense «100 %» for a petrol bike.
     equipment: getContractDefault(crewSecrets, "equipment", DEFAULT_EQUIPMENT),
-    damage_notes_at_delivery: "от даты начала аренды",
-    damage_notes_at_return: isEquipmentMode ? "от даты возврата экипировки" : "от даты возврата ТС",
-    battery_level_start: "100 %",
-    battery_level_end: "____ %",
-    media_links: "телефон",
+    damage_notes_at_delivery: isEquipmentMode ? "от даты начала аренды" : "",
+    damage_notes_at_return: isEquipmentMode ? "от даты возврата экипировки" : "",
+    battery_level_start: isElectric ? "100" : "",
+    battery_level_end: isElectric ? "____" : "",
+    media_links: isEquipmentMode ? "телефон" : "",
     damage_price_list: "мотоцикл в сборе / царапина на пластике / прочее по расчету",
 
     // Crew/Org info

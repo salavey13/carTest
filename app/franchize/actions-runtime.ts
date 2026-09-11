@@ -3097,6 +3097,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // For service, show visit date instead of rental period
     if (isServiceFlow && payload.rentalStartDate) {
       notificationParts.push(`Дата визита: ${payload.rentalStartDate}`);
+    } else if (isTestdrive && payload.rentalStartDate) {
+      // 2026-09-11: testdrives carry a picked slot (no end time) — show it
+      // as a testdrive time, not as a rental period with «по согласованию».
+      notificationParts.push(`Тест-драйв: ${payload.rentalStartDate}${rentStartTime && rentStartTime !== "10:00" ? ` ${rentStartTime}` : ""}`);
     } else if (payload.rentalStartDate) {
       notificationParts.push(`Период: ${periodStr}`);
     }

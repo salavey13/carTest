@@ -122,14 +122,17 @@ describe("HOTFIX string prices — calculatePrice with TEXT specs (yamaha-r7)", 
     expect(result.totalRub).toBe(12000);
   });
 
-  it("multi-day weekend blend with string weekday/weekend rates is numeric", () => {
-    // Fri 2026-08-28 → Sun 2026-08-30: 3 calendar days? differenceInDays=2
-    // blend only applies when days > 1 AND weekend days in range
+  it("multi-day Fri→Mon charges tier rates WITHOUT weekend blending (cart == contract)", () => {
+    // 2026-09-11 owner rule: cart must equal the contract digit-for-digit.
+    // The contract builder charges rent_2_4d × days for multi-day rentals and
+    // never blends rent_weekend into tier days, so the web calculator does the
+    // same now: Fri 2026-08-28 10:00 → Mon 2026-08-31 10:00 = 72h → 3 days ×
+    // rent_2_4d "9000" = 27000 (was 34000 with the weekend blend — the cart
+    // silently overcharged vs the signed contract).
     const result = calculatePrice(YAMAHA_R7_STRING_SPECS, "2026-08-28", "2026-08-31", "10:00", "10:00", 0);
     expect(typeof result.totalRub).toBe("number");
-    // 2026-08-28..31: Sat+Sun counted (2 weekend days), days=3
-    // blend = 2×12000 + 1×10000 = 34000
-    expect(result.totalRub).toBe(34000);
+    expect(result.totalRub).toBe(27000);
+    expect(result.tier).toBe("multi-day-2-4");
   });
 
   it("string deposit_rub returns as number", () => {

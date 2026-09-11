@@ -157,6 +157,16 @@ export function useFranchizeCartLines(
         // /testdrive reference — no rent, no deposit step) ──
       const isTestdrive = line.options.action === "testdrive" || (line.options as any).duration === "10 минут";
       if (isTestdrive) {
+        // 2026-09-11: the testdrive carries a picked slot (defaults to now) —
+        // show it in the cart badge so the rider sees WHEN they booked.
+        const slotLabel = (() => {
+          const d = line.options.rentStartDate;
+          if (!d) return "";
+          const [y, m, day] = d.split("-").map(Number);
+          if (!y || !m || !day) return "";
+          const t = line.options.rentStartTime || "";
+          return `${String(day).padStart(2, "0")}.${String(m).padStart(2, "0")}${t ? ` ${t}` : ""}`;
+        })();
         return {
           lineId,
           itemId: line.itemId,
@@ -168,7 +178,9 @@ export function useFranchizeCartLines(
           saleAvailable: false,
           salePrice: null,
           flowType: "rental" as const,
-          displayPriceLabel: "Тест-драйв · бесплатно (10 минут)",
+          displayPriceLabel: slotLabel
+            ? `Тест-драйв · ${slotLabel} · бесплатно (10 минут)`
+            : "Тест-драйв · бесплатно (10 минут)",
           rentalPeriod: "10 минут",
           options: line.options,
         };

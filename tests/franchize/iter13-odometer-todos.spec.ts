@@ -249,3 +249,45 @@ describe('iter13 — RentalOdometerDelta visibility', () => {
     expect(odometerCardVisibility(39676, 39000)).toBe('rollback');
   });
 });
+
+// ── B2. Router whitelist contract (2026-09-11 FIX) ──────────────────────────
+// The odometer suggestion button sends callback_data "odo_use_<km>". The /doc
+// callback whitelist in command-handler.ts did NOT include the prefix, so the
+// press fell through to the catch-all handler and the operator saw
+// «Неизвестная кнопка. Используй /help или /doc.» — the handler at
+// doc-manual.ts (callbackData.startsWith("odo_use_")) was UNREACHABLE.
+// Source-guard (iter24 pattern — the router can't be imported directly).
+
+import { readFileSync } from "fs";
+import { join } from "path";
+
+describe('iter13b — odo_use_ callback routing contract', () => {
+  const handlerSrc = readFileSync(
+    join(process.cwd(), "app/webhook-handlers/commands/command-handler.ts"),
+    "utf8",
+  );
+  const docManualSrc = readFileSync(
+    join(process.cwd(), "app/webhook-handlers/commands/doc-manual.ts"),
+    "utf8",
+  );
+
+  it('command-handler whitelist routes odo_use_ to handleDocCallback', () => {
+    expect(handlerSrc).toContain('text.startsWith("odo_use_")');
+  });
+
+  it('doc-manual has a ready handler for the odo_use_ prefix', () => {
+    expect(docManualSrc).toContain('callbackData.startsWith("odo_use_")');
+  });
+
+  it('the handler strips non-digits before parsing (button echo «1 940 км» → 1940)', () => {
+    expect(docManualSrc).toContain('callbackData.slice("odo_use_".length).replace(/[^\\d]/g, "")');
+  });
+
+  it('RENT_STEPS exposes a correctable «Цена» step (owner 2026-09-11)', () => {
+    expect(docManualSrc).toContain("{ num: '13a', state: 'price_override', label: 'Цена' }");
+  });
+
+  it('SALE price correction no longer dead-ends (state === "price" handler exists)', () => {
+    expect(docManualSrc).toContain('if (state === "price") {');
+  });
+});

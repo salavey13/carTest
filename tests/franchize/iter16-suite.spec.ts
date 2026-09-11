@@ -245,7 +245,7 @@ describe("iter16: ПЭП default-ON at checkout", () => {
       "docs/EQUIPMENT_RENTAL_DEAL_TEMPLATE.html",
     ]) {
       const src = readFileSync(join(process.cwd(), tpl), "utf8");
-      expect(src).toContain("Отпечаток подписи (SHA-256 initData): {{signature_fingerprint}}");
+      expect(src).toContain("Отпечаток подписи (SHA-256 initData, первые 16 символов): {{signature_fingerprint}}");
     }
   });
 

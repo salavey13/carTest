@@ -380,9 +380,19 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     () => cartLines.find((line) => line.options.rentStartDate && line.options.rentEndDate),
     [cartLines],
   );
-  const resolvedStartDate = firstLineWithDates?.options.rentStartDate || "";
+  // 2026-09-11: a TESTDRIVE line carries only rentStartDate (no end — the
+  // free 10-minute ride has no return window). Without this fallback the
+  // testdrive slot never reached the checkout payload and the generated doc
+  // kept the «по согласованию» placeholder.
+  const firstTestdriveLineWithDate = useMemo(
+    () => cartLines.find((line) => (line.options as any).action === "testdrive" && line.options.rentStartDate),
+    [cartLines],
+  );
+  const resolvedStartDate = firstLineWithDates?.options.rentStartDate || firstTestdriveLineWithDate?.options.rentStartDate || "";
   const resolvedEndDate = firstLineWithDates?.options.rentEndDate || "";
-  const resolvedStartTime = firstLineWithDates?.options.rentStartTime || "10:00";
+  const resolvedStartTime = firstLineWithDates?.options.rentStartTime
+    || firstTestdriveLineWithDate?.options.rentStartTime
+    || "10:00";
   const resolvedEndTime = firstLineWithDates?.options.rentEndTime || "10:00";
   const rentalPeriodDays = useMemo(
     () => (resolvedStartDate && resolvedEndDate ? durationDaysFromDateTime(resolvedStartDate, resolvedStartTime, resolvedEndDate, resolvedEndTime) : null),

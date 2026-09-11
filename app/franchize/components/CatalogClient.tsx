@@ -1637,20 +1637,30 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           setSelectedItem(null);
         }}
         onClose={() => setSelectedItem(null)}
-        onTestdrive={() => {
+        onTestdrive={(slot) => {
           if (!selectedItem) return;
           void recordRentIntent(selectedItem, "configured", {
             trigger: "modal_testdrive_cta",
             options: { ...selectedOptions, action: "testdrive" },
           });
           // Testdrive: add to cart with testdrive action — duration is 10min
-          // (hardcoded). Dates/times are meaningless for a testdrive (it is
-          // scheduled on-site) — strip them so the cart line stays clean.
+          // (hardcoded). 2026-09-11 (owner): the testdrive carries a DATE —
+          // the modal's picker defaults to NOW (never snapped to 10:00); the
+          // slot lands in rentStartDate/rentStartTime so the cart badge, the
+          // order page and the generated testdrive doc show the real slot
+          // instead of «по согласованию». Rental rentEnd* stay stripped —
+          // a testdrive has no end time.
           const { rentStartDate: _sd, rentEndDate: _ed, rentStartTime: _st, rentEndTime: _et, ...restOptions } = selectedOptions;
+          const now = new Date();
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const fallbackDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+          const fallbackTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
           addItem(selectedItem.id, {
             ...restOptions,
             action: "testdrive",
             duration: "10 минут",
+            rentStartDate: slot?.date || fallbackDate,
+            rentStartTime: slot?.time || fallbackTime,
           }, 1);
           setSelectedItem(null);
         }}

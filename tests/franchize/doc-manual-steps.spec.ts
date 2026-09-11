@@ -21,6 +21,8 @@ const RENT_STEPS: StepDef[] = [
   { num: 11, state: 'equipment', label: 'Оборудование' },
   { num: 12, state: 'odometer', label: 'Одометр' },
   { num: 13, state: 'payment_split', label: 'Способ оплаты' },
+  // 2026-09-11: «Цена» is now an explicit correctable step (routes to price_override)
+  { num: '13a', state: 'price_override', label: 'Цена' },
   { num: 14, state: 'deposit_choice', label: 'Депозит / СТС' },
   { num: 15, state: 'deposit_destination', label: 'Где получен депозит' },
   { num: '15a', state: 'deposit_split_cash', label: 'Смешанный: сколько наличными' },
@@ -79,8 +81,14 @@ function getVisibleSteps(context: MockContext): StepDef[] {
 
 describe('Doc-Manual Step Arrays', () => {
   describe('RENT_STEPS', () => {
-    it('has 18 entries (16 numbered + 2 split sub-states)', () => {
-      expect(RENT_STEPS).toHaveLength(18);
+    it('has 19 entries (16 numbered + price override + 2 split sub-states)', () => {
+      expect(RENT_STEPS).toHaveLength(19);
+    });
+
+    it('has a correctable price step (owner 2026-09-11: «Исправить шаг» must offer «Цена»)', () => {
+      const priceStep = RENT_STEPS.find(s => s.state === 'price_override');
+      expect(priceStep).toBeDefined();
+      expect(priceStep!.label).toBe('Цена');
     });
 
     it('does NOT have a license step (removed in simplification)', () => {
@@ -200,17 +208,16 @@ describe('getVisibleSteps', () => {
     expect(saleSteps.some(s => s.state === 'confirm')).toBe(false);
   });
 
-  it('rent steps count is 15 visible (without confirm + without split if not split)', () => {
+  it('rent steps count is 16 visible (without confirm + without split if not split)', () => {
     const steps = getVisibleSteps({ dealType: 'rent', stsPledgeUsed: false });
-    // 18 total - 1 confirm - 2 split sub-states (not in split mode) = 15
-    expect(steps).toHaveLength(15);
+    // 19 total - 1 confirm - 2 split sub-states (not in split mode) = 16
+    expect(steps).toHaveLength(16);
   });
 
-  it('rent steps count is 13 when СТС (no deposit_destination + no split)', () => {
+  it('rent steps count is 14 when СТС (no deposit_destination + no split)', () => {
     const steps = getVisibleSteps({ dealType: 'rent', stsPledgeUsed: true });
-    // 18 total - 1 confirm - 1 deposit_destination - 2 split - 1 confirm = 13
-    // Actually: 18 - 1 confirm - 1 deposit_destination - 2 split = 14
-    expect(steps).toHaveLength(14);
+    // 19 total - 1 confirm - 1 deposit_destination - 2 split = 15
+    expect(steps).toHaveLength(15);
   });
 
   it('sale steps count is 11 visible (without confirm + without transport if pickup)', () => {

@@ -41,7 +41,11 @@ describe("rental pricing calculator", () => {
     expect(result.tier).toBe("3-hours");
   });
 
-  it("rounds 4.5-hour rental to 6 hours", () => {
+  it("interpolates a 4-hour rental between 3h and 6h (no more round-up to the 6h tier)", () => {
+    // 2026-09-11 owner rule: «more complex interpolation is needed between
+    // prices of 3h, 6h, 12h, 1d…» — a 4h rental no longer bills the 6h tier.
+    // No price_per_3h anchor → the hourly fallback (2000 × 4 = 8000) applies,
+    // clamped to the [per_hour, per_6h] window so it can never exceed 9000.
     const result = calculatePrice(
       { price_per_6h: 9000, price_per_hour: 2000, deposit_rub: 15000 },
       "2026-06-19",
@@ -51,11 +55,11 @@ describe("rental pricing calculator", () => {
       0
     );
 
-    expect(result.totalRub).toBe(9000);
-    expect(result.basePriceRub).toBe(9000);
-    expect(result.rounded).toBe(true);
-    expect(result.displayHours).toBe(6);
-    expect(result.tier).toBe("6-hours");
+    expect(result.totalRub).toBe(8000);
+    expect(result.basePriceRub).toBe(8000);
+    expect(result.rounded).toBe(false);
+    expect(result.displayHours).toBe(4);
+    expect(result.tier).toBe("3-6-hours");
   });
 
   it("calculates 1-day rental", () => {
@@ -131,7 +135,10 @@ describe("rental pricing calculator", () => {
     expect(result.helmetRub).toBe(5000);
   });
 
-  it("rounds 11-hour rental to 12 hours", () => {
+  it("caps an 11-hour rental at the 12h tier (hourly fallback 22000 → clamp 15000)", () => {
+    // 2026-09-11: interpolation replaced the round-up. Without a 6h anchor the
+    // hourly fallback (2000 × 11 = 22000) would OVERCHARGE vs the next tier —
+    // the monotonic ladder clamp brings it back to price_per_12h (15000).
     const result = calculatePrice(
       { price_per_12h: 15000, price_per_hour: 2000, deposit_rub: 15000 },
       "2026-06-19",
@@ -143,9 +150,9 @@ describe("rental pricing calculator", () => {
 
     expect(result.totalRub).toBe(15000);
     expect(result.basePriceRub).toBe(15000);
-    expect(result.rounded).toBe(true);
-    expect(result.displayHours).toBe(12);
-    expect(result.tier).toBe("12-hours");
+    expect(result.rounded).toBe(false);
+    expect(result.displayHours).toBe(11);
+    expect(result.tier).toBe("6-12-hours");
   });
 
   it("detects missing pricing data", () => {

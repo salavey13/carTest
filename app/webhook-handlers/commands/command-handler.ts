@@ -137,6 +137,7 @@ export async function handleCommand(update: any) {
             text === "ok" ||
             text === "restart" ||
             text === "correct_step" ||  // FIX: was missing — caused "неизвестная команда" on "Исправить шаг" button
+            text.startsWith("odo_use_") || // FIX (2026-09-11): was missing — the odometer suggestion button ("🔢 1 940 км (последнее известное)") sent odo_use_<km>, which fell through to "Неизвестная кнопка. Используй /help или /doc."
             text === "sts_skip" ||
             text === "ph_skip"           // phone skip callback
         )) {
