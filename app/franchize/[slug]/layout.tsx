@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getFranchizeBySlug } from "../actions";
 import { resolveFranchizeSiteUrl, toAbsoluteFranchizeUrl } from "./metadata";
 import { AchievementToastSync } from "../components/AchievementToastSync";
+import { ScrollToTopButton } from "../components/ScrollToTopButton";
 
 interface FranchizeSlugLayoutProps {
   children: ReactNode;
@@ -144,6 +145,10 @@ export default async function FranchizeSlugLayout({
       {/* Achievement toasts: announces achievements unlocked outside the web app
           (rental closures, /shift streaks) the next time the user opens the crew. */}
       <AchievementToastSync slug={slug} />
+      {/* Кнопка «пролистать вверх» на всех страницах экипажа (как у каталога).
+          Сама скрывает себя на каталоге/витринах (там стрелка уже в плавающей
+          панели корзины) и на страницах со своей нижней фиксированной UI. */}
+      <ScrollToTopButton />
     </>
   );
 }
