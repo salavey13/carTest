@@ -26,7 +26,14 @@ export async function featureReady(
   try {
     const { error } = await probe(supabase)
     if (!error) return true
-    return error.code !== '42P01' && error.code !== '22P02'
+    if (error.code === '42P01' || error.code === '22P02') return false
+    // 2026-09-11: network-level failure (DNS ENOTFOUND / "fetch failed") comes
+    // back with NO error.code. That is not "feature missing" — the DB itself is
+    // unreachable (CI placeholder creds). Skip the suite instead of failing it
+    // wholesale: previously code=null fell through to `true`, every test then
+    // fetched the void and CI stayed permanently red.
+    if (!error.code) return false
+    return true
   } catch {
     return false
   }

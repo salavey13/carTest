@@ -21,7 +21,6 @@ import { readFileSync } from "fs";
 import {
   computeAnalyticsKpis,
   isRentalRelevantForDate,
-  localDateOnly,
 } from "@/app/franchize/[slug]/rentals-analytics/components/lib/analytics-utils";
 
 const read = (p: string) => readFileSync(p, "utf-8");
@@ -179,119 +178,10 @@ describe("iter27: cancelled exclusions across all aggregation surfaces (source g
   });
 });
 
-// ── 4. LIVE end-to-end simulation (real DB, real KPI functions) ─────────────
-// Mirrors getRentalsDashboard's query trio + dedupe, then runs the real client
-// pipeline (displayRentals → dayPageRentals → computeAnalyticsKpis) and asserts
-// the cancelled Panigale (ff73acb5) never reaches the KPI input rows.
-
-// Creds: process.env → environment secrets file (shared helper). When neither
-// source has them (fresh clone / CI), the live describe below SKIPS instead of
-// the whole file crashing at import (old module-scope readFileSync ENOENT).
-import { liveSupabaseCreds, hasSupabaseCreds } from "./helpers/live-env";
-const { url: LIVE_URL, key: LIVE_KEY } = liveSupabaseCreds();
-const hasLiveCreds = hasSupabaseCreds();
-
-async function sb(path: string): Promise<any[]> {
-  const res = await fetch(`${LIVE_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: LIVE_KEY,
-      Authorization: `Bearer ${LIVE_KEY}`,
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${res.status}: ${text.slice(0, 300)}`);
-  return JSON.parse(text);
-}
-
-const CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"; // vip-bike
-const BASE_SELECT =
-  "rental_id,user_id,vehicle_id,status,total_cost,agreed_start_date,agreed_end_date," +
-  "requested_start_date,requested_end_date,created_at,metadata," +
-  "vehicle:cars!inner(id,make,model,crew_id,specs)";
-
-async function fetchDayPage(date: string) {
-  const startOfDay = new Date(`${date}T00:00:00.000Z`).toISOString();
-  const endOfDay = new Date(`${date}T23:59:59.999Z`).toISOString();
-  const dayBeforeStart = new Date(new Date(startOfDay).getTime() - 24 * 3600 * 1000).toISOString();
-  const dayAfterEnd = new Date(new Date(endOfDay).getTime() + 24 * 3600 * 1000).toISOString();
-  const enc = encodeURIComponent;
-  const base = `rentals?select=${enc(BASE_SELECT)}&vehicle.crew_id=eq.${CREW_ID}`;
-  const q1 = `${base}&requested_start_date=gte.${enc(startOfDay)}&requested_start_date=lte.${enc(endOfDay)}&order=created_at.desc`;
-  const q2 = `${base}&agreed_start_date=gte.${enc(startOfDay)}&agreed_start_date=lte.${enc(endOfDay)}&requested_start_date=is.null&order=created_at.desc`;
-  const or3 = `or=(and(agreed_end_date.gte.${enc(dayBeforeStart)},agreed_end_date.lte.${enc(dayAfterEnd)}),` +
-    `and(requested_end_date.gte.${enc(dayBeforeStart)},requested_end_date.lte.${enc(dayAfterEnd)}),` +
-    `and(agreed_end_date.is.null,requested_end_date.gte.${enc(startOfDay)},requested_end_date.lte.${enc(endOfDay)})))`;
-  const q3 = `rentals?select=${enc(BASE_SELECT)}&vehicle.crew_id=eq.${CREW_ID}&${or3}&status=neq.cancelled&order=created_at.desc`;
-
-  const [a, b, c] = await Promise.all([sb(q1), sb(q2), sb(q3)]);
-  const map = new Map<string, any>();
-  for (const r of [...a, ...b, ...c]) if (!map.has(r.rental_id)) map.set(r.rental_id, r);
-  const seen = new Set<string>();
-  const items: any[] = [];
-  for (const r of map.values()) {
-    const key = `${r.user_id}::${r.vehicle_id}`;
-    if (!seen.has(key)) { seen.add(key); items.push(r); }
-  }
-  return items;
-}
-
-describe.skipIf(!hasLiveCreds)("iter27: live quick-counter simulation (vip-bike, Aug 29–31)", () => {
-  it("KPI cards exclude the cancelled rentals on every inspected day", async () => {
-    if (!hasLiveCreds) return; // no creds in CI — source guards above still cover the logic
-
-    for (const date of ["2026-08-29", "2026-08-30", "2026-08-31"]) {
-      const items = await fetchDayPage(date);
-      const toRow = (item: any) => ({
-        rental_id: item.rental_id,
-        status: item.status,
-        total_cost: Number(item.total_cost) || 0,
-        requested_start_date: item.requested_start_date,
-        requested_end_date: item.requested_end_date,
-        agreed_start_date: item.agreed_start_date,
-        agreed_end_date: item.agreed_end_date,
-        created_at: item.created_at,
-        metadata: item.metadata || {},
-        vehicle_id: item.vehicle_id,
-      });
-      const nonService = items
-        .filter((r) => !String(r.vehicle_id || "").startsWith("vip-bike-svc-"))
-        .map(toRow);
-      // Day-page rows fed RAW (cancelled included) — mirrors a hypothetical
-      // caller that forgets to pre-filter. The iter27 hardening inside
-      // computeAnalyticsKpis must make the pre-filter redundant:
-      const dayPageRaw = nonService.filter((r) => isRentalRelevantForDate(r, date));
-      const rawKpis = computeAnalyticsKpis(dayPageRaw, date);
-      const filteredKpis = computeAnalyticsKpis(
-        dayPageRaw.filter((r) => r.status !== "cancelled"),
-        date,
-      );
-      expect(rawKpis, `${date}: KPIs differ between raw and pre-filtered input — cancelled leaked`).toEqual(filteredKpis);
-
-      // The aborted Panigale (ff73acb5, ₽8000, started Aug 30) is the exact
-      // reported case: its money must not be inside Aug 30's revenue.
-      if (date === "2026-08-30") {
-        const dayPageRawCancelled = dayPageRaw.filter((r) => r.status === "cancelled");
-        const cancelledMoney = dayPageRawCancelled.reduce((s, r) => s + (Number(r.total_cost) || 0), 0);
-        // Revenue = STARTED-today billable rows only (MSK calendar day).
-        const billableMoney = dayPageRaw
-          .filter((r) =>
-            ["active", "completed", "confirmed", "pending_confirmation"].includes(String(r.status ?? "")) &&
-            localDateOnly(r.requested_start_date || r.agreed_start_date) === date)
-          .reduce((s, r) => s + (Number(r.total_cost) || 0), 0);
-        expect(rawKpis.revenueToday).toBe(billableMoney); // cancelled ₽ excluded
-        expect(cancelledMoney).toBeGreaterThan(0); // the cancelled row really is on this day page
-        const startedNonCancelled = dayPageRaw.filter(
-          (r) =>
-            String(r.status ?? "") !== "cancelled" &&
-            localDateOnly(r.requested_start_date || r.agreed_start_date) === date,
-        ).length;
-        expect(rawKpis.totalToday).toBe(startedNonCancelled); // «Аренд сегодня» ignores cancelled
-        // And a cancelled row that STARTS today must not be counted anywhere:
-        const startedCancelled = dayPageRawCancelled.filter(
-          (r) => localDateOnly(r.requested_start_date || r.agreed_start_date) === date,
-        );
-        expect(startedCancelled.length).toBeGreaterThanOrEqual(1); // Panigale case present
-      }
-    }
-  }, 60000);
-});
+// 2026-09-11: the LIVE end-to-end quick-counter simulation (vip-bike, Aug 29–31;
+// mirrored getRentalsDashboard's query trio + dedupe) was DITCHED at the
+// owner's request — a date-pinned live-DB fetch that ENOTFOUND-
+// crashed CI every push (placeholder creds) and rotted as soon as the window
+// passed. Cancellation-exclusion coverage lives entirely in the pure suites
+// below (KPI math, reload wiring, source guards) — the live variant added no
+// logic the pure ones don't lock.

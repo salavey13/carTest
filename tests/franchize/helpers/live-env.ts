@@ -31,7 +31,21 @@ export function liveSupabaseCreds(): { url: string; key: string } {
   };
 }
 
+// 2026-09-11: CI (ci-tests.yml) exports PLACEHOLDER creds —
+// NEXT_PUBLIC_SUPABASE_URL=https://test.supabase.co + SUPABASE_SERVICE_ROLE_KEY=test-key —
+// for the vitest step ("all tests mock supabaseAdmin"). Live-DB specs must NOT
+// treat that pair as real credentials: every fetch would die with
+// `getaddrinfo ENOTFOUND test.supabase.co` and paint CI red forever (the
+// "ditch these 5 annoying tests" incident). A URL that cannot resolve and a
+// non-JWT key are placeholders → hasSupabaseCreds() = false → suites SKIP.
+function isPlaceholderCreds(url?: string, key?: string): boolean {
+  if (!url || !key) return true;
+  if (/test\.supabase\.co|example\.com|localhost|127\.0\.0\.1/.test(url)) return true;
+  if (key === "test-key" || key.length < 20) return true; // real service-role keys are ~200-char JWTs
+  return false;
+}
+
 export function hasSupabaseCreds(): boolean {
   const { url, key } = liveSupabaseCreds();
-  return Boolean(url && key);
+  return !isPlaceholderCreds(url, key);
 }

@@ -302,81 +302,9 @@ describe("iter28: source guards — pages, gate, photos, service linkage", () =>
   });
 });
 
-// ── 4. LIVE simulation (vip-bike, creds-dependent like iter27) ───────────────
-
-// Creds: process.env → environment secrets file (shared helper). When neither
-// source has them (fresh clone / CI), the live describe below SKIPS instead of
-// the whole file crashing at import (old module-scope readFileSync ENOENT).
-import { liveSupabaseCreds, hasSupabaseCreds } from "./helpers/live-env";
-const { url: LIVE_URL, key: LIVE_KEY } = liveSupabaseCreds();
-const hasLiveCreds = hasSupabaseCreds();
-
-async function sb(path: string): Promise<any[]> {
-  const res = await fetch(`${LIVE_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: LIVE_KEY,
-      Authorization: `Bearer ${LIVE_KEY}`,
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${res.status}: ${text.slice(0, 300)}`);
-  return JSON.parse(text);
-}
-
-const HERO_BIKE = "ducati-panigale-s-electro-black";
-const SELECT = encodeURIComponent(
-  "rental_id,vehicle_id,status,total_cost,agreed_start_date,agreed_end_date,created_at,metadata",
-);
-
-describe.skipIf(!hasLiveCreds)("iter28: live hero-bike simulation (vip-bike)", () => {
-  it("engine stats equal an independent manual computation over the same rows", async () => {
-    if (!hasLiveCreds) return; // no creds in CI — unit + source guards above still cover the logic
-
-    // same or() query as getBikeStoryAction
-    const orFilter = encodeURIComponent(
-      `or=(vehicle_id.eq.${HERO_BIKE},metadata->>bike.eq.${HERO_BIKE})`,
-    );
-    const rows = await sb(`rentals?select=${SELECT}&${orFilter}&limit=300`);
-    expect(rows.length).toBeGreaterThan(0);
-
-    const bikeRentals = rows.filter((r) => r.vehicle_id === HERO_BIKE);
-    const serviceRows = rows
-      .filter((r) => r.vehicle_id !== HERO_BIKE && r.metadata?.bike === HERO_BIKE)
-      .map((r) => ({ cost: Number(r.total_cost) || 0, performedAt: r.metadata?.performed_at ?? r.created_at }));
-    expect(serviceRows.length).toBeGreaterThan(0); // the metadata.bike discovery holds on live data
-
-    const engine = computeBikeStats(
-      bikeRentals.map((r) => ({
-        status: r.status,
-        totalCost: r.total_cost,
-        start: r.agreed_start_date,
-        end: r.agreed_end_date,
-        odometerBefore: r.metadata?.odometer_before,
-        odometerAfter: r.metadata?.odometer_after,
-        createdAt: r.created_at,
-      })),
-      Date.now(),
-      serviceRows,
-    );
-
-    // manual computation, independent of the engine
-    const manualEarned = bikeRentals
-      .filter((r) => r.status !== "cancelled")
-      .reduce((acc, r) => acc + (Number(r.total_cost) || 0), 0);
-    const manualService = serviceRows.reduce((acc, s) => acc + s.cost, 0);
-    expect(engine.earnedTotal).toBe(manualEarned);
-    expect(engine.serviceTotal).toBe(manualService);
-    expect(engine.serviceCount).toBe(serviceRows.length);
-    expect(engine.cancelledCount).toBe(bikeRentals.filter((r) => r.status === "cancelled").length);
-  });
-
-  it("fleet-level: at least one bike in vip-bike has service history via metadata.bike", async () => {
-    if (!hasLiveCreds) return;
-    const svc = await sb(
-      `rentals?select=rental_id,metadata->>bike&metadata->>bike=not.is.null&limit=200`,
-    );
-    expect(svc.length).toBeGreaterThan(0);
-    const linked = svc.filter((r) => typeof r.bike === "string" && r.bike.length > 0);
-    expect(linked.length).toBeGreaterThan(0);
-  });
-});
+// ── 4. LIVE simulation — DITCHED 2026-09-11 ──────────────────────────────────
+// The live hero-bike describe (engine-stats manual cross-check + fleet-level
+// metadata.bike service-history probe) was removed at the owner's request:
+// live-DB fetches ENOTFOUND-crashed CI on every push (placeholder creds), and
+// the assertions duplicated what the pure computeBikeStats suites above lock
+// with fixed fixture rows. No live-fetch code remains in this file.
