@@ -119,7 +119,7 @@ export function getRentalEquipmentPart(metadata: Metadata): number {
   return getStoredEquipmentPrice(metadata) ?? estimateEquipmentPrice(metadata);
 }
 
-export type PriceSplitSource = "stored" | "estimated" | "equipment_total";
+export type PriceSplitSource = "stored" | "estimated" | "equipment_total" | "linked_inventory";
 
 export interface RentalPriceSplit {
   totalRub: number;
@@ -139,6 +139,20 @@ export function isEquipmentOnlyRental(metadata: Metadata): boolean {
   return metadata?.["item_type"] === "equipment";
 }
 
+/** True when the row is an INVENTORY MIRROR of gear issued WITH a primary
+ *  bike rental (metadata.primary_rental_id set by /doc's
+ *  createEquipmentRowsForRental). The gear money already lives in the
+ *  PRIMARY rental's total_cost (metadata.equipment_price) — the mirror row
+ *  itself carries no revenue. 2026-09-13 double-count fix: /doc used to
+ *  write daily_price × days into these rows, so every KPI / money surface
+ *  counted the same gear twice (measured +6 500 ₽ phantom revenue on the
+ *  2026-09-12 vip-bike day page alone). */
+export function isLinkedEquipmentRow(metadata: Metadata): boolean {
+  if (!isEquipmentOnlyRental(metadata)) return false;
+  const link = metadata?.["primary_rental_id"];
+  return (typeof link === "string" && link.trim() !== "") || typeof link === "number";
+}
+
 /**
  * Split a rental's total cost into BIKE and GEAR parts.
  * Stored split wins; the gear part is clamped into [0, total].
@@ -147,6 +161,14 @@ export function splitRentalPrice(
   totalCost: number | string | null | undefined,
   metadata: Metadata,
 ): RentalPriceSplit {
+  // 2026-09-13 double-count fix: a gear row LINKED to its primary bike rental
+  // is an inventory mirror — its money lives in the primary rental. Zero in
+  // EVERY money surface that goes through the split (KPI «Экипировка», rental
+  // cards, partner cuts, weekly reports). Checked BEFORE the equipment-only
+  // branch: linked rows are equipment rows by item_type.
+  if (isLinkedEquipmentRow(metadata)) {
+    return { totalRub: 0, bikePartRub: 0, equipmentPartRub: 0, source: "linked_inventory" };
+  }
   const totalRub = clampNonNegative(toFiniteNumber(totalCost));
   // iter32 (equipment parity): a standalone gear rental has no bike part —
   // the whole total_cost is equipment revenue. Before this branch, gear-only

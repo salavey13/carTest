@@ -23,6 +23,7 @@ import {
   EQUIPMENT_UNIT_PRICE_FALLBACK_RUB,
   getRentalEquipmentPart,
   isEquipmentOnlyRental,
+  isLinkedEquipmentRow,
 } from "./rental-price-split";
 
 /** Default owner share of the bike part (subrent contract §5.5). */
@@ -62,6 +63,12 @@ export function getEquipmentCostPart(
   metadata: Record<string, unknown> | null | undefined,
   totalCost?: number | string | null,
 ): number {
+  // 2026-09-13 double-count fix: a gear row LINKED to its primary bike rental
+  // is an inventory mirror — the gear money already lives in the primary
+  // rental's total (metadata.equipment_price). It must contribute ZERO gear
+  // revenue here, otherwise the KPI «Экипировка» and the partner split count
+  // the same gear twice (once in the primary row, once in the mirror).
+  if (isLinkedEquipmentRow(metadata)) return 0;
   // iter32 (equipment parity): standalone gear rentals (bot /ekip, web
   // equipment-only checkout, unified server actions) have NO bike part —
   // the whole total IS gear revenue. Without this branch their revenue used

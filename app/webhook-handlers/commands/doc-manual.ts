@@ -3432,9 +3432,13 @@ export async function handleDocText(userId: string, chatId: number, text: string
   // now exposes a «Цена» entry) — the correction menu finally covers the price.
   if (state === "price_override") {
     const value = text.replace(/\D/g, '');
-    if (!value || parseInt(value) < 100) {
+    // 2026-09-13: allow 0 — gift-card / «в подарок» deals are genuinely free
+    // (the old < 100 clamp forced operators to charge 100 ₽ through the gift
+    // card). The override sets the FULL total (bike + gear together), so 0
+    // makes the whole rental free.
+    if (!value) {
       logger.info(`[/doc] price_override: ${userId} → invalid input "${text.slice(0,40)}"`);
-      await sendComplexMessage(chatId, "❌ Введите цену (минимум 100 ₽)", [], { removeKeyboard: true });
+      await sendComplexMessage(chatId, "❌ Введите цену цифрами (0 ₽ = аренда в подарок)", [], { removeKeyboard: true });
       return true;
     }
     const newPrice = parseInt(value);

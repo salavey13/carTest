@@ -36,6 +36,7 @@ import {
   splitRentalPrice,
   computePartnerSplit,
   isEquipmentOnlyRental,
+  isLinkedEquipmentRow,
 } from '@/app/franchize/lib/rental-price-split';
 import {
   getEquipmentCostPart,
@@ -367,5 +368,78 @@ describe('iter32: salary leveling', () => {
     // and the parent passes the real slug at both render sites
     const client = read('app/franchize/[slug]/rentals-analytics/components/AnalyticsClient.tsx');
     expect(client.match(/crewSlug=\{initialSlug\}/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── 7. Linked gear rows are inventory, not revenue (2026-09-13) ─────────────
+// /doc's createEquipmentRowsForRental mirrors gear issued WITH a bike rental
+// into standalone rentals rows (metadata.primary_rental_id). Their money must
+// NOT be counted anywhere — the gear charge already lives in the primary
+// rental's total_cost. Measured impact before the fix: +6 500 ₽ phantom
+// revenue on the 2026-09-12 vip-bike day page alone.
+
+describe('iter32-fix: linked equipment rows are zero-money inventory mirrors', () => {
+  const LINKED = {
+    item_type: 'equipment',
+    primary_rental_id: 'c96d0f22-0000-0000-0000-000000000000',
+    daily_price: 1000,
+  };
+
+  it('isLinkedEquipmentRow detects mirrors and ignores everything else', () => {
+    expect(isLinkedEquipmentRow(LINKED)).toBe(true);
+    // standalone gear (real revenue) is NOT linked
+    expect(isLinkedEquipmentRow({ item_type: 'equipment' })).toBe(false);
+    // bike rows never link
+    expect(isLinkedEquipmentRow({ primary_rental_id: 'abc' })).toBe(false);
+    expect(isLinkedEquipmentRow({})).toBe(false);
+    expect(isLinkedEquipmentRow(null)).toBe(false);
+  });
+
+  it('splitRentalPrice zeroes linked rows (before the equipment_total branch)', () => {
+    // even though total_cost still carries the legacy phantom money in the DB
+    const split = splitRentalPrice(2000, LINKED);
+    expect(split.totalRub).toBe(0);
+    expect(split.equipmentPartRub).toBe(0);
+    expect(split.bikePartRub).toBe(0);
+    expect(split.source).toBe('linked_inventory');
+  });
+
+  it('getEquipmentCostPart returns 0 for linked rows regardless of total', () => {
+    expect(getEquipmentCostPart(LINKED, 2000)).toBe(0);
+    expect(getEquipmentCostPart(LINKED)).toBe(0);
+  });
+
+  it('computePartnerSplit: linked row adds nothing to partner or company', () => {
+    const ps = computePartnerSplit({ totalCost: 2000, metadata: LINKED, subrenterChatId: '413553377' });
+    expect(ps.partnerRub).toBe(0);
+    expect(ps.companyRub).toBe(0);
+  });
+
+  it('KPI counters exclude linked rows from money/counts but keep their returns', () => {
+    const day = '2026-09-12';
+    const row = (over: Record<string, unknown>) => ({
+      status: 'active',
+      total_cost: 0,
+      requested_start_date: `${day}T10:00:00+03:00`,
+      agreed_start_date: `${day}T10:00:00+03:00`,
+      metadata: {},
+      ...over,
+    });
+    const kpis = computeAnalyticsKpis(
+      [
+        // real bike rental with bundled gear (the ONLY money row)
+        row({ total_cost: 12500, metadata: { equipment_price: 2500, bike_price: 10000 } }),
+        // two phantom-money gear mirrors of that rental (legacy shape)
+        row({ total_cost: 1000, metadata: LINKED }),
+        row({ total_cost: 1000, metadata: LINKED }),
+        // a returning mirror: still shown in «Возвратов» (gear must come back)
+        row({ total_cost: 500, metadata: LINKED, agreed_end_date: `${day}T18:00:00+03:00`, requested_end_date: `${day}T18:00:00+03:00` }),
+      ],
+      day,
+    );
+    expect(kpis.totalToday).toBe(1);          // mirrors are not «аренды»
+    expect(kpis.revenueToday).toBe(12500);    // no +2000 phantom
+    expect(kpis.equipmentPartToday).toBe(2500);
+    expect(kpis.returnsDue).toBe(1);          // return tracking preserved
   });
 });

@@ -390,10 +390,13 @@ describe("equipment-rentals actions (unified storage)", () => {
       expect(insertedRows.every((r) => r.vehicle_id.startsWith("equip-"))).toBe(true);
       expect(insertedRows.every((r) => r.metadata.item_type === "equipment")).toBe(true);
       expect(insertedRows.every((r) => r.metadata.primary_rental_id === "primary-rental")).toBe(true);
-      // helmet price from cars.daily_price (1000₽), NOT the legacy 200₽ constant
+      // helmet price from cars.daily_price (1000₽), NOT the legacy 200₽ constant —
+      // 2026-09-13: stored as metadata.daily_price; total_cost is 0 because the
+      // mirror row's money already lives in the PRIMARY rental (double-count fix)
       const helmetRows = insertedRows.filter((r) => r.vehicle_id.includes("helmet"));
       expect(helmetRows).toHaveLength(2);
-      expect(helmetRows[0].total_cost).toBe(1000);
+      expect(helmetRows[0].total_cost).toBe(0);
+      expect(helmetRows[0].metadata.daily_price).toBe(1000);
     });
 
     it("returns created:0 when the crew has no equipment catalog", async () => {

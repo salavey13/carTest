@@ -448,12 +448,18 @@ export async function getRentalsDashboard(input: {
     // When user re-uploads documents (same date, same bike, same dude), a NEW rental_id
     // is created each time. We keep only the LATEST rental for each (user_id + vehicle_id).
     // Results are already ordered by created_at DESC, so first occurrence is the latest.
+    // 2026-09-13: STANDALONE GEAR ROWS (metadata.item_type="equipment") are
+    // exempt — two helmet rentals for the same user on one day are two PHYSICAL
+    // items (qty 2), not document re-generations. The old key silently dropped
+    // every same-category gear row but the newest, hiding issued items (and
+    // their returns) from the day page.
     const seenUserVehiclePairs = new Set<string>();
     let items: RentalDashboardItem[] = [];
     for (const rental of (rentals || []) as RentalDashboardItem[]) {
+      const isGearRow = (rental.metadata as Record<string, unknown> | null)?.item_type === "equipment";
       const dedupeKey = `${rental.user_id}::${rental.vehicle_id}`;
-      if (!seenUserVehiclePairs.has(dedupeKey)) {
-        seenUserVehiclePairs.add(dedupeKey);
+      if (isGearRow || !seenUserVehiclePairs.has(dedupeKey)) {
+        if (!isGearRow) seenUserVehiclePairs.add(dedupeKey);
         items.push({ ...rental, documentSecret: null });
       }
       // Skip duplicate (user, vehicle) pairs - older rental generations

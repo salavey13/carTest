@@ -553,7 +553,15 @@ export async function createEquipmentRowsForRental(params: {
           agreed_end_date: endIso,
           status: "active",
           payment_status: "fully_paid",
-          total_cost: daily * days,
+          // 2026-09-13 double-count fix: these rows are INVENTORY MIRRORS of
+          // gear issued WITH the primary bike rental — the gear money is
+          // ALREADY inside the primary rental's total_cost (its metadata.
+          // equipment_price). Writing daily_price × days here made every
+          // money surface (KPI «Выручка»/«Экипировка», CSV, partner reports)
+          // count the same gear twice. The catalog price stays available as
+          // metadata.daily_price for reference; isLinkedEquipmentRow() also
+          // guards the consumer side for rows written before this fix.
+          total_cost: 0,
           metadata: {
             source: "doc_command",
             item_type: "equipment",

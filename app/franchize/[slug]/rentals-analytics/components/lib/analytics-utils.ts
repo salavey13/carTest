@@ -30,7 +30,7 @@ import {
   SUBRENTER_EQUIPMENT_UNIT_PRICES as UNIT_PRICES,
   SUBRENTER_EQUIPMENT_PRICE_FALLBACK as UNIT_PRICE_FALLBACK,
 } from "@/app/franchize/lib/subrenter-economics";
-import { getStoredEquipmentPrice, isEquipmentOnlyRental, splitRentalPrice } from "@/app/franchize/lib/rental-price-split";
+import { getStoredEquipmentPrice, isEquipmentOnlyRental, isLinkedEquipmentRow, splitRentalPrice } from "@/app/franchize/lib/rental-price-split";
 
 // ── Status metadata ──────────────────────────────────────────────────────────
 
@@ -537,9 +537,19 @@ export function getGearPanelData(rental: AnalyticsRentalRow): GearPanelData {
   let cost: number;
   let exact: boolean;
   if (standalone) {
-    const split = splitRentalPrice(rental.total_cost, md);
-    cost = split.equipmentPartRub;
-    exact = true;
+    if (isLinkedEquipmentRow(md)) {
+      // 2026-09-13: an inventory MIRROR of gear issued with a primary bike
+      // rental — its money lives in the primary row, so splitRentalPrice
+      // reports 0 (double-count guard). The panel still shows the catalog
+      // value of the issued items for the operator; display-only, never
+      // summed into the KPIs.
+      cost = items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
+      exact = false;
+    } else {
+      const split = splitRentalPrice(rental.total_cost, md);
+      cost = split.equipmentPartRub;
+      exact = true;
+    }
   } else {
     const stored = getStoredEquipmentPrice(md);
     exact = stored != null;
@@ -861,9 +871,15 @@ export function computeAnalyticsKpis(
   date: string,
 ): AnalyticsKpiValues {
   const realRows = rows.filter((r) => String(r.status ?? "") !== "cancelled");
+  // 2026-09-13 double-count fix: gear rows LINKED to their primary bike rental
+  // (metadata.primary_rental_id) are inventory mirrors, not rentals — the gear
+  // money lives in the primary row. They are excluded from «Аренд сегодня» /
+  // «Выручка» / «Активных» / «Экипировка», but stay in «Возвратов» so the
+  // operator still sees each issued item come back.
+  const rentalRows = realRows.filter((r) => !isLinkedEquipmentRow(r.metadata));
   const localStart = (r: KpiRentalRow) => localDateOnly(r.requested_start_date || r.agreed_start_date);
   const localEnd = (r: KpiRentalRow) => localDateOnly(r.agreed_end_date || r.requested_end_date);
-  const startedToday = realRows.filter((r) => localStart(r) === date);
+  const startedToday = rentalRows.filter((r) => localStart(r) === date);
   const returnsToday = realRows.filter((r) => localEnd(r) === date);
   const revenueRows = startedToday
     .filter((r) => ["active", "completed", "confirmed", "pending_confirmation"].includes(String(r.status ?? "")));
@@ -882,7 +898,7 @@ export function computeAnalyticsKpis(
   return {
     totalToday: startedToday.length,
     revenueToday,
-    activeCount: realRows.filter((r) => r.status === "active").length,
+    activeCount: rentalRows.filter((r) => r.status === "active").length,
     returnsDue: returnsToday.length,
     equipmentPartToday,
     owedToSubrentersToday,
