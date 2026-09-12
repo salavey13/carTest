@@ -1,4 +1,22 @@
 ---
+Task ID: 9
+Agent: main (Super Z)
+Task: «При нажатии одной из аренд не открывается всплывающее окно, а только затемняется экран — почини, это была твоя ошибка после добавления стрелки прокрутки; проверь остальные страницы на наличие такой же ошибки.»
+
+Work Log:
+- Перепроверил оба «стрелочных» коммита (3ae058ef9, 6378d6378): ScrollToTopButton — leaf-кнопка z-40 под всеми попапами (z-50…z-100), passive listener, pointer-events-none в скрытом состоянии. Виновник НЕ она — атрибуция босса оказалась корреляцией.
+- Настоящая причина (воспроизведена в headless-Chromium на 1:1 реплике): FranchizePageShell.tsx:110 рисует карточку с `backdrop-blur` → в Chromium она становится CONTAINING BLOCK для position:fixed потомков (spec filter-effects-2). Inline-попапы на страницах с шёллом измеряли КАРТОЧКУ (~3000px) вместо вьюпорта: затемнение (`fixed inset-0`) закрывало видимый экран, а панель стояла у дна карточки — за тысячи px ниже фолда. Body scroll при этом лочился → «экран затемнился, окна нет». Репо сам документировал этот механизм: rental/[id]/page.tsx:244-248 («PageShell had backdrop-blur which breaks position:fixed»).
+- Охват (по z-инвентарю всех fixed-элементов): TRAPPED были AnalyticsMobileSheet z-55 (шторки аренд/продаж/сервиса — сам баг-репорт), ExportCsvModal z-70 (та же страница), CashLedgerClient manual-entry z-50 (касса), salary-coefficients save-bar z-40 (не трогал — это панель страницы, а не попап, отдельная история). Radix-диалоги и порталы (LeadsToolbar z-80, HeaderMenu z-70, BikeStory z-90) не затронуты.
+- Фикс (паттерн репо — createPortal в document.body): AnalyticsMobileSheet (mounted-guard, open=false до клика), ExportCsvModal (после if(!isOpen) return null — SSR-safe), CashLedgerClient (showManualForm — user-triggered). Все z-индексы сохранены.
+- Проверки (3 из 4): typecheck:franchize passed; eslint --max-warnings=0 по 3 файлам; vitest tests/franchize 1516 passed / 0 failed.
+- Пуш: ff878cd97 (после rebase на авто-коммиты CSV) → Vercel автодеплой.
+
+Stage Summary:
+- «Затемняется экран, попап не открывается» = backdrop растянут на карточку-предка, панель — за фолдом. Лечится порталом в body; стрелка не виновата.
+- Исправлены все найденные trapped-попапы класса «открыл — темно — пусто»: шторки аналитики аренд/продаж/сервиса, CSV-таблица, касса. Артефакт: commit ff878cd97.
+
+---
+
 Task ID: 8
 Agent: main (Super Z)
 Task: Починить падение Vercel-сборки: «Module not found: Can't resolve '@/app/franchize/lib/vip-bike-callback-lead'» в app/franchize/server-actions/leads.ts. (Босс: «Почини, потому что проще не стало )».)
