@@ -1,4 +1,20 @@
 ---
+Task ID: 8
+Agent: main (Super Z)
+Task: Починить падение Vercel-сборки: «Module not found: Can't resolve '@/app/franchize/lib/vip-bike-callback-lead'» в app/franchize/server-actions/leads.ts. (Босс: «Почини, потому что проще не стало )».)
+
+Work Log:
+- Диагноз: в коммите 6378d6378 (Task 7) импорт QUIZ_NOTE_AUTHOR записан как @/app/franchize/lib/vip-bike-callback-lead, а реальный модуль — lib/vip-bike-callback-lead.ts в КОРНЕ репо (так его уже импортирует app/api/franchize/callback-lead/route.ts: @/lib/vip-bike-callback-lead). Это был единственный битый импорт в том коммите (проверено по полному дифу).
+- Фикс: одна строка в app/franchize/server-actions/leads.ts:31 → import { QUIZ_NOTE_AUTHOR } from "@/lib/vip-bike-callback-lead". Комментарий над импортом оставлен.
+- Проверки (2 из 4): npm run typecheck:franchize — passed (strict slice, module resolution ок); npx eslint --max-warnings=0 app/franchize/server-actions/leads.ts — чисто.
+- Коммит 1adb5e447 запушен в main → Vercel автодеплой.
+
+Stage Summary:
+- Причина бага: опечатка в alias-пути (lib/ живёт в корне, а не в app/franchize/). Фикс = 1 строка, функциональность Task 7 (стрелка для списка клиентов + фильтр «С заметками») не тронута.
+- Артефакт: commit 1adb5e447 в salavey13/carTest@main.
+
+---
+
 Task ID: 7
 Agent: main (Super Z)
 Task: Страница «Клиенты и заявки» — кнопка «пролистать вверх» только для списка клиентов; фильтр по наличию заметок, добавленных человеком. (Босс: «Проверь сам себя максимум четыре раза, сделай мою жизнь проще».)
