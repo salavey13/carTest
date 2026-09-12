@@ -199,6 +199,9 @@ export function LeadsClient({
   const [filterSource, setFilterSource] = useState<string>("all");
   const [filterStage, setFilterStage] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<string>("all");
+  // Фильтр «С заметками» (просьба босса): true = только лиды с заметками,
+  // добавленными человеком (авто-квиз «подбор с сайта» не считается).
+  const [filterHumanNotes, setFilterHumanNotes] = useState(false);
   // ── Пагинация теперь СЕРВЕРНАЯ: окно LEADS_PAGE_SIZE «лучших» лидов +
   // «Показать ещё» (fetchWindow("more")). См. блок оконной загрузки выше. ──
   const [segment, setSegment] = useState<Segment>("all");
@@ -456,9 +459,10 @@ export function LeadsClient({
       owner: filterOwner,
       segment,
       hidePlaceholders,
+      notes: filterHumanNotes ? "human" : undefined,
       sort: sortMode,
     };
-  }, [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode]);
+  }, [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, filterHumanNotes, sortMode]);
 
   const hashOfFilters = (o: GetLeadsWindowOpts): string =>
     JSON.stringify([
@@ -468,6 +472,7 @@ export function LeadsClient({
       o.owner || "all",
       o.segment || "all",
       !!o.hidePlaceholders,
+      o.notes || "all",
       o.sort || "priority",
     ]);
 
@@ -649,6 +654,7 @@ export function LeadsClient({
       filterOwner !== "all" ||
       segment !== "all" ||
       hidePlaceholders !== false ||
+      filterHumanNotes !== false ||
       sortMode !== "priority" ||
       viewMode !== "list";
     const p = touched ? null : prefsResolution.prefs;
@@ -664,6 +670,7 @@ export function LeadsClient({
         setSegment(p.segment);
       }
       if (typeof p.hidePlaceholders === "boolean") setHidePlaceholders(p.hidePlaceholders);
+      if (typeof p.humanNotes === "boolean") setFilterHumanNotes(p.humanNotes);
       if (p.sortMode === "priority" || p.sortMode === "recent" || p.sortMode === "urgent" || p.sortMode === "name" || p.sortMode === "spent") {
         setSortMode(p.sortMode);
       }
@@ -677,7 +684,7 @@ export function LeadsClient({
       prefsSettledRef.current = true;
       setPrefsSettled(true);
     }
-  }, [prefsResolution, searchQuery, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode, viewMode]);
+  }, [prefsResolution, searchQuery, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, filterHumanNotes, sortMode, viewMode]);
 
   // ── Загрузка: первая (после применения prefs) и при смене фильтров ────────
   // SWR: мгновенно рисуем из кэша (память → sessionStorage); свежий (< TTL) —
@@ -721,6 +728,7 @@ export function LeadsClient({
     filterOwner,
     segment,
     hidePlaceholders,
+    filterHumanNotes,
     sortMode,
     manualRetryTick,
   ]);
@@ -737,10 +745,11 @@ export function LeadsClient({
       owner: filterOwner,
       segment,
       hidePlaceholders,
+      humanNotes: filterHumanNotes || undefined,
       sortMode,
       viewMode,
     });
-  }, [prefsSettled, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, sortMode, viewMode]);
+  }, [prefsSettled, debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, filterHumanNotes, sortMode, viewMode]);
 
   // ── «Показать ещё»: дозагрузка следующего окна с сервера ───────────────────
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -936,11 +945,12 @@ export function LeadsClient({
   const hasFilters =
     !!(debouncedSearchQuery || filterSource !== "all") ||
     filterStage !== "all" ||
-    filterOwner !== "all";
+    filterOwner !== "all" ||
+    filterHumanNotes;
 
   // Референс-дизайн §3: оранжевый бейдж «N» на кнопке фильтров — считаем
   // ВСЕ активные сужения списка (поиск, источник, стадия, ответственный,
-  // сегмент, заглушки). Клик — resetAllFilters ниже.
+  // сегмент, заглушки, заметки). Клик — resetAllFilters ниже.
   const activeFilterCount = useMemo(
     () =>
       [
@@ -950,8 +960,9 @@ export function LeadsClient({
         filterOwner !== "all",
         segment !== "all",
         hidePlaceholders,
+        filterHumanNotes,
       ].filter(Boolean).length,
-    [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders],
+    [debouncedSearchQuery, filterSource, filterStage, filterOwner, segment, hidePlaceholders, filterHumanNotes],
   );
 
   // FIX (mobile wave 3, dead button): EmptyState рисует «Сбросить фильтры»,
@@ -965,6 +976,7 @@ export function LeadsClient({
     setFilterOwner("all");
     setSegment("all");
     setHidePlaceholders(false);
+    setFilterHumanNotes(false);
   }, []);
 
   // ── Панели аналитики — СЕРВЕРНЫЕ агрегаты по ПОЛНОМУ набору (agg).
@@ -1771,6 +1783,7 @@ export function LeadsClient({
           viewMode={viewMode} onViewModeChange={setViewMode}
           segmentCounts={segmentCounts}
           hidePlaceholders={hidePlaceholders} setHidePlaceholders={setHidePlaceholders}
+          filterHumanNotes={filterHumanNotes} setFilterHumanNotes={setFilterHumanNotes}
           activeFilterCount={activeFilterCount} onResetFilters={resetAllFilters}
           T={T} isAuto={isAuto}
         />

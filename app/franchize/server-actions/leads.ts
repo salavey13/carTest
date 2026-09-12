@@ -17,6 +17,7 @@ import {
   getAvailableSources,
   matchStageFilter,
   matchOwnerFilter,
+  matchNotesFilter,
   placeholderHasActivity,
   computeLeadsKpiCardsStats,
 } from "@/app/franchize/[slug]/leads/lib/leads-query-core";
@@ -25,6 +26,9 @@ import { buildNextActions } from "@/app/franchize/[slug]/leads/lib/lead-playbook
 import { maybeCelebrateSuperlistClear } from "@/app/franchize/lib/superlist-clear";
 import { computeLeadAchievements } from "@/app/franchize/[slug]/leads/lib/lead-achievements";
 import { PIPELINE_STAGES } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
+// Автор служебной авто-заметки-квиза («подбор с сайта») — единственный
+// нечеловеческий писатель в lead_notes; light-модуль (только zod).
+import { QUIZ_NOTE_AUTHOR } from "@/app/franchize/lib/vip-bike-callback-lead";
 // NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
 // are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
 // poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
@@ -1645,11 +1649,15 @@ export async function getFranchizeLeads(
     }
 
     // 12b. Attach notes counts (флажок «Прочитать заметки» в списке лидов).
-    // Один проход по заметкам экипажа: lead_id → {count, lastAt, lastBy}.
+    // Один проход по заметкам экипажа: lead_id → {count, humanCount, lastAt, lastBy}.
     // Ключи, не совпадающие с ключами лидов (например "sale:<contract>" заметки
     // сделок), просто игнорируются — это чужая доменная область.
+    // humanCount — заметки, оставленные ЧЕЛОВЕКОМ: всё, кроме служебных
+    // авто-заметок автора QUIZ_NOTE_AUTHOR («подбор с сайта» — дамп ответов
+    // квиза с сайта, есть у каждого веб-лида). null/легаси-текст считаем
+    // человеческими — их писали операторы до введения атрибуции.
     if (notesResult.data) {
-      const notesAgg = new Map<string, { count: number; lastAt: string | null; lastModAt: string | null; lastBy: string | null }>();
+      const notesAgg = new Map<string, { count: number; humanCount: number; lastAt: string | null; lastModAt: string | null; lastBy: string | null }>();
       for (const n of notesResult.data) {
         const key = typeof n.lead_id === "string" ? n.lead_id : null;
         if (!key) continue;
@@ -1665,10 +1673,12 @@ export async function getFranchizeLeads(
         const by = typeof (n as { created_by?: unknown }).created_by === "string" && (n as { created_by?: string }).created_by
           ? (n as { created_by: string }).created_by
           : null;
+        const isHuman = by !== QUIZ_NOTE_AUTHOR;
         if (!prev) {
-          notesAgg.set(key, { count: 1, lastAt: at, lastModAt: modAt, lastBy: by });
+          notesAgg.set(key, { count: 1, humanCount: isHuman ? 1 : 0, lastAt: at, lastModAt: modAt, lastBy: by });
         } else {
           prev.count += 1;
+          if (isHuman) prev.humanCount += 1;
           if (at && (!prev.lastAt || at > prev.lastAt)) {
             prev.lastAt = at;
             prev.lastBy = by;
@@ -1679,6 +1689,7 @@ export async function getFranchizeLeads(
       for (const l of leadMap.values()) {
         const agg = notesAgg.get(l.user_id);
         l.notesCount = agg?.count ?? 0;
+        l.humanNotesCount = agg?.humanCount ?? 0;
         l.lastNoteAt = agg?.lastAt ?? null;
         // Сырое значение (id или имя) — имя подставим после резолва ниже.
         l.lastTouchedBy = agg?.lastBy ?? null;
@@ -2199,6 +2210,9 @@ export async function getFranchizeLeads(
         filtered = filtered.filter((l) => matchStageFilter(l, windowOpts.stage || "all"));
         const ownerName = (windowOpts.owner && operators.find((o) => o.id === windowOpts.owner)?.name) || null;
         filtered = filtered.filter((l) => matchOwnerFilter(l, windowOpts.owner || "all", ownerName));
+        // Фильтр «С заметками» (просьба босса): только лиды, которых человек
+        // трогал заметкой — служебные квиз-заметки «подбор с сайта» не в счёт.
+        filtered = filtered.filter((l) => matchNotesFilter(l, windowOpts.notes || "all"));
         // Счётчик «Показано X из Y» — по отфильтрованному набору (сортация
         // на счётчик не влияет, для total достаточно длины).
         const filteredTotal = filtered.length;
@@ -2235,7 +2249,8 @@ export async function getFranchizeLeads(
           windowOpts.segment || "all",
           getTodosForLeadSrv,
           !!windowOpts.hidePlaceholders,
-        ).filter((l) => matchStageFilter(l, windowOpts.stage || "all"));
+        ).filter((l) => matchStageFilter(l, windowOpts.stage || "all"))
+         .filter((l) => matchNotesFilter(l, windowOpts.notes || "all"));
         windowTodos = [];
         // 2026-09-10 FIX: раньше hasMore был захардкожен в true — после того
         // как оператор дозагрузил всё, тихий meta-рефреш каждые 90 с оживлял

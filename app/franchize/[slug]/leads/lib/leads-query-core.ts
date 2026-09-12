@@ -153,6 +153,19 @@ export function matchStageFilter(lead: LeadRow, filterStage: string): boolean {
 }
 
 /**
+ * Фильтр «С заметками»: «human» — у лида есть хотя бы одна заметка,
+ * оставленная ЧЕЛОВЕКОМ (humanNotesCount считается сервером в том же
+ * проходе, что notesCount: всё, кроме служебных авто-заметок с автором
+ * «подбор с сайта» — квиз с сайта есть у каждого веб-лида и работы
+ * оператора не отражает). Легаси-заметки без автора (null) считаем
+ * человеческими — их писали операторы до введения атрибуции.
+ */
+export function matchNotesFilter(lead: LeadRow, filterNotes: string): boolean {
+  if (filterNotes !== "human") return true;
+  return (lead.humanNotesCount ?? 0) > 0;
+}
+
+/**
  * Фильтр «Ответственный»: матч по id (assignee / owner / исходный оператор)
  * или по имени последнего оператора / легаси-имени. ownerName — имя,
  * резолвленное по id из ростера (может быть null для легаси-значений).

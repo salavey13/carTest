@@ -1,4 +1,25 @@
 ---
+Task ID: 7
+Agent: main (Super Z)
+Task: Страница «Клиенты и заявки» — кнопка «пролистать вверх» только для списка клиентов; фильтр по наличию заметок, добавленных человеком. (Босс: «Проверь сам себя максимум четыре раза, сделай мою жизнь проще».)
+
+Work Log:
+- ScrollToTopButton (app/franchize/components/ScrollToTopButton.tsx): добавлен isLeadsListOnlyPathname() — на /franchize/[slug]/leads кнопка обслуживает ТОЛЬКО список лидов #leads-list-scroll: появляется по скроллу списка (>400px), скролл самой страницы (KPI/плейбук/аналитика) стрелку не включает; клик скроллит только список к тулбару, окно страницы стоит на месте. На остальных страницах экипажа поведение прежнее (окно + внутренние контейнеры). Позиция/z-index не тронуты — другим кнопкам не мешает.
+- Определение «человеческой» заметки: created_by !== QUIZ_NOTE_AUTHOR («подбор с сайта» — единственный служебный писатель в lead_notes, дамп ответов квиза вебхуком callback-lead). Легаси-заметки (null / текст-имя) считаем человеческими — писали операторы до атрибуции (m5). QR-claim RPC только перекладывает lead_id, авторов не пишет.
+- leads-types.ts: LeadRow.humanNotesCount?: number; GetLeadsWindowOpts.notes?: "all" | "human".
+- leads-query-core.ts: matchNotesFilter(lead, filterNotes) — «human» = humanNotesCount > 0; спеки в tests/franchize/leads-query-core.spec.ts (3 кейса, вкл. «notesCount>0, но все заметки — авто-квиз» → false).
+- server-actions/leads.ts: в шаге 12b notesAgg копит humanCount в том же проходе (без доп. запросов); фильтр окна применён в ОБЕИХ ветках — полный путь (после matchOwnerFilter) и metaOnly-пересчёт total (иначе «Показать ещё» жило бы по другому total). Импорт QUIZ_NOTE_AUTHOR из lib/vip-bike-callback-lead (light, только zod).
+- LeadsClient.tsx: state filterHumanNotes; notes в filtersRef + hashOfFilters (инвалидация кэша окон); восстановление/сохранение prefs (humanNotes, touched-guard, deps); hasFilters/activeFilterCount/resetAllFilters; проброс в LeadsToolbar.
+- LeadsToolbar.tsx: чип «Заметки»/«С заметками» (StickyNote, amber как у «Без опер.») рядом с тумблером заглушек; title объясняет, что авто-заметки не считаются.
+- prefs: useLeadsUserPrefs.LeadsUiPrefsClient.humanNotes + prefsKey; API-роут user-prefs — sanitizePrefs принимает boolean humanNotes (whitelist, как остальные ключи).
+- Проверки (ровно 4, по лимиту босса): 1) vitest tests/franchize — 1516 passed / 0 failed (8 skipped — прежние); 2) typecheck:franchize — strict slice passed (13 прежних транзитивных debt-файлов, без новых); 3) eslint --max-warnings=0 по всем 9 тронутым файлам — чисто; 4) финальный осмотр git diff. Текст-порт skills/leads-crm-text не трогал: фильтр — UI-концепт веб-страницы, сигнальной логики в порту нет.
+
+Stage Summary:
+- Стрелка вверх на «Клиенты и заявки» больше не реагирует на скролл страницы и не уносит к плиткам KPI — только список клиентов к тулбару.
+- Новый фильтр «С заметками» ищет реальную операторскую работу: лиды, у которых есть хотя бы одна человеческая заметка; авто-квиз «подбор с сайта» (он у каждого веб-лида) не считается. Фильтр серверный (работает с пагинацией «Показать ещё» и meta-рефрешем), запоминается в prefs между сменами, входит в бейдж активных фильтров и сброс.
+- Deploy: push в main → Vercel (v0-car-test).
+
+---
 Task ID: 6
 Agent: main (Super Z)
 Task: Fix lead-card SLA counter — «was not touched since» must reset when the lead is touched (boss report: counter not updated on lead update, misleading).

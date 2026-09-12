@@ -12,6 +12,7 @@ import {
   getAvailableSources,
   matchStageFilter,
   matchOwnerFilter,
+  matchNotesFilter,
   placeholderHasActivity,
   computeLeadsKpiCardsStats,
 } from "@/app/franchize/[slug]/leads/lib/leads-query-core";
@@ -162,6 +163,27 @@ describe("matchOwnerFilter", () => {
 
   it("не матчит чужого оператора", () => {
     expect(matchOwnerFilter(lead, "op-42", null)).toBe(false);
+  });
+});
+
+describe("matchNotesFilter", () => {
+  it("«all» матчит всё (фильтр выключен)", () => {
+    expect(matchNotesFilter(buildLead(), "all")).toBe(true);
+    expect(matchNotesFilter(buildLead({ notesCount: 3 }), "all")).toBe(true);
+  });
+
+  it("«human» — только лиды с человеческими заметками", () => {
+    expect(matchNotesFilter(buildLead({ humanNotesCount: 1 }), "human")).toBe(true);
+    expect(matchNotesFilter(buildLead({ humanNotesCount: 4 }), "human")).toBe(true);
+  });
+
+  it("«human» скрывает лиды без заметок и лидов только с авто-квизом", () => {
+    // заметок нет вовсе
+    expect(matchNotesFilter(buildLead(), "human")).toBe(false);
+    // notesCount > 0, но все заметки служебные (квиз «подбор с сайта»)
+    expect(matchNotesFilter(buildLead({ notesCount: 1, humanNotesCount: 0 }), "human")).toBe(false);
+    // поле не приехало (легаси-ответ сервера) — не рисуем «есть заметки»
+    expect(matchNotesFilter(buildLead({ notesCount: 2 }), "human")).toBe(false);
   });
 });
 

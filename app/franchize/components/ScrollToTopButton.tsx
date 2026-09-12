@@ -20,6 +20,12 @@ import { ArrowUp } from "lucide-react";
  *    у листа свой overflow-y-auto, окно при этом не скроллится) > 400.
  *    Наверху страницы кнопка скрыта — не занимает экран зря.
  *  • Клик — плавный скролл наверх и окна, и внутренних контейнеров.
+ *  • СТРАНИЦА «КЛИЕНТЫ И ЗАЯВКИ» (/franchize/[slug]/leads) — исключение
+ *    (просьба босса: «кнопку прокрутки вверх сделай только для списка
+ *    клиентов»): кнопка привязана ТОЛЬКО к списку лидов #leads-list-scroll.
+ *    Скролл самой страницы (KPI-плиты, плейбук, аналитика) стрелку НЕ
+ *    включает, и клик не уносит к плиткам — список честно возвращается
+ *    к своему началу (тулбар с фильтрами), остальная страница стоит на месте.
  *  • Клик по стрелке на КАТАЛОГЕ не дублируется: маршруты каталога
  *    (где стрелка уже живёт в FloatingCartIconLinkBySlug) и страницы со
  *    своей нижней фиксированной UI (карточка аренды, конфигуратор,
@@ -48,9 +54,18 @@ function isExcludedPathname(pathname: string): boolean {
   return false;
 }
 
+/**
+ * Страница «Клиенты и заявки»: кнопка обслуживает ТОЛЬКО список лидов
+ * (#leads-list-scroll) — ни окно страницы, ни другие контейнеры.
+ */
+function isLeadsListOnlyPathname(pathname: string): boolean {
+  return /\/franchize\/[^/]+\/leads(\/|$)/.test(pathname);
+}
+
 export function ScrollToTopButton() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+  const listOnly = isLeadsListOnlyPathname(pathname);
 
   useEffect(() => {
     if (isExcludedPathname(pathname)) {
@@ -61,6 +76,11 @@ export function ScrollToTopButton() {
     const readDepth = (): number => {
       // Окно + внутренние скролл-контейнеры (список лидов скроллится
       // внутри собственного overflow-y-auto — окно стоит на месте).
+      // На странице «Клиенты и заявки» окно НЕ учитываем: стрелка
+      // обслуживает только список лидов (см. isLeadsListOnlyPathname).
+      if (listOnly) {
+        return document.getElementById("leads-list-scroll")?.scrollTop || 0;
+      }
       let deepest = window.scrollY || 0;
       const inner = document.getElementById("leads-list-scroll");
       if (inner) deepest = Math.max(deepest, inner.scrollTop || 0);
@@ -74,13 +94,16 @@ export function ScrollToTopButton() {
     document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     onScroll();
     return () => document.removeEventListener("scroll", onScroll, { capture: true });
-  }, [pathname]);
+  }, [pathname, listOnly]);
 
   const handleClick = useCallback(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // List-only (страница «Клиенты и заявки»): прокручиваем ТОЛЬКО список —
+    // страница (KPI/плейбук/аналитика) остаётся на месте, оператор не
+    // теряет свою позицию в ней.
     const inner = document.getElementById("leads-list-scroll");
     if (inner) inner.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+    if (!listOnly) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [listOnly]);
 
   if (isExcludedPathname(pathname)) return null;
 

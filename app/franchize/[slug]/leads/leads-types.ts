@@ -167,6 +167,15 @@ export interface LeadRow {
    * Считается на сервере одним агрегатным запросом; 0/undefined = заметок нет.
    */
   notesCount?: number;
+  /**
+   * Сколько из заметок лида оставлено ЧЕЛОВЕКОМ (оператором) — всё, что не
+   * служебная авто-заметка (автор «подбор с сайта» — дамп ответов квиза с
+   * сайта, пишется вебхуком callback-lead). Питает фильтр тулбара «С
+   * заметками»: авто-квиз есть у каждого лида с сайта, поэтому голый
+   * notesCount для «листов с человеческой работой» бесполезен.
+   * Считается на сервере в том же проходе, что notesCount.
+   */
+  humanNotesCount?: number;
   /** Когда оставлена последняя заметка (ISO) — «новая» (≤24 ч) подсвечена ярче. */
   lastNoteAt?: string | null;
   /**
@@ -331,6 +340,8 @@ export interface GetLeadsWindowOpts {
   owner?: string;
   segment?: LeadsSegment;
   hidePlaceholders?: boolean;
+  /** "all" (по умолчанию) | "human" — только лиды с заметками оператора. */
+  notes?: "all" | "human";
   sort?: "priority" | "recent" | "urgent" | "name" | "spent";
   /** true — отдать только агрегаты/счётчики, без окна лидов (тихий рефреш). */
   metaOnly?: boolean;

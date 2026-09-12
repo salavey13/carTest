@@ -13,6 +13,7 @@ import {
   Columns3,
   Table2,
   ShieldAlert,
+  StickyNote,
   Flame,
   CheckCircle,
   Phone,
@@ -90,6 +91,9 @@ export function LeadsToolbar({
   // Placeholders toggle
   hidePlaceholders,
   setHidePlaceholders,
+  // «С заметками» toggle (просьба босса: фильтр по заметкам, добавленным человеком)
+  filterHumanNotes,
+  setFilterHumanNotes,
   // Active filters badge (reference design §3: orange «2» on the filter button)
   activeFilterCount,
   onResetFilters,
@@ -118,6 +122,9 @@ export function LeadsToolbar({
   onViewModeChange?: (v: "list" | "board" | "table") => void;
   hidePlaceholders: boolean;
   setHidePlaceholders: (v: boolean) => void;
+  /** true = показывать только лидов с заметками оператора (авто-квиз не считается). */
+  filterHumanNotes?: boolean;
+  setFilterHumanNotes?: (v: boolean) => void;
   /** Сколько фильтров сейчас активно — оранжевый бейдж на кнопке сброса
    *  (референс §3). 0/undefined — кнопка не рисуется. */
   activeFilterCount?: number;
@@ -353,6 +360,29 @@ export function LeadsToolbar({
           <ShieldAlert className="h-3.5 w-3.5" />
           {hidePlaceholders ? "Без опер." : "С опер."}
         </button>
+
+        {/* «С заметками» — только лиды с человеческими заметками. Служебные
+            авто-заметки («подбор с сайта» — квиз с сайта) не считаются: они
+            есть у каждого веб-лида и работы оператора не отражают. */}
+        {setFilterHumanNotes && (
+          <button
+            onClick={() => setFilterHumanNotes(!filterHumanNotes)}
+            aria-pressed={!!filterHumanNotes}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+              filterHumanNotes ? "" : "opacity-50"
+            }`}
+            style={{
+              flexShrink: 0,
+              borderColor: filterHumanNotes ? "#f59e0b40" : T.border,
+              color: filterHumanNotes ? "#f59e0b" : T.textMuted,
+              backgroundColor: filterHumanNotes ? "#f59e0b10" : "transparent",
+            }}
+            title={filterHumanNotes ? "Показать всех (не фильтровать по заметкам)" : "Только лиды с заметками оператора (авто-заметки не считаются)"}
+          >
+            <StickyNote className="h-3.5 w-3.5" />
+            {filterHumanNotes ? "С заметками" : "Заметки"}
+          </button>
+        )}
       </div>
 
       {/* ── Row 3: segment chips — horizontal scroll on all sizes ──

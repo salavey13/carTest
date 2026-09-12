@@ -43,6 +43,8 @@ export interface LeadsUiPrefs {
   owner?: string;
   segment?: string;
   hidePlaceholders?: boolean;
+  /** Фильтр «С заметками»: только лиды с заметками оператора. */
+  humanNotes?: boolean;
   sortMode?: string;
   viewMode?: string;
 }
@@ -70,6 +72,7 @@ function sanitizePrefs(raw: unknown): LeadsUiPrefs | null {
   if (owner) out.owner = owner;
   if (typeof r.segment === "string" && SEGMENTS.has(r.segment)) out.segment = r.segment;
   if (typeof r.hidePlaceholders === "boolean") out.hidePlaceholders = r.hidePlaceholders;
+  if (typeof r.humanNotes === "boolean") out.humanNotes = r.humanNotes;
   if (typeof r.sortMode === "string" && SORTS.has(r.sortMode)) out.sortMode = r.sortMode;
   if (typeof r.viewMode === "string" && VIEWS.has(r.viewMode)) out.viewMode = r.viewMode;
   return Object.keys(out).length > 0 ? out : null;

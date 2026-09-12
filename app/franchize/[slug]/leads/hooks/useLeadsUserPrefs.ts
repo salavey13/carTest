@@ -37,6 +37,8 @@ export interface LeadsUiPrefsClient {
   owner?: string;
   segment?: string;
   hidePlaceholders?: boolean;
+  /** Фильтр «С заметками»: только лиды с заметками оператора. */
+  humanNotes?: boolean;
   sortMode?: string;
   viewMode?: string;
 }
@@ -85,6 +87,7 @@ const prefsKey = (p: LeadsUiPrefsClient): string =>
     p.owner || "all",
     p.segment || "all",
     !!p.hidePlaceholders,
+    !!p.humanNotes,
     p.sortMode || "priority",
     p.viewMode || "list",
   ]);
