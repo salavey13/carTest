@@ -28,6 +28,7 @@
 //    a no-op (live filter).
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
@@ -311,7 +312,13 @@ export function ExportCsvModal({
     textAlign: numericCols.has(i) ? "right" : dateCols.has(i) ? "center" : "left",
   });
 
-  return (
+  // PORTAL FIX (2026-09-13): the analytics page is wrapped in FranchizePageShell
+  // whose card has `backdrop-blur` — a containing block for position:fixed
+  // descendants in Chromium. Inline rendering trapped this full-screen modal
+  // inside the card box (backdrop covered the viewport, the panel sat below
+  // the fold). Portal to document.body — same treatment as AnalyticsMobileSheet.
+  // Line 217's `if (!isOpen) return null` guarantees client-only evaluation.
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4"
       onClick={downloading || sending ? undefined : onClose}
@@ -750,7 +757,8 @@ export function ExportCsvModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

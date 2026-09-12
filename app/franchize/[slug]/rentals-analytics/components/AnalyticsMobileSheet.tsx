@@ -33,7 +33,8 @@
 // The drag handle remains a dismiss gesture only (swipe down to close);
 // the sheet is not user-resizable — it is always the full intended size.
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   motion,
   AnimatePresence,
@@ -71,6 +72,10 @@ export function AnalyticsMobileSheet({
   const controls = useAnimationControls();
   const scrollRef = useRef<HTMLDivElement>(null);
   const viewportHeight = useViewportHeightPx();
+  // Portal guard: the component is mounted on every analytics render (open
+  // starts false), but createPortal needs a real document — client-only.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Pixel height derived from the VISIBLE viewport (see hook docblock).
   // Before mount (viewportHeight === 0) we fall back to the CSS class
@@ -119,7 +124,18 @@ export function AnalyticsMobileSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, controls]);
 
-  return (
+  // PORTAL FIX (2026-09-13): FranchizePageShell's card uses `backdrop-blur`,
+  // which makes it the CONTAINING BLOCK for position:fixed descendants
+  // (Chromium: filter-effects-2). This sheet then measured the ~3000px card
+  // instead of the viewport: the dark backdrop covered the visible screen
+  // while the panel itself sat at the CARD's bottom edge, thousands of px
+  // below the fold — «нажал на аренду — экран затемнился, а окно не
+  // открылось». Portal to document.body restores true viewport fixing
+  // (repo standard: LeadsToolbar z-[80], HeaderMenu z-[70], BikeStory z-[90]).
+  // Pre-mount we always render nothing anyway (open=false until user taps).
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -220,6 +236,7 @@ export function AnalyticsMobileSheet({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

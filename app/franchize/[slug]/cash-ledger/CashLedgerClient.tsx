@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { DollarSign, TrendingUp, TrendingDown, Plus, Filter } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
@@ -377,8 +378,13 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
         </div>
       )}
 
-      {/* Manual Entry Modal */}
-      {showManualForm && (
+      {/* Manual Entry Modal — PORTAL FIX (2026-09-13): this page is wrapped in
+          FranchizePageShell whose card has `backdrop-blur` (containing block for
+          position:fixed descendants in Chromium) — inline rendering trapped the
+          modal inside the card box. Portal to document.body, same as
+          AnalyticsMobileSheet/ExportCsvModal. showManualForm is user-triggered,
+          so createPortal only evaluates client-side. */}
+      {showManualForm && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="rounded-2xl border max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: T.bgCard, borderColor: T.borderSoft }}>
             <div className="p-6 space-y-4">
@@ -510,7 +516,8 @@ export function CashLedgerClient({ slug, crew }: CashLedgerClientProps) {
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
