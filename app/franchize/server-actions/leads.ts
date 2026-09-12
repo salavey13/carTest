@@ -28,7 +28,7 @@ import { computeLeadAchievements } from "@/app/franchize/[slug]/leads/lib/lead-a
 import { PIPELINE_STAGES } from "@/app/franchize/[slug]/leads/lib/pipeline-stages";
 // Автор служебной авто-заметки-квиза («подбор с сайта») — единственный
 // нечеловеческий писатель в lead_notes; light-модуль (только zod).
-import { QUIZ_NOTE_AUTHOR } from "@/app/franchize/lib/vip-bike-callback-lead";
+import { QUIZ_NOTE_AUTHOR } from "@/lib/vip-bike-callback-lead";
 // NOTE: privateSchema (from @/lib/private-secrets) + cookies + telegram-actor-cookie
 // are ALL imported DYNAMICALLY inside functions to avoid `import "server-only"`
 // poisoning the client bundle. private-secrets.ts has `import "server-only"` too.
