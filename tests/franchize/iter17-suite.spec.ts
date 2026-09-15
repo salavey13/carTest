@@ -202,6 +202,12 @@ describe("iter17 · rentalRowBlocksWindow — the live same-day scenario", () =>
 describe("iter17 · checkFranchizeCarsAvailability (server action)", () => {
   const rentalsResult = vi.fn();
 
+  // The scenario must run on a date that is ALWAYS in the future (rule 3 in
+  // rentalRowBlocksWindow frees any rental whose end + grace has already
+  // passed). A hardcoded date time-bombed the suite once that date arrived —
+  // compute it instead. 7 days of headroom is plenty for CI clocks.
+  const FUTURE_DATE = new Date(Date.now() + 7 * DAY).toISOString().slice(0, 10);
+
   const makeRentalsChain = (rows: unknown[]) => ({
     select: () => ({
       in: () => ({
@@ -227,14 +233,14 @@ describe("iter17 · checkFranchizeCarsAvailability (server action)", () => {
       {
         vehicle_id: "kawasaki-ex650k",
         status: "pending_confirmation",
-        requested_start_date: "2026-09-15T06:30:00+00:00",
-        requested_end_date: "2026-09-15T08:30:00+00:00",
+        requested_start_date: `${FUTURE_DATE}T06:30:00+00:00`,
+        requested_end_date: `${FUTURE_DATE}T08:30:00+00:00`,
       },
     ]);
     const result = await checkFranchizeCarsAvailability({
       carIds: ["kawasaki-ex650k"],
-      rentalStartDate: "2026-09-15",
-      rentalEndDate: "2026-09-15",
+      rentalStartDate: FUTURE_DATE,
+      rentalEndDate: FUTURE_DATE,
       rentalStartTime: "12:00",
       rentalEndTime: "15:00",
     });
@@ -246,20 +252,20 @@ describe("iter17 · checkFranchizeCarsAvailability (server action)", () => {
       {
         vehicle_id: "kawasaki-ex650k",
         status: "active",
-        requested_start_date: "2026-09-15T09:00:00+00:00", // 12:00 MSK
-        requested_end_date: "2026-09-15T12:00:00+00:00",   // 15:00 MSK
+        requested_start_date: `${FUTURE_DATE}T09:00:00+00:00`, // 12:00 MSK
+        requested_end_date: `${FUTURE_DATE}T12:00:00+00:00`,   // 15:00 MSK
       },
       {
         vehicle_id: "yamaha-r6-2007",
         status: "active",
-        requested_start_date: "2026-09-15T09:00:00+00:00",
-        requested_end_date: "2026-09-15T10:00:00+00:00",   // 13:00 MSK — 13:30+grace overlaps the 12:00 request
+        requested_start_date: `${FUTURE_DATE}T09:00:00+00:00`,
+        requested_end_date: `${FUTURE_DATE}T10:00:00+00:00`,   // 13:00 MSK — 13:30+grace overlaps the 12:00 request
       },
     ]);
     const result = await checkFranchizeCarsAvailability({
       carIds: ["kawasaki-ex650k", "yamaha-r6-2007", "ducati-green"],
-      rentalStartDate: "2026-09-15",
-      rentalEndDate: "2026-09-15",
+      rentalStartDate: FUTURE_DATE,
+      rentalEndDate: FUTURE_DATE,
       rentalStartTime: "12:00",
       rentalEndTime: "15:00",
     });
