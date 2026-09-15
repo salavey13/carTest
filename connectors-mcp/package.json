@@ -1,0 +1,17 @@
+{
+  "name": "@traversa/connectors-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP stdio sidecar exposing carTest lib/connectors (ETM + 1С) as 6 tools for OpenCode and other MCP clients. Sole runtime dep: zod.",
+  "bin": {
+    "connectors-mcp": "dist/connectors-mcp/src/server.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/connectors-mcp/src/server.js",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}

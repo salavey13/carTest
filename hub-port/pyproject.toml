@@ -1,0 +1,13 @@
+[project]
+name = "hub-port"
+version = "0.1.0"
+description = "Python reference layer for the traversa hub: TG MiniApp auth, dirty-way crew registry (Supabase), actor/correlation contract, bot->OpenCode command logic. Staged in carTest, ported to Jeezzzy/traversa."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
