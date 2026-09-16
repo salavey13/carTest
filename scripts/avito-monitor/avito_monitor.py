@@ -40,10 +40,7 @@ KNOWLEDGE_FILE = SCRIPT_DIR / "avito_knowledge.json"
 # Прайс аренды для GLM-агента: публичный CSV каталога (крон update_catalog_csvs.sh
 # обновляет public/docs/autoreply/ в репо, сайт отдаёт его по этому URL) + локальный
 # кэш рядом со скриптом, чтобы не качать файл на каждое сообщение покупателя.
-PRICING_CSV_URL = os.environ.get(
-    "AVITO_PRICING_CSV_URL",
-    "https://rental.vip-bike.ru/docs/autoreply/vip-bike-rent.csv",
-)
+PRICING_CSV_DEFAULT_URL = "https://rental.vip-bike.ru/docs/autoreply/vip-bike-rent.csv"
 PRICING_CSV_FILE = SCRIPT_DIR / "vip-bike-rent.cache.csv"
 PRICING_CSV_TTL = 6 * 60 * 60
 DB_FILE = ROOT_DIR / "data/avito_leads.db"
@@ -409,11 +406,16 @@ def _compact_pricing_rows(rows: list) -> list:
 
 
 def load_pricing_rows():
-    """Прайс аренды по моделям из CSV каталога (PRICING_CSV_URL).
+    """Прайс аренды по моделям из CSV каталога (URL или локальный кэш).
 
-    Свежий кэш живёт рядом со скриптом PRICING_CSV_TTL секунд; при недоступности
-    сайта используем устаревший кэш. Возвращает (строки, описание источника).
+    URL берётся из env `AVITO_PRICING_CSV_URL` (окружение или secrets.env,
+    по умолчанию — публичный CSV каталога на сайте). Свежий кэш живёт рядом
+    со скриптом PRICING_CSV_TTL секунд; при недоступности сайта используем
+    устаревший кэш. Возвращает (строки, описание источника).
     """
+    env = os.environ.copy()
+    load_dotenv(SECRETS_FILE, env)
+    pricing_csv_url = env.get("AVITO_PRICING_CSV_URL", PRICING_CSV_DEFAULT_URL)
     text = ""
     try:
         if PRICING_CSV_FILE.exists() and (
@@ -424,13 +426,13 @@ def load_pricing_rows():
         logger.exception("Не удалось прочитать кэш прайс-CSV")
     if not text:
         try:
-            response = requests.get(PRICING_CSV_URL, timeout=10)
+            response = requests.get(pricing_csv_url, timeout=10)
             response.raise_for_status()
             response.encoding = "utf-8"
             text = response.text
             PRICING_CSV_FILE.write_text(text, encoding="utf-8")
         except Exception as error:
-            logger.error("Прайс-CSV %s недоступен: %s", PRICING_CSV_URL, error)
+            logger.error("Прайс-CSV %s недоступен: %s", pricing_csv_url, error)
             if PRICING_CSV_FILE.exists():
                 try:
                     text = PRICING_CSV_FILE.read_text(encoding="utf-8")
