@@ -16,6 +16,17 @@ webhook. **Production deployment is authoritative** — this folder mirrors it.
   `TELEGRAM_BOT_TOKEN`, `AVITO_TELEGRAM_CHAT_IDS`, `Z_AI_API_KEY`,
   `Z_AI_BASE_URL`, `AVITO_LEADS_WEBHOOK_URL/SECRET`.
 
+## Pricing source (verified_knowledge.pricing, 2026-09-16)
+
+Цены аренды агент берёт из CSV каталога `public/docs/autoreply/vip-bike-rent.csv`
+(обновляется кроном `update_catalog_csvs.sh`, сайт отдаёт его по
+`https://rental.vip-bike.ru/docs/autoreply/vip-bike-rent.csv`). Монитор тянет
+CSV по URL (env `AVITO_PRICING_CSV_URL`), кэширует рядом со скриптом на 6ч
+(`vip-bike-rent.cache.csv`), компактирует до ставок/пакетов/залогов по каждой
+модели и кладёт в `verified_knowledge.pricing` **только для профиля аренды**.
+CSV подтверждает цены, но НЕ наличие на даты — «наличие» остаётся в unknowns.
+Проверка источника на проде: `python3 avito_monitor.py --pricing-check`.
+
 ## Token economy (B1, plan 2026-09-05)
 - Avito access token cached in `state.json` for 23h (~2 token calls/day).
 - GLM called **exactly once per new inbound buyer message**; stored

@@ -1,0 +1,6 @@
+# Рантайм-артефакты монитора (создаются на проде / при локальных проверках)
+state.json
+monitor.log
+cron.log
+.avito_monitor.lock
+vip-bike-rent.cache.csv

@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import fcntl
 import hashlib
 import html
+import io
 import json
 import logging
 import os
@@ -35,6 +37,15 @@ STATE_FILE = SCRIPT_DIR / "state.json"
 LOG_FILE = SCRIPT_DIR / "monitor.log"
 LOCK_FILE = SCRIPT_DIR / ".avito_monitor.lock"
 KNOWLEDGE_FILE = SCRIPT_DIR / "avito_knowledge.json"
+# Прайс аренды для GLM-агента: публичный CSV каталога (крон update_catalog_csvs.sh
+# обновляет public/docs/autoreply/ в репо, сайт отдаёт его по этому URL) + локальный
+# кэш рядом со скриптом, чтобы не качать файл на каждое сообщение покупателя.
+PRICING_CSV_URL = os.environ.get(
+    "AVITO_PRICING_CSV_URL",
+    "https://rental.vip-bike.ru/docs/autoreply/vip-bike-rent.csv",
+)
+PRICING_CSV_FILE = SCRIPT_DIR / "vip-bike-rent.cache.csv"
+PRICING_CSV_TTL = 6 * 60 * 60
 DB_FILE = ROOT_DIR / "data/avito_leads.db"
 SECRETS_FILE = ROOT_DIR / "secrets.env"
 WORKSPACE = ROOT_DIR / "workspace"
@@ -357,14 +368,96 @@ def parse_agent_json(text: str) -> dict[str, str]:
     }
 
 
-def relevant_knowledge(profile_name: str, item_title: str) -> dict:
-    if not KNOWLEDGE_FILE.exists():
-        return {}
+def _pricing_int(row: dict, key: str) -> Optional[int]:
+    value = str(row.get(key) or "").strip()
     try:
-        knowledge = json.loads(KNOWLEDGE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        logger.exception("Не удалось прочитать базу фактов Авито")
-        return {}
+        return int(float(value)) if value else None
+    except ValueError:
+        return None
+
+
+def _compact_pricing_rows(rows: list) -> list:
+    """Из ~40 колонок CSV каталога оставляем только цифры для ответа клиенту."""
+    compact = []
+    for row in rows:
+        model = " ".join(
+            part for part in (row.get("make"), row.get("model")) if part
+        ).strip()
+        if not model:
+            continue
+        is_electric = str(row.get("type") or "").lower() == "electric"
+        entry = {
+            "model": model,
+            "subtype": row.get("bike_subtype") or "",
+            "fuel": "электро" if is_electric else (row.get("fuel_type") or "бензин"),
+            "license": str(row.get("license_class") or "").split("(")[0].strip(),
+            "daily_price": _pricing_int(row, "daily_price"),
+            "rent_weekday": _pricing_int(row, "rent_weekday"),
+            "rent_weekend": _pricing_int(row, "rent_weekend"),
+            "rent_2_4d": _pricing_int(row, "rent_2_4d"),
+            "rent_5_10d": _pricing_int(row, "rent_5_10d"),
+            "rent_11_30d": _pricing_int(row, "rent_11_30d"),
+            "price_per_hour": _pricing_int(row, "price_per_hour"),
+            "price_per_3h": _pricing_int(row, "price_per_3h"),
+            "price_per_6h": _pricing_int(row, "price_per_6h"),
+            "price_per_12h": _pricing_int(row, "price_per_12h"),
+            "deposit_rub": _pricing_int(row, "deposit_rub"),
+        }
+        if entry["daily_price"]:
+            compact.append(entry)
+    return compact
+
+
+def load_pricing_rows():
+    """Прайс аренды по моделям из CSV каталога (PRICING_CSV_URL).
+
+    Свежий кэш живёт рядом со скриптом PRICING_CSV_TTL секунд; при недоступности
+    сайта используем устаревший кэш. Возвращает (строки, описание источника).
+    """
+    text = ""
+    try:
+        if PRICING_CSV_FILE.exists() and (
+            time.time() - PRICING_CSV_FILE.stat().st_mtime < PRICING_CSV_TTL
+        ):
+            text = PRICING_CSV_FILE.read_text(encoding="utf-8")
+    except OSError:
+        logger.exception("Не удалось прочитать кэш прайс-CSV")
+    if not text:
+        try:
+            response = requests.get(PRICING_CSV_URL, timeout=10)
+            response.raise_for_status()
+            response.encoding = "utf-8"
+            text = response.text
+            PRICING_CSV_FILE.write_text(text, encoding="utf-8")
+        except Exception as error:
+            logger.error("Прайс-CSV %s недоступен: %s", PRICING_CSV_URL, error)
+            if PRICING_CSV_FILE.exists():
+                try:
+                    text = PRICING_CSV_FILE.read_text(encoding="utf-8")
+                    logger.warning("Использую устаревший кэш прайс-CSV")
+                except OSError:
+                    text = ""
+    if not text:
+        return [], ""
+    try:
+        rows = list(csv.DictReader(io.StringIO(text)))
+        return (
+            _compact_pricing_rows(rows),
+            "vip-bike-rent.csv — официальный прайс каталога аренды VIP BIKE",
+        )
+    except Exception:
+        logger.exception("Не удалось разобрать прайс-CSV")
+        return [], ""
+
+
+def relevant_knowledge(profile_name: str, item_title: str) -> dict:
+    knowledge: dict = {}
+    if KNOWLEDGE_FILE.exists():
+        try:
+            knowledge = json.loads(KNOWLEDGE_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            logger.exception("Не удалось прочитать базу фактов Авито")
+            knowledge = {}
     section = "rental" if re.search(
         r"аренд|прокат", profile_name, re.IGNORECASE
     ) else "sale"
@@ -374,12 +467,28 @@ def relevant_knowledge(profile_name: str, item_title: str) -> dict:
         aliases = [str(alias).lower() for alias in item.get("aliases") or []]
         if any(alias in title for alias in aliases):
             matches.append(item)
-    return {
+    unknowns = list(knowledge.get("unknowns") or [])
+    result = {
         "updated_at": knowledge.get("updated_at"),
         "general": knowledge.get("general") or {},
         "listing_facts": matches,
-        "unknowns": knowledge.get("unknowns") or [],
+        "unknowns": unknowns,
     }
+    if section == "rental":
+        # Прайс каталога (кейс 2026-09-16: агент отказывался называть цены,
+        # потому что их не было в verified_knowledge). CSV подтверждает ЦЕНЫ,
+        # но не наличие модели на конкретные даты — «наличие» из unknowns
+        # не убираем.
+        pricing, pricing_source = load_pricing_rows()
+        if pricing:
+            result["pricing_source"] = pricing_source
+            result["pricing"] = pricing
+            result["unknowns"] = [
+                unknown
+                for unknown in unknowns
+                if not re.search(r"цен|стоимост|прайс|тариф", str(unknown), re.IGNORECASE)
+            ]
+    return result
 
 
 def generate_agent_reply(
@@ -430,6 +539,15 @@ def generate_agent_reply(
 Статус модели в продаже не доказывает свободную дату аренды.
 Если поле указано среди unknowns, не отвечай наугад — уточни у клиента нужную деталь
 или предложи менеджеру проверить условие.
+Цены аренды, пакеты часов, ставки за срок и залоги — из verified_knowledge.pricing
+(прайс каталога): сутки будни/выходные = rent_weekday / rent_weekend, срок =
+rent_2_4d / rent_5_10d / rent_11_30d, часы = price_per_hour / price_per_3h /
+price_per_6h / price_per_12h, залог = deposit_rub, права = license. Клиент назвал
+модель (любую, не только из заголовка объявления) — найди её в pricing и называй
+ТОЧНЫЕ цифры этой модели; строки pricing подтверждены каталогом и пересиливают
+unknowns о ценах. Модели в pricing нет — «уточню у менеджера и вернусь с ценой».
+Наличие модели на конкретные даты CSV не подтверждает — про свободные даты
+не утверждай.
 
 Правила ведения ответа (методология продаж):
 - ЭХО обязательное: первый абзац reply — повтори суть последнего сообщения клиента
@@ -1196,8 +1314,33 @@ def monitor_self_test() -> dict:
             },
         }
     )
+    pricing_rows = _compact_pricing_rows(
+        [
+            {
+                "make": "Honda",
+                "model": "CBR600RR",
+                "bike_subtype": "Спорт",
+                "type": "ICE",
+                "fuel_type": "АИ-95",
+                "license_class": "A (бензиновый мотоцикл — требуется категория A)",
+                "daily_price": "10000",
+                "rent_weekend": "12000",
+                "deposit_rub": "20000",
+                "price_per_hour": "1200",
+            },
+            {"make": "", "model": "", "daily_price": "1"},  # без модели — скип
+        ]
+    )
+    assert len(pricing_rows) == 1
+    pricing_row = pricing_rows[0]
+    assert pricing_row["model"] == "Honda CBR600RR"
+    assert pricing_row["daily_price"] == 10000
+    assert pricing_row["rent_2_4d"] is None
+    assert pricing_row["license"] == "A"
+    assert pricing_row["fuel"] == "АИ-95"
     result = store_self_test()
     result["api_placeholder_filter"] = "ok"
+    result["pricing_compact"] = "ok"
     return result
 
 
@@ -1258,6 +1401,11 @@ def main() -> int:
     parser.add_argument("--agent-health", action="store_true")
     parser.add_argument("--init-db", action="store_true")
     parser.add_argument(
+        "--pricing-check",
+        action="store_true",
+        help="загрузить прайс-CSV каталога и напечатать сводку (проверка источника цен)",
+    )
+    parser.add_argument(
         "--sla-report",
         type=int,
         metavar="DAYS",
@@ -1272,6 +1420,20 @@ def main() -> int:
     if args.self_test:
         print(json.dumps(monitor_self_test(), ensure_ascii=False, sort_keys=True))
         return 0
+    if args.pricing_check:
+        pricing_rows, pricing_source = load_pricing_rows()
+        print(
+            json.dumps(
+                {
+                    "source": pricing_source,
+                    "count": len(pricing_rows),
+                    "models": [row["model"] for row in pricing_rows],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if pricing_rows else 1
     if args.agent_health:
         return 0 if agent_health() else 1
     if args.sla_report is not None or args.sla_report_send:
