@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, ChevronDown, Info, Lock, Sparkles } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -27,6 +27,7 @@ import {
 import { msUntilNextMidnight } from "./lib/lead-playbook-done";
 import { LeadsPathPanel } from "./components/LeadsPathPanel";
 import { getFranchizeLeads } from "@/app/franchize/server-actions/leads";
+import { normalizePhoneDigits } from "@/app/franchize/lib/phone-utils";
 // Изоморфное ядро запросов (тот же filterLeads, что и на сервере) —
 // INSTANT SEARCH FEEDBACK 2026-09-10: локальная перетряска окна, пока
 // серверный reset в пути.
@@ -826,6 +827,71 @@ export function LeadsClient({
     })();
   }, [slug, dbUser?.user_id, passwordAuthOwnerId, storedPassword, showToast]);
 
+  // ── DEEPLINK → ШТОРКА (TG-уведомления о новых лидах, 2026-09-17) ──────────
+  // Уведомление «Новый лид» несёт ссылку t.me/<bot>/app?startapp=lead_<key>.
+  // useStartParamRouter роутит её в /franchize/<slug>/leads?leadId=<key>;
+  // здесь — последняя миля: резолвим ключ в реальный lead.user_id и открываем
+  // шторку. Ключ может прийти в трёх видах (webhook не знает, каким ключом
+  // lead-страница проиндексировала лида):
+  //   · сам user_id (авито-лид без телефона → "avito:<chatId>");
+  //   · голый avito chat id (матчится через metadata.avitoChatId — так
+  //     проиндексированы лиды, у которых телефон нашли в тексте);
+  //   · цифры телефона (site-form лиды ключуются нормализованным телефоном).
+  const openLeadFromDeeplink = useCallback(
+    async (rawKey: string) => {
+      const key = rawKey.trim();
+      if (!key) return;
+      const digits = key.replace(/\D/g, "");
+      const matchesKey = (l: LeadRow) =>
+        l.user_id === key ||
+        l.user_id === `avito:${key}` ||
+        l.avito?.chatId === key ||
+        (!!digits &&
+          digits.length >= 10 &&
+          (normalizePhoneDigits(l.user_id) === digits ||
+            normalizePhoneDigits(l.phone) === digits));
+      const local = leadsStateRef.current.find(matchesKey);
+      if (local) {
+        openLeadById(local.user_id);
+        return;
+      }
+      // Лид вне загруженного окна — точечный серверный поиск (тот же приём,
+      // что в openLeadById: q ищет по ключу лида в ПОЛНОМ наборе).
+      showToast("Ищу лида на сервере…", "info", 1600);
+      try {
+        const initData = (() => {
+          try {
+            const tg = (window as any).Telegram?.WebApp;
+            return typeof tg?.initData === "string" && tg.initData.length > 0 ? tg.initData : undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+        const res = await getFranchizeLeads(
+          slug,
+          dbUser?.user_id || passwordAuthOwnerId || "",
+          false,
+          initData,
+          storedPassword || undefined,
+          { q: key, offset: 0, limit: 10 },
+        );
+        if (!mountedRef.current) return;
+        const found = res.success ? (res.leads || []).find(matchesKey) : null;
+        if (found) {
+          setLeadsState((prev) =>
+            prev.some((l) => l.user_id === found.user_id) ? prev : [found, ...prev],
+          );
+          openLeadById(found.user_id);
+          return;
+        }
+        showToast("Лид по ссылке не найден — откройте список и воспользуйтесь поиском", "error", 4200);
+      } catch {
+        showToast("Не удалось найти лида — проверьте связь и повторите", "error", 4200);
+      }
+    },
+    [openLeadById, slug, dbUser?.user_id, passwordAuthOwnerId, storedPassword, showToast],
+  );
+
   // ── Тихий рефреш агрегатов (90 c, только в видимой вкладке) ────────────────
   // KPI/воронка/плейбук/лидерборд и счётчик total остаются честными, пока
   // оператор держит страницу открытой; окно и скролл не трогаются.
@@ -842,6 +908,28 @@ export function LeadsClient({
       document.removeEventListener("visibilitychange", tick);
     };
   }, [isAuthed, shouldShowPassword, prefsSettled, fetchWindow]);
+
+  // ── Потребление ?leadId= из TG-deeplink (см. openLeadFromDeeplink) ─────────
+  // Ждём пока откроется доступ (auth/password gate), затем один раз на ключ
+  // открываем шторку и чистим параметр из URL — рефреш не должен переоткрывать.
+  const leadLinkSearchParams = useSearchParams();
+  const processedLeadLinkRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isAuthed || shouldShowPassword || !prefsSettled) return;
+    const rawLeadId = leadLinkSearchParams.get("leadId");
+    if (!rawLeadId) return;
+    const key = rawLeadId.trim();
+    if (!key || processedLeadLinkRef.current === key) return;
+    processedLeadLinkRef.current = key;
+    void openLeadFromDeeplink(key);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("leadId");
+      window.history.replaceState(window.history.state, "", url.toString());
+    } catch {
+      // Не критично: повторное открытие защищено processedLeadLinkRef.
+    }
+  }, [leadLinkSearchParams, isAuthed, shouldShowPassword, prefsSettled, openLeadFromDeeplink]);
 
   // ── Watchdog загрузки (2026-09-10, критик R2): зависший reset (мёртвая
   // сеть/сервер) держал isFetchingLeads=true вечно — страница молчала без

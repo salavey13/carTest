@@ -8,6 +8,7 @@ import {
 } from "@/app/franchize/lib/phone-utils";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
+import { notifyNewLead } from "@/app/franchize/lib/new-lead-notify";
 import {
   appendMessageLog,
   mergeClientFacts,
@@ -197,7 +198,7 @@ async function createLead(input: {
   analysis?: Record<string, unknown> | null;
   /** Ключ аккаунта Авито (?acc= вебхука) — в metadata.avitoAccount. */
   accountKey?: string;
-}): Promise<void> {
+}): Promise<{ chatId: string; phone: string | null }> {
   const { value, eventId, now, extra, phone, client, analysis, accountKey } = input;
   const leadScore = sanitizeScore(client?.score);
   // Avito никогда не отдаёт телефон покупателя через API (privacy) — но часто
@@ -258,6 +259,8 @@ async function createLead(input: {
 
   if (error) throw error;
   logger.info("[avito-webhook] lead created", { chatId: value.chat_id });
+  // Возвращаем факты лида для уведомления (телефон вычислен здесь).
+  const createdLead = { chatId: String(value.chat_id ?? leadKey), phone: resolvedPhone };
 
   // ЖУРНАЛ ИСТОРИИ (wave Lead Game): факты переживают лид и видны команде.
   await recordLeadEvent({
@@ -278,6 +281,7 @@ async function createLead(input: {
       detail: analysisSummary(analysis),
     });
   }
+  return createdLead;
 }
 
 async function updateLead(
@@ -389,70 +393,37 @@ function analysisSummary(analysis: Record<string, unknown>): string | null {
   return joined ? joined.slice(0, 200) : null;
 }
 
-/** Best-effort Telegram ping about a brand-new lead — ВСЕМ участникам экипажа.
- *  «All participants get same notifications about new leads appearing» —
- *  раньше пинг уходил только owner'у, и члены экипажа узнавали о лидах
- *  постфактум. Теперь: owner + все active crew_members. Fire-and-forget:
- *  the webhook response must not wait on it (2s limit). */
+/** Best-effort Telegram ping about a brand-new lead.
+ *  Получатели: владелец экипажа + админы (owner/admin/co_owner) + активные
+ *  члены + глобальный ADMIN_CHAT_ID; доставка и сборка сообщения (HTML +
+ *  inline-кнопка с deeplink «Открыть лид») — в new-lead-notify.ts.
+ *  ИСТОРИЯ: раньше здесь был ручной POST /api/forward-telegram с payload
+ *  {chatId,text} — а эндпоинт ждёт {chat_id,method,payload}; все уведомления
+ *  о новых лидах падали с 400 незаметно (fire-and-forget). Теперь —
+ *  telegramDeliver с корректной формой, плюс deeplink на карточку лида.
+ *  Fire-and-forget: the webhook response must not wait on it (2s limit). */
 function notifyCrewOwnerAsync(lead: {
   name: string;
   bikeTitle: string | null;
   text: string | null;
+  /** Avito chat id (или синтетический fwd-*) — ключ лида для deeplink. */
   chatId: string | null;
+  phone?: string | null;
 }): void {
-  void (async () => {
-    try {
-      // Ростер экипажа: owner + активные участники — все получают ОДИНАКОВОЕ
-      // уведомление о новом лиде (дедуп ниже).
-      const recipients = new Set<string>();
-      const { data: crew } = await supabaseAdmin
-        .from("crews")
-        .select("id, owner_id")
-        .eq("slug", CREW_SLUG)
-        .maybeSingle();
-      if (crew?.owner_id) recipients.add(crew.owner_id);
-      if (crew?.id) {
-        const { data: members } = await supabaseAdmin
-          .from("crew_members")
-          .select("user_id")
-          .eq("crew_id", crew.id)
-          .eq("membership_status", "active");
-        for (const m of members ?? []) {
-          if (m.user_id) recipients.add(m.user_id);
-        }
-      }
-      if (recipients.size === 0) return;
-
-      const lines = [
-        "🟡 Новый лид из Авито",
-        "",
-        lead.bikeTitle ? `Объявление: ${lead.bikeTitle}` : null,
-        `Покупатель: ${lead.name}`,
-        lead.text ? `Сообщение: «${lead.text.slice(0, 300)}»` : null,
-        "",
-        "Ответить в Авито → авито.ру / мессенджер",
-      ].filter(Boolean);
-      // Telegram is blocked on the VPS — use the self-hosted proxy, same as
-      // the callback-lead generic handler. On Vercel the proxy also works.
-      const base = process.env.NEXT_PUBLIC_SITE_URL || "http://127.0.0.1:3000";
-      // Все получатели параллельно; отдельная неудача не рушит остальных.
-      await Promise.allSettled(
-        Array.from(recipients).map((chatId) =>
-          fetch(`${base}/api/forward-telegram`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chatId,
-              text: lines.join("\n"),
-            }),
-            cache: "no-store",
-          }),
-        ),
-      );
-    } catch (error) {
-      logger.warn("[avito-webhook] crew notification failed", error);
-    }
-  })();
+  const chatId = (lead.chatId || "").trim();
+  if (!chatId) return;
+  void notifyNewLead({
+    slug: CREW_SLUG,
+    title: "Новый лид из Авито",
+    leadKey: chatId,
+    name: lead.name,
+    phone: lead.phone,
+    bikeTitle: lead.bikeTitle,
+    message: lead.text,
+    buttonLabel: "🟡 Открыть лид",
+  }).catch((error) => {
+    logger.warn("[avito-webhook] crew notification failed", error);
+  });
 }
 
 /**
@@ -602,6 +573,7 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
       bikeTitle: body.bike_title || null,
       text: text.slice(0, 300),
       chatId,
+      phone: phone || null,
     });
     return ack();
   } catch (error) {
@@ -711,7 +683,7 @@ export async function POST(request: NextRequest) {
 
     if (!fromBuyer) return ack();
 
-    await createLead({
+    const createdLead = await createLead({
       value,
       eventId: body.id ?? null,
       now,
@@ -723,7 +695,8 @@ export async function POST(request: NextRequest) {
       name: buyerDisplayName(value, body.client?.name),
       bikeTitle: truncate(value.item_title, 200),
       text: truncate(value.text, 300),
-      chatId: value.chat_id,
+      chatId: createdLead.chatId,
+      phone: createdLead.phone,
     });
     return ack();
   } catch (error) {

@@ -6,11 +6,17 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
-import { normalizePhone } from "@/app/franchize/lib/phone-utils";
+import { normalizePhone, normalizePhoneDigits } from "@/app/franchize/lib/phone-utils";
 import { recordLeadEvent } from "@/app/franchize/lib/lead-events";
+import {
+  leadDeeplinkUrl,
+  notifyNewLead,
+  resolveLeadNotifyRecipients,
+} from "@/app/franchize/lib/new-lead-notify";
 import { logger } from "@/lib/logger";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { telegramDeliver } from "@/lib/telegram-transport";
 import {
   buildVipBikeCallbackMessage,
   callbackLeadRequestSchema,
@@ -478,43 +484,41 @@ async function saveQuizNote(input: {
   }
 }
 
-async function notifyCrewOwner(input: {
-  ownerChatId: string;
+async function notifyCrewRecipients(input: {
+  recipients: string[];
   message: string;
 }): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) {
-    logger.error("[callback-lead] TELEGRAM_BOT_TOKEN is not configured");
+  if (input.recipients.length === 0) {
+    logger.error("[callback-lead] no notification recipients configured");
     return false;
   }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-  try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${token}/sendMessage`,
-      {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: input.ownerChatId, text: input.message }),
-      cache: "no-store",
-      signal: controller.signal,
-      },
-    );
-    if (!response.ok) {
-      logger.error("[callback-lead] Telegram delivery failed", {
-        status: response.status,
-      });
-      return false;
-    }
-    const result = (await response.json()) as { ok?: boolean };
-    return result.ok === true;
-  } catch (error) {
-    logger.error("[callback-lead] Telegram delivery exception", error);
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
+  // telegramDeliver: форвард через Vercel + прямой фолбэк — работает и там,
+  // где api.telegram.org недоступен (VPS). Plain text — URL в хвосте
+  // Telegram линкует сам, parse_mode не нужен.
+  let delivered = 0;
+  await Promise.allSettled(
+    input.recipients.map(async (chatId) => {
+      try {
+        const result = await telegramDeliver("sendMessage", chatId, {
+          text: input.message,
+          disable_web_page_preview: true,
+        });
+        if (result.ok) delivered += 1;
+        else {
+          logger.error("[callback-lead] Telegram delivery failed", {
+            chatId,
+            error: result.error,
+          });
+        }
+      } catch (error) {
+        logger.error("[callback-lead] Telegram delivery exception", {
+          chatId,
+          error,
+        });
+      }
+    }),
+  );
+  return delivered > 0;
 }
 
 function sourceRouteFromRequest(request: NextRequest) {
@@ -905,22 +909,33 @@ async function handleVipBikeRentalCallback(request: NextRequest) {
     }
 
     const ownerChatId = crew?.owner_id ? String(crew.owner_id) : "";
-    const notificationSent = ownerChatId
-      ? await notifyCrewOwner({
-          ownerChatId,
-          message: buildVipBikeCallbackMessage({
-            slug: input.slug,
-            name: input.name,
-            phone: normalizedPhone,
-            bikeTitle: bikeTitle ?? undefined,
-            sourceRoute,
-            nick: input.nick,
-            formSource: input.formSource,
-            quiz: input.quiz,
-            attribution: input.attribution,
-            createdAt: now,
-          }),
-        })
+    // Уведомление: owner + админы экипажа (без рядовых членов — форма сайта
+    // шумнее Авито) + глобальный ADMIN_CHAT_ID. В хвост — deeplink на
+    // карточку лида (ключ — цифры телефона: именно по ним lead-страница
+    // ищет site-form лида).
+    const leadNotifyKey = normalizedPhone
+      ? normalizePhoneDigits(normalizedPhone)
+      : "";
+    const baseMessage = buildVipBikeCallbackMessage({
+      slug: input.slug,
+      name: input.name,
+      phone: normalizedPhone,
+      bikeTitle: bikeTitle ?? undefined,
+      sourceRoute,
+      nick: input.nick,
+      formSource: input.formSource,
+      quiz: input.quiz,
+      attribution: input.attribution,
+      createdAt: now,
+    });
+    const message = leadNotifyKey
+      ? `${baseMessage}\n\n👉 Открыть лид: ${leadDeeplinkUrl(leadNotifyKey)}`
+      : baseMessage;
+    const notifyRecipients = await resolveLeadNotifyRecipients(input.slug, {
+      includeMembers: false,
+    });
+    const notificationSent = notifyRecipients.length
+      ? await notifyCrewRecipients({ recipients: notifyRecipients, message })
       : false;
 
     let notificationStateSaved = false;
@@ -1073,27 +1088,15 @@ async function handleGenericCallback(request: NextRequest) {
     }
 
     if (ownerChatId) {
-      const message =
-        `*Новая заявка на звонок*\n\n` +
-        `Модель: ${bikeTitle || "Байк"}\n` +
-        `Имя: ${name}\n` +
-        `Телефон: ${normalizedPhone}\n` +
-        `Источник: веб-сайт\n` +
-        `Время: ${new Date().toLocaleString("ru-RU")}`;
-
-      try {
-        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/forward-telegram`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chatId: ownerChatId,
-            text: message,
-            parseMode: "Markdown",
-          }),
-        });
-      } catch {
-        // The user and intent are already stored; keep legacy best-effort behavior.
-      }
+      void notifyNewLead({
+        slug: slug || "vip-bike",
+        title: "Новая заявка на звонок",
+        leadKey: normalizePhoneDigits(normalizedPhone),
+        name,
+        phone: normalizedPhone,
+        bikeTitle: bikeTitle || null,
+        message: `Источник: веб-сайт · ${new Date().toLocaleString("ru-RU")}`,
+      });
     }
 
     return NextResponse.json({ success: true, userId });

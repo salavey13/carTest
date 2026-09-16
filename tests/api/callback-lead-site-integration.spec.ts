@@ -225,9 +225,13 @@ describe("vip-bike.ru site form → callback-lead", () => {
 
     expect(fetchStub).toHaveBeenCalledOnce();
     const body = JSON.parse((fetchStub.mock.calls[0] as unknown as any[])[1].body as string);
-    expect(body.text).toContain("Новая заявка с сайта vip-bike.ru");
-    expect(body.text).toContain("@oleg_biker");
-    expect(body.text).toContain("home-final");
+    // Доставка идёт через форвард-транспорт: конверт {chat_id, method, payload}.
+    const sentText = String(body.payload?.text ?? body.text ?? "");
+    expect(sentText).toContain("Новая заявка с сайта vip-bike.ru");
+    expect(sentText).toContain("@oleg_biker");
+    expect(sentText).toContain("home-final");
+    // Deeplink на карточку лида: ключ — цифры телефона (site-form лид).
+    expect(sentText).toContain("t.me/oneBikePlsBot/app?startapp=lead_9031234567");
   });
 
   test("rejects an unsafe landingPath (no whitespace control chars)", async () => {
@@ -396,7 +400,8 @@ describe("vip-bike.ru site form → callback-lead", () => {
 
     // Telegram-уведомление получило компактную строку квиза.
     const body = JSON.parse((fetchStub.mock.calls[0] as unknown as any[])[1].body as string);
-    expect(body.text).toContain("Квиз: 350–500 000 ₽ · есть базовый опыт · город и пробки");
+    const sentText = String(body.payload?.text ?? body.text ?? "");
+    expect(sentText).toContain("Квиз: 350–500 000 ₽ · есть базовый опыт · город и пробки");
   });
 
   test("quiz note is idempotent across a duplicate retry (no second note)", async () => {

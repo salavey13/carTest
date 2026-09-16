@@ -158,9 +158,14 @@ describe("VIP BIKE callback API", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  test("fails closed when the Telegram token is missing", async () => {
+  test("fails closed when the notification cannot be delivered (no token, forward unavailable)", async () => {
     delete process.env.TELEGRAM_BOT_TOKEN;
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ ok: false, description: "forward unavailable" }),
+        { status: 503 },
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const response = await POST(request("203.0.113.20"));
@@ -168,7 +173,24 @@ describe("VIP BIKE callback API", () => {
 
     expect(response.status).toBe(502);
     expect(payload).toMatchObject({ success: false, saved: true });
-    expect(fetchMock).not.toHaveBeenCalled();
+    // Доставка ПЫТАЛАСЬ уйти через форвард-транспорт (ему локальный токен не
+    // нужен), но все пути закрылись → маршрут всё равно fails closed.
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  test("delivers via the forwarding transport even without a local bot token", async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(request("203.0.113.21"));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({ success: true, notificationSent: true });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   test("keeps capturing leads atomically while the new RPC migration is pending", async () => {
