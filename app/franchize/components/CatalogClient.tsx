@@ -1237,7 +1237,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </div>
         )}
 
-        <div id="catalog-search" className="relative mb-5" role="search" aria-label="Поиск по каталогу">
+        {/* 2026-09-17: fixed 52px track (input h-full) — the absolute «Показать»/
+            «Сброс» buttons stretch top-1..bottom-1 → 44px, exactly their min-h-11.
+            Before, the 46px input left only 38px of stretch and min-h-11 anchored
+            the button to top-1, pushing it ~2px out of the bottom → visibly
+            off-center vertically. */}
+        <div id="catalog-search" className="relative mb-5 h-[52px]" role="search" aria-label="Поиск по каталогу">
           <label htmlFor="catalog-search-input" className="sr-only">
             Поиск по каталогу
           </label>
@@ -1249,7 +1254,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             aria-describedby="catalog-results-status"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border py-3 pl-5 pr-24 text-sm outline-none transition focus:border-transparent focus:ring-2 md:pr-36"
+            className="h-full w-full rounded-full border py-3 pl-5 pr-24 text-sm outline-none transition focus:border-transparent focus:ring-2 md:pr-36"
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             style={{
@@ -1340,7 +1345,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           Найдено позиций: {filteredItems.length}
         </p>
 
-        <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30]" role="group" aria-label="Быстрые фильтры каталога">
+        {/* margin math: pt-2.5/-mt-2.5 and pb-2.5/mb-3.5 keep the visual gaps
+            IDENTICAL to the old pt-0/pb-1/mb-5 (24px below, 20px above), while
+            the extra padding lives INSIDE the scrollport so glow/rings survive
+            the overflow clip. */}
+        <div className="-mt-2.5 mb-3.5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.filter(f => {
             // In equipment mode, show equipment filters + "all"
             // In bike modes, show bike filters + "all"

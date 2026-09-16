@@ -1088,7 +1088,12 @@ async function handleGenericCallback(request: NextRequest) {
     }
 
     if (ownerChatId) {
-      void notifyNewLead({
+      // AWAIT (not `void`): notifyNewLead never throws (per-recipient try/catch
+      // inside), but on Vercel a fire-and-forget promise is frozen as soon as
+      // the response returns — the notification would randomly never deliver.
+      // The legacy handler awaited its (broken) forward too — keep the same
+      // delivery guarantee now that the transport actually works.
+      await notifyNewLead({
         slug: slug || "vip-bike",
         title: "Новая заявка на звонок",
         leadKey: normalizePhoneDigits(normalizedPhone),
