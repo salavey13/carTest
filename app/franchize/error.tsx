@@ -6,7 +6,13 @@ import { DEFAULT_FRANCHIZE_THEME } from "@/lib/franchize-config";
 import { debugLogger } from "@/lib/debugLogger";
 import { crewPaletteForSurface } from "./lib/theme";
 
-export default function FranchizeSegmentError({ error }: { error: Error & { digest?: string } }) {
+export default function FranchizeSegmentError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   useEffect(() => {
     debugLogger.error("[franchize/error]", {
       name: error.name,
@@ -36,9 +42,33 @@ export default function FranchizeSegmentError({ error }: { error: Error & { dige
             ))}
           </div>
           {error.digest ? <p className="mt-4 text-[11px] opacity-50" style={surface.mutedText}>debug digest: {error.digest}</p> : null}
-          <Link href="/franchize" className="mt-6 inline-flex text-sm font-semibold" style={{ color: DEFAULT_FRANCHIZE_THEME.palette.accentMain }}>
-            Вернуться в каталог
-          </Link>
+          {/* 2026-09-17: `reset` re-renders the crashed segment in place — one
+              tap back into the flow, WITHOUT losing the URL (and therefore
+              the order the renter was filling). Previously the only way out
+              was «Вернуться в каталог», which drops the whole checkout. */}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={reset}
+              className="rounded-xl px-4 py-2.5 text-sm font-semibold transition hover:brightness-110"
+              style={{
+                backgroundColor: DEFAULT_FRANCHIZE_THEME.palette.accentMain,
+                color: "#16130A",
+              }}
+            >
+              Попробовать ещё раз
+            </button>
+            <Link
+              href="/franchize"
+              className="inline-flex rounded-xl border px-4 py-2.5 text-sm"
+              style={{
+                borderColor: DEFAULT_FRANCHIZE_THEME.palette.accentMain,
+                color: DEFAULT_FRANCHIZE_THEME.palette.accentMain,
+              }}
+            >
+              Вернуться в каталог
+            </Link>
+          </div>
         </div>
       </section>
     </main>

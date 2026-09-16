@@ -15,6 +15,7 @@ export const maxDuration = 60;
 import { getFranchizeBySlug } from "../../../actions";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { CrewHeader } from "../../../components/CrewHeader";
+import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { OrderPageClient } from "../../../components/OrderPageClient";
 import { getFranchizeRouteCtaPolicy } from "../../../lib/route-cta-policy";
 import { crewPaletteForSurface } from "../../../lib/theme";
@@ -43,7 +44,21 @@ export default async function FranchizeOrderPage({ params }: FranchizeOrderPageP
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/order/${id}`} groupLinks={items.map((item) => item.category)} items={items} />
-      <OrderPageClient crew={crew} slug={crew.slug || slug} orderId={id} items={items} />
+      {/* 2026-09-17: the order form is the MOST valuable screen in the renter
+          flow (passport + licence already typed when things break). A runtime
+          error here used to bubble to the segment error screen and the renter
+          lost the checkout. The local boundary keeps the page chrome, offers
+          «Повторить» in place, and — combined with the order-page draft
+          persistence — the remounted form refills itself from localStorage. */}
+      <FranchizeErrorBoundary
+        resetKey={`${slug}:${id}`}
+        fallbackTitle="Форма заказа временно недоступна"
+        fallbackMessage="Введённые данные сохранены на этом устройстве — нажмите «Повторить», и мы вернём их в форму. Если не помогло, откройте каталог и соберите заказ заново."
+        fallbackHref={`/franchize/${crew.slug || slug}`}
+        fallbackLinkLabel="Вернуться в каталог"
+      >
+        <OrderPageClient crew={crew} slug={crew.slug || slug} orderId={id} items={items} />
+      </FranchizeErrorBoundary>
       <CrewFooter crew={crew} />
     </main>
   );

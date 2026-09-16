@@ -29,6 +29,15 @@ import {
   durationDaysFromDateTime,
 } from "../lib/date-utils";
 import { ruPluralDays } from "../lib/catalog-utils";
+import {
+  buildOrderDraft,
+  clearOrderDraft,
+  isOrderDraftMeaningful,
+  loadOrderDraft,
+  saveOrderDraft,
+  type OrderDraftForm,
+  type OrderDraftPayment,
+} from "../lib/order-draft";
 import { PhotoUploadButton, DOC_PHOTO_UPLOAD_ENABLED } from "./PhotoUploadButton";
 
 interface OrderPageClientProps {
@@ -252,6 +261,18 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const lastSubmitFingerprintRef = useRef<string | null>(null);
   const lastRecoveryFingerprintRef = useRef<string | null>(null);
   const recoveryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── iter36: DRAFT persistence (crash/reload-safe order form) ──
+  // Renters lost every typed passport/licence field when the page crashed
+  // or the Telegram WebView reloaded. Every meaningful keystroke is now
+  // mirrored into localStorage (debounced, best-effort) and restored on the
+  // next mount. The draft is keyed by the crew SLUG (not orderId — a new
+  // orderId is minted on every cart→order transition) and WINS over the
+  // server-side prefill: the user's own half-typed passport is always
+  // newer than anything stored in the DB.
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftRestoredRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDraftRef = useRef<OrderDraftForm | null>(null);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     mode: "onChange",
@@ -360,6 +381,15 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     // After hydration, switch to device-aware href (desktop → web.telegram.org, mobile → t.me)
     setAdaptiveTgFallbackHref(getTelegramWebAppAdaptiveHref(`franchize/${slug}`, crew.contacts.telegramBotUsername));
   }, [slug, crew.contacts.telegramBotUsername]);
+  // ── Hydration fix: `todayISO()` used to be called during render
+  // (`min={todayISO()}` on the service visit date input). The server and the
+  // client can disagree on "today" around midnight UTC → React hydration
+  // mismatch → a recoverable error that in the Telegram WebView presents as
+  // a broken page. Compute the min-date after mount instead.
+  const [minVisitDate, setMinVisitDate] = useState("");
+  useEffect(() => {
+    setMinVisitDate(todayISO());
+  }, []);
   const selectedExtraItems = useMemo(
     () => orderExtras.filter((extra) => selectedExtras.includes(extra.id)),
     [selectedExtras],
@@ -470,17 +500,24 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     [flowLabel, hasTdLicense, hasTdPassport, hasUnvalidatedPromo, isCartEmpty, isTestdriveFlowType, phone, recipient, rentalStartDate, isServiceFlowType],
   );
   const nextAction = checkoutBlockers[0];
-  const holdAmountRub = crew.reservationHold.amountRub;
-  const holdDepositAmount = crew.reservationHold.percent
-    ? Math.max(1, Math.ceil(totalAmount * (crew.reservationHold.percent / 100)))
+  // iter36 hardening: reservationHold comes from the crew config — a legacy/
+  // half-migrated crew could arrive without the block (or without some of
+  // its fields), and the previous direct `.amountRub` access turned that
+  // data drift into a full-page crash. Every access now degrades to a sane
+  // default instead of throwing during render.
+  const holdAmountRub = Number(crew.reservationHold?.amountRub) || 0;
+  const holdPercent = Number(crew.reservationHold?.percent) || 0;
+  const holdDepositAmount = holdPercent
+    ? Math.max(1, Math.ceil(totalAmount * (holdPercent / 100)))
     : holdAmountRub;
-  const holdPaymentAmountRub = crew.reservationHold.percent ? holdDepositAmount : holdAmountRub;
-  const holdCtaLabel = crew.reservationHold.percent
-    ? `Забронировать за ${crew.reservationHold.percent}%`
-    : crew.reservationHold.label || "Подтвердить заказ";
-  const pickupAddress = crew.reservationHold.pickupAddress || crew.contacts.address || "адрес выдачи подтвердит оператор";
-  const requiredDocs = crew.reservationHold.requiredDocs.length > 0
-    ? crew.reservationHold.requiredDocs
+  const holdPaymentAmountRub = holdPercent ? holdDepositAmount : holdAmountRub;
+  const holdCtaLabel = holdPercent
+    ? `Забронировать за ${holdPercent}%`
+    : crew.reservationHold?.label || "Подтвердить заказ";
+  const pickupAddress = crew.reservationHold?.pickupAddress || crew.contacts?.address || "адрес выдачи подтвердит оператор";
+  const configuredRequiredDocs = crew.reservationHold?.requiredDocs;
+  const requiredDocs = configuredRequiredDocs && configuredRequiredDocs.length > 0
+    ? configuredRequiredDocs
     : ["Паспорт", "Водительское удостоверение", "Электронная подпись договора"];
 
   const submitPayload = useMemo<CheckoutPayload>(
@@ -609,9 +646,114 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           ? `Промокод ${appliedPromo.code} применён: ${appliedPromo.description}.`
           : "Проверьте контакты и подтверждайте заказ.";
 
+  // ── iter36: RESTORE the locally saved draft BEFORE any server prefill ──
+  // Declared before the prefill effects ON PURPOSE: mount effects run in
+  // order, so the draft lands in the form first, and the prefill effects
+  // below then see draftRestoredRef and back off. localStorage is
+  // synchronous → the draft is applied before the user can see/typed
+  // anything.
+  useEffect(() => {
+    const draft = loadOrderDraft(typeof window === "undefined" ? null : window.localStorage, slug);
+    if (!draft) return;
+    draftRestoredRef.current = true;
+    if (draft.recipient) setValue("recipient", draft.recipient, { shouldDirty: true, shouldValidate: false });
+    if (draft.phone) setValue("phone", draft.phone, { shouldDirty: true, shouldValidate: false });
+    if (draft.comment) setValue("comment", draft.comment, { shouldDirty: true, shouldValidate: false });
+    if (draft.birthDate) setValue("birthDate", draft.birthDate, { shouldDirty: true, shouldValidate: false });
+    if (draft.passportSeries) setValue("passportSeries", draft.passportSeries, { shouldDirty: true, shouldValidate: false });
+    if (draft.passportNumber) setValue("passportNumber", draft.passportNumber, { shouldDirty: true, shouldValidate: false });
+    if (draft.passportIssueDate) setValue("passportIssueDate", draft.passportIssueDate, { shouldDirty: true, shouldValidate: false });
+    if (draft.passportIssuedBy) setValue("passportIssuedBy", draft.passportIssuedBy, { shouldDirty: true, shouldValidate: false });
+    if (draft.registrationAddress) setValue("registrationAddress", draft.registrationAddress, { shouldDirty: true, shouldValidate: false });
+    setValue("hasLicense", draft.hasLicense, { shouldDirty: true, shouldValidate: false });
+    if (draft.licenseSeries) setValue("licenseSeries", draft.licenseSeries, { shouldDirty: true, shouldValidate: false });
+    if (draft.licenseNumber) setValue("licenseNumber", draft.licenseNumber, { shouldDirty: true, shouldValidate: false });
+    if (draft.licenseCategories) setValue("licenseCategories", draft.licenseCategories, { shouldDirty: true, shouldValidate: false });
+    if (draft.licenseExpiryDate) setValue("licenseExpiryDate", draft.licenseExpiryDate, { shouldDirty: true, shouldValidate: false });
+    setValue("payment", draft.payment, { shouldDirty: true, shouldValidate: false });
+    setValue("deliveryMode", draft.deliveryMode, { shouldDirty: true, shouldValidate: false });
+    if (draft.selectedExtras.length > 0) setValue("selectedExtras", draft.selectedExtras, { shouldDirty: true, shouldValidate: false });
+    if (draft.promo) setValue("promo", draft.promo, { shouldDirty: true, shouldValidate: false });
+    setDraftRestored(true);
+  }, [slug, setValue]);
+
+  // ── iter36: MIRROR every meaningful keystroke into localStorage ──
+  // Debounced 400ms + a `pagehide` flush: a crash / WebView reload loses at
+  // most the very last keystroke. An all-empty draft is REMOVED instead of
+  // written, so the explicit «Очистить и ввести заново» flow also resets the
+  // storage. Best-effort by design — storage must never block typing.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const flushDraft = () => {
+      const snapshot = latestDraftRef.current;
+      if (!snapshot) return;
+      if (isOrderDraftMeaningful(snapshot)) {
+        saveOrderDraft(
+          window.localStorage,
+          buildOrderDraft(snapshot, {
+            slug,
+            orderId,
+            tgUserId: user?.id ? String(user.id) : undefined,
+          }),
+        );
+      } else {
+        clearOrderDraft(window.localStorage, slug);
+      }
+    };
+
+    const unsubscribe = watch((values) => {
+      const snapshot: OrderDraftForm = {
+        recipient: (values.recipient ?? "").trim(),
+        phone: (values.phone ?? "").trim(),
+        comment: (values.comment ?? "").trim(),
+        birthDate: (values.birthDate ?? "").trim(),
+        passportSeries: (values.passportSeries ?? "").trim(),
+        passportNumber: (values.passportNumber ?? "").trim(),
+        passportIssueDate: (values.passportIssueDate ?? "").trim(),
+        passportIssuedBy: (values.passportIssuedBy ?? "").trim(),
+        registrationAddress: (values.registrationAddress ?? "").trim(),
+        hasLicense: values.hasLicense === undefined ? true : Boolean(values.hasLicense),
+        licenseSeries: (values.licenseSeries ?? "").trim(),
+        licenseNumber: (values.licenseNumber ?? "").trim(),
+        licenseCategories: (values.licenseCategories ?? "").trim(),
+        licenseExpiryDate: (values.licenseExpiryDate ?? "").trim(),
+        payment: ((values.payment as OrderDraftPayment) || "card"),
+        deliveryMode: values.deliveryMode === "delivery" ? "delivery" : "pickup",
+        selectedExtras: Array.isArray(values.selectedExtras) ? values.selectedExtras : [],
+        promo: (values.promo ?? "").trim(),
+      };
+      latestDraftRef.current = snapshot;
+      if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = setTimeout(flushDraft, 400);
+    });
+
+    const handlePageHide = () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      flushDraft();
+    };
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("pagehide", handlePageHide);
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
+  }, [watch, slug, orderId, user?.id]);
+
   useEffect(() => {
     const loadPrefill = async () => {
+      // A restored local draft is NEWER than any server-side prefill —
+      // never clobber the renter's half-typed data with stored values.
+      if (draftRestoredRef.current) return;
       if (!dbUser?.user_id) return;
+      try {
       const res = await getFranchizeFormPrefillAction({ userId: dbUser.user_id, slug });
       if (!res.success || !res.data) return;
       setValue("recipient", res.data.fullName || "");
@@ -622,6 +764,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       const prefillTime = res.data.preferredTime || "";
       setValue("comment", prefillComment || prefillTime);
       setValue("deliveryMode", res.data.deliveryMode || "pickup");
+      } catch {
+        // iter36: a failed server action used to surface as an unhandled
+        // rejection. Prefill is a nice-to-have — the renter just types data
+        // manually, the page must stay alive.
+      }
     };
     void loadPrefill();
   }, [dbUser?.user_id, setValue, slug]);
@@ -629,7 +776,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   // Load rental secrets for returning users (WOW effect + signature prefill)
   useEffect(() => {
     const loadRentalSecrets = async () => {
+      // Draft wins (see the restore effect above) — skip the whole chain.
+      if (draftRestoredRef.current) return;
       if (!dbUser?.user_id) return;
+      try {
 
       // 1. Check for previous rentals (WOW effect)
       const res = await getFranchizeUserRentalSecretsAction({ userId: dbUser.user_id, slug });
@@ -790,6 +940,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         });
         setPrefillBannerVisible(true);
       }
+      } catch {
+        // iter36: prefill chain failing (network/server hiccup) must not
+        // produce unhandled rejections — the renter keeps typing manually.
+      }
     };
     void loadRentalSecrets();
   }, [dbUser?.user_id, setValue, slug]);
@@ -802,6 +956,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const phoneLookupDoneRef = useRef(false);
   useEffect(() => {
     if (!dbUser?.user_id || phoneLookupDoneRef.current) return;
+    if (draftRestoredRef.current) return; // draft wins — don't resurrect prefill
     if (prefillData?.hasData) return; // chat_id prefill already kicked in
     const digits = (phone || "").replace(/\D/g, "");
     if (digits.length < 10) return;
@@ -1040,6 +1195,10 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
       // Clear cart after successful order
       clearCart();
+      // iter36: the order is in — the draft has served its purpose.
+      clearOrderDraft(window.localStorage, slug);
+      latestDraftRef.current = null;
+      setDraftRestored(false);
       if (dbUser?.user_id) {
         saveUserFranchizeCartAction(dbUser.user_id, slug, {}).catch(() => {
           // Best-effort server-side cart clear
@@ -1190,6 +1349,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   const clearAllPrefillFields = () => {
+    // iter36: wiping the form also wipes the local draft — otherwise the
+    // watch-subscription would re-save the pre-reset values a keystroke later.
+    clearOrderDraft(window.localStorage, slug);
+    latestDraftRef.current = null;
+    setDraftRestored(false);
     setValue("recipient", "", { shouldDirty: true, shouldValidate: true });
     setValue("phone", "", { shouldDirty: true, shouldValidate: true });
     setValue("birthDate", "", { shouldDirty: true, shouldValidate: true });
@@ -1271,6 +1435,27 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         /franchize/{slug}/order/{orderId}
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Оформление заказа</h1>
+
+      {/* ── iter36: restored-draft chip — the renter sees the form came back
+          filled and can wipe it with one tap ── */}
+      {draftRestored && (
+        <div
+          className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-3 py-2 text-xs"
+          style={{ borderColor: borderSoft, color: textSecondary }}
+        >
+          <span>
+            Мы восстановили введённые ранее данные — ничего не потерялось после перезагрузки.
+          </span>
+          <button
+            type="button"
+            onClick={clearAllPrefillFields}
+            className="font-semibold underline underline-offset-2 transition hover:opacity-80"
+            style={{ color: accentMain }}
+          >
+            Очистить и ввести заново
+          </button>
+        </div>
+      )}
 
       {isReturningUser && (
         <div
@@ -1478,7 +1663,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                     type="date"
                     className="w-full rounded-xl border px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                     style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                    min={todayISO()}
+                    min={minVisitDate || undefined}
                     {...register("rentalStartDate")}
                   />
                 </div>
@@ -1720,7 +1905,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                     type="checkbox"
                     id="hasLicense"
                     className="h-4 w-4"
-                    accent={T.accent}
+                    style={{ accentColor: T.accent }}
                     {...register("hasLicense")}
                   />
                   <label htmlFor="hasLicense" className="text-xs" style={{ color: T.textMuted }}>
@@ -1907,7 +2092,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <input
                 className="w-full rounded-xl border px-3 py-2 text-sm uppercase tracking-[0.08em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                placeholder={crew.catalog.promoBanners.length > 0 ? "Промокод" : "Промокодов нет"}
+                placeholder={(crew.catalog.promoBanners?.length ?? 0) > 0 ? "Промокод" : "Промокодов нет"}
                 aria-invalid={promoMessage?.tone === "error"}
                 {...register("promo")}
               />
