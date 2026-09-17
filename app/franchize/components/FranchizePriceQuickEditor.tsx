@@ -27,6 +27,12 @@ type PriceDraft = {
   salePrice: string;
   hidden: boolean;
 
+  // 2026-09-17: «мотоцикл на продажу» — specs.sale is what actually lists
+  // the bike on the vitrine's sale tab (catalog-utils.hasSalePrice requires
+  // sale enabled AND sale_price > 0). Editable right in the quick editor
+  // header so marking a bike «на продажу» is a one-click job.
+  sale: boolean;
+
   // Hourly rates
   pricePerHour: string;
   pricePer3h: string;
@@ -109,6 +115,7 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
               dailyPrice: String(vehicle.daily_price ?? 0),
               salePrice: safeNum(specs.sale_price),
               hidden: isHidden(specs),
+              sale: isSaleEnabled(specs),
 
               // Hourly
               pricePerHour: safeNum(specs.price_per_hour),
@@ -217,7 +224,10 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
         // update price_rub too, so legacy price_rub consumers (daily
         // insights cron etc.) don't charge/show a stale value. Intentional
         // divergence (totalled > sale price) is preserved untouched.
-        const saleFlagOn = isSaleEnabled(currentSpecs);
+        // 2026-09-17: base the mirror decision on the SAVED flag state
+        // (draft.sale), so a bike marked «на продажу» right here joins the
+        // mirror logic immediately, not after a second save.
+        const saleFlagOn = draft.sale;
         const prevSale = Number(currentSpecs.sale_price ?? 0) || 0;
         const prevRub = Number(currentSpecs.price_rub ?? 0) || 0;
         const nextSale = Number(draft.salePrice) || 0;
@@ -249,6 +259,8 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
               // Sale & Totalled
               sale_price: nextSale,
               price_rub: nextRub,
+              // 2026-09-17: «мотоцикл на продажу» — the marking itself.
+              sale: draft.sale,
               // Existing
               hidden: draft.hidden,
             },
@@ -260,11 +272,17 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
           return;
         }
 
-        toast.success(
-          wasMirrored && nextRub !== prevRub
-            ? "Цены сохранены (sale + price_rub синхронизированы)"
-            : "Цены сохранены",
-        );
+        if (draft.sale && !nextSale) {
+          // The vitrine's hasSalePrice gates the sale tab on sale flag AND
+          // sale_price > 0 — warn instead of silently «lost» marking.
+          toast.warning("Сохранено, но без цены продажи мотоцикл не появится во вкладке «Продажа»");
+        } else {
+          toast.success(
+            wasMirrored && nextRub !== prevRub
+              ? "Цены сохранены (sale + price_rub синхронизированы)"
+              : "Цены сохранены",
+          );
+        }
         await loadFleet();
       } catch (error) {
         toast.error(
@@ -352,8 +370,10 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
       <div className="space-y-3">
         {fleet.map((vehicle) => {
           const specs = (vehicle.specs || {}) as Record<string, unknown>;
-          const saleFlag = isSaleEnabled(specs);
           const draft = drafts[vehicle.id];
+          // Draft-driven so the 💰 badge and the sale-price input react
+          // instantly to the «На продажу» checkbox, even before saving.
+          const saleFlag = draft ? draft.sale : isSaleEnabled(specs);
           const isExpanded = expandedCards[vehicle.id];
 
           if (!draft) return null;
@@ -406,6 +426,17 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
                   </div>
 
                   <div className="flex items-center gap-3">
+                    {/* 2026-09-17: «мотоцикл на продажу» — one-click marking,
+                        visible even when the card is collapsed. */}
+                    <label className="flex items-center gap-2 text-xs text-[var(--fr-admin-muted)]">
+                      <input
+                        type="checkbox"
+                        checked={draft.sale}
+                        onChange={(e) => updateDraft(vehicle.id, "sale", e.target.checked)}
+                        className="rounded"
+                      />
+                      На продажу
+                    </label>
                     <label className="flex items-center gap-2 text-xs text-[var(--fr-admin-muted)]">
                       <input
                         type="checkbox"
@@ -578,7 +609,7 @@ export function FranchizePriceQuickEditor({ initialSlug, initialCrew }: Franchiz
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label className="text-xs text-[var(--fr-admin-muted)]">
-                        Sale цена {saleFlag ? "" : "(отключено)"}
+                        Sale цена {saleFlag ? "" : "(включите «На продажу»)"}
                         <Input
                           type="number"
                           placeholder="₽"
