@@ -331,3 +331,35 @@ Stage Summary:
 - Committed aaf0d5efb, pushed origin/main (Vercel auto-deploy).
 - 121 Bitrix deal-history notes added to Supabase lead_notes (crew vip-bike), script committed for re-runs.
 - True Bitrix timeline comments are NOT in this CSV export — need a separate Bitrix export (REST crm.timeline or timeline export) if they are to be migrated.
+
+---
+Task ID: 11 (recovery — «crew recovery / Oops...»)
+Agent: main (Super Z)
+Task: Boss: «ты всё сломал, почини, запуш» — live "Oops..." error boundary on franchize pages after the promo push.
+
+Work Log:
+- Identified the screenshot text: «crew recovery / Oops...» = app/franchize/[slug]/error.tsx → some [slug] page throws at runtime.
+- Reproduced in headless browser on live /franchize/vip-bike/cart: console error «ReferenceError: useMemo is not defined», error boundary visible.
+- Root cause: CartPageClient.tsx used useMemo (displayCartLines, promo commit c780ae251) WITHOUT importing it — not a syntax error, so Vercel build passed and the crash surfaced only at runtime. Same class: OrderPageClient.tsx used useCallback (applyPromoByCode, same commit) without importing it — checkout would crash identically.
+- Why checks missed it: tsconfig.franchize.json allowlist-slice covers only 19 hardcoded files; both components are outside it, and the slice exits 0 on pre-existing debt. Lesson recorded.
+- Added a repo-wide hook-usage-vs-import scanner (scripts/hook-import-scan.mjs pattern, kept in workspace): 0 remaining occurrences across app/franchize + app/vip-bike-dashboard (3 crew-file hits were false positives — import React, { ... } form).
+- Fixed both imports (1 line each). Full-project tsc: 0 errors in touched files; eslint --max-warnings=0 clean; vitest tests/franchize 1567 passed.
+- Commit fdee56e87 → origin/main → Vercel deploy. Live re-verification in browser: vitrine, card popups, cart — no Oops anywhere; PROMORIDE flow re-tested end-to-end (applies, prices → 0 ₽, «Итого к оплате 0 ₽», −372 000 ₽ row).
+
+Stage Summary:
+- Both live ReferenceError crashes eliminated; promo feature confirmed working on production. Extra guard added: any future hook used without import is caught by the scanner (should be wired into qa later).
+
+---
+Task ID: 12 (admin «мотоцикл на продажу» marking)
+Agent: main (Super Z)
+Task: Boss: «в админке, где быстрая правка цен, добавь возможность маркировки что мотоцикл на продажу».
+
+Work Log:
+- Feature surface: FranchizePriceQuickEditor.tsx («Быстрая правка цен», /franchize/[slug]/admin/prices). Sale listing semantics confirmed in catalog-utils.ts: hasSalePrice = specs.sale explicitly enabled AND sale_price > 0; the quick editor previously edited only sale_price.
+- PriceDraft += sale:boolean (init isSaleEnabled(specs), saved back into specs.sale on PUT /api/cars — route merges specs without a key whitelist, so explicit false clears the flag too).
+- UI: one-click «На продажу» checkbox in the always-visible card header next to «Скрыть»; 💰 Sale badge and the sale-price input now react to the DRAFT (badge appears instantly, input unlocks when checked, label «включите „На продажу“» when off); iteration29 price_rub mirror-sync keyed off the saved flag state.
+- Saving with flag on but no price → toast.warning «Сохранено, но без цены продажи мотоцикл не появится во вкладке «Продажа»» (vitrine gate is flag AND price > 0) instead of a misleading success toast.
+- Checks: esbuild parse ok; eslint --max-warnings=0 clean; full-project tsc 0 errors in the file; vitest tests/franchize 1567 passed; deployed chunk grep confirms «На продажу» is in the served page JS.
+
+Stage Summary:
+- Marking a bike for sale is now a single checkbox in the quick price editor; commit 5ae117d79 pushed to main (Vercel auto-deploy). Card-level visual check needs a Telegram-authed operator session (fleet list is empty for anonymous); code verified in the deployed bundle.
