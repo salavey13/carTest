@@ -1,4 +1,25 @@
 ---
+Task ID: 10
+Agent: main (Super Z)
+Task: «В корзине поле под промокод, при введении в которое промокод "promoride" цена на выбранный товар будет меняться на 0. Проверь себя и оцени свою работу, повтори максимум 4 раза, пока не оценишь на 8.»
+
+Work Log:
+- Нашёл готовую систему промокодов на странице заказа: коды лежат в crews.metadata.franchize.catalog.promoBanners, валидация — validateFranchizePromoCode (actions-runtime), сабмит ревалидируется сервером (resolveFranchizeCheckoutTotal). Процентная скидка жёстко капится на 90% → «цена 0» через percent недостижима.
+- Сервер: BUILT_IN_PROMO_CODES в actions-runtime.ts — PROMORIDE = 100% (discountAmount = baseAmount), проверяется ПОСЛЕ переключателя order.allowPromo и ДО баннеров витрины: работает на любой витрине без конфигурации БД, отключается переключателем, ревалидация сабмита симметрична.
+- Новый lib/cart-promo.ts: тип CartAppliedPromo (+baseAmountAtApply), save/load/clear в sessionStorage (ключ franchize-applied-promo), чистая computeCartPromoDiscount (100% код продолжает покрывать выросшую корзину, фикс. код капится).
+- Новый components/cart/PromoCodeInput.tsx (+barrel): поле+кнопка «Применить» в стиле корзины, ошибки сервера показываются inline; применённый код — зелёная плашка с ✕.
+- OrderSummary: зелёная строка «Промокод X −N ₽» + «Итого к оплате» (finalTotal = max(0, grandTotal − promoDiscount)).
+- CartPageClient: restore appliedPromo из sessionStorage; при 100%-покрытии displayCartLines рендерят ЦЕНЫ СТРОК как 0 ₽ (карточка товара: «0 ₽», «Цена за период», без «ВЫГОДНО») — ровно «цена на выбранный товар = 0»; реальные суммы идут в intent metadata (+promoCode/promoDiscount) — CRM видит честные числа.
+- OrderPageClient: handleApplyPromo отрефакторен в applyPromoByCode (useCallback); mount-эффект с ref-гвардом ОДИН раз авто-применяет промокод из корзины после гидрации суммы (baseOrderAmount > 0); после успешного заказа clearCartAppliedPromo (иначе новая корзина молча унаследует 100% скидку); плейсхолдер поля всегда «Промокод» (больше не зависит от promoBanners — built-in коды работают везде).
+- Проверки (3 из 4): vitest tests/franchize → 1567 passed / 0 failed (12 новых: валидатор 5, storage 4, re-cap 3; wiring-тест обновлён: promoBanners-плейсхолдер удалён + новые assertions переноса); typecheck:franchize passed — stash-сверка: 3 ошибки debt в actions-runtime.ts до == после правки (0 новых); eslint --max-warnings=0 по 8 затронутым файлам — чисто.
+- Самооценка: 8/10 с первой полной итерации (минус балл: E2E в браузере не прогнан — в сессии нет env-секретов Supabase; плюс дисциплина «промокод живёт только на сервере» и минимальный дифф 211+/44−).
+
+Stage Summary:
+- Промокод promoride (case/пробел-независимый) в корзине обнуляет цену выбранного товара и итог; скидка доезжает до оформления без повторного ввода и подтверждается сервером при сабмите. Ни одной настройки в БД не требуется.
+- Артефакт: commit (см. git log) в salavey13/carTest@main → Vercel автодеплой.
+
+---
+
 Task ID: 9
 Agent: main (Super Z)
 Task: «При нажатии одной из аренд не открывается всплывающее окно, а только затемняется экран — почини, это была твоя ошибка после добавления стрелки прокрутки; проверь остальные страницы на наличие такой же ошибки.»
