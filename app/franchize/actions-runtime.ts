@@ -15,6 +15,7 @@ import { getUserRentalSecrets as getVerifiedRentalSecrets, getUserRentalSecretsB
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
 import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
+import { buildFranchizeCrewUi, type FranchizeCrewUiVM } from "@/app/franchize/lib/crew-ui";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
@@ -51,6 +52,8 @@ import {
 
 
 type UnknownRecord = Record<string, unknown>;
+
+export type { FranchizeCrewUiVM };
 
 // Russian labels for equipment categories (used in catalog display)
 const EQUIPMENT_CATEGORY_LABELS: Record<string, string> = {
@@ -236,6 +239,9 @@ export interface FranchizeCrewVM {
   contentBlocks: FranchizeContentBlocks;
   reviewsLink?: string;
   cta: CtaBlock;
+  // Per-crew UI overrides from metadata.franchize.ui (hydration SQL).
+  // Optional: crews without overrides keep every default (labels, rail, buttons).
+  ui?: FranchizeCrewUiVM;
 }
 
 export interface CtaBlock {
@@ -970,6 +976,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         buttonLabel: readPath(franchize, ["cta", "buttonLabel"], "Записаться"),
         buttonHref: readPath(franchize, ["cta", "buttonHref"], ""),
       },
+      // metadata.franchize.ui — crew specs UI overrides (tab labels/visibility,
+      // showCreateButton). Sanitized in lib/crew-ui; undefined when absent.
+      ui: buildFranchizeCrewUi(readPath<unknown>(franchize, ["ui"], null)),
     };
 
     const items: CatalogItemVM[] = (cars ?? [])

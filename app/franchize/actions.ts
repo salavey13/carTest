@@ -7,6 +7,7 @@ export type {
   FranchizeBySlugResult,
   FranchizeConfigInput,
   FranchizeConfigState,
+  FranchizeCrewUiVM,
   FranchizeCrewVM,
   FranchizeHeaderVM,
   FranchizeTheme,

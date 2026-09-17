@@ -24,6 +24,7 @@ import {
 } from "../lib/route-cta-policy";
 import type { FranchizeSectionLink } from "../lib/section-links";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
+import { resolveCrewTabLabels, type FranchizeTabKey } from "../lib/crew-ui";
 import { readablePaletteTextOnColor, withAlpha } from "../lib/theme";
 
 const EQUIPMENT_PATH = "equipment";
@@ -82,6 +83,12 @@ export function CrewHeader({
   const palette = useResolvedPalette(crew.theme);
   const activePillText = readablePaletteTextOnColor(palette.accentMain, palette);
   const { itemCount } = useFranchizeCart(crew.slug);
+
+  // Rail labels/visibility are crew-configurable via metadata.franchize.ui
+  // (hydration SQL): ui.tabLabels overrides pill captions, ui.hiddenTabs hides
+  // pills (sanitizer refuses to hide ALL of them). Defaults = classic rail.
+  const tabLabels = resolveCrewTabLabels(crew.ui);
+  const hiddenTabs = new Set<FranchizeTabKey>(crew.ui?.hiddenTabs ?? []);
 
   // ── Logo loading state machine ──
   const [brokenLogoUrls, setBrokenLogoUrls] = useState<Record<string, true>>({});
@@ -380,12 +387,12 @@ export function CrewHeader({
               bottoms and read as "clipped balloons". */}
           <div className="mx-auto -mb-1.5 -mt-2.5 flex w-full max-w-7xl gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30" role="tablist" aria-label="Навигация экипажа" style={{ WebkitOverflowScrolling: 'touch' }}>
             {([
-              { key: "rent" as const, label: "Аренда", count: items?.filter(hasRentPrice).length ?? 0 },
-              { key: "sale" as const, label: "Продажа", count: items?.filter(hasSalePrice).length ?? 0 },
-              { key: "service" as const, label: "Сервис", count: items?.filter(hasServicePrice).length ?? 0 },
-              { key: "equipment" as const, label: "Экипировка", count: items?.filter(hasEquipmentPrice).length ?? 0, isEquipment: true },
-              { key: "parts" as const, label: "Запчасти", count: 0, icon: Wrench, isExternal: true },
-            ]).map((pill) => {
+              { key: "rent" as const, label: tabLabels.rent, count: items?.filter(hasRentPrice).length ?? 0 },
+              { key: "sale" as const, label: tabLabels.sale, count: items?.filter(hasSalePrice).length ?? 0 },
+              { key: "service" as const, label: tabLabels.service, count: items?.filter(hasServicePrice).length ?? 0 },
+              { key: "equipment" as const, label: tabLabels.equipment, count: items?.filter(hasEquipmentPrice).length ?? 0, isEquipment: true },
+              { key: "parts" as const, label: tabLabels.parts, count: 0, icon: Wrench, isExternal: true },
+            ]).filter((pill) => !hiddenTabs.has(pill.key)).map((pill) => {
               // Equipment and Parts use pathname-based active state (separate routes);
               // rent/sale/service use displayMode-based active state
               const isActive = pill.isEquipment
