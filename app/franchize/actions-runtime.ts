@@ -1754,6 +1754,17 @@ function normalizePromoCode(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }
 
+// ── Built-in promo codes (2026-09-17, boss request «promoride») ──
+// Codes that work on EVERY vitrine without any DB configuration. The
+// percent path in extractPromoDiscount is hard-capped at 90%, so a
+// "the whole order costs 0 ₽" promo needs its own constant. Returning
+// discountAmount = baseAmount makes the checkout total exactly 0 and
+// re-validates symmetrically inside resolveFranchizeCheckoutTotal.
+// Still gated by the per-crew order.allowPromo switch below.
+const BUILT_IN_PROMO_CODES: Record<string, { title: string; description: string }> = {
+  PROMORIDE: { title: "PROMORIDE", description: "100% скидка — заказ 0 ₽" },
+};
+
 function parsePromoDate(value: string, boundary: "start" | "end"): Date | null {
   if (!value.trim()) return null;
   const date = new Date(boundary === "start" ? `${value}T00:00:00` : `${value}T23:59:59`);
@@ -1842,6 +1853,19 @@ export async function validateFranchizePromoCode(input: unknown): Promise<
   const franchize = readPath<UnknownRecord>(crew.metadata, ["franchize"], {});
   if (!readPath(franchize, ["order", "allowPromo"], true)) {
     return { success: false, error: "Промокоды отключены для этой витрины." };
+  }
+
+  // Built-in codes (e.g. PROMORIDE) bypass the per-crew banner list but
+  // still honor the allowPromo switch above.
+  const builtInPromo = BUILT_IN_PROMO_CODES[code];
+  if (builtInPromo) {
+    return {
+      success: true,
+      code,
+      title: builtInPromo.title,
+      discountAmount: baseAmount,
+      description: builtInPromo.description,
+    };
   }
 
   const availablePromos = readArrayPath<unknown>(franchize, ["catalog", "promoBanners"])

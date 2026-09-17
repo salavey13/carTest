@@ -29,6 +29,7 @@ import {
   durationDaysFromDateTime,
 } from "../lib/date-utils";
 import { ruPluralDays } from "../lib/catalog-utils";
+import { clearCartAppliedPromo, loadCartAppliedPromo } from "../lib/cart-promo";
 import {
   buildOrderDraft,
   clearOrderDraft,
@@ -1197,6 +1198,9 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       clearCart();
       // iter36: the order is in — the draft has served its purpose.
       clearOrderDraft(window.localStorage, slug);
+      // The cart-applied promo has been consumed — a fresh cart must not
+      // silently inherit a 100%-discount code from the previous order.
+      clearCartAppliedPromo(window.sessionStorage);
       latestDraftRef.current = null;
       setDraftRestored(false);
       if (dbUser?.user_id) {
@@ -1234,48 +1238,72 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
   };
 
-  const handleApplyPromo = async () => {
-    const requestedCode = normalizePromoCode(promo);
-    setIsPromoValidating(true);
+  const applyPromoByCode = useCallback(
+    async (rawCode: string) => {
+      const requestedCode = normalizePromoCode(rawCode);
+      setIsPromoValidating(true);
 
-    try {
-      const result = await validateFranchizePromoCode({ slug, code: promo, baseAmount: baseOrderAmount });
-      if (!result.success) {
+      try {
+        const result = await validateFranchizePromoCode({ slug, code: rawCode, baseAmount: baseOrderAmount });
+        if (!result.success) {
+          setAppliedPromo(null);
+          setPromoMessage({ tone: "error", text: result.error });
+          toast.error(result.error);
+          return;
+        }
+
+        if (result.code !== requestedCode) {
+          setPromoMessage({ tone: "info", text: "Поле промокода изменилось во время проверки — примените актуальный код ещё раз." });
+          return;
+        }
+
+        const promoResult: AppliedPromo = {
+          code: result.code,
+          title: result.title,
+          discountAmount: result.discountAmount,
+          description: result.description,
+          baseAmount: baseOrderAmount,
+        };
+        setAppliedPromo(promoResult);
+        setPromoMessage({
+          tone: "success",
+          text: result.discountAmount > 0
+            ? `${result.code} применён: −${result.discountAmount.toLocaleString("ru-RU")} ₽ (${result.description}).`
+            : `${result.code} проверен: ${result.description}.`,
+        });
+        toast.success(result.discountAmount > 0 ? "Промокод применён к заказу." : "Промокод проверен и закреплён за заказом.");
+      } catch {
+        const error = "Не удалось проверить промокод. Попробуйте ещё раз.";
         setAppliedPromo(null);
-        setPromoMessage({ tone: "error", text: result.error });
-        toast.error(result.error);
-        return;
+        setPromoMessage({ tone: "error", text: error });
+        toast.error(error);
+      } finally {
+        setIsPromoValidating(false);
       }
+    },
+    [baseOrderAmount, slug],
+  );
 
-      if (normalizePromoCode(promo) !== requestedCode || result.code !== requestedCode) {
-        setPromoMessage({ tone: "info", text: "Поле промокода изменилось во время проверки — примените актуальный код ещё раз." });
-        return;
-      }
-
-      const promoResult: AppliedPromo = {
-        code: result.code,
-        title: result.title,
-        discountAmount: result.discountAmount,
-        description: result.description,
-        baseAmount: baseOrderAmount,
-      };
-      setAppliedPromo(promoResult);
-      setPromoMessage({
-        tone: "success",
-        text: result.discountAmount > 0
-          ? `${result.code} применён: −${result.discountAmount.toLocaleString("ru-RU")} ₽ (${result.description}).`
-          : `${result.code} проверен: ${result.description}.`,
-      });
-      toast.success(result.discountAmount > 0 ? "Промокод применён к заказу." : "Промокод проверен и закреплён за заказом.");
-    } catch {
-      const error = "Не удалось проверить промокод. Попробуйте ещё раз.";
-      setAppliedPromo(null);
-      setPromoMessage({ tone: "error", text: error });
-      toast.error(error);
-    } finally {
-      setIsPromoValidating(false);
-    }
+  const handleApplyPromo = () => {
+    void applyPromoByCode(promo);
   };
+
+  // ── 2026-09-17: carry a promo applied on the CART page into checkout ──
+  // The cart stores the validated code in sessionStorage (lib/cart-promo).
+  // Once the cart total is hydrated (baseOrderAmount > 0) we pre-fill the
+  // field and auto-apply ONCE, so the rider sees the discounted total
+  // without re-typing the code. Manual re-apply still works as before.
+  const cartPromoCarriedRef = useRef(false);
+  useEffect(() => {
+    if (cartPromoCarriedRef.current) return;
+    if (typeof window === "undefined") return;
+    if (baseOrderAmount <= 0) return;
+    cartPromoCarriedRef.current = true;
+    const stored = loadCartAppliedPromo(window.sessionStorage, slug);
+    if (!stored) return;
+    setValue("promo", stored.code, { shouldDirty: true, shouldValidate: false });
+    void applyPromoByCode(stored.code);
+  }, [applyPromoByCode, baseOrderAmount, setValue, slug]);
 
   const handleSwitchToFallbackPayment = () => {
     setValue("payment", "card", { shouldDirty: true, shouldValidate: true });
@@ -2092,7 +2120,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
               <input
                 className="w-full rounded-xl border px-3 py-2 text-sm uppercase tracking-[0.08em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 style={{ ...fieldStyle, ...focusRingOutlineStyle(crew.theme) }}
-                placeholder={(crew.catalog.promoBanners?.length ?? 0) > 0 ? "Промокод" : "Промокодов нет"}
+                placeholder="Промокод"
                 aria-invalid={promoMessage?.tone === "error"}
                 {...register("promo")}
               />

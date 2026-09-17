@@ -17,7 +17,15 @@ import {
   CheckoutButton,
   EmptyCartState,
   CartShimmerStyle,
+  PromoCodeInput,
 } from "./cart";
+import {
+  clearCartAppliedPromo,
+  computeCartPromoDiscount,
+  loadCartAppliedPromo,
+  saveCartAppliedPromo,
+  type CartAppliedPromo,
+} from "../lib/cart-promo";
 
 interface CartPageClientProps {
   crew: FranchizeCrewVM;
@@ -42,6 +50,24 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
   const [hasSavedDocs, setHasSavedDocs] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>("");
+  // ── Promo applied in the cart (boss request 2026-09-17) ──
+  // Validated server-side by PromoCodeInput; persisted to sessionStorage so
+  // the order page auto-applies the same code at checkout.
+  const [appliedPromo, setAppliedPromo] = useState<CartAppliedPromo | null>(null);
+
+  useEffect(() => {
+    setAppliedPromo(loadCartAppliedPromo(typeof window === "undefined" ? null : window.sessionStorage, slug));
+  }, [slug]);
+
+  const handlePromoApplied = useCallback((promo: CartAppliedPromo) => {
+    setAppliedPromo(promo);
+    saveCartAppliedPromo(typeof window === "undefined" ? null : window.sessionStorage, promo);
+  }, []);
+
+  const handlePromoCleared = useCallback(() => {
+    setAppliedPromo(null);
+    clearCartAppliedPromo(typeof window === "undefined" ? null : window.sessionStorage);
+  }, []);
 
   // Load rental secrets for returning users (WOW effect)
   useEffect(() => {
@@ -84,6 +110,29 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
           ? `Сумма ${rentalLabel} аренды`
           : "Сумма аренды";
 
+  // ── Promo math ──
+  // computeCartPromoDiscount re-caps the server-validated amount against the
+  // LIVE subtotal: 100% codes (PROMORIDE) keep covering the whole order even
+  // after the rider adds another bike. When the promo covers everything, the
+  // LINE PRICES THEMSELVES render as 0 ₽ — the boss asked for «цена на
+  // выбранный товар меняется на 0» — while the real totals still feed the
+  // checkout intent metadata so the CRM sees the honest pre-promo numbers.
+  const promoDiscount = appliedPromo ? computeCartPromoDiscount(appliedPromo, subtotal) : 0;
+  const promoCoversAll = subtotal > 0 && promoDiscount >= subtotal;
+  const displayCartLines = useMemo(
+    () =>
+      promoCoversAll && appliedPromo
+        ? cartLines.map((line) => ({
+            ...line,
+            lineTotal: 0,
+            pricePerDay: 0,
+            salePrice: line.flowType === "sale" ? 0 : line.salePrice,
+            displayPriceLabel: `0 ₽ · промокод ${appliedPromo.code}`,
+          }))
+        : cartLines,
+    [cartLines, promoCoversAll, appliedPromo],
+  );
+
   // CART-TODO #4: CTA text adapts to flow
   const ctaLabel = isAllSale
     ? "Перейти к оформлению покупки"
@@ -111,6 +160,8 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
         flow,
         itemCount,
         subtotal,
+        promoCode: appliedPromo?.code,
+        promoDiscount,
         cartLines: cartLines.map((line) => ({
           itemId: line.item?.id ?? line.itemId,
           qty: line.qty,
@@ -247,9 +298,11 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
             transition={{ duration: 0.4 }}
           >
             <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
-              {/* Left: Cart item cards with stagger + delete animation */}
+              {/* Left: Cart item cards with stagger + delete animation.
+                  With a 100% promo (e.g. PROMORIDE) the display lines carry
+                  zeroed prices — «цена на выбранный товар = 0». */}
               <div className="space-y-3">
-                {cartLines.map((line, index) => (
+                {displayCartLines.map((line, index) => (
                   <motion.div
                     key={line.lineId}
                     layout
@@ -277,9 +330,19 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
               {/* Right: Summary sidebar */}
               <div className="space-y-3 lg:sticky lg:top-24 lg:h-fit">
                 <OrderSummary
-                  cartLines={cartLines}
+                  cartLines={displayCartLines}
                   subtotal={subtotal}
                   crew={crew}
+                  promoCode={appliedPromo?.code}
+                  promoDiscount={promoDiscount}
+                />
+                <PromoCodeInput
+                  slug={slug}
+                  crew={crew}
+                  baseAmount={subtotal}
+                  appliedPromo={appliedPromo}
+                  onApply={handlePromoApplied}
+                  onClear={handlePromoCleared}
                 />
                 <CheckoutButton
                   onClick={handleProceed}

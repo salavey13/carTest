@@ -53,10 +53,21 @@ describe("order draft wiring (OrderPageClient)", () => {
     expect(src.includes("min={minVisitDate || undefined}")).toBe(true);
   });
 
-  it("reservationHold + promoBanners are accessed defensively", () => {
+  it("reservationHold is accessed defensively; promo no longer depends on catalog banners", () => {
     expect(src.includes("crew.reservationHold?.amountRub")).toBe(true);
-    expect(src.includes("crew.catalog.promoBanners?.length")).toBe(true);
     expect(src.includes("crew.reservationHold.amountRub")).toBe(false);
+    // 2026-09-17: built-in promo codes (e.g. PROMORIDE) work on every
+    // vitrine without DB config, so the placeholder no longer branches on
+    // crew.catalog.promoBanners — the field is always usable.
+    expect(src.includes("crew.catalog.promoBanners")).toBe(false);
+  });
+
+  it("carries the cart-applied promo into checkout (sessionStorage wiring)", () => {
+    expect(src.includes("loadCartAppliedPromo(window.sessionStorage, slug)")).toBe(true);
+    expect(src.includes("clearCartAppliedPromo(window.sessionStorage)")).toBe(true);
+    // the auto-apply runs exactly once per mount, after the cart total hydrates
+    expect(src.includes("cartPromoCarriedRef.current = true")).toBe(true);
+    expect(src.indexOf("baseOrderAmount <= 0") !== -1).toBe(true);
   });
 
   it("order page wraps OrderPageClient in FranchizeErrorBoundary", () => {

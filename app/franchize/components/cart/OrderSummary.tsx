@@ -12,9 +12,16 @@ interface OrderSummaryProps {
   cartLines: FranchizeCartLineVM[];
   subtotal: number;
   crew: FranchizeCrewVM;
+  /** Normalized code of the promo applied in the cart (e.g. "PROMORIDE"). */
+  promoCode?: string;
+  /** Absolute discount already validated by the server. Lines whose price
+   *  the promo fully covers arrive here already zeroed (see CartPageClient),
+   *  so grandTotal − promoDiscount stays correct in both partial and 100%
+   *  cases. */
+  promoDiscount?: number;
 }
 
-export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
+export function OrderSummary({ cartLines, subtotal, crew, promoCode, promoDiscount = 0 }: OrderSummaryProps) {
   const T = useCrewTokens(crew.theme);
   const rentLines = cartLines.filter((l) => l.flowType === "rental");
   const buyLines = cartLines.filter((l) => l.flowType === "sale");
@@ -31,6 +38,11 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
 
   const discountPercent = 0;
   const discountAmount = 0;
+
+  // Promo applied in the cart: show the validated discount and the final
+  // payable total. Clamped at 0 — a 100% promo zeroed the lines above, so
+  // this is max(0, 0 − subtotal) = 0 for PROMORIDE-style codes.
+  const finalTotal = Math.max(0, grandTotal - promoDiscount);
 
   return (
     <motion.aside
@@ -124,6 +136,34 @@ export function OrderSummary({ cartLines, subtotal, crew }: OrderSummaryProps) {
           <Calendar className="h-3 w-3" />
           {periodParts.join(" + ")}
         </span>
+      )}
+
+      {promoDiscount > 0 && (
+        <>
+          <div
+            className="mt-3 flex items-start justify-between gap-2 rounded-lg border p-3"
+            style={{
+              backgroundColor: withAlpha("#00C853", 0.08),
+              borderColor: withAlpha("#00C853", 0.25),
+            }}
+          >
+            {/* min-w-0 + break-words: long codes wrap instead of pushing
+                the −amount out of the card */}
+            <span className="min-w-0 break-words text-sm font-medium" style={{ color: "#00C853" }}>
+              Промокод {promoCode}
+            </span>
+            <span className="shrink-0 text-sm font-bold" style={{ color: "#00C853" }}>
+              −{promoDiscount.toLocaleString("ru-RU")} ₽
+            </span>
+          </div>
+          <div className="my-3 border-t" style={{ borderColor: T.borderSoft }} />
+          <p className="text-sm" style={{ color: T.textMuted }}>
+            Итого к оплате
+          </p>
+          <p className="text-2xl font-bold" style={{ color: T.accent }}>
+            {finalTotal.toLocaleString("ru-RU")} ₽
+          </p>
+        </>
       )}
 
       <DiscountBanner percent={discountPercent} amount={discountAmount} />

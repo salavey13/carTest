@@ -6,4 +6,5 @@ export { EmptyCartState } from "./EmptyCartState";
 export { SpecBadge, SpecBadges } from "./SpecBadge";
 export { QuantityControl } from "./QuantityControl";
 export { DiscountBanner } from "./DiscountBanner";
+export { PromoCodeInput } from "./PromoCodeInput";
 export { CartShimmerStyle } from "./CartShimmerStyle";
