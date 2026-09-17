@@ -1307,7 +1307,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         {promoModules.length > 0 &&
           mode !== "electro" &&
           ctaPolicy?.intent !== "rental" && (
-          <div className="mb-5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-1 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:bg-current/20] [&::-webkit-scrollbar-thumb:hover:bg-current/30] sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:[&::-webkit-scrollbar]:hidden sm:[scrollbar-width:none]">
+          // Same scrollport-padding recipe as the quick-filter row below:
+          // pt-2.5/-mt-2.5 and pb-2.5/mb-3.5 keep the visual gaps identical
+          // (20px above, 24px below) while giving focus rings room inside
+          // the overflow clip; sm:mb-5 restores the desktop 20px gap.
+          <div className="-mt-2.5 mb-3.5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30 sm:grid sm:grid-cols-3 sm:overflow-visible sm:mb-5 sm:pb-0 sm:[&::-webkit-scrollbar]:hidden sm:[scrollbar-width:none]">
             {visiblePromoModules.map((module, index) => {
               const isExternal = /^(https?:|mailto:|tel:)/.test(module.href);
               return (
