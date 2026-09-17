@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Calendar, Camera, CheckCircle2, Loader2, Pencil, PenLine, RotateCcw, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
