@@ -1619,6 +1619,24 @@ export async function confirmVehicleReturn(
             }
         }
 
+        // ── 2026-09-19: auto-close linked equipment rentals ────────────────
+        // Gear issued with this bike rental (metadata.item_type='equipment',
+        // metadata.primary_rental_id = this rental) used to stay active
+        // forever after the bike was returned — operators had to close each
+        // helmet/jacket row manually. Close them together with the bike
+        // (best-effort — never blocks the closure itself).
+        try {
+            const { closeLinkedEquipmentRentals } = await import('@/app/rentals/rental-cascade');
+            const cascade = await closeLinkedEquipmentRentals(rentalId, userId, {
+                reason: 'bike_rental_returned',
+            });
+            if (cascade.closed > 0) {
+                logger.info(`[confirmVehicleReturn] Auto-closed ${cascade.closed} linked equipment rental(s) for ${rentalId}:`, cascade.rentalIds);
+            }
+        } catch (cascadeErr) {
+            logger.warn(`[confirmVehicleReturn] Equipment cascade failed (non-fatal):`, cascadeErr);
+        }
+
         // ── BUG B fix: update bike's last_known_odometer ───────────────────────
         // Mirror what updateRentalStatus does (rentals-dashboard.ts:2076-2096)
         // so the next renter's prefill gets the up-to-date reading.
@@ -2035,6 +2053,28 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
     return { success: false, error: "Не удалось создать новую аренду." };
   }
 
+  // ── 3b. Close the original rental — it was superseded by the new one. ──
+  // FIX (2026-09-19): the original used to stay "active" alongside the new
+  // "prolonged" rental — two open rentals for the same trip. Now the original
+  // is closed automatically with a superseded comment in metadata.history,
+  // and open equipment rows linked to it follow the extension
+  // (primary_rental_id → newRentalId). Best-effort: on failure we keep the
+  // pre-fix behavior (both open) and log — the extension itself still works.
+  let supersedeNote = "";
+  try {
+    const { supersedeRentalForExtension } = await import("@/app/rentals/rental-cascade");
+    const sup = await supersedeRentalForExtension({
+      originalRentalId,
+      newRentalId,
+      closedBy: callerUserId,
+    });
+    if (sup.ok) {
+      supersedeNote = `\n🔒 Прежняя аренда ${escapeHtml(originalRentalId.slice(0, 8))} закрыта автоматически (продлена).`;
+    }
+  } catch (supErr) {
+    console.warn("[extendRental] Supersede failed (non-fatal):", supErr);
+  }
+
   // ── 4. Send TG notification to operator ──
   const bikeTitle = `${vehicle.make} ${vehicle.model}`.trim();
   const shortId = newRentalId.slice(0, 8);
@@ -2091,7 +2131,8 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
       `👤 ${escapeHtml(renterFullName)}\n` +
       `📅 ${dateRangeStr} (${newDays} дн.)\n` +
       `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n` +
-      `🔑 Аренда: ${escapeHtml(shortId)}\n\n` +
+      `🔑 Аренда: ${escapeHtml(shortId)}\n` +
+      `${supersedeNote}\n\n` +
       `Договор сформируется автоматически. Активируйте после выдачи ТС.`;
 
     await sendComplexMessage(
@@ -2118,7 +2159,8 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
         `✅ <b>Ваша аренда продлена</b>\n` +
         `🏍 ${escapeHtml(bikeTitle)}\n` +
         `📅 ${dateRangeStr}\n` +
-        `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n\n` +
+        `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n` +
+        `${supersedeNote}\n\n` +
         `Менеджер активирует аренду и пришлёт договор. Приятной поездки! 🏍️`;
 
       await sendComplexMessage(String(finalRenterChatId), renterMessage, [], {
@@ -2142,7 +2184,7 @@ export async function extendRental(input: ExtendRentalInput): Promise<ExtendRent
       `🔑 Новая аренда: ${escapeHtml(shortId)}\n` +
       `📅 ${dateRangeStr} (${newDays} дн.)\n` +
       `💰 ${newTotal.toLocaleString("ru-RU")} ₽\n` +
-      `🔗 Из оригинала: ${escapeHtml(originalRentalId.slice(0, 8))}`;
+      `🔗 Из оригинала: ${escapeHtml(originalRentalId.slice(0, 8))} (закрыт как продлённый)`;
     await notifyAdmin(adminMessage);
   } catch (adminErr) {
     console.warn("[extendRental] Admin notify failed (non-fatal):", adminErr);

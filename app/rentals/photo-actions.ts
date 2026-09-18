@@ -355,14 +355,40 @@ export async function uploadRentalPhoto(
     const timestamp = Date.now();
     const storagePath = `${rentalId}/${photoType}/${seq}-${timestamp}-${uploaderUserId}.jpg`;
 
-    // 7. Upload to storage
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(PHOTO_BUCKET)
-      .upload(storagePath, compressed, {
-        contentType: "image/jpeg",
-        cacheControl: "3600",
-        upsert: false,
+    // 7. Upload to storage — with collision retry.
+    // ROBUSTNESS FIX (2026-09-19): storagePath embeds seq = count+1. Two
+    // concurrent uploads (renter + operator, or double device sync) computed
+    // the same seq → the second upload failed with Supabase "Duplicate"
+    // (409, upsert:false) → operator saw an error toast and NO photo in the
+    // gallery. Now: on a duplicate-path error we retry with a random suffix
+    // (up to 2 retries) — path uniqueness is all we need, order is preserved
+    // by created_at anyway.
+    let uploadError: { message: string } | null = null;
+    let finalStoragePath = storagePath;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        finalStoragePath = storagePath.replace(
+          /\.jpg$/,
+          `-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.jpg`,
+        );
+      }
+      const { error } = await supabaseAdmin.storage
+        .from(PHOTO_BUCKET)
+        .upload(finalStoragePath, compressed, {
+          contentType: "image/jpeg",
+          cacheControl: "3600",
+          upsert: false,
+        });
+      uploadError = error;
+      if (!error) break;
+      const isCollision =
+        error.statusCode === "409" ||
+        /duplicate|already exists/i.test(error.message || "");
+      if (!isCollision) break;
+      logger.warn(`[uploadRentalPhoto] Storage path collision (attempt ${attempt + 1}), retrying with suffix`, {
+        rentalId, path: finalStoragePath,
       });
+    }
 
     if (uploadError) {
       logger.error("[uploadRentalPhoto] Storage upload failed:", uploadError);
@@ -375,7 +401,7 @@ export async function uploadRentalPhoto(
       .insert({
         rental_id: rentalId,
         photo_type: photoType,
-        storage_path: storagePath,
+        storage_path: finalStoragePath,
         file_size_bytes: compressed.length,
         sha256_hash: hash,
         mime_type: "image/jpeg", // always JPEG after compression
@@ -394,8 +420,8 @@ export async function uploadRentalPhoto(
       .single();
 
     if (insertError) {
-      // Rollback storage upload if metadata insert fails
-      await supabaseAdmin.storage.from(PHOTO_BUCKET).remove([storagePath]);
+      // Rollback storage upload if metadata insert fails (final path — may differ after collision retry)
+      await supabaseAdmin.storage.from(PHOTO_BUCKET).remove([finalStoragePath]);
       logger.error("[uploadRentalPhoto] Metadata insert failed:", insertError);
       return { success: false, error: `Metadata insert failed: ${insertError.message}` };
     }
@@ -421,7 +447,7 @@ export async function uploadRentalPhoto(
       created_by: uploaderUserId,
       payload: {
         photo_id: photoRow.id,
-        storage_path: storagePath,
+        storage_path: finalStoragePath, // may differ from the base path after collision retry
         sha256_hash: hash,
         file_size_bytes: compressed.length,
         width,
@@ -535,13 +561,17 @@ export async function listRentalPhotos(
       return { success: false, error: "Недостаточно прав для просмотра фото." };
     }
 
-    // Fetch photo rows
+    // Fetch photo rows.
+    // ROBUSTNESS FIX (2026-09-19): soft-deleted photos were still listed —
+    // their storage_path was already moved to _trash/, so they rendered as
+    // "ghost" thumbnails the operator had deleted. Exclude deleted_at rows.
     let query = supabaseAdmin
       .from("rental_photos")
       .select(
         "id, photo_type, storage_path, file_size_bytes, width, height, uploaded_by, uploader_role, source, created_at, metadata",
       )
       .eq("rental_id", rentalId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: true });
 
     if (photoType) {

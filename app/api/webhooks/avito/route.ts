@@ -401,7 +401,14 @@ function analysisSummary(analysis: Record<string, unknown>): string | null {
  *  {chatId,text} — а эндпоинт ждёт {chat_id,method,payload}; все уведомления
  *  о новых лидах падали с 400 незаметно (fire-and-forget). Теперь —
  *  telegramDeliver с корректной формой, плюс deeplink на карточку лида.
- *  Fire-and-forget: the webhook response must not wait on it (2s limit). */
+ *  2026-09-19 RELIABILITY FIX: the function now RETURNS the notifyNewLead
+ *  promise and callers AWAIT it. It used to be `void`-ed and the webhook
+ *  returned ack() immediately — on Vercel the lambda freezes right after the
+ *  response, so the fire-and-forget delivery (recipient lookup + N ×
+ *  telegramDeliver) was randomly cut off: «иногда уведомление о лиде не
+ *  приходит». notifyNewLead never throws (per-recipient try/catch), so
+ *  awaiting it only costs ~100-300 ms and guarantees delivery — same fix
+ *  as the generic-callback handler got in the previous round. */
 function notifyCrewOwnerAsync(lead: {
   name: string;
   bikeTitle: string | null;
@@ -409,10 +416,10 @@ function notifyCrewOwnerAsync(lead: {
   /** Avito chat id (или синтетический fwd-*) — ключ лида для deeplink. */
   chatId: string | null;
   phone?: string | null;
-}): void {
+}): Promise<unknown> {
   const chatId = (lead.chatId || "").trim();
-  if (!chatId) return;
-  void notifyNewLead({
+  if (!chatId) return Promise.resolve();
+  return notifyNewLead({
     slug: CREW_SLUG,
     title: "Новый лид из Авито",
     leadKey: chatId,
@@ -568,7 +575,8 @@ async function handleBotForward(body: BotForwardBody): Promise<NextResponse> {
       return ack();
     }
     await createLead({ value, eventId: null, now, extra, phone: phone || null, analysis });
-    notifyCrewOwnerAsync({
+    // AWAIT: notifyNewLead never throws — see RELIABILITY FIX note above.
+    await notifyCrewOwnerAsync({
       name: body.name || `Покупатель Avito (форвард${body.manager ? ` от ${body.manager}` : ""})`,
       bikeTitle: body.bike_title || null,
       text: text.slice(0, 300),
@@ -691,7 +699,8 @@ export async function POST(request: NextRequest) {
       analysis,
       accountKey: accountKeyFromRequest(request),
     });
-    notifyCrewOwnerAsync({
+    // AWAIT: notifyNewLead never throws — see RELIABILITY FIX note above.
+    await notifyCrewOwnerAsync({
       name: buyerDisplayName(value, body.client?.name),
       bikeTitle: truncate(value.item_title, 200),
       text: truncate(value.text, 300),

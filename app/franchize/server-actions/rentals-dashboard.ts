@@ -2348,6 +2348,28 @@ export async function updateRentalStatus(input: {
       return { success: false, error: updateError.message };
     }
 
+    // ── 2026-09-19: auto-close linked equipment rentals on completion ─────
+    // Gear issued with this bike rental (metadata.item_type='equipment',
+    // metadata.primary_rental_id = this rental) used to stay active after the
+    // bike was closed from the analytics drawer. Close it together with the
+    // bike (best-effort, see app/rentals/rental-cascade.ts).
+    // NB: `rental` is ParserError-typed here (typegen can't parse the
+    // `status as old_status` alias — pre-existing debt), hence the `as any`.
+    const previousStatus = (rental as any)?.old_status as string | undefined;
+    if (status === "completed" && previousStatus !== "completed") {
+      try {
+        const { closeLinkedEquipmentRentals } = await import("@/app/rentals/rental-cascade");
+        const cascade = await closeLinkedEquipmentRentals(rentalId, actorUserId, {
+          reason: "bike_rental_completed",
+        });
+        if (cascade.closed > 0) {
+          console.log(`[update-rental-status] Auto-closed ${cascade.closed} linked equipment rental(s) for ${rentalId}:`, cascade.rentalIds);
+        }
+      } catch (cascadeErr) {
+        console.warn("[update-rental-status] Equipment cascade failed (non-fatal):", cascadeErr);
+      }
+    }
+
     // ── ALWAYS notify renter on status change (v3 polish: was only if operatorMessage) ──
     // CRITICAL FIX: previously, if operator flipped status without typing a message,
     // the renter had NO IDEA their rental was marked completed/cancelled.

@@ -71,9 +71,25 @@ export function RentalPhotoGallery({
   const [lightboxPhoto, setLightboxPhoto] = useState<Photo | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxList, setLightboxList] = useState<Photo[]>([]);
+  // ROBUSTNESS FIX (2026-09-19, "sometimes uploaded photos don't show up"):
+  // signed URLs live 15 minutes. The gallery fetched ONCE on mount — a page
+  // kept open in the Telegram WebView rendered expired URLs afterwards
+  // (broken thumbnails), and any transient object error silently dropped
+  // that photo from the list (badge said N, thumbnails showed fewer).
+  // Now: <img> errors trigger ONE silent re-fetch (fresh signed URLs), the
+  // page re-fetches on visibilitychange after a long idle, photos whose
+  // signed URL is missing are counted in hiddenCount and surfaced, and a
+  // still-broken thumbnail shows an explicit placeholder instead of a
+  // silent blank.
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+  const [hiddenCount, setHiddenCount] = useState(0);
+  const lastFetchedAtRef = useRef<number>(0);
+  const silentRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSilentRefreshAtRef = useRef<number>(0);
 
-  const loadPhotos = useCallback(async () => {
-    setLoading(true);
+  const loadPhotos = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setLoading(true);
     setLoadError(null);
     try {
       const resp = await fetch(
@@ -82,25 +98,73 @@ export function RentalPhotoGallery({
       if (resp.ok) {
         const data = await resp.json();
         if (data.success) {
+          const all: Photo[] = data.photos || [];
           // CR fix: filter out photos with empty signedUrl (broken storage objects)
-          const photos: Photo[] = (data.photos || []).filter((p: Photo) => p.signedUrl);
+          const photos: Photo[] = all.filter((p: Photo) => p.signedUrl);
+          setHiddenCount(all.length - photos.length);
           setStartPhotos(photos.filter((p) => p.photoType === "start"));
           setEndPhotos(photos.filter((p) => p.photoType === "end"));
+          // Fresh signed URLs — previous load failures are resolved
+          setBrokenIds(new Set());
+          lastFetchedAtRef.current = Date.now();
         } else {
-          setLoadError(String(data.error || "Не удалось загрузить фото."));
+          if (!silent) setLoadError(String(data.error || "Не удалось загрузить фото."));
         }
       } else if (resp.status === 401) {
         // Session expired — tell the user instead of a silent empty gallery
-        setLoadError("Сессия истекла — откройте приложение заново, чтобы увидеть фото.");
+        if (!silent) setLoadError("Сессия истекла — откройте приложение заново, чтобы увидеть фото.");
       } else {
-        setLoadError(`Не удалось загрузить фото (код ${resp.status}).`);
+        if (!silent) setLoadError(`Не удалось загрузить фото (код ${resp.status}).`);
       }
     } catch {
-      setLoadError("Сеть недоступна — фото не загрузились.");
+      if (!silent) setLoadError("Сеть недоступна — фото не загрузились.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [rentalId]);
+
+  /** One-shot silent re-fetch with a cooldown — used by <img> onError handlers
+   *  (expired/broken signed URL). Silent: no spinner, no error row. */
+  const scheduleSilentRefresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastSilentRefreshAtRef.current < 10_000) return; // cooldown 10s
+    if (silentRefreshTimerRef.current) clearTimeout(silentRefreshTimerRef.current);
+    lastSilentRefreshAtRef.current = now;
+    silentRefreshTimerRef.current = setTimeout(() => {
+      silentRefreshTimerRef.current = null;
+      void loadPhotos({ silent: true });
+    }, 1500);
+  }, [loadPhotos]);
+
+  const markPhotoBroken = useCallback((photoId: string) => {
+    setBrokenIds((prev) => {
+      if (prev.has(photoId)) return prev;
+      const next = new Set(prev);
+      next.add(photoId);
+      return next;
+    });
+    scheduleSilentRefresh();
+  }, [scheduleSilentRefresh]);
+
+  // Re-fetch fresh signed URLs when the page becomes visible after a long
+  // idle (Telegram WebView keeps the WebView alive; signed URLs expire in
+  // 15 min — by the time the operator switches back they are dead).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastFetchedAtRef.current < 10 * 60 * 1000) return;
+      void loadPhotos({ silent: true });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadPhotos]);
+
+  // Clear the pending silent-refresh timer on unmount
+  useEffect(() => {
+    return () => {
+      if (silentRefreshTimerRef.current) clearTimeout(silentRefreshTimerRef.current);
+    };
+  }, []);
 
   // Always fetch photos on mount. Previously skipped when both initial counts
   // were 0 — but that caused photos to not display on page load (only showed
@@ -284,6 +348,9 @@ export function RentalPhotoGallery({
           onUpload={(files) => handleBatchUpload("start", files)}
           batchProgress={uploadingType === "start" ? batchProgress : null}
           onPhotoClick={(p) => openLightbox(p, startPhotos)}
+          brokenIds={brokenIds}
+          onImgError={markPhotoBroken}
+          onManualRefresh={() => void loadPhotos()}
           formatSize={formatSize}
           formatDate={formatDate}
           compact={compact}
@@ -301,11 +368,36 @@ export function RentalPhotoGallery({
           onUpload={(files) => handleBatchUpload("end", files)}
           batchProgress={uploadingType === "end" ? batchProgress : null}
           onPhotoClick={(p) => openLightbox(p, endPhotos)}
+          brokenIds={brokenIds}
+          onImgError={markPhotoBroken}
+          onManualRefresh={() => void loadPhotos()}
           formatSize={formatSize}
           formatDate={formatDate}
           compact={compact}
         />
       </div>
+
+      {/* ROBUSTNESS FIX (2026-09-19): surface photos that exist in the DB but
+          whose signed URL could not be produced (missing storage object).
+          Previously they were silently filtered out — the badge said N while
+          fewer thumbnails rendered, reading as "uploaded photos don't show up". */}
+      {!compact && hiddenCount > 0 && (
+        <div
+          className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs"
+          role="status"
+        >
+          <span style={{ color: "var(--franchize-text-secondary, #999)" }}>
+            {hiddenCount} фото не отобразилось (повреждён файл в хранилище).
+          </span>
+          <button
+            type="button"
+            onClick={() => void loadPhotos()}
+            className="shrink-0 rounded-md border border-amber-400/40 px-2 py-1 text-[11px] font-semibold text-amber-200 transition hover:bg-amber-500/10"
+          >
+            Обновить
+          </button>
+        </div>
+      )}
 
       {/* Soft warning when both are empty (v1: non-blocking).
           I3 hotfix (M4): hidden in compact mode — analytics drawer can't act on it.
@@ -384,6 +476,10 @@ export function RentalPhotoGallery({
               src={lightboxPhoto.signedUrl}
               alt={`Фото ${lightboxPhoto.photoType === "start" ? "ДО" : "ПОСЛЕ"}`}
               className="max-h-[80vh] max-w-[90vw] rounded-lg object-contain"
+              onError={() => {
+                // Signed URL expired while the lightbox was open → one silent re-fetch
+                markPhotoBroken(lightboxPhoto.photoId);
+              }}
             />
             <div className="mt-3 rounded-lg bg-black/60 px-4 py-2 text-xs text-white">
               <span className="font-semibold">
@@ -418,6 +514,13 @@ interface PhotoColumnProps {
   // I4 enhancement: batch progress display
   batchProgress: { current: number; total: number; fileName: string } | null;
   onPhotoClick: (photo: Photo) => void;
+  /** ROBUSTNESS 2026-09-19: photo ids whose image failed to load
+   *  (expired signed URL / missing object). */
+  brokenIds: Set<string>;
+  /** Called on <img> error — marks broken + schedules one silent re-fetch. */
+  onImgError: (photoId: string) => void;
+  /** Manual "Обновить" for still-broken thumbnails. */
+  onManualRefresh: () => void;
   formatSize: (bytes: number) => string;
   formatDate: (iso: string) => string;
   compact: boolean;
@@ -433,6 +536,9 @@ function PhotoColumn({
   onUpload,
   batchProgress,
   onPhotoClick,
+  brokenIds,
+  onImgError,
+  onManualRefresh,
   formatSize,
   formatDate,
   compact,
@@ -477,24 +583,51 @@ function PhotoColumn({
         )
       ) : (
         <div className={`mt-2 grid ${compact ? "grid-cols-2" : "grid-cols-3"} gap-1.5`}>
-          {photos.map((photo) => (
-            <button
-              key={photo.photoId}
-              type="button"
-              onClick={() => onPhotoClick(photo)}
-              className="relative aspect-square overflow-hidden rounded-md border"
-              style={{ borderColor: "var(--franchize-border-soft, #333)" }}
-              title={`${formatDate(photo.takenAt)} · ${formatSize(photo.fileSizeBytes)} · ${photo.uploaderRole}`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photo.signedUrl}
-                alt={`${label} ${formatDate(photo.takenAt)}`}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            </button>
-          ))}
+          {photos.map((photo) => {
+            const isBroken = brokenIds.has(photo.photoId);
+            return (
+              <button
+                key={photo.photoId}
+                type="button"
+                onClick={() => onPhotoClick(photo)}
+                className="relative aspect-square overflow-hidden rounded-md border"
+                style={{ borderColor: "var(--franchize-border-soft, #333)" }}
+                title={`${formatDate(photo.takenAt)} · ${formatSize(photo.fileSizeBytes)} · ${photo.uploaderRole}`}
+              >
+                {isBroken ? (
+                  // ROBUSTNESS 2026-09-19: explicit placeholder instead of a
+                  // silent blank — after the auto re-fetch this thumbnail is
+                  // either fixed or clearly marked, with a manual retry.
+                  <span
+                    className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/30 p-1 text-center"
+                    onClick={(e) => {
+                      // Click on a broken thumb retries instead of opening the lightbox
+                      e.stopPropagation();
+                      onManualRefresh();
+                    }}
+                  >
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                    <span className="text-[9px] leading-tight" style={{ color: "var(--franchize-text-secondary, #ccc)" }}>
+                      не загрузилось — обновить
+                    </span>
+                  </span>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={photo.signedUrl}
+                    alt={`${label} ${formatDate(photo.takenAt)}`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={() => {
+                      // Expired signed URL (15-min TTL) or transient storage error →
+                      // mark broken + one silent re-fetch with fresh URLs.
+                      onImgError(photo.photoId);
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
