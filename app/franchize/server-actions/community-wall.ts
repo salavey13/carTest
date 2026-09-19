@@ -26,22 +26,37 @@ import { logger } from "@/lib/logger";
 import {
   buildStatsPostBody,
   computeRiderStats,
-  parseTelegramInitDataUser,
   type RentalStatsSnapshot,
   type WallAuthorView,
+  type WallBikeRefView,
   type WallCommentView,
+  type WallPhotoView,
   type WallPostView,
   type WallRentalRef,
   type WallViewerInfo,
   RIDE_EARNING_STATUSES,
+  sanitizeWallPhotoInputs,
+  sanitizeWallBikeIds,
+  wallPhotoPublicUrl,
+  WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
   WALL_COMMENT_PREVIEW,
   WALL_COMMENTS_FETCH_LIMIT,
   WALL_FEED_PAGE_SIZE,
+  WALL_PHOTOS_MAX,
   WALL_POST_MAX_LEN,
-  WALL_RATE_COMMENTS_PER_HOUR,
-  WALL_RATE_POSTS_PER_HOUR,
+  WALLPHOTO_BUCKET,
 } from "@/app/franchize/lib/community-wall";
+import {
+  assertWallRate,
+  canWriteOnWall,
+  ensureUserProfile,
+  getCrewBySlug,
+  isCrewStaffUser,
+  resolveWallActor,
+  type DbCrew,
+} from "@/app/franchize/lib/wall-access";
+import { notifyNewWallPost } from "@/app/franchize/lib/wall-notify";
 
 // NOTE: cookies + telegram-actor-cookie are imported DYNAMICALLY inside
 // functions (same reason as server-actions/leads.ts — avoid `import
@@ -49,7 +64,6 @@ import {
 
 // ── shared row types ─────────────────────────────────────────────────────────
 
-type DbCrew = { id: string; name: string | null; slug: string | null; owner_id: string };
 type DbPostRow = {
   id: string;
   crew_id: string;
@@ -70,185 +84,6 @@ type DbUserRow = {
   full_name: string | null;
   avatar_url: string | null;
 };
-
-// ── identity ─────────────────────────────────────────────────────────────────
-
-/** Global admin — top-level columns first (iter8 pattern), metadata legacy second. */
-function isGlobalAdminRow(user: { role: string | null; status: string | null; metadata: Record<string, unknown> | null } | null): boolean {
-  const meta = user?.metadata as Record<string, unknown> | null;
-  return (
-    user?.role === "admin" ||
-    user?.role === "vprAdmin" ||
-    user?.status === "admin" ||
-    meta?.role === "admin" ||
-    meta?.status === "admin"
-  );
-}
-
-interface WallActor {
-  userId: string;
-  /** Fresh Telegram profile (only available on the initData path). */
-  tg: { username: string | null; fullName: string | null; photoUrl: string | null } | null;
-}
-
-/**
- * Resolve the caller identity. Cookie first (WebApp sessions), initData as the
- * fallback for browsers that block third-party cookies. Returns null for
- * anonymous web visitors — they may read, never write.
- */
-async function resolveWallActor(initData?: string): Promise<WallActor | null> {
-  const { cookies } = await import("next/headers");
-  const { TELEGRAM_ACTOR_COOKIE, verifyTelegramActorCookieValue } = await import("@/lib/telegram-actor-cookie");
-
-  const cookieUserId = verifyTelegramActorCookieValue((await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value);
-  if (cookieUserId) return { userId: cookieUserId, tg: null };
-
-  if (initData && initData.trim().length > 0) {
-    try {
-      const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
-      const botToken = process.env.TELEGRAM_BOT_TOKEN;
-      if (!botToken) {
-        logger.warn("[community-wall] TELEGRAM_BOT_TOKEN missing — initData path unavailable");
-        return null;
-      }
-      const validation = await computeTelegramWebAppHash(initData, botToken);
-      if (!validation.isValid) {
-        logger.warn("[community-wall] initData signature invalid — rejecting");
-        return null;
-      }
-      // Freshness: a captured initData must not replay forever (24h window,
-      // same constant the auth lib uses elsewhere).
-      const { isTelegramInitDataFresh } = await import("@/lib/telegram-webapp-auth");
-      if (!isTelegramInitDataFresh(initData)) {
-        logger.warn("[community-wall] initData stale (>24h) — rejecting");
-        return null;
-      }
-      const parsed = parseTelegramInitDataUser(initData);
-      if (!parsed) {
-        logger.warn("[community-wall] initData valid but user payload unparsable");
-        return null;
-      }
-      return {
-        userId: parsed.id,
-        tg: { username: parsed.username, fullName: parsed.fullName, photoUrl: parsed.photoUrl },
-      };
-    } catch (err) {
-      logger.warn("[community-wall] initData resolution failed:", err instanceof Error ? err.message : String(err));
-      return null;
-    }
-  }
-
-  return null;
-}
-
-/** Crew staff check: owner / global admin / ANY active crew membership. */
-async function isCrewStaffUser(userId: string, crew: Pick<DbCrew, "id" | "owner_id">): Promise<boolean> {
-  if (crew.owner_id === userId) return true;
-  const { data: user } = await supabaseAdmin
-    .from("users")
-    .select("role, status, metadata")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (isGlobalAdminRow(user ?? null)) return true;
-  const { data: member } = await supabaseAdmin
-    .from("crew_members")
-    .select("user_id")
-    .eq("crew_id", crew.id)
-    .eq("user_id", userId)
-    .eq("membership_status", "active")
-    .maybeSingle();
-  return !!member;
-}
-
-/**
- * Write scope for the wall: the wall «живёт для экипажа и его райдеров», so
- * posting/commenting requires a real crew relation — staff membership OR at
- * least one rental in this crew (any status: a pending request already makes
- * you this crew's renter). Likes stay open to any VERIFIED Telegram identity
- * (visitor applause, VK-wall style) — no crew relation needed there.
- */
-async function canWriteOnWall(userId: string, crew: Pick<DbCrew, "id" | "owner_id">): Promise<boolean> {
-  if (await isCrewStaffUser(userId, crew)) return true;
-  const { data: rental } = await supabaseAdmin
-    .from("rentals")
-    .select("rental_id")
-    .eq("user_id", userId)
-    .eq("crew_id", crew.id)
-    .limit(1)
-    .maybeSingle();
-  return !!rental;
-}
-
-/**
- * Minimal spam brake: count this author's wall posts / comments in the last
- * hour (head-count queries — no payload, works across instances because it is
- * DB-based, not in-memory).
- */
-async function assertWallRate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const [postsRes, commentsRes] = await Promise.all([
-    supabaseAdmin.from("crew_posts").select("id", { count: "exact", head: true }).eq("author_id", userId).gte("created_at", since),
-    supabaseAdmin.from("crew_post_comments").select("id", { count: "exact", head: true }).eq("author_id", userId).gte("created_at", since),
-  ]);
-  const posts = postsRes.count ?? 0;
-  const comments = commentsRes.count ?? 0;
-  if (posts >= WALL_RATE_POSTS_PER_HOUR) {
-    return { ok: false, error: `Не так быстро: максимум ${WALL_RATE_POSTS_PER_HOUR} постов в час.` };
-  }
-  if (comments >= WALL_RATE_COMMENTS_PER_HOUR) {
-    return { ok: false, error: `Не так быстро: максимум ${WALL_RATE_COMMENTS_PER_HOUR} комментариев в час.` };
-  }
-  return { ok: true };
-}
-
-/**
- * Make sure the author exists in public.users (FK target) without ever
- * overwriting richer profile data the bot already stored. Only fills gaps.
- */
-async function ensureUserProfile(actor: WallActor): Promise<void> {
-  const { data: existing } = await supabaseAdmin
-    .from("users")
-    .select("user_id, username, full_name, avatar_url")
-    .eq("user_id", actor.userId)
-    .maybeSingle();
-
-  if (!existing) {
-    const insertRow: {
-      user_id: string;
-      metadata: { source: string };
-      username?: string;
-      full_name?: string;
-      avatar_url?: string;
-    } = {
-      user_id: actor.userId,
-      metadata: { source: "community_wall" },
-    };
-    if (actor.tg?.username) insertRow.username = actor.tg.username;
-    if (actor.tg?.fullName) insertRow.full_name = actor.tg.fullName;
-    if (actor.tg?.photoUrl) insertRow.avatar_url = actor.tg.photoUrl;
-    const { error } = await supabaseAdmin.from("users").insert(insertRow);
-    if (error) logger.warn("[community-wall] user auto-provision failed:", error.message);
-    return;
-  }
-
-  // Fill only NULL fields — never clobber bot-managed profile data.
-  const patch: { username?: string; full_name?: string; avatar_url?: string } = {};
-  if (actor.tg?.username && !existing.username) patch.username = actor.tg.username;
-  if (actor.tg?.fullName && !existing.full_name) patch.full_name = actor.tg.fullName;
-  if (actor.tg?.photoUrl && !existing.avatar_url) patch.avatar_url = actor.tg.photoUrl;
-  if (Object.keys(patch).length === 0) return;
-  const { error } = await supabaseAdmin.from("users").update(patch).eq("user_id", actor.userId);
-  if (error) logger.warn("[community-wall] profile patch failed:", error.message);
-}
-
-async function getCrewBySlug(slug: string): Promise<DbCrew | null> {
-  const { data } = await supabaseAdmin
-    .from("crews")
-    .select("id, name, slug, owner_id")
-    .eq("slug", slug.trim())
-    .maybeSingle();
-  return (data as DbCrew | null) ?? null;
-}
 
 // ── stats snapshot helpers ───────────────────────────────────────────────────
 
@@ -467,6 +302,46 @@ export async function getCommunityWallAction(input: {
     }
   }
 
+  // 4b. Post photos (public wallpix URLs — no signed-URL round trips).
+  const photosByPost = new Map<string, WallPhotoView[]>();
+  const { data: photoRows } = await supabaseAdmin
+    .from("crew_post_photos")
+    .select("id, post_id, storage_path, width, height")
+    .in("post_id", postIds)
+    .order("position", { ascending: true });
+  for (const row of (photoRows ?? []) as {
+    id: string;
+    post_id: string;
+    storage_path: string;
+    width: number | null;
+    height: number | null;
+  }[]) {
+    const list = photosByPost.get(row.post_id) ?? [];
+    list.push({ id: row.id, url: wallPhotoPublicUrl(row.storage_path), width: row.width, height: row.height });
+    photosByPost.set(row.post_id, list);
+  }
+
+  // 4c. Bike mentions (catalogue card data via the FK embed).
+  const bikesByPost = new Map<string, WallBikeRefView[]>();
+  const { data: bikeMentionRows } = await supabaseAdmin
+    .from("crew_post_bikes")
+    .select("post_id, bike_id, cars(id, model, image_url)")
+    .in("post_id", postIds)
+    .order("position", { ascending: true });
+  for (const row of (bikeMentionRows ?? []) as unknown as {
+    post_id: string;
+    bike_id: string;
+    cars: { model: string | null; image_url: string | null } | null;
+  }[]) {
+    const list = bikesByPost.get(row.post_id) ?? [];
+    list.push({
+      bikeId: row.bike_id,
+      title: row.cars?.model || "Байк",
+      imageUrl: row.cars?.image_url ?? null,
+    });
+    bikesByPost.set(row.post_id, list);
+  }
+
   // 5. Viewer likes for the page.
   const likedSet = new Set<string>();
   if (actor && postIds.length > 0) {
@@ -492,6 +367,8 @@ export async function getCommunityWallAction(input: {
     author: authors.get(p.author_id) ?? { userId: p.author_id, username: null, fullName: null, avatarUrl: null },
     comments: commentsByPost.get(p.id) ?? [],
     rental: p.rental_id ? rentalRefs.get(p.rental_id) ?? null : null,
+    photos: photosByPost.get(p.id) ?? [],
+    bikes: bikesByPost.get(p.id) ?? [],
   }));
 
   return {
@@ -511,6 +388,11 @@ const CreatePostInput = z.object({
   initData: z.string().trim().optional(),
   shareStats: z.boolean().optional(),
   rentalId: z.string().trim().uuid().optional(),
+  // Photo payloads from /api/franchize/wall-photo-upload (staging paths).
+  // Shape-checked later by sanitizeWallPhotoInputs — needs the resolved actor.
+  photos: z.unknown().optional(),
+  // Catalogue bike mentions — shape-checked by sanitizeWallBikeIds.
+  bikes: z.unknown().optional(),
 });
 
 export type CreateCommunityPostResult =
@@ -523,6 +405,8 @@ export async function createCommunityPostAction(input: {
   initData?: string;
   shareStats?: boolean;
   rentalId?: string;
+  photos?: unknown;
+  bikes?: unknown;
 }): Promise<CreateCommunityPostResult> {
   const parsed = CreatePostInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный пост." };
@@ -544,7 +428,21 @@ export async function createCommunityPostAction(input: {
   const rate = await assertWallRate(actor.userId);
   if (!rate.ok) return { ok: false, error: rate.error };
 
-  if (!shareStats && body.length === 0) return { ok: false, error: "Пост пустой — напиши пару слов." };
+  // ── Photos: every path must be the actor's OWN staging folder (wallpix) ──
+  const photos = sanitizeWallPhotoInputs(parsed.data.photos, actor.userId);
+  if (photos === null) {
+    return { ok: false, error: `Фото: максимум ${WALL_PHOTOS_MAX} на пост и только свои загруженные файлы.` };
+  }
+
+  // ── Bike mentions: ids must be UUIDs, ≤ WALL_BIKES_MAX ──
+  const bikeIds = sanitizeWallBikeIds(parsed.data.bikes);
+  if (bikeIds === null) {
+    return { ok: false, error: `Байков в посте — максимум ${WALL_BIKES_MAX}.` };
+  }
+
+  if (!shareStats && body.length === 0 && photos.length === 0 && bikeIds.length === 0) {
+    return { ok: false, error: "Пост пустой — напиши пару слов или прикрепи фото." };
+  }
   if (body.length > WALL_POST_MAX_LEN) return { ok: false, error: `Максимум ${WALL_POST_MAX_LEN} символов.` };
 
   await ensureUserProfile(actor);
@@ -581,6 +479,29 @@ export async function createCommunityPostAction(input: {
     }
   }
 
+  // ── Bike mentions: ONLY bikes from THIS crew's catalogue ──
+  let bikeRefs: WallBikeRefView[] = [];
+  if (bikeIds.length > 0) {
+    const { data: bikeRows, error: bikeErr } = await supabaseAdmin
+      .from("cars")
+      .select("id, model, image_url")
+      .eq("crew_id", crew.id)
+      .in("id", bikeIds);
+    if (bikeErr) {
+      logger.error("[community-wall] bike verify failed:", bikeErr.message);
+      return { ok: false, error: "Не удалось проверить байки. Попробуй ещё раз." };
+    }
+    const rows = (bikeRows ?? []) as { id: string; model: string | null; image_url: string | null }[];
+    if (rows.length !== bikeIds.length) {
+      return { ok: false, error: "Один из байков не из каталога этого экипажа." };
+    }
+    // Keep the author's attach order.
+    bikeRefs = bikeIds.map((id) => {
+      const row = rows.find((r) => String(r.id) === id);
+      return { bikeId: id, title: row?.model || "Байк", imageUrl: row?.image_url ?? null };
+    });
+  }
+
   // Stats snapshot is computed server-side at post time — immutable afterwards.
   let statsSnapshot: RentalStatsSnapshot | null = null;
   let finalBody = body;
@@ -614,6 +535,62 @@ export async function createCommunityPostAction(input: {
     logger.error("[community-wall] insert post failed:", error?.message);
     return { ok: false, error: "Не удалось опубликовать пост. Попробуй ещё раз." };
   }
+  const postId = inserted.id as string;
+
+  // ── Photos: move staging → posts/<postId>/<n>.jpg, then insert rows ──
+  const photoViews: WallPhotoView[] = [];
+  for (let i = 0; i < photos.length; i += 1) {
+    const photo = photos[i];
+    let finalPath = photo.path;
+    try {
+      const target = `posts/${postId}/${i}.jpg`;
+      const { error: moveError } = await supabaseAdmin.storage
+        .from(WALLPHOTO_BUCKET)
+        .move(photo.path, target);
+      if (moveError) {
+        // Staging path stays public-readable in a public bucket — the post
+        // still renders; the untidy path beats a broken image or a dead post.
+        logger.warn("[community-wall] photo move failed (kept staging path):", moveError.message);
+      } else {
+        finalPath = target;
+      }
+    } catch (moveCrash) {
+      logger.warn("[community-wall] photo move crashed:", moveCrash);
+    }
+    const { error: photoInsertError } = await supabaseAdmin.from("crew_post_photos").insert({
+      post_id: postId,
+      crew_id: crew.id,
+      storage_path: finalPath,
+      width: photo.width,
+      height: photo.height,
+      byte_size: photo.bytes,
+      position: i,
+    });
+    if (photoInsertError) {
+      logger.error("[community-wall] photo row insert failed:", photoInsertError.message);
+    }
+    photoViews.push({
+      id: `${postId}-${i}`,
+      url: wallPhotoPublicUrl(finalPath),
+      width: photo.width,
+      height: photo.height,
+    });
+  }
+
+  // ── Bike mention rows (join table; cars already verified above) ──
+  if (bikeIds.length > 0) {
+    const { error: bikeInsertError } = await supabaseAdmin.from("crew_post_bikes").insert(
+      bikeRefs.map((ref, i) => ({
+        post_id: postId,
+        bike_id: ref.bikeId,
+        crew_id: crew.id,
+        position: i,
+      })),
+    );
+    if (bikeInsertError) {
+      logger.error("[community-wall] bike rows insert failed:", bikeInsertError.message);
+    }
+  }
 
   const { data: me } = await supabaseAdmin
     .from("users")
@@ -622,7 +599,7 @@ export async function createCommunityPostAction(input: {
     .maybeSingle();
 
   const post: WallPostView = {
-    id: inserted.id,
+    id: postId,
     kind: statsSnapshot ? "stats" : "post",
     body: finalBody,
     stats: statsSnapshot,
@@ -635,7 +612,28 @@ export async function createCommunityPostAction(input: {
     author: me ? toAuthorView(me as DbUserRow) : { userId: actor.userId, username: actor.tg?.username ?? null, fullName: actor.tg?.fullName ?? null, avatarUrl: actor.tg?.photoUrl ?? null },
     comments: [],
     rental: rentalRef,
+    photos: photoViews,
+    bikes: bikeRefs,
   };
+
+  // ── Crew notification: awaited ON PURPOSE (fire-and-forget freezes on
+  // Vercel after the response — the d275c52 lesson). notifyNewWallPost never
+  // throws, and a notify outage must never fail the post itself.
+  const authorName =
+    (me as DbUserRow | null)?.full_name ||
+    (me as DbUserRow | null)?.username ||
+    actor.tg?.fullName ||
+    actor.tg?.username ||
+    "Райдер";
+  await notifyNewWallPost({
+    slug: crew.slug || slug,
+    authorName,
+    body: finalBody,
+    photoCount: photoViews.length,
+    bikeTitles: bikeRefs.map((b) => b.title),
+    hasStats: statsSnapshot !== null,
+    excludeUserId: actor.userId,
+  });
 
   const { revalidatePath } = await import("next/cache");
   revalidatePath(`/franchize/${crew.slug || slug}/community`);
@@ -885,10 +883,25 @@ export async function deleteCommunityPostAction(input: {
     return { ok: false, error: "Удалить можно только свой пост." };
   }
 
+  // Photo cleanup: collect storage paths BEFORE the row delete (the FK cascade
+  // wipes crew_post_photos), then remove the objects best-effort after.
+  const { data: photoRows } = await supabaseAdmin
+    .from("crew_post_photos")
+    .select("storage_path")
+    .eq("post_id", postId);
+  const photoPaths = ((photoRows ?? []) as { storage_path: string }[])
+    .map((r) => r.storage_path)
+    .filter(Boolean);
+
   const { error } = await supabaseAdmin.from("crew_posts").delete().eq("id", postId);
   if (error) {
     logger.error("[community-wall] delete post failed:", error.message);
     return { ok: false, error: "Не удалось удалить пост." };
+  }
+
+  if (photoPaths.length > 0) {
+    const { error: rmError } = await supabaseAdmin.storage.from(WALLPHOTO_BUCKET).remove(photoPaths);
+    if (rmError) logger.warn("[community-wall] photo cleanup failed:", rmError.message);
   }
 
   const { revalidatePath } = await import("next/cache");
@@ -1091,4 +1104,47 @@ export async function getMyRentalStatsAction(input: {
 
   const stats = await computeMyCrewStats(actor.userId, crew.id);
   return { ok: true, stats, autoText: buildStatsPostBody(stats) };
+}
+
+// ── BIKE PICKER OPTIONS (composer «прикрепить байк») ────────────────────────
+
+export interface WallBikeOption {
+  bikeId: string;
+  title: string;
+  imageUrl: string | null;
+}
+
+export type GetWallBikeOptionsResult =
+  | { ok: true; bikes: WallBikeOption[] }
+  | { ok: false; error: string };
+
+/**
+ * Catalogue bikes of the crew for the composer's mention picker. Public read
+ * (the catalogue itself is public) — no identity required: anonymous visitors
+ * just never see the composer.
+ */
+export async function getWallBikeOptionsAction(input: {
+  slug: string;
+}): Promise<GetWallBikeOptionsResult> {
+  const parsed = z.object({ slug: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const { data, error } = await supabaseAdmin
+    .from("cars")
+    .select("id, model, image_url")
+    .eq("crew_id", crew.id)
+    .eq("type", "bike")
+    .order("model", { ascending: true })
+    .limit(60);
+  if (error) {
+    logger.error("[community-wall] bike options failed:", error.message);
+    return { ok: false, error: "Не удалось загрузить каталог." };
+  }
+  const bikes: WallBikeOption[] = ((data ?? []) as { id: string; model: string | null; image_url: string | null }[]).map(
+    (b) => ({ bikeId: String(b.id), title: b.model || String(b.id), imageUrl: b.image_url ?? null }),
+  );
+  return { ok: true, bikes };
 }

@@ -26,7 +26,10 @@
     "app/franchize/[slug]/bikes/[bikeId]/page.tsx",
     "app/franchize/[slug]/bikes/[bikeId]/BikeStoryClient.tsx",
     "app/franchize/lib/community-wall.ts",
+    "app/franchize/lib/wall-access.ts",
+    "app/franchize/lib/wall-notify.ts",
     "app/franchize/server-actions/community-wall.ts",
+    "app/api/franchize/wall-photo-upload/route.ts",
     "app/franchize/[slug]/community/page.tsx",
     "app/franchize/[slug]/community/CommunityWallClient.tsx"
   ],

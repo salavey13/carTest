@@ -3,12 +3,18 @@
 // app/franchize/[slug]/community/CommunityWallClient.tsx
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// OnlyBike community wall — the live part of the /community page.
+// OnlyBike community wall — the live part of the /community page (wall v2).
 // A VK-style wall for the crew and its riders/renters:
 //   • feed of posts (pinned first), stats-brag posts with a snapshot card;
-//   • composer: free text + «Поделиться статистикой» (server computes the
-//     rider's rental stats from real rentals — not client-claimed);
-//   • likes + one-level comments, staff moderation (hide) / author delete.
+//   • composer: free text + «Поделиться статистикой» + PHOTO attachments
+//     (compressed client-side via lib/client-image-compress — the rental-page
+//     pipeline — then re-compressed server-side by sharp) + bike «mentions»
+//     from the crew catalogue (up to 3);
+//   • photo grid per post + fullscreen lightbox with PINCH-ZOOM (mobile),
+//     double-tap zoom, pan and swipe navigation;
+//   • likes + one-level comments, staff moderation (hide) / author delete;
+//   • the wall spans the FULL page width (no max-w wrapper) — page.tsx renders
+//     it outside the legacy content container.
 //
 // Identity: server actions resolve the Telegram actor (signed cookie or
 // HMAC-verified initData). Anonymous web visitors get a read-only wall with a
@@ -16,12 +22,16 @@
 // page, so the wall inherits the crew theme automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   BarChart3,
   Bike,
+  ChevronLeft,
+  ChevronRight,
   EyeOff,
   Heart,
+  ImagePlus,
   Loader2,
   Lock,
   MessageCircle,
@@ -29,16 +39,21 @@ import {
   PinOff,
   Send,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   formatDateTimeRu,
   formatRelativeTimeRu,
   formatRub,
   pluralRu,
+  WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
   WALL_COMMENTS_FETCH_LIMIT,
+  WALL_PHOTOS_MAX,
   WALL_POST_MAX_LEN,
   type RentalStatsSnapshot,
+  type WallBikeRefView,
+  type WallPhotoView,
   type WallPostView,
   type WallViewerInfo,
 } from "@/app/franchize/lib/community-wall";
@@ -49,12 +64,28 @@ import {
   getCommunityWallAction,
   getMyRentalStatsAction,
   getPostCommentsAction,
+  getWallBikeOptionsAction,
   hideCommunityCommentAction,
   hideCommunityPostAction,
   setPostPinnedAction,
   togglePostLikeAction,
+  type WallBikeOption,
 } from "@/app/franchize/server-actions/community-wall";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
+import { reduceImageResolution } from "@/lib/client-image-compress";
+
+/** A photo being attached in the composer (upload → staging → post). */
+interface ComposerPhoto {
+  /** Local blob URL for the preview (revoked on remove). */
+  previewUrl: string;
+  /** wallpix staging path once uploaded; null while uploading/failed. */
+  path: string | null;
+  width: number | null;
+  height: number | null;
+  bytes: number | null;
+  uploading: boolean;
+  failed: boolean;
+}
 
 interface CommunityWallClientProps {
   slug: string;
@@ -79,6 +110,22 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
   const [statsLoading, setStatsLoading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [composerPhotos, setComposerPhotos] = useState<ComposerPhoto[]>([]);
+  const [selectedBikes, setSelectedBikes] = useState<WallBikeOption[]>([]);
+  const [bikePickerOpen, setBikePickerOpen] = useState(false);
+  const [bikeOptions, setBikeOptions] = useState<WallBikeOption[] | null>(null);
+  const [bikeOptionsLoading, setBikeOptionsLoading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  // Mirror of composerPhotos for synchronous cap checks (async file loop may
+  // overlap with a second pick while uploads are still in flight).
+  const composerPhotosRef = useRef<ComposerPhoto[]>([]);
+  const setComposerPhotosSync = useCallback((next: ComposerPhoto[]) => {
+    composerPhotosRef.current = next;
+    setComposerPhotos(next);
+  }, []);
+
+  // lightbox: which post's photos are open (index = photo within the post)
+  const [lightbox, setLightbox] = useState<{ postId: string; index: number } | null>(null);
 
   // interactions
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -123,7 +170,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
     setLoadingMore(false);
   }, [slug, nextBefore, loadingMore, withInitData]);
 
-  // ── composer ────────────────────────────────────────────────────────────────
+  // ── composer: stats toggle ──────────────────────────────────────────────────
 
   const toggleShareStats = useCallback(async () => {
     const next = !shareStats;
@@ -143,8 +190,117 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
     }
   }, [shareStats, statsPreview, statsLoading, slug, withInitData, text]);
 
+  // ── composer: photo attach (rental-page pipeline: compress → upload) ────────
+
+  const addPhotoFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const incoming = [...files].filter((f) => f.type.startsWith("image/"));
+      if (incoming.length === 0) return;
+      setComposerError(null);
+
+      const slotsLeft = WALL_PHOTOS_MAX - composerPhotosRef.current.length;
+      if (slotsLeft <= 0) {
+        setComposerError(`Максимум ${WALL_PHOTOS_MAX} фото на пост.`);
+        return;
+      }
+      const accepted = incoming.slice(0, slotsLeft);
+      if (incoming.length > slotsLeft) {
+        setComposerError(`Максимум ${WALL_PHOTOS_MAX} фото на пост — лишние отброшены.`);
+      }
+
+      for (const file of accepted) {
+        const placeholder: ComposerPhoto = {
+          previewUrl: URL.createObjectURL(file),
+          path: null,
+          width: null,
+          height: null,
+          bytes: null,
+          uploading: true,
+          failed: false,
+        };
+        setComposerPhotos((prev) => [...prev, placeholder]);
+
+        try {
+          // 1. Client-side compression — the same lib the rental page uses.
+          const blob = await reduceImageResolution(file, { maxSize: 1600, quality: 0.72 });
+          const compressedFile = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
+          placeholder.previewUrl = URL.createObjectURL(compressedFile);
+
+          // 2. Upload to staging via the wall-photo-upload route (sharp on server).
+          const form = new FormData();
+          form.set("file", compressedFile);
+          form.set("slug", slug);
+          const initData = withInitData();
+          if (initData) form.set("initData", initData);
+          const res = await fetch("/api/franchize/wall-photo-upload", { method: "POST", body: form });
+          const json = (await res.json().catch(() => null)) as
+            | { success?: boolean; path?: string; width?: number; height?: number; bytes?: number; error?: string }
+            | null;
+          if (!res.ok || !json?.success || !json.path) {
+            throw new Error(json?.error || "Не удалось загрузить фото.");
+          }
+
+          setComposerPhotosSync(
+            composerPhotosRef.current.map((p) =>
+              p === placeholder
+                ? { ...placeholder, path: json.path!, width: json.width ?? null, height: json.height ?? null, bytes: json.bytes ?? null, uploading: false, failed: false }
+                : p,
+            ),
+          );
+        } catch (err) {
+          setComposerPhotosSync(
+            composerPhotosRef.current.map((p) => (p === placeholder ? { ...placeholder, uploading: false, failed: true } : p)),
+          );
+          setComposerError(err instanceof Error ? err.message : "Не удалось загрузить фото.");
+        }
+      }
+    },
+    [slug, withInitData, setComposerPhotosSync],
+  );
+
+  const removeComposerPhoto = useCallback((target: ComposerPhoto) => {
+    URL.revokeObjectURL(target.previewUrl);
+    setComposerPhotosSync(composerPhotosRef.current.filter((p) => p !== target));
+  }, [setComposerPhotosSync]);
+
+  // ── composer: bike picker («прикрепить байк из каталога») ──────────────────
+
+  const toggleBikePicker = useCallback(async () => {
+    const next = !bikePickerOpen;
+    setBikePickerOpen(next);
+    setComposerError(null);
+    if (next && bikeOptions === null && !bikeOptionsLoading) {
+      setBikeOptionsLoading(true);
+      const res = await getWallBikeOptionsAction({ slug });
+      if (res.ok) setBikeOptions(res.bikes);
+      else setComposerError(res.error);
+      setBikeOptionsLoading(false);
+    }
+  }, [bikePickerOpen, bikeOptions, bikeOptionsLoading, slug]);
+
+  const toggleBikeSelected = useCallback((bike: WallBikeOption) => {
+    setSelectedBikes((prev) => {
+      const isSelected = prev.some((b) => b.bikeId === bike.bikeId);
+      if (isSelected) return prev.filter((b) => b.bikeId !== bike.bikeId);
+      if (prev.length >= WALL_BIKES_MAX) {
+        setComposerError(`Максимум ${WALL_BIKES_MAX} байка на пост.`);
+        return prev;
+      }
+      return [...prev, bike];
+    });
+  }, []);
+
+  const pendingUploads = composerPhotos.some((p) => p.uploading);
+  const failedUploads = composerPhotos.filter((p) => p.failed).length;
+
+  // ── publish ────────────────────────────────────────────────────────────────
+
   const submitPost = useCallback(async () => {
     if (posting) return;
+    if (failedUploads > 0) {
+      setComposerError("Часть фото не загрузилось — удали их и попробуй ещё раз.");
+      return;
+    }
     setPosting(true);
     setComposerError(null);
     const res = await createCommunityPostAction({
@@ -152,6 +308,10 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       body: text.trim() || undefined,
       shareStats,
       initData: withInitData(),
+      photos: composerPhotos
+        .filter((p) => p.path)
+        .map((p) => ({ path: p.path, width: p.width, height: p.height, bytes: p.bytes })),
+      bikes: selectedBikes.map((b) => b.bikeId),
     });
     if (res.ok) {
       // Insert after pinned posts (pinned block always stays on top).
@@ -164,11 +324,15 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       setText("");
       setShareStats(false);
       setStatsPreview(null); // next stats post gets a FRESH server snapshot
+      for (const p of composerPhotosRef.current) URL.revokeObjectURL(p.previewUrl);
+      setComposerPhotosSync([]);
+      setSelectedBikes([]);
+      setBikePickerOpen(false);
     } else {
       setComposerError(res.error);
     }
     setPosting(false);
-  }, [posting, slug, text, shareStats, withInitData]);
+  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, setComposerPhotosSync]);
 
   // ── likes / comments / moderation ──────────────────────────────────────────
 
@@ -269,6 +433,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
     const res = await deleteCommunityPostAction({ postId: post.id, initData: withInitData() });
     if (res.ok) {
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      setLightbox((cur) => (cur && cur.postId === post.id ? null : cur));
     } else {
       setWallNotice(res.error);
     }
@@ -302,13 +467,15 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
   const canModerate = !!viewer?.isCrewStaff;
   const isAnonymous = !viewer?.userId;
 
+  const lightboxPost = lightbox ? posts.find((p) => p.id === lightbox.postId) ?? null : null;
+
   return (
     <section
-      className="overflow-hidden rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-soft)] shadow-2xl backdrop-blur-xl"
+      className="w-full border-y border-[var(--community-border)] bg-[var(--community-card-soft)] backdrop-blur-xl"
       aria-label="Стена сообщества экипажа"
     >
       {/* header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--community-border)] px-5 py-4 md:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--community-border)] px-4 py-4 md:px-8">
         <div className="flex items-center gap-3">
           <BarChart3 className="h-5 w-5 text-[var(--community-accent)]" />
           <h2 className="font-orbitron text-xl md:text-2xl text-[var(--community-text)]">Стена экипажа</h2>
@@ -339,7 +506,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                   Читать может кто угодно, писать — райдеры из Telegram
                 </p>
                 <p className="mt-1 text-sm text-[var(--community-muted)]">
-                  Открой эту страницу через бота экипажа — и публикуй посты, хвастайся статистикой поездок, комментируй.
+                  Открой эту страницу через бота экипажа — и публикуй посты с фото, хвастайся статистикой поездок, комментируй.
                 </p>
               </div>
             </div>
@@ -363,11 +530,179 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
               rows={3}
               className="w-full resize-y rounded-xl border border-[var(--community-border)] bg-transparent p-3 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)]"
             />
+
+            {/* photo previews */}
+            {composerPhotos.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {composerPhotos.map((photo, i) => (
+                  <div
+                    key={`${photo.previewUrl}-${i}`}
+                    className="group relative h-20 w-20 overflow-hidden rounded-xl border border-[var(--community-border)]"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+                    <img src={photo.previewUrl} alt={`Фото ${i + 1}`} className="h-full w-full object-cover" />
+                    {photo.uploading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      </div>
+                    )}
+                    {photo.failed && (
+                      <div className="absolute inset-x-0 bottom-0 bg-red-500/80 px-1 py-0.5 text-center text-[10px] text-white">
+                        ошибка
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeComposerPhoto(photo)}
+                      disabled={photo.uploading}
+                      aria-label={`Убрать фото ${i + 1}`}
+                      className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white transition hover:bg-black/80 disabled:opacity-40"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {composerPhotos.length < WALL_PHOTOS_MAX && (
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--community-border)] text-[var(--community-muted)] transition hover:border-[var(--community-accent)] hover:text-[var(--community-accent)]"
+                    aria-label="Добавить ещё фото"
+                  >
+                    <ImagePlus className="h-5 w-5" />
+                    <span className="text-[10px]">{composerPhotos.length}/{WALL_PHOTOS_MAX}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
             {shareStats && (
               <StatsPreviewCard stats={statsPreview} loading={statsLoading} />
             )}
+
+            {/* bike picker */}
+            {bikePickerOpen && (
+              <div className="mt-3 rounded-xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--community-accent)]">
+                    <Bike className="h-3.5 w-3.5" /> прикрепить байк из каталога
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setBikePickerOpen(false)}
+                    aria-label="Закрыть выбор байков"
+                    className="rounded-full p-1 text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {bikeOptionsLoading ? (
+                  <p className="flex items-center gap-2 text-sm text-[var(--community-muted)]">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Загружаем каталог…
+                  </p>
+                ) : (bikeOptions ?? []).length === 0 ? (
+                  <p className="text-sm text-[var(--community-muted)]">В каталоге экипажа пока нет байков.</p>
+                ) : (
+                  <div className="grid max-h-52 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                    {(bikeOptions ?? []).map((bike) => {
+                      const isSelected = selectedBikes.some((b) => b.bikeId === bike.bikeId);
+                      return (
+                        <button
+                          key={bike.bikeId}
+                          type="button"
+                          onClick={() => toggleBikeSelected(bike)}
+                          aria-pressed={isSelected}
+                          className={`flex items-center gap-2 rounded-xl border p-2 text-left transition ${
+                            isSelected
+                              ? "border-[var(--community-accent)] bg-[var(--community-accent)]/10"
+                              : "border-[var(--community-border)] hover:border-[var(--community-accent)]/50"
+                          }`}
+                        >
+                          {bike.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- crew-managed bike photos live on arbitrary hosts
+                            <img src={bike.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                          ) : (
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--community-accent)]/10">
+                              <Bike className="h-4 w-4 text-[var(--community-accent)]" />
+                            </span>
+                          )}
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--community-text)]">
+                            {bike.title}
+                          </span>
+                          {isSelected && (
+                            <span className="text-[10px] font-bold text-[var(--community-accent)]">✓</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* selected bikes chips */}
+            {selectedBikes.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedBikes.map((bike) => (
+                  <span
+                    key={bike.bikeId}
+                    className="flex items-center gap-1.5 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-2 pr-1 text-xs text-[var(--community-accent)]"
+                  >
+                    <Bike className="h-3.5 w-3.5" />
+                    {bike.title}
+                    <button
+                      type="button"
+                      onClick={() => toggleBikeSelected(bike)}
+                      aria-label={`Убрать ${bike.title}`}
+                      className="rounded-full p-0.5 transition hover:bg-[var(--community-accent)]/20"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.length) void addPhotoFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={composerPhotos.length >= WALL_PHOTOS_MAX}
+                  title={`Фото (до ${WALL_PHOTOS_MAX})`}
+                  aria-label="Прикрепить фото"
+                  className="flex items-center gap-2 rounded-full border border-[var(--community-border)] px-3.5 py-2 text-xs font-semibold text-[var(--community-muted)] transition hover:border-[var(--community-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Фото
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void toggleBikePicker()}
+                  disabled={selectedBikes.length >= WALL_BIKES_MAX && !bikePickerOpen}
+                  title="Прикрепить байк из каталога"
+                  aria-label="Прикрепить байк из каталога"
+                  aria-expanded={bikePickerOpen}
+                  className={`flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    bikePickerOpen || selectedBikes.length > 0
+                      ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
+                      : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)]"
+                  }`}
+                >
+                  <Bike className="h-4 w-4" />
+                  Байк
+                </button>
                 <button
                   type="button"
                   onClick={() => void toggleShareStats()}
@@ -378,7 +713,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                   }`}
                 >
                   <BarChart3 className="h-4 w-4" />
-                  {statsLoading ? "Считаем поездки…" : "Поделиться статистикой"}
+                  {statsLoading ? "Считаем поездки…" : "Статистика"}
                 </button>
                 <span className="text-xs text-[var(--community-muted)] opacity-70">
                   {text.length} / {WALL_POST_MAX_LEN}
@@ -387,11 +722,15 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
               <button
                 type="button"
                 onClick={() => void submitPost()}
-                disabled={posting || (!text.trim() && !shareStats)}
+                disabled={
+                  posting ||
+                  pendingUploads ||
+                  (!text.trim() && !shareStats && composerPhotos.length === 0 && selectedBikes.length === 0)
+                }
                 className="flex items-center gap-2 rounded-full bg-[var(--community-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--community-accent-text)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Опубликовать
+                {pendingUploads ? "Загружаем фото…" : "Опубликовать"}
               </button>
             </div>
             {composerError && (
@@ -420,7 +759,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
               Стена экипажа {crewName} пока пустая — будь первым!
             </p>
             <p className="mt-1 text-sm text-[var(--community-muted)]">
-              Расскажи про свой первый заезд или поделись статистикой поездок.
+              Расскажи про свой первый заезд, прикрепи фото или поделись статистикой поездок.
             </p>
           </div>
         ) : (
@@ -429,6 +768,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
               <PostCard
                 key={post.id}
                 post={post}
+                slug={slug}
                 viewer={viewer}
                 canModerate={canModerate}
                 expanded={expanded.has(post.id)}
@@ -444,6 +784,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                 onHide={(hide) => void moderatePost(post, hide)}
                 onDelete={() => void deletePost(post)}
                 onHideComment={(commentId) => void hideComment(post, commentId)}
+                onOpenPhoto={(index) => setLightbox({ postId: post.id, index })}
               />
             ))}
           </div>
@@ -461,6 +802,16 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
           </button>
         )}
       </div>
+
+      {/* fullscreen photo viewer with pinch-zoom */}
+      {lightboxPost && lightbox && lightboxPost.photos.length > 0 && (
+        <PhotoLightbox
+          photos={lightboxPost.photos}
+          index={Math.min(lightbox.index, lightboxPost.photos.length - 1)}
+          onClose={() => setLightbox(null)}
+          onIndexChange={(index) => setLightbox({ postId: lightboxPost.id, index })}
+        />
+      )}
     </section>
   );
 }
@@ -546,8 +897,359 @@ function StatsGrid({ stats, compact = false }: { stats: RentalStatsSnapshot; com
   );
 }
 
+// ── photo grid (VK-style: 1 → large, 2+ → even grid) ────────────────────────
+
+function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (index: number) => void }) {
+  if (photos.length === 0) return null;
+  if (photos.length === 1) {
+    const p = photos[0];
+    return (
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => onOpen(0)}
+          className="block w-full overflow-hidden rounded-xl border border-[var(--community-border)]"
+          aria-label="Открыть фото"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
+          <img
+            src={p.url}
+            alt="Фото поста"
+            loading="lazy"
+            className="max-h-[560px] w-full object-cover"
+          />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className={`mt-3 grid gap-1.5 ${photos.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+      {photos.map((p, i) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => onOpen(i)}
+          className="aspect-square overflow-hidden rounded-xl border border-[var(--community-border)]"
+          aria-label={`Открыть фото ${i + 1}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
+          <img src={p.url} alt={`Фото ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── bike mention chips on a post ─────────────────────────────────────────────
+
+function PostBikeChips({ bikes, slug }: { bikes: WallBikeRefView[]; slug: string }) {
+  if (bikes.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {bikes.map((bike) => (
+        <Link
+          key={bike.bikeId}
+          href={`/franchize/${slug}/catalog`}
+          title={`Открыть каталог — ${bike.title}`}
+          className="flex items-center gap-2 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-1 pr-3 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+        >
+          {bike.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- crew-managed bike photos live on arbitrary hosts
+            <img src={bike.imageUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--community-accent)]/15">
+              <Bike className="h-3.5 w-3.5" />
+            </span>
+          )}
+          {bike.title}
+          <span className="font-normal opacity-70">· из каталога</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ── fullscreen lightbox with pinch-zoom / pan / double-tap / swipe ──────────
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
+}
+
+interface PhotoLightboxProps {
+  photos: WallPhotoView[];
+  index: number;
+  onClose: () => void;
+  onIndexChange: (index: number) => void;
+}
+
+function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxProps) {
+  // gesture state — refs avoid re-renders on every pointermove
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [smooth, setSmooth] = useState(true); // CSS transition when NOT gesturing
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ dist: number; scale: number; midX: number; midY: number } | null>(null);
+  const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
+
+  const photo = photos[index];
+
+  const reset = useCallback(() => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+    setSmooth(true);
+  }, []);
+
+  const go = useCallback(
+    (delta: number) => {
+      const next = clamp(index + delta, 0, photos.length - 1);
+      if (next !== index) {
+        reset();
+        onIndexChange(next);
+      }
+    },
+    [index, photos.length, onIndexChange, reset],
+  );
+
+  // scroll lock + keyboard nav
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") go(-1);
+      if (e.key === "ArrowRight") go(1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose, go]);
+
+  if (!photo) return null;
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    setSmooth(false);
+
+    if (pointers.current.size === 1) {
+      if (scale > 1) {
+        panStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+      } else {
+        swipeStart.current = { x: e.clientX, y: e.clientY };
+        // double-tap detection (mobile)
+        const now = Date.now();
+        const last = lastTap.current;
+        if (last && now - last.time < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30) {
+          // toggle zoom at tap point
+          const nx = (window.innerWidth / 2 - e.clientX) * 1.5;
+          const ny = (window.innerHeight / 2 - e.clientY) * 1.5;
+          setScale((s) => (s > 1 ? 1 : 2.5));
+          setOffset(scale > 1 ? { x: 0, y: 0 } : { x: nx, y: ny });
+          lastTap.current = null;
+          swipeStart.current = null;
+        } else {
+          lastTap.current = { time: now, x: e.clientX, y: e.clientY };
+        }
+      }
+    } else if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()];
+      pinchStart.current = {
+        dist: Math.hypot(a.x - b.x, a.y - b.y),
+        scale,
+        midX: (a.x + b.x) / 2,
+        midY: (a.y + b.y) / 2,
+      };
+      swipeStart.current = null;
+      panStart.current = null;
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.current.size === 2 && pinchStart.current) {
+      const [a, b] = [...pointers.current.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      const start = pinchStart.current;
+      const nextScale = clamp((start.scale * dist) / Math.max(start.dist, 1), 1, 5);
+      // keep the pinch midpoint anchored while zooming
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const k = nextScale - start.scale;
+      setOffset({
+        x: (start.midX - cx) * -k + (midX - start.midX),
+        y: (start.midY - cy) * -k + (midY - start.midY),
+      });
+      setScale(nextScale);
+    } else if (pointers.current.size === 1 && panStart.current && scale > 1) {
+      const start = panStart.current;
+      setOffset({ x: start.ox + (e.clientX - start.x), y: start.oy + (e.clientY - start.y) });
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const hadTwo = pointers.current.size === 2;
+    pointers.current.delete(e.pointerId);
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+
+    if (pointers.current.size === 0) {
+      // swipe navigation only at natural zoom
+      const swipe = swipeStart.current;
+      if (swipe && scale <= 1.01 && !hadTwo) {
+        const dx = e.clientX - swipe.x;
+        const dy = e.clientY - swipe.y;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          go(dx < 0 ? 1 : -1);
+          return;
+        }
+      }
+      // snap back
+      panStart.current = null;
+      swipeStart.current = null;
+      pinchStart.current = null;
+      if (scale <= 1.05) {
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+        setSmooth(true);
+      } else {
+        setSmooth(true);
+      }
+    } else if (pointers.current.size === 1) {
+      // two → one: re-anchor panning to the remaining finger
+      const [rest] = [...pointers.current.values()];
+      pinchStart.current = null;
+      if (scale > 1) panStart.current = { x: rest.x, y: rest.y, ox: offset.x, oy: offset.y };
+    }
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if (scale > 1) {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+    } else {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      setScale(2.5);
+      setOffset({ x: (cx - e.clientX) * 1.5, y: (cy - e.clientY) * 1.5 });
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col bg-black/95"
+      style={{ touchAction: "none" }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Просмотр фото"
+    >
+      {/* top bar */}
+      <div className="flex items-center justify-between px-4 py-3 text-white">
+        <span className="text-sm tabular-nums text-white/80">
+          {index + 1} / {photos.length}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Закрыть просмотр"
+          className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* image stage */}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+        <div
+          className="flex items-center justify-center"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={onDoubleClick}
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+            transition: smooth ? "transform 200ms ease-out" : "none",
+            willChange: "transform",
+            touchAction: "none",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
+          <img
+            src={photo.url}
+            alt={`Фото ${index + 1}`}
+            draggable={false}
+            className="max-h-[78vh] max-w-[94vw] select-none object-contain"
+          />
+        </div>
+
+        {/* desktop arrows */}
+        {photos.length > 1 && index > 0 && (
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            aria-label="Предыдущее фото"
+            className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 md:block"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        )}
+        {photos.length > 1 && index < photos.length - 1 && (
+          <button
+            type="button"
+            onClick={() => go(1)}
+            aria-label="Следующее фото"
+            className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 md:block"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        )}
+      </div>
+
+      {/* hint + thumbs */}
+      <div className="flex flex-col items-center gap-2 px-4 pb-4">
+        <p className="hidden text-[11px] text-white/50 md:block">
+          Свайп ← → для навигации · двойной клик — зум · Esc — закрыть
+        </p>
+        <p className="text-[11px] text-white/50 md:hidden">
+          Щипок — зум · двойной тап — зум · свайп — следующее фото
+        </p>
+        {photos.length > 1 && (
+          <div className="flex max-w-full gap-1.5 overflow-x-auto py-1">
+            {photos.map((p, i) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  reset();
+                  onIndexChange(i);
+                }}
+                aria-label={`Фото ${i + 1}`}
+                className={`h-11 w-11 shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                  i === index ? "border-white" : "border-transparent opacity-50 hover:opacity-80"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
+                <img src={p.url} alt="" className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface PostCardProps {
   post: WallPostView;
+  slug: string;
   viewer: WallViewerInfo | null;
   canModerate: boolean;
   expanded: boolean;
@@ -563,10 +1265,11 @@ interface PostCardProps {
   onHide: (hide: boolean) => void;
   onDelete: () => void;
   onHideComment: (commentId: string) => void;
+  onOpenPhoto: (index: number) => void;
 }
 
 function PostCard(props: PostCardProps) {
-  const { post, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending } = props;
+  const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending } = props;
   const isOwnPost = !!viewer?.userId && viewer.userId === post.author.userId;
   const authorName = post.author.fullName || post.author.username || "Райдер";
 
@@ -640,6 +1343,12 @@ function PostCard(props: PostCardProps) {
       {post.body && (
         <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--community-text)]">{post.body}</p>
       )}
+
+      {/* photos */}
+      <PostPhotoGrid photos={post.photos} onOpen={props.onOpenPhoto} />
+
+      {/* bike mentions */}
+      <PostBikeChips bikes={post.bikes} slug={slug} />
 
       {/* stats snapshot */}
       {post.kind === "stats" && post.stats && (

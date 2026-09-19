@@ -638,6 +638,17 @@ export function useStartParamRouter() {
             targetPath = `/franchize/${crewSlug}/leads${params.toString() ? `?${params.toString()}` : ""}`;
             logger.info(`[ClientLayout] Routing to leads: ${targetPath}`);
           }
+        } else if (paramToProcess === "wall" || paramToProcess.startsWith("wall_")) {
+          // ── Community wall deep link: wall → own crew, wall_{slug} → that crew ──
+          // Sent by the «Новый пост на стене» TG notification (lib/wall-notify.ts).
+          const wallSlug =
+            paramToProcess === "wall"
+              ? userCrewInfo?.slug || "vip-bike"
+              : paramToProcess.slice(5).replace(/[^A-Za-z0-9_-]/g, "");
+          if (wallSlug) {
+            targetPath = `/franchize/${wallSlug}/community`;
+            logger.info(`[ClientLayout] Routing to community wall: ${targetPath}`);
+          }
         } else if (paramToProcess.startsWith("rental_")) {
           // ── Rental detail deep link: rental_{rentalId} ──
           // (NOT "rent_" which is the QR claim link handled above)

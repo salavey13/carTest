@@ -265,6 +265,21 @@ export interface WallRentalRef {
   imageUrl: string | null;
 }
 
+/** Photo on a wall post (public wallpix bucket URL, ready to render). */
+export interface WallPhotoView {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+/** Catalogue bike attached («mentioned») to a wall post. */
+export interface WallBikeRefView {
+  bikeId: string;
+  title: string;
+  imageUrl: string | null;
+}
+
 export interface WallPostView {
   id: string;
   kind: "post" | "stats";
@@ -279,6 +294,8 @@ export interface WallPostView {
   author: WallAuthorView;
   comments: WallCommentView[];
   rental: WallRentalRef | null;
+  photos: WallPhotoView[];
+  bikes: WallBikeRefView[];
 }
 
 export interface WallViewerInfo {
@@ -304,3 +321,147 @@ export const WALL_FEED_PAGE_SIZE = 25;
 /** Body length limits (server validates, client mirrors with a counter). */
 export const WALL_POST_MAX_LEN = 2000;
 export const WALL_COMMENT_MAX_LEN = 500;
+
+// ── Photos + bike mentions (wall v2) ─────────────────────────────────────────
+
+/** Max photos per wall post (client picker + server both enforce). */
+export const WALL_PHOTOS_MAX = 6;
+/** Max catalogue bikes attachable to one post. */
+export const WALL_BIKES_MAX = 3;
+/** Storage bucket for wall photos (created by migration 20260919220000). */
+export const WALLPHOTO_BUCKET = "wallpix";
+
+/**
+ * Public CDN URL of a wall photo — the bucket is public by design (the feed
+ * itself is public), so no signed-URL round trips are needed.
+ */
+export function wallPhotoPublicUrl(storagePath: string): string {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  // encodeURIComponent per segment: paths contain "/" separators that must stay.
+  const encoded = storagePath.split("/").map(encodeURIComponent).join("/");
+  return `${base}/storage/v1/object/public/${WALLPHOTO_BUCKET}/${encoded}`;
+}
+
+const STAGING_FILE_RE = /^[A-Za-z0-9_-]{8,64}\.(jpg|jpeg|png|webp)$/;
+
+/**
+ * A staging path is only trustworthy if it lives in the CALLER's own folder:
+ * `staging/<userId>/<uuid>.<ext>`. Anything else (other users' staging files,
+ * `posts/...` finals, `..` traversal) is rejected before we ever move storage
+ * objects or insert rows.
+ */
+export function isWallStagingPath(storagePath: string, userId: string): boolean {
+  if (!storagePath || !userId) return false;
+  const prefix = `staging/${userId}/`;
+  if (!storagePath.startsWith(prefix)) return false;
+  const fileName = storagePath.slice(prefix.length);
+  return STAGING_FILE_RE.test(fileName);
+}
+
+/** Raw photo payload the composer sends with createPost (pre-validation). */
+export interface WallPhotoInput {
+  path: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+}
+
+export interface SanitizedWallPhoto {
+  path: string;
+  width: number | null;
+  height: number | null;
+  bytes: number | null;
+}
+
+/**
+ * Validate the composer's photo list server-side:
+ * ≤ WALL_PHOTOS_MAX items, every path is the actor's own staging path,
+ * dimensions/size are sane integers or dropped. Returns null when the whole
+ * list is invalid (wrong type, too many) — the action then rejects the post.
+ */
+export function sanitizeWallPhotoInputs(
+  raw: unknown,
+  userId: string,
+): SanitizedWallPhoto[] | null {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > WALL_PHOTOS_MAX) return null;
+  const out: SanitizedWallPhoto[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.path !== "string" || !isWallStagingPath(rec.path, userId)) return null;
+    if (seen.has(rec.path)) continue; // duplicate attach → keep one
+    seen.add(rec.path);
+    const int = (v: unknown, max: number): number | null =>
+      typeof v === "number" && Number.isInteger(v) && v > 0 && v <= max ? v : null;
+    out.push({
+      path: rec.path,
+      width: int(rec.width, 20000),
+      height: int(rec.height, 20000),
+      bytes: int(rec.bytes, 20 * 1024 * 1024),
+    });
+  }
+  return out;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Bike-mention ids from the composer: strings only, must look like UUIDs,
+ * deduplicated, capped at WALL_BIKES_MAX. Returns null when the payload shape
+ * is wrong (caller rejects), [] when nothing is attached.
+ */
+export function sanitizeWallBikeIds(raw: unknown): string[] | null {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > WALL_BIKES_MAX) return null;
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string" || !UUID_RE.test(item)) return null;
+    if (!out.includes(item)) out.push(item);
+  }
+  return out;
+}
+
+// ── TG notification message builder (pure, unit-tested) ─────────────────────
+
+/** Short one-line preview of a post body for the TG notification. */
+export function buildWallPostPreview(body: string | null | undefined, max = 220): string {
+  const flat = String(body ?? "").replace(/\s+/g, " ").trim();
+  if (!flat) return "";
+  if (flat.length <= max) return flat;
+  return `${flat.slice(0, max - 1).trimEnd()}…`;
+}
+
+/** Escapes HTML special chars for Telegram HTML parse mode. */
+export function escapeTelegramHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export interface WallPostNotifyInfo {
+  authorName: string;
+  body: string;
+  photoCount: number;
+  bikeTitles: string[];
+  hasStats: boolean;
+}
+
+/**
+ * HTML message for «new post on the wall» crew notifications. Pure — the
+ * delivery transport lives in lib/wall-notify.ts; this builder is unit-tested
+ * without any Supabase/Telegram imports.
+ */
+export function buildWallPostNotifyHtml(info: WallPostNotifyInfo): string {
+  const lines: string[] = ["🟣 <b>Новый пост на стене экипажа</b>", ""];
+  lines.push(`👤 ${escapeTelegramHtml(info.authorName || "Райдер")}`);
+  const preview = buildWallPostPreview(info.body);
+  if (preview) lines.push(`💬 «${escapeTelegramHtml(preview)}»`);
+  if (info.photoCount > 0) {
+    lines.push(`📷 ${info.photoCount} ${pluralRu(info.photoCount, ["фото", "фото", "фото"])}`);
+  }
+  if (info.bikeTitles.length > 0) {
+    lines.push(`🏍 ${info.bikeTitles.map(escapeTelegramHtml).join(", ")}`);
+  }
+  if (info.hasStats) lines.push(`📊 делится статистикой поездок`);
+  return lines.join("\n");
+}

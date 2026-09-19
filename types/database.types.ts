@@ -380,11 +380,59 @@ export interface Database {
           },
         ]
       }
-      // NOTE: crew_posts / crew_post_comments / crew_post_likes blocks below were
-      // hand-inserted to match the 20260919000000_onlybike_community_wall.sql
-      // migration BEFORE it was applied to the live DB (gen:db-types can only
-      // see tables that exist). Shapes follow scripts/gen-db-types.mjs output
-      // exactly — after applying the migration, `npm run gen:db-types` regenerates them identically.
+      // NOTE: crew_posts / crew_post_comments / crew_post_likes /
+      // crew_post_photos / crew_post_bikes blocks below were hand-inserted to
+      // match the 20260919000000_onlybike_community_wall.sql +
+      // 20260919220000_onlybike_wall_photos_bikes.sql migrations BEFORE they
+      // were applied to the live DB (gen:db-types can only see tables that
+      // exist). Shapes follow scripts/gen-db-types.mjs output exactly — after
+      // applying the migrations, `npm run gen:db-types` regenerates them identically.
+      crew_post_bikes: {
+        Row: {
+          post_id: string
+          bike_id: string
+          crew_id: string
+          position: number
+          created_at: string
+        }
+        Insert: {
+          post_id: string
+          bike_id: string
+          crew_id: string
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          post_id?: string
+          bike_id?: string
+          crew_id?: string
+          position?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_post_bikes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "crew_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_post_bikes_bike_id_fkey"
+            columns: ["bike_id"]
+            isOneToOne: false
+            referencedRelation: "cars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_post_bikes_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_post_comments: {
         Row: {
           id: string
@@ -467,6 +515,57 @@ export interface Database {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      crew_post_photos: {
+        Row: {
+          id: string
+          post_id: string
+          crew_id: string
+          storage_path: string
+          width: number | null
+          height: number | null
+          byte_size: number | null
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          crew_id: string
+          storage_path: string
+          width?: number | null
+          height?: number | null
+          byte_size?: number | null
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          crew_id?: string
+          storage_path?: string
+          width?: number | null
+          height?: number | null
+          byte_size?: number | null
+          position?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_post_photos_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "crew_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_post_photos_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crews"
+            referencedColumns: ["id"]
           },
         ]
       }

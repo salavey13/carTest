@@ -89,13 +89,14 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     expect(init).not.toMatch(/^Paul:/m);
   });
 
-  it("apply path holds exactly the 164 clean SQL files — no junk, no crons", () => {
+  it("apply path holds exactly the 165 clean SQL files — no junk, no crons", () => {
     // 159 → 160: 20260901120000_owner_cash_entries.sql (deposit-entries feature)
     // 160 → 161: 20260907000000_leads_perf_indexes.sql (leads page perf indexes)
     // 161 → 162: 20260908000000_lead_events.sql (Lead Game: lead history journal)
     // 162 → 163: 20260910120000_equipment_unify_finish.sql (equipment → unified rentals: re-backfill + income_equipment trigger + legacy trigger drop)
     // 163 → 164: 20260919000000_onlybike_community_wall.sql (OnlyBike community wall: crew_posts + comments + likes, count triggers, RLS)
-    expect(files.length).toBe(164);
+    // 164 → 165: 20260919220000_onlybike_wall_photos_bikes.sql (wall v2: crew_post_photos + crew_post_bikes + public wallpix bucket + policies)
+    expect(files.length).toBe(165);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

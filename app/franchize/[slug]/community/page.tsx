@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, Handshake, MapPinned, ShieldCheck, UsersRound } from "lucide-react";
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
@@ -9,13 +8,11 @@ import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 
-
-
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   return buildFranchizeSectionMetadata(slug, {
-    sectionTitle: "Сообщество и поездки",
-    sectionDescription: "События, партнёры и городские маршруты экипажа для совместных выездов.",
+    sectionTitle: "Сообщество экипажа",
+    sectionDescription: "Живая стена экипажа: посты райдеров, фото поездок, статистика аренды и комментарии.",
     pathSuffix: "/community",
   });
 }
@@ -36,118 +33,70 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
     : crewBotUsername
       ? `https://t.me/${crewBotUsername}`
       : "";
-  const { communityEvents, partnerCards, cityRiderTips } = crew.contentBlocks;
   const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
+  const themeVars = {
+    ["--community-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+    ["--community-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+    ["--community-card" as string]: surface.subtleCard.backgroundColor,
+    ["--community-base-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase, 0.35),
+    ["--community-card-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.86),
+    ["--community-card-faint" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.54),
+    ["--community-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+    ["--community-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
+    ["--community-accent-text" as string]: crew.theme.isAuto
+      ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palettes?.light || crew.theme.palette)
+      : accentText,
+    color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+  } as React.CSSProperties;
+
   return (
-    <main className="min-h-screen" style={surface.page}>
+    <main className="min-h-screen" style={{ ...surface.page, ...themeVars }}>
       <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
 
-      <div
-        className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 text-[var(--community-text)] md:pt-24"
-        style={{
-          ["--community-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
-          ["--community-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
-          ["--community-card" as string]: surface.subtleCard.backgroundColor,
-          ["--community-base-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase, 0.35),
-          ["--community-card-soft" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.86),
-          ["--community-card-faint" as string]: withAlpha(crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard, 0.54),
-          ["--community-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
-          ["--community-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
-          ["--community-accent-text" as string]: crew.theme.isAuto
-            ? readablePaletteTextOnColor(crew.theme.palettes?.dark?.accentMain || crew.theme.palettes?.light?.accentMain || crew.theme.palette.accentMain, crew.theme.palettes?.dark || crew.theme.palettes?.light || crew.theme.palette)
-            : accentText,
-          color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
-        }}
-      >
-        <section className="overflow-hidden rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-soft)] p-6 shadow-2xl backdrop-blur-xl md:p-8">
-          <div className="grid gap-8 lg:grid-cols-[1.2fr,0.8fr] lg:items-end">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--community-accent)]">FRZ-R9 • community hub</p>
-              <h1 className="mt-4 font-orbitron text-4xl leading-tight md:text-6xl">
-                Куда ехать с {brandName} прямо сейчас
-              </h1>
-              <p className="mt-4 max-w-2xl text-base text-[var(--community-muted)] md:text-lg">
-                Живая стена экипажа: посты райдеров, статистика поездок и комментарии — плюс события, партнёры и понятные городские сценарии для тех, кто открыл MapRiders и спросил: «а что мне реально делать?»
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link href={`/franchize/${crewSlug}/map-riders`} className="rounded-full bg-[var(--community-accent)] px-5 py-3 text-sm font-semibold text-[var(--community-accent-text)] transition hover:brightness-110">
-                  Открыть live-карту
-                </Link>
-                <a href={telegramHref} target="_blank" rel="noreferrer" className="rounded-full border border-[var(--community-border)] px-5 py-3 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)]">
-                  Написать экипажу
-                </a>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-5">
-              <div className="flex items-center gap-3 text-[var(--community-accent)]">
-                <UsersRound className="h-5 w-5" />
-                <span className="text-sm font-semibold uppercase tracking-[0.16em]">как это работает</span>
-              </div>
-              <ol className="mt-4 space-y-3 text-sm text-[var(--community-muted)]">
-                <li><span className="text-[var(--community-text)]">1.</span> Проходишь быстрый quiz на MapRiders.</li>
-                <li><span className="text-[var(--community-text)]">2.</span> Включаешь геошеринг с приватностью экипажа.</li>
-                <li><span className="text-[var(--community-text)]">3.</span> Едешь к событию или meetup-пину без хаоса.</li>
-              </ol>
-            </div>
+      {/* compact intro — no legacy schedule/guide/partner filler, just the two live CTAs */}
+      <div className="mx-auto w-full max-w-6xl px-4 pt-20 md:pt-24">
+        <section className="flex flex-wrap items-center justify-between gap-4 pb-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--community-accent)]">
+              OnlyBike community
+            </p>
+            <h1 className="mt-2 font-orbitron text-3xl leading-tight md:text-5xl">
+              Стена экипажа {brandName}
+            </h1>
+            <p className="mt-3 max-w-2xl text-base text-[var(--community-muted)]">
+              Живая лента райдеров: посты с фото, статистика поездок из аренды и комментарии — как стена экипажа, только на всю ширину.
+            </p>
           </div>
-        </section>
-
-        {/* OnlyBike community wall — live feed: posts, rental stats, comments.
-            Server actions verify the Telegram actor; anonymous visitors read-only. */}
-        <CommunityWallClient
-          slug={crewSlug}
-          crewName={brandName}
-          botUsername={crewBotUsername || (crewTelegram ? crewTelegram : null)}
-        />
-
-        <section className="grid gap-4 md:grid-cols-3">
-          {communityEvents.map((event) => (
-            <article key={event.title} className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-5 backdrop-blur-xl">
-              <CalendarDays className="h-6 w-6 text-[var(--community-accent)]" />
-              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--community-muted)] opacity-70">{event.time}</p>
-              <h2 className="mt-2 text-xl font-semibold text-[var(--community-text)]">{event.title}</h2>
-              <p className="mt-1 text-sm text-[var(--community-accent)]">{event.place}</p>
-              <p className="mt-3 text-sm leading-6 text-[var(--community-muted)]">{event.text}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
-          <div className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-base-soft)] p-6">
-            <div className="flex items-center gap-3 text-[var(--community-accent)]">
-              <MapPinned className="h-6 w-6" />
-              <h2 className="font-orbitron text-2xl text-[var(--community-text)]">Городской riding-гайд</h2>
-            </div>
-            <ul className="mt-5 space-y-3 text-sm text-[var(--community-muted)]">
-              {cityRiderTips.map((tip) => (
-                <li key={tip.text} className="flex gap-3 rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--community-accent)]" />
-                  <span>{tip.text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-3xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-6">
-            <div className="flex items-center gap-3 text-[var(--community-accent)]">
-              <Handshake className="h-6 w-6" />
-              <h2 className="font-orbitron text-2xl text-[var(--community-text)]">Партнёры экипажа</h2>
-            </div>
-            <div className="mt-5 grid gap-3">
-              {partnerCards.map((partner) => (
-                <article key={partner.name} className="rounded-2xl border border-[var(--community-border)] bg-[var(--community-base-soft)] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold text-[var(--community-text)]">{partner.name}</h3>
-                    <span className="rounded-full border border-[var(--community-accent)]/35 bg-[var(--community-accent)]/10 px-3 py-1 text-xs text-[var(--community-accent)]">{partner.role}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--community-muted)]">{partner.perk}</p>
-                </article>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/franchize/${crewSlug}/map-riders`}
+              className="rounded-full bg-[var(--community-accent)] px-5 py-3 text-sm font-semibold text-[var(--community-accent-text)] transition hover:brightness-110"
+            >
+              Открыть live-карту
+            </Link>
+            {telegramHref && (
+              <a
+                href={telegramHref}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-[var(--community-border)] px-5 py-3 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)]"
+              >
+                Написать экипажу
+              </a>
+            )}
           </div>
         </section>
       </div>
+
+      {/* OnlyBike community wall — live feed: posts, photos, rental stats, comments.
+          FULL PAGE WIDTH on purpose (no max-w wrapper): the wall is the page.
+          Server actions verify the Telegram actor; anonymous visitors read-only. */}
+      <CommunityWallClient
+        slug={crewSlug}
+        crewName={brandName}
+        botUsername={crewBotUsername || (crewTelegram ? crewTelegram : null)}
+      />
 
       <CrewFooter crew={crew} />
     </main>
