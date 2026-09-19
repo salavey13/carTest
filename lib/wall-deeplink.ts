@@ -87,20 +87,32 @@ export function parseWallDeepLink(param: string | null | undefined): WallDeepLin
 
 // ── Builders (the notify side + share button) ────────────────────────────────
 
+/**
+ * Telegram `startapp` budget: keep the WHOLE param ≤ 64 chars even for long
+ * crew slugs (a 36-char uuid + prefix already eats ~41 of them). Slugs longer
+ * than the per-builder budget are truncated — the wall slug in the URL is a
+ * convenience, the ids are the payload; a truncated slug degrades to the
+ * viewer's-crew fallback instead of a dead link.
+ */
+function budgetedSlug(slug: string, reserved: number): string {
+  const s = sanitizeWallSlug(slug) ?? "vip-bike";
+  return s.slice(0, Math.max(1, 64 - reserved));
+}
+
 export function wallStartParam(slug: string): string {
-  return `wall_${sanitizeWallSlug(slug) ?? "vip-bike"}`;
+  return `wall_${budgetedSlug(slug, 5)}`;
 }
 
 export function wallPostStartParam(postId: string, slug: string): string {
   const id = postId.trim();
   if (!isUuidLike(id)) throw new Error(`wallPostStartParam: postId is not a uuid: ${id}`);
-  return `post_${id}_${sanitizeWallSlug(slug) ?? "vip-bike"}`;
+  return `post_${id}_${budgetedSlug(slug, 5 + 36 + 1)}`;
 }
 
 export function wallComposeStartParam(rentalId: string, slug: string): string {
   const id = rentalId.trim();
   if (!isUuidLike(id)) throw new Error(`wallComposeStartParam: rentalId is not a uuid: ${id}`);
-  return `wallp_${id}_${sanitizeWallSlug(slug) ?? "vip-bike"}`;
+  return `wallp_${id}_${budgetedSlug(slug, 6 + 36 + 1)}`;
 }
 
 /** https://t.me/<bot>/app?startapp=<param> — opens the Mini App on the spot. */

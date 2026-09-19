@@ -144,6 +144,14 @@ describe("TG builders", () => {
     expect(html).toContain("Откатал 12 ч");
   });
 
+  it("never emits <br> — Telegram Bot API HTML whitelist rejects it (P0 v4 review)", () => {
+    const summary = summarizeRide({ ...BASE, startIso: isoAgo(12), endIso: isoAgo(0.5) });
+    const html = buildRideFinishedRenterHtml(summary, buildSuggestedWallPost(summary));
+    expect(html).not.toContain("<br>");
+    // multiline suggested post survives as plain newlines (valid in TG HTML)
+    expect(html.split("\n").length).toBeGreaterThan(3);
+  });
+
   it("withheld deposit gets the ⚠️ variant", () => {
     const summary = summarizeRide({ ...BASE, depositReturned: false, startIso: isoAgo(4), endIso: isoAgo(1) });
     const html = buildRideFinishedRenterHtml(summary, buildSuggestedWallPost(summary));
@@ -222,6 +230,16 @@ describe("notifyRideFinishedAndSuggestPost", () => {
 });
 
 describe("wiring (source contract)", () => {
+  it("the crew cc button carries startapp=wall_<slug> — NOT lead_ (leads-page bug)", () => {
+    const src = read("app/franchize/lib/ride-share-notify.ts");
+    expect(src).not.toContain("leadDeeplinkUrl(wallStartParam");
+    expect(src).toContain("wallDeepLinkUrl");
+    // and the shared wall-notify builder is fixed too:
+    const notify = read("app/franchize/lib/wall-notify.ts");
+    expect(notify).not.toContain("leadDeeplinkUrl(`wall_");
+    expect(notify).toContain("wallStartParam(safeSlug)");
+  });
+
   it("confirmVehicleReturn calls the ride-share notify after the receipt (non-fatal, awaited)", () => {
     const src = read("app/rentals/actions.ts");
     expect(src).toContain("notifyRideFinishedAndSuggestPost");

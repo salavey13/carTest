@@ -166,6 +166,24 @@ describe("migration 20260920040000 (source contract)", () => {
   });
 });
 
+describe("dedup + anti-flood wiring (source contract)", () => {
+  const lib = read("app/franchize/lib/wall-engage-notify.ts");
+
+  it("claimNotifySlot is a TRUE ignore-duplicates upsert (P0 v4 review fix)", () => {
+    expect(lib).toContain('upsert(');
+    expect(lib).toContain('onConflict: "post_id,kind,key"');
+    expect(lib).toContain("ignoreDuplicates: true");
+    // a plain insert would 409 on conflict and hit the error branch → always send
+    expect(lib).not.toMatch(/\.insert\(\{ post_id: postId, kind, key \}\)/);
+  });
+
+  it("comment fanout has an hourly cap per (recipient, post) and parallel sends", () => {
+    expect(lib).toContain("WALL_COMMENT_NOTIFY_HOURLY_CAP_PER_POST = 3");
+    expect(lib).toContain("countRecentCommentNotifies");
+    expect(lib).toContain("Promise.allSettled(");
+  });
+});
+
 describe("action wiring (source contract)", () => {
   const actions = read("app/franchize/server-actions/community-wall.ts");
 
@@ -180,6 +198,15 @@ describe("action wiring (source contract)", () => {
     expect(actions).toContain('reason: "post_author"');
     expect(actions).toContain('reason: "reply_author"');
     expect(actions).toContain('reason: "mentioned"');
+  });
+
+  it("mention lookup is EXACT (no ilike wildcards — @ivan_petrov must not ping ivanXpetrov)", () => {
+    expect(actions).not.toContain("username.ilike.");
+    expect(actions).toContain('.in("username", mentionNames)');
+  });
+
+  it("reaction notify meta fetch skips hidden posts", () => {
+    expect(actions).toContain('is_hidden === false');
   });
 
   it("new-post crew notification now carries the postId (lands ON the post)", () => {

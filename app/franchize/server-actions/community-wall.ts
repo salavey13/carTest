@@ -900,17 +900,18 @@ export async function togglePostReactionAction(input: {
     try {
       const { data: postMeta } = await supabaseAdmin
         .from("crew_posts")
-        .select("author_id, body, crew_id, crews(slug)")
+        .select("author_id, body, crew_id, is_hidden, crews(slug)")
         .eq("id", postId)
         .maybeSingle();
       const meta = postMeta as {
         author_id: string;
         body: string | null;
         crew_id: string;
+        is_hidden: boolean;
         crews: { slug: string | null } | { slug: string | null }[] | null;
       } | null;
       const crewSlugRaw = Array.isArray(meta?.crews) ? meta?.crews[0]?.slug : meta?.crews?.slug;
-      if (meta?.author_id && crewSlugRaw) {
+      if (meta?.author_id && crewSlugRaw && meta.is_hidden === false) {
         // topEmoji: самая частая эмодзи поста (для «лица» уведомления).
         const counts = sanitizeReactionCounts(res.reaction_counts);
         const topEmoji =
@@ -1095,12 +1096,18 @@ export async function addPostCommentAction(input: {
     }
     const mentionNames = extractMentionUsernames(body);
     if (mentionNames.length > 0) {
-      const { data: mentionedUsers } = await supabaseAdmin
-        .from("users")
-        .select("user_id")
-        .or(mentionNames.map((n) => `username.ilike.${n}`).join(","))
-        .limit(WALL_MENTION_LOOKUP_CAP);
-      for (const u of (mentionedUsers ?? []) as { user_id: string }[]) {
+      // Точное совпадение (indexed, без SQL-дикой карты): `_` в username —
+      // это ПОДЧЁРКИВАНИЕ, а не wildcard (ilike превращал @ivan_petrov в
+      // «ivan-что-угодно-petrov» и пинговал чужих людей). Два exact-запроса
+      // покрывают разницу регистра (@Sly13 vs @sly13).
+      const lowered = mentionNames.map((n) => n.toLowerCase());
+      const [{ data: exactUsers }, { data: loweredUsers }] = await Promise.all([
+        supabaseAdmin.from("users").select("user_id").in("username", mentionNames).limit(WALL_MENTION_LOOKUP_CAP),
+        lowered.some((n) => !mentionNames.includes(n))
+          ? supabaseAdmin.from("users").select("user_id").in("username", lowered).limit(WALL_MENTION_LOOKUP_CAP)
+          : Promise.resolve({ data: [] as unknown[] }),
+      ]);
+      for (const u of [...((exactUsers ?? []) as { user_id: string }[]), ...((loweredUsers ?? []) as { user_id: string }[])]) {
         recipients.push({ userId: u.user_id, reason: "mentioned" });
       }
     }

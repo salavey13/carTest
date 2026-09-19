@@ -152,20 +152,42 @@ async function sendEngagementDm(input: {
   }
 }
 
-/** Dedup-вставка в ledger; true — мы первые, можно слать. */
+/** Dedup-вставка в ledger; true — мы первые, можно слать.
+ *  PostgREST: upsert c ignoreDuplicates → `Prefer: resolution=ignore-duplicates`
+ *  + `on_conflict=post_id,kind,key`. Конфликт PK возвращает ПУСТОЙ массив (не
+ *  ошибку) — значит, слот уже занят, молчим. Ошибка же (например, миграция ещё
+ *  не применена) → один лишний DM лучше, чем никакого уведомления. */
 async function claimNotifySlot(postId: string, kind: string, key: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from("crew_post_notify_log")
-    .insert({ post_id: postId, kind, key })
+    .upsert(
+      { post_id: postId, kind, key },
+      { onConflict: "post_id,kind,key", ignoreDuplicates: true },
+    )
     .select("post_id")
     .abortSignal(AbortSignal.timeout(5000));
   if (error) {
-    // Таблицы может не быть (миграция не применена) — лучше ONE лишний DM,
-    // чем вообще ничего: молча считаем слот полученным.
     logger.warn("[wall-engage-notify] dedup insert failed (notify anyway)", { error: error.message });
     return true;
   }
   return (data ?? []).length > 0;
+}
+
+/** Сколько comment-DM получил получатель за последний час (по ledger). */
+async function countRecentCommentNotifies(
+  postId: string,
+  recipientId: string,
+  sinceIso: string,
+): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from("crew_post_notify_log")
+    .select("key", { count: "exact", head: true })
+    .eq("post_id", postId)
+    .eq("kind", "comment")
+    .like("key", `${recipientId}:%`)
+    .gte("created_at", sinceIso)
+    .abortSignal(AbortSignal.timeout(5000));
+  return count ?? 0;
 }
 
 // ── 1. reaction milestone ────────────────────────────────────────────────────
@@ -263,35 +285,66 @@ export interface CommentNotifyInput {
   botUsername?: string | null;
 }
 
+/** Анти-пушка: сколько comment-DM максимум получает один получатель по ОДНОМУ
+ *  посту за час (лимит самих комментариев 40/ч × 5 получателей = до 200 DM/ч —
+ *  потолок превращает это в максимум 3 DM/пост/получатель/час). */
+export const WALL_COMMENT_NOTIFY_HOURLY_CAP_PER_POST = 3;
+
 /**
  * Разослать уведомления о комментарии. Один DM получателю на один
- * комментарий (dedup commentId:userId). Никогда не бросает.
+ * комментарий (dedup commentId:userId + часовой потолок на получателя),
+ * отправки параллельно (Promise.allSettled). Никогда не бросает.
  */
 export async function notifyWallComment(input: CommentNotifyInput): Promise<void> {
   try {
     const recipients = dedupeCommentRecipients(input.recipients, input.commenterId);
+    if (recipients.length === 0) return;
+
+    const hourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    // Claim slots последовательно (быстрые upsert'ы), отправки — параллельно.
+    const claimed: { userId: string; reason: WallCommentNotifyReason; replyToName: string | null }[] = [];
     for (const recipient of recipients) {
-      const claimed = await claimNotifySlot(
+      // Часовой потолок на (получатель, пост): читаем из того же ledger.
+      try {
+        const recent = await countRecentCommentNotifies(input.postId, recipient.userId, hourAgoIso);
+        if (recent >= WALL_COMMENT_NOTIFY_HOURLY_CAP_PER_POST) continue;
+      } catch {
+        // Счёт не получился — потолок пропускаем, dedup-ключ всё равно стоит.
+      }
+      const ok = await claimNotifySlot(
         input.postId,
         "comment",
         `${input.commentId}:${recipient.userId}`,
       );
-      if (!claimed) continue;
-      const text = buildCommentNotifyHtml({
-        reason: recipient.reason,
-        commenterName: input.commenterName,
-        replyToName: recipient.replyToName ?? null,
-        commentBody: input.commentBody,
-        postPreview: input.postPreview,
-      });
-      await sendEngagementDm({
-        chatId: recipient.userId,
-        text,
-        botUsername: input.botUsername ?? null,
-        postId: input.postId,
-        slug: input.slug,
-      });
+      if (ok) {
+        claimed.push({
+          userId: recipient.userId,
+          reason: recipient.reason,
+          replyToName: recipient.replyToName ?? null,
+        });
+      }
     }
+    if (claimed.length === 0) return;
+
+    await Promise.allSettled(
+      claimed.map(async (recipient) => {
+        const text = buildCommentNotifyHtml({
+          reason: recipient.reason,
+          commenterName: input.commenterName,
+          replyToName: recipient.replyToName,
+          commentBody: input.commentBody,
+          postPreview: input.postPreview,
+        });
+        await sendEngagementDm({
+          chatId: recipient.userId,
+          text,
+          botUsername: input.botUsername ?? null,
+          postId: input.postId,
+          slug: input.slug,
+        });
+      }),
+    );
   } catch (error) {
     logger.warn("[wall-engage-notify] comment notify crashed (comment unaffected)", error);
   }

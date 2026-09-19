@@ -19,20 +19,14 @@
 
 import { logger } from "@/lib/logger";
 import { telegramDeliver } from "@/lib/telegram-transport";
-import { escapeTelegramHtml } from "@/app/franchize/lib/community-wall";
-import { rentalHours } from "@/app/franchize/lib/community-wall";
+import { escapeTelegramHtml, rentalHours } from "@/app/franchize/lib/community-wall";
 import {
   buildTelegramAppLink,
   sanitizeWallSlug,
   wallComposeStartParam,
   wallStartParam,
 } from "@/lib/wall-deeplink";
-import {
-  leadDeeplinkUrl,
-  resolveLeadNotifyRecipients,
-} from "@/app/franchize/lib/new-lead-notify";
-
-export { leadDeeplinkUrl as wallCrewDeeplinkUrl };
+import { resolveLeadNotifyRecipients } from "@/app/franchize/lib/new-lead-notify";
 
 // ── pure summary ─────────────────────────────────────────────────────────────
 
@@ -131,7 +125,10 @@ export function buildRideFinishedRenterHtml(summary: RideSummary, suggestedPost:
     ``,
     `Расскажи экипажу, как прокатился — пост уже составлен, можешь поправить и отправить:`,
     ``,
-    `<i>${escapeTelegramHtml(suggestedPost).replace(/\n/g, "<br>")}</i>`,
+    // ⚠️ Telegram Bot API HTML: <br> НЕ входит в whitelist тегов (400
+    // «Unsupported start tag 'br'» убил бы ВСЁ сообщение) — но переводы строк
+    // в HTML-режиме и так переносятся как есть. Просто экранируем текст.
+    `<i>${escapeTelegramHtml(suggestedPost)}</i>`,
   );
   return lines.join("\n");
 }
@@ -173,14 +170,34 @@ function botUsername(): string | null {
   return process.env.TELEGRAM_BOT_USERNAME || null;
 }
 
+/** Web-фолбэк, когда имя бота не настроено: стена всё равно публичная. */
+function webWallUrl(slug: string): string {
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+  return `${site.replace(/\/+$/, "")}/franchize/${encodeURIComponent(slug)}/community`;
+}
+
 function composeDeepLinkUrl(slug: string, rentalId: string): string | null {
   const bot = botUsername();
+  if (!bot) return null;
   try {
-    if (bot) return buildTelegramAppLink(bot, wallComposeStartParam(rentalId, slug));
-    return null;
+    return buildTelegramAppLink(bot, wallComposeStartParam(rentalId, slug));
   } catch {
     return null;
   }
+}
+
+/** Кнопка «Открыть стену» для cc: startapp=wall_<slug> (НЕ lead_!
+ *  leadDeeplinkUrl клал префикс lead_ и роутер уводил на СТРАНИЦУ ЛИДОВ). */
+function wallDeepLinkUrl(slug: string): string {
+  const bot = botUsername();
+  if (bot) {
+    try {
+      return buildTelegramAppLink(bot, wallStartParam(slug));
+    } catch {
+      // fall through to web
+    }
+  }
+  return webWallUrl(slug);
 }
 
 /**
@@ -229,7 +246,7 @@ export async function notifyRideFinishedAndSuggestPost(
       result.crewRecipients = recipients;
       if (recipients.length > 0) {
         const crewText = buildRideFinishedCrewHtml(input.summary);
-        const wallUrl = leadDeeplinkUrl(wallStartParam(slug));
+        const wallUrl = wallDeepLinkUrl(slug);
         const crewPayload: Record<string, unknown> = {
           text: crewText,
           parse_mode: "HTML",

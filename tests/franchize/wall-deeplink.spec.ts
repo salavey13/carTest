@@ -90,6 +90,17 @@ describe("builders", () => {
     expect(wallComposeStartParam(RENTAL_ID, SLUG).length).toBeLessThanOrEqual(64);
   });
 
+  it("long slugs are CLAMPED so post_/wallp_ params never exceed the 64-char budget", () => {
+    const longSlug = "a-very-long-crew-slug-that-keeps-going-and-going"; // 48 chars
+    const p = wallPostStartParam(POST_ID, longSlug);
+    const c = wallComposeStartParam(RENTAL_ID, longSlug);
+    expect(p.length).toBeLessThanOrEqual(64);
+    expect(c.length).toBeLessThanOrEqual(64);
+    // ids (the payload) survive intact:
+    expect(p).toContain(`post_${POST_ID}_`);
+    expect(c).toContain(`wallp_${RENTAL_ID}_`);
+  });
+
   it("builds t.me app links without @ in the bot handle", () => {
     expect(buildTelegramAppLink("@oneBikePlsBot", wallPostStartParam(POST_ID, SLUG))).toBe(
       `https://t.me/oneBikePlsBot/app?startapp=post_${POST_ID}_${SLUG}`,

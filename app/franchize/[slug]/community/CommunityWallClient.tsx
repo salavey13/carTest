@@ -111,6 +111,10 @@ interface CommunityWallClientProps {
   crewName: string;
   /** Fallback for locked visitors: «открой через бота». */
   botUsername?: string | null;
+  /** ТОЛЬКО бот (crew.contacts.telegramBotUsername || TELEGRAM_BOT_USERNAME):
+   *  источник для share/deeplink построек. Человеческий @handle сюда попадать
+   *  не должен — t.me/<human>/app?startapp=… это битая Mini App ссылка. */
+  deeplinkBotUsername?: string | null;
   /** Deep-link: startapp=post_<id>_<slug> → выделить этот пост (и подгрузить,
    *  если он старый и не попал в первую страницу ленты). */
   highlightPostId?: string | null;
@@ -119,7 +123,7 @@ interface CommunityWallClientProps {
   composeRentalId?: string | null;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, highlightPostId, composeRentalId }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -282,6 +286,11 @@ export function CommunityWallClient({ slug, crewName, botUsername, highlightPost
   const hashScrolledRef = useRef(false);
   const deepLinkPostFetchedRef = useRef(false);
   const pendingDeepLinkPostId = highlightPostId ?? null;
+  // Пере-оружаемся при смене цели (in-place навигация на другой ?post=).
+  useEffect(() => {
+    hashScrolledRef.current = false;
+    deepLinkPostFetchedRef.current = false;
+  }, [pendingDeepLinkPostId]);
   useEffect(() => {
     if (loading || hashScrolledRef.current) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
@@ -290,8 +299,9 @@ export function CommunityWallClient({ slug, crewName, botUsername, highlightPost
     if (!targetPostId) return;
     const el = document.getElementById(`post-${targetPostId}`);
     if (!el) {
-      // Пост не в ленте → один раз добираем его с сервера.
-      if (!deepLinkPostFetchedRef.current && !hashPostId) {
+      // Пост не в ленте (старый пост) → один раз добираем его с сервера —
+      // работает и для ?post= (startapp), и для #post- (веб-шара).
+      if (!deepLinkPostFetchedRef.current && !activeTag && !activeQuery) {
         deepLinkPostFetchedRef.current = true;
         void getWallPostAction({ slug, postId: targetPostId }).then((res) => {
           if (res.ok) setPosts((prev) => (prev.some((p) => p.id === res.post.id) ? prev : [res.post, ...prev]));
@@ -304,7 +314,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, highlightPost
     el.classList.add("ring-2", "ring-[var(--community-accent)]");
     const t = setTimeout(() => el.classList.remove("ring-2", "ring-[var(--community-accent)]"), 2500);
     return () => clearTimeout(t);
-  }, [loading, posts, pendingDeepLinkPostId, slug]);
+  }, [loading, posts, pendingDeepLinkPostId, slug, activeTag, activeQuery]);
 
   // ── compose draft («поделиться поездкой» из уведомления о закрытии аренды) ──
   const [composeDraft, setComposeDraft] = useState<WallRentalDraft | null>(null);
@@ -313,7 +323,12 @@ export function CommunityWallClient({ slug, crewName, botUsername, highlightPost
     if (!composeRentalId) return;
     let cancelled = false;
     void getWallRentalDraftAction({ slug, rentalId: composeRentalId, initData: withInitData() }).then((res) => {
-      if (cancelled || !res.ok) return;
+      if (cancelled) return;
+      if (!res.ok) {
+        // Тихий композер — плохой UX: черновик не приехал, скажи почему.
+        setWallNotice(res.error);
+        return;
+      }
       setComposeDraft(res.draft);
       // Текст — только если композер пустой (не затираем то, что человек пишет).
       setText((prev) => (prev.trim() ? prev : res.draft.autoText));
@@ -1129,7 +1144,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, highlightPost
                 onDelete={() => void deletePost(post)}
                 onHideComment={(commentId) => void hideComment(post, commentId)}
                 onOpenPhoto={(index) => setLightbox({ postId: post.id, index })}
-                botUsername={botUsername}
+                deeplinkBotUsername={deeplinkBotUsername}
               />
             ))}
           </div>
@@ -2025,7 +2040,7 @@ interface PostCardProps {
   onHideComment: (commentId: string) => void;
   onOpenPhoto: (index: number) => void;
   onHashtag: (tag: string) => void;
-  botUsername?: string | null;
+  deeplinkBotUsername?: string | null;
 }
 
 function PostCard(props: PostCardProps) {
@@ -2050,9 +2065,9 @@ function PostCard(props: PostCardProps) {
   const sharePost = useCallback(() => {
     const webUrl = `${window.location.origin}/franchize/${slug}/community#post-${post.id}`;
     let url = webUrl;
-    if (props.botUsername) {
+    if (props.deeplinkBotUsername) {
       try {
-        url = buildTelegramAppLink(props.botUsername, wallPostStartParam(post.id, slug));
+        url = buildTelegramAppLink(props.deeplinkBotUsername, wallPostStartParam(post.id, slug));
       } catch {
         url = webUrl;
       }
@@ -2069,7 +2084,7 @@ function PostCard(props: PostCardProps) {
       // plain web — fall through to window.open
     }
     window.open(shareUrl, "_blank", "noopener,noreferrer");
-  }, [slug, post.id, post.body, authorName, props.botUsername]);
+  }, [slug, post.id, post.body, authorName, props.deeplinkBotUsername]);
 
   return (
     <article

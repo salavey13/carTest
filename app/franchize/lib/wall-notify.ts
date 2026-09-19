@@ -26,6 +26,7 @@ import {
   buildTelegramAppLink,
   isUuidLike,
   wallPostStartParam,
+  wallStartParam,
 } from "@/lib/wall-deeplink";
 import {
   leadDeeplinkUrl,
@@ -63,9 +64,22 @@ export interface WallPostNotifyResult {
   failed: number;
 }
 
-/** Deeplink на стену экипажа: t.me/<bot>/app?startapp=wall_<slug>. */
+/** Deeplink на стену экипажа: t.me/<bot>/app?startapp=wall_<slug>.
+ *  ⚠️ НЕ через leadDeeplinkUrl: тот клал префикс lead_ → startapp=lead_wall_<slug>
+ *  → роутер матчил lead_-ветку и уводил на СТРАНИЦУ ЛИДОВ (баг времён wall v2,
+ *  найден boss-ревью v4). Плюс web-фолбэк, когда имя бота не настроено. */
 export function wallDeeplinkUrl(slug: string): string {
-  return leadDeeplinkUrl(`wall_${sanitizeLeadKey(slug)}`);
+  const safeSlug = sanitizeLeadKey(slug);
+  const bot = process.env.TELEGRAM_BOT_USERNAME;
+  if (bot) {
+    try {
+      return buildTelegramAppLink(bot, wallStartParam(safeSlug));
+    } catch {
+      // fall through to web
+    }
+  }
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
+  return `${site.replace(/\/+$/, "")}/franchize/${encodeURIComponent(safeSlug)}/community`;
 }
 
 /**

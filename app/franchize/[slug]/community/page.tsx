@@ -109,6 +109,9 @@ export default async function FranchizeCommunityPage(
         slug={crewSlug}
         crewName={brandName}
         botUsername={crewBotUsername || (crewTelegram ? crewTelegram : null)}
+        // Для share/deeplink-построек годится ТОЛЬКО настоящий бот:
+        // t.me/<человек>/app?startapp=… — битая Mini App ссылка (boss v4).
+        deeplinkBotUsername={crew.contacts.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || null}
         highlightPostId={highlightPostId}
         composeRentalId={composeRentalId}
       />
