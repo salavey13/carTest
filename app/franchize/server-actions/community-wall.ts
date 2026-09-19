@@ -556,13 +556,20 @@ export async function createCommunityPostAction(input: {
     let finalPath: string | null = null;
     for (let attempt = 0; attempt < 2 && finalPath === null; attempt += 1) {
       const target = `posts/${postId}/${i}.jpg`;
-      const { error: moveError } = await supabaseAdmin.storage
-        .from(WALLPHOTO_BUCKET)
-        .move(photo.path, target);
-      if (moveError) {
-        logger.warn(`[community-wall] photo move attempt ${attempt + 1} failed:`, moveError.message);
-      } else {
-        finalPath = target;
+      try {
+        const { error: moveError } = await supabaseAdmin.storage
+          .from(WALLPHOTO_BUCKET)
+          .move(photo.path, target);
+        if (moveError) {
+          logger.warn(`[community-wall] photo move attempt ${attempt + 1} failed:`, moveError.message);
+        } else {
+          finalPath = target;
+        }
+      } catch (moveCrash) {
+        // storage-js wraps network failures into {error}, but a non-storage
+        // throw must not escape AFTER the post row exists (the user would
+        // retry and create a duplicate post) — treat it as a failed move.
+        logger.warn(`[community-wall] photo move attempt ${attempt + 1} crashed:`, moveCrash);
       }
     }
     if (finalPath === null) {
@@ -570,6 +577,9 @@ export async function createCommunityPostAction(input: {
       // via the TTL janitor instead of becoming a broken image later.
       continue;
     }
+    // The removal path below is UNCONDITIONAL (ghost guard must clean the
+    // file even if the row insert fails), but the OPTIMISTIC photo is only
+    // advertised when the row exists — otherwise it would vanish on refresh.
     const { error: photoInsertError } = await supabaseAdmin.from("crew_post_photos").insert({
       post_id: postId,
       crew_id: crew.id,
@@ -581,13 +591,14 @@ export async function createCommunityPostAction(input: {
     });
     if (photoInsertError) {
       logger.error("[community-wall] photo row insert failed:", photoInsertError.message);
+    } else {
+      photoViews.push({
+        id: `${postId}-${i}`,
+        url: wallPhotoPublicUrl(finalPath),
+        width: photo.width,
+        height: photo.height,
+      });
     }
-    photoViews.push({
-      id: `${postId}-${i}`,
-      url: wallPhotoPublicUrl(finalPath),
-      width: photo.width,
-      height: photo.height,
-    });
     photoFinalPaths.push(finalPath);
   }
 

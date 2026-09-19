@@ -1054,6 +1054,13 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     };
   }, [onClose, go]);
 
+  // Wheel state mirrored into a ref: the native wheel listener registers ONCE
+  // (no teardown/re-add churn per zoom step) and always reads fresh values.
+  const wheelState = useRef({ scale: 1, offset: { x: 0, y: 0 } });
+  useEffect(() => {
+    wheelState.current = { scale, offset };
+  }, [scale, offset]);
+
   // Wheel zoom-to-cursor. Registered NATIVELY with { passive: false } —
   // React 18 attaches wheel at the root as passive, so e.preventDefault()
   // inside a React onWheel prop would be a silent no-op. Lives BEFORE the
@@ -1063,18 +1070,19 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     if (!el) return;
     const onWheelNative = (e: WheelEvent) => {
       e.preventDefault();
-      const nextScale = clamp(scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5);
+      const { scale: curScale, offset: curOffset } = wheelState.current;
+      const nextScale = clamp(curScale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5);
       if (nextScale === 1) {
         setScale(1);
         setOffset({ x: 0, y: 0 });
         return;
       }
-      setOffset(zoomAtPoint(scale, offset, { x: e.clientX, y: e.clientY }, stageCenter(), nextScale));
+      setOffset(zoomAtPoint(curScale, curOffset, { x: e.clientX, y: e.clientY }, stageCenter(), nextScale));
       setScale(nextScale);
     };
     el.addEventListener("wheel", onWheelNative, { passive: false });
     return () => el.removeEventListener("wheel", onWheelNative);
-  }, [scale, offset]);
+  }, []);
 
   if (!photo) return null;
 
@@ -1162,6 +1170,10 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     const hadTwo = pointers.current.size === 2;
     pointers.current.delete(e.pointerId);
     (e.target as Element).releasePointerCapture?.(e.pointerId);
+    // A pinch gesture must not leave a stale tap marker: the next single-finger
+    // touch within 300ms of the pinch start would otherwise false-fire the
+    // double-tap reset mid-adjustment.
+    if (hadTwo) lastTap.current = null;
 
     if (pointers.current.size === 0) {
       // swipe navigation only at natural zoom

@@ -308,10 +308,6 @@ describe("community-wall server actions (v2)", () => {
     expect(src).toContain("photoFinalPaths");
   });
 
-  it("ghost guard: notify skipped + photos cleaned if post vanished", () => {
-    expect(src).toContain("post vanished before notify");
-    expect(src).toContain("photoFinalPaths");
-  });
 
   it("photo move retried once; persistent failure skips the photo row entirely", () => {
     expect(src).toContain("attempt < 2 && finalPath === null");
@@ -376,16 +372,17 @@ describe("wall-photo-upload route", () => {
     const cronRoute = read("app/api/cron/cleanup-wallpix-staging/route.ts");
     expect(cronRoute).toContain("x-vercel-cron");
     expect(cronRoute).toContain("CLEANUP_WALLPIX_TOKEN");
+    expect(cronRoute).toContain("timingSafeEqual"); // timing-safe token compare
+    expect(cronRoute).toContain("TIME_BUDGET_MS"); // liveness: partial passes durably
+    expect(cronRoute).toContain("purgeFolder"); // remove INSIDE the scan loop
     const vercel = JSON.parse(read("vercel.json"));
     expect(vercel.crons.some((c: { path: string }) => c.path === "/api/cron/cleanup-wallpix-staging")).toBe(true);
   });
 
-  it("no raw sharp/stack errors over the wire — generic message only", () => {
-    expect(src).toContain("Не удалось обработать фото");
-  });
 
   it("no raw sharp/stack errors over the wire — generic message + hint only", () => {
     expect(src).toContain("Не удалось обработать фото");
+    expect(src).toContain("const hint = error instanceof Error");
   });
 });
 

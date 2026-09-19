@@ -98,5 +98,9 @@ if (dryRun) {
   process.exit(0);
 }
 
-await removeObjects(removedPaths);
+// Batched like the cron route — a single mega-DELETE with thousands of
+// prefixes is fragile.
+for (let i = 0; i < removedPaths.length; i += 100) {
+  await removeObjects(removedPaths.slice(i, i + 100));
+}
 console.log(`removed ${removedPaths.length} object(s)`);
