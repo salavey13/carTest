@@ -502,9 +502,30 @@ export function parseWallText(text: string): WallTextToken[] {
   return out;
 }
 
-/** Tag body for iteration-3 filtering (lowercased, no #). */
+/** Tag body for filtering/trending (lowercased, no #). */
 export function hashtagKey(hashtag: string): string {
   return hashtag.slice(1).toLowerCase();
+}
+
+/** Max distinct tags stored per post (server caps at write time). */
+export const WALL_TAGS_MAX = 8;
+
+/**
+ * Extract + normalize hashtags from a post body for crew_post_tags:
+ * parseWallText tokens of type hashtag → hashtagKey, deduped, capped.
+ * Reuses the exact same tokenizer the UI renders with, so what the reader
+ * sees as #tag is what the filter matches — no second regex to drift.
+ */
+export function extractHashtags(body: string): string[] {
+  const out: string[] = [];
+  for (const token of parseWallText(body ?? "")) {
+    if (token.type !== "hashtag") continue;
+    const key = hashtagKey(token.value);
+    if (key.length < 2 || key.length > 40) continue;
+    if (!out.includes(key)) out.push(key);
+    if (out.length >= WALL_TAGS_MAX) break;
+  }
+  return out;
 }
 
 // ── Emoji reactions (wall v3, VK-style) ──────────────────────────────────────

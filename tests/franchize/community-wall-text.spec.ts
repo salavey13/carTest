@@ -4,7 +4,12 @@
 // reply-flattening contract, unit-tested pure.
 
 import { describe, expect, it } from "vitest";
-import { hashtagKey, parseWallText } from "@/app/franchize/lib/community-wall";
+import {
+  extractHashtags,
+  hashtagKey,
+  parseWallText,
+  WALL_TAGS_MAX,
+} from "@/app/franchize/lib/community-wall";
 
 const types = (text: string) => parseWallText(text).map((t) => t.type);
 const values = (text: string) => parseWallText(text).map((t) => t.value);
@@ -73,5 +78,20 @@ describe("parseWallText", () => {
 describe("hashtagKey", () => {
   it("lowercases and strips the hash", () => {
     expect(hashtagKey("#ВечернийЗаезд")).toBe("вечернийзаезд");
+  });
+});
+
+describe("extractHashtags (crew_post_tags contract)", () => {
+  it("normalizes + dedupes case-insensitively", () => {
+    expect(extractHashtags("заезд #ВечернийЗаезд и #вечернийзаезд!")).toEqual(["вечернийзаезд"]);
+  });
+
+  it("caps at WALL_TAGS_MAX", () => {
+    const body = Array.from({ length: 15 }, (_, i) => `#tag${i} `).join("");
+    expect(extractHashtags(body)).toHaveLength(WALL_TAGS_MAX);
+  });
+
+  it("ignores hashtags inside URLs and emails", () => {
+    expect(extractHashtags("link https://x.com/#anchor mail@yandex.ru")).toEqual([]);
   });
 });

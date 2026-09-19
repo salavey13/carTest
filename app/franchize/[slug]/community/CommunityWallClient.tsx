@@ -29,6 +29,7 @@ import {
   Bike,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CornerDownRight,
   EyeOff,
   Heart,
@@ -38,6 +39,7 @@ import {
   MessageCircle,
   Pin,
   PinOff,
+  Search,
   Send,
   Trash2,
   X,
@@ -65,17 +67,20 @@ import {
 } from "@/app/franchize/lib/community-wall";
 import {
   addPostCommentAction,
+  countNewWallPostsAction,
   createCommunityPostAction,
   deleteCommunityPostAction,
   getCommunityWallAction,
   getMyRentalStatsAction,
   getPostCommentsAction,
   getWallBikeOptionsAction,
+  getWallTrendingAction,
   hideCommunityCommentAction,
   hideCommunityPostAction,
   setPostPinnedAction,
   togglePostReactionAction,
   type WallBikeOption,
+  type WallTrendingTag,
 } from "@/app/franchize/server-actions/community-wall";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
@@ -149,10 +154,23 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
 
   const withInitData = useCallback(() => getTelegramInitData(), []);
 
+  // discovery state (wall v3 step 3)
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeQuery, setActiveQuery] = useState<string | null>(null);
+  const [searchDraft, setSearchDraft] = useState("");
+  const [trending, setTrending] = useState<{ tags: WallTrendingTag[]; weekPosts: number } | null>(null);
+  const [newPostsCount, setNewPostsCount] = useState(0);
+  const wallTopRef = useRef<HTMLDivElement>(null);
+
   const loadFeed = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     setFeedError(null);
-    const res = await getCommunityWallAction({ slug, initData: withInitData() });
+    const res = await getCommunityWallAction({
+      slug,
+      initData: withInitData(),
+      tag: activeTag ?? undefined,
+      q: activeQuery ?? undefined,
+    });
     if (res.ok) {
       setPosts(res.posts);
       setViewer(res.viewer);
@@ -162,7 +180,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       setFeedError(res.error);
     }
     setLoading(false);
-  }, [slug, withInitData]);
+  }, [slug, withInitData, activeTag, activeQuery]);
 
   useEffect(() => {
     void loadFeed();
@@ -171,7 +189,13 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
   const loadMore = useCallback(async () => {
     if (!nextBefore || loadingMore) return;
     setLoadingMore(true);
-    const res = await getCommunityWallAction({ slug, initData: withInitData(), before: nextBefore });
+    const res = await getCommunityWallAction({
+      slug,
+      initData: withInitData(),
+      before: nextBefore,
+      tag: activeTag ?? undefined,
+      q: activeQuery ?? undefined,
+    });
     if (res.ok) {
       setPosts((prev) => [...prev, ...res.posts]);
       setHasMore(res.hasMore);
@@ -180,7 +204,46 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       setWallNotice(res.error);
     }
     setLoadingMore(false);
-  }, [slug, nextBefore, loadingMore, withInitData]);
+  }, [slug, nextBefore, loadingMore, withInitData, activeTag, activeQuery]);
+
+  // trending strip (top tags of the week) — loaded once per mount
+  useEffect(() => {
+    void getWallTrendingAction({ slug }).then((res) => {
+      if (res.ok) setTrending({ tags: res.tags, weekPosts: res.weekPosts });
+    });
+  }, [slug]);
+
+  // debounced wall search: draft settles 400ms → query state (feed refetches)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = searchDraft.trim();
+      setActiveQuery(q.length >= 2 ? q : null);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchDraft]);
+
+  // «N новых постов» pill: cheap probe on an interval, paused in background tabs
+  useEffect(() => {
+    const t = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      const newest = posts.reduce((m, p) => (p.createdAt > m ? p.createdAt : m), posts[0]?.createdAt ?? "");
+      if (!newest) return;
+      const res = await countNewWallPostsAction({ slug, after: newest });
+      if (res.ok && res.count > 0) setNewPostsCount(res.count);
+    }, 45000);
+    return () => clearInterval(t);
+  }, [posts, slug]);
+
+  const jumpToNewPosts = useCallback(() => {
+    setNewPostsCount(0);
+    void loadFeed({ silent: true });
+    wallTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loadFeed]);
+
+  const applyTagFilter = useCallback((tag: string | null) => {
+    setActiveTag((cur) => (tag !== null && cur === tag ? null : tag));
+    setSearchDraft("");
+  }, []);
 
   // ── composer: stats toggle ──────────────────────────────────────────────────
 
@@ -532,6 +595,97 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
           </button>
         )}
 
+        {/* discovery bar (wall v3 step 3): search, trending, filters, pill */}
+        <div ref={wallTopRef} className="scroll-mt-4">
+          {newPostsCount > 0 && (
+            <button
+              type="button"
+              onClick={jumpToNewPosts}
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-full border border-[var(--community-accent)]/50 bg-[var(--community-accent)]/10 px-4 py-2 text-sm font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+            >
+              <ChevronUp className="h-4 w-4" />
+              {newPostsCount} {pluralRu(newPostsCount, ["новый пост", "новых поста", "новых постов"])} — показать
+            </button>
+          )}
+          <div className="flex flex-col gap-2.5 rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--community-muted)]" />
+              <input
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value.slice(0, 60))}
+                placeholder="Поиск по стене…"
+                aria-label="Поиск по стене"
+                className="w-full rounded-full border border-[var(--community-border)] bg-transparent py-2 pl-9 pr-8 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)]"
+              />
+              {searchDraft && (
+                <button
+                  type="button"
+                  onClick={() => setSearchDraft("")}
+                  aria-label="Очистить поиск"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {trending && (trending.tags.length > 0 || trending.weekPosts > 0) && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {trending.weekPosts > 0 && (
+                  <span className="rounded-full border border-[var(--community-border)] px-2.5 py-1 text-[11px] text-[var(--community-muted)]">
+                    {trending.weekPosts} {pluralRu(trending.weekPosts, ["пост", "поста", "постов"])} за неделю
+                  </span>
+                )}
+                {trending.tags.map(({ tag, count }) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => applyTagFilter(tag)}
+                    aria-pressed={activeTag === tag}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                      activeTag === tag
+                        ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
+                        : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)] hover:text-[var(--community-accent)]"
+                    }`}
+                  >
+                    #{tag} · {count}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {(activeTag || activeQuery) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--community-muted)]">
+              <span>Фильтр:</span>
+              {activeTag && (
+                <span className="flex items-center gap-1 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-2 pr-1 font-semibold text-[var(--community-accent)]">
+                  #{activeTag}
+                  <button
+                    type="button"
+                    onClick={() => applyTagFilter(null)}
+                    aria-label="Убрать фильтр по тегу"
+                    className="rounded-full p-0.5 transition hover:bg-[var(--community-accent)]/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {activeQuery && (
+                <span className="flex items-center gap-1 rounded-full border border-[var(--community-border)] py-1 pl-2 pr-1 text-[var(--community-text)]">
+                  «{activeQuery}»
+                  <button
+                    type="button"
+                    onClick={() => setSearchDraft("")}
+                    aria-label="Убрать поиск"
+                    className="rounded-full p-0.5 transition hover:bg-[var(--community-accent)]/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* composer / locked state */}
         {isAnonymous ? (
           <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-[var(--community-border)] bg-[var(--community-card-faint)] p-5 md:flex-row md:items-center md:justify-between">
@@ -796,15 +950,35 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
             </button>
           </div>
         ) : posts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[var(--community-border)] bg-[var(--community-card-faint)] p-8 text-center">
-            <Bike className="mx-auto h-8 w-8 text-[var(--community-accent)]" />
-            <p className="mt-3 text-sm font-semibold text-[var(--community-text)]">
-              Стена экипажа {crewName} пока пустая — будь первым!
-            </p>
-            <p className="mt-1 text-sm text-[var(--community-muted)]">
-              Расскажи про свой первый заезд, прикрепи фото или поделись статистикой поездок.
-            </p>
-          </div>
+          activeTag || activeQuery ? (
+            <div className="rounded-2xl border border-dashed border-[var(--community-border)] bg-[var(--community-card-faint)] p-8 text-center">
+              <Search className="mx-auto h-8 w-8 text-[var(--community-muted)]" />
+              <p className="mt-3 text-sm font-semibold text-[var(--community-text)]">Ничего не нашлось.</p>
+              <p className="mt-1 text-sm text-[var(--community-muted)]">
+                Попробуй другой запрос или убери фильтр — и стена покажет всё подряд.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  applyTagFilter(null);
+                  setSearchDraft("");
+                }}
+                className="mt-3 rounded-full border border-[var(--community-accent)]/50 px-4 py-1.5 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/10"
+              >
+                Показать всю стену
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[var(--community-border)] bg-[var(--community-card-faint)] p-8 text-center">
+              <Bike className="mx-auto h-8 w-8 text-[var(--community-accent)]" />
+              <p className="mt-3 text-sm font-semibold text-[var(--community-text)]">
+                Стена экипажа {crewName} пока пустая — будь первым!
+              </p>
+              <p className="mt-1 text-sm text-[var(--community-muted)]">
+                Расскажи про свой первый заезд, прикрепи фото или поделись статистикой поездок.
+              </p>
+            </div>
+          )
         ) : (
           <div className="flex flex-col gap-4">
             {posts.map((post) => (
@@ -827,6 +1001,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                 onToggleReaction={(emoji) => void toggleReaction(post, emoji)}
                 onToggleComments={() => void toggleComments(post)}
                 onTogglePin={() => void togglePin(post)}
+                onHashtag={(tag) => applyTagFilter(tag)}
                 onDraftChange={(v) => setCommentDrafts((prev) => ({ ...prev, [post.id]: v }))}
                 onSubmitComment={() => void submitComment(post)}
                 onHide={(hide) => void moderatePost(post, hide)}
@@ -1593,11 +1768,19 @@ function ReactionBar({
 }
 
 /**
- * Rich wall text: @mentions highlighted, #hashtags accent-colored (clickable
- * when the parent passes a filter handler), URLs open safely in a new tab.
- * Rendering is token-based (lib parseWallText) — no markdown, no HTML injection.
+ * Rich wall text: @mentions highlighted, #hashtags clickable (filter via the
+ * parent handler), URLs open safely in a new tab. Rendering is token-based
+ * (lib parseWallText) — no markdown, no HTML injection.
  */
-function WallRichText({ text, className }: { text: string; className?: string }) {
+function WallRichText({
+  text,
+  className,
+  onHashtag,
+}: {
+  text: string;
+  className?: string;
+  onHashtag?: (tag: string) => void;
+}) {
   const tokens = useMemo(() => parseWallText(text), [text]);
   return (
     <p className={className}>
@@ -1610,6 +1793,20 @@ function WallRichText({ text, className }: { text: string; className?: string })
           );
         }
         if (t.type === "hashtag") {
+          const body = t.value.slice(1);
+          if (onHashtag) {
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onHashtag(body)}
+                title={`Показать посты по тегу ${t.value}`}
+                className="font-medium text-[var(--community-accent)] hover:underline"
+              >
+                {t.value}
+              </button>
+            );
+          }
           return (
             <span key={i} className="font-medium text-[var(--community-accent)]">
               {t.value}
@@ -1657,6 +1854,7 @@ interface PostCardProps {
   onDelete: () => void;
   onHideComment: (commentId: string) => void;
   onOpenPhoto: (index: number) => void;
+  onHashtag: (tag: string) => void;
 }
 
 function PostCard(props: PostCardProps) {
@@ -1735,6 +1933,7 @@ function PostCard(props: PostCardProps) {
         <WallRichText
           text={post.body}
           className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--community-text)]"
+          onHashtag={props.onHashtag}
         />
       )}
 
@@ -1836,6 +2035,7 @@ function PostCard(props: PostCardProps) {
                       <WallRichText
                         text={c.body}
                         className="mt-0.5 whitespace-pre-wrap break-words text-sm text-[var(--community-text)]"
+                        onHashtag={props.onHashtag}
                       />
                     </div>
                     <div className="flex shrink-0 items-start">

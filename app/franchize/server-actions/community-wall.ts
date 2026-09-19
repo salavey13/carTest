@@ -39,6 +39,7 @@ import {
   sanitizeWallPhotoInputs,
   sanitizeWallBikeIds,
   isValidWallReaction,
+  extractHashtags,
   wallPhotoPublicUrl,
   WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
@@ -213,6 +214,15 @@ const FeedInput = z.object({
     .trim()
     .refine((v) => !Number.isNaN(Date.parse(v)), "before must be a parseable ISO date")
     .optional(),
+  /** Tag filter: normalized hashtag body (see hashtagKey). */
+  tag: z
+    .string()
+    .trim()
+    .max(40)
+    .regex(/^[a-zа-яё0-9_]+$/i, "tag must be a normalized hashtag body")
+    .optional(),
+  /** Free-text wall search (websearch syntax over the simple tsvector). */
+  q: z.string().trim().min(1).max(60).optional(),
   // NOTE: no caller-supplied limit — pageSize is server-fixed so the
   // page-1-holds-all-pinned invariant (WALL_PIN_CAP « WALL_FEED_PAGE_SIZE)
   // cannot be broken from the outside.
@@ -226,10 +236,12 @@ export async function getCommunityWallAction(input: {
   slug: string;
   initData?: string;
   before?: string;
+  tag?: string;
+  q?: string;
 }): Promise<GetCommunityWallResult> {
   const parsed = FeedInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный запрос ленты." };
-  const { slug, initData, before } = parsed.data;
+  const { slug, initData, before, tag, q } = parsed.data;
   const pageSize = WALL_FEED_PAGE_SIZE;
 
   const crew = await getCrewBySlug(slug);
@@ -239,15 +251,19 @@ export async function getCommunityWallAction(input: {
   const isStaff = actor ? await isCrewStaffUser(actor.userId, crew) : false;
   const viewer: WallViewerInfo = { userId: actor?.userId ?? null, isCrewStaff: isStaff };
 
-  // 1. Posts page (pinned first, then newest).
+  // 1. Posts page (pinned first, then newest). Tag filter goes through the
+  // !inner embed (PostgREST), search through the generated tsvector — both
+  // compose with the keyset cursor.
   let query = supabaseAdmin
     .from("crew_posts")
-    .select("*")
+    .select(tag ? "*, crew_post_tags!inner(tag)" : "*")
     .eq("crew_id", crew.id)
     .eq("is_hidden", false)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(pageSize + 1);
+  if (tag) query = query.eq("crew_post_tags.tag", tag);
+  if (q) query = query.textSearch("search_tsv", q, { type: "websearch", config: "simple" });
   if (before) {
     // Page 2+: pinned posts live on page 1 only — otherwise any pinned post
     // older than the cursor would re-appear at the top of EVERY later page.
@@ -261,7 +277,10 @@ export async function getCommunityWallAction(input: {
     return { ok: false, error: "Не удалось загрузить стену. Попробуй ещё раз." };
   }
 
-  const rows = (postRows ?? []) as DbPostRow[];
+  // unknown cast: the generated DB types lag the migrations (crew_post_tags /
+  // search_tsv ship before the next `supabase gen types` run) — values are
+  // re-validated field by field below anyway.
+  const rows = (postRows ?? []) as unknown as DbPostRow[];
   const hasMore = rows.length > pageSize;
   const pageRows = rows.slice(0, pageSize);
   const postIds = pageRows.map((p) => p.id);
@@ -608,6 +627,19 @@ export async function createCommunityPostAction(input: {
     return { ok: false, error: "Не удалось опубликовать пост. Попробуй ещё раз." };
   }
   const postId = inserted.id as string;
+
+  // ── Tags: normalized hashtags extracted from the final body ──
+  // Same tokenizer the UI renders with, so the filter always matches what
+  // readers see. Rows are idempotent per (post, tag); cap 8 enforced in lib.
+  const tagKeys = extractHashtags(finalBody);
+  if (tagKeys.length > 0) {
+    const { error: tagInsertError } = await supabaseAdmin.from("crew_post_tags").insert(
+      tagKeys.map((tag) => ({ post_id: postId, tag, crew_id: crew.id })),
+    );
+    if (tagInsertError) {
+      logger.error("[community-wall] tag rows insert failed:", tagInsertError.message);
+    }
+  }
 
   // ── Photos: move staging → posts/<postId>/<n>.jpg, then insert rows ──
   // If the move fails twice, the photo row is SKIPPED: a staging object is
@@ -1304,4 +1336,98 @@ export async function getWallBikeOptionsAction(input: {
     (b) => ({ bikeId: String(b.id), title: b.model || String(b.id), imageUrl: b.image_url ?? null }),
   );
   return { ok: true, bikes };
+}
+
+// ── TRENDING TAGS (7 days) + weekly pulse ────────────────────────────────────
+
+export interface WallTrendingTag {
+  tag: string;
+  count: number;
+}
+
+export type GetWallTrendingResult =
+  | { ok: true; tags: WallTrendingTag[]; weekPosts: number }
+  | { ok: false; error: string };
+
+/**
+ * Top-5 crew hashtags of the rolling week + how many posts the crew shared
+ * in 7 days. Tags are counted in JS over one bounded fetch (≤ ~2k rows at
+ * this scale) — no RPC needed; the (crew_id, tag, created_at) index serves it.
+ */
+export async function getWallTrendingAction(input: { slug: string }): Promise<GetWallTrendingResult> {
+  const parsed = z.object({ slug: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [{ data: tagRows }, { count: weekPosts }] = await Promise.all([
+    supabaseAdmin
+      .from("crew_post_tags")
+      .select("tag")
+      .eq("crew_id", crew.id)
+      .gte("created_at", weekAgo)
+      .limit(2000),
+    supabaseAdmin
+      .from("crew_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("crew_id", crew.id)
+      .eq("is_hidden", false)
+      .gte("created_at", weekAgo),
+  ]);
+
+  const counts = new Map<string, number>();
+  for (const row of (tagRows ?? []) as { tag: string }[]) {
+    counts.set(row.tag, (counts.get(row.tag) ?? 0) + 1);
+  }
+  const tags: WallTrendingTag[] = [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .slice(0, 5);
+
+  return { ok: true, tags, weekPosts: weekPosts ?? 0 };
+}
+
+// ── NEW-POSTS PROBE (background pill) ───────────────────────────────────────
+
+export type CountNewWallPostsResult =
+  | { ok: true; count: number }
+  | { ok: false; error: string };
+
+/**
+ * How many fresh posts appeared after the newest one the viewer already has.
+ * Cheap head-count, polled on an interval by the «N новых постов» pill —
+ * no new tables, composes with the existing keyset.
+ */
+export async function countNewWallPostsAction(input: {
+  slug: string;
+  /** created_at ISO of the newest post currently on the viewer's screen. */
+  after: string;
+}): Promise<CountNewWallPostsResult> {
+  const parsed = z
+    .object({
+      slug: z.string().trim().min(1),
+      after: z
+        .string()
+        .trim()
+        .refine((v) => !Number.isNaN(Date.parse(v)), "after must be a parseable ISO date"),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const { count, error } = await supabaseAdmin
+    .from("crew_posts")
+    .select("id", { count: "exact", head: true })
+    .eq("crew_id", crew.id)
+    .eq("is_hidden", false)
+    .gt("created_at", parsed.data.after);
+  if (error) {
+    logger.error("[community-wall] new-posts probe failed:", error.message);
+    return { ok: false, error: "Не удалось проверить новые посты." };
+  }
+  return { ok: true, count: count ?? 0 };
 }
