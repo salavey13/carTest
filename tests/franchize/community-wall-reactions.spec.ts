@@ -4,6 +4,8 @@
 // mirrors the DB trigger), server-side counter hygiene and the VK tap
 // semantics (re-tap removes, tap another switches).
 
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   isValidWallReaction,
@@ -11,6 +13,42 @@ import {
   toggleReactionOptimistic,
   WALL_REACTIONS,
 } from "@/app/franchize/lib/community-wall";
+
+const ROOT = join(__dirname, "../..");
+const MIGRATION = "supabase/migrations/20260920010000_onlybike_wall_reactions.sql";
+
+/** Boss-guard: the SQL CHECK constraint can never drift from WALL_REACTIONS. */
+describe("reactions migration ↔ lib sync", () => {
+  const sql = existsSync(join(ROOT, MIGRATION))
+    ? readFileSync(join(ROOT, MIGRATION), "utf8")
+    : "";
+
+  it("migration exists", () => {
+    expect(sql).not.toBe("");
+  });
+
+  it("every WALL_REACTIONS emoji is in the SQL CHECK + RPC whitelist", () => {
+    for (const emoji of WALL_REACTIONS) {
+      expect(sql.split(emoji).length - 1).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("legacy likes are retired, RLS is on, no anon SELECT policy", () => {
+    expect(sql).toContain("DROP TABLE public.crew_post_likes");
+    expect(sql).toContain("ALTER TABLE public.crew_post_reactions ENABLE ROW LEVEL SECURITY");
+    expect(sql).not.toMatch(/CREATE POLICY[^;]*crew_post_reactions/);
+  });
+
+  it("atomic toggle RPC exists and returns the fresh aggregate", () => {
+    expect(sql).toContain("CREATE OR REPLACE FUNCTION public.toggle_post_reaction");
+    expect(sql).toContain("jsonb_build_object('reaction', v_final, 'like_count', v_total, 'reaction_counts', v_counts)");
+  });
+
+  it("backfill is exception-safe and refuses to drop likes on an incomplete copy", () => {
+    expect(sql).toContain("EXCEPTION WHEN OTHERS THEN");
+    expect(sql).toContain("backfill incomplete");
+  });
+});
 
 describe("WALL_REACTIONS", () => {
   it("has ❤️ as the default quick-tap reaction, six total", () => {

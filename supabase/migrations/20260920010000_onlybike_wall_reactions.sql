@@ -102,18 +102,26 @@ EXECUTE FUNCTION public.crew_posts_sync_reaction_counts();
 
 -- ── 4. Backfill: existing likes become ❤️ reactions ──────────────────────────
 -- Trigger is disabled during the copy; counters are reconciled from the
--- reactions table right after, so they end EXACT regardless.
+-- reactions table right after, so they end EXACT regardless. The enable is
+-- EXCEPTION-safe (autocommit runners like psql -f): a failed backfill
+-- re-enables the trigger before re-raising, and the precondition check in
+-- step 5 then REFUSES to retire the legacy table on an incomplete copy.
 
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables
              WHERE table_schema = 'public' AND table_name = 'crew_post_likes') THEN
-    ALTER TABLE public.crew_post_reactions DISABLE TRIGGER crew_post_reactions_sync_counts;
-    INSERT INTO public.crew_post_reactions (post_id, user_id, emoji, created_at)
-    SELECT post_id, user_id, '❤️', created_at
-      FROM public.crew_post_likes
-     WHERE EXISTS (SELECT 1 FROM public.crew_posts p WHERE p.id = crew_post_likes.post_id)
-    ON CONFLICT (post_id, user_id) DO NOTHING;
+    BEGIN
+      ALTER TABLE public.crew_post_reactions DISABLE TRIGGER crew_post_reactions_sync_counts;
+      INSERT INTO public.crew_post_reactions (post_id, user_id, emoji, created_at)
+      SELECT post_id, user_id, '❤️', created_at
+        FROM public.crew_post_likes
+       WHERE EXISTS (SELECT 1 FROM public.crew_posts p WHERE p.id = crew_post_likes.post_id)
+      ON CONFLICT (post_id, user_id) DO NOTHING;
+    EXCEPTION WHEN OTHERS THEN
+      ALTER TABLE public.crew_post_reactions ENABLE TRIGGER crew_post_reactions_sync_counts;
+      RAISE;
+    END;
     ALTER TABLE public.crew_post_reactions ENABLE TRIGGER crew_post_reactions_sync_counts;
   END IF;
 END $$;
@@ -139,15 +147,98 @@ UPDATE public.crew_posts p
 
 -- ── 5. Retire the legacy likes table ─────────────────────────────────────────
 -- Its trigger would fight the new counter if anything ever wrote there again.
+-- GUARDED: the drop only happens when every like has a backfilled reaction
+-- row — an incomplete backfill above aborts here instead of losing counts.
 
-DROP TRIGGER IF EXISTS crew_post_likes_sync_count ON public.crew_post_likes;
-DROP TABLE IF EXISTS public.crew_post_likes;
+DO $$
+DECLARE
+  v_unmatched bigint;
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables
+             WHERE table_schema = 'public' AND table_name = 'crew_post_likes') THEN
+    SELECT count(*) INTO v_unmatched
+      FROM public.crew_post_likes l
+     WHERE NOT EXISTS (
+       SELECT 1 FROM public.crew_post_reactions r
+        WHERE r.post_id = l.post_id AND r.user_id = l.user_id
+     );
+    IF v_unmatched > 0 THEN
+      RAISE EXCEPTION 'backfill incomplete: % like rows without a reaction — crew_post_likes kept', v_unmatched;
+    END IF;
+    DROP TRIGGER IF EXISTS crew_post_likes_sync_count ON public.crew_post_likes;
+    DROP TABLE public.crew_post_likes;
+  END IF;
+END $$;
 
 -- NOTE for re-runs of 20260919000000_onlybike_community_wall.sql: it would
 -- recreate an EMPTY crew_post_likes + trigger — harmless (nothing writes
 -- there anymore), the wall keeps counting through crew_post_reactions.
 
--- ── 6. RLS: no anon policies at all (privacy parity with old likes) ─────────
+-- ── 6. Single-roundtrip toggle RPC ───────────────────────────────────────────
+-- The server action used to do rate-check + read-post + read-existing +
+-- write + re-read-aggregate (≈5 sequential roundtrips) with a racy
+-- read-before-write window. This RPC does the whole VK toggle atomically:
+--   tap = insert, re-tap = delete, different emoji = update (switch),
+--   PK race on insert is absorbed by an UPDATE (last write wins).
+-- Returns the trigger-fed aggregate so the client NEVER guesses counts.
+-- Called only by the service-role server actions after identity check;
+-- p_user_id is the verified actor, never a client-supplied guess.
+
+CREATE OR REPLACE FUNCTION public.toggle_post_reaction(p_post_id uuid, p_user_id text, p_emoji text)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_post uuid;
+  v_existing text;
+  v_final text;
+  v_counts jsonb;
+  v_total integer;
+BEGIN
+  IF p_emoji NOT IN ('❤️', '🔥', '😂', '😮', '👍', '🏍') THEN
+    RETURN jsonb_build_object('error', 'bad_emoji');
+  END IF;
+
+  SELECT id INTO v_post FROM public.crew_posts WHERE id = p_post_id AND is_hidden = false;
+  IF v_post IS NULL THEN
+    RETURN jsonb_build_object('error', 'post_unavailable');
+  END IF;
+
+  SELECT emoji INTO v_existing
+    FROM public.crew_post_reactions
+   WHERE post_id = p_post_id AND user_id = p_user_id;
+
+  IF v_existing IS NOT DISTINCT FROM p_emoji THEN
+    -- re-tap of the current emoji (or a stale duplicate) → remove
+    DELETE FROM public.crew_post_reactions WHERE post_id = p_post_id AND user_id = p_user_id;
+    v_final := NULL;
+  ELSIF v_existing IS NOT NULL THEN
+    UPDATE public.crew_post_reactions SET emoji = p_emoji
+     WHERE post_id = p_post_id AND user_id = p_user_id;
+    v_final := p_emoji;
+  ELSE
+    BEGIN
+      INSERT INTO public.crew_post_reactions (post_id, user_id, emoji)
+      VALUES (p_post_id, p_user_id, p_emoji);
+      v_final := p_emoji;
+    EXCEPTION WHEN unique_violation THEN
+      -- concurrent first tap from another device: absorb, last write wins
+      UPDATE public.crew_post_reactions SET emoji = p_emoji
+       WHERE post_id = p_post_id AND user_id = p_user_id;
+      v_final := p_emoji;
+    END;
+  END IF;
+
+  SELECT like_count, reaction_counts INTO v_total, v_counts
+    FROM public.crew_posts WHERE id = p_post_id;
+  RETURN jsonb_build_object('reaction', v_final, 'like_count', v_total, 'reaction_counts', v_counts);
+END;
+$$;
+
+COMMENT ON FUNCTION public.toggle_post_reaction(uuid, text, text) IS
+  'OnlyBike wall: atomic VK toggle for one viewer''s reaction on a post; returns the fresh trigger-fed aggregate.';
+
+-- ── 7. RLS: no anon policies at all (privacy parity with old likes) ─────────
 
 ALTER TABLE public.crew_post_reactions ENABLE ROW LEVEL SECURITY;
 

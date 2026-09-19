@@ -707,8 +707,10 @@ export type TogglePostReactionResult =
 
 /**
  * VK semantics: tap = set my reaction (❤️ default), tap again = remove,
- * tap another emoji = switch. Counters come back from the DB (trigger-fed),
- * so the client never guesses the aggregate after a round trip.
+ * tap another emoji = switch. The whole toggle runs as ONE Postgres RPC
+ * (migration 20260920010000: toggle_post_reaction) — atomic, race-absorbing,
+ * ~1 roundtrip instead of 5 — and returns the trigger-fed aggregate, so the
+ * client never guesses counts.
  */
 export async function togglePostReactionAction(input: {
   postId: string;
@@ -727,71 +729,24 @@ export async function togglePostReactionAction(input: {
   const reactionRate = await assertReactionRate(actor.userId);
   if (!reactionRate.ok) return { ok: false, error: reactionRate.error };
 
-  const { data: post } = await supabaseAdmin
-    .from("crew_posts")
-    .select("id, is_hidden")
-    .eq("id", postId)
-    .maybeSingle();
-  const postRow = post as { id: string; is_hidden: boolean } | null;
-  if (!postRow || postRow.is_hidden) return { ok: false, error: "Пост недоступен." };
-
-  const { data: existing } = await supabaseAdmin
-    .from("crew_post_reactions")
-    .select("emoji")
-    .eq("post_id", postId)
-    .eq("user_id", actor.userId)
-    .maybeSingle();
-  const existingEmoji = (existing as { emoji: string } | null)?.emoji ?? null;
-
-  let finalEmoji: string | null = emoji;
-  if (existingEmoji === emoji) {
-    // Re-tap the same emoji → remove (VK undo).
-    const { error } = await supabaseAdmin
-      .from("crew_post_reactions")
-      .delete()
-      .eq("post_id", postId)
-      .eq("user_id", actor.userId);
-    if (error) {
-      logger.error("[community-wall] reaction remove failed:", error.message);
-      return { ok: false, error: "Не получилось убрать реакцию." };
-    }
-    finalEmoji = null;
-  } else if (existingEmoji) {
-    // Switch emoji: same PK, update the row (trigger moves the counts).
-    const { error } = await supabaseAdmin
-      .from("crew_post_reactions")
-      .update({ emoji })
-      .eq("post_id", postId)
-      .eq("user_id", actor.userId);
-    if (error) {
-      logger.error("[community-wall] reaction switch failed:", error.message);
-      return { ok: false, error: "Не получилось переключить реакцию." };
-    }
-  } else {
-    const { error } = await supabaseAdmin
-      .from("crew_post_reactions")
-      .insert({ post_id: postId, user_id: actor.userId, emoji });
-    if (error) {
-      // PK race (double tap on a post I hadn't reacted to yet): the row now
-      // exists — fall through and read the fresh aggregate instead of lying.
-      if (error.code !== "23505") {
-        logger.error("[community-wall] reaction insert failed:", error.message);
-        return { ok: false, error: "Не получилось поставить реакцию." };
-      }
-      finalEmoji = emoji;
-    }
+  const { data, error } = await supabaseAdmin.rpc("toggle_post_reaction", {
+    p_post_id: postId,
+    p_user_id: actor.userId,
+    p_emoji: emoji,
+  });
+  if (error) {
+    logger.error("[community-wall] reaction rpc failed:", error.message);
+    return { ok: false, error: "Не получилось поставить реакцию." };
   }
+  const res = data as { error?: string; reaction: string | null; like_count: number | null; reaction_counts: unknown } | null;
+  if (!res || res.error === "post_unavailable") return { ok: false, error: "Пост недоступен." };
+  if (res.error === "bad_emoji") return { ok: false, error: "Такой реакции нет." };
 
-  const { data: fresh } = await supabaseAdmin
-    .from("crew_posts")
-    .select("like_count, reaction_counts")
-    .eq("id", postId)
-    .maybeSingle();
   return {
     ok: true,
-    reaction: finalEmoji,
-    likeCount: (fresh as { like_count: number | null } | null)?.like_count ?? 0,
-    reactionCounts: sanitizeReactionCounts((fresh as { reaction_counts: unknown } | null)?.reaction_counts),
+    reaction: res.reaction,
+    likeCount: res.like_count ?? 0,
+    reactionCounts: sanitizeReactionCounts(res.reaction_counts),
   };
 }
 

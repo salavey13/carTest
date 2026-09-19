@@ -1349,57 +1349,109 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
 
 const REACTION_PICKER_HOVER_MS = 250;
 const REACTION_LONG_PRESS_MS = 350;
+const REACTION_COACH_KEY = "onlybike-wall-reaction-coach";
+
+/** Top emoji for the VK-style summary chip: counts desc, lib order as tiebreak. */
+function topReactions(counts: Record<string, number>, max = 3): string[] {
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || WALL_REACTIONS.indexOf(a[0] as never) - WALL_REACTIONS.indexOf(b[0] as never))
+    .slice(0, max)
+    .map(([emoji]) => emoji);
+}
+
+/** Telegram-native haptics, silent no-op outside the MiniApp WebView. */
+function tgHaptic(kind: "light" | "select"): void {
+  try {
+    const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred?: (s: string) => void; selectionChanged?: () => void } } } }).Telegram?.WebApp?.HapticFeedback;
+    if (!tg) return;
+    if (kind === "light") tg.impactOccurred?.("light");
+    else tg.selectionChanged?.();
+  } catch {
+    // plain web browser — haptics simply do not exist here
+  }
+}
 
 /**
  * VK-style reaction control: quick tap toggles the viewer's current reaction
  * (default ❤️, re-tap removes); hover (desktop) or long-press (mobile, with
- * a haptic tick) opens the full emoji picker with per-emoji counts.
+ * a Telegram-native haptic tick) opens the full emoji picker. A VK-style
+ * summary chip («🔥😂❤ 12») sits next to the control, and a one-time
+ * coach-mark makes the long-press discoverable.
  */
 function ReactionBar({
   post,
   pending,
-  disabled,
+  canReact,
   onToggle,
 }: {
   post: WallPostView;
   pending: boolean;
-  disabled: boolean;
+  /** false = anonymous visitor: tapping explains how to unlock reactions. */
+  canReact: boolean;
   onToggle: (emoji: string) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pop, setPop] = useState(0);
+  const [coachSeen, setCoachSeen] = useState(true);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const longPressFired = useRef(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTimers = useCallback(() => {
-    if (hoverTimer.current) {
-      clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem(REACTION_COACH_KEY)) setCoachSeen(false);
+    } catch {
+      // private mode — skip the coach-mark rather than crash
     }
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
+    return () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      if (pressTimer.current) clearTimeout(pressTimer.current);
+    };
   }, []);
-  useEffect(() => clearTimers, [clearTimers]);
 
-  const openPicker = () => {
+  const openPicker = useCallback(() => {
     longPressFired.current = true;
     setPickerOpen(true);
+    setCoachSeen(true);
     try {
-      navigator.vibrate?.(10);
+      window.localStorage.setItem(REACTION_COACH_KEY, "1");
     } catch {
-      // web browsers without vibration API — the picker still opens
+      // ignore
     }
-  };
+    tgHaptic("light");
+  }, []);
+
+  const closePicker = useCallback(() => {
+    setPickerOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  const quickToggle = useCallback(() => {
+    if (pending) return;
+    if (!canReact) {
+      onToggle(post.viewerReaction ?? WALL_REACTIONS[0]); // parent shows the «открой через бота» notice
+      return;
+    }
+    setPop((n) => n + 1);
+    tgHaptic("light");
+    onToggle(post.viewerReaction ?? WALL_REACTIONS[0]);
+  }, [pending, canReact, onToggle, post.viewerReaction]);
+
+  const countLabel = `${post.likeCount} ${pluralRu(post.likeCount, ["реакция", "реакции", "реакций"])}`;
+  const ariaLabel = post.viewerReaction
+    ? `Реакция ${post.viewerReaction}, всего ${countLabel}, удержите или откройте меню для другой`
+    : `Поставить реакцию, удержите для выбора эмодзи`;
 
   return (
     <div
+      ref={rootRef}
       className="relative"
       onMouseEnter={() => {
-        if (disabled || pending) return;
+        if (!canReact || pending) return;
         if (hoverTimer.current) clearTimeout(hoverTimer.current);
-        hoverTimer.current = setTimeout(() => setPickerOpen(true), REACTION_PICKER_HOVER_MS);
+        hoverTimer.current = setTimeout(openPicker, REACTION_PICKER_HOVER_MS);
       }}
       onMouseLeave={() => {
         if (hoverTimer.current) clearTimeout(hoverTimer.current);
@@ -1408,45 +1460,82 @@ function ReactionBar({
       }}
     >
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => {
           if (longPressFired.current) {
             longPressFired.current = false;
             return;
           }
-          if (!disabled && !pending) onToggle(post.viewerReaction ?? WALL_REACTIONS[0]);
+          quickToggle();
         }}
         onPointerDown={() => {
-          if (disabled || pending) return;
-          clearTimers();
+          if (!canReact || pending) return;
+          if (pressTimer.current) clearTimeout(pressTimer.current);
           pressTimer.current = setTimeout(openPicker, REACTION_LONG_PRESS_MS);
         }}
-        onPointerUp={clearTimers}
-        onPointerCancel={clearTimers}
+        onPointerUp={() => {
+          if (pressTimer.current) clearTimeout(pressTimer.current);
+        }}
+        onPointerCancel={() => {
+          if (pressTimer.current) clearTimeout(pressTimer.current);
+        }}
+        onKeyDown={(e) => {
+          // keyboard parity: ArrowDown opens the picker, Escape closes + restores focus
+          if (e.key === "ArrowDown" && !pickerOpen) {
+            e.preventDefault();
+            openPicker();
+          } else if (e.key === "Escape" && pickerOpen) {
+            e.preventDefault();
+            closePicker();
+          }
+        }}
         onContextMenu={(e) => e.preventDefault()}
         disabled={pending}
-        aria-pressed={post.viewerReaction !== null}
-        aria-label="Реакция"
-        className={`flex select-none items-center gap-1.5 text-sm transition disabled:opacity-60 ${
+        aria-haspopup="menu"
+        aria-expanded={pickerOpen}
+        aria-label={ariaLabel}
+        className={`relative flex select-none items-center gap-1.5 text-sm transition disabled:opacity-60 ${
           post.viewerReaction
             ? "text-[var(--community-accent)]"
             : "text-[var(--community-muted)] hover:text-[var(--community-accent)]"
         }`}
       >
         {post.viewerReaction ? (
-          <span className="inline-block text-base leading-none transition-transform duration-150 scale-110">
+          <span
+            key={pop}
+            className="inline-block text-base leading-none animate-reaction-pop"
+          >
             {post.viewerReaction}
           </span>
         ) : (
-          <Heart className="h-4 w-4" />
+          <Heart className="h-4 w-4 transition-transform active:scale-90" />
         )}
         {post.likeCount > 0 && <span>{post.likeCount}</span>}
+        {!coachSeen && canReact && (
+          <span className="absolute -top-1.5 left-full ml-1 hidden whitespace-nowrap rounded-full bg-[var(--community-accent)] px-2 py-0.5 text-[10px] font-semibold text-white shadow md:inline-flex">
+            удержи — выбери эмодзи
+          </span>
+        )}
       </button>
+
+      {/* VK-style summary chip: top emoji + total, pure display */}
+      {post.likeCount > 0 && Object.keys(post.reactionCounts).length > 0 && (
+        <span
+          className="ml-1 inline-flex translate-y-[1px] items-center gap-0.5 rounded-full border border-[var(--community-border)] bg-[var(--community-card)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--community-muted)]"
+          aria-hidden="true"
+        >
+          {topReactions(post.reactionCounts).map((emoji) => (
+            <span key={emoji}>{emoji}</span>
+          ))}
+          <span className="font-semibold">{post.likeCount}</span>
+        </span>
+      )}
 
       {pickerOpen && (
         <>
-          {/* click-away catcher (also closes on scroll-taps elsewhere) */}
-          <div className="fixed inset-0 z-30" onClick={() => setPickerOpen(false)} aria-hidden="true" />
+          {/* click-away catcher */}
+          <div className="fixed inset-0 z-30" onClick={closePicker} aria-hidden="true" />
           <div
             role="menu"
             aria-label="Выбрать реакцию"
@@ -1456,12 +1545,18 @@ function ReactionBar({
               <button
                 key={emoji}
                 type="button"
+                role="menuitemradio"
+                aria-checked={post.viewerReaction === emoji}
+                aria-label={`Реакция ${emoji}${post.reactionCounts[emoji] ? `, ${post.reactionCounts[emoji]}` : ""}`}
                 onClick={() => {
-                  setPickerOpen(false);
+                  closePicker();
                   longPressFired.current = false;
-                  if (!disabled && !pending) onToggle(emoji);
+                  if (canReact && !pending) {
+                    setPop((n) => n + 1);
+                    tgHaptic("select");
+                    onToggle(emoji);
+                  }
                 }}
-                aria-label={`Реакция ${emoji}`}
                 className={`flex flex-col items-center rounded-full px-1.5 py-1 text-lg leading-none transition hover:scale-125 ${
                   post.viewerReaction === emoji ? "bg-[var(--community-accent)]/15" : ""
                 }`}
@@ -1617,7 +1712,7 @@ function PostCard(props: PostCardProps) {
         <ReactionBar
           post={post}
           pending={likePending}
-          disabled={!viewer?.userId}
+          canReact={!!viewer?.userId}
           onToggle={props.onToggleReaction}
         />
         <button
