@@ -405,19 +405,21 @@ export function sanitizeWallPhotoInputs(
   return out;
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
- * Bike-mention ids from the composer: strings only, must look like UUIDs,
- * deduplicated, capped at WALL_BIKES_MAX. Returns null when the payload shape
- * is wrong (caller rejects), [] when nothing is attached.
+ * cars.id is TEXT — a catalogue slug like «kawasaki-ex650k» (see
+ * 20240101000000_init.sql: `id TEXT PRIMARY KEY`), NOT a uuid. So ids are
+ * validated as sane opaque strings: printable, no whitespace/control chars,
+ * bounded length. Returns null when the payload shape is wrong (caller
+ * rejects), [] when nothing is attached.
  */
+const WALL_BIKE_ID_RE = /^[A-Za-z0-9._:@-]{1,128}$/;
+
 export function sanitizeWallBikeIds(raw: unknown): string[] | null {
   if (raw === undefined || raw === null) return [];
   if (!Array.isArray(raw) || raw.length > WALL_BIKES_MAX) return null;
   const out: string[] = [];
   for (const item of raw) {
-    if (typeof item !== "string" || !UUID_RE.test(item)) return null;
+    if (typeof item !== "string" || !WALL_BIKE_ID_RE.test(item)) return null;
     if (!out.includes(item)) out.push(item);
   }
   return out;

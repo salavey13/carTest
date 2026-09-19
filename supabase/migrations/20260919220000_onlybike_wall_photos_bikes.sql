@@ -49,9 +49,28 @@ CREATE INDEX IF NOT EXISTS idx_crew_post_photos_crew
 
 -- ── 2. Bike mentions («прикрепить байк из каталога») ─────────────────────────
 
+-- Guard for re-runs after the original buggy version: cars.id is TEXT
+-- (catalogue slugs like «kawasaki-ex650k», see 20240101000000_init.sql), but
+-- the first draft of this migration created bike_id as uuid — the FK
+-- crew_post_bikes_bike_id_fkey failed with 42804 and the whole CREATE TABLE
+-- rolled back. If such a table somehow exists, fix its column type in place.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'crew_post_bikes'
+      AND column_name = 'bike_id'
+      AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE public.crew_post_bikes ALTER COLUMN bike_id TYPE text USING bike_id::text;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.crew_post_bikes (
   post_id uuid NOT NULL REFERENCES public.crew_posts(id) ON DELETE CASCADE,
-  bike_id uuid NOT NULL REFERENCES public.cars(id) ON DELETE CASCADE,
+  -- TEXT on purpose: public.cars.id is TEXT (catalogue slug), NOT uuid.
+  bike_id text NOT NULL REFERENCES public.cars(id) ON DELETE CASCADE,
   -- Denormalized crew_id: a bike can only be mentioned by posts of its own crew.
   crew_id uuid NOT NULL REFERENCES public.crews(id) ON DELETE CASCADE,
   position integer NOT NULL DEFAULT 0,

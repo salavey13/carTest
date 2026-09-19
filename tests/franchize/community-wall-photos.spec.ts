@@ -90,18 +90,22 @@ describe("sanitizeWallPhotoInputs", () => {
 });
 
 describe("sanitizeWallBikeIds", () => {
-  const ID_A = "11111111-1111-1111-1111-111111111111";
-  const ID_B = "22222222-2222-2222-2222-222222222222";
+  // cars.id is TEXT — real catalogue slugs, NOT uuids (migration 42804 lesson).
+  const SLUG_A = "kawasaki-ex650k";
+  const SLUG_B = "suzuki-boulevard";
 
-  it("accepts uuids, dedupes, caps at WALL_BIKES_MAX", () => {
-    expect(sanitizeWallBikeIds([ID_A, ID_B, ID_A])).toEqual([ID_A, ID_B]);
+  it("accepts catalogue slugs (and uuids), dedupes, caps at WALL_BIKES_MAX", () => {
+    expect(sanitizeWallBikeIds([SLUG_A, SLUG_B, SLUG_A])).toEqual([SLUG_A, SLUG_B]);
+    expect(sanitizeWallBikeIds(["11111111-1111-1111-1111-111111111111"])).not.toBeNull();
     expect(sanitizeWallBikeIds(undefined)).toEqual([]);
-    const many = Array.from({ length: WALL_BIKES_MAX + 1 }, () => ID_A);
+    const many = Array.from({ length: WALL_BIKES_MAX + 1 }, () => SLUG_A);
     expect(sanitizeWallBikeIds(many)).toBeNull();
   });
 
-  it("rejects non-uuid junk", () => {
-    expect(sanitizeWallBikeIds(["not-a-uuid"])).toBeNull();
+  it("rejects junk: whitespace, control chars, overlong ids, non-strings", () => {
+    expect(sanitizeWallBikeIds(["not a slug"])).toBeNull(); // space
+    expect(sanitizeWallBikeIds(["два"])).toBeNull(); // non-ascii
+    expect(sanitizeWallBikeIds(["a".repeat(129)])).toBeNull(); // overlong
     expect(sanitizeWallBikeIds([42])).toBeNull();
     expect(sanitizeWallBikeIds("x")).toBeNull();
   });
