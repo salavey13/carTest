@@ -444,12 +444,16 @@ const MENTION_RE = /@[A-Za-z0-9_]{4,32}/g;
 const HASHTAG_RE = /#[\p{L}\p{N}_]{2,40}/gu;
 const URL_RE = /https?:\/\/[^\s<>"']+/g;
 
+/** Chars that would glue a sentence to a URL — trimmed off the token end. */
+const URL_TRAILING_PUNCT = /[.,;:!?)»”]+$/;
+
 /**
  * Split wall text (post bodies, comments) into safe render tokens.
  * Deliberately render-ONLY: mentions never auto-resolve to users (no
  * enumeration), hashtags become clickable filters in the UI, URLs render as
  * plain anchor tags. Longest-match wins at the same position (a URL may
- * contain a hashtag — the URL token swallows it).
+ * contain a hashtag — the URL token swallows it); emails are not mentions;
+ * sentence punctuation after a URL stays text.
  */
 export function parseWallText(text: string): WallTextToken[] {
   if (!text) return [];
@@ -457,11 +461,23 @@ export function parseWallText(text: string): WallTextToken[] {
 
   for (const m of text.matchAll(URL_RE)) {
     const start = m.index ?? 0;
-    marks.push({ start, end: start + m[0].length, token: { type: "url", value: m[0] } });
+    let raw = m[0];
+    // «смотри https://x.com.» — the trailing dot ends the sentence, not the URL.
+    const punct = raw.match(URL_TRAILING_PUNCT);
+    if (punct) raw = raw.slice(0, raw.length - punct[0].length);
+    marks.push({ start, end: start + raw.length, token: { type: "url", value: raw } });
+    // trimmed punctuation stays plain text
+    if (punct) {
+      marks.push({ start: start + raw.length, end: start + m[0].length, token: { type: "text", value: punct[0] } });
+    }
   }
   const overlaps = (s: number, e: number) => marks.some((k) => s < k.end && e > k.start);
   for (const m of text.matchAll(MENTION_RE)) {
     const start = m.index ?? 0;
+    // Left-boundary check: «mail@test.com» is an email, not a mention — a
+    // @ preceded by a word char / dot / another @ is part of the word.
+    const prev = start > 0 ? text[start - 1] : "";
+    if (/[\w.@]/.test(prev)) continue;
     if (!overlaps(start, start + m[0].length)) {
       marks.push({ start, end: start + m[0].length, token: { type: "mention", value: m[0] } });
     }

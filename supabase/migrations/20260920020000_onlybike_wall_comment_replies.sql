@@ -13,7 +13,9 @@
 ALTER TABLE public.crew_post_comments
   ADD COLUMN IF NOT EXISTS reply_to_id uuid REFERENCES public.crew_post_comments(id) ON DELETE CASCADE;
 
--- Bounded lookup of a page's reply targets (feed render resolves author names).
+-- Moderation / audit lookups of a comment's replies (who answered this one).
+-- The feed's reply-prefix render resolves targets by PK; this index serves
+-- staff tooling and future thread-collapse queries.
 CREATE INDEX IF NOT EXISTS idx_crew_post_comments_reply
   ON public.crew_post_comments (reply_to_id)
   WHERE reply_to_id IS NOT NULL;

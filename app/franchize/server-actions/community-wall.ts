@@ -848,12 +848,14 @@ export async function addPostCommentAction(input: {
   if (!postRow || postRow.is_hidden) return { ok: false, error: "Пост недоступен." };
 
   // ── Reply target: same post, visible, normalized to ROOT (one level) ──
+  // The optimistic render gets the ROOT author's name so the freshly
+  // appended comment never flip-flops with what a refetch would show.
   let verifiedReplyToId: string | null = null;
   let replyToName: string | null = null;
   if (replyTo) {
     const { data: target } = await supabaseAdmin
       .from("crew_post_comments")
-      .select("id, post_id, is_hidden, reply_to_id, author_id")
+      .select("id, post_id, is_hidden, reply_to_id")
       .eq("id", replyTo)
       .maybeSingle();
     const t = target as {
@@ -861,7 +863,6 @@ export async function addPostCommentAction(input: {
       post_id: string;
       is_hidden: boolean;
       reply_to_id: string | null;
-      author_id: string;
     } | null;
     if (!t || t.post_id !== postRow.id || t.is_hidden) {
       return { ok: false, error: "Комментарий, на который отвечаешь, уже недоступен." };
@@ -869,13 +870,23 @@ export async function addPostCommentAction(input: {
     // Flatten: a reply to a reply attaches to the ROOT comment instead —
     // the wall's threads are one level deep, same as VK's render model.
     verifiedReplyToId = t.reply_to_id ?? t.id;
-    const { data: nameRow } = await supabaseAdmin
-      .from("users")
-      .select("user_id, username, full_name")
-      .eq("user_id", t.author_id)
+    const rootId = verifiedReplyToId;
+    const { data: rootRow } = await supabaseAdmin
+      .from("crew_post_comments")
+      .select("id, author_id")
+      .eq("id", rootId)
       .maybeSingle();
-    const nr = nameRow as { username: string | null; full_name: string | null } | null;
-    replyToName = nr?.full_name || nr?.username || "Райдер";
+    const rootAuthorId = (rootRow as { author_id: string } | null)?.author_id;
+    if (rootAuthorId) {
+      const { data: nameRow } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name")
+        .eq("user_id", rootAuthorId)
+        .maybeSingle();
+      const nr = nameRow as { username: string | null; full_name: string | null } | null;
+      replyToName = nr?.full_name || nr?.username || "Райдер";
+    }
+    replyToName = replyToName ?? "Райдер";
   }
 
   // Same write scope + rate brake as posts (crew riders & staff only).

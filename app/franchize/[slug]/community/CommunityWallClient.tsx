@@ -1841,7 +1841,12 @@ function PostCard(props: PostCardProps) {
                     <div className="flex shrink-0 items-start">
                       <button
                         type="button"
-                        onClick={() => props.onStartReply(c.id, cName)}
+                        onClick={() => {
+                          props.onStartReply(c.id, cName);
+                          // The composer exists only in the expanded block —
+                          // replying to a preview comment must reveal it first.
+                          if (!expanded) props.onToggleComments();
+                        }}
                         title={`Ответить ${cName}`}
                         aria-label={`Ответить ${cName}`}
                         className="rounded-full p-1 text-[var(--community-muted)] opacity-0 transition hover:text-[var(--community-accent)] focus:opacity-100 group-hover:opacity-100 max-md:opacity-70"
@@ -1866,6 +1871,7 @@ function PostCard(props: PostCardProps) {
             </ul>
           )}
           {!commentsLoading &&
+            !expanded &&
             post.comments.length > 0 &&
             post.comments.length < Math.min(WALL_COMMENTS_FETCH_LIMIT, post.commentCount) && (
               <button
@@ -1896,7 +1902,9 @@ function PostCard(props: PostCardProps) {
               )}
               <div className="flex items-center gap-2">
                 <input
+                  key={replyTarget?.commentId ?? "plain"}
                   value={draft}
+                  autoFocus={!!replyTarget}
                   onChange={(e) => props.onDraftChange(e.target.value.slice(0, WALL_COMMENT_MAX_LEN))}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {

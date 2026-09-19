@@ -50,6 +50,17 @@ describe("parseWallText", () => {
     expect(parseWallText("https://t.me/@evil_payload")[0]).toEqual({ type: "url", value: "https://t.me/@evil_payload" });
   });
 
+  it("emails are NOT mentions (left-boundary check)", () => {
+    expect(types("пиши на mail@test.com сегодня")).toEqual(["text"]);
+    expect(values("пиши на mail@test.com сегодня")[0]).toBe("пиши на mail@test.com сегодня");
+  });
+
+  it("URL trailing sentence punctuation stays outside the token", () => {
+    const toks = parseWallText("отчёт https://example.com/route. Готово");
+    expect(toks[1]).toEqual({ type: "url", value: "https://example.com/route" });
+    expect(toks[2]).toEqual({ type: "text", value: "." });
+  });
+
   it("keeps mixed RU/EN + digits in hashtags", () => {
     expect(values("#заезд2025 x")).toEqual(["#заезд2025", " x"]);
   });
