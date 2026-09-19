@@ -380,6 +380,182 @@ export interface Database {
           },
         ]
       }
+      // NOTE: crew_posts / crew_post_comments / crew_post_likes blocks below were
+      // hand-inserted to match the 20260919000000_onlybike_community_wall.sql
+      // migration BEFORE it was applied to the live DB (gen:db-types can only
+      // see tables that exist). Shapes follow scripts/gen-db-types.mjs output
+      // exactly — after applying the migration, `npm run gen:db-types` regenerates them identically.
+      crew_post_comments: {
+        Row: {
+          id: string
+          post_id: string
+          crew_id: string
+          author_id: string
+          body: string
+          is_hidden: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          crew_id: string
+          author_id: string
+          body: string
+          is_hidden?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          crew_id?: string
+          author_id?: string
+          body?: string
+          is_hidden?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "crew_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crews_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      crew_post_likes: {
+        Row: {
+          post_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          post_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          post_id?: string
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "crew_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      crew_posts: {
+        Row: {
+          id: string
+          crew_id: string
+          author_id: string
+          author_scope: string
+          kind: string
+          body: string
+          stats: Json | null
+          rental_id: string | null
+          like_count: number
+          comment_count: number
+          is_pinned: boolean
+          is_hidden: boolean
+          hidden_by: string | null
+          hidden_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          crew_id: string
+          author_id: string
+          author_scope?: string
+          kind?: string
+          body?: string
+          stats?: Json | null
+          rental_id?: string | null
+          like_count?: number
+          comment_count?: number
+          is_pinned?: boolean
+          is_hidden?: boolean
+          hidden_by?: string | null
+          hidden_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          crew_id?: string
+          author_id?: string
+          author_scope?: string
+          kind?: string
+          body?: string
+          stats?: Json
+          rental_id?: string
+          like_count?: number
+          comment_count?: number
+          is_pinned?: boolean
+          is_hidden?: boolean
+          hidden_by?: string
+          hidden_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crews_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "rentals_rental_id_fkey"
+            columns: ["rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["rental_id"]
+          },
+          {
+            foreignKeyName: "users_hidden_by_fkey"
+            columns: ["hidden_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       // NOT exposed in the REST spec (private schema or dropped) — kept loose:
       crew_secrets: LooseSupabaseTable
       crew_todos: {

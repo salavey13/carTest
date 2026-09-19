@@ -24,7 +24,11 @@
     "app/franchize/[slug]/bikes/page.tsx",
     "app/franchize/[slug]/bikes/BikesWallClient.tsx",
     "app/franchize/[slug]/bikes/[bikeId]/page.tsx",
-    "app/franchize/[slug]/bikes/[bikeId]/BikeStoryClient.tsx"
+    "app/franchize/[slug]/bikes/[bikeId]/BikeStoryClient.tsx",
+    "app/franchize/lib/community-wall.ts",
+    "app/franchize/server-actions/community-wall.ts",
+    "app/franchize/[slug]/community/page.tsx",
+    "app/franchize/[slug]/community/CommunityWallClient.tsx"
   ],
   "exclude": ["node_modules", ".next"]
 }

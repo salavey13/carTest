@@ -4,6 +4,7 @@ import { CalendarDays, Handshake, MapPinned, ShieldCheck, UsersRound } from "luc
 import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
+import { CommunityWallClient } from "./CommunityWallClient";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -67,7 +68,7 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
                 Куда ехать с {brandName} прямо сейчас
               </h1>
               <p className="mt-4 max-w-2xl text-base text-[var(--community-muted)] md:text-lg">
-                События, партнёры и понятные городские сценарии для тех, кто открыл MapRiders и спросил: «а что мне реально делать?»
+                Живая стена экипажа: посты райдеров, статистика поездок и комментарии — плюс события, партнёры и понятные городские сценарии для тех, кто открыл MapRiders и спросил: «а что мне реально делать?»
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link href={`/franchize/${crewSlug}/map-riders`} className="rounded-full bg-[var(--community-accent)] px-5 py-3 text-sm font-semibold text-[var(--community-accent-text)] transition hover:brightness-110">
@@ -91,6 +92,14 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
             </div>
           </div>
         </section>
+
+        {/* OnlyBike community wall — live feed: posts, rental stats, comments.
+            Server actions verify the Telegram actor; anonymous visitors read-only. */}
+        <CommunityWallClient
+          slug={crewSlug}
+          crewName={brandName}
+          botUsername={crewBotUsername || (crewTelegram ? crewTelegram : null)}
+        />
 
         <section className="grid gap-4 md:grid-cols-3">
           {communityEvents.map((event) => (
