@@ -66,7 +66,10 @@ async function listPage(prefix: string, offset: number): Promise<{ name: string;
   return (data ?? []) as { name: string; id: string | null; created_at?: string; updated_at?: string }[];
 }
 
-/** Remove stale files of ONE folder, batched. Durable per folder. */
+/** Remove stale files of ONE folder, batched. Durable per folder.
+ *  After a page with removals the listing SHIFTS left — re-list the same
+ *  offset so shifted entries are not skipped; advance only on a
+ *  removal-free page (converges within the same pass). */
 async function purgeFolder(userPrefix: string, cutoff: number): Promise<number> {
   let removed = 0;
   let offset = 0;
@@ -89,7 +92,7 @@ async function purgeFolder(userPrefix: string, cutoff: number): Promise<number> 
       }
     }
     if (files.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
+    if (stale.length === 0) offset += PAGE_SIZE;
   }
   return removed;
 }
@@ -101,7 +104,6 @@ export async function GET(req: NextRequest) {
 
   const startedAt = Date.now();
   const cutoff = Date.now() - TTL_HOURS * 60 * 60 * 1000;
-  let scanned = 0;
   let removed = 0;
   let foldersProcessed = 0;
   let timeBudgetExceeded = false;
@@ -120,7 +122,6 @@ export async function GET(req: NextRequest) {
           break;
         }
         const purged = await purgeFolder(`staging/${folder.name}`, cutoff);
-        scanned += purged > 0 ? purged : 0; // scanned counted loosely; removals matter
         removed += purged;
         foldersProcessed += 1;
       }

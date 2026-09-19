@@ -591,6 +591,10 @@ export async function createCommunityPostAction(input: {
     });
     if (photoInsertError) {
       logger.error("[community-wall] photo row insert failed:", photoInsertError.message);
+      // Nothing references the object (no row) — remove it now instead of
+      // leaving a permanent orphan in posts/<postId>/ (the ghost guard only
+      // cleans row-backed paths).
+      await supabaseAdmin.storage.from(WALLPHOTO_BUCKET).remove([finalPath]);
     } else {
       photoViews.push({
         id: `${postId}-${i}`,
@@ -598,8 +602,8 @@ export async function createCommunityPostAction(input: {
         width: photo.width,
         height: photo.height,
       });
+      photoFinalPaths.push(finalPath);
     }
-    photoFinalPaths.push(finalPath);
   }
 
   // ── Bike mention rows (join table; cars already verified above) ──
