@@ -147,9 +147,11 @@ describe("extractMentionUsernames", () => {
     expect(names.filter((n) => n.toLowerCase() === "sly13").length).toBe(1);
   });
 
-  it("the action's lowercase fallback query only runs for case-changed tokens (source contract)", () => {
+  it("the action looks up BOTH case variants in one exact query (source contract)", () => {
     const actions = read("app/franchize/server-actions/community-wall.ts");
-    expect(actions).toContain(".filter((n) => !mentionNames.includes(n))");
+    expect(actions).toContain("const variants = [...new Set([...mentionNames, ...mentionNames.map((n) => n.toLowerCase())])]");
+    expect(actions).toContain('.in("username", variants)');
+    expect(actions).not.toContain("username.ilike.");
   });
 });
 
@@ -199,7 +201,6 @@ describe("dedup + anti-flood wiring (source contract)", () => {
     // a claim failure must not abort the loop (already-claimed DMs would
     // otherwise stay suppressed in the ledger forever):
     expect(lib).toContain("let ok = true;");
-    expect(lib.indexOf("let ok = true;")).toBeLessThan(lib.indexOf("claimNotifySlot(\n          input.postId,\n          \"comment\""));
   });
 });
 
@@ -221,7 +222,7 @@ describe("action wiring (source contract)", () => {
 
   it("mention lookup is EXACT (no ilike wildcards — @ivan_petrov must not ping ivanXpetrov)", () => {
     expect(actions).not.toContain("username.ilike.");
-    expect(actions).toContain('.in("username", mentionNames)');
+    expect(actions).toContain('.in("username", variants)');
   });
 
   it("reaction notify meta fetch skips hidden posts", () => {

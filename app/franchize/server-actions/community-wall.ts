@@ -1098,17 +1098,16 @@ export async function addPostCommentAction(input: {
     if (mentionNames.length > 0) {
       // Точное совпадение (indexed, без SQL-дикой карты): `_` в username —
       // это ПОДЧЁРКИВАНИЕ, а не wildcard (ilike превращал @ivan_petrov в
-      // «ivan-что-угодно-petrov» и пинговал чужих людей). Второй exact-запрос
-      // по нижнему регистру покрывает разницу: автор поста пишет @sly13,
-      // а в users.username лежит @Sly13 (ensureUserProfile пишет как в TG).
-      const lowered = mentionNames.map((n) => n.toLowerCase()).filter((n) => !mentionNames.includes(n));
-      const [exactRes, loweredRes] = await Promise.all([
-        supabaseAdmin.from("users").select("user_id").in("username", mentionNames).limit(WALL_MENTION_LOOKUP_CAP),
-        lowered.length > 0
-          ? supabaseAdmin.from("users").select("user_id").in("username", lowered).limit(WALL_MENTION_LOOKUP_CAP)
-          : Promise.resolve({ data: [] as unknown[] }),
-      ]);
-      for (const u of [...((exactRes.data ?? []) as { user_id: string }[]), ...((loweredRes.data ?? []) as { user_id: string }[])]) {
+      // «ivan-что-угодно-petrov» и пинговал чужих людей). Один запрос по
+      // ОБЕИМ вариантам регистра (как напечатал автор + lower) закрывает
+      // оба направления: DB хранит «Sly13» при набранном «@sly13» — и наоборот.
+      const variants = [...new Set([...mentionNames, ...mentionNames.map((n) => n.toLowerCase())])];
+      const { data: mentionedUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
+        .in("username", variants)
+        .limit(WALL_MENTION_LOOKUP_CAP);
+      for (const u of (mentionedUsers ?? []) as { user_id: string }[]) {
         recipients.push({ userId: u.user_id, reason: "mentioned" });
       }
     }
