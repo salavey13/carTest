@@ -476,7 +476,8 @@ describe("community page (legacy ditched)", () => {
   });
 
   it("keeps the live CTAs and renders the wall as the full-width page body", () => {
-    expect(src).toContain("Стена экипажа {brandName}");
+    // wall v5: brandName is accent-tinted inside the h1 (crew palette respect)
+    expect(src).toContain('Стена экипажа <span className="text-[var(--community-accent)]">{brandName}</span>');
     expect(src).toContain("<CommunityWallClient");
     expect(src).toContain("map-riders");
     expect(src).toContain("FULL PAGE WIDTH");

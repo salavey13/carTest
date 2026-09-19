@@ -75,7 +75,7 @@ export default async function FranchizeCommunityPage(
               OnlyBike community
             </p>
             <h1 className="mt-2 font-orbitron text-3xl leading-tight md:text-5xl">
-              Стена экипажа {brandName}
+              Стена экипажа <span className="text-[var(--community-accent)]">{brandName}</span>
             </h1>
             <p className="mt-3 max-w-2xl text-base text-[var(--community-muted)]">
               Живая лента райдеров: посты с фото, статистика поездок из аренды и комментарии — как стена экипажа, только на всю ширину.

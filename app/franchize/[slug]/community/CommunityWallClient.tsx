@@ -3,8 +3,8 @@
 // app/franchize/[slug]/community/CommunityWallClient.tsx
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// OnlyBike community wall — the live part of the /community page (wall v2).
-// A VK-style wall for the crew and its riders/renters:
+// OnlyBike community wall — the live part of the /community page (wall v5,
+// «Neon Garage» beauty pass). A VK-style wall for the crew and its riders:
 //   • feed of posts (pinned first), stats-brag posts with a snapshot card;
 //   • composer: free text + «Поделиться статистикой» + PHOTO attachments
 //     (compressed client-side via lib/client-image-compress — the rental-page
@@ -23,6 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   BarChart3,
@@ -104,6 +105,23 @@ interface ComposerPhoto {
   bytes: number | null;
   uploading: boolean;
   failed: boolean;
+}
+
+/**
+ * Portal to document.body. The wall section carries `backdrop-blur-xl`, which
+ * per CSS spec turns it into the CONTAINING BLOCK for position:fixed
+ * descendants — a plain `fixed inset-0` overlay inside it would anchor to the
+ * (possibly 10k-px tall) section instead of the viewport. Everything that must
+ * cover the real screen (lightbox, particle bursts) goes through here.
+ */
+function WallOverlayPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+  if (!mounted) return null;
+  return createPortal(children, document.body);
 }
 
 interface CommunityWallClientProps {
@@ -685,26 +703,42 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
   return (
     <section
-      className="w-full border-y border-[var(--community-border)] bg-[var(--community-card-soft)] backdrop-blur-xl"
+      className="cw-scene cw-neon-top w-full border-y border-[var(--community-border)] bg-[var(--community-card-soft)] backdrop-blur-xl"
       aria-label="Стена сообщества экипажа"
     >
+      {/* ambient garage atmosphere — decorative, never interactive */}
+      <div className="cw-aurora" aria-hidden="true" />
+      <div className="cw-grain" aria-hidden="true" />
+
       {/* header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--community-border)] px-4 py-4 md:px-8">
+      <div className="cw-above flex flex-wrap items-center justify-between gap-3 border-b border-[var(--community-border)] px-4 py-4 md:px-8">
         <div className="flex items-center gap-3">
-          <BarChart3 className="h-5 w-5 text-[var(--community-accent)]" />
-          <h2 className="font-orbitron text-xl md:text-2xl text-[var(--community-text)]">Стена экипажа</h2>
+          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10">
+            <BarChart3 className="h-5 w-5 text-[var(--community-accent)]" />
+          </span>
+          <div>
+            <h2 className="flex items-center gap-2 font-orbitron text-xl md:text-2xl text-[var(--community-text)]">
+              Стена экипажа
+              <span className="cw-live-dot" aria-hidden="true" />
+            </h2>
+            {trending && trending.weekPosts > 0 && (
+              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--community-muted)] opacity-80">
+                {trending.weekPosts} {pluralRu(trending.weekPosts, ["пост", "поста", "постов"])} за неделю — экипаж живой
+              </p>
+            )}
+          </div>
         </div>
         <p className="text-xs uppercase tracking-[0.18em] text-[var(--community-muted)] opacity-70">
           OnlyBike community
         </p>
       </div>
 
-      <div className="flex flex-col gap-5 px-4 py-5 md:px-8 md:py-6">
+      <div className="cw-above flex flex-col gap-5 px-3 py-5 sm:px-4 md:px-8 md:py-6">
         {wallNotice && (
           <button
             type="button"
             onClick={() => setWallNotice(null)}
-            className="rounded-2xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-4 py-2 text-left text-sm text-[var(--community-accent)]"
+            className="cw-press rounded-2xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-4 py-2 text-left text-sm text-[var(--community-accent)]"
           >
             {wallNotice} — нажми, чтобы скрыть
           </button>
@@ -716,7 +750,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             <button
               type="button"
               onClick={jumpToNewPosts}
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-full border border-[var(--community-accent)]/50 bg-[var(--community-accent)]/10 px-4 py-2 text-sm font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+              className="cw-newpill cw-press mb-3 flex w-full items-center justify-center gap-2 rounded-full border border-[var(--community-accent)]/50 bg-[var(--community-accent)]/10 px-4 py-2.5 text-sm font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
             >
               <ChevronUp className="h-4 w-4" />
               {newPostsCount} {pluralRu(newPostsCount, ["новый пост", "новых поста", "новых постов"])} — показать
@@ -730,7 +764,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 onChange={(e) => setSearchDraft(e.target.value.slice(0, 60))}
                 placeholder="Поиск по стене…"
                 aria-label="Поиск по стене"
-                className="w-full rounded-full border border-[var(--community-border)] bg-transparent py-2 pl-9 pr-8 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)]"
+                className="w-full min-h-[44px] rounded-full border border-[var(--community-border)] bg-transparent py-2 pl-9 pr-8 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)] focus:ring-2 focus:ring-[var(--community-accent)]/25"
               />
               {searchDraft && (
                 <button
@@ -756,9 +790,9 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                     type="button"
                     onClick={() => applyTagFilter(tag)}
                     aria-pressed={activeTag === tag}
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                    className={`cw-press rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition ${
                       activeTag === tag
-                        ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
+                        ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)] shadow-[0_0_14px_-4px_var(--community-accent)]"
                         : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)] hover:text-[var(--community-accent)]"
                     }`}
                   >
@@ -827,7 +861,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             ) : null}
           </div>
         ) : (
-          <div className="rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-4">
+          <div className="cw-composer rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-4">
             {/* compose-draft banner: «поделиться поездкой» из уведомления о закрытии */}
             {composeDraft && !composeDismissed && (
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-3 py-2 text-xs">
@@ -1015,7 +1049,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                   disabled={composerPhotos.length >= WALL_PHOTOS_MAX}
                   title={`Фото (до ${WALL_PHOTOS_MAX})`}
                   aria-label="Прикрепить фото"
-                  className="flex items-center gap-2 rounded-full border border-[var(--community-border)] px-3.5 py-2 text-xs font-semibold text-[var(--community-muted)] transition hover:border-[var(--community-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="cw-press flex min-h-[44px] items-center gap-2 rounded-full border border-[var(--community-border)] px-3.5 text-xs font-semibold text-[var(--community-muted)] transition hover:border-[var(--community-accent)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ImagePlus className="h-4 w-4" />
                   Фото
@@ -1027,7 +1061,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                   title="Прикрепить байк из каталога"
                   aria-label="Прикрепить байк из каталога"
                   aria-expanded={bikePickerOpen}
-                  className={`flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`cw-press flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     bikePickerOpen || selectedBikes.length > 0
                       ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
                       : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)]"
@@ -1039,7 +1073,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 <button
                   type="button"
                   onClick={() => void toggleShareStats()}
-                  className={`flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+                  className={`cw-press flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition ${
                     shareStats
                       ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
                       : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)]"
@@ -1060,7 +1094,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                   pendingUploads ||
                   (!text.trim() && !shareStats && composerPhotos.length === 0 && selectedBikes.length === 0)
                 }
-                className="flex items-center gap-2 rounded-full bg-[var(--community-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--community-accent-text)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                className="cw-press flex items-center gap-2 rounded-full bg-[var(--community-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--community-accent-text)] shadow-[0_8px_26px_-10px_var(--community-accent)] transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {pendingUploads ? "Загружаем фото…" : "Опубликовать"}
@@ -1074,10 +1108,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
         {/* feed */}
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-[var(--community-muted)]">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Загружаем стену…</span>
-          </div>
+          <WallSkeleton />
         ) : feedError ? (
           <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
             {feedError}
@@ -1088,7 +1119,9 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
         ) : posts.length === 0 ? (
           activeTag || activeQuery ? (
             <div className="rounded-2xl border border-dashed border-[var(--community-border)] bg-[var(--community-card-faint)] p-8 text-center">
-              <Search className="mx-auto h-8 w-8 text-[var(--community-muted)]" />
+              <span className="cw-empty-icon">
+                <Search className="h-8 w-8 text-[var(--community-muted)]" />
+              </span>
               <p className="mt-3 text-sm font-semibold text-[var(--community-text)]">Ничего не нашлось.</p>
               <p className="mt-1 text-sm text-[var(--community-muted)]">
                 Попробуй другой запрос или убери фильтр — и стена покажет всё подряд.
@@ -1106,7 +1139,9 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[var(--community-border)] bg-[var(--community-card-faint)] p-8 text-center">
-              <Bike className="mx-auto h-8 w-8 text-[var(--community-accent)]" />
+              <span className="cw-empty-icon">
+                <Bike className="h-8 w-8 text-[var(--community-accent)]" />
+              </span>
               <p className="mt-3 text-sm font-semibold text-[var(--community-text)]">
                 Стена экипажа {crewName} пока пустая — будь первым!
               </p>
@@ -1117,9 +1152,10 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
           )
         ) : (
           <div className="flex flex-col gap-4">
-            {posts.map((post) => (
+            {posts.map((post, i) => (
               <PostCard
                 key={post.id}
+                index={i}
                 post={post}
                 slug={slug}
                 viewer={viewer}
@@ -1155,7 +1191,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             type="button"
             onClick={() => void loadMore()}
             disabled={loadingMore}
-            className="mx-auto flex items-center gap-2 rounded-full border border-[var(--community-border)] px-6 py-2.5 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] disabled:opacity-50"
+            className="cw-press mx-auto flex min-h-[44px] items-center gap-2 rounded-full border border-[var(--community-border)] px-6 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] disabled:opacity-50"
           >
             {loadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
             Показать ещё
@@ -1163,14 +1199,18 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
         )}
       </div>
 
-      {/* fullscreen photo viewer with pinch-zoom */}
+      {/* fullscreen photo viewer with pinch-zoom — PORTALED: the section's
+          backdrop-blur would otherwise become its containing block and the
+          «fixed» overlay would anchor to the section, not the viewport */}
       {lightboxPost && lightbox && lightboxPost.photos.length > 0 && (
-        <PhotoLightbox
-          photos={lightboxPost.photos}
-          index={Math.min(lightbox.index, lightboxPost.photos.length - 1)}
-          onClose={() => setLightbox(null)}
-          onIndexChange={(index) => setLightbox({ postId: lightboxPost.id, index })}
-        />
+        <WallOverlayPortal>
+          <PhotoLightbox
+            photos={lightboxPost.photos}
+            index={Math.min(lightbox.index, lightboxPost.photos.length - 1)}
+            onClose={() => setLightbox(null)}
+            onIndexChange={(index) => setLightbox({ postId: lightboxPost.id, index })}
+          />
+        </WallOverlayPortal>
       )}
     </section>
   );
@@ -1209,6 +1249,35 @@ function Avatar({ url, name, size = 40 }: { url: string | null; name: string | n
   );
 }
 
+/** Shimmer skeleton of the feed — replaces the bare spinner (wall v5). */
+function WallSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="cw-card p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <div className="cw-skel h-10 w-10 shrink-0 !rounded-full" />
+            <div className="flex-1 space-y-2">
+              <div className="cw-skel h-3.5 w-32" />
+              <div className="cw-skel h-2.5 w-20" />
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <div className="cw-skel h-3 w-full" />
+            <div className="cw-skel h-3 w-11/12" />
+            <div className="cw-skel h-3 w-2/3" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-1.5">
+            <div className="cw-skel aspect-square !rounded-xl" />
+            <div className="cw-skel aspect-square !rounded-xl" />
+            <div className="cw-skel aspect-square !rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatsPreviewCard({ stats, loading }: { stats: RentalStatsSnapshot | null; loading: boolean }) {
   if (loading || !stats) {
     return (
@@ -1224,19 +1293,129 @@ function StatsPreviewCard({ stats, loading }: { stats: RentalStatsSnapshot | nul
   );
 }
 
+
+/**
+ * rAF odometer (v5): eases 0→target once `run` turns true — stat numbers
+ * count up as the dashboard scrolls into view. Honours prefers-reduced-motion
+ * (jumps straight to the target) and cancels the frame on cleanup.
+ */
+function useCountUp(target: number, run: boolean, durationMs = 900): number {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!run) return;
+    const reduced =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced || target <= 0) {
+      setValue(target);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / durationMs);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setValue(Math.round(target * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [run, target, durationMs]);
+  return run ? value : 0;
+}
+
+/** True once the element has been ≥35% visible (fires once, then disconnects). */
+function useInViewOnce(): [React.RefObject<HTMLDivElement>, boolean] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || inView) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true); // ancient WebView — show the numbers immediately
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView]);
+  return [ref, inView];
+}
+
+/**
+ * «Спидометр» (v5 special sauce) — hours in the saddle drawn as a neon gauge
+ * arc (scale 0–100 ч, capped with «+»). The arc draws itself in via the CSS
+ * cw-gauge animation; the number counts up with the shared rAF odometer.
+ */
+function SaddleGauge({ hours, run }: { hours: number; run: boolean }) {
+  const pct = Math.max(0, Math.min(1, hours / 100));
+  const shown = useCountUp(Math.min(hours, 100), run, 1100);
+  return (
+    <div className="cw-tick mb-3 flex items-center gap-4">
+      <svg
+        viewBox="0 0 120 68"
+        className="h-[68px] w-[120px] shrink-0"
+        role="img"
+        aria-label={`Часов в седле: ${shown}${hours >= 100 ? "+" : ""}`}
+      >
+        {/* track */}
+        <path d="M 12 60 A 48 48 0 0 1 108 60" fill="none" stroke="var(--community-border)" strokeWidth="8" strokeLinecap="round" opacity="0.45" />
+        {/* accent arc — pathLength=100 makes dashoffset math percentages */}
+        <path
+          d="M 12 60 A 48 48 0 0 1 108 60"
+          fill="none"
+          stroke="var(--community-accent)"
+          strokeWidth="8"
+          strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray="100"
+          strokeDashoffset={100 - pct * 100}
+          className="cw-gauge-arc"
+          style={{ "--cw-gauge-len": 100 } as React.CSSProperties}
+        />
+      </svg>
+      <div>
+        <p className="font-orbitron text-2xl tabular-nums text-[var(--community-accent)]">
+          {shown}
+          {hours >= 100 ? "+" : ""}
+        </p>
+        <p className="text-xs text-[var(--community-muted)]">часов в седле всего</p>
+      </div>
+    </div>
+  );
+}
+
 function StatsGrid({ stats, compact = false }: { stats: RentalStatsSnapshot; compact?: boolean }) {
+  // dashboard comes alive when it scrolls into view (v5 odometers)
+  const [rootRef, inView] = useInViewOnce();
+
+  const rides = useCountUp(stats.ridesCount, inView);
+  const hours = useCountUp(stats.hoursRented, inView);
+  const spent = useCountUp(Math.round(stats.totalSpent), inView);
+  const bikes = useCountUp(stats.bikesUsed, inView);
+
   const cells: { value: string; label: string }[] = [
-    { value: String(stats.ridesCount), label: pluralRu(stats.ridesCount, ["поездка", "поездки", "поездок"]) },
-    { value: String(stats.hoursRented), label: pluralRu(stats.hoursRented, ["час в седле", "часа в седле", "часов в седле"]) },
-    { value: formatRub(stats.totalSpent), label: "потрачено" },
-    { value: String(stats.bikesUsed), label: pluralRu(stats.bikesUsed, ["байк", "байка", "байков"]) },
+    { value: String(rides), label: pluralRu(stats.ridesCount, ["поездка", "поездки", "поездок"]) },
+    { value: String(hours), label: pluralRu(stats.hoursRented, ["час в седле", "часа в седле", "часов в седле"]) },
+    { value: formatRub(spent), label: "потрачено" },
+    { value: String(bikes), label: pluralRu(stats.bikesUsed, ["байк", "байка", "байков"]) },
   ];
   return (
-    <div>
+    <div ref={rootRef}>
+      {!compact && <SaddleGauge hours={stats.hoursRented} run={inView} />}
       <div className={`grid gap-2 ${compact ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"}`}>
         {cells.map((c) => (
           <div key={c.label} className="rounded-xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3 text-center">
-            <p className="font-orbitron text-lg text-[var(--community-accent)] md:text-xl">{c.value}</p>
+            <p className="font-orbitron text-lg tabular-nums text-[var(--community-accent)] md:text-xl">{c.value}</p>
             <p className="mt-1 text-xs text-[var(--community-muted)]">{c.label}</p>
           </div>
         ))}
@@ -1257,7 +1436,8 @@ function StatsGrid({ stats, compact = false }: { stats: RentalStatsSnapshot; com
   );
 }
 
-// ── photo grid (VK-style: 1 → large, 2+ → even grid) ────────────────────────
+// ── photo grid (v5 mosaic: 1 → cinematic, 2 → diptych, 3 → hero + stack,
+//    4+ → 2×2 with «+N» tile — VK/IG habits, thumbs stay ≥44px) ───────────────
 
 function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (index: number) => void }) {
   if (photos.length === 0) return null;
@@ -1268,7 +1448,7 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
         <button
           type="button"
           onClick={() => onOpen(0)}
-          className="block w-full overflow-hidden rounded-xl border border-[var(--community-border)] bg-[var(--community-base-soft)]"
+          className="cw-photo block w-full"
           aria-label="Открыть фото"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
@@ -1276,24 +1456,40 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
             src={p.url}
             alt="Фото поста"
             loading="lazy"
-            className="mx-auto max-h-[560px] w-full object-contain"
+            className="mx-auto max-h-[560px] w-full object-cover"
           />
+          <span className="cw-photo-veil" aria-hidden="true" />
         </button>
       </div>
     );
   }
+
+  const shown = photos.slice(0, 4);
+  const extra = photos.length - shown.length;
+  const layout =
+    photos.length === 2
+      ? "grid-cols-2 aspect-[4/3]"
+      : photos.length === 3
+        ? "grid-cols-2 grid-rows-2 aspect-[4/3]"
+        : "grid-cols-2 aspect-square";
   return (
-    <div className={`mt-3 grid gap-1.5 ${photos.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
-      {photos.map((p, i) => (
+    <div className={`mt-3 grid gap-1.5 ${layout}`}>
+      {shown.map((p, i) => (
         <button
           key={p.id}
           type="button"
           onClick={() => onOpen(i)}
-          className="aspect-square overflow-hidden rounded-xl border border-[var(--community-border)]"
-          aria-label={`Открыть фото ${i + 1}`}
+          className={`cw-photo h-full w-full ${photos.length === 3 && i === 0 ? "row-span-2" : ""}`}
+          aria-label={`Открыть фото ${i + 1}${extra > 0 && i === 3 ? ` (ещё ${extra})` : ""}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
           <img src={p.url} alt={`Фото ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
+          <span className="cw-photo-veil" aria-hidden="true" />
+          {i === 3 && extra > 0 && (
+            <span className="cw-more-tile absolute inset-0 flex items-center justify-center text-xl font-bold text-white">
+              +{extra}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -1326,7 +1522,7 @@ function PostBikeChips({ bikes, slug }: { bikes: WallBikeRefView[]; slug: string
           key={bike.bikeId}
           href={`/franchize/${slug}/catalog`}
           title={`Открыть каталог — ${bike.title}`}
-          className="flex items-center gap-2 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-1 pr-3 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+          className="flex items-center gap-2 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-1 pr-3 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20 cw-press"
         >
           {bike.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- crew-managed bike photos live on arbitrary hosts
@@ -1616,22 +1812,22 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     <div
       ref={dialogRef}
       tabIndex={-1}
-      className="fixed inset-0 z-[100] flex flex-col bg-black/95 outline-none"
+      className="fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-black/95 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] outline-none"
       style={{ touchAction: "none" }}
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр фото"
     >
-      {/* top bar */}
+      {/* top bar — glassy counter chip + thumb-sized close */}
       <div className="flex items-center justify-between px-4 py-3 text-white">
-        <span className="text-sm tabular-nums text-white/80">
+        <span className="rounded-full bg-white/10 px-3 py-1 text-sm tabular-nums text-white/80 backdrop-blur">
           {index + 1} / {photos.length}
         </span>
         <button
           type="button"
           onClick={onClose}
           aria-label="Закрыть просмотр"
-          className="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
+          className="cw-press flex h-11 w-11 items-center justify-center rounded-full bg-white/10 transition hover:bg-white/20"
         >
           <X className="h-5 w-5" />
         </button>
@@ -1694,7 +1890,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
           Щипок — зум · двойной тап — зум · свайп — следующее фото
         </p>
         {photos.length > 1 && (
-          <div className="flex max-w-full gap-1.5 overflow-x-auto py-1">
+          <div className="flex max-w-full snap-x snap-mandatory gap-1.5 overflow-x-auto py-1">
             {photos.map((p, i) => (
               <button
                 key={p.id}
@@ -1704,7 +1900,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
                   onIndexChange(i);
                 }}
                 aria-label={`Фото ${i + 1}`}
-                className={`h-11 w-11 shrink-0 overflow-hidden rounded-lg border-2 transition ${
+                className={`h-11 w-11 shrink-0 snap-center overflow-hidden rounded-lg border-2 transition ${
                   i === index ? "border-white" : "border-transparent opacity-50 hover:opacity-80"
                 }`}
               >
@@ -1731,6 +1927,21 @@ function topReactions(counts: Record<string, number>, max = 3): string[] {
     .sort((a, b) => b[1] - a[1] || WALL_REACTIONS.indexOf(a[0] as never) - WALL_REACTIONS.indexOf(b[0] as never))
     .slice(0, max)
     .map(([emoji]) => emoji);
+}
+
+/** One flying emoji particle of the reaction burst (v5 special sauce). */
+interface CwBurstParticle {
+  key: string;
+  emoji: string;
+  /** launch point (viewport px, from the trigger button's centre) */
+  x: number;
+  y: number;
+  /** random flight vector + spin + size + duration */
+  dx: number;
+  dy: number;
+  s: number;
+  rot: number;
+  dur: number;
 }
 
 /** Telegram-native haptics, silent no-op outside the MiniApp WebView. */
@@ -1802,6 +2013,44 @@ function ReactionBar({
     triggerRef.current?.focus();
   }, []);
 
+  // v5 special sauce: emoji particles fly out of the button on every new
+  // reaction. PORTALED to document.body — fixed positioning inside the
+  // backdrop-blurred section would anchor to the section, not the viewport.
+  const [bursts, setBursts] = useState<CwBurstParticle[]>([]);
+  const burstSeq = useRef(0);
+  const burstTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    const timers = burstTimers;
+    return () => timers.current.forEach(clearTimeout);
+  }, []);
+  const fireBurst = useCallback((emoji: string) => {
+    const el = triggerRef.current;
+    if (!el) return;
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const batch = ++burstSeq.current;
+    const particles: CwBurstParticle[] = Array.from({ length: 7 }, (_, i) => ({
+      key: `${batch}-${i}`,
+      emoji,
+      x,
+      y,
+      dx: (Math.random() - 0.5) * 96,
+      dy: -44 - Math.random() * 78,
+      s: 0.9 + Math.random() * 0.9,
+      rot: (Math.random() - 0.5) * 44,
+      dur: 0.66 + Math.random() * 0.3,
+    }));
+    setBursts((prev) => [...prev, ...particles]);
+    burstTimers.current.push(
+      setTimeout(() => {
+        const keys = new Set(particles.map((p) => p.key));
+        setBursts((prev) => prev.filter((b) => !keys.has(b.key)));
+      }, 1050),
+    );
+  }, []);
+
   const quickToggle = useCallback(() => {
     if (pending) return;
     if (!canReact) {
@@ -1810,8 +2059,10 @@ function ReactionBar({
     }
     setPop((n) => n + 1);
     tgHaptic("light");
+    // burst only when a reaction is SET (quick re-tap removes it — VK behaviour)
+    if (!post.viewerReaction) fireBurst(post.viewerReaction ?? WALL_REACTIONS[0]);
     onToggle(post.viewerReaction ?? WALL_REACTIONS[0]);
-  }, [pending, canReact, onToggle, post.viewerReaction]);
+  }, [pending, canReact, onToggle, post.viewerReaction, fireBurst]);
 
   const countLabel = `${post.likeCount} ${pluralRu(post.likeCount, ["реакция", "реакции", "реакций"])}`;
   const ariaLabel = post.viewerReaction
@@ -1869,7 +2120,7 @@ function ReactionBar({
         aria-haspopup="menu"
         aria-expanded={pickerOpen}
         aria-label={ariaLabel}
-        className={`relative flex select-none items-center gap-1.5 text-sm transition disabled:opacity-60 ${
+        className={`relative flex min-h-[44px] select-none items-center gap-1.5 rounded-full px-2.5 text-sm transition disabled:opacity-60 ${
           post.viewerReaction
             ? "text-[var(--community-accent)]"
             : "text-[var(--community-muted)] hover:text-[var(--community-accent)]"
@@ -1928,6 +2179,7 @@ function ReactionBar({
                   if (canReact && !pending) {
                     setPop((n) => n + 1);
                     tgHaptic("select");
+                    fireBurst(emoji);
                     onToggle(emoji);
                   }
                 }}
@@ -1945,6 +2197,31 @@ function ReactionBar({
             ))}
           </div>
         </>
+      )}
+
+      {/* v5: flying-emoji burst layer (see fireBurst) */}
+      {bursts.length > 0 && (
+        <WallOverlayPortal>
+          <div className="cw-burst-layer" aria-hidden="true">
+            {bursts.map((b) => (
+              <span
+                key={b.key}
+                className="cw-burst-particle text-xl"
+                style={{
+                  "--cw-x": `${b.x}px`,
+                  "--cw-y": `${b.y}px`,
+                  "--cw-dx": `${b.dx}px`,
+                  "--cw-dy": `${b.dy}px`,
+                  "--cw-s": b.s,
+                  "--cw-rot": `${b.rot}deg`,
+                  "--cw-burst-dur": `${b.dur}s`,
+                } as React.CSSProperties}
+              >
+                {b.emoji}
+              </span>
+            ))}
+          </div>
+        </WallOverlayPortal>
       )}
     </div>
   );
@@ -2019,6 +2296,8 @@ function WallRichText({
 
 interface PostCardProps {
   post: WallPostView;
+  /** position in the feed — drives the staggered entrance (capped at 8) */
+  index: number;
   slug: string;
   viewer: WallViewerInfo | null;
   canModerate: boolean;
@@ -2047,6 +2326,24 @@ function PostCard(props: PostCardProps) {
   const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending, replyTarget } = props;
   const isOwnPost = !!viewer?.userId && viewer.userId === post.author.userId;
   const authorName = post.author.fullName || post.author.username || "Райдер";
+
+  // desktop spotlight — a soft accent glow that follows the mouse (rAF-throttled,
+  // attached only for fine pointers, so mobile never pays for it)
+  const cardRef = useRef<HTMLElement>(null);
+  const spotRaf = useRef(0);
+  const onCardPointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    const el = cardRef.current;
+    if (!el) return;
+    const { clientX, clientY } = e;
+    if (spotRaf.current) return;
+    spotRaf.current = requestAnimationFrame(() => {
+      spotRaf.current = 0;
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty("--cw-mx", `${clientX - rect.left}px`);
+      el.style.setProperty("--cw-my", `${clientY - rect.top}px`);
+    });
+  }, []);
   // special sauce: milestone badge + days-since-first-ride on stats posts
   const milestone = post.stats ? riderMilestoneBadge(post.stats.ridesCount) : null;
   const daysInCrew = useMemo(() => {
@@ -2089,9 +2386,10 @@ function PostCard(props: PostCardProps) {
   return (
     <article
       id={`post-${post.id}`}
-      className={`rounded-2xl border bg-[var(--community-card-faint)] p-4 transition md:p-5 ${
-        post.isPinned ? "border-[var(--community-accent)]/50" : "border-[var(--community-border)]"
-      }`}
+      ref={cardRef}
+      onPointerMove={onCardPointerMove}
+      style={{ "--cw-i": props.index } as React.CSSProperties}
+      className={`cw-rise cw-card ${post.isPinned ? "cw-card-pinned" : ""} cw-spotlight p-4 md:p-5`}
     >
       {/* header */}
       <div className="flex items-start justify-between gap-3">
@@ -2109,7 +2407,11 @@ function PostCard(props: PostCardProps) {
               >
                 {post.authorScope === "crew" ? "Экипаж" : "Райдер"}
               </span>
-              {post.isPinned && <Pin className="h-3.5 w-3.5 text-[var(--community-accent)]" />}
+              {post.isPinned && (
+                <span className="flex items-center gap-1 rounded-full bg-[var(--community-accent)]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--community-accent)]">
+                  <Pin className="h-3 w-3" /> закреплено
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-xs text-[var(--community-muted)] opacity-70">
               {formatRelativeTimeRu(post.createdAt)}
@@ -2170,7 +2472,7 @@ function PostCard(props: PostCardProps) {
 
       {/* stats snapshot */}
       {post.kind === "stats" && post.stats && (
-        <div className="mt-3 rounded-xl border border-[var(--community-accent)]/30 bg-[var(--community-accent)]/5 p-3">
+        <div className="cw-dash mt-3 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--community-accent)]">
               <BarChart3 className="h-3.5 w-3.5" /> статистика поездок
@@ -2178,7 +2480,7 @@ function PostCard(props: PostCardProps) {
             {milestone && (
               <span
                 title="Достижение за поездки с этим экипажем"
-                className="rounded-full bg-[var(--community-accent)]/15 px-2.5 py-0.5 text-[11px] font-bold text-[var(--community-accent)]"
+                className="cw-milestone rounded-full px-2.5 py-0.5 text-[11px] font-bold text-[var(--community-accent)]"
               >
                 {milestone.emoji} {milestone.label}
               </span>
@@ -2211,8 +2513,8 @@ function PostCard(props: PostCardProps) {
         </div>
       )}
 
-      {/* actions row */}
-      <div className="mt-3 flex items-center gap-4">
+      {/* actions row — v5: 44px thumb targets with inner padding (mobile) */}
+      <div className="-mx-2 mt-3 flex items-center gap-1">
         <ReactionBar
           post={post}
           pending={likePending}
@@ -2224,7 +2526,7 @@ function PostCard(props: PostCardProps) {
           onClick={props.onToggleComments}
           aria-expanded={expanded}
           aria-label="Комментарии"
-          className="flex items-center gap-1.5 text-sm text-[var(--community-muted)] transition hover:text-[var(--community-accent)]"
+          className="cw-press flex min-h-[44px] items-center gap-1.5 rounded-full px-2.5 text-sm text-[var(--community-muted)] transition hover:text-[var(--community-accent)]"
         >
           <MessageCircle className="h-4 w-4" />
           {post.commentCount > 0 ? pluralRu(post.commentCount, ["комментарий", "комментария", "комментариев"]) : "Комментировать"}
@@ -2234,7 +2536,7 @@ function PostCard(props: PostCardProps) {
           onClick={sharePost}
           aria-label="Поделиться в Telegram"
           title="Поделиться в Telegram"
-          className="flex items-center gap-1.5 text-sm text-[var(--community-muted)] transition hover:text-[var(--community-accent)]"
+          className="cw-press flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-full text-sm text-[var(--community-muted)] transition hover:text-[var(--community-accent)]"
         >
           <Share2 className="h-4 w-4" />
         </button>
@@ -2362,13 +2664,13 @@ function PostCard(props: PostCardProps) {
                     }
                   }}
                   placeholder={replyTarget ? `Ответить ${replyTarget.authorName}…` : "Твой комментарий…"}
-                  className="flex-1 rounded-full border border-[var(--community-border)] bg-transparent px-4 py-2 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)]"
+                  className="min-h-[44px] flex-1 rounded-full border border-[var(--community-border)] bg-transparent px-4 py-2 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)] focus:ring-2 focus:ring-[var(--community-accent)]/25"
                 />
                 <button
                   type="button"
                   onClick={props.onSubmitComment}
                   disabled={sendingComment || !draft.trim()}
-                  className="rounded-full bg-[var(--community-accent)] p-2 text-[var(--community-accent-text)] transition hover:brightness-110 disabled:opacity-40"
+                  className="cw-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--community-accent)] text-[var(--community-accent-text)] shadow-[0_6px_20px_-8px_var(--community-accent)] disabled:opacity-40"
                   title="Отправить"
                 >
                   {sendingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

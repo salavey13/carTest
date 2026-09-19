@@ -732,3 +732,376 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 .animate-reaction-pop {
   animation: reaction-pop 0.32s ease-out forwards;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   OnlyBike community wall v5 — «Neon Garage» beauty pass
+   All classes are namespaced .cw-* (community wall) to stay leak-free.
+   Every effect reads the crew theme via --community-* vars set on the page,
+   animates ONLY transform/opacity (compositor-friendly) and honours
+   prefers-reduced-motion. No external deps added.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Ambient aurora: two slow accent blobs + grain, absolutely positioned
+      behind the feed (parent needs .cw-scene with overflow clip). ─────────── */
+.cw-scene {
+  position: relative;
+  overflow: hidden;
+}
+.cw-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.cw-aurora::before,
+.cw-aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  will-change: transform;
+}
+/* top-left blob — accent-tinted */
+.cw-aurora::before {
+  width: 520px;
+  height: 520px;
+  top: -220px;
+  left: -140px;
+  background: radial-gradient(circle, var(--community-accent) 0%, transparent 65%);
+  opacity: 0.16;
+  animation: cw-drift 26s ease-in-out infinite;
+}
+/* bottom-right blob — cooler, slower, counter-directional */
+.cw-aurora::after {
+  width: 640px;
+  height: 640px;
+  bottom: -300px;
+  right: -180px;
+  background: radial-gradient(circle, var(--community-accent) 0%, transparent 60%);
+  opacity: 0.10;
+  animation: cw-drift 34s ease-in-out infinite reverse;
+}
+@keyframes cw-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(60px, 40px, 0) scale(1.08); }
+  66%      { transform: translate3d(-40px, -30px, 0) scale(0.94); }
+}
+/* fine grain so big flat surfaces don't band on OLED */
+.cw-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* content above the aurora */
+.cw-above { position: relative; z-index: 1; }
+
+/* ── 2. Neon top strip on the wall band + header underline ────────────────── */
+.cw-neon-top {
+  position: relative;
+}
+.cw-neon-top::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 4%, var(--community-accent) 30%, var(--community-accent) 70%, transparent 96%);
+  opacity: 0.75;
+  filter: drop-shadow(0 0 6px var(--community-accent));
+}
+.cw-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--community-accent);
+  box-shadow: 0 0 0 0 var(--community-accent);
+  animation: cw-live-pulse 2.4s ease-out infinite;
+}
+@keyframes cw-live-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--community-accent) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ── 3. Post cards: sheen border + spotlight follow (desktop) + hover lift ── */
+.cw-card {
+  position: relative;
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--community-accent) 4%, transparent) 0%, transparent 90px),
+    var(--community-card-faint);
+  border: 1px solid var(--community-border);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+/* top sheen — a 1px light edge like metal in a garage */
+.cw-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--community-accent) 65%, white 0%) 50%, transparent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .cw-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--community-accent) 38%, var(--community-border));
+    box-shadow:
+      0 10px 34px -14px color-mix(in srgb, var(--community-accent) 42%, transparent),
+      0 2px 10px -4px rgba(0, 0, 0, 0.28);
+  }
+  .cw-card:hover::before { opacity: 1; }
+}
+/* pinned post — accent edge + soft inner glow */
+.cw-card-pinned {
+  border-color: color-mix(in srgb, var(--community-accent) 45%, var(--community-border));
+  box-shadow: inset 3px 0 0 0 var(--community-accent), 0 6px 26px -16px color-mix(in srgb, var(--community-accent) 55%, transparent);
+}
+/* mouse spotlight — desktop only, vars fed from JS (pointermove, rAF-throttled) */
+.cw-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(
+    420px circle at var(--cw-mx, 50%) var(--cw-my, 0%),
+    color-mix(in srgb, var(--community-accent) 9%, transparent),
+    transparent 65%
+  );
+}
+@media (hover: hover) and (pointer: fine) {
+  .cw-spotlight:hover::after { opacity: 1; }
+}
+
+/* ── 4. Feed entrance: posts rise+fade with a tiny stagger ────────────────── */
+@keyframes cw-rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.cw-rise {
+  /* backwards: shows the from-state during the stagger delay, then releases
+     the transform entirely after the run (no permanent containing block) */
+  animation: cw-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(min(var(--cw-i, 0), 8) * 55ms);
+}
+
+/* ── 5. Skeleton feed (shimmer) ────────────────────────────────────────────── */
+@keyframes cw-shimmer {
+  from { background-position: -180% 0; }
+  to   { background-position: 180% 0; }
+}
+.cw-skel {
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--community-text) 6%, transparent) 30%,
+    color-mix(in srgb, var(--community-text) 13%, transparent) 50%,
+    color-mix(in srgb, var(--community-text) 6%, transparent) 70%
+  );
+  background-size: 220% 100%;
+  animation: cw-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── 6. Photo grid: press feedback + slow ken-burns on hover ──────────────── */
+.cw-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  border: 1px solid var(--community-border);
+  background: var(--community-base-soft);
+}
+.cw-photo img {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (hover: hover) {
+  .cw-photo:hover img { transform: scale(1.045); }
+}
+.cw-photo:active img { transform: scale(1.03); }
+.cw-photo-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 62%, rgba(0, 0, 0, 0.42) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.cw-photo:hover .cw-photo-veil,
+.cw-photo:focus-visible .cw-photo-veil { opacity: 1; }
+
+/* «+N more» overlay tile */
+.cw-more-tile {
+  backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--community-accent) 22%, rgba(0, 0, 0, 0.55));
+}
+
+/* ── 7. Buttons: magnetic press feedback (all pointers) ────────────────────── */
+.cw-press {
+  transition: transform 0.16s ease, filter 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.cw-press:active { transform: scale(0.94); }
+@media (hover: hover) {
+  .cw-press:hover { filter: brightness(1.08); }
+}
+
+/* ── 8. Composer: glowing focus ring ───────────────────────────────────────── */
+.cw-composer {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.cw-composer:focus-within {
+  border-color: color-mix(in srgb, var(--community-accent) 55%, var(--community-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--community-accent) 40%, transparent),
+    0 8px 30px -18px color-mix(in srgb, var(--community-accent) 70%, transparent);
+}
+
+/* ── 9. Stats dashboard: dashboard panel, gauge draw, sparkles ─────────────── */
+.cw-dash {
+  position: relative;
+  border-radius: 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--community-accent) 32%, var(--community-border));
+  background:
+    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--community-accent) 14%, transparent) 0%, transparent 55%),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--community-text) 2.5%, transparent) 0 1px, transparent 1px 26px),
+    var(--community-accent-faint, color-mix(in srgb, var(--community-accent) 5%, transparent));
+  overflow: hidden;
+}
+/* gauge arc draws itself in when mounted */
+@keyframes cw-gauge {
+  from { stroke-dashoffset: var(--cw-gauge-len, 220); }
+}
+.cw-gauge-arc {
+  animation: cw-gauge 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.15s;
+}
+@keyframes cw-tick {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+}
+.cw-tick { animation: cw-tick 0.5s ease-out both; }
+
+/* milestone badge: shine sweep + sparkle ring */
+.cw-milestone {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--community-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--community-accent) 14%, transparent);
+}
+.cw-milestone::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  width: 34%;
+  left: -60%;
+  transform: skewX(-22deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: cw-shine 3.2s ease-in-out infinite;
+}
+@keyframes cw-shine {
+  0%, 55%  { left: -60%; }
+  85%, 100% { left: 130%; }
+}
+
+/* ── 10. Reaction burst particles (emoji fly out of the like button) ──────── */
+.cw-burst-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+.cw-burst-particle {
+  position: fixed;
+  left: 0;
+  top: 0;
+  will-change: transform, opacity;
+  animation: cw-burst var(--cw-burst-dur, 0.8s) cubic-bezier(0.16, 0.84, 0.44, 1) forwards;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+@keyframes cw-burst {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--cw-x, 0), var(--cw-y, 0), 0) scale(0.4);
+  }
+  18% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(
+        calc(var(--cw-x, 0) + var(--cw-dx, 0px)),
+        calc(var(--cw-y, 0) + var(--cw-dy, -70px)),
+        0
+      )
+      scale(var(--cw-s, 1.35))
+      rotate(var(--cw-rot, 12deg));
+  }
+}
+
+/* ── 11. «New posts» pill: breathing glow ──────────────────────────────────── */
+.cw-newpill {
+  animation: cw-newpill-breathe 2.2s ease-in-out infinite;
+}
+@keyframes cw-newpill-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--community-accent) 34%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 18px 2px color-mix(in srgb, var(--community-accent) 30%, transparent);
+  }
+}
+
+/* ── 12. Empty states: soft accent halo behind the icon ───────────────────── */
+.cw-empty-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cw-empty-icon::before {
+  content: "";
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--community-accent) 20%, transparent) 0%, transparent 70%);
+  animation: cw-empty-breathe 3s ease-in-out infinite;
+}
+@keyframes cw-empty-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50%      { transform: scale(1.14); opacity: 1; }
+}
+
+/* ── 13. Reduced motion: kill the party, keep the info ────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cw-aurora::before,
+  .cw-aurora::after,
+  .cw-live-dot,
+  .cw-rise,
+  .cw-skel,
+  .cw-gauge-arc,
+  .cw-tick,
+  .cw-milestone::after,
+  .cw-newpill,
+  .cw-empty-icon::before,
+  .cw-burst-particle {
+    animation: none !important;
+  }
+  .cw-rise { opacity: 1; transform: none; }
+  .cw-card,
+  .cw-photo img,
+  .cw-press {
+    transition: none !important;
+  }
+}
