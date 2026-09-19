@@ -63,6 +63,17 @@ import {
   type DbCrew,
 } from "@/app/franchize/lib/wall-access";
 import { notifyNewWallPost } from "@/app/franchize/lib/wall-notify";
+import {
+  extractMentionUsernames,
+  maybeNotifyReactionMilestone,
+  notifyWallComment,
+  type CommentNotifyRecipient,
+} from "@/app/franchize/lib/wall-engage-notify";
+import { buildWallPostPreview } from "@/app/franchize/lib/community-wall";
+import {
+  buildSuggestedWallPost,
+  summarizeRide,
+} from "@/app/franchize/lib/ride-share-notify";
 
 // NOTE: cookies + telegram-actor-cookie are imported DYNAMICALLY inside
 // functions (same reason as server-actions/leads.ts — avoid `import
@@ -91,6 +102,9 @@ type DbUserRow = {
   full_name: string | null;
   avatar_url: string | null;
 };
+
+/** Сколько @упомянутых пользователей резолвим одним комментарием (cap lookup). */
+const WALL_MENTION_LOOKUP_CAP = 3;
 
 // ── stats snapshot helpers ───────────────────────────────────────────────────
 
@@ -800,6 +814,7 @@ export async function createCommunityPostAction(input: {
       "Райдер";
     await notifyNewWallPost({
       slug: crew.slug || slug,
+      postId,
       authorName,
       body: finalBody,
       photoCount: photoViews.length,
@@ -866,14 +881,61 @@ export async function togglePostReactionAction(input: {
     logger.error("[community-wall] reaction rpc failed:", error.message);
     return { ok: false, error: "Не получилось поставить реакцию." };
   }
-  const res = data as { error?: string; reaction: string | null; like_count: number | null; reaction_counts: unknown } | null;
+  const res = data as {
+    error?: string;
+    reaction: string | null;
+    like_count: number | null;
+    reaction_counts: unknown;
+    added?: boolean;
+  } | null;
   if (!res || res.error === "post_unavailable") return { ok: false, error: "Пост недоступен." };
   if (res.error === "bad_emoji") return { ok: false, error: "Такой реакции нет." };
+
+  const likeCount = res.like_count ?? 0;
+
+  // ── Author engagement notify (wall v4): reaction milestone → author DM.
+  // Only on a NET-NEW reaction (RPC `added`), only on round numbers, exactly-
+  // once per milestone via crew_post_notify_log. Never blocks the toggle.
+  if (res.added === true && res.reaction === emoji) {
+    try {
+      const { data: postMeta } = await supabaseAdmin
+        .from("crew_posts")
+        .select("author_id, body, crew_id, crews(slug)")
+        .eq("id", postId)
+        .maybeSingle();
+      const meta = postMeta as {
+        author_id: string;
+        body: string | null;
+        crew_id: string;
+        crews: { slug: string | null } | { slug: string | null }[] | null;
+      } | null;
+      const crewSlugRaw = Array.isArray(meta?.crews) ? meta?.crews[0]?.slug : meta?.crews?.slug;
+      if (meta?.author_id && crewSlugRaw) {
+        // topEmoji: самая частая эмодзи поста (для «лица» уведомления).
+        const counts = sanitizeReactionCounts(res.reaction_counts);
+        const topEmoji =
+          Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? emoji;
+        await maybeNotifyReactionMilestone({
+          slug: crewSlugRaw,
+          postId,
+          postAuthorId: meta.author_id,
+          reactorId: actor.userId,
+          reactorName: actor.tg?.fullName || actor.tg?.username || null,
+          total: likeCount,
+          topEmoji,
+          postPreview: buildWallPostPreview(meta.body || "", 160),
+          botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+        });
+      }
+    } catch (notifyErr) {
+      logger.warn("[community-wall] reaction milestone notify failed (non-fatal):", notifyErr);
+    }
+  }
 
   return {
     ok: true,
     reaction: res.reaction,
-    likeCount: res.like_count ?? 0,
+    likeCount,
     reactionCounts: sanitizeReactionCounts(res.reaction_counts),
   };
 }
@@ -912,10 +974,16 @@ export async function addPostCommentAction(input: {
 
   const { data: post } = await supabaseAdmin
     .from("crew_posts")
-    .select("id, crew_id, is_hidden")
+    .select("id, crew_id, is_hidden, author_id, body")
     .eq("id", postId)
     .maybeSingle();
-  const postRow = post as { id: string; crew_id: string; is_hidden: boolean } | null;
+  const postRow = post as {
+    id: string;
+    crew_id: string;
+    is_hidden: boolean;
+    author_id: string;
+    body: string | null;
+  } | null;
   if (!postRow || postRow.is_hidden) return { ok: false, error: "Пост недоступен." };
 
   // ── Reply target: same post, visible, normalized to ROOT (one level) ──
@@ -923,6 +991,7 @@ export async function addPostCommentAction(input: {
   // appended comment never flip-flops with what a refetch would show.
   let verifiedReplyToId: string | null = null;
   let replyToName: string | null = null;
+  let replyRootAuthorId: string | null = null;
   if (replyTo) {
     const { data: target } = await supabaseAdmin
       .from("crew_post_comments")
@@ -948,6 +1017,7 @@ export async function addPostCommentAction(input: {
       .eq("id", rootId)
       .maybeSingle();
     const rootAuthorId = (rootRow as { author_id: string } | null)?.author_id;
+    replyRootAuthorId = rootAuthorId ?? null;
     if (rootAuthorId) {
       const { data: nameRow } = await supabaseAdmin
         .from("users")
@@ -963,7 +1033,7 @@ export async function addPostCommentAction(input: {
   // Same write scope + rate brake as posts (crew riders & staff only).
   const { data: crewRow } = await supabaseAdmin
     .from("crews")
-    .select("id, owner_id")
+    .select("id, owner_id, slug, name")
     .eq("id", postRow.crew_id)
     .maybeSingle();
   if (!crewRow || !(await canWriteOnWall(actor.userId, crewRow as Pick<DbCrew, "id" | "owner_id">))) {
@@ -1006,6 +1076,54 @@ export async function addPostCommentAction(input: {
     .select("comment_count")
     .eq("id", postRow.id)
     .maybeSingle();
+
+  // ── Engagement notify (wall v4): автору поста, автору корневого
+  // комментария (при ответе) и @упомянутым. Один DM на один комментарий
+  // получателю (dedup через crew_post_notify_log), never throws —
+  // сбои уведомлений не влияют на сам комментарий.
+  try {
+    const recipients: CommentNotifyRecipient[] = [];
+    if (postRow.author_id) {
+      recipients.push({ userId: postRow.author_id, reason: "post_author" });
+    }
+    if (replyRootAuthorId && replyRootAuthorId !== postRow.author_id) {
+      recipients.push({
+        userId: replyRootAuthorId,
+        reason: "reply_author",
+        replyToName: replyToName ?? null,
+      });
+    }
+    const mentionNames = extractMentionUsernames(body);
+    if (mentionNames.length > 0) {
+      const { data: mentionedUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id")
+        .or(mentionNames.map((n) => `username.ilike.${n}`).join(","))
+        .limit(WALL_MENTION_LOOKUP_CAP);
+      for (const u of (mentionedUsers ?? []) as { user_id: string }[]) {
+        recipients.push({ userId: u.user_id, reason: "mentioned" });
+      }
+    }
+    const commenterName =
+      (me as DbUserRow | null)?.full_name ||
+      (me as DbUserRow | null)?.username ||
+      actor.tg?.fullName ||
+      actor.tg?.username ||
+      "Райдер";
+    await notifyWallComment({
+      slug: (crewRow as { slug: string | null; name: string | null }).slug || "",
+      postId: postRow.id,
+      commentId: inserted.id,
+      commenterId: actor.userId,
+      commenterName,
+      commentBody: body.slice(0, 200),
+      postPreview: buildWallPostPreview(postRow.body || "", 160),
+      recipients,
+      botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+    });
+  } catch (notifyErr) {
+    logger.warn("[community-wall] comment notify failed (non-fatal):", notifyErr);
+  }
 
   return { ok: true, comment, commentCount: (freshPost as { comment_count: number | null } | null)?.comment_count ?? 0 };
 }
@@ -1489,4 +1607,300 @@ export async function countNewWallPostsAction(input: {
     busyUntilIso: busyMs.has(bikeId) ? new Date(busyMs.get(bikeId)!).toISOString() : null,
   }));
   return { ok: true, count: count ?? 0, bikesBusy };
+}
+
+// ── SINGLE POST (deep-link landing: startapp=post_<id>_<slug>) ───────────────
+
+const SinglePostInput = z.object({
+  slug: z.string().trim().min(1),
+  postId: z.string().trim().uuid(),
+});
+
+export type GetWallPostResult =
+  | { ok: true; post: WallPostView }
+  | { ok: false; error: string };
+
+/**
+ * Один пост по id — для deep-link посадки, когда пост старый и не попал в
+ * первую страницу ленты (кнопки уведомлений и «Поделиться» должны вести К
+ * ПОСТУ, а не к верху стены). Публичное чтение, как и вся лента. Вернёт
+ * error для скрытых/чужих экипажей — как если бы поста не было.
+ */
+export async function getWallPostAction(input: {
+  slug: string;
+  postId: string;
+}): Promise<GetWallPostResult> {
+  const parsed = SinglePostInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const { data: row } = await supabaseAdmin
+    .from("crew_posts")
+    .select("*")
+    .eq("id", parsed.data.postId)
+    .eq("crew_id", crew.id)
+    .eq("is_hidden", false)
+    .maybeSingle();
+  const postRow = row as DbPostRow | null;
+  if (!postRow) return { ok: false, error: "Пост недоступен." };
+
+  const { data: authorRow } = await supabaseAdmin
+    .from("users")
+    .select("user_id, username, full_name, avatar_url")
+    .eq("user_id", postRow.author_id)
+    .maybeSingle();
+  const author = authorRow
+    ? toAuthorView(authorRow as DbUserRow)
+    : { userId: postRow.author_id, username: null, fullName: null, avatarUrl: null };
+
+  // Comments preview (same 2-newest contract as the feed).
+  const { data: commentRows } = await supabaseAdmin
+    .from("crew_post_comments")
+    .select("id, post_id, author_id, body, created_at, reply_to_id")
+    .eq("post_id", postRow.id)
+    .eq("is_hidden", false)
+    .order("created_at", { ascending: false })
+    .limit(WALL_COMMENT_PREVIEW);
+  const commentAuthorIds = [...new Set(((commentRows ?? []) as { author_id: string }[]).map((c) => c.author_id))];
+  const { data: commentAuthors } = commentAuthorIds.length
+    ? await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name, avatar_url")
+        .in("user_id", commentAuthorIds)
+    : { data: null };
+  const cAuthors = new Map<string, WallAuthorView>();
+  for (const row of (commentAuthors ?? []) as DbUserRow[]) cAuthors.set(row.user_id, toAuthorView(row));
+  const comments: WallCommentView[] = ((commentRows ?? []) as {
+    id: string;
+    post_id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+  }[])
+    .slice(0, WALL_COMMENT_PREVIEW)
+    .map((c) => ({
+      id: c.id,
+      postId: c.post_id,
+      author: cAuthors.get(c.author_id) ?? { userId: c.author_id, username: null, fullName: null, avatarUrl: null },
+      replyTo: null,
+      body: c.body,
+      createdAt: c.created_at,
+    }))
+    .reverse();
+
+  // Photos + bike mentions (+ live availability) in parallel.
+  const [photosRes, bikesRes] = await Promise.all([
+    supabaseAdmin
+      .from("crew_post_photos")
+      .select("id, post_id, storage_path, width, height")
+      .eq("post_id", postRow.id)
+      .order("position", { ascending: true }),
+    supabaseAdmin
+      .from("crew_post_bikes")
+      .select("post_id, bike_id, cars(id, model, image_url)")
+      .eq("post_id", postRow.id)
+      .order("position", { ascending: true }),
+  ]);
+  const photos: WallPhotoView[] = ((photosRes.data ?? []) as {
+    id: string;
+    storage_path: string;
+    width: number | null;
+    height: number | null;
+  }[]).map((p) => ({
+    id: p.id,
+    url: wallPhotoPublicUrl(p.storage_path),
+    width: p.width,
+    height: p.height,
+  }));
+  const bikes: WallBikeRefView[] = [];
+  for (const row of (bikesRes.data ?? []) as unknown as {
+    bike_id: string;
+    cars: { model: string | null; image_url: string | null } | null;
+  }[]) {
+    bikes.push({
+      bikeId: row.bike_id,
+      title: row.cars?.model || "Байк",
+      imageUrl: row.cars?.image_url ?? null,
+      busyUntilIso: null,
+    });
+  }
+  const mentionIds = bikes.map((b) => b.bikeId);
+  if (mentionIds.length > 0) {
+    const { data: busyRows } = await supabaseAdmin
+      .from("rentals")
+      .select("vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date")
+      .in("vehicle_id", mentionIds)
+      .in("status", WALL_BLOCKING_RENTAL_STATUSES);
+    const busyMs = wallBusyUntilMap((busyRows ?? []) as never[], Date.now());
+    for (const bike of bikes) {
+      const until = busyMs.get(bike.bikeId);
+      bike.busyUntilIso = until ? new Date(until).toISOString() : null;
+    }
+  }
+
+  // Rental ref (если пост привязан к аренде).
+  let rental: WallRentalRef | null = null;
+  if (postRow.rental_id) {
+    const { data: rentalRow } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, vehicle_id")
+      .eq("rental_id", postRow.rental_id)
+      .maybeSingle();
+    const r = rentalRow as { rental_id: string; vehicle_id: string | null } | null;
+    if (r?.vehicle_id) {
+      const { data: bike } = await supabaseAdmin
+        .from("cars")
+        .select("id, model, image_url")
+        .eq("id", r.vehicle_id)
+        .maybeSingle();
+      const b = bike as { model: string | null; image_url: string | null } | null;
+      rental = { rentalId: r.rental_id, bikeTitle: b?.model || "Байк", imageUrl: b?.image_url ?? null };
+    }
+  }
+
+  const post: WallPostView = {
+    id: postRow.id,
+    kind: postRow.kind === "stats" ? "stats" : "post",
+    body: postRow.body,
+    stats: postRow.kind === "stats" ? sanitizeStatsSnapshot(postRow.stats) : null,
+    authorScope: postRow.author_scope === "crew" ? "crew" : "rider",
+    isPinned: postRow.is_pinned,
+    createdAt: postRow.created_at,
+    likeCount: postRow.like_count ?? 0,
+    commentCount: postRow.comment_count ?? 0,
+    reactionCounts: sanitizeReactionCounts(postRow.reaction_counts),
+    viewerReaction: null, // deep-link посадка — viewer ещё не «себя» показал; подгрузка ленты поправит
+    author,
+    comments,
+    rental,
+    photos,
+    bikes,
+  };
+  return { ok: true, post };
+}
+
+// ── RENTAL COMPOSE DRAFT («поделиться поездкой» из уведомления о закрытии) ──
+
+const RentalDraftInput = z.object({
+  slug: z.string().trim().min(1),
+  rentalId: z.string().trim().uuid(),
+  initData: z.string().trim().optional(),
+});
+
+export interface WallRentalDraft {
+  rentalId: string;
+  bikeId: string | null;
+  bikeTitle: string;
+  hours: number;
+  days: number | null;
+  km: number | null;
+  totalCost: number;
+  depositReturned: boolean | null;
+  periodStartIso: string | null;
+  periodEndIso: string | null;
+  crewName: string;
+  /** Готовый текст поста (summary baked in) — редактируемый. */
+  autoText: string;
+  /** true — актор владеет арендой и МОЖЕТ прикрепить rentalId к посту. */
+  canAttachRental: boolean;
+}
+
+export type GetWallRentalDraftResult =
+  | { ok: true; draft: WallRentalDraft }
+  | { ok: false; error: string };
+
+/**
+ * Черновик поста из закрытой аренды: сводка поездки + готовый текст.
+ * Доступно арендатору этой аренды ИЛИ staff экипажа (арендаторы постят наравне
+ * с экипажем — canWriteOnWall). Прикрепить rental_id к посту может только
+ * владелец аренды (createCommunityPostAction это отдельно проверит).
+ */
+export async function getWallRentalDraftAction(input: {
+  slug: string;
+  rentalId: string;
+  initData?: string;
+}): Promise<GetWallRentalDraftResult> {
+  const parsed = RentalDraftInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const actor = await resolveWallActor(parsed.data.initData);
+  if (!actor) return { ok: false, error: "Черновик доступен из Telegram-бота экипажа." };
+
+  const { data: rentalRow } = await supabaseAdmin
+    .from("rentals")
+    .select(
+      "rental_id, user_id, crew_id, vehicle_id, total_cost, agreed_start_date, agreed_end_date, requested_start_date, requested_end_date, metadata, status, cars(id, model, image_url)",
+    )
+    .eq("rental_id", parsed.data.rentalId)
+    .maybeSingle();
+  const r = rentalRow as {
+    rental_id: string;
+    user_id: string | null;
+    crew_id: string;
+    vehicle_id: string | null;
+    total_cost: number | string | null;
+    agreed_start_date: string | null;
+    agreed_end_date: string | null;
+    requested_start_date: string | null;
+    requested_end_date: string | null;
+    metadata: Record<string, unknown> | null;
+    status: string | null;
+    cars: { id: string; model: string | null; image_url: string | null } | null;
+  } | null;
+  if (!r || r.crew_id !== crew.id) return { ok: false, error: "Аренда не найдена в этом экипаже." };
+
+  const isOwner = !!r.user_id && r.user_id === actor.userId;
+  const isStaff = await isCrewStaffUser(actor.userId, crew);
+  if (!isOwner && !isStaff) {
+    return { ok: false, error: "Этот черновик — для райдера и экипажа." };
+  }
+
+  const md = (r.metadata ?? {}) as Record<string, unknown>;
+  const odoBefore = Number.isFinite(Number(md.odometer_before ?? md.odometerBefore))
+    ? Number(md.odometer_before ?? md.odometerBefore)
+    : null;
+  const odoAfter = Number.isFinite(Number(md.odometer_after ?? md.odometerAfter))
+    ? Number(md.odometer_after ?? md.odometerAfter)
+    : null;
+  const depositReturned =
+    typeof r.metadata === "object" && r.metadata !== null && "deposit_returned" in (r.metadata as Record<string, unknown>)
+      ? Boolean((r.metadata as Record<string, unknown>).deposit_returned)
+      : null;
+
+  const bikeTitle = r.cars?.model || "Байк";
+  const draft = summarizeRide({
+    bikeTitle,
+    startIso: r.agreed_start_date ?? r.requested_start_date,
+    endIso: r.agreed_end_date ?? r.requested_end_date,
+    totalCost: r.total_cost,
+    odometerBefore: odoBefore,
+    odometerAfter: odoAfter,
+    depositReturned,
+    crewName: crew.name || crew.slug || "экипаж",
+    crewSlug: crew.slug,
+  });
+
+  return {
+    ok: true,
+    draft: {
+      rentalId: r.rental_id,
+      bikeId: r.cars?.id ?? null,
+      bikeTitle,
+      hours: draft.hours,
+      days: draft.days,
+      km: draft.km,
+      totalCost: draft.totalCost,
+      depositReturned,
+      periodStartIso: r.agreed_start_date ?? r.requested_start_date,
+      periodEndIso: r.agreed_end_date ?? r.requested_end_date,
+      crewName: crew.name || crew.slug || "экипаж",
+      autoText: buildSuggestedWallPost(draft),
+      canAttachRental: isOwner,
+    },
+  };
 }

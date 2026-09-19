@@ -23,6 +23,11 @@ import { logger } from "@/lib/logger";
 import { telegramDeliver } from "@/lib/telegram-transport";
 import { buildWallPostNotifyHtml } from "@/app/franchize/lib/community-wall";
 import {
+  buildTelegramAppLink,
+  isUuidLike,
+  wallPostStartParam,
+} from "@/lib/wall-deeplink";
+import {
   leadDeeplinkUrl,
   resolveLeadNotifyRecipients,
   sanitizeLeadKey,
@@ -33,6 +38,9 @@ export { leadDeeplinkUrl };
 export interface WallPostNotifyInput {
   /** Slug экипажа, например "vip-bike". */
   slug: string;
+  /** Id поста — если есть, кнопка ведёт К ПОСТУ (startapp=post_<id>_<slug>),
+   *  а не к верху стены (роутер FAST path + подсветка поста). */
+  postId?: string | null;
   /** Имя автора для сообщения. */
   authorName: string;
   /** Текст поста (обрезается до превью внутри билдера). */
@@ -86,7 +94,20 @@ export async function notifyNewWallPost(
       return result;
     }
 
-    const deeplink = wallDeeplinkUrl(input.slug);
+    const deeplink =
+      input.postId && isUuidLike(input.postId)
+        ? // Точный пост: Mini App открывается сразу на нём (wall v4).
+          (() => {
+            try {
+              return buildTelegramAppLink(
+                process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot",
+                wallPostStartParam(input.postId!, input.slug),
+              );
+            } catch {
+              return wallDeeplinkUrl(input.slug);
+            }
+          })()
+        : wallDeeplinkUrl(input.slug);
     const text = buildWallPostNotifyHtml({
       authorName: input.authorName,
       body: input.body,

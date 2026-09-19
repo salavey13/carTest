@@ -9,7 +9,9 @@
 //      HMAC-верифицирует initData из form-data — тот же контракт, что у
 //      server-actions/community-wall.ts) и право писать на стену экипажа.
 //   3. sharp дожимает канонично: 1280px по длинной стороне, JPEG q75 (mozjpeg),
-//      EXIF срезан, прогрессивное снижение качества до ≤ 500 КБ —
+//      EXIF срезан, ступенчатое снижение качества И РАЗМЕРА до ≤ 300 КБ
+//      (wall v4: 500 КБ → 300 КБ — милистоун-бюджет босса; лестница
+//      1280 → 1080 → 896 px гарантирует попадание даже для пёстрых фото),
 //      ровно тот же пайплайн, что у арендных фото.
 //   4. Файл кладётся в ПУБЛИЧНЫЙ бакет wallpix в staging-папку пользователя:
 //        staging/<userId>/<uuid32>.jpg
@@ -43,8 +45,10 @@ import {
 } from "@/app/franchize/lib/community-wall";
 import { canWriteOnWall, getCrewBySlug } from "@/app/franchize/lib/wall-access";
 
-const MAX_SIZE_BYTES = 500 * 1024; // 500 KB post-compression (rental parity)
-const MAX_DIMENSION = 1280;
+/** Max STORED size (300 KB wall v4 — the bucket limit matches this exactly). */
+const MAX_SIZE_BYTES = 300 * 1024;
+/** Dimension step-down ladder: quality floor first, then shrink geometry. */
+const DIMENSION_LADDER = [1280, 1080, 896];
 const QUALITY_FLOOR = 50;
 
 /** Max staging files per author (quota; doubles as the burst rate limit). */
@@ -53,30 +57,39 @@ export const WALL_STAGING_QUOTA = 60;
 export const WALL_STAGING_TTL_HOURS = 24;
 
 async function compressImage(input: Buffer): Promise<{ buffer: Buffer; width: number; height: number }> {
-  let quality = 75;
-  const compressed = await sharp(input)
-    .rotate() // auto-orient from EXIF
-    .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality, mozjpeg: true })
-    .toBuffer({ resolveWithObject: true });
-  let { data, info } = compressed;
-  const width = info.width;
-  const height = info.height;
-  while (data.length > MAX_SIZE_BYTES && quality > QUALITY_FLOOR) {
-    quality -= 5;
-    const retry = await sharp(input)
-      .rotate()
-      .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: "inside", withoutEnlargement: true })
+  // Ladder: for each dimension (1280 → 1080 → 896) sweep quality 75 → 50.
+  // The first candidate under 300 KB wins; the 896px stop makes the budget
+  // reachable even for noisy, high-detail photos where q50 @1280 is ~350 KB.
+  for (const dimension of DIMENSION_LADDER) {
+    let quality = 75;
+    const first = await sharp(input)
+      .rotate() // auto-orient from EXIF
+      .resize(dimension, dimension, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality, mozjpeg: true })
       .toBuffer({ resolveWithObject: true });
-    data = retry.data;
+    let { data, info } = first;
+    while (data.length > MAX_SIZE_BYTES && quality > QUALITY_FLOOR) {
+      quality -= 5;
+      const retry = await sharp(input)
+        .rotate()
+        .resize(dimension, dimension, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality, mozjpeg: true })
+        .toBuffer({ resolveWithObject: true });
+      data = retry.data;
+    }
+    if (data.length <= MAX_SIZE_BYTES) {
+      return { buffer: data, width: info.width, height: info.height };
+    }
+    // 896px @ q50 still over 300 KB is effectively impossible for a photo —
+    // but keep the hard guard so the contract holds unconditionally.
+    if (dimension === DIMENSION_LADDER[DIMENSION_LADDER.length - 1]) {
+      throw new Error(
+        `Не удалось сжать фото до 300 КБ (минимальное качество ${QUALITY_FLOOR}, размер ${Math.round(data.length / 1024)} КБ).`,
+      );
+    }
   }
-  if (data.length > MAX_SIZE_BYTES) {
-    throw new Error(
-      `Не удалось сжать фото до 500 КБ (минимальное качество ${QUALITY_FLOOR}, размер ${Math.round(data.length / 1024)} КБ).`,
-    );
-  }
-  return { buffer: data, width, height };
+  // Unreachable (the ladder loop always returns or throws).
+  throw new Error("Не удалось сжать фото до 300 КБ.");
 }
 
 export async function POST(request: NextRequest) {

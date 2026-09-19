@@ -78,16 +78,20 @@ import {
   getMyRentalStatsAction,
   getPostCommentsAction,
   getWallBikeOptionsAction,
+  getWallPostAction,
+  getWallRentalDraftAction,
   getWallTrendingAction,
   hideCommunityCommentAction,
   hideCommunityPostAction,
   setPostPinnedAction,
   togglePostReactionAction,
   type WallBikeOption,
+  type WallRentalDraft,
   type WallTrendingTag,
 } from "@/app/franchize/server-actions/community-wall";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
+import { buildTelegramAppLink, wallPostStartParam } from "@/lib/wall-deeplink";
 
 /** A photo being attached in the composer (upload → staging → post). */
 interface ComposerPhoto {
@@ -107,9 +111,15 @@ interface CommunityWallClientProps {
   crewName: string;
   /** Fallback for locked visitors: «открой через бота». */
   botUsername?: string | null;
+  /** Deep-link: startapp=post_<id>_<slug> → выделить этот пост (и подгрузить,
+   *  если он старый и не попал в первую страницу ленты). */
+  highlightPostId?: string | null;
+  /** Deep-link: startapp=wallp_<rentalId>_<slug> → открыть композер с готовым
+   *  черновиком «поделиться поездкой» (аренда закрыта — уведомление экипажа). */
+  composeRentalId?: string | null;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, highlightPostId, composeRentalId }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -266,20 +276,61 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
     wallTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loadFeed]);
 
-  // Deep link: #post-<id> (from the «Поделиться» link) → scroll + highlight flash.
+  // Deep link: #post-<id> (из «Поделиться») или ?post=<id> (из startapp) →
+  // скролл + подсветка. Если пост старый и его НЕТ в загруженной ленте —
+  // добираем одним запросом (getWallPostAction) и вставляем сверху.
   const hashScrolledRef = useRef(false);
+  const deepLinkPostFetchedRef = useRef(false);
+  const pendingDeepLinkPostId = highlightPostId ?? null;
   useEffect(() => {
     if (loading || hashScrolledRef.current) return;
-    const hash = window.location.hash;
-    if (!hash.startsWith("#post-")) return;
-    const el = document.getElementById(hash.slice(1));
-    if (!el) return;
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const hashPostId = hash.startsWith("#post-") ? hash.slice(6) : null;
+    const targetPostId = hashPostId || pendingDeepLinkPostId;
+    if (!targetPostId) return;
+    const el = document.getElementById(`post-${targetPostId}`);
+    if (!el) {
+      // Пост не в ленте → один раз добираем его с сервера.
+      if (!deepLinkPostFetchedRef.current && !hashPostId) {
+        deepLinkPostFetchedRef.current = true;
+        void getWallPostAction({ slug, postId: targetPostId }).then((res) => {
+          if (res.ok) setPosts((prev) => (prev.some((p) => p.id === res.post.id) ? prev : [res.post, ...prev]));
+        });
+      }
+      return;
+    }
     hashScrolledRef.current = true;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.add("ring-2", "ring-[var(--community-accent)]");
     const t = setTimeout(() => el.classList.remove("ring-2", "ring-[var(--community-accent)]"), 2500);
     return () => clearTimeout(t);
-  }, [loading, posts]);
+  }, [loading, posts, pendingDeepLinkPostId, slug]);
+
+  // ── compose draft («поделиться поездкой» из уведомления о закрытии аренды) ──
+  const [composeDraft, setComposeDraft] = useState<WallRentalDraft | null>(null);
+  const [composeDismissed, setComposeDismissed] = useState(false);
+  useEffect(() => {
+    if (!composeRentalId) return;
+    let cancelled = false;
+    void getWallRentalDraftAction({ slug, rentalId: composeRentalId, initData: withInitData() }).then((res) => {
+      if (cancelled || !res.ok) return;
+      setComposeDraft(res.draft);
+      // Текст — только если композер пустой (не затираем то, что человек пишет).
+      setText((prev) => (prev.trim() ? prev : res.draft.autoText));
+      if (res.draft.bikeId) {
+        const bike = {
+          bikeId: res.draft.bikeId,
+          title: res.draft.bikeTitle,
+          imageUrl: null as string | null,
+        };
+        setSelectedBikes((prev) => (prev.some((b) => b.bikeId === bike.bikeId) ? prev : [...prev, bike]));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeRentalId, slug]);
 
   const applyTagFilter = useCallback((tag: string | null) => {
     setActiveTag((cur) => (tag !== null && cur === tag ? null : tag));
@@ -340,7 +391,10 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
 
         try {
           // 1. Client-side compression — the same lib the rental page uses.
-          const blob = await reduceImageResolution(file, { maxSize: 1600, quality: 0.72 });
+          // 1280px / q0.70: tighter than the rental gallery (wall v4 photo
+          // budget is < 300 KB after the server's sharp pass, so sending the
+          // server a 1600px blob just wastes mobile upload time).
+          const blob = await reduceImageResolution(file, { maxSize: 1280, quality: 0.7 });
           const compressedFile = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
           // swap the preview to the compressed variant (revoke the original
           // blob — a 10–25 MB source must not stay retained in the session)
@@ -430,6 +484,9 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       slug,
       body: text.trim() || undefined,
       shareStats,
+      // «Поделиться поездкой»: прикрепляем аренду ТОЛЬКО если это своя аренда
+      // (сервер отдельно проверяет владельца — чужую не даст прицепить).
+      rentalId: composeDraft?.canAttachRental ? composeDraft.rentalId : undefined,
       initData: withInitData(),
       photos: composerPhotos
         .filter((p) => p.path)
@@ -451,11 +508,13 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       setComposerPhotosSync([]);
       setSelectedBikes([]);
       setBikePickerOpen(false);
+      setComposeDraft(null);
+      setComposeDismissed(false);
     } else {
       setComposerError(res.error);
     }
     setPosting(false);
-  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, setComposerPhotosSync]);
+  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, setComposerPhotosSync]);
 
   // ── likes / comments / moderation ──────────────────────────────────────────
 
@@ -754,6 +813,27 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
           </div>
         ) : (
           <div className="rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-4">
+            {/* compose-draft banner: «поделиться поездкой» из уведомления о закрытии */}
+            {composeDraft && !composeDismissed && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-3 py-2 text-xs">
+                <span className="font-semibold text-[var(--community-accent)]">
+                  🏁 Поездка прикреплена: {composeDraft.bikeTitle}
+                  {composeDraft.km ? ` · ${composeDraft.km} км` : ""}
+                  {composeDraft.canAttachRental ? "" : " (текст — твой, аренда чужая)"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setComposeDraft(null);
+                    setComposeDismissed(true);
+                  }}
+                  aria-label="Убрать черновик поездки"
+                  className="ml-auto rounded-full p-1 transition hover:bg-[var(--community-accent)]/20"
+                >
+                  <X className="h-3.5 w-3.5 text-[var(--community-accent)]" />
+                </button>
+              </div>
+            )}
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value.slice(0, WALL_POST_MAX_LEN))}
@@ -1049,6 +1129,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                 onDelete={() => void deletePost(post)}
                 onHideComment={(commentId) => void hideComment(post, commentId)}
                 onOpenPhoto={(index) => setLightbox({ postId: post.id, index })}
+                botUsername={botUsername}
               />
             ))}
           </div>
@@ -1944,6 +2025,7 @@ interface PostCardProps {
   onHideComment: (commentId: string) => void;
   onOpenPhoto: (index: number) => void;
   onHashtag: (tag: string) => void;
+  botUsername?: string | null;
 }
 
 function PostCard(props: PostCardProps) {
@@ -1961,9 +2043,20 @@ function PostCard(props: PostCardProps) {
   }, [post.stats]);
 
   /** VK/Telegram share: opens the native TG share dialog (MiniApp) or a tab.
-   *  The link carries #post-<id> — on load the wall scrolls to the post. */
+   *  Wall v4: the shared link is a BOT DEEPLINK (startapp=post_<id>_<slug>)
+   *  when the bot username is known — the receiver lands inside the Mini App
+   *  exactly on this post (router FAST path + highlight flash). Without the
+   *  bot we fall back to the web URL (#post-<id>), which also works anonymous. */
   const sharePost = useCallback(() => {
-    const url = `${window.location.origin}/franchize/${slug}/community#post-${post.id}`;
+    const webUrl = `${window.location.origin}/franchize/${slug}/community#post-${post.id}`;
+    let url = webUrl;
+    if (props.botUsername) {
+      try {
+        url = buildTelegramAppLink(props.botUsername, wallPostStartParam(post.id, slug));
+      } catch {
+        url = webUrl;
+      }
+    }
     const text = `${authorName} на стене экипажа: ${buildWallPostPreview(post.body || "пост с фото", 120)}`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
     try {
@@ -1976,7 +2069,7 @@ function PostCard(props: PostCardProps) {
       // plain web — fall through to window.open
     }
     window.open(shareUrl, "_blank", "noopener,noreferrer");
-  }, [slug, post.id, post.body, authorName]);
+  }, [slug, post.id, post.body, authorName, props.botUsername]);
 
   return (
     <article

@@ -14,6 +14,7 @@ import {
   decodeStartappState,
   isStartappStateFresh,
 } from "@/lib/startapp-state";
+import { parseWallDeepLink } from "@/lib/wall-deeplink";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
@@ -194,6 +195,35 @@ function parseAnalyticsDeepLink(param: string): {
   }
 
   return null;
+}
+
+/**
+ * FAST PATH for wall deep links (wall v4).
+ *
+ * The OLD flow waited for the full Telegram auth roundtrip before ANY routing
+ * (`isAppLoading || isAuthenticating` gate), so a notification deep link sat on
+ * the home page for seconds while dbUser + crew snapshot were fetched, and only
+ * THEN navigated. Wall destinations are PUBLIC pages — the auth wait bought
+ * nothing for them.
+ *
+ * Params whose payload is self-contained route IMMEDIATELY on first render:
+ *   wall_<slug>               → /franchize/<slug>/community
+ *   post_<postId>_<slug>      → /franchize/<slug>/community?post=<id>
+ *   wallp_<rentalId>_<slug>   → /franchize/<slug>/community?compose=<id>
+ *
+ * Bare forms (wall / post_<id>) need userCrewInfo to resolve the crew — they
+ * stay on the gated path (this returns null for them).
+ */
+function computeFastWallTarget(param: string): string | null {
+  const link = parseWallDeepLink(param);
+  if (!link) return null;
+  if (link.kind === "wall") {
+    return link.slug ? `/franchize/${link.slug}/community` : null;
+  }
+  if (link.kind === "post") {
+    return link.slug ? `/franchize/${link.slug}/community?post=${link.postId}` : null;
+  }
+  return `/franchize/${link.slug}/community?compose=${link.rentalId}`;
 }
 
 export function useStartParamRouter() {
@@ -444,6 +474,25 @@ export function useStartParamRouter() {
         return;
       }
 
+      // ── FAST PATH (wall v4): self-contained wall deep links route HERE,
+      // before the auth gate — see computeFastWallTarget for the why.
+      const fastWallTarget = computeFastWallTarget(paramToProcess);
+      if (fastWallTarget) {
+        if (lastHandledStartParamRef.current !== paramToProcess && activeStartParamRef.current !== paramToProcess) {
+          lastHandledStartParamRef.current = paramToProcess;
+          if (startParamPayload && normalizedUrlStartParam) {
+            ignoredUrlStartParamRef.current = normalizedUrlStartParam;
+          }
+          if (fastWallTarget !== pathname) {
+            logger.info(`[ClientLayout] FAST routing wall deep link → ${fastWallTarget}`);
+            router.replace(fastWallTarget);
+          }
+          clearStartParam?.();
+        }
+        // Handled (or already handled) — never fall through to the gated logic.
+        return;
+      }
+
       if (isAppLoading || isAuthenticating) {
         return;
       }
@@ -638,15 +687,22 @@ export function useStartParamRouter() {
             targetPath = `/franchize/${crewSlug}/leads${params.toString() ? `?${params.toString()}` : ""}`;
             logger.info(`[ClientLayout] Routing to leads: ${targetPath}`);
           }
-        } else if (paramToProcess === "wall" || paramToProcess.startsWith("wall_")) {
-          // ── Community wall deep link: wall → own crew, wall_{slug} → that crew ──
-          // Sent by the «Новый пост на стене» TG notification (lib/wall-notify.ts).
-          const wallSlug =
-            paramToProcess === "wall"
-              ? userCrewInfo?.slug || "vip-bike"
-              : paramToProcess.slice(5).replace(/[^A-Za-z0-9_-]/g, "");
-          if (wallSlug) {
-            targetPath = `/franchize/${wallSlug}/community`;
+        } else if (parseWallDeepLink(paramToProcess)) {
+          // ── Community wall deep links (wall v4): the slug-carried variants
+          // (wall_<slug> / post_<id>_<slug> / wallp_<rental>_<slug>) were ALREADY
+          // routed by the FAST PATH above without waiting for auth. What reaches
+          // here is only the bare forms — wall / post_<id> — which need the
+          // viewer's crew (userCrewInfo) to resolve the destination:
+          const link = parseWallDeepLink(paramToProcess);
+          if (link) {
+            const wallSlug = link.slug || userCrewInfo?.slug || "vip-bike";
+            if (link.kind === "post") {
+              targetPath = `/franchize/${wallSlug}/community?post=${link.postId}`;
+            } else if (link.kind === "compose") {
+              targetPath = `/franchize/${wallSlug}/community?compose=${link.rentalId}`;
+            } else {
+              targetPath = `/franchize/${wallSlug}/community`;
+            }
             logger.info(`[ClientLayout] Routing to community wall: ${targetPath}`);
           }
         } else if (paramToProcess.startsWith("rental_")) {

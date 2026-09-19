@@ -350,11 +350,10 @@ describe("wall-photo-upload route", () => {
     expect(src).toContain('getCrewBySlug(slug)');
   });
 
-  it("sharp pipeline parity with rental photos (1280px, mozjpeg q75 → ≤500KB)", () => {
+  it("sharp pipeline parity with rental photos (mozjpeg q75 → ≤300KB, wall v4 budget)", () => {
     expect(src).toContain('from "sharp"');
     expect(src).toContain(".rotate()");
-    expect(src).toContain("MAX_DIMENSION = 1280");
-    expect(src).toContain("MAX_SIZE_BYTES = 500 * 1024");
+    expect(src).toContain("MAX_SIZE_BYTES = 300 * 1024");
     expect(src).toContain("QUALITY_FLOOR = 50");
     expect(src).toContain('mozjpeg: true');
   });
@@ -399,10 +398,10 @@ describe("wall-photo-upload route", () => {
 describe("community wall client (v2)", () => {
   const src = read(`${APP}/[slug]/community/CommunityWallClient.tsx`);
 
-  it("photo attach REUSES the rental-page compression lib (1600px, q0.72)", () => {
+  it("photo attach REUSES the rental-page compression lib (1280px, q0.70 — wall v4 budget)", () => {
     expect(src).toContain('from "@/lib/client-image-compress"');
-    expect(src).toContain("maxSize: 1600");
-    expect(src).toContain("quality: 0.72");
+    expect(src).toContain("maxSize: 1280");
+    expect(src).toContain("quality: 0.7");
     expect(src).toContain('fetch("/api/franchize/wall-photo-upload"');
   });
 
@@ -493,9 +492,10 @@ describe("community page (legacy ditched)", () => {
 describe("useStartParamRouter: wall deep links", () => {
   const src = read("hooks/useStartParamRouter.ts");
 
-  it("wall → own crew community, wall_<slug> → that crew's community", () => {
-    expect(src).toContain('paramToProcess === "wall" || paramToProcess.startsWith("wall_")');
+  it("wall / wall_<slug> route through the shared wall-deeplink parser", () => {
+    expect(src).toContain('from "@/lib/wall-deeplink"');
+    expect(src).toContain("parseWallDeepLink(paramToProcess)");
     expect(src).toContain("`/franchize/${wallSlug}/community`");
-    expect(src).toContain("lib/wall-notify.ts");
+    expect(src).toContain("computeFastWallTarget");
   });
 });

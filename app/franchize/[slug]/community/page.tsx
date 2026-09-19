@@ -17,8 +17,21 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   });
 }
 
-export default async function FranchizeCommunityPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function FranchizeCommunityPage(
+  { params, searchParams }: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  },
+) {
   const { slug } = await params;
+  const sp = await searchParams;
+  // Deep-link landing (startapp=post_<id>_<slug> / wallp_<rental>_<slug>):
+  // id валидируем по форме uuid — всё остальное молча игнорируем.
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const rawPost = typeof sp.post === "string" ? sp.post.trim() : "";
+  const rawCompose = typeof sp.compose === "string" ? sp.compose.trim() : "";
+  const highlightPostId = uuidRe.test(rawPost) ? rawPost : null;
+  const composeRentalId = uuidRe.test(rawCompose) ? rawCompose : null;
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/community`;
@@ -96,6 +109,8 @@ export default async function FranchizeCommunityPage({ params }: { params: Promi
         slug={crewSlug}
         crewName={brandName}
         botUsername={crewBotUsername || (crewTelegram ? crewTelegram : null)}
+        highlightPostId={highlightPostId}
+        composeRentalId={composeRentalId}
       />
 
       <CrewFooter crew={crew} />

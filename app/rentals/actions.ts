@@ -1761,6 +1761,56 @@ export async function confirmVehicleReturn(
             logger.warn(`[confirmVehicleReturn] No renter chat_id available (user_id is null AND rental_contract_artefacts.telegram_chat_id is null/missing) — receipt skipped for rental ${rentalId}`);
         }
 
+        // ── Wall v4: «поездка завершена» + готовый пост на стену (OnlyBike) ──
+        // Арендатор получает сводку поездки (байк, часы, км, депозит) с ГОТОВЫМ
+        // текстом поста и кнопкой «Поделиться на стене» (startapp=wallp_<rental>_<slug>
+        // → композер стены открывается уже заполненным). CC экипажу (owner+админы).
+        // Non-fatal: закрытие аренды важнее уведомлений.
+        try {
+            const { notifyRideFinishedAndSuggestPost, summarizeRide } = await import(
+                "@/app/franchize/lib/ride-share-notify"
+            );
+            let crewSlug: string | null = null;
+            let crewName: string | null = null;
+            if (rental.crew_id) {
+                const { data: crewRow } = await supabaseAdmin
+                    .from("crews")
+                    .select("slug, name")
+                    .eq("id", rental.crew_id)
+                    .maybeSingle();
+                crewSlug = (crewRow as { slug: string | null } | null)?.slug ?? null;
+                crewName = (crewRow as { name: string | null } | null)?.name ?? null;
+            }
+            const vehicleMeta = rental.vehicle as { make?: string | null; model?: string | null } | null;
+            const rideBikeTitle = vehicleMeta
+                ? `${vehicleMeta.make || ""} ${vehicleMeta.model || ""}`.trim()
+                : "байк";
+            const md = (rental.metadata as Record<string, unknown> | null) || {};
+            const odoBeforeNum = Number.isFinite(Number(md.odometer_before ?? md.odometerBefore))
+                ? Number(md.odometer_before ?? md.odometerBefore)
+                : null;
+            const summary = summarizeRide({
+                bikeTitle: rideBikeTitle,
+                startIso: rental.agreed_start_date ?? null,
+                endIso: rental.agreed_end_date ?? null,
+                totalCost: rental.total_cost,
+                odometerBefore: odoBeforeNum,
+                odometerAfter: closureData?.odometerAfter ?? null,
+                depositReturned: closureData?.depositReturned ?? null,
+                crewName,
+                crewSlug,
+            });
+            await notifyRideFinishedAndSuggestPost({
+                rentalId,
+                crewSlug,
+                summary,
+                renterChatId: receiptChatId,
+                ccCrew: true,
+            });
+        } catch (rideShareErr) {
+            logger.warn(`[confirmVehicleReturn] Ride-share notify failed (non-fatal):`, rideShareErr);
+        }
+
         // ── FIX (iter4): grant rental closure achievements ───────────────────
         // Fires AFTER the rental is closed, the receipt is sent, and the
         // odometer/damage/deposit fields are persisted. Non-fatal — failures
