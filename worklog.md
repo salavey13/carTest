@@ -363,3 +363,19 @@ Work Log:
 
 Stage Summary:
 - Marking a bike for sale is now a single checkbox in the quick price editor; commit 5ae117d79 pushed to main (Vercel auto-deploy). Card-level visual check needs a Telegram-authed operator session (fleet list is empty for anonymous); code verified in the deployed bundle.
+
+---
+Task ID: 13 (recovery 2 — «useRef is not defined» on rental card)
+Agent: main (Super Z)
+Task: Boss opened /franchize/[slug]/rental/[id] — FranchizeErrorBoundary «Блок аренды временно недоступен / useRef is not defined».
+
+Work Log:
+- Same bug class as Task ID 11, one file over: RentalPhotoGallery.tsx (I3 photo gallery on the rental card) calls useRef<T>(...) ×3 while the react import listed only useCallback, useEffect, useState.
+- Why the Task-11 scanner missed it: v1 regex matched useRef\s*\( — generic calls useRef<number>(0) / useRef<ReturnType<typeof setTimeout> | null>(null) did not match. Scanner v2 (hook-import-scan.mjs) matches \s*[<(] and now also scans root components/, contexts/, hooks/ in addition to app/franchize.
+- Scan result after fix: 0 missing hook imports repo-wide (franchize + shared dirs).
+- Workspace was wiped again between sessions — re-cloned repo (d281447) + npm ci + git config restored.
+- Checks: eslint --max-warnings=0 clean; FULL-project tsc: 0 errors total (baseline debt now zero); vitest tests/franchize 1599 passed (suite grew since Task 11).
+- Commit 94754f1 → origin/main → Vercel deploy. Live verification on a real rental card (38043660-cf0c-4089-a170-10a110651ebd from public/docs/autoreply/vip-bike-rentals.csv): page renders — overdue warning, bike photo, QuickActionBar «Продлить/Написать», no error boundary, console clean.
+
+Stage Summary:
+- Rental card crash fixed and verified on production with a real rental id. Scanner v2 closes the generic-call gap; recommend wiring scripts/hook-import-scan.mjs into qa:franchize so this class never ships again.
