@@ -1,7 +1,7 @@
 // /app/franchize/components/RentalPhotoGallery.tsx
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, X, Upload, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { reduceImageResolution } from "@/lib/client-image-compress";
