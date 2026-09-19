@@ -91,6 +91,10 @@ USING (true);
 -- directly: <SUPABASE_URL>/storage/v1/object/public/wallpix/<storage_path>.
 -- Uploads never touch anon credentials: the upload route authenticates the
 -- Telegram actor server-side and uploads with the service role key.
+-- NOTE: ON CONFLICT DO UPDATE intentionally re-asserts public/limits/mimes on
+-- every re-run of this file so the wall CANNOT silently break because someone
+-- toggled the bucket private in the dashboard. If ops deliberately changes
+-- bucket settings, adjust this statement accordingly.
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (

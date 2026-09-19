@@ -64,7 +64,12 @@ export async function reduceImageResolution(
       return;
     }
 
+    // Track the temp object URL — revoke it once decoded (a 10–25 MB source
+    // blob must not stay retained for the whole page session).
+    const objectUrl = URL.createObjectURL(file);
+
     img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       let { width, height } = img;
 
       // Resize if larger than maxSize on the longest edge
@@ -102,7 +107,10 @@ export async function reduceImageResolution(
       );
     };
 
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = objectUrl;
   });
 }

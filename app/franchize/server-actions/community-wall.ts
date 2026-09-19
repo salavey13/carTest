@@ -48,6 +48,7 @@ import {
   WALLPHOTO_BUCKET,
 } from "@/app/franchize/lib/community-wall";
 import {
+  assertLikeRate,
   assertWallRate,
   canWriteOnWall,
   ensureUserProfile,
@@ -160,7 +161,11 @@ const FeedInput = z.object({
   slug: z.string().trim().min(1),
   initData: z.string().trim().optional(),
   /** Cursor: created_at ISO of the last post of the previous page. */
-  before: z.string().trim().optional(),
+  before: z
+    .string()
+    .trim()
+    .refine((v) => !Number.isNaN(Date.parse(v)), "before must be a parseable ISO date")
+    .optional(),
   // NOTE: no caller-supplied limit — pageSize is server-fixed so the
   // page-1-holds-all-pinned invariant (WALL_PIN_CAP « WALL_FEED_PAGE_SIZE)
   // cannot be broken from the outside.
@@ -240,7 +245,10 @@ export async function getCommunityWallAction(input: {
     .in("post_id", postIds)
     .eq("is_hidden", false)
     .order("created_at", { ascending: false })
-    .limit(postIds.length * WALL_COMMENT_PREVIEW);
+    // Global budget with headroom: WALL_COMMENT_PREVIEW per post is the norm,
+    // but one hot post must not starve the whole page — 3× headroom lets the
+    // newest ~6 land on a chatty post while others still get their two.
+    .limit(postIds.length * WALL_COMMENT_PREVIEW * 3);
 
   const commentAuthorIds = [...new Set(((commentRows ?? []) as { author_id: string }[]).map((c) => c.author_id))];
   const missingCommentAuthors = commentAuthorIds.filter((id) => !authors.has(id));
@@ -427,8 +435,7 @@ export async function createCommunityPostAction(input: {
   }
   const rate = await assertWallRate(actor.userId);
   if (!rate.ok) return { ok: false, error: rate.error };
-
-  // ── Photos: every path must be the actor's OWN staging folder (wallpix) ──
+  const authorPostsLastHour = rate.ok ? rate.posts : 0;
   const photos = sanitizeWallPhotoInputs(parsed.data.photos, actor.userId);
   if (photos === null) {
     return { ok: false, error: `Фото: максимум ${WALL_PHOTOS_MAX} на пост и только свои загруженные файлы.` };
@@ -479,13 +486,14 @@ export async function createCommunityPostAction(input: {
     }
   }
 
-  // ── Bike mentions: ONLY bikes from THIS crew's catalogue ──
+  // ── Bike mentions: ONLY real bikes from THIS crew's catalogue ──
   let bikeRefs: WallBikeRefView[] = [];
   if (bikeIds.length > 0) {
     const { data: bikeRows, error: bikeErr } = await supabaseAdmin
       .from("cars")
       .select("id, model, image_url")
       .eq("crew_id", crew.id)
+      .eq("type", "bike") // same filter the picker uses — no helmet/service mentions
       .in("id", bikeIds);
     if (bikeErr) {
       logger.error("[community-wall] bike verify failed:", bikeErr.message);
@@ -539,6 +547,7 @@ export async function createCommunityPostAction(input: {
 
   // ── Photos: move staging → posts/<postId>/<n>.jpg, then insert rows ──
   const photoViews: WallPhotoView[] = [];
+  const photoFinalPaths: string[] = [];
   for (let i = 0; i < photos.length; i += 1) {
     const photo = photos[i];
     let finalPath = photo.path;
@@ -575,6 +584,7 @@ export async function createCommunityPostAction(input: {
       width: photo.width,
       height: photo.height,
     });
+    photoFinalPaths.push(finalPath);
   }
 
   // ── Bike mention rows (join table; cars already verified above) ──
@@ -619,21 +629,37 @@ export async function createCommunityPostAction(input: {
   // ── Crew notification: awaited ON PURPOSE (fire-and-forget freezes on
   // Vercel after the response — the d275c52 lesson). notifyNewWallPost never
   // throws, and a notify outage must never fail the post itself.
-  const authorName =
-    (me as DbUserRow | null)?.full_name ||
-    (me as DbUserRow | null)?.username ||
-    actor.tg?.fullName ||
-    actor.tg?.username ||
-    "Райдер";
-  await notifyNewWallPost({
-    slug: crew.slug || slug,
-    authorName,
-    body: finalBody,
-    photoCount: photoViews.length,
-    bikeTitles: bikeRefs.map((b) => b.title),
-    hasStats: statsSnapshot !== null,
-    excludeUserId: actor.userId,
-  });
+  // Ghost guard: a concurrent delete between insert and notify would otherwise
+  // announce a post that no longer exists (and orphan its photos).
+  const { data: stillThere } = await supabaseAdmin
+    .from("crew_posts")
+    .select("id")
+    .eq("id", postId)
+    .maybeSingle();
+  if (stillThere) {
+    const authorName =
+      (me as DbUserRow | null)?.full_name ||
+      (me as DbUserRow | null)?.username ||
+      actor.tg?.fullName ||
+      actor.tg?.username ||
+      "Райдер";
+    await notifyNewWallPost({
+      slug: crew.slug || slug,
+      authorName,
+      body: finalBody,
+      photoCount: photoViews.length,
+      bikeTitles: bikeRefs.map((b) => b.title),
+      hasStats: statsSnapshot !== null,
+      excludeUserId: actor.userId,
+      recentAuthorPosts: authorPostsLastHour,
+    });
+  } else {
+    logger.warn("[community-wall] post vanished before notify — skipping + cleaning photos");
+    if (photoFinalPaths.length > 0) {
+      await supabaseAdmin.storage.from(WALLPHOTO_BUCKET).remove(photoFinalPaths);
+    }
+    await supabaseAdmin.from("crew_posts").delete().eq("id", postId); // photo rows cascade
+  }
 
   const { revalidatePath } = await import("next/cache");
   revalidatePath(`/franchize/${crew.slug || slug}/community`);
@@ -661,6 +687,9 @@ export async function togglePostLikeAction(input: {
 
   const actor = await resolveWallActor(initData);
   if (!actor) return { ok: false, error: "Лайки доступны из Telegram-бота экипажа." };
+
+  const likeRate = await assertLikeRate(actor.userId);
+  if (!likeRate.ok) return { ok: false, error: likeRate.error };
 
   const { data: post } = await supabaseAdmin
     .from("crew_posts")

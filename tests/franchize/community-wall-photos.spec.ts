@@ -22,10 +22,12 @@ import { join } from "node:path";
 import {
   buildWallPostNotifyHtml,
   buildWallPostPreview,
+  computeZoomOffset,
   isWallStagingPath,
   sanitizeWallBikeIds,
   sanitizeWallPhotoInputs,
   wallPhotoPublicUrl,
+  zoomAtPoint,
   WALL_BIKES_MAX,
   WALL_PHOTOS_MAX,
 } from "@/app/franchize/lib/community-wall";
@@ -147,6 +149,50 @@ describe("wall notify builder", () => {
   });
 });
 
+describe("lightbox zoom math (pure)", () => {
+  const CENTER = { x: 500, y: 400 };
+
+  it("zoom at screen centre keeps the offset at zero (from natural state)", () => {
+    const offset = zoomAtPoint(1, { x: 0, y: 0 }, CENTER, CENTER, 2.5);
+    expect(offset.x).toBeCloseTo(0, 6);
+    expect(offset.y).toBeCloseTo(0, 6);
+  });
+
+  it("keeps the zoomed point visually anchored (pinch midpoint stays put)", () => {
+    // zoom to 2 around an off-centre point: that point must not move
+    const point = { x: 700, y: 250 };
+    const before = zoomAtPoint(1, { x: 0, y: 0 }, point, CENTER, 2);
+    // screen position of the content point after transform:
+    // screen = center + offset + (content - center) * scale; invert for content:
+    const content = {
+      x: (point.x - CENTER.x - before.x) / 2,
+      y: (point.y - CENTER.y - before.y) / 2,
+    };
+    const after = zoomAtPoint(2, before, point, CENTER, 4);
+    const screenAfter = {
+      x: CENTER.x + after.x + content.x * 4,
+      y: CENTER.y + after.y + content.y * 4,
+    };
+    expect(screenAfter.x).toBeCloseTo(point.x, 4);
+    expect(screenAfter.y).toBeCloseTo(point.y, 4);
+  });
+
+  it("pinch after pan preserves the pan (ratio-scaled, no snap to centre)", () => {
+    const startOffset = { x: 120, y: -80 };
+    const out = computeZoomOffset({
+      startScale: 2,
+      startOffset,
+      startMid: CENTER,
+      currentMid: CENTER,
+      center: CENTER,
+      nextScale: 3,
+    });
+    // mid = centre → o' = o * r
+    expect(out.x).toBeCloseTo(180, 6);
+    expect(out.y).toBeCloseTo(-120, 6);
+  });
+});
+
 // ── 2. migration ─────────────────────────────────────────────────────────────
 
 describe("migration 20260919220000 (photos + bikes + wallpix)", () => {
@@ -242,6 +288,44 @@ describe("community-wall server actions (v2)", () => {
     expect(src).toContain(".limit(60)");
   });
 
+  it("like toggles are rate-braked too (writes are writes)", () => {
+    expect(src).toContain("assertLikeRate(actor.userId)");
+    const access = read(`${APP}/lib/wall-access.ts`);
+    expect(access).toContain("WALL_RATE_LIKES_PER_HOUR = 120");
+  });
+
+  it("cursor is validated (parseable date) before it reaches PostgREST", () => {
+    expect(src).toContain("before must be a parseable ISO date");
+  });
+
+  it("comment preview budget has headroom against starvation", () => {
+    expect(src).toContain("WALL_COMMENT_PREVIEW * 3");
+  });
+
+  it("ghost guard: notify skipped + photos cleaned if post vanished", () => {
+    expect(src).toContain("post vanished before notify");
+    expect(src).toContain("photoFinalPaths");
+  });
+
+  it("like toggles are rate-braked too (writes are writes)", () => {
+    expect(src).toContain("assertLikeRate(actor.userId)");
+    const access = read(`${APP}/lib/wall-access.ts`);
+    expect(access).toContain("WALL_RATE_LIKES_PER_HOUR = 120");
+  });
+
+  it("cursor is validated (parseable date) before it reaches PostgREST", () => {
+    expect(src).toContain("before must be a parseable ISO date");
+  });
+
+  it("comment preview budget has headroom against starvation", () => {
+    expect(src).toContain("WALL_COMMENT_PREVIEW * 3");
+  });
+
+  it("ghost guard: notify skipped + photos cleaned if post vanished", () => {
+    expect(src).toContain("post vanished before notify");
+    expect(src).toContain("photoFinalPaths");
+  });
+
   it("shared access helpers moved to lib/wall-access (imported, not duplicated)", () => {
     expect(src).toContain('from "@/app/franchize/lib/wall-access"');
     const access = read(`${APP}/lib/wall-access.ts`);
@@ -279,10 +363,42 @@ describe("wall-photo-upload route", () => {
   });
 
   it("uploads into the actor's OWN staging folder with a RE-safe name", () => {
-    expect(src).toContain("staging/${callerUserId}/");
+    expect(src).toContain("staging/${callerUserId}");
     expect(src).toContain("randomUUID().replace(/-/g, \"\")");
     expect(src).toContain("upsert: false");
     expect(src).toContain("WALLPHOTO_BUCKET");
+  });
+
+  it("staging lifecycle is honest: quota 429 + TTL janitor per upload + script", () => {
+    expect(src).toContain("WALL_STAGING_QUOTA");
+    expect(src).toContain("WALL_STAGING_TTL_HOURS");
+    expect(src).toContain("Слишком много черновых фото");
+    expect(src).toContain(".list(stagingPrefix, { limit: 200");
+    expect(src).toContain(".emptyFolderPlaceholder");
+    const janitor = read("scripts/cleanup-wallpix-staging.mjs");
+    expect(janitor).toContain("wallpix");
+    expect(janitor).toContain("--dry-run");
+    expect(janitor).toContain("--ttl-hours=");
+  });
+
+  it("no raw sharp/stack errors over the wire — generic message only", () => {
+    expect(src).toContain("Не удалось обработать фото");
+  });
+
+  it("staging lifecycle is honest: quota 429 + TTL janitor per upload + script", () => {
+    expect(src).toContain("WALL_STAGING_QUOTA");
+    expect(src).toContain("WALL_STAGING_TTL_HOURS");
+    expect(src).toContain("Слишком много черновых фото");
+    expect(src).toContain('.list(stagingPrefix, { limit: 200');
+    expect(src).toContain(".emptyFolderPlaceholder");
+    const janitor = read("scripts/cleanup-wallpix-staging.mjs");
+    expect(janitor).toContain("wallpix");
+    expect(janitor).toContain("--dry-run");
+    expect(janitor).toContain("--ttl-hours=");
+  });
+
+  it("no raw sharp/stack errors over the wire — generic message + hint only", () => {
+    expect(src).toContain("Не удалось обработать фото");
   });
 });
 
@@ -314,10 +430,31 @@ describe("community wall client (v2)", () => {
     expect(src).toContain("function PhotoLightbox");
     expect(src).toContain("onPointerDown");
     expect(src).toContain("onDoubleClick");
+    expect(src).toContain("onWheel={onWheel}");
     expect(src).toContain("pointers.current.size === 2");
     expect(src).toContain("document.body.style.overflow = \"hidden\"");
     expect(src).toContain("touchAction: \"none\"");
     expect(src).toContain("Math.abs(dx) > 60");
+    // desktop zoom uses dblclick; the double-tap detector ignores mice
+    expect(src).toContain('e.pointerType !== "mouse"');
+    // zoom math goes through the pure, unit-tested helpers
+    expect(src).toContain("computeZoomOffset({");
+    expect(src).toContain("zoomAtPoint(");
+  });
+
+  it("notification spam budget: chatty authors stop waking all members", () => {
+    const notify = read(`${APP}/lib/wall-notify.ts`);
+    expect(notify).toContain("WALL_NOTIFY_MEMBER_FANOUT_THRESHOLD = 3");
+    expect(notify).toContain("includeMembers: !quietMode");
+    const actions = read(`${APP}/server-actions/community-wall.ts`);
+    expect(actions).toContain("recentAuthorPosts: authorPostsLastHour");
+    expect(actions).toContain("authorPostsLastHour = rate.ok ? rate.posts : 0");
+  });
+
+  it("original photo blob is revoked when the compressed preview replaces it", () => {
+    expect(src).toContain("URL.revokeObjectURL(placeholder.previewUrl)");
+    const sharedLib = read("lib/client-image-compress.ts");
+    expect(sharedLib.match(/revokeObjectURL\(objectUrl\)/g)?.length).toBe(2);
   });
 
   it("wall spans the FULL page width (border-y band, no max-w container)", () => {

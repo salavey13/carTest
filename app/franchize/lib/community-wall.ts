@@ -423,6 +423,56 @@ export function sanitizeWallBikeIds(raw: unknown): string[] | null {
   return out;
 }
 
+// ── Lightbox zoom math (pure, unit-tested) ───────────────────────────────────
+
+export interface ZoomAnchorState {
+  /** Scale before the gesture frame. */
+  startScale: number;
+  /** Pan offset before the gesture frame (px). */
+  startOffset: { x: number; y: number };
+  /** Pinch/gesture midpoint at gesture start (viewport px). */
+  startMid: { x: number; y: number };
+  /** Pinch/gesture midpoint now (viewport px). */
+  currentMid: { x: number; y: number };
+  /** Stage centre (viewport px) — the transform-origin of the image. */
+  center: { x: number; y: number };
+  /** Target scale (already clamped by the caller). */
+  nextScale: number;
+}
+
+/**
+ * Pan offset that keeps the gesture midpoint visually anchored while zooming:
+ *   o' = (m₀ − c)(1 − r) + o₀·r + (m₁ − m₀),  r = s'/s₀
+ * The `o₀·r` term preserves the pan the user already had (pinch after pan
+ * used to snap the image back to centre); the ratio (not a linear delta)
+ * keeps the anchor exact at any start scale.
+ */
+export function computeZoomOffset(state: ZoomAnchorState): { x: number; y: number } {
+  const r = state.nextScale / Math.max(state.startScale, 0.0001);
+  return {
+    x: (state.startMid.x - state.center.x) * (1 - r) + state.startOffset.x * r + (state.currentMid.x - state.startMid.x),
+    y: (state.startMid.y - state.center.y) * (1 - r) + state.startOffset.y * r + (state.currentMid.y - state.startMid.y),
+  };
+}
+
+/** Zoom-to-point for wheel/double-tap: same math, midpoint = pointer, o₀ = current. */
+export function zoomAtPoint(
+  currentScale: number,
+  currentOffset: { x: number; y: number },
+  point: { x: number; y: number },
+  center: { x: number; y: number },
+  nextScale: number,
+): { x: number; y: number } {
+  return computeZoomOffset({
+    startScale: currentScale,
+    startOffset: currentOffset,
+    startMid: point,
+    currentMid: point,
+    center,
+    nextScale,
+  });
+}
+
 // ── TG notification message builder (pure, unit-tested) ─────────────────────
 
 /** Short one-line preview of a post body for the TG notification. */

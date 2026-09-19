@@ -141,9 +141,12 @@ export async function canWriteOnWall(
 /**
  * Minimal spam brake: count this author's wall posts / comments in the last
  * hour (head-count queries — no payload, works across instances because it is
- * DB-based, not in-memory).
+ * DB-based, not in-memory). Also returns the counts so callers can derive
+ * budgets (e.g. quieter notifications for chatty authors).
  */
-export async function assertWallRate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function assertWallRate(
+  userId: string,
+): Promise<{ ok: true; posts: number; comments: number } | { ok: false; error: string }> {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const [postsRes, commentsRes] = await Promise.all([
     supabaseAdmin.from("crew_posts").select("id", { count: "exact", head: true }).eq("author_id", userId).gte("created_at", since),
@@ -156,6 +159,22 @@ export async function assertWallRate(userId: string): Promise<{ ok: true } | { o
   }
   if (comments >= WALL_RATE_COMMENTS_PER_HOUR) {
     return { ok: false, error: `Не так быстро: максимум ${WALL_RATE_COMMENTS_PER_HOUR} комментариев в час.` };
+  }
+  return { ok: true, posts, comments };
+}
+
+/** Like toggles are writes too — cap bursts from any verified identity. */
+export const WALL_RATE_LIKES_PER_HOUR = 120;
+
+export async function assertLikeRate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabaseAdmin
+    .from("crew_post_likes")
+    .select("post_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", since);
+  if ((count ?? 0) >= WALL_RATE_LIKES_PER_HOUR) {
+    return { ok: false, error: "Слишком много лайков подряд — передохни минутку." };
   }
   return { ok: true };
 }

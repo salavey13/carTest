@@ -45,6 +45,8 @@ export interface WallPostNotifyInput {
   hasStats: boolean;
   /** Author получает уведомление о своём посте? Нет — исключаем его chat_id. */
   excludeUserId?: string | null;
+  /** Сколько постов автор написал за последний час (бюджет рассылки). */
+  recentAuthorPosts?: number;
 }
 
 export interface WallPostNotifyResult {
@@ -61,14 +63,21 @@ export function wallDeeplinkUrl(slug: string): string {
 /**
  * Разослать экипажу уведомление о новом посте на стене. Никогда не бросает.
  * Ожидается await от caller'а (см. шапку файла).
+ *
+ * Антиспам-бюджет: автор, который уже завалил стену (≥3 постов за час),
+ * будит только owner'а и админов — активные члены получают DM максимум
+ * от первых трёх постов автора в час.
  */
+export const WALL_NOTIFY_MEMBER_FANOUT_THRESHOLD = 3;
+
 export async function notifyNewWallPost(
   input: WallPostNotifyInput,
 ): Promise<WallPostNotifyResult> {
   const result: WallPostNotifyResult = { recipients: [], sent: 0, failed: 0 };
   try {
+    const quietMode = (input.recentAuthorPosts ?? 0) >= WALL_NOTIFY_MEMBER_FANOUT_THRESHOLD;
     const recipients = await resolveLeadNotifyRecipients(input.slug, {
-      includeMembers: true,
+      includeMembers: !quietMode,
     });
     const targets = recipients.filter((id) => id && id !== input.excludeUserId);
     result.recipients = targets;

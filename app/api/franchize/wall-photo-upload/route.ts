@@ -15,9 +15,16 @@
 //        staging/<userId>/<uuid32>.jpg
 //      createCommunityPostAction потом верифицирует путь (строго своя staging-
 //      папка), ПЕРЕНОСИТ объект в posts/<postId>/<n>.jpg и вставляет строку в
-//      crew_post_photos. Фантомных фото не остаётся: неопубликованные staging-
-//      объекты просто затираются следующим upload'ом (и это самая маленькая
-//      грязь по сравнению с черновыми строками в БД).
+//      crew_post_photos.
+//
+// Жизненный цикл staging (честно):
+//   · квота: не больше WALL_STAGING_QUOTA файлов в папке автора (ниже) —
+//     при переполнении роут отвечает 429;
+//   · оппортунистическая чистка: при каждой загрузке роут удаляет из папки
+//     автора объекты старше WALL_STAGING_TTL_HOURS (фото, к которым пост так
+//     и не был создан);
+//   · janitor: scripts/cleanup-wallpix-staging.mjs — глобальная зачистка
+//     staging/* старше TTL (повесить на pg_cron/Vercel cron/внешний таймер).
 //
 // Тело: multipart form-data { file, slug, initData? }.
 
@@ -39,6 +46,11 @@ import { canWriteOnWall, getCrewBySlug } from "@/app/franchize/lib/wall-access";
 const MAX_SIZE_BYTES = 500 * 1024; // 500 KB post-compression (rental parity)
 const MAX_DIMENSION = 1280;
 const QUALITY_FLOOR = 50;
+
+/** Max staging files per author (quota; doubles as the burst rate limit). */
+export const WALL_STAGING_QUOTA = 60;
+/** Staging files older than this are janitored on every upload. */
+export const WALL_STAGING_TTL_HOURS = 24;
 
 async function compressImage(input: Buffer): Promise<{ buffer: Buffer; width: number; height: number }> {
   let quality = 75;
@@ -131,9 +143,33 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const { buffer, width, height } = await compressImage(Buffer.from(arrayBuffer));
 
+    // ── Quota + opportunistic staging janitor (own folder only) ──
+    const stagingPrefix = `staging/${callerUserId}`;
+    const { data: existingStaging } = await supabaseAdmin.storage
+      .from(WALLPHOTO_BUCKET)
+      .list(stagingPrefix, { limit: 200, sortBy: { column: "created_at", order: "desc" } });
+    const stagingFiles = (existingStaging ?? []).filter((f) => !!f.name && f.name !== ".emptyFolderPlaceholder");
+    if (stagingFiles.length >= WALL_STAGING_QUOTA) {
+      return NextResponse.json(
+        { error: "Слишком много черновых фото — опубликуй пост или попробуй позже." },
+        { status: 429 },
+      );
+    }
+    const ttlCutoff = Date.now() - WALL_STAGING_TTL_HOURS * 60 * 60 * 1000;
+    const stale = stagingFiles.filter((f) => {
+      const ts = f.updated_at ? Date.parse(f.updated_at) : Number.NaN;
+      return Number.isFinite(ts) && ts < ttlCutoff;
+    });
+    if (stale.length > 0) {
+      // Best-effort: abandoned drafts (photo picked, post never created).
+      await supabaseAdmin.storage
+        .from(WALLPHOTO_BUCKET)
+        .remove(stale.map((f) => `${stagingPrefix}/${f.name}`));
+    }
+
     // 32 hex chars — passes the wall's STAGING_FILE_RE (8–64 of [A-Za-z0-9_-]).
     const fileName = `${randomUUID().replace(/-/g, "")}.jpg`;
-    const storagePath = `staging/${callerUserId}/${fileName}`;
+    const storagePath = `${stagingPrefix}/${fileName}`;
     const { error: uploadError } = await supabaseAdmin.storage
       .from(WALLPHOTO_BUCKET)
       .upload(storagePath, buffer, { contentType: "image/jpeg", upsert: false });
@@ -150,8 +186,10 @@ export async function POST(request: NextRequest) {
       bytes: buffer.length,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to upload photo";
+    // Generic message to the client; details stay in the logs (no sharp/stack
+    // internals leaked over the wire).
     logger.error("[wall-photo-upload] Error:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const hint = error instanceof Error && /сжать фото/.test(error.message) ? error.message : undefined;
+    return NextResponse.json({ error: hint || "Не удалось обработать фото. Попробуй другое." }, { status: 500 });
   }
 }

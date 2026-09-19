@@ -46,6 +46,8 @@ import {
   formatRelativeTimeRu,
   formatRub,
   pluralRu,
+  computeZoomOffset,
+  zoomAtPoint,
   WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
   WALL_COMMENTS_FETCH_LIMIT,
@@ -116,12 +118,16 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
   const [bikeOptions, setBikeOptions] = useState<WallBikeOption[] | null>(null);
   const [bikeOptionsLoading, setBikeOptionsLoading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  // Mirror of composerPhotos for synchronous cap checks (async file loop may
-  // overlap with a second pick while uploads are still in flight).
+  // Mirror of composerPhotos for synchronous cap checks (parallel uploads
+  // mutate the ref synchronously so concurrent appends can never lose one).
   const composerPhotosRef = useRef<ComposerPhoto[]>([]);
   const setComposerPhotosSync = useCallback((next: ComposerPhoto[]) => {
     composerPhotosRef.current = next;
     setComposerPhotos(next);
+  }, []);
+  const appendComposerPhoto = useCallback((placeholder: ComposerPhoto) => {
+    composerPhotosRef.current = [...composerPhotosRef.current, placeholder];
+    setComposerPhotos(composerPhotosRef.current);
   }, []);
 
   // lightbox: which post's photos are open (index = photo within the post)
@@ -208,7 +214,9 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
         setComposerError(`Максимум ${WALL_PHOTOS_MAX} фото на пост — лишние отброшены.`);
       }
 
-      for (const file of accepted) {
+      // Parallel uploads (per-file placeholder keeps object identity for the
+      // state updates; the ref-guard above makes the cap race-free).
+      const uploadOne = async (file: File) => {
         const placeholder: ComposerPhoto = {
           previewUrl: URL.createObjectURL(file),
           path: null,
@@ -218,12 +226,15 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
           uploading: true,
           failed: false,
         };
-        setComposerPhotos((prev) => [...prev, placeholder]);
+        appendComposerPhoto(placeholder);
 
         try {
           // 1. Client-side compression — the same lib the rental page uses.
           const blob = await reduceImageResolution(file, { maxSize: 1600, quality: 0.72 });
           const compressedFile = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
+          // swap the preview to the compressed variant (revoke the original
+          // blob — a 10–25 MB source must not stay retained in the session)
+          URL.revokeObjectURL(placeholder.previewUrl);
           placeholder.previewUrl = URL.createObjectURL(compressedFile);
 
           // 2. Upload to staging via the wall-photo-upload route (sharp on server).
@@ -253,9 +264,11 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
           );
           setComposerError(err instanceof Error ? err.message : "Не удалось загрузить фото.");
         }
-      }
+      };
+
+      await Promise.all(accepted.map((file) => uploadOne(file)));
     },
-    [slug, withInitData, setComposerPhotosSync],
+    [slug, withInitData, setComposerPhotosSync, appendComposerPhoto],
   );
 
   const removeComposerPhoto = useCallback((target: ComposerPhoto) => {
@@ -603,7 +616,13 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                 ) : (bikeOptions ?? []).length === 0 ? (
                   <p className="text-sm text-[var(--community-muted)]">В каталоге экипажа пока нет байков.</p>
                 ) : (
-                  <div className="grid max-h-52 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                  <>
+                    {(bikeOptions ?? []).length >= 60 && (
+                      <p className="mb-1.5 text-[11px] text-[var(--community-muted)] opacity-70">
+                        Показаны первые 60 байков каталога.
+                      </p>
+                    )}
+                    <div className="grid max-h-52 gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
                     {(bikeOptions ?? []).map((bike) => {
                       const isSelected = selectedBikes.some((b) => b.bikeId === bike.bikeId);
                       return (
@@ -635,7 +654,8 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                         </button>
                       );
                     })}
-                  </div>
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -908,7 +928,7 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
         <button
           type="button"
           onClick={() => onOpen(0)}
-          className="block w-full overflow-hidden rounded-xl border border-[var(--community-border)]"
+          className="block w-full overflow-hidden rounded-xl border border-[var(--community-border)] bg-[var(--community-base-soft)]"
           aria-label="Открыть фото"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
@@ -916,7 +936,7 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
             src={p.url}
             alt="Фото поста"
             loading="lazy"
-            className="max-h-[560px] w-full object-cover"
+            className="mx-auto max-h-[560px] w-full object-contain"
           />
         </button>
       </div>
@@ -988,7 +1008,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [smooth, setSmooth] = useState(true); // CSS transition when NOT gesturing
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const pinchStart = useRef<{ dist: number; scale: number; midX: number; midY: number } | null>(null);
+  const pinchStart = useRef<{ dist: number; scale: number; ox: number; oy: number; midX: number; midY: number } | null>(null);
   const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
@@ -1041,19 +1061,27 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
         panStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
       } else {
         swipeStart.current = { x: e.clientX, y: e.clientY };
-        // double-tap detection (mobile)
-        const now = Date.now();
-        const last = lastTap.current;
-        if (last && now - last.time < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30) {
-          // toggle zoom at tap point
-          const nx = (window.innerWidth / 2 - e.clientX) * 1.5;
-          const ny = (window.innerHeight / 2 - e.clientY) * 1.5;
-          setScale((s) => (s > 1 ? 1 : 2.5));
-          setOffset(scale > 1 ? { x: 0, y: 0 } : { x: nx, y: ny });
-          lastTap.current = null;
-          swipeStart.current = null;
-        } else {
-          lastTap.current = { time: now, x: e.clientX, y: e.clientY };
+        // double-tap detection — TOUCH only: for mice the native dblclick
+        // handler is the path (the pointerdown detector would otherwise fire
+        // first at scale 2.5 and onDoubleClick would instantly cancel it).
+        if (e.pointerType !== "mouse") {
+          const now = Date.now();
+          const last = lastTap.current;
+          if (last && now - last.time < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30) {
+            if (scale > 1) {
+              setScale(1);
+              setOffset({ x: 0, y: 0 });
+            } else {
+              setScale(2.5);
+              setOffset(
+                zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5),
+              );
+            }
+            lastTap.current = null;
+            swipeStart.current = null;
+          } else {
+            lastTap.current = { time: now, x: e.clientX, y: e.clientY };
+          }
         }
       }
     } else if (pointers.current.size === 2) {
@@ -1061,6 +1089,8 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
       pinchStart.current = {
         dist: Math.hypot(a.x - b.x, a.y - b.y),
         scale,
+        ox: offset.x, // preserve the pan the user already had
+        oy: offset.y,
         midX: (a.x + b.x) / 2,
         midY: (a.y + b.y) / 2,
       };
@@ -1076,18 +1106,20 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     if (pointers.current.size === 2 && pinchStart.current) {
       const [a, b] = [...pointers.current.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const midX = (a.x + b.x) / 2;
-      const midY = (a.y + b.y) / 2;
       const start = pinchStart.current;
       const nextScale = clamp((start.scale * dist) / Math.max(start.dist, 1), 1, 5);
-      // keep the pinch midpoint anchored while zooming
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      const k = nextScale - start.scale;
-      setOffset({
-        x: (start.midX - cx) * -k + (midX - start.midX),
-        y: (start.midY - cy) * -k + (midY - start.midY),
-      });
+      // Anchor the pinch midpoint exactly at ANY start scale (ratio, not a
+      // linear delta) and preserve the pre-pinch pan offset.
+      setOffset(
+        computeZoomOffset({
+          startScale: start.scale,
+          startOffset: { x: start.ox, y: start.oy },
+          startMid: { x: start.midX, y: start.midY },
+          currentMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+          center: stageCenter(),
+          nextScale,
+        }),
+      );
       setScale(nextScale);
     } else if (pointers.current.size === 1 && panStart.current && scale > 1) {
       const start = panStart.current;
@@ -1130,16 +1162,33 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     }
   };
 
+  // Stage centre = transform-origin of the image box (centre of the viewport).
+  function stageCenter(): { x: number; y: number } {
+    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  }
+
+  // Desktop zoom: native dblclick (mouse-only path — the pointerdown double-tap
+  // detector ignores mice) + wheel zoom-to-cursor.
   const onDoubleClick = (e: React.MouseEvent) => {
     if (scale > 1) {
       setScale(1);
       setOffset({ x: 0, y: 0 });
     } else {
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
       setScale(2.5);
-      setOffset({ x: (cx - e.clientX) * 1.5, y: (cy - e.clientY) * 1.5 });
+      setOffset(zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5));
     }
+  };
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const nextScale = clamp(scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5);
+    if (nextScale === 1) {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+      return;
+    }
+    setOffset(zoomAtPoint(scale, offset, { x: e.clientX, y: e.clientY }, stageCenter(), nextScale));
+    setScale(nextScale);
   };
 
   return (
@@ -1174,6 +1223,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onDoubleClick={onDoubleClick}
+          onWheel={onWheel}
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transition: smooth ? "transform 200ms ease-out" : "none",
