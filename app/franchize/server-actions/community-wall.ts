@@ -546,25 +546,29 @@ export async function createCommunityPostAction(input: {
   const postId = inserted.id as string;
 
   // ── Photos: move staging → posts/<postId>/<n>.jpg, then insert rows ──
+  // If the move fails twice, the photo row is SKIPPED: a staging object is
+  // purged by the 24h TTL janitor, so keeping the row would turn the photo
+  // into a broken image on a live post within two days.
   const photoViews: WallPhotoView[] = [];
   const photoFinalPaths: string[] = [];
   for (let i = 0; i < photos.length; i += 1) {
     const photo = photos[i];
-    let finalPath = photo.path;
-    try {
+    let finalPath: string | null = null;
+    for (let attempt = 0; attempt < 2 && finalPath === null; attempt += 1) {
       const target = `posts/${postId}/${i}.jpg`;
       const { error: moveError } = await supabaseAdmin.storage
         .from(WALLPHOTO_BUCKET)
         .move(photo.path, target);
       if (moveError) {
-        // Staging path stays public-readable in a public bucket — the post
-        // still renders; the untidy path beats a broken image or a dead post.
-        logger.warn("[community-wall] photo move failed (kept staging path):", moveError.message);
+        logger.warn(`[community-wall] photo move attempt ${attempt + 1} failed:`, moveError.message);
       } else {
         finalPath = target;
       }
-    } catch (moveCrash) {
-      logger.warn("[community-wall] photo move crashed:", moveCrash);
+    }
+    if (finalPath === null) {
+      // Keep the post alive without this photo; the staging object ages out
+      // via the TTL janitor instead of becoming a broken image later.
+      continue;
     }
     const { error: photoInsertError } = await supabaseAdmin.from("crew_post_photos").insert({
       post_id: postId,

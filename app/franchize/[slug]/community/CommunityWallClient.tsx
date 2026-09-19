@@ -1012,6 +1012,12 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
   const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
+  // Chrome Android synthesizes dblclick from touch — the mouse-only zoom path
+  // must not fire after a touch gesture (it would instantly cancel it).
+  const lastPointerType = useRef<string>("mouse");
+  // The stage container (NOT the transformed image — its own rect moves with
+  // the transform) is the transform-origin reference for zoom anchoring.
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   const photo = photos[index];
 
@@ -1048,41 +1054,66 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     };
   }, [onClose, go]);
 
+  // Wheel zoom-to-cursor. Registered NATIVELY with { passive: false } —
+  // React 18 attaches wheel at the root as passive, so e.preventDefault()
+  // inside a React onWheel prop would be a silent no-op. Lives BEFORE the
+  // early return (Rules of Hooks).
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const nextScale = clamp(scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5);
+      if (nextScale === 1) {
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+        return;
+      }
+      setOffset(zoomAtPoint(scale, offset, { x: e.clientX, y: e.clientY }, stageCenter(), nextScale));
+      setScale(nextScale);
+    };
+    el.addEventListener("wheel", onWheelNative, { passive: false });
+    return () => el.removeEventListener("wheel", onWheelNative);
+  }, [scale, offset]);
+
   if (!photo) return null;
 
   const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     (e.target as Element).setPointerCapture?.(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    lastPointerType.current = e.pointerType;
     setSmooth(false);
 
     if (pointers.current.size === 1) {
+      // Double-tap detection — TOUCH only, at ANY scale (so a double-tap while
+      // zoomed resets). For mice the native dblclick handler is the path: the
+      // pointerdown detector would otherwise fire first at 2.5× and dblclick
+      // would instantly cancel it.
+      if (e.pointerType !== "mouse") {
+        const now = Date.now();
+        const last = lastTap.current;
+        if (last && now - last.time < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30) {
+          if (scale > 1) {
+            setScale(1);
+            setOffset({ x: 0, y: 0 });
+          } else {
+            setScale(2.5);
+            setOffset(
+              zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5),
+            );
+          }
+          lastTap.current = null;
+          swipeStart.current = null;
+          panStart.current = null;
+          return;
+        }
+        lastTap.current = { time: now, x: e.clientX, y: e.clientY };
+      }
       if (scale > 1) {
         panStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
       } else {
         swipeStart.current = { x: e.clientX, y: e.clientY };
-        // double-tap detection — TOUCH only: for mice the native dblclick
-        // handler is the path (the pointerdown detector would otherwise fire
-        // first at scale 2.5 and onDoubleClick would instantly cancel it).
-        if (e.pointerType !== "mouse") {
-          const now = Date.now();
-          const last = lastTap.current;
-          if (last && now - last.time < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30) {
-            if (scale > 1) {
-              setScale(1);
-              setOffset({ x: 0, y: 0 });
-            } else {
-              setScale(2.5);
-              setOffset(
-                zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5),
-              );
-            }
-            lastTap.current = null;
-            swipeStart.current = null;
-          } else {
-            lastTap.current = { time: now, x: e.clientX, y: e.clientY };
-          }
-        }
       }
     } else if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
@@ -1162,14 +1193,20 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     }
   };
 
-  // Stage centre = transform-origin of the image box (centre of the viewport).
+  // Stage centre = transform-origin of the image box. Measured from the stage
+  // CONTAINER (never the transformed image — its own rect moves with it).
   function stageCenter(): { x: number; y: number } {
+    const el = stageRef.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }
     return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   }
 
-  // Desktop zoom: native dblclick (mouse-only path — the pointerdown double-tap
-  // detector ignores mice) + wheel zoom-to-cursor.
+  // Desktop zoom: native dblclick (guarded against touch-synthesized dblclick).
   const onDoubleClick = (e: React.MouseEvent) => {
+    if (lastPointerType.current !== "mouse") return;
     if (scale > 1) {
       setScale(1);
       setOffset({ x: 0, y: 0 });
@@ -1177,18 +1214,6 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
       setScale(2.5);
       setOffset(zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5));
     }
-  };
-
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const nextScale = clamp(scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5);
-    if (nextScale === 1) {
-      setScale(1);
-      setOffset({ x: 0, y: 0 });
-      return;
-    }
-    setOffset(zoomAtPoint(scale, offset, { x: e.clientX, y: e.clientY }, stageCenter(), nextScale));
-    setScale(nextScale);
   };
 
   return (
@@ -1215,7 +1240,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
       </div>
 
       {/* image stage */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+      <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
         <div
           className="flex items-center justify-center"
           onPointerDown={onPointerDown}
@@ -1223,7 +1248,6 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onDoubleClick={onDoubleClick}
-          onWheel={onWheel}
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transition: smooth ? "transform 200ms ease-out" : "none",

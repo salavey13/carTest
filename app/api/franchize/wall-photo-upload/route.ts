@@ -144,17 +144,13 @@ export async function POST(request: NextRequest) {
     const { buffer, width, height } = await compressImage(Buffer.from(arrayBuffer));
 
     // ── Quota + opportunistic staging janitor (own folder only) ──
+    // The TTL purge runs BEFORE the quota check: a user with a folder full of
+    // stale drafts must self-heal on the next upload, never lock out forever.
     const stagingPrefix = `staging/${callerUserId}`;
     const { data: existingStaging } = await supabaseAdmin.storage
       .from(WALLPHOTO_BUCKET)
       .list(stagingPrefix, { limit: 200, sortBy: { column: "created_at", order: "desc" } });
     const stagingFiles = (existingStaging ?? []).filter((f) => !!f.name && f.name !== ".emptyFolderPlaceholder");
-    if (stagingFiles.length >= WALL_STAGING_QUOTA) {
-      return NextResponse.json(
-        { error: "Слишком много черновых фото — опубликуй пост или попробуй позже." },
-        { status: 429 },
-      );
-    }
     const ttlCutoff = Date.now() - WALL_STAGING_TTL_HOURS * 60 * 60 * 1000;
     const stale = stagingFiles.filter((f) => {
       const ts = f.updated_at ? Date.parse(f.updated_at) : Number.NaN;
@@ -165,6 +161,13 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.storage
         .from(WALLPHOTO_BUCKET)
         .remove(stale.map((f) => `${stagingPrefix}/${f.name}`));
+    }
+    // Only LIVE (non-stale) files count against the quota.
+    if (stagingFiles.length - stale.length >= WALL_STAGING_QUOTA) {
+      return NextResponse.json(
+        { error: "Слишком много черновых фото — опубликуй пост или попробуй позже." },
+        { status: 429 },
+      );
     }
 
     // 32 hex chars — passes the wall's STAGING_FILE_RE (8–64 of [A-Za-z0-9_-]).

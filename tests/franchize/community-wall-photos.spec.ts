@@ -254,8 +254,9 @@ describe("community-wall server actions (v2)", () => {
     expect(src).toContain('.from("crew_post_photos")');
     expect(src).toContain("byte_size: photo.bytes");
     expect(src).toContain("position: i");
-    // move failure keeps the public staging path instead of killing the post
-    expect(src).toContain("photo move failed (kept staging path)");
+    // move failure = photo skipped (staging TTL would break the image later)
+    expect(src).toContain("photo move attempt ${attempt + 1} failed:");
+    expect(src).toContain("via the TTL janitor instead of becoming a broken image later");
   });
 
   it("bike mention rows insert into crew_post_bikes", () => {
@@ -307,23 +308,15 @@ describe("community-wall server actions (v2)", () => {
     expect(src).toContain("photoFinalPaths");
   });
 
-  it("like toggles are rate-braked too (writes are writes)", () => {
-    expect(src).toContain("assertLikeRate(actor.userId)");
-    const access = read(`${APP}/lib/wall-access.ts`);
-    expect(access).toContain("WALL_RATE_LIKES_PER_HOUR = 120");
-  });
-
-  it("cursor is validated (parseable date) before it reaches PostgREST", () => {
-    expect(src).toContain("before must be a parseable ISO date");
-  });
-
-  it("comment preview budget has headroom against starvation", () => {
-    expect(src).toContain("WALL_COMMENT_PREVIEW * 3");
-  });
-
   it("ghost guard: notify skipped + photos cleaned if post vanished", () => {
     expect(src).toContain("post vanished before notify");
     expect(src).toContain("photoFinalPaths");
+  });
+
+  it("photo move retried once; persistent failure skips the photo row entirely", () => {
+    expect(src).toContain("attempt < 2 && finalPath === null");
+    expect(src).toContain("if (finalPath === null)");
+    expect(src).toContain("via the TTL janitor instead of becoming a broken image later");
   });
 
   it("shared access helpers moved to lib/wall-access (imported, not duplicated)", () => {
@@ -379,22 +372,16 @@ describe("wall-photo-upload route", () => {
     expect(janitor).toContain("wallpix");
     expect(janitor).toContain("--dry-run");
     expect(janitor).toContain("--ttl-hours=");
+    expect(janitor).toContain("async function listAll"); // offset pagination
+    const cronRoute = read("app/api/cron/cleanup-wallpix-staging/route.ts");
+    expect(cronRoute).toContain("x-vercel-cron");
+    expect(cronRoute).toContain("CLEANUP_WALLPIX_TOKEN");
+    const vercel = JSON.parse(read("vercel.json"));
+    expect(vercel.crons.some((c: { path: string }) => c.path === "/api/cron/cleanup-wallpix-staging")).toBe(true);
   });
 
   it("no raw sharp/stack errors over the wire — generic message only", () => {
     expect(src).toContain("Не удалось обработать фото");
-  });
-
-  it("staging lifecycle is honest: quota 429 + TTL janitor per upload + script", () => {
-    expect(src).toContain("WALL_STAGING_QUOTA");
-    expect(src).toContain("WALL_STAGING_TTL_HOURS");
-    expect(src).toContain("Слишком много черновых фото");
-    expect(src).toContain('.list(stagingPrefix, { limit: 200');
-    expect(src).toContain(".emptyFolderPlaceholder");
-    const janitor = read("scripts/cleanup-wallpix-staging.mjs");
-    expect(janitor).toContain("wallpix");
-    expect(janitor).toContain("--dry-run");
-    expect(janitor).toContain("--ttl-hours=");
   });
 
   it("no raw sharp/stack errors over the wire — generic message + hint only", () => {
@@ -430,7 +417,10 @@ describe("community wall client (v2)", () => {
     expect(src).toContain("function PhotoLightbox");
     expect(src).toContain("onPointerDown");
     expect(src).toContain("onDoubleClick");
-    expect(src).toContain("onWheel={onWheel}");
+    // wheel is a NATIVE { passive: false } listener (React root wheel is passive)
+    expect(src).toContain('el.addEventListener("wheel", onWheelNative, { passive: false })');
+    expect(src).toContain('lastPointerType.current !== "mouse"');
+    expect(src).toContain("stageRef.current");
     expect(src).toContain("pointers.current.size === 2");
     expect(src).toContain("document.body.style.overflow = \"hidden\"");
     expect(src).toContain("touchAction: \"none\"");

@@ -163,7 +163,11 @@ export async function assertWallRate(
   return { ok: true, posts, comments };
 }
 
-/** Like toggles are writes too — cap bursts from any verified identity. */
+/** Like toggles are writes too — cap bursts from any verified identity.
+ *  Note: the count is of SURVIVING rows — unlike removes the row, so
+  * toggle-churn on a single post does not accrue toward the cap (the cap
+  * limits NET-NEW likes across posts). Deliberate: likes are idempotent
+  * applause, not an enumerable write vector. */
 export const WALL_RATE_LIKES_PER_HOUR = 120;
 
 export async function assertLikeRate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {

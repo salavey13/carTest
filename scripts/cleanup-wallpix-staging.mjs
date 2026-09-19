@@ -36,25 +36,27 @@ if (!Number.isFinite(TTL_HOURS) || TTL_HOURS <= 0) {
 
 const cutoffMs = Date.now() - TTL_HOURS * 60 * 60 * 1000;
 
-async function listUsersFolders() {
-  // staging/<userId>/<file> — list() по префиксу staging вернёт папки-пользователей.
+async function listPage(prefix, offset) {
+  // Page through with offset: >1000 entries must not be silently skipped.
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${BUCKET}`, {
     method: "POST",
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: STAGING_PREFIX, limit: 1000, offset: 0 }),
+    body: JSON.stringify({ prefix, limit: 1000, offset, sortBy: { column: "created_at", order: "asc" } }),
   });
-  if (!res.ok) throw new Error(`list staging failed: HTTP ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`list ${prefix} failed: HTTP ${res.status} ${await res.text()}`);
   return res.json();
 }
 
-async function listFiles(userFolder) {
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${BUCKET}`, {
-    method: "POST",
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: `${STAGING_PREFIX}/${userFolder}`, limit: 1000, offset: 0, sortBy: { column: "created_at", order: "asc" } }),
-  });
-  if (!res.ok) throw new Error(`list files failed: HTTP ${res.status} ${await res.text()}`);
-  return res.json();
+async function listAll(prefix) {
+  const all = [];
+  let offset = 0;
+  for (;;) {
+    const page = await listPage(prefix, offset);
+    all.push(...page);
+    if (page.length < 1000) break;
+    offset += 1000;
+  }
+  return all;
 }
 
 async function removeObjects(paths) {
@@ -67,14 +69,13 @@ async function removeObjects(paths) {
   return res.json();
 }
 
-const folders = await listUsersFolders();
+const folders = await listAll(STAGING_PREFIX);
 const userFolders = folders.filter((f) => f.name && f.id === null); // id===null → папка
 let scanned = 0;
-let removed = 0;
 const removedPaths = [];
 
 for (const folder of userFolders) {
-  const files = await listFiles(folder.name);
+  const files = await listAll(`${STAGING_PREFIX}/${folder.name}`);
   for (const file of files) {
     if (!file.name || file.name === ".emptyFolderPlaceholder") continue;
     scanned += 1;
@@ -98,5 +99,4 @@ if (dryRun) {
 }
 
 await removeObjects(removedPaths);
-removed = removedPaths.length;
-console.log(`removed ${removed} object(s)`);
+console.log(`removed ${removedPaths.length} object(s)`);
