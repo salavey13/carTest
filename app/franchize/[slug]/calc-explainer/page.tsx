@@ -247,8 +247,12 @@ function Table({ headers, children }: { headers: string[]; children: React.React
 function Row({ cells }: { cells: string[] }) {
   return (
     <tr className="border-b" style={{ borderColor: "var(--franchize-border-soft, #1a1a1a)" }}>
+      {/* Plain text rendering — the cells are static literals, so they go in
+          as React children (no raw-HTML sink in this component at all). */}
       {cells.map((c, i) => (
-        <td key={i} className="py-2 px-3 text-xs" style={{ color: "var(--franchize-text-primary, #fff)" }} dangerouslySetInnerHTML={{ __html: c }} />
+        <td key={i} className="py-2 px-3 text-xs" style={{ color: "var(--franchize-text-primary, #fff)" }}>
+          {c}
+        </td>
       ))}
     </tr>
   );

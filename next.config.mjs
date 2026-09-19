@@ -75,6 +75,35 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // ── Security headers (security codereview, 2026-09-20) ────────────────────
+  // Deliberately MINIMAL: the app is a Telegram Mini App rendered inside the
+  // web.telegram.org iframe, so any frame-deny header (DENY/SAMEORIGIN or a
+  // CSP ancestor restriction) would blank the whole Mini App on desktop
+  // Telegram. No script-src CSP either — Next/TG bootstrap needs several
+  // third-party origins; a broken CSP is worse than none. The three headers
+  // below are frame-safe and zero-risk for the WebApp.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // Never MIME-sniff user-generated content (wall photos are served
+          // from the Supabase CDN, but the app also proxies/downloads files).
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          // Don't leak full URLs (incl. ?post= deeplinks) to t.me and other
+          // cross-origin targets opened from the app.
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // The app uses no powerful browser APIs; deny everything except
+          // what's explicitly needed later (camera stays 'self' for future
+          // in-app photo capture).
+          {
+            key: "Permissions-Policy",
+            value: "geolocation=(self), camera=(self), microphone=(), payment=(), usb=()",
+          },
+        ],
+      },
+    ];
+  },
   // Note: server-assets fonts are bundled automatically without explicit tracing
   // Disabled experimental features to reduce memory usage during build
   // Disable source maps in production to reduce memory usage
