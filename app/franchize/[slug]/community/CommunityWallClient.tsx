@@ -41,10 +41,12 @@ import {
   PinOff,
   Search,
   Send,
+  Share2,
   Trash2,
   X,
 } from "lucide-react";
 import {
+  buildWallPostPreview,
   formatDateTimeRu,
   formatRelativeTimeRu,
   formatRub,
@@ -52,6 +54,7 @@ import {
   pluralRu,
   computeZoomOffset,
   zoomAtPoint,
+  riderMilestoneBadge,
   toggleReactionOptimistic,
   WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
@@ -1165,6 +1168,21 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
 
 // ── bike mention chips on a post ─────────────────────────────────────────────
 
+const RU_MONTHS_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+
+/** «в аренде до ~19:30» (same day) or «в аренде до 12 сен» (later). */
+function formatBusyUntil(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "в аренде";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  if (sameDay) {
+    return `в аренде до ~${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  return `в аренде до ${d.getDate()} ${RU_MONTHS_SHORT[d.getMonth()]}`;
+}
+
 function PostBikeChips({ bikes, slug }: { bikes: WallBikeRefView[]; slug: string }) {
   if (bikes.length === 0) return null;
   return (
@@ -1185,7 +1203,14 @@ function PostBikeChips({ bikes, slug }: { bikes: WallBikeRefView[]; slug: string
             </span>
           )}
           {bike.title}
-          <span className="font-normal opacity-70">· из каталога</span>
+          {/* live availability — the wall agrees with the checkout gate */}
+          <span className="flex items-center gap-1 font-normal opacity-80">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${bike.busyUntilIso ? "bg-red-400" : "bg-emerald-400"}`}
+              aria-hidden="true"
+            />
+            {bike.busyUntilIso ? formatBusyUntil(bike.busyUntilIso) : "свободен"}
+          </span>
         </Link>
       ))}
     </div>
@@ -1861,6 +1886,32 @@ function PostCard(props: PostCardProps) {
   const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending, replyTarget } = props;
   const isOwnPost = !!viewer?.userId && viewer.userId === post.author.userId;
   const authorName = post.author.fullName || post.author.username || "Райдер";
+  // special sauce: milestone badge + days-since-first-ride on stats posts
+  const milestone = post.stats ? riderMilestoneBadge(post.stats.ridesCount) : null;
+  const daysInCrew = useMemo(() => {
+    const first = post.stats?.firstRideAt;
+    if (!first) return null;
+    const ts = Date.parse(first);
+    if (Number.isNaN(ts)) return null;
+    return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+  }, [post.stats]);
+
+  /** VK/Telegram share: opens the native TG share dialog (MiniApp) or a tab. */
+  const sharePost = useCallback(() => {
+    const url = `${window.location.origin}/franchize/${slug}/community`;
+    const text = `${authorName} на стене экипажа: ${buildWallPostPreview(post.body || "пост с фото", 120)}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    try {
+      const tg = (window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp;
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(shareUrl);
+        return;
+      }
+    } catch {
+      // plain web — fall through to window.open
+    }
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  }, [slug, post.body, authorName]);
 
   return (
     <article
@@ -1946,10 +1997,25 @@ function PostCard(props: PostCardProps) {
       {/* stats snapshot */}
       {post.kind === "stats" && post.stats && (
         <div className="mt-3 rounded-xl border border-[var(--community-accent)]/30 bg-[var(--community-accent)]/5 p-3">
-          <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--community-accent)]">
-            <BarChart3 className="h-3.5 w-3.5" /> статистика поездок
-          </p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--community-accent)]">
+              <BarChart3 className="h-3.5 w-3.5" /> статистика поездок
+            </p>
+            {milestone && (
+              <span
+                title="Достижение за поездки с этим экипажем"
+                className="rounded-full bg-[var(--community-accent)]/15 px-2.5 py-0.5 text-[11px] font-bold text-[var(--community-accent)]"
+              >
+                {milestone.emoji} {milestone.label}
+              </span>
+            )}
+          </div>
           <StatsGrid stats={post.stats} />
+          {daysInCrew !== null && daysInCrew > 0 && (
+            <p className="mt-2 text-[11px] text-[var(--community-muted)]">
+              катает с экипажем уже {daysInCrew} {pluralRu(daysInCrew, ["день", "дня", "дней"])} — с первого заезда
+            </p>
+          )}
         </div>
       )}
 
@@ -1988,6 +2054,15 @@ function PostCard(props: PostCardProps) {
         >
           <MessageCircle className="h-4 w-4" />
           {post.commentCount > 0 ? pluralRu(post.commentCount, ["комментарий", "комментария", "комментариев"]) : "Комментировать"}
+        </button>
+        <button
+          type="button"
+          onClick={sharePost}
+          aria-label="Поделиться в Telegram"
+          title="Поделиться в Telegram"
+          className="flex items-center gap-1.5 text-sm text-[var(--community-muted)] transition hover:text-[var(--community-accent)]"
+        >
+          <Share2 className="h-4 w-4" />
         </button>
       </div>
 

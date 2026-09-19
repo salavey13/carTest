@@ -7,6 +7,8 @@
 // lib/bike-wall.ts pattern).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { parseStoredRentalTs, RENTAL_BLOCK_GRACE_MS } from "@/app/franchize/lib/rental-overlap";
+
 // ── Stats snapshot ───────────────────────────────────────────────────────────
 
 /** Minimal bike info needed for stats (from cars: id/title/type). */
@@ -279,6 +281,8 @@ export interface WallBikeRefView {
   bikeId: string;
   title: string;
   imageUrl: string | null;
+  /** Epoch ISO when the bike becomes free (null = free right now). */
+  busyUntilIso: string | null;
 }
 
 export interface WallPostView {
@@ -526,6 +530,70 @@ export function extractHashtags(body: string): string[] {
     if (out.length >= WALL_TAGS_MAX) break;
   }
   return out;
+}
+
+// ── Live availability + rider milestones (wall v3 special sauce) ────────────
+
+/**
+ * Same blocking statuses the order-page availability gate uses
+ * (actions-runtime.checkFranchizeCarsAvailability): a bike on ANY of these
+ * is potentially on the road; the window math below does the rest.
+ */
+export const WALL_BLOCKING_RENTAL_STATUSES = ["pending", "pending_confirmation", "confirmed", "active"];
+
+/** Rental row shape the busy-map needs (subset of rentals columns). */
+export interface WallBusyRentalRow {
+  vehicle_id: string | null;
+  status: string | null;
+  requested_start_date: string | null;
+  requested_end_date: string | null;
+  agreed_start_date: string | null;
+  agreed_end_date: string | null;
+}
+
+/**
+ * bikeId → epoch ms when the bike becomes free (bike absent from the map =
+ * free right now). Same contract as the checkout gate: requested_* dates win,
+ * agreed_* as fallback, +30 min late-return grace, and a rental whose
+ * (graced) end is already in the past never blocks — a forgotten `active`
+ * row must not keep a bike «занят» forever.
+ */
+export function wallBusyUntilMap(rows: WallBusyRentalRow[], nowMs: number): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.vehicle_id) continue;
+    if (!WALL_BLOCKING_RENTAL_STATUSES.includes(row.status ?? "")) continue;
+    const startTs =
+      parseStoredRentalTs(row.requested_start_date, "start") ||
+      parseStoredRentalTs(row.agreed_start_date, "start");
+    let endTs =
+      parseStoredRentalTs(row.requested_end_date, "end") ||
+      parseStoredRentalTs(row.agreed_end_date, "end");
+    if (Number.isNaN(startTs) && Number.isNaN(endTs)) continue;
+    if (Number.isNaN(endTs)) endTs = startTs + 24 * 60 * 60 * 1000; // same 24h fallback as the gate
+    const effectiveEnd = endTs + RENTAL_BLOCK_GRACE_MS;
+    if (effectiveEnd <= nowMs) continue;
+    const prev = map.get(row.vehicle_id);
+    if (prev === undefined || effectiveEnd > prev) map.set(row.vehicle_id, effectiveEnd);
+  }
+  return map;
+}
+
+export interface RiderMilestoneBadge {
+  emoji: string;
+  label: string;
+}
+
+/**
+ * Rider milestone for stats posts (VK gaming-style achievements): derived
+ * purely from the immutable snapshot — 5/10/25/50 rides.
+ */
+export function riderMilestoneBadge(rides: number): RiderMilestoneBadge | null {
+  if (rides >= 50) return { emoji: "🏆", label: "Легенда экипажа" };
+  if (rides >= 25) return { emoji: "🥇", label: "Ветеран дороги" };
+  if (rides >= 10) return { emoji: "🏍", label: "Свой в доску" };
+  if (rides >= 5) return { emoji: "🔥", label: "Разогрев" };
+  return null;
 }
 
 // ── Emoji reactions (wall v3, VK-style) ──────────────────────────────────────

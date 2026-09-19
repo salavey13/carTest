@@ -40,8 +40,10 @@ import {
   sanitizeWallBikeIds,
   isValidWallReaction,
   extractHashtags,
+  wallBusyUntilMap,
   wallPhotoPublicUrl,
   WALL_BIKES_MAX,
+  WALL_BLOCKING_RENTAL_STATUSES,
   WALL_COMMENT_MAX_LEN,
   WALL_COMMENT_PREVIEW,
   WALL_COMMENTS_FETCH_LIMIT,
@@ -425,8 +427,28 @@ export async function getCommunityWallAction(input: {
       bikeId: row.bike_id,
       title: row.cars?.model || "Байк",
       imageUrl: row.cars?.image_url ?? null,
+      busyUntilIso: null,
     });
     bikesByPost.set(row.post_id, list);
+  }
+
+  // 4c-bis. LIVE AVAILABILITY for mentioned bikes (special sauce): reuse the
+  // checkout gate's blocking statuses + overlap contract (lib wallBusyUntilMap)
+  // so the wall always agrees with the cart. One bounded query per page.
+  const mentionIds = [...new Set([...bikesByPost.values()].flatMap((list) => list.map((b) => b.bikeId)))];
+  if (mentionIds.length > 0) {
+    const { data: busyRows } = await supabaseAdmin
+      .from("rentals")
+      .select("vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date")
+      .in("vehicle_id", mentionIds)
+      .in("status", WALL_BLOCKING_RENTAL_STATUSES);
+    const busyMs = wallBusyUntilMap((busyRows ?? []) as never[], Date.now());
+    for (const list of bikesByPost.values()) {
+      for (const bike of list) {
+        const until = busyMs.get(bike.bikeId);
+        bike.busyUntilIso = until ? new Date(until).toISOString() : null;
+      }
+    }
   }
 
   // 5. The viewer's own reactions for the page (counts live on crew_posts,
@@ -589,7 +611,7 @@ export async function createCommunityPostAction(input: {
     // Keep the author's attach order.
     bikeRefs = bikeIds.map((id) => {
       const row = rows.find((r) => String(r.id) === id);
-      return { bikeId: id, title: row?.model || "Байк", imageUrl: row?.image_url ?? null };
+      return { bikeId: id, title: row?.model || "Байк", imageUrl: row?.image_url ?? null, busyUntilIso: null };
     });
   }
 
