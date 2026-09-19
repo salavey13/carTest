@@ -260,16 +260,23 @@ export function dedupeCommentRecipients(
   return out;
 }
 
-/** @user-токены из тела комментария (тот же парсер, что рендерит стену). */
+/** @user-токены из тела комментария (тот же парсер, что рендерит стену).
+ *  Регистр СОХРАНЯЕМ (в users.username Telegram хранит @Sly13 как есть),
+ *  дедуп по нижнему регистру. Exact-lookup в экшене сам пробует оба варианта. */
 export function extractMentionUsernames(body: string): string[] {
-  const names = new Set<string>();
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const token of parseWallText(body)) {
     if (token.type === "mention") {
-      const v = token.value.replace(/^@/, "").trim().toLowerCase();
-      if (v) names.add(v);
+      const v = token.value.replace(/^@/, "").trim();
+      const key = v.toLowerCase();
+      if (v && !seen.has(key)) {
+        seen.add(key);
+        out.push(v);
+      }
     }
   }
-  return [...names].slice(0, WALL_ENGAGE_MAX_MENTIONS);
+  return out.slice(0, WALL_ENGAGE_MAX_MENTIONS);
 }
 
 export interface CommentNotifyInput {
@@ -306,17 +313,27 @@ export async function notifyWallComment(input: CommentNotifyInput): Promise<void
     const claimed: { userId: string; reason: WallCommentNotifyReason; replyToName: string | null }[] = [];
     for (const recipient of recipients) {
       // Часовой потолок на (получатель, пост): читаем из того же ledger.
+      // Ключ слота `${recipientId}:${commentId}` — получатель ПЕРВЫМ, чтобы
+      // prefix-LIKE в countRecentCommentNotifies совпадал и был index-friendly.
       try {
         const recent = await countRecentCommentNotifies(input.postId, recipient.userId, hourAgoIso);
         if (recent >= WALL_COMMENT_NOTIFY_HOURLY_CAP_PER_POST) continue;
       } catch {
         // Счёт не получился — потолок пропускаем, dedup-ключ всё равно стоит.
       }
-      const ok = await claimNotifySlot(
-        input.postId,
-        "comment",
-        `${input.commentId}:${recipient.userId}`,
-      );
+      let ok = true;
+      try {
+        ok = await claimNotifySlot(
+          input.postId,
+          "comment",
+          `${recipient.userId}:${input.commentId}`,
+        );
+      } catch {
+        // Сбой claim'а не должен обрывать цикл: уже занятые слоты других
+        // получателей обязаны всё равно отправиться (иначе их DM навсегда
+        // подавлен занятой записью в ledger).
+        ok = true;
+      }
       if (ok) {
         claimed.push({
           userId: recipient.userId,

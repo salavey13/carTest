@@ -1094,20 +1094,21 @@ export async function addPostCommentAction(input: {
         replyToName: replyToName ?? null,
       });
     }
-    const mentionNames = extractMentionUsernames(body);
+    const mentionNames = extractMentionUsernames(body); // регистр сохранён
     if (mentionNames.length > 0) {
       // Точное совпадение (indexed, без SQL-дикой карты): `_` в username —
       // это ПОДЧЁРКИВАНИЕ, а не wildcard (ilike превращал @ivan_petrov в
-      // «ivan-что-угодно-petrov» и пинговал чужих людей). Два exact-запроса
-      // покрывают разницу регистра (@Sly13 vs @sly13).
-      const lowered = mentionNames.map((n) => n.toLowerCase());
-      const [{ data: exactUsers }, { data: loweredUsers }] = await Promise.all([
+      // «ivan-что-угодно-petrov» и пинговал чужих людей). Второй exact-запрос
+      // по нижнему регистру покрывает разницу: автор поста пишет @sly13,
+      // а в users.username лежит @Sly13 (ensureUserProfile пишет как в TG).
+      const lowered = mentionNames.map((n) => n.toLowerCase()).filter((n) => !mentionNames.includes(n));
+      const [exactRes, loweredRes] = await Promise.all([
         supabaseAdmin.from("users").select("user_id").in("username", mentionNames).limit(WALL_MENTION_LOOKUP_CAP),
-        lowered.some((n) => !mentionNames.includes(n))
+        lowered.length > 0
           ? supabaseAdmin.from("users").select("user_id").in("username", lowered).limit(WALL_MENTION_LOOKUP_CAP)
           : Promise.resolve({ data: [] as unknown[] }),
       ]);
-      for (const u of [...((exactUsers ?? []) as { user_id: string }[]), ...((loweredUsers ?? []) as { user_id: string }[])]) {
+      for (const u of [...((exactRes.data ?? []) as { user_id: string }[]), ...((loweredRes.data ?? []) as { user_id: string }[])]) {
         recipients.push({ userId: u.user_id, reason: "mentioned" });
       }
     }

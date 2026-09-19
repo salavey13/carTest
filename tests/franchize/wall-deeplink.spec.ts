@@ -90,15 +90,23 @@ describe("builders", () => {
     expect(wallComposeStartParam(RENTAL_ID, SLUG).length).toBeLessThanOrEqual(64);
   });
 
-  it("long slugs are CLAMPED so post_/wallp_ params never exceed the 64-char budget", () => {
+  it("over-budget slugs DOWNGRADE to the bare form, never a wrong-slug link", () => {
     const longSlug = "a-very-long-crew-slug-that-keeps-going-and-going"; // 48 chars
+    const hugeSlug = `${longSlug}-and-even-more-characters-to-blow-the-budget`; // >59 chars
     const p = wallPostStartParam(POST_ID, longSlug);
+    // bare post_<id> → parser resolves slug:null → router falls back to the
+    // VIEWER's crew (a truncated slug would fast-route to an empty shell wall):
+    expect(p).toBe(`post_${POST_ID}`);
+    expect(parseWallDeepLink(p)).toEqual({ kind: "post", postId: POST_ID, slug: null });
+    // wall_ has a 59-char slug budget — the 48-char slug FITS and stays intact:
+    expect(wallStartParam(longSlug)).toBe(`wall_${longSlug}`);
+    // but an over-budget slug degrades to bare `wall` (own-crew fallback):
+    expect(wallStartParam(hugeSlug)).toBe("wall");
+    expect(parseWallDeepLink(wallStartParam(hugeSlug))).toEqual({ kind: "wall", slug: null });
+    // wallp_ has no bare form (parser needs the slug) — truncate to a valid prefix:
     const c = wallComposeStartParam(RENTAL_ID, longSlug);
-    expect(p.length).toBeLessThanOrEqual(64);
     expect(c.length).toBeLessThanOrEqual(64);
-    // ids (the payload) survive intact:
-    expect(p).toContain(`post_${POST_ID}_`);
-    expect(c).toContain(`wallp_${RENTAL_ID}_`);
+    expect(parseWallDeepLink(c)).toEqual({ kind: "compose", rentalId: RENTAL_ID, slug: expect.any(String) });
   });
 
   it("builds t.me app links without @ in the bot handle", () => {

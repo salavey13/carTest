@@ -134,14 +134,22 @@ describe("dedupeCommentRecipients", () => {
 });
 
 describe("extractMentionUsernames", () => {
-  it("extracts @mentions via the wall tokenizer (lowercased, capped)", () => {
-    const tokens = parseWallText("привет @Sly13 и @Nikita, письмо Sly13@example.com не упоминание");
-    expect(tokens.some((t) => t.type === "mention")).toBe(true);
+  it("extracts @mentions via the wall tokenizer, PRESERVING case (users.username stores TG case)", () => {
     const names = extractMentionUsernames("привет @Sly13 и @Nikita и @Third и @Fourth, Sly13@example.com не в счёте");
-    expect(names).toContain("sly13");
-    expect(names).toContain("nikita");
+    expect(names).toContain("Sly13"); // original case — exact lookup tries it first
+    expect(names).toContain("Nikita");
     expect(names.length).toBeLessThanOrEqual(3);
     expect(names).not.toContain("sly13@example.com");
+  });
+
+  it("dedupes by lowercase key (typing @sly13 twice yields one token)", () => {
+    const names = extractMentionUsernames("@Sly13 и @sly13");
+    expect(names.filter((n) => n.toLowerCase() === "sly13").length).toBe(1);
+  });
+
+  it("the action's lowercase fallback query only runs for case-changed tokens (source contract)", () => {
+    const actions = read("app/franchize/server-actions/community-wall.ts");
+    expect(actions).toContain(".filter((n) => !mentionNames.includes(n))");
   });
 });
 
@@ -181,6 +189,17 @@ describe("dedup + anti-flood wiring (source contract)", () => {
     expect(lib).toContain("WALL_COMMENT_NOTIFY_HOURLY_CAP_PER_POST = 3");
     expect(lib).toContain("countRecentCommentNotifies");
     expect(lib).toContain("Promise.allSettled(");
+  });
+
+  it("cap COUNT and slot KEY agree on the layout (recipient FIRST — prefix-LIKE works)", () => {
+    // claim key:
+    expect(lib).toContain("`${recipient.userId}:${input.commentId}`");
+    // count pattern:
+    expect(lib).toContain("`${recipientId}:%`");
+    // a claim failure must not abort the loop (already-claimed DMs would
+    // otherwise stay suppressed in the ledger forever):
+    expect(lib).toContain("let ok = true;");
+    expect(lib.indexOf("let ok = true;")).toBeLessThan(lib.indexOf("claimNotifySlot(\n          input.postId,\n          \"comment\""));
   });
 });
 

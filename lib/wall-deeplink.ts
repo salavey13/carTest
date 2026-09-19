@@ -88,31 +88,41 @@ export function parseWallDeepLink(param: string | null | undefined): WallDeepLin
 // ── Builders (the notify side + share button) ────────────────────────────────
 
 /**
- * Telegram `startapp` budget: keep the WHOLE param ≤ 64 chars even for long
- * crew slugs (a 36-char uuid + prefix already eats ~41 of them). Slugs longer
- * than the per-builder budget are truncated — the wall slug in the URL is a
- * convenience, the ids are the payload; a truncated slug degrades to the
- * viewer's-crew fallback instead of a dead link.
+ * Telegram `startapp` budget: keep the WHOLE param ≤ 64 chars. Slugs that do
+ * not fit are DROPPED (not truncated) — a truncated slug would fast-route to
+ * /franchize/<wrong-slug>/community (empty shell wall), while the bare form
+ * (`post_<id>` / `wall`) degrades to the viewer's-crew fallback, which is
+ * correct for the renter/member who usually taps these links.
  */
 function budgetedSlug(slug: string, reserved: number): string {
-  const s = sanitizeWallSlug(slug) ?? "vip-bike";
-  return s.slice(0, Math.max(1, 64 - reserved));
+  const s = sanitizeWallSlug(slug) ?? "";
+  const budget = 64 - reserved;
+  return s.length > 0 && s.length <= budget ? s : "";
 }
 
 export function wallStartParam(slug: string): string {
-  return `wall_${budgetedSlug(slug, 5)}`;
+  const s = budgetedSlug(slug, 5);
+  return s ? `wall_${s}` : "wall";
 }
 
 export function wallPostStartParam(postId: string, slug: string): string {
   const id = postId.trim();
   if (!isUuidLike(id)) throw new Error(`wallPostStartParam: postId is not a uuid: ${id}`);
-  return `post_${id}_${budgetedSlug(slug, 5 + 36 + 1)}`;
+  const s = budgetedSlug(slug, 5 + 36 + 1);
+  return s ? `post_${id}_${s}` : `post_${id}`;
 }
 
 export function wallComposeStartParam(rentalId: string, slug: string): string {
   const id = rentalId.trim();
   if (!isUuidLike(id)) throw new Error(`wallComposeStartParam: rentalId is not a uuid: ${id}`);
-  return `wallp_${id}_${budgetedSlug(slug, 6 + 36 + 1)}`;
+  // wallp_ has NO bare fallback (the parser requires a slug to route). Over-
+  // budget or invalid slugs truncate to a VALID prefix instead: slugs that
+  // long are theoretical (21 chars covers every real crew), and a wrong-crew
+  // landing is harmless — the draft action re-verifies rental ∈ crew server-
+  // side and the composer surfaces the error as a wall notice.
+  const budget = 64 - 6 - 36 - 1;
+  const s = sanitizeWallSlug(slug) ?? "vip-bike";
+  return `wallp_${id}_${s.slice(0, Math.max(1, budget))}`;
 }
 
 /** https://t.me/<bot>/app?startapp=<param> — opens the Mini App on the spot. */

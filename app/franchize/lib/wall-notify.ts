@@ -29,12 +29,14 @@ import {
   wallStartParam,
 } from "@/lib/wall-deeplink";
 import {
-  leadDeeplinkUrl,
   resolveLeadNotifyRecipients,
   sanitizeLeadKey,
 } from "@/app/franchize/lib/new-lead-notify";
 
-export { leadDeeplinkUrl };
+// NOTE: leadDeeplinkUrl сознательно НЕ ре-экспортируется и НЕ используется:
+// тот префиксует startapp как lead_… — кнопки стены на таком deeplink уводили
+// роутер на СТРАНИЦУ ЛИДОВ (баг wall v2, найден boss-ревью v4). Только
+// buildTelegramAppLink(bot, wall_/post_/wallp_…) + web-фолбэк.
 
 export interface WallPostNotifyInput {
   /** Slug экипажа, например "vip-bike". */
