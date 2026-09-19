@@ -365,10 +365,15 @@ export async function getCommunityWallAction(input: {
   // Flip each preview back to chronological order (oldest → newest).
   for (const list of commentsByPost.values()) list.reverse();
 
-  // 4. Optional rental refs (bike title + photo for attached rides).
+  // 4–5. Everything below the page fetch depends ONLY on postIds — so all
+  // four blocks run CONCURRENTLY (Promise.all) instead of ~7 sequential
+  // roundtrips. The busy-map pass lands after the mention rows (it needs the
+  // collected bike ids).
   const rentalIds = [...new Set(pageRows.map((p) => p.rental_id).filter((id): id is string => !!id))];
-  const rentalRefs = new Map<string, WallRentalRef>();
-  if (rentalIds.length > 0) {
+
+  async function buildRentalRefs(): Promise<Map<string, WallRentalRef>> {
+    const rentalRefs = new Map<string, WallRentalRef>();
+    if (rentalIds.length === 0) return rentalRefs;
     const { data: rentalRows } = await supabaseAdmin
       .from("rentals")
       .select("rental_id, vehicle_id")
@@ -389,72 +394,76 @@ export async function getCommunityWallAction(input: {
         imageUrl: meta?.imageUrl ?? null,
       });
     }
+    return rentalRefs;
   }
 
-  // 4b. Post photos (public wallpix URLs — no signed-URL round trips).
-  const photosByPost = new Map<string, WallPhotoView[]>();
-  const { data: photoRows } = await supabaseAdmin
-    .from("crew_post_photos")
-    .select("id, post_id, storage_path, width, height")
-    .in("post_id", postIds)
-    .order("position", { ascending: true });
-  for (const row of (photoRows ?? []) as {
-    id: string;
-    post_id: string;
-    storage_path: string;
-    width: number | null;
-    height: number | null;
-  }[]) {
-    const list = photosByPost.get(row.post_id) ?? [];
-    list.push({ id: row.id, url: wallPhotoPublicUrl(row.storage_path), width: row.width, height: row.height });
-    photosByPost.set(row.post_id, list);
+  async function buildPhotosByPost(): Promise<Map<string, WallPhotoView[]>> {
+    const photosByPost = new Map<string, WallPhotoView[]>();
+    const { data: photoRows } = await supabaseAdmin
+      .from("crew_post_photos")
+      .select("id, post_id, storage_path, width, height")
+      .in("post_id", postIds)
+      .order("position", { ascending: true });
+    for (const row of (photoRows ?? []) as {
+      id: string;
+      post_id: string;
+      storage_path: string;
+      width: number | null;
+      height: number | null;
+    }[]) {
+      const list = photosByPost.get(row.post_id) ?? [];
+      list.push({ id: row.id, url: wallPhotoPublicUrl(row.storage_path), width: row.width, height: row.height });
+      photosByPost.set(row.post_id, list);
+    }
+    return photosByPost;
   }
 
-  // 4c. Bike mentions (catalogue card data via the FK embed).
-  const bikesByPost = new Map<string, WallBikeRefView[]>();
-  const { data: bikeMentionRows } = await supabaseAdmin
-    .from("crew_post_bikes")
-    .select("post_id, bike_id, cars(id, model, image_url)")
-    .in("post_id", postIds)
-    .order("position", { ascending: true });
-  for (const row of (bikeMentionRows ?? []) as unknown as {
-    post_id: string;
-    bike_id: string;
-    cars: { model: string | null; image_url: string | null } | null;
-  }[]) {
-    const list = bikesByPost.get(row.post_id) ?? [];
-    list.push({
-      bikeId: row.bike_id,
-      title: row.cars?.model || "Байк",
-      imageUrl: row.cars?.image_url ?? null,
-      busyUntilIso: null,
-    });
-    bikesByPost.set(row.post_id, list);
-  }
+  async function buildBikesByPost(): Promise<Map<string, WallBikeRefView[]>> {
+    const bikesByPost = new Map<string, WallBikeRefView[]>();
+    const { data: bikeMentionRows } = await supabaseAdmin
+      .from("crew_post_bikes")
+      .select("post_id, bike_id, cars(id, model, image_url)")
+      .in("post_id", postIds)
+      .order("position", { ascending: true });
+    for (const row of (bikeMentionRows ?? []) as unknown as {
+      post_id: string;
+      bike_id: string;
+      cars: { model: string | null; image_url: string | null } | null;
+    }[]) {
+      const list = bikesByPost.get(row.post_id) ?? [];
+      list.push({
+        bikeId: row.bike_id,
+        title: row.cars?.model || "Байк",
+        imageUrl: row.cars?.image_url ?? null,
+        busyUntilIso: null,
+      });
+      bikesByPost.set(row.post_id, list);
+    }
 
-  // 4c-bis. LIVE AVAILABILITY for mentioned bikes (special sauce): reuse the
-  // checkout gate's blocking statuses + overlap contract (lib wallBusyUntilMap)
-  // so the wall always agrees with the cart. One bounded query per page.
-  const mentionIds = [...new Set([...bikesByPost.values()].flatMap((list) => list.map((b) => b.bikeId)))];
-  if (mentionIds.length > 0) {
-    const { data: busyRows } = await supabaseAdmin
-      .from("rentals")
-      .select("vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date")
-      .in("vehicle_id", mentionIds)
-      .in("status", WALL_BLOCKING_RENTAL_STATUSES);
-    const busyMs = wallBusyUntilMap((busyRows ?? []) as never[], Date.now());
-    for (const list of bikesByPost.values()) {
-      for (const bike of list) {
-        const until = busyMs.get(bike.bikeId);
-        bike.busyUntilIso = until ? new Date(until).toISOString() : null;
+    // LIVE AVAILABILITY for mentioned bikes (special sauce): reuse the
+    // checkout gate's blocking statuses + overlap contract (lib
+    // wallBusyUntilMap) so the wall always agrees with the cart.
+    const mentionIds = [...new Set([...bikesByPost.values()].flatMap((list) => list.map((b) => b.bikeId)))];
+    if (mentionIds.length > 0) {
+      const { data: busyRows } = await supabaseAdmin
+        .from("rentals")
+        .select("vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date")
+        .in("vehicle_id", mentionIds)
+        .in("status", WALL_BLOCKING_RENTAL_STATUSES);
+      const busyMs = wallBusyUntilMap((busyRows ?? []) as never[], Date.now());
+      for (const list of bikesByPost.values()) {
+        for (const bike of list) {
+          const until = busyMs.get(bike.bikeId);
+          bike.busyUntilIso = until ? new Date(until).toISOString() : null;
+        }
       }
     }
+    return bikesByPost;
   }
 
-  // 5. The viewer's own reactions for the page (counts live on crew_posts,
-  // maintained by the DB trigger — never recomputed here).
-  const viewerReactions = new Map<string, string>();
-  if (actor && postIds.length > 0) {
+  async function buildViewerReactions(): Promise<Map<string, string>> {
+    const viewerReactions = new Map<string, string>();
+    if (!actor || postIds.length === 0) return viewerReactions;
     const { data: reactionRows } = await supabaseAdmin
       .from("crew_post_reactions")
       .select("post_id, emoji")
@@ -463,7 +472,15 @@ export async function getCommunityWallAction(input: {
     for (const row of (reactionRows ?? []) as { post_id: string; emoji: string }[]) {
       viewerReactions.set(row.post_id, row.emoji);
     }
+    return viewerReactions;
   }
+
+  const [rentalRefs, photosByPost, bikesByPost, viewerReactions] = await Promise.all([
+    buildRentalRefs(),
+    buildPhotosByPost(),
+    buildBikesByPost(),
+    buildViewerReactions(),
+  ]);
 
   const posts: WallPostView[] = pageRows.map((p) => ({
     id: p.id,
@@ -1414,18 +1431,23 @@ export async function getWallTrendingAction(input: { slug: string }): Promise<Ge
 // ── NEW-POSTS PROBE (background pill) ───────────────────────────────────────
 
 export type CountNewWallPostsResult =
-  | { ok: true; count: number }
+  | { ok: true; count: number; bikesBusy: { bikeId: string; busyUntilIso: string | null }[] }
   | { ok: false; error: string };
 
 /**
  * How many fresh posts appeared after the newest one the viewer already has.
  * Cheap head-count, polled on an interval by the «N новых постов» pill —
- * no new tables, composes with the existing keyset.
+ * no new tables, composes with the existing keyset. When the client passes
+ * the currently-mentioned bike ids, the probe ALSO returns fresh live
+ * availability for them, so «в аренде до ~19:30» dots never go stale during
+ * a long session.
  */
 export async function countNewWallPostsAction(input: {
   slug: string;
   /** created_at ISO of the newest post currently on the viewer's screen. */
   after: string;
+  /** Currently-mentioned catalogue bike ids on screen (optional). */
+  bikeIds?: string[];
 }): Promise<CountNewWallPostsResult> {
   const parsed = z
     .object({
@@ -1434,6 +1456,7 @@ export async function countNewWallPostsAction(input: {
         .string()
         .trim()
         .refine((v) => !Number.isNaN(Date.parse(v)), "after must be a parseable ISO date"),
+      bikeIds: z.array(z.string().trim().min(1).max(128)).max(60).optional(),
     })
     .safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
@@ -1451,5 +1474,19 @@ export async function countNewWallPostsAction(input: {
     logger.error("[community-wall] new-posts probe failed:", error.message);
     return { ok: false, error: "Не удалось проверить новые посты." };
   }
-  return { ok: true, count: count ?? 0 };
+
+  const bikeIds = parsed.data.bikeIds ?? [];
+  if (bikeIds.length === 0) return { ok: true, count: count ?? 0, bikesBusy: [] };
+
+  const { data: busyRows } = await supabaseAdmin
+    .from("rentals")
+    .select("vehicle_id, status, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date")
+    .in("vehicle_id", bikeIds)
+    .in("status", WALL_BLOCKING_RENTAL_STATUSES);
+  const busyMs = wallBusyUntilMap((busyRows ?? []) as never[], Date.now());
+  const bikesBusy = bikeIds.map((bikeId) => ({
+    bikeId,
+    busyUntilIso: busyMs.has(bikeId) ? new Date(busyMs.get(bikeId)!).toISOString() : null,
+  }));
+  return { ok: true, count: count ?? 0, bikesBusy };
 }

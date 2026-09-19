@@ -35,22 +35,30 @@ CREATE INDEX IF NOT EXISTS idx_crew_post_tags_crew_tag
 
 -- ── 2. Backfill from existing post bodies ────────────────────────────────────
 -- Same normalization contract as lib hashtagKey(): lowercase, no '#'.
--- [[:alnum:]_] with a UTF-8 database covers Cyrillic and latin alike.
+-- URLs are stripped FIRST so anchors («x.com/#top») never become junk tags,
+-- matching the write-time extractHashtags() behavior; the charset is spelled
+-- out explicitly (Cyrillic + latin + digits) — [[:alnum:]] would degrade to
+-- ASCII on a C-locale database.
 
 INSERT INTO public.crew_post_tags (post_id, tag, crew_id, created_at)
 SELECT p.id, lower(m[1]), p.crew_id, p.created_at
   FROM public.crew_posts p
- CROSS JOIN LATERAL regexp_matches(p.body, '#([[:alnum:]_]{2,40})', 'g') AS m
+ CROSS JOIN LATERAL regexp_matches(
+        regexp_replace(p.body, 'https?://\S+', '', 'g'),
+        '#([a-zA-Zа-яёА-ЯЁ0-9_]{2,40})', 'g') AS m
 ON CONFLICT (post_id, tag) DO NOTHING;
 
 -- ── 3. Full-text search column (generated) + GIN ─────────────────────────────
--- 'simple' keeps translit/model names («kawasaki», «ex650k») searchable and
--- avoids surprise stemming; websearch_to_tsquery on the client side stays
--- forgiving (no syntax errors from raw user input).
+-- Bilingual vector: 'simple' keeps translit/model names («kawasaki»,
+-- «ex650k») searchable as-is, 'russian' adds morphology for the dominant
+-- language («поездки» now matches «поездка»). websearch_to_tsquery on the
+-- query side stays forgiving (no syntax errors from raw user input).
 
 ALTER TABLE public.crew_posts
   ADD COLUMN IF NOT EXISTS search_tsv tsvector
-  GENERATED ALWAYS AS (to_tsvector('simple', coalesce(body, ''))) STORED;
+  GENERATED ALWAYS AS (
+    to_tsvector('simple', coalesce(body, '')) || to_tsvector('russian', coalesce(body, ''))
+  ) STORED;
 
 CREATE INDEX IF NOT EXISTS idx_crew_posts_search
   ON public.crew_posts USING gin (search_tsv);

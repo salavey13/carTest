@@ -127,14 +127,20 @@ BEGIN
 END $$;
 
 -- Reconcile BOTH counters from the reactions table (single source of truth).
+-- NOTE: two-level GROUP BY — per (post, emoji) first, then aggregated into a
+-- per-post jsonb map; `total` = sum of all emoji counts for the post.
 UPDATE public.crew_posts p
-   SET like_count     = COALESCE(r.total, 0),
+   SET like_count      = COALESCE(r.total, 0),
        reaction_counts = COALESCE(r.per_emoji, '{}'::jsonb)
   FROM (
     SELECT post_id,
-           count(*)::integer AS total,
+           sum(cnt)::integer AS total,
            jsonb_object_agg(emoji, cnt) AS per_emoji
-      FROM public.crew_post_reactions
+      FROM (
+        SELECT post_id, emoji, count(*)::integer AS cnt
+          FROM public.crew_post_reactions
+         GROUP BY post_id, emoji
+      ) per_emoji
      GROUP BY post_id
   ) r
  WHERE r.post_id = p.id;

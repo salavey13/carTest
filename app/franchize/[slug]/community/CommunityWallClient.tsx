@@ -50,6 +50,7 @@ import {
   formatDateTimeRu,
   formatRelativeTimeRu,
   formatRub,
+  hashtagKey,
   parseWallText,
   pluralRu,
   computeZoomOffset,
@@ -225,23 +226,60 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
     return () => clearTimeout(t);
   }, [searchDraft]);
 
-  // «N новых постов» pill: cheap probe on an interval, paused in background tabs
+  // «N новых постов» pill: cheap probe on an interval, paused in background tabs.
+  // The probe ALSO refreshes live availability for the mentioned bikes so the
+  // «в аренде до ~19:30» dots never go stale during a long session.
+  const mentionIds = useMemo(
+    () => [...new Set(posts.flatMap((p) => p.bikes.map((b) => b.bikeId)))].slice(0, 60),
+    [posts],
+  );
   useEffect(() => {
     const t = setInterval(async () => {
       if (document.visibilityState !== "visible") return;
       const newest = posts.reduce((m, p) => (p.createdAt > m ? p.createdAt : m), posts[0]?.createdAt ?? "");
       if (!newest) return;
-      const res = await countNewWallPostsAction({ slug, after: newest });
+      const res = await countNewWallPostsAction({ slug, after: newest, bikeIds: mentionIds });
       if (res.ok && res.count > 0) setNewPostsCount(res.count);
+      if (res.ok && res.bikesBusy.length > 0) {
+        const busyById = new Map(res.bikesBusy.map((b) => [b.bikeId, b.busyUntilIso]));
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.bikes.length === 0
+              ? p
+              : {
+                  ...p,
+                  bikes: p.bikes.map((b) => {
+                    const fresh = busyById.get(b.bikeId);
+                    return fresh === undefined || fresh === b.busyUntilIso ? b : { ...b, busyUntilIso: fresh };
+                  }),
+                },
+          ),
+        );
+      }
     }, 45000);
     return () => clearInterval(t);
-  }, [posts, slug]);
+  }, [posts, slug, mentionIds]);
 
   const jumpToNewPosts = useCallback(() => {
     setNewPostsCount(0);
     void loadFeed({ silent: true });
     wallTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loadFeed]);
+
+  // Deep link: #post-<id> (from the «Поделиться» link) → scroll + highlight flash.
+  const hashScrolledRef = useRef(false);
+  useEffect(() => {
+    if (loading || hashScrolledRef.current) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#post-")) return;
+    const el = document.getElementById(hash.slice(1));
+    if (!el) return;
+    hashScrolledRef.current = true;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-[var(--community-accent)]");
+    const t = setTimeout(() => el.classList.remove("ring-2", "ring-[var(--community-accent)]"), 2500);
+    return () => clearTimeout(t);
+  }, [loading, posts]);
 
   const applyTagFilter = useCallback((tag: string | null) => {
     setActiveTag((cur) => (tag !== null && cur === tag ? null : tag));
@@ -1266,19 +1304,41 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     [index, photos.length, onIndexChange, reset],
   );
 
-  // scroll lock + keyboard nav
+  // scroll lock + keyboard nav + focus management (a11y):
+  // focus moves into the dialog on open, Tab is trapped inside, focus returns
+  // to the trigger on close.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
+    const prevFocus = document.activeElement as HTMLElement | null;
     document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft") go(-1);
       if (e.key === "ArrowRight") go(1);
+      if (e.key === "Tab") {
+        // simple focus trap: cycle within the dialog
+        const root = dialogRef.current;
+        if (!root) return;
+        const focusables = root.querySelectorAll<HTMLElement>("button, [href], [tabindex]:not([tabindex='-1'])");
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKey);
+      prevFocus?.focus?.();
     };
   }, [onClose, go]);
 
@@ -1458,7 +1518,9 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col bg-black/95"
+      ref={dialogRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-[100] flex flex-col bg-black/95 outline-none"
       style={{ touchAction: "none" }}
       role="dialog"
       aria-modal="true"
@@ -1818,7 +1880,9 @@ function WallRichText({
           );
         }
         if (t.type === "hashtag") {
-          const body = t.value.slice(1);
+          // Normalize EXACTLY like the DB rows (lowercased body, no '#') —
+          // a mixed-case «#ВечернийЗаезд» must hit the tag filter, not lie empty.
+          const body = hashtagKey(t.value);
           if (onHashtag) {
             return (
               <button
@@ -1896,9 +1960,10 @@ function PostCard(props: PostCardProps) {
     return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
   }, [post.stats]);
 
-  /** VK/Telegram share: opens the native TG share dialog (MiniApp) or a tab. */
+  /** VK/Telegram share: opens the native TG share dialog (MiniApp) or a tab.
+   *  The link carries #post-<id> — on load the wall scrolls to the post. */
   const sharePost = useCallback(() => {
-    const url = `${window.location.origin}/franchize/${slug}/community`;
+    const url = `${window.location.origin}/franchize/${slug}/community#post-${post.id}`;
     const text = `${authorName} на стене экипажа: ${buildWallPostPreview(post.body || "пост с фото", 120)}`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
     try {
@@ -1911,10 +1976,11 @@ function PostCard(props: PostCardProps) {
       // plain web — fall through to window.open
     }
     window.open(shareUrl, "_blank", "noopener,noreferrer");
-  }, [slug, post.body, authorName]);
+  }, [slug, post.id, post.body, authorName]);
 
   return (
     <article
+      id={`post-${post.id}`}
       className={`rounded-2xl border bg-[var(--community-card-faint)] p-4 transition md:p-5 ${
         post.isPinned ? "border-[var(--community-accent)]/50" : "border-[var(--community-border)]"
       }`}
