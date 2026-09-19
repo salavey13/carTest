@@ -163,22 +163,22 @@ export async function assertWallRate(
   return { ok: true, posts, comments };
 }
 
-/** Like toggles are writes too — cap bursts from any verified identity.
- *  Note: the count is of SURVIVING rows — unlike removes the row, so
+/** Reaction toggles are writes too — cap bursts from any verified identity.
+ *  Note: the count is of SURVIVING rows — un-reacting removes the row, so
  *  toggle-churn on a single post does not accrue toward the cap (the cap
- *  limits NET-NEW likes across posts). Deliberate: likes are idempotent
- *  applause, not an enumerable write vector. */
-export const WALL_RATE_LIKES_PER_HOUR = 120;
+ *  limits NET-NEW reactions across posts). Deliberate: reactions are
+ *  idempotent applause, not an enumerable write vector. */
+export const WALL_RATE_REACTIONS_PER_HOUR = 120;
 
-export async function assertLikeRate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function assertReactionRate(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count } = await supabaseAdmin
-    .from("crew_post_likes")
+    .from("crew_post_reactions")
     .select("post_id", { count: "exact", head: true })
     .eq("user_id", userId)
     .gte("created_at", since);
-  if ((count ?? 0) >= WALL_RATE_LIKES_PER_HOUR) {
-    return { ok: false, error: "Слишком много лайков подряд — передохни минутку." };
+  if ((count ?? 0) >= WALL_RATE_REACTIONS_PER_HOUR) {
+    return { ok: false, error: "Слишком много реакций подряд — передохни минутку." };
   }
   return { ok: true };
 }

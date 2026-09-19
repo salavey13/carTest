@@ -288,9 +288,13 @@ export interface WallPostView {
   authorScope: "crew" | "rider";
   isPinned: boolean;
   createdAt: string;
+  /** TOTAL reactions across all emoji (legacy name kept from the like era). */
   likeCount: number;
   commentCount: number;
-  likedByViewer: boolean;
+  /** Per-emoji counts — only keys with count > 0 are present. */
+  reactionCounts: Record<string, number>;
+  /** The viewer's own reaction emoji, or null (VK: re-tap removes). */
+  viewerReaction: string | null;
   author: WallAuthorView;
   comments: WallCommentView[];
   rental: WallRentalRef | null;
@@ -423,6 +427,68 @@ export function sanitizeWallBikeIds(raw: unknown): string[] | null {
     if (!out.includes(item)) out.push(item);
   }
   return out;
+}
+
+// ── Emoji reactions (wall v3, VK-style) ──────────────────────────────────────
+
+/**
+ * The reaction bar set, in display order. ❤️ first = the default quick-tap
+ * reaction (VK behaviour). MUST stay in sync with the CHECK constraint on
+ * crew_post_reactions.emoji (migration 20260920010000).
+ */
+export const WALL_REACTIONS = ["❤️", "🔥", "😂", "😮", "👍", "🏍"] as const;
+export type WallReaction = (typeof WALL_REACTIONS)[number];
+
+export function isValidWallReaction(value: unknown): value is WallReaction {
+  return typeof value === "string" && (WALL_REACTIONS as readonly string[]).includes(value);
+}
+
+/**
+ * Server-side hygiene for the jsonb counter blob: keep only known emoji keys
+ * with positive integer counts (anything else from the DB is dropped, not
+ * trusted).
+ */
+export function sanitizeReactionCounts(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isValidWallReaction(key)) continue;
+    if (typeof value === "number" && Number.isInteger(value) && value > 0) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Pure optimistic math behind a reaction tap (client mirrors the server
+ * trigger so the UI updates instantly and can roll back on error):
+ *  - previous reaction removed from counts/total;
+ *  - tapping the SAME emoji removes it (VK: re-tap = undo);
+ *  - tapping a NEW one switches the reaction (no double count).
+ */
+export function toggleReactionOptimistic(
+  counts: Record<string, number>,
+  total: number,
+  prev: string | null,
+  emoji: string,
+): { counts: Record<string, number>; total: number; next: string | null } {
+  const map: Record<string, number> = { ...counts };
+  let t = total;
+  if (prev && prev !== emoji) {
+    const dec = (map[prev] ?? 1) - 1;
+    if (dec > 0) map[prev] = dec;
+    else delete map[prev];
+    t -= 1;
+  }
+  if (prev === emoji) {
+    const dec = (map[prev] ?? 1) - 1;
+    if (dec > 0) map[prev] = dec;
+    else delete map[prev];
+    t -= 1;
+    return { counts: map, total: Math.max(0, t), next: null };
+  }
+  map[emoji] = (map[emoji] ?? 0) + 1;
+  t += 1;
+  return { counts: map, total: Math.max(0, t), next: emoji };
 }
 
 // ── Lightbox zoom math (pure, unit-tested) ───────────────────────────────────

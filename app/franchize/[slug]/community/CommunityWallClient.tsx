@@ -48,11 +48,13 @@ import {
   pluralRu,
   computeZoomOffset,
   zoomAtPoint,
+  toggleReactionOptimistic,
   WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
   WALL_COMMENTS_FETCH_LIMIT,
   WALL_PHOTOS_MAX,
   WALL_POST_MAX_LEN,
+  WALL_REACTIONS,
   type RentalStatsSnapshot,
   type WallBikeRefView,
   type WallPhotoView,
@@ -70,7 +72,7 @@ import {
   hideCommunityCommentAction,
   hideCommunityPostAction,
   setPostPinnedAction,
-  togglePostLikeAction,
+  togglePostReactionAction,
   type WallBikeOption,
 } from "@/app/franchize/server-actions/community-wall";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
@@ -349,29 +351,39 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
 
   // ── likes / comments / moderation ──────────────────────────────────────────
 
-  const toggleLike = useCallback(async (post: WallPostView) => {
+  /** VK semantics: quick tap = ❤️ (or your current emoji toggles off); the
+   *  picker (long-press / hover) sets any of the six. Optimistic first, DB
+   *  truth after the round trip, rollback + notice on failure. */
+  const toggleReaction = useCallback(async (post: WallPostView, emoji: string) => {
     if (pendingLikes.has(post.id)) return;
     if (!viewer?.userId) {
-      setWallNotice("Лайки доступны из Telegram-бота экипажа.");
+      setWallNotice("Реакции доступны из Telegram-бота экипажа.");
       return;
     }
     setPendingLikes((prev) => new Set(prev).add(post.id));
-    // optimistic flip
+    const prevSnapshot = { counts: post.reactionCounts, total: post.likeCount, mine: post.viewerReaction };
+    const optimistic = toggleReactionOptimistic(post.reactionCounts, post.likeCount, post.viewerReaction, emoji);
     setPosts((prev) =>
       prev.map((p) =>
         p.id === post.id
-          ? { ...p, likedByViewer: !p.likedByViewer, likeCount: p.likeCount + (p.likedByViewer ? -1 : 1) }
+          ? { ...p, reactionCounts: optimistic.counts, likeCount: optimistic.total, viewerReaction: optimistic.next }
           : p,
       ),
     );
-    const res = await togglePostLikeAction({ postId: post.id, initData: withInitData() });
+    const res = await togglePostReactionAction({ postId: post.id, emoji, initData: withInitData() });
     if (res.ok) {
-      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, likedByViewer: res.liked, likeCount: res.likeCount } : p)));
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === post.id
+            ? { ...p, viewerReaction: res.reaction, likeCount: res.likeCount, reactionCounts: res.reactionCounts }
+            : p,
+        ),
+      );
     } else {
       setPosts((prev) =>
         prev.map((p) =>
           p.id === post.id
-            ? { ...p, likedByViewer: post.likedByViewer, likeCount: post.likeCount }
+            ? { ...p, reactionCounts: prevSnapshot.counts, likeCount: prevSnapshot.total, viewerReaction: prevSnapshot.mine }
             : p,
         ),
       );
@@ -796,7 +808,7 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                 draft={commentDrafts[post.id] ?? ""}
                 sendingComment={!!sendingCommentFor[post.id]}
                 likePending={pendingLikes.has(post.id)}
-                onToggleLike={() => void toggleLike(post)}
+                onToggleReaction={(emoji) => void toggleReaction(post, emoji)}
                 onToggleComments={() => void toggleComments(post)}
                 onTogglePin={() => void togglePin(post)}
                 onDraftChange={(v) => setCommentDrafts((prev) => ({ ...prev, [post.id]: v }))}
@@ -1333,6 +1345,142 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
   );
 }
 
+// ── Reaction bar (VK-style) ──────────────────────────────────────────────────
+
+const REACTION_PICKER_HOVER_MS = 250;
+const REACTION_LONG_PRESS_MS = 350;
+
+/**
+ * VK-style reaction control: quick tap toggles the viewer's current reaction
+ * (default ❤️, re-tap removes); hover (desktop) or long-press (mobile, with
+ * a haptic tick) opens the full emoji picker with per-emoji counts.
+ */
+function ReactionBar({
+  post,
+  pending,
+  disabled,
+  onToggle,
+}: {
+  post: WallPostView;
+  pending: boolean;
+  disabled: boolean;
+  onToggle: (emoji: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const longPressFired = useRef(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }, []);
+  useEffect(() => clearTimers, [clearTimers]);
+
+  const openPicker = () => {
+    longPressFired.current = true;
+    setPickerOpen(true);
+    try {
+      navigator.vibrate?.(10);
+    } catch {
+      // web browsers without vibration API — the picker still opens
+    }
+  };
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => {
+        if (disabled || pending) return;
+        if (hoverTimer.current) clearTimeout(hoverTimer.current);
+        hoverTimer.current = setTimeout(() => setPickerOpen(true), REACTION_PICKER_HOVER_MS);
+      }}
+      onMouseLeave={() => {
+        if (hoverTimer.current) clearTimeout(hoverTimer.current);
+        setPickerOpen(false);
+        longPressFired.current = false;
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          if (longPressFired.current) {
+            longPressFired.current = false;
+            return;
+          }
+          if (!disabled && !pending) onToggle(post.viewerReaction ?? WALL_REACTIONS[0]);
+        }}
+        onPointerDown={() => {
+          if (disabled || pending) return;
+          clearTimers();
+          pressTimer.current = setTimeout(openPicker, REACTION_LONG_PRESS_MS);
+        }}
+        onPointerUp={clearTimers}
+        onPointerCancel={clearTimers}
+        onContextMenu={(e) => e.preventDefault()}
+        disabled={pending}
+        aria-pressed={post.viewerReaction !== null}
+        aria-label="Реакция"
+        className={`flex select-none items-center gap-1.5 text-sm transition disabled:opacity-60 ${
+          post.viewerReaction
+            ? "text-[var(--community-accent)]"
+            : "text-[var(--community-muted)] hover:text-[var(--community-accent)]"
+        }`}
+      >
+        {post.viewerReaction ? (
+          <span className="inline-block text-base leading-none transition-transform duration-150 scale-110">
+            {post.viewerReaction}
+          </span>
+        ) : (
+          <Heart className="h-4 w-4" />
+        )}
+        {post.likeCount > 0 && <span>{post.likeCount}</span>}
+      </button>
+
+      {pickerOpen && (
+        <>
+          {/* click-away catcher (also closes on scroll-taps elsewhere) */}
+          <div className="fixed inset-0 z-30" onClick={() => setPickerOpen(false)} aria-hidden="true" />
+          <div
+            role="menu"
+            aria-label="Выбрать реакцию"
+            className="absolute bottom-full left-0 z-40 mb-2 flex items-end gap-0.5 rounded-full border border-[var(--community-border)] bg-[var(--community-card)] p-1 shadow-xl"
+          >
+            {WALL_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  setPickerOpen(false);
+                  longPressFired.current = false;
+                  if (!disabled && !pending) onToggle(emoji);
+                }}
+                aria-label={`Реакция ${emoji}`}
+                className={`flex flex-col items-center rounded-full px-1.5 py-1 text-lg leading-none transition hover:scale-125 ${
+                  post.viewerReaction === emoji ? "bg-[var(--community-accent)]/15" : ""
+                }`}
+              >
+                <span>{emoji}</span>
+                {(post.reactionCounts[emoji] ?? 0) > 0 && (
+                  <span className="text-[9px] font-semibold leading-none text-[var(--community-muted)]">
+                    {post.reactionCounts[emoji]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 interface PostCardProps {
   post: WallPostView;
   slug: string;
@@ -1343,7 +1491,7 @@ interface PostCardProps {
   draft: string;
   sendingComment: boolean;
   likePending: boolean;
-  onToggleLike: () => void;
+  onToggleReaction: (emoji: string) => void;
   onToggleComments: () => void;
   onTogglePin: () => void;
   onDraftChange: (v: string) => void;
@@ -1466,19 +1614,12 @@ function PostCard(props: PostCardProps) {
 
       {/* actions row */}
       <div className="mt-3 flex items-center gap-4">
-        <button
-          type="button"
-          onClick={props.onToggleLike}
-          disabled={likePending}
-          aria-pressed={post.likedByViewer}
-          aria-label="Нравится"
-          className={`flex items-center gap-1.5 text-sm transition disabled:opacity-60 ${
-            post.likedByViewer ? "text-red-400" : "text-[var(--community-muted)] hover:text-red-400"
-          }`}
-        >
-          <Heart className={`h-4 w-4 ${post.likedByViewer ? "fill-current" : ""}`} />
-          {post.likeCount > 0 && <span>{post.likeCount}</span>}
-        </button>
+        <ReactionBar
+          post={post}
+          pending={likePending}
+          disabled={!viewer?.userId}
+          onToggle={props.onToggleReaction}
+        />
         <button
           type="button"
           onClick={props.onToggleComments}

@@ -293,10 +293,14 @@ describe("community-wall server actions (v2)", () => {
     expect(src).toContain(".limit(60)");
   });
 
-  it("like toggles are rate-braked too (writes are writes)", () => {
-    expect(src).toContain("assertLikeRate(actor.userId)");
+  it("reaction toggles are rate-braked too (writes are writes)", () => {
+    expect(src).toContain("assertReactionRate(actor.userId)");
     const access = read(`${APP}/lib/wall-access.ts`);
-    expect(access).toContain("WALL_RATE_LIKES_PER_HOUR = 120");
+    expect(access).toContain("WALL_RATE_REACTIONS_PER_HOUR = 120");
+    // legacy likes table is retired — nothing may read it anymore
+    expect(src).not.toContain('.from("crew_post_likes")');
+    expect(src).toContain('togglePostReactionAction');
+    expect(src).toContain("isValidWallReaction(parsed.data.emoji)");
   });
 
   it("cursor is validated (parseable date) before it reaches PostgREST", () => {

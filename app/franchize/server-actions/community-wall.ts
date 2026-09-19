@@ -35,8 +35,10 @@ import {
   type WallRentalRef,
   type WallViewerInfo,
   RIDE_EARNING_STATUSES,
+  sanitizeReactionCounts,
   sanitizeWallPhotoInputs,
   sanitizeWallBikeIds,
+  isValidWallReaction,
   wallPhotoPublicUrl,
   WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
@@ -48,8 +50,8 @@ import {
   WALLPHOTO_BUCKET,
 } from "@/app/franchize/lib/community-wall";
 import {
-  assertLikeRate,
   assertWallRate,
+  assertReactionRate,
   canWriteOnWall,
   ensureUserProfile,
   getCrewBySlug,
@@ -76,6 +78,7 @@ type DbPostRow = {
   rental_id: string | null;
   like_count: number;
   comment_count: number;
+  reaction_counts: unknown;
   is_pinned: boolean;
   created_at: string;
 };
@@ -350,15 +353,18 @@ export async function getCommunityWallAction(input: {
     bikesByPost.set(row.post_id, list);
   }
 
-  // 5. Viewer likes for the page.
-  const likedSet = new Set<string>();
+  // 5. The viewer's own reactions for the page (counts live on crew_posts,
+  // maintained by the DB trigger — never recomputed here).
+  const viewerReactions = new Map<string, string>();
   if (actor && postIds.length > 0) {
-    const { data: likeRows } = await supabaseAdmin
-      .from("crew_post_likes")
-      .select("post_id")
+    const { data: reactionRows } = await supabaseAdmin
+      .from("crew_post_reactions")
+      .select("post_id, emoji")
       .eq("user_id", actor.userId)
       .in("post_id", postIds);
-    for (const row of (likeRows ?? []) as { post_id: string }[]) likedSet.add(row.post_id);
+    for (const row of (reactionRows ?? []) as { post_id: string; emoji: string }[]) {
+      viewerReactions.set(row.post_id, row.emoji);
+    }
   }
 
   const posts: WallPostView[] = pageRows.map((p) => ({
@@ -371,7 +377,8 @@ export async function getCommunityWallAction(input: {
     createdAt: p.created_at,
     likeCount: p.like_count ?? 0,
     commentCount: p.comment_count ?? 0,
-    likedByViewer: likedSet.has(p.id),
+    reactionCounts: sanitizeReactionCounts(p.reaction_counts),
+    viewerReaction: viewerReactions.get(p.id) ?? null,
     author: authors.get(p.author_id) ?? { userId: p.author_id, username: null, fullName: null, avatarUrl: null },
     comments: commentsByPost.get(p.id) ?? [],
     rental: p.rental_id ? rentalRefs.get(p.rental_id) ?? null : null,
@@ -637,7 +644,8 @@ export async function createCommunityPostAction(input: {
     createdAt: inserted.created_at,
     likeCount: 0,
     commentCount: 0,
-    likedByViewer: false,
+    reactionCounts: {},
+    viewerReaction: null,
     author: me ? toAuthorView(me as DbUserRow) : { userId: actor.userId, username: actor.tg?.username ?? null, fullName: actor.tg?.fullName ?? null, avatarUrl: actor.tg?.photoUrl ?? null },
     comments: [],
     rental: rentalRef,
@@ -685,30 +693,39 @@ export async function createCommunityPostAction(input: {
   return { ok: true, post };
 }
 
-// ── TOGGLE LIKE ──────────────────────────────────────────────────────────────
+// ── TOGGLE REACTION (VK-style emoji, supersedes the plain like) ─────────────
 
-const ToggleLikeInput = z.object({
+const ToggleReactionInput = z.object({
   postId: z.string().trim().uuid(),
+  emoji: z.string().trim().min(1).max(8),
   initData: z.string().trim().optional(),
 });
 
-export type TogglePostLikeResult =
-  | { ok: true; liked: boolean; likeCount: number }
+export type TogglePostReactionResult =
+  | { ok: true; reaction: string | null; likeCount: number; reactionCounts: Record<string, number> }
   | { ok: false; error: string };
 
-export async function togglePostLikeAction(input: {
+/**
+ * VK semantics: tap = set my reaction (❤️ default), tap again = remove,
+ * tap another emoji = switch. Counters come back from the DB (trigger-fed),
+ * so the client never guesses the aggregate after a round trip.
+ */
+export async function togglePostReactionAction(input: {
   postId: string;
+  emoji: string;
   initData?: string;
-}): Promise<TogglePostLikeResult> {
-  const parsed = ToggleLikeInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Некорректный пост." };
+}): Promise<TogglePostReactionResult> {
+  const parsed = ToggleReactionInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректная реакция." };
   const { postId, initData } = parsed.data;
+  if (!isValidWallReaction(parsed.data.emoji)) return { ok: false, error: "Такой реакции нет." };
+  const emoji = parsed.data.emoji;
 
   const actor = await resolveWallActor(initData);
-  if (!actor) return { ok: false, error: "Лайки доступны из Telegram-бота экипажа." };
+  if (!actor) return { ok: false, error: "Реакции доступны из Telegram-бота экипажа." };
 
-  const likeRate = await assertLikeRate(actor.userId);
-  if (!likeRate.ok) return { ok: false, error: likeRate.error };
+  const reactionRate = await assertReactionRate(actor.userId);
+  if (!reactionRate.ok) return { ok: false, error: reactionRate.error };
 
   const { data: post } = await supabaseAdmin
     .from("crew_posts")
@@ -719,44 +736,63 @@ export async function togglePostLikeAction(input: {
   if (!postRow || postRow.is_hidden) return { ok: false, error: "Пост недоступен." };
 
   const { data: existing } = await supabaseAdmin
-    .from("crew_post_likes")
-    .select("post_id")
+    .from("crew_post_reactions")
+    .select("emoji")
     .eq("post_id", postId)
     .eq("user_id", actor.userId)
     .maybeSingle();
+  const existingEmoji = (existing as { emoji: string } | null)?.emoji ?? null;
 
-  if (existing) {
+  let finalEmoji: string | null = emoji;
+  if (existingEmoji === emoji) {
+    // Re-tap the same emoji → remove (VK undo).
     const { error } = await supabaseAdmin
-      .from("crew_post_likes")
+      .from("crew_post_reactions")
       .delete()
       .eq("post_id", postId)
       .eq("user_id", actor.userId);
     if (error) {
-      logger.error("[community-wall] unlike failed:", error.message);
-      return { ok: false, error: "Не получилось убрать лайк." };
+      logger.error("[community-wall] reaction remove failed:", error.message);
+      return { ok: false, error: "Не получилось убрать реакцию." };
+    }
+    finalEmoji = null;
+  } else if (existingEmoji) {
+    // Switch emoji: same PK, update the row (trigger moves the counts).
+    const { error } = await supabaseAdmin
+      .from("crew_post_reactions")
+      .update({ emoji })
+      .eq("post_id", postId)
+      .eq("user_id", actor.userId);
+    if (error) {
+      logger.error("[community-wall] reaction switch failed:", error.message);
+      return { ok: false, error: "Не получилось переключить реакцию." };
     }
   } else {
     const { error } = await supabaseAdmin
-      .from("crew_post_likes")
-      .insert({ post_id: postId, user_id: actor.userId });
+      .from("crew_post_reactions")
+      .insert({ post_id: postId, user_id: actor.userId, emoji });
     if (error) {
-      // Unique PK race (double tap) → treat as already liked.
-      if (error.code === "23505") return { ok: true, liked: true, likeCount: await readLikeCount(postId) };
-      logger.error("[community-wall] like failed:", error.message);
-      return { ok: false, error: "Не получилось поставить лайк." };
+      // PK race (double tap on a post I hadn't reacted to yet): the row now
+      // exists — fall through and read the fresh aggregate instead of lying.
+      if (error.code !== "23505") {
+        logger.error("[community-wall] reaction insert failed:", error.message);
+        return { ok: false, error: "Не получилось поставить реакцию." };
+      }
+      finalEmoji = emoji;
     }
   }
 
-  return { ok: true, liked: !existing, likeCount: await readLikeCount(postId) };
-}
-
-async function readLikeCount(postId: string): Promise<number> {
-  const { data } = await supabaseAdmin
+  const { data: fresh } = await supabaseAdmin
     .from("crew_posts")
-    .select("like_count")
+    .select("like_count, reaction_counts")
     .eq("id", postId)
     .maybeSingle();
-  return (data as { like_count: number | null } | null)?.like_count ?? 0;
+  return {
+    ok: true,
+    reaction: finalEmoji,
+    likeCount: (fresh as { like_count: number | null } | null)?.like_count ?? 0,
+    reactionCounts: sanitizeReactionCounts((fresh as { reaction_counts: unknown } | null)?.reaction_counts),
+  };
 }
 
 // ── ADD COMMENT ──────────────────────────────────────────────────────────────
