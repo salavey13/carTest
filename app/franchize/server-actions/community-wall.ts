@@ -158,6 +158,50 @@ function toAuthorView(row: DbUserRow): WallAuthorView {
   };
 }
 
+/** Display name for a reply prefix («Имя ответил(а)…»). */
+function authorDisplayName(a: WallAuthorView | undefined): string {
+  return a?.fullName || a?.username || "Райдер";
+}
+
+/**
+ * Batched resolver for comment reply prefixes: collects (commentId →
+ * replyToId) pairs, fetches the target rows in ONE bounded query, resolves
+ * names through the already-loaded authors map (plus one extra users fetch
+ * for targets whose author is not on the page). Root comments stay null.
+ */
+function createReplyEnricher() {
+  const pairs = new Map<string, string>(); // commentId → replyToId
+  return {
+    add(commentId: string, replyToId: string) {
+      pairs.set(commentId, replyToId);
+    },
+    async resolve(authors: Map<string, WallAuthorView>, patch: (commentId: string, replyTo: { commentId: string; authorName: string } | null) => void) {
+      if (pairs.size === 0) return;
+      const targetIds = [...new Set(pairs.values())];
+      const { data: targets } = await supabaseAdmin
+        .from("crew_post_comments")
+        .select("id, author_id")
+        .in("id", targetIds);
+      const targetAuthor = new Map<string, string>();
+      for (const t of (targets ?? []) as { id: string; author_id: string }[]) {
+        targetAuthor.set(t.id, t.author_id);
+      }
+      const missingAuthors = [...new Set([...targetAuthor.values()].filter((id) => !authors.has(id)))];
+      if (missingAuthors.length > 0) {
+        const { data: extra } = await supabaseAdmin
+          .from("users")
+          .select("user_id, username, full_name, avatar_url")
+          .in("user_id", missingAuthors);
+        for (const row of (extra ?? []) as DbUserRow[]) authors.set(row.user_id, toAuthorView(row));
+      }
+      for (const [commentId, replyToId] of pairs) {
+        const authorId = targetAuthor.get(replyToId);
+        patch(commentId, authorId ? { commentId: replyToId, authorName: authorDisplayName(authors.get(authorId)) } : null);
+      }
+    },
+  };
+}
+
 // ── GET FEED ─────────────────────────────────────────────────────────────────
 
 const FeedInput = z.object({
@@ -244,7 +288,7 @@ export async function getCommunityWallAction(input: {
   // — the post's comment_count is authoritative, so «Показать все» never lies.
   const { data: commentRows } = await supabaseAdmin
     .from("crew_post_comments")
-    .select("id, post_id, author_id, body, created_at")
+    .select("id, post_id, author_id, body, created_at, reply_to_id")
     .in("post_id", postIds)
     .eq("is_hidden", false)
     .order("created_at", { ascending: false })
@@ -264,12 +308,14 @@ export async function getCommunityWallAction(input: {
   }
 
   const commentsByPost = new Map<string, WallCommentView[]>();
+  const replyEnricher = createReplyEnricher();
   for (const row of (commentRows ?? []) as {
     id: string;
     post_id: string;
     author_id: string;
     body: string;
     created_at: string;
+    reply_to_id: string | null;
   }[]) {
     const list = commentsByPost.get(row.post_id) ?? [];
     // Rows arrive newest-first; keep only the first WALL_COMMENT_PREVIEW per post.
@@ -278,12 +324,23 @@ export async function getCommunityWallAction(input: {
         id: row.id,
         postId: row.post_id,
         author: authors.get(row.author_id) ?? { userId: row.author_id, username: null, fullName: null, avatarUrl: null },
+        replyTo: null,
         body: row.body,
         createdAt: row.created_at,
       });
+      if (row.reply_to_id) replyEnricher.add(row.id, row.reply_to_id);
     }
     commentsByPost.set(row.post_id, list);
   }
+  await replyEnricher.resolve(authors, (commentId, replyTo) => {
+    for (const list of commentsByPost.values()) {
+      const c = list.find((x) => x.id === commentId);
+      if (c) {
+        c.replyTo = replyTo;
+        return;
+      }
+    }
+  });
   // Flip each preview back to chronological order (oldest → newest).
   for (const list of commentsByPost.values()) list.reverse();
 
@@ -755,6 +812,9 @@ export async function togglePostReactionAction(input: {
 const AddCommentInput = z.object({
   postId: z.string().trim().uuid(),
   body: z.string().trim().min(1).max(WALL_COMMENT_MAX_LEN),
+  /** Optional reply target (VK-style, ONE level): replies-to-replies are
+   *  normalized to the root comment server-side. */
+  replyTo: z.string().trim().uuid().optional(),
   initData: z.string().trim().optional(),
 });
 
@@ -765,12 +825,14 @@ export type AddPostCommentResult =
 export async function addPostCommentAction(input: {
   postId: string;
   body: string;
+  replyTo?: string;
   initData?: string;
 }): Promise<AddPostCommentResult> {
   const parsed = AddCommentInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Комментарий пустой или слишком длинный." };
   const { postId, initData } = parsed.data;
   const body = parsed.data.body.trim();
+  const replyTo = parsed.data.replyTo ?? null;
 
   const actor = await resolveWallActor(initData);
   if (!actor) {
@@ -784,6 +846,37 @@ export async function addPostCommentAction(input: {
     .maybeSingle();
   const postRow = post as { id: string; crew_id: string; is_hidden: boolean } | null;
   if (!postRow || postRow.is_hidden) return { ok: false, error: "Пост недоступен." };
+
+  // ── Reply target: same post, visible, normalized to ROOT (one level) ──
+  let verifiedReplyToId: string | null = null;
+  let replyToName: string | null = null;
+  if (replyTo) {
+    const { data: target } = await supabaseAdmin
+      .from("crew_post_comments")
+      .select("id, post_id, is_hidden, reply_to_id, author_id")
+      .eq("id", replyTo)
+      .maybeSingle();
+    const t = target as {
+      id: string;
+      post_id: string;
+      is_hidden: boolean;
+      reply_to_id: string | null;
+      author_id: string;
+    } | null;
+    if (!t || t.post_id !== postRow.id || t.is_hidden) {
+      return { ok: false, error: "Комментарий, на который отвечаешь, уже недоступен." };
+    }
+    // Flatten: a reply to a reply attaches to the ROOT comment instead —
+    // the wall's threads are one level deep, same as VK's render model.
+    verifiedReplyToId = t.reply_to_id ?? t.id;
+    const { data: nameRow } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name")
+      .eq("user_id", t.author_id)
+      .maybeSingle();
+    const nr = nameRow as { username: string | null; full_name: string | null } | null;
+    replyToName = nr?.full_name || nr?.username || "Райдер";
+  }
 
   // Same write scope + rate brake as posts (crew riders & staff only).
   const { data: crewRow } = await supabaseAdmin
@@ -801,7 +894,7 @@ export async function addPostCommentAction(input: {
 
   const { data: inserted, error } = await supabaseAdmin
     .from("crew_post_comments")
-    .insert({ post_id: postRow.id, crew_id: postRow.crew_id, author_id: actor.userId, body })
+    .insert({ post_id: postRow.id, crew_id: postRow.crew_id, author_id: actor.userId, body, reply_to_id: verifiedReplyToId })
     .select("id, created_at")
     .single();
   if (error || !inserted) {
@@ -821,6 +914,7 @@ export async function addPostCommentAction(input: {
     author: me
       ? toAuthorView(me as DbUserRow)
       : { userId: actor.userId, username: actor.tg?.username ?? null, fullName: actor.tg?.fullName ?? null, avatarUrl: actor.tg?.photoUrl ?? null },
+    replyTo: verifiedReplyToId ? { commentId: verifiedReplyToId, authorName: replyToName ?? "Райдер" } : null,
     body,
     createdAt: inserted.created_at,
   };
@@ -1037,7 +1131,7 @@ export async function getPostCommentsAction(input: {
 
   const { data: rows, error } = await supabaseAdmin
     .from("crew_post_comments")
-    .select("id, post_id, author_id, body, created_at")
+    .select("id, post_id, author_id, body, created_at, reply_to_id")
     .eq("post_id", postId)
     .eq("is_hidden", false)
     // Newest first + server-side reverse: the expansion always shows the
@@ -1066,16 +1160,29 @@ export async function getPostCommentsAction(input: {
     author_id: string;
     body: string;
     created_at: string;
+    reply_to_id: string | null;
   }[])
     .map((row) => ({
       id: row.id,
       postId: row.post_id,
       author: authors.get(row.author_id) ?? { userId: row.author_id, username: null, fullName: null, avatarUrl: null },
+      replyTo: null as WallCommentView["replyTo"],
       body: row.body,
       createdAt: row.created_at,
     }))
     // Flip newest-first → chronological for rendering.
     .reverse();
+
+  // Reply prefixes (VK «Имя ответил(а)…»): one bounded fetch for targets.
+  const enricher = createReplyEnricher();
+  for (const c of ((rows ?? []) as { id: string; reply_to_id: string | null }[])) {
+    if (c.reply_to_id) enricher.add(c.id, c.reply_to_id);
+  }
+  await enricher.resolve(authors, (commentId, replyTo) => {
+    const c = comments.find((x) => x.id === commentId);
+    if (c) c.replyTo = replyTo;
+  });
+
   return { ok: true, comments };
 }
 

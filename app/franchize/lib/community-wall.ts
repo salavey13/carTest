@@ -254,7 +254,8 @@ export interface WallCommentView {
   id: string;
   postId: string;
   author: WallAuthorView;
-  /** 'crew' | 'rider' — author_scope copied from nothing: derived at render from author badge needs. */
+  /** Set when this comment is a reply to another comment (VK-style, one level). */
+  replyTo: { commentId: string; authorName: string } | null;
   body: string;
   createdAt: string;
 }
@@ -427,6 +428,67 @@ export function sanitizeWallBikeIds(raw: unknown): string[] | null {
     if (!out.includes(item)) out.push(item);
   }
   return out;
+}
+
+// ── Rich text tokens: @mentions, #hashtags, links (pure, unit-tested) ────────
+
+export type WallTextToken =
+  | { type: "text"; value: string }
+  | { type: "mention"; value: string }
+  | { type: "hashtag"; value: string }
+  | { type: "url"; value: string };
+
+/** Telegram usernames: 5–32 chars of [A-Za-z0-9_]; we accept ≥4 to be liberal. */
+const MENTION_RE = /@[A-Za-z0-9_]{4,32}/g;
+/** Latin + Cyrillic hashtags, 2–40 chars after #. */
+const HASHTAG_RE = /#[\p{L}\p{N}_]{2,40}/gu;
+const URL_RE = /https?:\/\/[^\s<>"']+/g;
+
+/**
+ * Split wall text (post bodies, comments) into safe render tokens.
+ * Deliberately render-ONLY: mentions never auto-resolve to users (no
+ * enumeration), hashtags become clickable filters in the UI, URLs render as
+ * plain anchor tags. Longest-match wins at the same position (a URL may
+ * contain a hashtag — the URL token swallows it).
+ */
+export function parseWallText(text: string): WallTextToken[] {
+  if (!text) return [];
+  const marks: { start: number; end: number; token: WallTextToken }[] = [];
+
+  for (const m of text.matchAll(URL_RE)) {
+    const start = m.index ?? 0;
+    marks.push({ start, end: start + m[0].length, token: { type: "url", value: m[0] } });
+  }
+  const overlaps = (s: number, e: number) => marks.some((k) => s < k.end && e > k.start);
+  for (const m of text.matchAll(MENTION_RE)) {
+    const start = m.index ?? 0;
+    if (!overlaps(start, start + m[0].length)) {
+      marks.push({ start, end: start + m[0].length, token: { type: "mention", value: m[0] } });
+    }
+  }
+  for (const m of text.matchAll(HASHTAG_RE)) {
+    const start = m.index ?? 0;
+    if (!overlaps(start, start + m[0].length)) {
+      marks.push({ start, end: start + m[0].length, token: { type: "hashtag", value: m[0] } });
+    }
+  }
+
+  marks.sort((a, b) => a.start - b.start || b.end - a.end);
+  const out: WallTextToken[] = [];
+  let pos = 0;
+  for (const mark of marks) {
+    if (mark.start < pos) continue; // defensive: no overlap should survive the filter, but stay safe
+    if (mark.start > pos) out.push({ type: "text", value: text.slice(pos, mark.start) });
+    out.push(mark.token);
+    pos = mark.end;
+  }
+  if (pos < text.length) out.push({ type: "text", value: text.slice(pos) });
+  return out;
+}
+
+/** Tag body for iteration-3 filtering (lowercased, no #). */
+export function hashtagKey(hashtag: string): string {
+  return hashtag.slice(1).toLowerCase();
 }
 
 // ── Emoji reactions (wall v3, VK-style) ──────────────────────────────────────

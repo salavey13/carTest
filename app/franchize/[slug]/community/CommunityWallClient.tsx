@@ -29,6 +29,7 @@ import {
   Bike,
   ChevronLeft,
   ChevronRight,
+  CornerDownRight,
   EyeOff,
   Heart,
   ImagePlus,
@@ -45,6 +46,7 @@ import {
   formatDateTimeRu,
   formatRelativeTimeRu,
   formatRub,
+  parseWallText,
   pluralRu,
   computeZoomOffset,
   zoomAtPoint,
@@ -138,6 +140,8 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
   // interactions
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  /** VK-style reply targets keyed by postId («Ответить {name}» chip above the input). */
+  const [replyTargets, setReplyTargets] = useState<Record<string, { commentId: string; authorName: string } | null>>({});
   const [pendingLikes, setPendingLikes] = useState<Set<string>>(new Set());
   const [sendingCommentFor, setSendingCommentFor] = useState<Record<string, boolean>>({});
   const [loadingCommentsFor, setLoadingCommentsFor] = useState<Record<string, boolean>>({});
@@ -427,8 +431,14 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
       setWallNotice("Комментировать можно из Telegram-бота экипажа.");
       return;
     }
+    const replyTarget = replyTargets[post.id] ?? null;
     setSendingCommentFor((prev) => ({ ...prev, [post.id]: true }));
-    const res = await addPostCommentAction({ postId: post.id, body: draft, initData: withInitData() });
+    const res = await addPostCommentAction({
+      postId: post.id,
+      body: draft,
+      replyTo: replyTarget?.commentId,
+      initData: withInitData(),
+    });
     if (res.ok) {
       setPosts((prev) =>
         prev.map((p) =>
@@ -436,12 +446,13 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
         ),
       );
       setCommentDrafts((prev) => ({ ...prev, [post.id]: "" }));
+      setReplyTargets((prev) => ({ ...prev, [post.id]: null }));
       setExpanded((prev) => new Set(prev).add(post.id));
     } else {
       setWallNotice(res.error);
     }
     setSendingCommentFor((prev) => ({ ...prev, [post.id]: false }));
-  }, [commentDrafts, sendingCommentFor, viewer, withInitData]);
+  }, [commentDrafts, replyTargets, sendingCommentFor, viewer, withInitData]);
 
   const moderatePost = useCallback(async (post: WallPostView, hide: boolean) => {
     const res = await hideCommunityPostAction({ postId: post.id, hide, initData: withInitData() });
@@ -808,6 +819,11 @@ export function CommunityWallClient({ slug, crewName, botUsername }: CommunityWa
                 draft={commentDrafts[post.id] ?? ""}
                 sendingComment={!!sendingCommentFor[post.id]}
                 likePending={pendingLikes.has(post.id)}
+                replyTarget={replyTargets[post.id] ?? null}
+                onStartReply={(commentId, authorName) =>
+                  setReplyTargets((prev) => ({ ...prev, [post.id]: { commentId, authorName } }))
+                }
+                onCancelReply={() => setReplyTargets((prev) => ({ ...prev, [post.id]: null }))}
                 onToggleReaction={(emoji) => void toggleReaction(post, emoji)}
                 onToggleComments={() => void toggleComments(post)}
                 onTogglePin={() => void togglePin(post)}
@@ -1576,6 +1592,49 @@ function ReactionBar({
   );
 }
 
+/**
+ * Rich wall text: @mentions highlighted, #hashtags accent-colored (clickable
+ * when the parent passes a filter handler), URLs open safely in a new tab.
+ * Rendering is token-based (lib parseWallText) — no markdown, no HTML injection.
+ */
+function WallRichText({ text, className }: { text: string; className?: string }) {
+  const tokens = useMemo(() => parseWallText(text), [text]);
+  return (
+    <p className={className}>
+      {tokens.map((t, i) => {
+        if (t.type === "mention") {
+          return (
+            <span key={i} className="font-medium text-[var(--community-accent)]">
+              {t.value}
+            </span>
+          );
+        }
+        if (t.type === "hashtag") {
+          return (
+            <span key={i} className="font-medium text-[var(--community-accent)]">
+              {t.value}
+            </span>
+          );
+        }
+        if (t.type === "url") {
+          return (
+            <a
+              key={i}
+              href={t.value}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="break-all text-[var(--community-accent)] underline decoration-[var(--community-accent)]/40 underline-offset-2 hover:decoration-[var(--community-accent)]"
+            >
+              {t.value}
+            </a>
+          );
+        }
+        return <span key={i}>{t.value}</span>;
+      })}
+    </p>
+  );
+}
+
 interface PostCardProps {
   post: WallPostView;
   slug: string;
@@ -1586,6 +1645,9 @@ interface PostCardProps {
   draft: string;
   sendingComment: boolean;
   likePending: boolean;
+  replyTarget: { commentId: string; authorName: string } | null;
+  onStartReply: (commentId: string, authorName: string) => void;
+  onCancelReply: () => void;
   onToggleReaction: (emoji: string) => void;
   onToggleComments: () => void;
   onTogglePin: () => void;
@@ -1598,7 +1660,7 @@ interface PostCardProps {
 }
 
 function PostCard(props: PostCardProps) {
-  const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending } = props;
+  const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending, replyTarget } = props;
   const isOwnPost = !!viewer?.userId && viewer.userId === post.author.userId;
   const authorName = post.author.fullName || post.author.username || "Райдер";
 
@@ -1670,7 +1732,10 @@ function PostCard(props: PostCardProps) {
 
       {/* body */}
       {post.body && (
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--community-text)]">{post.body}</p>
+        <WallRichText
+          text={post.body}
+          className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--community-text)]"
+        />
       )}
 
       {/* photos */}
@@ -1753,7 +1818,7 @@ function PostCard(props: PostCardProps) {
               {post.comments.map((c) => {
                 const cName = c.author.fullName || c.author.username || "Райдер";
                 return (
-                  <li key={c.id} className="flex items-start gap-2.5">
+                  <li key={c.id} className="group flex items-start gap-2.5">
                     <Avatar url={c.author.avatarUrl} name={cName} size={28} />
                     <div className="min-w-0 flex-1 rounded-xl bg-[var(--community-base-soft)] px-3 py-2">
                       <div className="flex items-baseline justify-between gap-2">
@@ -1762,19 +1827,39 @@ function PostCard(props: PostCardProps) {
                           {formatDateTimeRu(c.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-[var(--community-text)]">{c.body}</p>
+                      {c.replyTo && (
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--community-muted)]">
+                          <CornerDownRight className="h-3 w-3" />
+                          <span className="font-medium">{c.replyTo.authorName}</span>
+                        </p>
+                      )}
+                      <WallRichText
+                        text={c.body}
+                        className="mt-0.5 whitespace-pre-wrap break-words text-sm text-[var(--community-text)]"
+                      />
                     </div>
-                    {canModerate && (
+                    <div className="flex shrink-0 items-start">
                       <button
                         type="button"
-                        onClick={() => props.onHideComment(c.id)}
-                        title="Скрыть комментарий"
-                        aria-label="Скрыть комментарий"
-                        className="rounded-full p-1 text-[var(--community-muted)] transition hover:text-red-400"
+                        onClick={() => props.onStartReply(c.id, cName)}
+                        title={`Ответить ${cName}`}
+                        aria-label={`Ответить ${cName}`}
+                        className="rounded-full p-1 text-[var(--community-muted)] opacity-0 transition hover:text-[var(--community-accent)] focus:opacity-100 group-hover:opacity-100 max-md:opacity-70"
                       >
-                        <EyeOff className="h-3.5 w-3.5" />
+                        <CornerDownRight className="h-3.5 w-3.5" />
                       </button>
-                    )}
+                      {canModerate && (
+                        <button
+                          type="button"
+                          onClick={() => props.onHideComment(c.id)}
+                          title="Скрыть комментарий"
+                          aria-label="Скрыть комментарий"
+                          className="rounded-full p-1 text-[var(--community-muted)] transition hover:text-red-400"
+                        >
+                          <EyeOff className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </li>
                 );
               })}
@@ -1792,28 +1877,46 @@ function PostCard(props: PostCardProps) {
               </button>
             )}
           {expanded && viewer?.userId && (
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                value={draft}
-                onChange={(e) => props.onDraftChange(e.target.value.slice(0, WALL_COMMENT_MAX_LEN))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    props.onSubmitComment();
-                  }
-                }}
-                placeholder="Твой комментарий…"
-                className="flex-1 rounded-full border border-[var(--community-border)] bg-transparent px-4 py-2 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)]"
-              />
-              <button
-                type="button"
-                onClick={props.onSubmitComment}
-                disabled={sendingComment || !draft.trim()}
-                className="rounded-full bg-[var(--community-accent)] p-2 text-[var(--community-accent-text)] transition hover:brightness-110 disabled:opacity-40"
-                title="Отправить"
-              >
-                {sendingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
+            <div className="mt-3">
+              {replyTarget && (
+                <div className="mb-1.5 flex items-center gap-2 text-xs text-[var(--community-muted)]">
+                  <CornerDownRight className="h-3 w-3" />
+                  <span>
+                    Ответ <span className="font-semibold text-[var(--community-text)]">{replyTarget.authorName}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={props.onCancelReply}
+                    aria-label="Отменить ответ"
+                    className="rounded-full p-0.5 transition hover:text-red-400"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  value={draft}
+                  onChange={(e) => props.onDraftChange(e.target.value.slice(0, WALL_COMMENT_MAX_LEN))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      props.onSubmitComment();
+                    }
+                  }}
+                  placeholder={replyTarget ? `Ответить ${replyTarget.authorName}…` : "Твой комментарий…"}
+                  className="flex-1 rounded-full border border-[var(--community-border)] bg-transparent px-4 py-2 text-sm text-[var(--community-text)] outline-none placeholder:text-[var(--community-muted)] focus:border-[var(--community-accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={props.onSubmitComment}
+                  disabled={sendingComment || !draft.trim()}
+                  className="rounded-full bg-[var(--community-accent)] p-2 text-[var(--community-accent-text)] transition hover:brightness-110 disabled:opacity-40"
+                  title="Отправить"
+                >
+                  {sendingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           )}
         </div>
