@@ -96,6 +96,7 @@
 | `post_{postId}_{slug}` | `/franchize/{slug}/community?post={id}` (FAST path) |
 | `wallp_{rentalId}_{slug}` | `/franchize/{slug}/community?compose={id}` — черновик «поделиться поездкой» из закрытой аренды (FAST path) |
 | `ride_{sessionId}_{slug}` | `/franchize/{slug}/community?ride={id}` — черновик «поделиться заездом» из map-riders (FAST path; id сессии — uuid; автор сессии или staff) |
+| `rider_{userId}_{slug}` | `/franchize/{slug}/rider/{userId}` — публичный профиль райдера (FAST path; profile v1). userId — числовой TG id (users.user_id); «Поделиться профилем» строит его через `riderProfileStartParam`. Страница сама проверяет связь райдера с экипажем (member/owner/rental/post) и уважает `hideProfile` |
 
 ---
 

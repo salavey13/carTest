@@ -17,6 +17,7 @@ import { riderDisplayName, formatRideDuration } from "@/lib/map-riders";
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
+import { useRouter } from "next/navigation";
 
 type RidersDrawerEmptyStateCopy = {
   history: string;
@@ -37,6 +38,14 @@ const DEFAULT_EMPTY_STATE_COPY: RidersDrawerEmptyStateCopy = {
 export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, externalOpen, onExternalOpenChange }: RidersDrawerProps) {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const { dbUser } = useAppContext();
+  // Rider profile v1: name → public profile. A <Link> inside the row <button>
+  // would be invalid HTML (interactive-in-interactive), so: span + router push
+  // + stopPropagation (tap the name, not the row).
+  const router = useRouter();
+  const openRiderProfile = (userId: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/franchize/${crewSlug}/rider/${userId}`);
+  };
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   const [meetupTitle, setMeetupTitle] = useState("Точка сбора");
@@ -164,7 +173,21 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
                     className="flex w-full items-center justify-between rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-left transition hover:border-amber-300/70"
                   >
                     <div>
-                      <div className="text-sm font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
+                      {/* Rider profile v1: tap the name → public profile. */}
+                      <span
+                        role="link"
+                        tabIndex={0}
+                        onClick={openRiderProfile(session.user_id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openRiderProfile(session.user_id)(e as unknown as React.MouseEvent);
+                          }
+                        }}
+                        className="cursor-pointer text-sm font-medium text-white underline-offset-2 hover:underline"
+                      >
+                        {riderDisplayName(session.users, session.user_id)}
+                      </span>
                       <div className="text-[11px] text-zinc-400">{session.ride_name || "Без названия"}</div>
                     </div>
                     <div className="text-right text-xs text-amber-100">
@@ -242,7 +265,20 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
                         className="flex w-full items-center justify-between text-left transition hover:text-emerald-100"
                       >
                         <div>
-                          <div className="text-sm font-medium text-white">{riderDisplayName(session.users, session.user_id)}</div>
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={openRiderProfile(session.user_id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                openRiderProfile(session.user_id)(e as unknown as React.MouseEvent);
+                              }
+                            }}
+                            className="cursor-pointer text-sm font-medium text-white underline-offset-2 hover:underline"
+                          >
+                            {riderDisplayName(session.users, session.user_id)}
+                          </span>
                           <div className="text-xs text-zinc-400">{session.ride_name || "Без названия"} • {formatRideDuration(0)}</div>
                         </div>
                         <div className="text-right text-sm text-emerald-200">

@@ -45,6 +45,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
   mapRidersAlerts: true,
   marketingDigest: false,
   reviewRequests: true,
+  wallActivity: true,
 };
 
 // FIX: De-biked notification option helper text.
@@ -52,6 +53,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
 const NOTIFICATION_OPTIONS: Array<{ key: keyof FranchizeNotificationPreferences; label: string; helper: string }> = [
   { key: "orderUpdates", label: "Статусы заказов", helper: "бронь, покупка, документы" },
   { key: "mapRidersAlerts", label: "MapRiders", helper: "заезды и встречи экипажа" },
+  { key: "wallActivity", label: "Стена экипажа", helper: "посты, реакции, комментарии и упоминания" },
   { key: "marketingDigest", label: "Редкие акции", helper: "промо и новости экипажа" },
   { key: "reviewRequests", label: "Отзывы после аренды", helper: "просьба оставить отзыв после завершения" },
 ];

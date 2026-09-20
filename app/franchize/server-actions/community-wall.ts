@@ -67,6 +67,7 @@ import {
   extractMentionUsernames,
   maybeNotifyReactionMilestone,
   notifyWallComment,
+  notifyWallPostMentions,
   type CommentNotifyRecipient,
 } from "@/app/franchize/lib/wall-engage-notify";
 import { buildWallPostPreview } from "@/app/franchize/lib/community-wall";
@@ -240,6 +241,9 @@ const FeedInput = z.object({
     .optional(),
   /** Free-text wall search (websearch syntax over the simple tsvector). */
   q: z.string().trim().min(1).max(60).optional(),
+  /** Author filter (rider profile v1): «this rider's part of the wall».
+   *  uuid — cast failures from hostile callers just return an empty page. */
+  authorId: z.string().trim().uuid().optional(),
   // NOTE: no caller-supplied limit — pageSize is server-fixed so the
   // page-1-holds-all-pinned invariant (WALL_PIN_CAP « WALL_FEED_PAGE_SIZE)
   // cannot be broken from the outside.
@@ -255,10 +259,11 @@ export async function getCommunityWallAction(input: {
   before?: string;
   tag?: string;
   q?: string;
+  authorId?: string;
 }): Promise<GetCommunityWallResult> {
   const parsed = FeedInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный запрос ленты." };
-  const { slug, initData, before, tag, q } = parsed.data;
+  const { slug, initData, before, tag, q, authorId } = parsed.data;
   const pageSize = WALL_FEED_PAGE_SIZE;
 
   const crew = await getCrewBySlug(slug);
@@ -281,6 +286,7 @@ export async function getCommunityWallAction(input: {
     .limit(pageSize + 1);
   if (tag) query = query.eq("crew_post_tags.tag", tag);
   if (q) query = query.textSearch("search_tsv", q, { type: "websearch", config: "simple" });
+  if (authorId) query = query.eq("author_id", authorId);
   if (before) {
     // Page 2+: pinned posts live on page 1 only — otherwise any pinned post
     // older than the cursor would re-appear at the top of EVERY later page.
@@ -823,6 +829,18 @@ export async function createCommunityPostAction(input: {
       hasStats: statsSnapshot !== null,
       excludeUserId: actor.userId,
       recentAuthorPosts: authorPostsLastHour,
+    });
+    // Post-mention DMs (profile v1 parity with comments): @user in the body
+    // pings the rider. Prefs-aware + exactly-once per (post, user) via the
+    // same ledger; never throws, never blocks the post.
+    await notifyWallPostMentions({
+      slug: crew.slug || slug,
+      postId,
+      authorId: actor.userId,
+      authorName,
+      body: finalBody,
+      postPreview: buildWallPostPreview(finalBody, 160),
+      botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
     });
   } else {
     logger.warn("[community-wall] post vanished before notify — skipping + cleaning photos");

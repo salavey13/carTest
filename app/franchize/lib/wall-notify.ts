@@ -32,6 +32,7 @@ import {
   resolveLeadNotifyRecipients,
   sanitizeLeadKey,
 } from "@/app/franchize/lib/new-lead-notify";
+import { filterWallNotifyRecipients } from "@/app/franchize/lib/wall-prefs";
 
 // NOTE: leadDeeplinkUrl сознательно НЕ ре-экспортируется и НЕ используется:
 // тот префиксует startapp как lead_… — кнопки стены на таком deeplink уводили
@@ -100,10 +101,14 @@ export async function notifyNewWallPost(
   const result: WallPostNotifyResult = { recipients: [], sent: 0, failed: 0 };
   try {
     const quietMode = (input.recentAuthorPosts ?? 0) >= WALL_NOTIFY_MEMBER_FANOUT_THRESHOLD;
-    const recipients = await resolveLeadNotifyRecipients(input.slug, {
+    const resolved = await resolveLeadNotifyRecipients(input.slug, {
       includeMembers: !quietMode,
     });
-    const targets = recipients.filter((id) => id && id !== input.excludeUserId);
+    // Preference-aware fanout (wall v6): «Стена экипажа» opt-out wins —
+    // owner/admins included (a mute is a mute). Never throws.
+    const targets = (await filterWallNotifyRecipients(resolved, input.slug)).filter(
+      (id) => id && id !== input.excludeUserId,
+    );
     result.recipients = targets;
     if (targets.length === 0) {
       logger.warn("[wall-notify] no recipients, skipping", { slug: input.slug });

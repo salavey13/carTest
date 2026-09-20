@@ -54,6 +54,10 @@ export type FranchizeNotificationPreferences = {
   mapRidersAlerts: boolean;
   marketingDigest: boolean;
   reviewRequests: boolean;
+  /** Wall v6 (profile v1): DM-фанкоут стены — новые посты, милистоуны
+   *  реакций, комментарии и упоминания. Default true; opt-out не глушит
+   *  транзакционные статусы заказов. */
+  wallActivity: boolean;
 };
 
 const FRANCHIZE_ACHIEVEMENT_CAPABILITIES = {
@@ -88,6 +92,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: FranchizeNotificationPreferences = {
   mapRidersAlerts: true,
   marketingDigest: false,
   reviewRequests: true,
+  wallActivity: true,
 };
 
 function normalizeSlug(slug: string): string {
@@ -106,6 +111,7 @@ function normalizeNotificationPreferences(value: unknown): FranchizeNotification
       typeof raw.mapRidersAlerts === "boolean" ? raw.mapRidersAlerts : DEFAULT_NOTIFICATION_PREFERENCES.mapRidersAlerts,
     marketingDigest: typeof raw.marketingDigest === "boolean" ? raw.marketingDigest : DEFAULT_NOTIFICATION_PREFERENCES.marketingDigest,
     reviewRequests: typeof raw.reviewRequests === "boolean" ? raw.reviewRequests : DEFAULT_NOTIFICATION_PREFERENCES.reviewRequests,
+    wallActivity: typeof raw.wallActivity === "boolean" ? raw.wallActivity : DEFAULT_NOTIFICATION_PREFERENCES.wallActivity,
   };
 }
 

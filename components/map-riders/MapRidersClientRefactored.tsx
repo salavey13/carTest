@@ -343,6 +343,8 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   // уводит на стену ТЕКУЩЕГО экипажа с ?spot=<id> (check-in текст в композере).
   const spotPopupFor = useCallback(
     (spot: MotoSpot) => (
+      // Community tokens (--community-*): same family as the wall's cards —
+      // the --mr-* fallbacks keep the popup readable on old embeds.
       <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
         <div className="text-sm font-semibold" style={{ color: spot.color }}>
           {spot.name}
@@ -355,14 +357,14 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
           <Link
             href={`/franchize/${crewSlug}/community?spot=${spot.id}`}
             className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
-            style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
+            style={{ backgroundColor: "var(--community-accent, var(--mr-accent))", color: "var(--community-accent-text, var(--mr-base))" }}
           >
             Отметиться на стене экипажа
           </Link>
           <Link
             href={`/franchize/${spot.slug}/community`}
             className="rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition hover:brightness-125"
-            style={{ borderColor: "var(--mr-border)" }}
+            style={{ borderColor: "var(--community-border, var(--mr-border))", color: "var(--community-text, var(--mr-text))" }}
           >
             Стена точки
           </Link>
@@ -612,6 +614,21 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       className="relative flex-1 h-full w-full overflow-hidden"
       style={{ ...cssVars } as React.CSSProperties}
     >
+      {/* ── community band (consistency round) ─────────────────────────────
+          The same accent/live language as the wall: cw-live-dot + the
+          --community-* bridge the page sets on <main>. Top-right because the
+          Leaflet zoom lives top-left and the record FAB bottom-right. */}
+      <div className="pointer-events-auto absolute right-2 top-2 z-[500] flex items-center gap-2 rounded-full border border-[var(--community-border)] bg-[var(--community-card-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--community-text)] shadow-lg backdrop-blur">
+        <span className="cw-live-dot" aria-hidden />
+        <span className="hidden sm:inline">OnlyBike community</span>
+        <Link
+          href={`/franchize/${crewSlug}/community`}
+          className="text-[var(--community-accent)] transition hover:underline"
+        >
+          Стена →
+        </Link>
+      </div>
+
       {/* ── MAP (fullscreen background) ── */}
       <section className="absolute inset-0 z-0">
         <div className="absolute inset-0 pointer-events-auto">

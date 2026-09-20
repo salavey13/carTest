@@ -211,6 +211,8 @@ function parseAnalyticsDeepLink(param: string): {
  *   post_<postId>_<slug>      → /franchize/<slug>/community?post=<id>
  *   wallp_<rentalId>_<slug>   → /franchize/<slug>/community?compose=<id>
  *   ride_<sessionId>_<slug>   → /franchize/<slug>/community?ride=<id>
+ *   rider_<userId>_<slug>     → /franchize/<slug>/rider/<userId> (public
+ *                               rider profile, Chain-style — profile v1)
  *
  * Bare forms (wall / post_<id>) need userCrewInfo to resolve the crew — they
  * stay on the gated path (this returns null for them).
@@ -226,6 +228,9 @@ function computeFastWallTarget(param: string): string | null {
   }
   if (link.kind === "compose-ride") {
     return `/franchize/${link.slug}/community?ride=${link.sessionId}`;
+  }
+  if (link.kind === "rider") {
+    return `/franchize/${link.slug}/rider/${link.userId}`;
   }
   return `/franchize/${link.slug}/community?compose=${link.rentalId}`;
 }
@@ -704,6 +709,11 @@ export function useStartParamRouter() {
               targetPath = `/franchize/${wallSlug}/community?post=${link.postId}`;
             } else if (link.kind === "compose") {
               targetPath = `/franchize/${wallSlug}/community?compose=${link.rentalId}`;
+            } else if (link.kind === "rider") {
+              // Belt & suspenders: rider_<id>_<slug> is self-contained and is
+              // normally claimed by the FAST path; a slug-carried variant can
+              // only land here if fast routing was skipped entirely.
+              targetPath = `/franchize/${wallSlug}/rider/${link.userId}`;
             } else {
               targetPath = `/franchize/${wallSlug}/community`;
             }

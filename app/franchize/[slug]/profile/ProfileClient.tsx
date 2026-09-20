@@ -444,6 +444,7 @@ export function FranchizeProfileClient({
       <ProfileHeaderPanel
         crewName={profile?.crewName || crew.header.brandName || slug}
         slug={slug}
+        riderId={dbUser?.user_id ?? null}
         unlockedCount={unlockedCount}
         achievementsTotal={catalog.length}
         shiftsCompleted={profile?.counters?.shiftsCompleted || 0}

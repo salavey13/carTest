@@ -34,6 +34,7 @@ import {
   sanitizeWallSlug,
   wallPostStartParam,
 } from "@/lib/wall-deeplink";
+import { filterWallNotifyRecipients, userWantsWallActivity } from "@/app/franchize/lib/wall-prefs";
 
 /** Круглые числа, на которые автор получает «твой пост набрал N реакций». */
 export const WALL_REACTION_MILESTONES: readonly number[] = [1, 3, 5, 10, 25, 50, 100];
@@ -108,6 +109,76 @@ export function buildCommentNotifyHtml(info: CommentNotifyInfo): string {
   lines.push(``, `${body}`);
   if (preview) lines.push(``, `📜 «${preview}»`);
   return lines.join("\n");
+}
+
+// ── 3. post mentions (profile v1 / notifications polish) ─────────────────────
+// Comments had mention-DMs since wall v4 — posts did not. Parity: @user in a
+// POST body now pings the mentioned rider (exactly-once per post+user via the
+// same ledger, prefs-aware, capped by WALL_ENGAGE_MAX_MENTIONS).
+
+export interface PostMentionNotifyInput {
+  slug: string;
+  postId: string;
+  authorId: string;
+  authorName: string;
+  /** Raw post body (mentions extracted here). */
+  body: string;
+  postPreview: string;
+  botUsername?: string | null;
+}
+
+export function buildPostMentionHtml(info: {
+  authorName: string;
+  postPreview: string;
+}): string {
+  return [
+    `📢 <b>${escapeTelegramHtml(info.authorName)} упомянул(а) тебя в посте</b>`,
+    ``,
+    `📜 «${escapeTelegramHtml(info.postPreview || "")}»`,
+  ].join("\n");
+}
+
+/** Уведомить @упомянутых в новом посте. Никогда не бросает. */
+export async function notifyWallPostMentions(input: PostMentionNotifyInput): Promise<void> {
+  try {
+    const mentionNames = extractMentionUsernames(input.body);
+    if (mentionNames.length === 0) return;
+
+    // Same two-case exact lookup as the comment flow: DB may store «Sly13»
+    // while the author typed «@sly13» (and vice versa). No ilike wildcards —
+    // «_» in usernames is an underscore, not a pattern.
+    const variants = [...new Set([...mentionNames, ...mentionNames.map((n) => n.toLowerCase())])];
+    const { data: mentionedUsers } = await supabaseAdmin
+      .from("users")
+      .select("user_id")
+      .in("username", variants)
+      .limit(WALL_ENGAGE_MAX_MENTIONS * 2);
+
+    const mentionedIds = ((mentionedUsers ?? []) as { user_id: string }[])
+      .map((u) => u.user_id)
+      .filter((id) => id && id !== input.authorId);
+    if (mentionedIds.length === 0) return;
+
+    const allowed = await filterWallNotifyRecipients(mentionedIds, input.slug);
+    let sent = 0;
+    for (const userId of allowed.slice(0, WALL_ENGAGE_MAX_MENTIONS)) {
+      // exactly-once per (post, mentioned user)
+      const claimed = await claimNotifySlot(input.postId, "post_mention", userId);
+      if (!claimed) continue;
+      const text = buildPostMentionHtml({ authorName: input.authorName, postPreview: input.postPreview });
+      const ok = await sendEngagementDm({
+        chatId: userId,
+        text,
+        botUsername: input.botUsername ?? null,
+        postId: input.postId,
+        slug: input.slug,
+      });
+      if (ok) sent += 1;
+    }
+    if (sent > 0) logger.info("[wall-engage-notify] post mentions delivered", { postId: input.postId, sent });
+  } catch (error) {
+    logger.warn("[wall-engage-notify] post mention notify crashed (post unaffected)", error);
+  }
 }
 
 // ── delivery (never throws) ──────────────────────────────────────────────────
@@ -215,6 +286,20 @@ export async function maybeNotifyReactionMilestone(input: ReactionMilestoneNotif
   try {
     if (input.postAuthorId === input.reactorId) return; // сам себе не пишем
     if (!isReactionMilestone(input.total)) return;
+    // Preference check (wall v6): автор мог замьютить стену — читаем его
+    // metadata одним точечным запросом (fail-open: сбой не глушит уведомление).
+    try {
+      // NOTE: no .abortSignal() here — this supabase-js build only types it
+      // on a subset of builder overloads; the try/catch below is the guard.
+      const { data: authorRow } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", input.postAuthorId)
+        .maybeSingle();
+      if (authorRow && !userWantsWallActivity(authorRow.metadata, input.slug)) return;
+    } catch {
+      // prefs недоступны — уведомляем как раньше
+    }
     const claimed = await claimNotifySlot(input.postId, "reaction_milestone", String(input.total));
     if (!claimed) return;
 
@@ -304,7 +389,13 @@ export const WALL_COMMENT_NOTIFY_HOURLY_CAP_PER_POST = 3;
  */
 export async function notifyWallComment(input: CommentNotifyInput): Promise<void> {
   try {
-    const recipients = dedupeCommentRecipients(input.recipients, input.commenterId);
+    const candidates = dedupeCommentRecipients(input.recipients, input.commenterId);
+    if (candidates.length === 0) return;
+    // Preference-aware fanout (wall v6): «Стена экипажа» opt-out.
+    const recipients = await filterWallNotifyRecipients(
+      candidates.map((c) => c.userId),
+      input.slug,
+    ).then((allowed) => candidates.filter((c) => allowed.includes(c.userId)));
     if (recipients.length === 0) return;
 
     const hourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();

@@ -17,6 +17,11 @@
 //   ride_<sessionId>_<slug> → open the wall composer prefilled from a finished
 //                             map-riders session (share ride stats → wall post;
 //                             interlink map-riders ↔ wall, Chain-style)
+//   rider_<userId>_<slug>   → public rider profile page (Chain-style profile
+//                             card: stats, badges, garage, the user's part of
+//                             the wall). userId is the Telegram numeric id
+//                             (users.user_id, digits only) — NO bare fallback:
+//                             the profile is crew-scoped, slug required.
 //
 // postId / rentalId are Postgres uuids (8-4-4-4-12 hex, hyphen-separated);
 // map-riders session ids are uuids too (gen_random_uuid).
@@ -43,7 +48,11 @@ export type WallDeepLink =
   | { kind: "wall"; slug: string | null }
   | { kind: "post"; postId: string; slug: string | null }
   | { kind: "compose"; rentalId: string; slug: string }
-  | { kind: "compose-ride"; sessionId: string; slug: string };
+  | { kind: "compose-ride"; sessionId: string; slug: string }
+  | { kind: "rider"; userId: string; slug: string };
+
+/** TG user ids are pure digits (users.user_id / chat id). */
+const RIDER_ID_RE = /^[0-9]{1,16}$/;
 
 /**
  * Parse a startapp param into a wall deep link.
@@ -83,6 +92,20 @@ export function parseWallDeepLink(param: string | null | undefined): WallDeepLin
     const slug = sanitizeWallSlug(rest.slice(sep + 1));
     if (!isUuidLike(sessionId) || !slug) return null;
     return { kind: "compose-ride", sessionId, slug };
+  }
+
+  if (p.startsWith("rider_")) {
+    // rider_<userId>_<slug> — public rider profile. Digits-first split (the
+    // id has no underscores of its own), slug required — same contract as
+    // wallp_/ride_: a wrong-crew landing is harmless, the profile page
+    // re-verifies the rider ∈ crew server-side and renders a soft fallback.
+    const rest = p.slice(6);
+    const sep = rest.indexOf("_");
+    if (sep <= 0) return null;
+    const userId = rest.slice(0, sep);
+    const slug = sanitizeWallSlug(rest.slice(sep + 1));
+    if (!RIDER_ID_RE.test(userId) || !slug) return null;
+    return { kind: "rider", userId, slug };
   }
 
   if (p.startsWith("post_")) {
@@ -140,6 +163,17 @@ export function wallComposeStartParam(rentalId: string, slug: string): string {
   const budget = 64 - 6 - 36 - 1;
   const s = sanitizeWallSlug(slug) ?? "vip-bike";
   return `wallp_${id}_${s.slice(0, Math.max(1, budget))}`;
+}
+
+/** rider_<userId>_<slug> start param for the public rider profile page.
+ *  No bare fallback (the page is crew-scoped); over-budget slugs truncate to
+ *  a valid prefix — wrong-crew landing degrades to a soft fallback card. */
+export function riderProfileStartParam(userId: string, slug: string): string {
+  const id = userId.trim();
+  if (!RIDER_ID_RE.test(id)) throw new Error(`riderProfileStartParam: userId is not a TG numeric id: ${id}`);
+  const budget = 64 - 6 - id.length - 1;
+  const s = sanitizeWallSlug(slug) ?? "vip-bike";
+  return `rider_${id}_${s.slice(0, Math.max(1, budget))}`;
 }
 
 export function wallRideStartParam(sessionId: string, slug: string): string {

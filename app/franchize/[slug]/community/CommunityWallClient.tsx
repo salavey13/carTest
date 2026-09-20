@@ -96,6 +96,7 @@ import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
 import { buildSpotCheckinText, findMotoSpotById } from "@/lib/map-riders-spots";
 import { buildTelegramAppLink, wallPostStartParam } from "@/lib/wall-deeplink";
+import { WhoReactedModal } from "./WhoReactedModal";
 
 /** A photo being attached in the composer (upload → staging → post). */
 interface ComposerPhoto {
@@ -187,6 +188,8 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
   // lightbox: which post's photos are open (index = photo within the post)
   const [lightbox, setLightbox] = useState<{ postId: string; index: number } | null>(null);
+  // «Кому понравилось» (profile v1 / Chain #5): postId of the open modal.
+  const [whoReacted, setWhoReacted] = useState<string | null>(null);
 
   // interactions
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -775,9 +778,21 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             )}
           </div>
         </div>
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--community-muted)] opacity-70">
-          OnlyBike community
-        </p>
+        {/* Profile v1: signed-in riders get a one-tap bridge to their public
+            profile; anonymous visitors keep the plain community caption. */}
+        {viewer?.userId ? (
+          <Link
+            href={`/franchize/${slug}/rider/${viewer.userId}`}
+            className="cw-press inline-flex min-h-[36px] items-center gap-2 rounded-full border border-[var(--community-border)] bg-[var(--community-card)] px-3.5 text-xs font-bold uppercase tracking-[0.18em] text-[var(--community-muted)] transition hover:border-[var(--community-accent)] hover:text-[var(--community-text)]"
+          >
+            Мой профиль
+            <span aria-hidden>→</span>
+          </Link>
+        ) : (
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--community-muted)] opacity-70">
+            OnlyBike community
+          </p>
+        )}
       </div>
 
       <div className="cw-above flex flex-col gap-5 px-3 py-5 sm:px-4 md:px-8 md:py-6">
@@ -1265,6 +1280,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 onDelete={() => void deletePost(post)}
                 onHideComment={(commentId) => void hideComment(post, commentId)}
                 onOpenPhoto={(index) => setLightbox({ postId: post.id, index })}
+                onOpenReactions={() => setWhoReacted(post.id)}
                 deeplinkBotUsername={deeplinkBotUsername}
               />
             ))}
@@ -1295,6 +1311,14 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             onClose={() => setLightbox(null)}
             onIndexChange={(index) => setLightbox({ postId: lightboxPost.id, index })}
           />
+        </WallOverlayPortal>
+      )}
+
+      {/* «Кому понравилось» (profile v1): portaled for the same
+          containing-block reason as the photo lightbox above. */}
+      {whoReacted && (
+        <WallOverlayPortal>
+          <WhoReactedModal slug={slug} postId={whoReacted} onClose={() => setWhoReacted(null)} />
         </WallOverlayPortal>
       )}
     </section>
@@ -2053,12 +2077,15 @@ function ReactionBar({
   pending,
   canReact,
   onToggle,
+  onOpenReactions,
 }: {
   post: WallPostView;
   pending: boolean;
   /** false = anonymous visitor: tapping explains how to unlock reactions. */
   canReact: boolean;
   onToggle: (emoji: string) => void;
+  /** «Кому понравилось»: tap on the summary chip (profile v1). */
+  onOpenReactions: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pop, setPop] = useState(0);
@@ -2229,17 +2256,21 @@ function ReactionBar({
         )}
       </button>
 
-      {/* VK-style summary chip: top emoji + total, pure display */}
+      {/* VK-style summary chip: top emoji + total — TAP opens «Кому
+          понравилось» (profile v1). Anonymous visitors get the same modal,
+          which itself explains that the list is a riders-only surface. */}
       {post.likeCount > 0 && Object.keys(post.reactionCounts).length > 0 && (
-        <span
-          className="ml-1 inline-flex translate-y-[1px] items-center gap-0.5 rounded-full border border-[var(--community-border)] bg-[var(--community-card)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--community-muted)]"
-          aria-hidden="true"
+        <button
+          type="button"
+          onClick={onOpenReactions}
+          className="ml-1 inline-flex translate-y-[1px] items-center gap-0.5 rounded-full border border-[var(--community-border)] bg-[var(--community-card)] px-1.5 py-0.5 text-[11px] leading-none text-[var(--community-muted)] transition hover:border-[var(--community-accent)] hover:text-[var(--community-text)]"
+          aria-label={`Кому понравилось: ${post.likeCount}`}
         >
           {topReactions(post.reactionCounts).map((emoji) => (
             <span key={emoji}>{emoji}</span>
           ))}
           <span className="font-semibold">{post.likeCount}</span>
-        </span>
+        </button>
       )}
 
       {pickerOpen && (
@@ -2395,6 +2426,8 @@ interface PostCardProps {
   onStartReply: (commentId: string, authorName: string) => void;
   onCancelReply: () => void;
   onToggleReaction: (emoji: string) => void;
+  /** «Кому понравилось»: opens the reactors modal for this post. */
+  onOpenReactions: () => void;
   onToggleComments: () => void;
   onTogglePin: () => void;
   onDraftChange: (v: string) => void;
@@ -2408,7 +2441,7 @@ interface PostCardProps {
 }
 
 function PostCard(props: PostCardProps) {
-  const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending, replyTarget } = props;
+  const { post, slug, viewer, canModerate, expanded, commentsLoading, draft, sendingComment, likePending, replyTarget, onOpenReactions } = props;
   const isOwnPost = !!viewer?.userId && viewer.userId === post.author.userId;
   const authorName = post.author.fullName || post.author.username || "Райдер";
 
@@ -2479,10 +2512,33 @@ function PostCard(props: PostCardProps) {
       {/* header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Avatar url={post.author.avatarUrl} name={authorName} />
+          {/* Rider profile v1: author identity is now a destination — avatar +
+              name lead to the rider's public profile (Chain-style). Crew-scope
+              posts (authorScope='crew') keep the plain header: the crew speaks,
+              not a person. */}
+          {post.authorScope === "rider" ? (
+            <Link
+              href={`/franchize/${slug}/rider/${post.author.userId}`}
+              className="flex items-center gap-3 rounded-full transition hover:opacity-85"
+              aria-label={`Профиль райдера ${authorName}`}
+            >
+              <Avatar url={post.author.avatarUrl} name={authorName} />
+            </Link>
+          ) : (
+            <Avatar url={post.author.avatarUrl} name={authorName} />
+          )}
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-[var(--community-text)]">{authorName}</p>
+              {post.authorScope === "rider" ? (
+                <Link
+                  href={`/franchize/${slug}/rider/${post.author.userId}`}
+                  className="text-sm font-semibold text-[var(--community-text)] underline-offset-2 transition hover:text-[var(--community-accent)] hover:underline"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                <p className="text-sm font-semibold text-[var(--community-text)]">{authorName}</p>
+              )}
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                   post.authorScope === "crew"
@@ -2605,6 +2661,7 @@ function PostCard(props: PostCardProps) {
           pending={likePending}
           canReact={!!viewer?.userId}
           onToggle={props.onToggleReaction}
+          onOpenReactions={onOpenReactions}
         />
         <button
           type="button"
@@ -2657,7 +2714,13 @@ function PostCard(props: PostCardProps) {
                     <Avatar url={c.author.avatarUrl} name={cName} size={28} />
                     <div className="min-w-0 flex-1 rounded-xl bg-[var(--community-base-soft)] px-3 py-2">
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-xs font-semibold text-[var(--community-text)]">{cName}</p>
+                        {/* Comment authors link to their rider profile too (profile v1). */}
+                        <Link
+                          href={`/franchize/${slug}/rider/${c.author.userId}`}
+                          className="truncate text-xs font-semibold text-[var(--community-text)] underline-offset-2 transition hover:text-[var(--community-accent)] hover:underline"
+                        >
+                          {cName}
+                        </Link>
                         <span className="shrink-0 text-[10px] text-[var(--community-muted)] opacity-70">
                           {formatDateTimeRu(c.createdAt)}
                         </span>

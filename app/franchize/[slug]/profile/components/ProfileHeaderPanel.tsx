@@ -11,6 +11,7 @@ import { itemVariants, type CrewTokens } from "./profile-shared";
 export function ProfileHeaderPanel({
   crewName,
   slug,
+  riderId,
   unlockedCount,
   achievementsTotal,
   shiftsCompleted,
@@ -19,6 +20,8 @@ export function ProfileHeaderPanel({
 }: {
   crewName: string;
   slug: string;
+  /** Own TG id — enables the «Публичный профиль» CTA (rider profile v1). */
+  riderId: string | null;
   unlockedCount: number;
   achievementsTotal: number;
   shiftsCompleted: number;
@@ -41,9 +44,22 @@ export function ProfileHeaderPanel({
             возвратов в аренды экипажа.
           </p>
         </div>
-        <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
-          В каталог
-        </FranchizeOperatorLinkButton>
+        <div className="flex flex-col items-end gap-2">
+          {/* Rider profile v1: the CRM profile stays private (docs/earnings),
+              the public one is what the crew sees — keep both one tap apart. */}
+          {riderId && (
+            <a
+              href={`/franchize/${slug}/rider/${riderId}`}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-xs font-semibold transition hover:brightness-110"
+              style={{ borderColor: T.accent, color: T.accent }}
+            >
+              Публичный профиль →
+            </a>
+          )}
+          <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
+            В каталог
+          </FranchizeOperatorLinkButton>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
