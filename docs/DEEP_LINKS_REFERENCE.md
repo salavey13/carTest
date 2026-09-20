@@ -86,6 +86,17 @@
 | `create_crew` | `/franchize/create#create-crew-form` (скролл к форме создания) |
 | `mapriders_{slug}` / `mapriders-{slug}` | `/franchize/{slug}/map-riders` — карта райдеров |
 
+### Стена экипажа (wall v4+, grammar в `lib/wall-deeplink.ts`)
+
+| startapp | Куда ведёт |
+|---|---|
+| `wall` | стена своего экипажа (router ждёт auth → userCrewInfo) |
+| `wall_{slug}` | `/franchize/{slug}/community` (FAST path, до auth) |
+| `post_{postId}` | стена своего экипажа, подсветка поста (gated) |
+| `post_{postId}_{slug}` | `/franchize/{slug}/community?post={id}` (FAST path) |
+| `wallp_{rentalId}_{slug}` | `/franchize/{slug}/community?compose={id}` — черновик «поделиться поездкой» из закрытой аренды (FAST path) |
+| `ride_{sessionId}_{slug}` | `/franchize/{slug}/community?ride={id}` — черновик «поделиться заездом» из map-riders (FAST path; id сессии — uuid; автор сессии или staff) |
+
 ---
 
 ## 6. Корзина: хэндофф «сайт → Telegram»

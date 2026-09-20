@@ -258,6 +258,20 @@ describe("wall page interlink params", () => {
     const map = read("components/maps/RacingMap.tsx");
     expect(map).toContain("React.isValidElement(poi.popup)");
   });
+
+  it("round-3 polish: legend chips, check-in banner, migration uses a CTE (no ghost columns)", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("MOTO_SPOT_KINDS.map");
+    expect(client).toContain("aria-pressed");
+    const wall = read("app/franchize/[slug]/community/CommunityWallClient.tsx");
+    expect(wall).toContain("checkinSpot && !checkinDismissed");
+    const migration = read("supabase/migrations/20260921000000_seed_nn_moto_spot_crews.sql");
+    // regression guard: the first draft referenced v.description (ghost column);
+    // the CTE form computes description once and exposes it to both usages
+    expect(migration).toContain("with data as (");
+    expect(migration).not.toMatch(/v\.description/);
+    expect(migration).toContain("from data d");
+  });
 });
 
 // ── uuid guard sanity (shared with wall grammar) ─────────────────────────────
