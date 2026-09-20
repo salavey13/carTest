@@ -153,8 +153,11 @@ export function RacingMap({
                   click: () => onPointClick?.(poi),
                 }}
               >
-                <Popup>
-                  <div className="font-medium">{poi.name}</div>
+                {/* poi.popup comes only from client-side in-repo constants
+                    (spots/meetups) — DB JSON can't carry a React node, so
+                    rendering it is safe (React renders strings as text). */}
+                <Popup className={poi.popup ? "mr-spot-popup-wrapper" : undefined}>
+                  {poi.popup ?? <div className="font-medium">{poi.name}</div>}
                 </Popup>
               </CircleMarker>
             );

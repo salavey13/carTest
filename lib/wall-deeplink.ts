@@ -14,8 +14,12 @@
 //   wallp_<rentalId>_<slug> → open the wall composer prefilled from a finished
 //                             rental («поделиться поездкой» from the closure
 //                             notification; renters can post too)
+//   ride_<sessionId>_<slug> → open the wall composer prefilled from a finished
+//                             map-riders session (share ride stats → wall post;
+//                             interlink map-riders ↔ wall, Chain-style)
 //
 // postId / rentalId are Postgres uuids (8-4-4-4-12 hex, hyphen-separated);
+// map-riders session ids are uuids too (gen_random_uuid).
 // slugs match [A-Za-z0-9_-]+ and contain no underscores is NOT guaranteed —
 // crew slugs CAN contain underscores, so trailing segments after the FIRST
 // underscore belong to the slug (we split on the first "_" only and sanitize
@@ -38,7 +42,8 @@ export function sanitizeWallSlug(raw: string | null | undefined): string | null 
 export type WallDeepLink =
   | { kind: "wall"; slug: string | null }
   | { kind: "post"; postId: string; slug: string | null }
-  | { kind: "compose"; rentalId: string; slug: string };
+  | { kind: "compose"; rentalId: string; slug: string }
+  | { kind: "compose-ride"; sessionId: string; slug: string };
 
 /**
  * Parse a startapp param into a wall deep link.
@@ -66,6 +71,18 @@ export function parseWallDeepLink(param: string | null | undefined): WallDeepLin
     const slug = sanitizeWallSlug(rest.slice(sep + 1));
     if (!isUuidLike(rentalId) || !slug) return null;
     return { kind: "compose", rentalId, slug };
+  }
+
+  if (p.startsWith("ride_")) {
+    // ride_<sessionId>_<slug> — map-riders session → wall composer.
+    // No bare fallback (same as wallp_): the slug is required to route.
+    const rest = p.slice(5);
+    const sep = rest.indexOf("_");
+    if (sep <= 0) return null;
+    const sessionId = rest.slice(0, sep);
+    const slug = sanitizeWallSlug(rest.slice(sep + 1));
+    if (!isUuidLike(sessionId) || !slug) return null;
+    return { kind: "compose-ride", sessionId, slug };
   }
 
   if (p.startsWith("post_")) {
@@ -123,6 +140,15 @@ export function wallComposeStartParam(rentalId: string, slug: string): string {
   const budget = 64 - 6 - 36 - 1;
   const s = sanitizeWallSlug(slug) ?? "vip-bike";
   return `wallp_${id}_${s.slice(0, Math.max(1, budget))}`;
+}
+
+export function wallRideStartParam(sessionId: string, slug: string): string {
+  const id = sessionId.trim();
+  if (!isUuidLike(id)) throw new Error(`wallRideStartParam: sessionId is not a uuid: ${id}`);
+  // ride_ mirrors wallp_: no bare fallback, slug truncated to the valid budget.
+  const budget = 64 - 5 - 36 - 1;
+  const s = sanitizeWallSlug(slug) ?? "vip-bike";
+  return `ride_${id}_${s.slice(0, Math.max(1, budget))}`;
 }
 
 /** https://t.me/<bot>/app?startapp=<param> — opens the Mini App on the spot. */

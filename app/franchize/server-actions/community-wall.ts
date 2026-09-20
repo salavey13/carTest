@@ -70,6 +70,7 @@ import {
   type CommentNotifyRecipient,
 } from "@/app/franchize/lib/wall-engage-notify";
 import { buildWallPostPreview } from "@/app/franchize/lib/community-wall";
+import { buildRideSessionDraftText } from "@/app/franchize/lib/community-wall";
 import {
   buildSuggestedWallPost,
   summarizeRide,
@@ -1908,6 +1909,116 @@ export async function getWallRentalDraftAction(input: {
       crewName: crew.name || crew.slug || "экипаж",
       autoText: buildSuggestedWallPost(draft),
       canAttachRental: isOwner,
+    },
+  };
+}
+
+// ── RIDE COMPOSE DRAFT (map-riders заезд → пост на стене) ────────────────────
+
+const RideDraftInput = z.object({
+  slug: z.string().trim().min(1),
+  sessionId: z.string().trim().uuid(),
+  initData: z.string().trim().optional(),
+});
+
+export interface WallRideDraft {
+  sessionId: string;
+  rideName: string | null;
+  vehicleLabel: string | null;
+  rideMode: string | null;
+  distanceKm: number | null;
+  durationSeconds: number | null;
+  maxSpeedKmh: number | null;
+  avgSpeedKmh: number | null;
+  startedAtIso: string | null;
+  crewName: string;
+  /** Готовый текст поста (статистика заезда baked in) — редактируемый. */
+  autoText: string;
+}
+
+export type GetWallRideDraftResult =
+  | { ok: true; draft: WallRideDraft }
+  | { ok: false; error: string };
+
+/**
+ * Черновик поста «поделиться заездом» из завершённой/активной сессии
+ * map-riders. Читает ТОЛЬКО свою сессию (или staff экипажа) — чужие сессии
+ * не утекают (по аналогии с getWallRentalDraftAction: черновик — для
+ * автора заезда и staff).
+ */
+export async function getWallRideDraftAction(input: {
+  slug: string;
+  sessionId: string;
+  initData?: string;
+}): Promise<GetWallRideDraftResult> {
+  const parsed = RideDraftInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const actor = await resolveWallActor(parsed.data.initData);
+  if (!actor) return { ok: false, error: "Черновик доступен из Telegram-бота экипажа." };
+
+  const { data: sessionRow } = await supabaseAdmin
+    .from("map_rider_sessions")
+    .select(
+      "id, crew_slug, user_id, ride_name, vehicle_label, ride_mode, total_distance_km, duration_seconds, max_speed_kmh, avg_speed_kmh, started_at, status",
+    )
+    .eq("id", parsed.data.sessionId)
+    .maybeSingle();
+  const s = sessionRow as {
+    id: string;
+    crew_slug: string;
+    user_id: string;
+    ride_name: string | null;
+    vehicle_label: string | null;
+    ride_mode: string | null;
+    total_distance_km: number | null;
+    duration_seconds: number | null;
+    max_speed_kmh: number | null;
+    avg_speed_kmh: number | null;
+    started_at: string | null;
+    status: string | null;
+  } | null;
+  if (!s) return { ok: false, error: "Заезд не найден — обнови страницу." };
+  // Сессия не из этого экипажа → не показываем (не раскрываем существование).
+  if (s.crew_slug !== crew.slug) return { ok: false, error: "Заезд не найден в этом экипаже." };
+
+  const isOwner = !!s.user_id && s.user_id === actor.userId;
+  const isStaff = await isCrewStaffUser(actor.userId, crew);
+  if (!isOwner && !isStaff) {
+    return { ok: false, error: "Этот черновик — для автора заезда и экипажа." };
+  }
+
+  const crewName = crew.name || crew.slug || "экипаж";
+  const autoText = buildRideSessionDraftText({
+    sessionId: s.id,
+    rideName: s.ride_name,
+    vehicleLabel: s.vehicle_label,
+    rideMode: s.ride_mode,
+    distanceKm: Number.isFinite(Number(s.total_distance_km)) ? Number(s.total_distance_km) : null,
+    durationSeconds: Number.isFinite(Number(s.duration_seconds)) ? Number(s.duration_seconds) : null,
+    maxSpeedKmh: Number.isFinite(Number(s.max_speed_kmh)) ? Number(s.max_speed_kmh) : null,
+    avgSpeedKmh: Number.isFinite(Number(s.avg_speed_kmh)) ? Number(s.avg_speed_kmh) : null,
+    startedAtIso: s.started_at,
+    crewName,
+  });
+
+  return {
+    ok: true,
+    draft: {
+      sessionId: s.id,
+      rideName: s.ride_name,
+      vehicleLabel: s.vehicle_label,
+      rideMode: s.ride_mode,
+      distanceKm: Number.isFinite(Number(s.total_distance_km)) ? Number(s.total_distance_km) : null,
+      durationSeconds: Number.isFinite(Number(s.duration_seconds)) ? Number(s.duration_seconds) : null,
+      maxSpeedKmh: Number.isFinite(Number(s.max_speed_kmh)) ? Number(s.max_speed_kmh) : null,
+      avgSpeedKmh: Number.isFinite(Number(s.avg_speed_kmh)) ? Number(s.avg_speed_kmh) : null,
+      startedAtIso: s.started_at,
+      crewName,
+      autoText,
     },
   };
 }

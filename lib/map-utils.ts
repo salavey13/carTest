@@ -8,6 +8,8 @@
  * ✨ Enhanced: fitBounds helper, coordinate formatters, grid snapping
  */
 
+import type { ReactNode } from "react";
+
 // === CONFIGURATION CONSTANTS ===
 export const DEFAULT_MAP_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/nnmap.jpg";
 export const FALLBACK_MAP_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/placeholder-map.jpg";
@@ -56,6 +58,13 @@ export interface PointOfInterest {
     properties?: Record<string, unknown>;
   };
   markerClassName?: string;
+  /**
+   * Rich React popup (map-riders spots/meetups). Only ever attached
+   * CLIENT-SIDE from in-repo constants — DB POIs arrive as parsed JSON, so a
+   * React node can never be smuggled through the network (a string value
+   * would render as plain text, not HTML — no XSS vector).
+   */
+  popup?: ReactNode;
   roadHighlight?: {
     weight?: number;
     glow?: boolean;

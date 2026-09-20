@@ -210,6 +210,7 @@ function parseAnalyticsDeepLink(param: string): {
  *   wall_<slug>               → /franchize/<slug>/community
  *   post_<postId>_<slug>      → /franchize/<slug>/community?post=<id>
  *   wallp_<rentalId>_<slug>   → /franchize/<slug>/community?compose=<id>
+ *   ride_<sessionId>_<slug>   → /franchize/<slug>/community?ride=<id>
  *
  * Bare forms (wall / post_<id>) need userCrewInfo to resolve the crew — they
  * stay on the gated path (this returns null for them).
@@ -222,6 +223,9 @@ function computeFastWallTarget(param: string): string | null {
   }
   if (link.kind === "post") {
     return link.slug ? `/franchize/${link.slug}/community?post=${link.postId}` : null;
+  }
+  if (link.kind === "compose-ride") {
+    return `/franchize/${link.slug}/community?ride=${link.sessionId}`;
   }
   return `/franchize/${link.slug}/community?compose=${link.rentalId}`;
 }

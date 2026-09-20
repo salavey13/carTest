@@ -81,6 +81,7 @@ import {
   getWallBikeOptionsAction,
   getWallPostAction,
   getWallRentalDraftAction,
+  getWallRideDraftAction,
   getWallTrendingAction,
   hideCommunityCommentAction,
   hideCommunityPostAction,
@@ -88,10 +89,12 @@ import {
   togglePostReactionAction,
   type WallBikeOption,
   type WallRentalDraft,
+  type WallRideDraft,
   type WallTrendingTag,
 } from "@/app/franchize/server-actions/community-wall";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
+import { buildSpotCheckinText, findMotoSpotById } from "@/lib/map-riders-spots";
 import { buildTelegramAppLink, wallPostStartParam } from "@/lib/wall-deeplink";
 
 /** A photo being attached in the composer (upload → staging → post). */
@@ -139,9 +142,16 @@ interface CommunityWallClientProps {
   /** Deep-link: startapp=wallp_<rentalId>_<slug> → открыть композер с готовым
    *  черновиком «поделиться поездкой» (аренда закрыта — уведомление экипажа). */
   composeRentalId?: string | null;
+  /** Deep-link: startapp=ride_<sessionId>_<slug> → открыть композер с черновиком
+   *  «поделиться заездом» из map-riders (interlink карта ↔ стена). */
+  composeRideId?: string | null;
+  /** Meetup → wall: предзаполнить поиск по заголовку точки встречи (?q=). */
+  initialQuery?: string | null;
+  /** Spot check-in (?spot=<id>): предзаполнить композер текстом про мототочку. */
+  checkinSpotId?: string | null;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -192,8 +202,9 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
   // discovery state (wall v3 step 3)
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [activeQuery, setActiveQuery] = useState<string | null>(null);
-  const [searchDraft, setSearchDraft] = useState("");
+  // ?q= (meetup → wall interlink): предзаполняем поиск — лента сразу фильтруется.
+  const [activeQuery, setActiveQuery] = useState<string | null>(initialQuery ?? null);
+  const [searchDraft, setSearchDraft] = useState(initialQuery ?? "");
   const [trending, setTrending] = useState<{ tags: WallTrendingTag[]; weekPosts: number } | null>(null);
   const [newPostsCount, setNewPostsCount] = useState(0);
   const wallTopRef = useRef<HTMLDivElement>(null);
@@ -364,6 +375,38 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composeRentalId, slug]);
+
+  // ── ride draft («поделиться заездом» из map-riders, interlink карта ↔ стена) ──
+  const [rideDraft, setRideDraft] = useState<WallRideDraft | null>(null);
+  const [rideDraftDismissed, setRideDraftDismissed] = useState(false);
+  useEffect(() => {
+    if (!composeRideId) return;
+    let cancelled = false;
+    void getWallRideDraftAction({ slug, sessionId: composeRideId, initData: withInitData() }).then((res) => {
+      if (cancelled) return;
+      if (!res.ok) {
+        setWallNotice(res.error);
+        return;
+      }
+      setRideDraft(res.draft);
+      // Текст — только если композер пустой (не затираем то, что человек пишет).
+      setText((prev) => (prev.trim() ? prev : res.draft.autoText));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeRideId, slug]);
+
+  // ── spot check-in (?spot=<id> с попапа точки на карте) ───────────────────────
+  // Текст — только в пустой композер; id валидируется по каталогу (иначе тихо
+  // игнорируем: параметр недоверенный — пришёл из URL).
+  useEffect(() => {
+    const spot = findMotoSpotById(checkinSpotId);
+    if (!spot) return;
+    setText((prev) => (prev.trim() ? prev : buildSpotCheckinText(spot)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkinSpotId]);
 
   const applyTagFilter = useCallback((tag: string | null) => {
     setActiveTag((cur) => (tag !== null && cur === tag ? null : tag));
@@ -543,6 +586,8 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
       setBikePickerOpen(false);
       setComposeDraft(null);
       setComposeDismissed(false);
+      setRideDraft(null);
+      setRideDraftDismissed(false);
     } else {
       setComposerError(res.error);
     }
@@ -877,6 +922,28 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                     setComposeDismissed(true);
                   }}
                   aria-label="Убрать черновик поездки"
+                  className="ml-auto rounded-full p-1 transition hover:bg-[var(--community-accent)]/20"
+                >
+                  <X className="h-3.5 w-3.5 text-[var(--community-accent)]" />
+                </button>
+              </div>
+            )}
+            {/* ride-draft banner: «поделиться заездом» из map-riders (interlink) */}
+            {rideDraft && !rideDraftDismissed && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-3 py-2 text-xs">
+                <span className="font-semibold text-[var(--community-accent)]">
+                  🗺 Заезд подхвачен: {rideDraft.rideName?.trim() || "без названия"}
+                  {rideDraft.distanceKm && rideDraft.distanceKm > 0 ? ` · ${Math.round(rideDraft.distanceKm * 10) / 10} км` : ""}
+                  {rideDraft.maxSpeedKmh && rideDraft.maxSpeedKmh > 0 ? ` · до ${Math.round(rideDraft.maxSpeedKmh)} км/ч` : ""}
+                  {" — статистика уже в тексте"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRideDraft(null);
+                    setRideDraftDismissed(true);
+                  }}
+                  aria-label="Убрать черновик заезда"
                   className="ml-auto rounded-full p-1 transition hover:bg-[var(--community-accent)]/20"
                 >
                   <X className="h-3.5 w-3.5 text-[var(--community-accent)]" />

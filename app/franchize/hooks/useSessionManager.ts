@@ -12,6 +12,9 @@ interface UseSessionManagerOptions {
   authErrorMessage?: string;
   refreshOnStart?: boolean;
   refreshOnStop?: boolean;
+  /** Interlink карта → стена: вызывается после УСПЕШНОГО стопа с id сессии
+   *  (захватывается ДО dispatch share/stopped, который чистит state.sessionId). */
+  onRideStopped?: (endedSessionId: string) => void;
 }
 
 interface SessionManagerResult {
@@ -31,6 +34,7 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
     authErrorMessage = "Авторизуйся в Telegram/VIP BIKE",
     refreshOnStart = true,
     refreshOnStop = true,
+    onRideStopped,
   } = options;
   const { dbUser } = useAppContext();
   const { state } = useMapRidersState();
@@ -106,6 +110,9 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
       return false;
     }
 
+    // Capture BEFORE dispatch clears it — the «поделиться на стене» interlink
+    // needs the session id of the ride that just ended.
+    const endedSessionId = state.sessionId;
     setIsSubmitting(true);
     try {
       const headers = await getMapRidersWriteHeaders();
@@ -114,7 +121,7 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
         headers,
         body: JSON.stringify({
           action: "stop",
-          sessionId: state.sessionId,
+          sessionId: endedSessionId,
           userId: dbUser.user_id,
           crewSlug,
           routePoints: [],
@@ -126,6 +133,7 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
       dispatch({ type: "share/stopped" });
       if (refreshOnStop) await fetchSnapshot();
       toast.success(stopSuccessMessage);
+      onRideStopped?.(endedSessionId);
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Ошибка остановки");
@@ -133,7 +141,7 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
     } finally {
       setIsSubmitting(false);
     }
-  }, [authErrorMessage, crewSlug, dbUser?.user_id, dispatch, fetchSnapshot, refreshOnStop, state.sessionId, stopSuccessMessage]);
+  }, [authErrorMessage, crewSlug, dbUser?.user_id, dispatch, fetchSnapshot, onRideStopped, refreshOnStop, state.sessionId, stopSuccessMessage]);
 
   const toggleSession = useCallback(() => (state.shareEnabled ? stopSession() : startSession()), [startSession, state.shareEnabled, stopSession]);
 

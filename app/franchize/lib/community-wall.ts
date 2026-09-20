@@ -750,3 +750,49 @@ export function buildWallPostNotifyHtml(info: WallPostNotifyInfo): string {
   if (info.hasStats) lines.push(`📊 делится статистикой поездок`);
   return lines.join("\n");
 }
+
+// ── map-riders → wall compose draft (pure, unit-tested) ─────────────────────
+
+export interface WallRideSessionStats {
+  sessionId: string;
+  rideName: string | null;
+  vehicleLabel: string | null;
+  rideMode: string | null;
+  distanceKm: number | null;
+  durationSeconds: number | null;
+  maxSpeedKmh: number | null;
+  avgSpeedKmh: number | null;
+  startedAtIso: string | null;
+  crewName: string;
+}
+
+/** Duration line — mirrors lib/map-riders formatRideDuration copy for >0 values. */
+function rideDurationLabel(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "Меньше минуты";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours} ч ${minutes} мин`;
+  if (minutes <= 0) return "Меньше минуты";
+  return `${minutes} мин`;
+}
+
+/**
+ * Draft text for «поделиться заездом» (map-riders session → wall post).
+ * Pure — tests assert exact copy and NaN-safety; the server action only
+ * fetches the row and delegates here.
+ */
+export function buildRideSessionDraftText(s: WallRideSessionStats): string {
+  const title = s.rideName?.trim() || "Без названия";
+  const vehicle = s.vehicleLabel?.trim() || (s.rideMode === "personal" ? "личный байк" : "байк экипажа");
+  const lines: string[] = [`🏁 Заезд завершён: ${title}`, `🏍 ${vehicle}`];
+
+  const facts: string[] = [];
+  if (s.distanceKm && s.distanceKm > 0) facts.push(`${Math.round(s.distanceKm * 10) / 10} км`);
+  if (s.durationSeconds && s.durationSeconds > 0) facts.push(rideDurationLabel(s.durationSeconds));
+  if (s.maxSpeedKmh && s.maxSpeedKmh > 0) facts.push(`до ${Math.round(s.maxSpeedKmh)} км/ч`);
+  if (s.avgSpeedKmh && s.avgSpeedKmh > 0) facts.push(`средняя ${Math.round(s.avgSpeedKmh)} км/ч`);
+  if (facts.length > 0) lines.push(`📏 ${facts.join(" · ")}`);
+
+  lines.push(`${s.crewName} — MapRiders`, `#mapriders #OnlyBike`);
+  return lines.join("\n");
+}

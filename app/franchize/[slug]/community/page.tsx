@@ -25,13 +25,23 @@ export default async function FranchizeCommunityPage(
 ) {
   const { slug } = await params;
   const sp = await searchParams;
-  // Deep-link landing (startapp=post_<id>_<slug> / wallp_<rental>_<slug>):
+  // Deep-link landing (startapp=post_<id>_<slug> / wallp_<rental>_<slug> /
+  // ride_<session>_<slug>):
   // id валидируем по форме uuid — всё остальное молча игнорируем.
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const rawPost = typeof sp.post === "string" ? sp.post.trim() : "";
   const rawCompose = typeof sp.compose === "string" ? sp.compose.trim() : "";
+  const rawRide = typeof sp.ride === "string" ? sp.ride.trim() : "";
   const highlightPostId = uuidRe.test(rawPost) ? rawPost : null;
   const composeRentalId = uuidRe.test(rawCompose) ? rawCompose : null;
+  const composeRideId = uuidRe.test(rawRide) ? rawRide : null;
+  // Meetup → wall interlink: поиск по заголовку meetup-точки (q ≤ 60 — тот же
+  // cap, что у FeedInput в server actions).
+  const rawQ = typeof sp.q === "string" ? sp.q.trim() : "";
+  const initialQuery = rawQ.slice(0, 60) || null;
+  // Spot check-in: id из каталога мототочек (валидация — на клиенте по каталогу).
+  const rawSpot = typeof sp.spot === "string" ? sp.spot.trim() : "";
+  const checkinSpotId = /^[a-z0-9-]{1,64}$/i.test(rawSpot) ? rawSpot.toLowerCase() : null;
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/community`;
@@ -114,6 +124,9 @@ export default async function FranchizeCommunityPage(
         deeplinkBotUsername={crew.contacts.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || null}
         highlightPostId={highlightPostId}
         composeRentalId={composeRentalId}
+        composeRideId={composeRideId}
+        initialQuery={initialQuery}
+        checkinSpotId={checkinSpotId}
       />
 
       <CrewFooter crew={crew} />

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { Drawer } from "vaul";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
 import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
+import { motoSpotKindLabel, NN_MOTO_SPOTS, type MotoSpot } from "@/lib/map-riders-spots";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
@@ -108,6 +110,10 @@ const DEFAULT_ROUTES = [
 
 const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 
+// Leaflet popup default container is white — force the dark card look for the
+// rich spot/meetup popups (leaflet-popup-content-wrapper).
+const SPOT_POPUP_CLASSNAME = "mr-spot-popup";
+
 // Snap labels for the 3-button control (matching vaul snapPoints)
 const SNAP_POINTS = [0.2, 0.48, 0.86] as const;
 const DRAWER_SNAP_POINTS: number[] = [...SNAP_POINTS];
@@ -118,6 +124,7 @@ const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Сре�
 function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknown[] }) {
   const { dbUser } = useAppContext();
   const { resolvedTheme = "dark" } = useTheme();
+  const router = useRouter();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
@@ -129,6 +136,9 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
   const [ridersDrawerOpen, setRidersDrawerOpen] = useState(false);
+  // Interlink карта → стена: id последнего завершённого заезда — даёт кнопку
+  // «Поделиться заездом на стене» (→ /community?ride=<id>). Чистится при новом старте.
+  const [endedRideSessionId, setEndedRideSessionId] = useState<string | null>(null);
   const lastMeetupActionAtRef = useRef(0);
   const leaderboardRef = useRef<HTMLDivElement>(null);
 
@@ -156,6 +166,14 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   const { canStart, canStop, startSession, stopSession } = useSessionManager({
     authErrorMessage: "Авторизуйся",
     stopSuccessMessage: "Заезд завершён",
+    onRideStopped: useCallback(
+      (endedSessionId: string) => {
+        setEndedRideSessionId(endedSessionId);
+        // Панель свернута (Мини) → подними до Средне, чтобы кнопка шеринга была видна.
+        setActiveSnap((snap) => (snap <= 0.2 ? 0.48 : snap));
+      },
+      [],
+    ),
   });
   const drawerEmptyStateCopy = useMemo(
     () => ({
@@ -214,6 +232,11 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       body.style.overflow = prevBodyOverflow;
     };
   }, []);
+
+  // Interlink: новый старт = старый «поделиться заездом» больше не актуален.
+  useEffect(() => {
+    if (state.shareEnabled) setEndedRideSessionId(null);
+  }, [state.shareEnabled]);
 
   // ── GPS tracking hook ──
   const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
@@ -314,6 +337,56 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
     // MR-022: removed mapData?.bounds from deps — the filter body doesn't read it
   }, [mapData?.points]);
 
+  // ── Мототочки НН (Chain-style discovery layer) ─────────────────────────────
+  // Каждая точка = dummy-экипаж (crews.slug = spot.slug, сеет миграция
+  // 20260921000000) → попап ссылается на стену точки и её карту, а «Отметиться»
+  // уводит на стену ТЕКУЩЕГО экипажа с ?spot=<id> (check-in текст в композере).
+  const spotPopupFor = useCallback(
+    (spot: MotoSpot) => (
+      <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
+        <div className="text-sm font-semibold" style={{ color: spot.color }}>
+          {spot.name}
+        </div>
+        <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
+          {motoSpotKindLabel(spot.kind)} · {spot.address}
+        </div>
+        <div className="text-xs leading-snug opacity-80">{spot.hint}</div>
+        <div className="flex flex-col gap-1 pt-1">
+          <Link
+            href={`/franchize/${crewSlug}/community?spot=${spot.id}`}
+            className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+            style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
+          >
+            Отметиться на стене экипажа
+          </Link>
+          <Link
+            href={`/franchize/${spot.slug}/community`}
+            className="rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition hover:brightness-125"
+            style={{ borderColor: "var(--mr-border)" }}
+          >
+            Стена точки
+          </Link>
+        </div>
+      </div>
+    ),
+    [crewSlug],
+  );
+
+  const spotPoints = useMemo(
+    () =>
+      NN_MOTO_SPOTS.map((spot) => ({
+        id: `spot-${spot.id}`,
+        name: `${spot.name} · ${motoSpotKindLabel(spot.kind)}`,
+        type: "point" as const,
+        icon: "::FaLocationDot::",
+        color: spot.color,
+        coords: [spot.coords] as [number, number][],
+        markerClassName: SPOT_POPUP_CLASSNAME,
+        popup: spotPopupFor(spot),
+      })),
+    [spotPopupFor],
+  );
+
   const mapPoints = useMemo(() => {
     // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
     // re-run or the DB POI is missing. Uses HOME_BASE constant (single source of truth).
@@ -346,6 +419,23 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       icon: "::FaLocationDot::",
       color: "#f97316",
       coords: [[m.lat, m.lon]] as [number, number][],
+      markerClassName: SPOT_POPUP_CLASSNAME,
+      // Meetup → wall interlink: поиск по заголовку точки на стене экипажа.
+      popup: (
+        <div className="min-w-[180px] max-w-[240px] space-y-1.5 p-1 text-[var(--mr-text)]">
+          <div className="text-sm font-semibold" style={{ color: "#f97316" }}>
+            {m.title}
+          </div>
+          {m.comment ? <div className="text-xs opacity-80">{m.comment}</div> : null}
+          <Link
+            href={`/franchize/${crewSlug}/community?q=${encodeURIComponent(m.title.slice(0, 60))}`}
+            className="block rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+            style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
+          >
+            Обсудить на стене экипажа
+          </Link>
+        </div>
+      ),
     }));
 
     const routePoints =
@@ -364,8 +454,8 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
 
     // DEFAULT_ROUTES are always present (scenic routes around HQ) — they're filtered
     // out of staticMapPoints above to avoid duplication if the migration also seeded them.
-    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints];
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail]);
+    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints];
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -769,6 +859,14 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
               <VibeContentRenderer content="::FaPowerOff::" className="mr-2" />
               Завершить заезд
             </Button>
+            {endedRideSessionId && !state.shareEnabled ? (
+              <Button asChild variant="outline" className="w-full">
+                <Link href={`/franchize/${crewSlug}/community?ride=${endedRideSessionId}`}>
+                  <VibeContentRenderer content="::FaShareNodes::" className="mr-2" />
+                  Поделиться заездом на стене
+                </Link>
+              </Button>
+            ) : null}
             <Button asChild variant="outline" className="w-full">
               <Link href={`https://t.me/share/url?url=${encodeURIComponent(`https://t.me/oneBikePlsBot/app?startapp=mapriders_${crewSlug}`)}&text=${encodeURIComponent(`${crew.header.brandName || "VIP BIKE"} MapRiders`)}`}>
                 Поделиться в Telegram
