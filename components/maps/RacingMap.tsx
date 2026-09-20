@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import React from "react";
 import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer } from "react-leaflet";
 import type { GeoJsonObject } from "geojson";
 import { MapInteractionCapture } from "@/components/maps/MapInteractionCapture";
@@ -137,6 +138,11 @@ export function RacingMap({
           if (poi.type === "point") {
             const center = poi.coords?.[0];
             if (!center) return null;
+            // Security guard: only REAL React elements (built client-side from
+            // in-repo constants) render as rich popups. A DB-authored `popup`
+            // value (JSONB string/object) can never smuggle markup — it is
+            // ignored and the plain name fallback is used.
+            const richPopup = React.isValidElement(poi.popup) ? poi.popup : null;
             return (
               <CircleMarker
                 key={poi.id}
@@ -156,8 +162,8 @@ export function RacingMap({
                 {/* poi.popup comes only from client-side in-repo constants
                     (spots/meetups) — DB JSON can't carry a React node, so
                     rendering it is safe (React renders strings as text). */}
-                <Popup className={poi.popup ? "mr-spot-popup-wrapper" : undefined}>
-                  {poi.popup ?? <div className="font-medium">{poi.name}</div>}
+                <Popup className={richPopup ? "mr-spot-popup-wrapper" : undefined}>
+                  {richPopup ?? <div className="font-medium">{poi.name}</div>}
                 </Popup>
               </CircleMarker>
             );

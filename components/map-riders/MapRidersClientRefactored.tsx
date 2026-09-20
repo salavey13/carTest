@@ -9,7 +9,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { Drawer } from "vaul";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -124,7 +123,6 @@ const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Сре�
 function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknown[] }) {
   const { dbUser } = useAppContext();
   const { resolvedTheme = "dark" } = useTheme();
-  const router = useRouter();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const isAdmin = useIsAdmin();
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);

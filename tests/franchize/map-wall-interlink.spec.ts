@@ -251,6 +251,11 @@ describe("wall page interlink params", () => {
     expect(client).toContain("community?ride=${endedRideSessionId}");
     expect(client).toContain("encodeURIComponent(m.title.slice(0, 60))");
   });
+
+  it("RacingMap renders only real React elements as rich popups (XSS guard)", () => {
+    const map = read("components/maps/RacingMap.tsx");
+    expect(map).toContain("React.isValidElement(poi.popup)");
+  });
 });
 
 // ── uuid guard sanity (shared with wall grammar) ─────────────────────────────
