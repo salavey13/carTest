@@ -232,7 +232,9 @@ describe("rider profile wiring", () => {
     expect(mapPage).toContain('"--community-accent"');
     const mapClient = read("components/map-riders/MapRidersClientRefactored.tsx");
     expect(mapClient).toContain("cw-live-dot");
-    expect(mapClient).toContain("Стена →");
+    // Стена больше не бэнд-ссылка: она и ЕСТЬ контент шита карты.
+    expect(mapClient).toContain("Стена экипажа");
+    expect(mapClient).toContain("<CommunityWallClient");
     const drawer = read("components/map-riders/RidersDrawer.tsx");
     expect(drawer).toContain("openRiderProfile(session.user_id)");
     // router push (no <a> inside <button> — invalid HTML)

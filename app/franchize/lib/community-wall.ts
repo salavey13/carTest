@@ -285,6 +285,33 @@ export interface WallBikeRefView {
   busyUntilIso: string | null;
 }
 
+/** Optional geotag on a wall post (wall × map interlink, migration 20260922000000). */
+export interface WallPostGeo {
+  /** WGS-84 latitude (-90..90). */
+  lat: number;
+  /** WGS-84 longitude (-180..180). */
+  lng: number;
+  /** Human-readable point name («Байк Ленд», «56.2912, 43.9876») or null. */
+  label: string | null;
+}
+
+/** Map-layer pin built from a geotagged post (getWallGeotagsAction). */
+export interface WallGeoPinView {
+  postId: string;
+  /** Plain-text excerpt of the body (≤ 140 chars) — render as TEXT only. */
+  excerpt: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  /** First photo of the post (public CDN URL) or null. */
+  photoUrl: string | null;
+  lat: number;
+  lng: number;
+  label: string | null;
+  createdAt: string;
+  likeCount: number;
+  commentCount: number;
+}
+
 export interface WallPostView {
   id: string;
   kind: "post" | "stats";
@@ -305,6 +332,8 @@ export interface WallPostView {
   rental: WallRentalRef | null;
   photos: WallPhotoView[];
   bikes: WallBikeRefView[];
+  /** Geotag (map marker) or null — a post never REQUIRES one. */
+  geo: WallPostGeo | null;
 }
 
 export interface WallViewerInfo {
@@ -330,6 +359,50 @@ export const WALL_FEED_PAGE_SIZE = 25;
 /** Body length limits (server validates, client mirrors with a counter). */
 export const WALL_POST_MAX_LEN = 2000;
 export const WALL_COMMENT_MAX_LEN = 500;
+
+// ── Geotags (wall × map interlink, migration 20260922000000) ─────────────────
+
+/** Geo label cap — server zod + client composer both enforce. */
+export const WALL_GEO_LABEL_MAX_LEN = 80;
+/** Map-layer cap: latest geotagged posts per crew (bounded fetch). */
+export const WALL_GEO_PINS_LIMIT = 200;
+/** Plain-text excerpt cap for map popups. */
+export const WALL_GEO_EXCERPT_LEN = 140;
+
+/**
+ * Isomorphic geotag sanitizer: accepts unknown input (composer payload / DB
+ * row fields), returns a clean {@link WallPostGeo} or null. Lat/lng must be a
+ * valid WGS-84 pair (both present or both absent — mirrors the DB check
+ * constraint), label is trimmed and capped.
+ */
+export function sanitizeWallGeo(raw: unknown): WallPostGeo | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const lat = typeof r.lat === "number" ? r.lat : Number(r.lat);
+  const lng = typeof r.lng === "number" ? r.lng : Number(r.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  const label =
+    typeof r.label === "string" && r.label.trim().length > 0
+      ? r.label.trim().slice(0, WALL_GEO_LABEL_MAX_LEN)
+      : null;
+  return { lat, lng, label };
+}
+
+/** «56.2912, 43.9876» — deterministic fallback label when no spot/name matches. */
+export function formatGeoCoords(lat: number, lng: number): string {
+  const fmt = (v: number) => v.toFixed(4).replace(/\.?0+$/, "");
+  return `${fmt(lat)}, ${fmt(lng)}`;
+}
+
+// ── Wall × map window events (map-riders sheet ↔ wall feed, same page) ──────
+// Both components are client-side on ONE page, so window CustomEvents are the
+// same integration pattern map-riders already uses (mapriders-* events).
+
+/** Map popup → wall feed: «показать этот пост» (detail: { postId }). */
+export const WALL_FOCUS_POST_EVENT = "onlybike:wall:focus-post";
+/** Wall feed changed (post created/hidden/deleted) → map refetches pins. */
+export const WALL_POSTS_CHANGED_EVENT = "onlybike:wall:posts-changed";
 
 // ── Photos + bike mentions (wall v2) ─────────────────────────────────────────
 

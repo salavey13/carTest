@@ -3,9 +3,11 @@
 // /components/layout/FranchizeMapBottomNav.tsx
 // Franchise-scoped bottom tab navigation for map-riders routes.
 // Refactored to control the sliding sheet instead of navigating away.
-// - "Топ" scrolls to the leaderboard section in the sheet
+// - "Топ" opens the RidersDrawer on the ride tab (зал славы живёт там)
 // - "Лист" opens the RidersDrawer (riders/meetups/history)
-// - "Экипаж" navigates to community page
+// - "Стена" expands the sheet — the community wall IS the sheet content now
+//   (on non-map routes — e.g. /leaderboard — it falls back to a plain Link:
+//   the sheet-controlling actions don't exist there).
 // z-30 sits behind the vaul Drawer (z-40), so it's visible
 // when the drawer is collapsed but hidden when expanded.
 
@@ -18,8 +20,7 @@ interface FranchizeMapBottomNavProps {
 }
 
 export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNavProps) {
-  const slugMatch = pathname.match(/^\/franchize\/([^/]+)\//);
-  const slug = slugMatch?.[1] || "vip-bike";
+  const slug = pathname.match(/^\/franchize\/([^/]+)\//)?.[1] || "vip-bike";
   const [canControl, setCanControl] = useState(false);
 
   // Check if we're on map-riders page (where we can control the sheet)
@@ -34,8 +35,8 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
       icon: Trophy,
       isLink: false,
       action: () => {
-        // Dispatch custom event for MapRidersClientRefactored to handle
-        window.dispatchEvent(new CustomEvent("mapriders-scroll-to-leaderboard"));
+        // RidersDrawer on the ride tab — the riding leaderboard lives there now.
+        window.dispatchEvent(new CustomEvent("mapriders-open-riders-drawer", { detail: { tab: "ride" } }));
       },
     },
     {
@@ -50,10 +51,13 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
     },
     {
       key: "crew",
-      label: "Экипаж",
-      href: `/franchize/${slug}/community`,
+      label: "Стена",
       icon: Users,
-      isLink: true,
+      isLink: false,
+      action: () => {
+        // Стена = контент шита: просто раскрываем его (без перехода).
+        window.dispatchEvent(new CustomEvent("mapriders-expand-sheet"));
+      },
     },
   ] as const;
 
@@ -68,26 +72,22 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
       <div className="pointer-events-auto mx-auto grid w-full max-w-lg grid-cols-3 gap-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const isLink = "href" in item && item.isLink;
-          const isActive = isLink && pathname === item.href;
-
-          if (isLink) {
+          // Off the map page the sheet/drawer actions don't exist — «Стена»
+          // degrades to a plain link to the standalone wall (old «Экипаж»
+          // behavior), Топ/Лист stay disabled.
+          if (!canControl && item.key === "crew") {
             return (
               <Link
                 key={item.key}
-                href={item.href}
+                href={`/franchize/${slug}/community`}
                 className="flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition"
-                style={{
-                  color: isActive ? "var(--fr-map-nav-accent, #facc15)" : "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)",
-                  backgroundColor: isActive ? "color-mix(in srgb, var(--fr-map-nav-accent, #facc15) 12%, transparent)" : "transparent",
-                }}
+                style={{ color: "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)" }}
               >
                 <Icon className="mb-1 h-4 w-4" />
-                {item.label}
+                Стена
               </Link>
             );
           }
-
           return (
             <button
               key={item.key}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import React from "react";
-import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer } from "react-leaflet";
+import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
 import type { GeoJsonObject } from "geojson";
 import { MapInteractionCapture } from "@/components/maps/MapInteractionCapture";
 import type { PointOfInterest } from "@/lib/map-utils";
@@ -74,6 +74,28 @@ function getPoiRenderKey(poi: PointOfInterest) {
   return `${poi.id}:${revisionCandidate}`;
 }
 
+/**
+ * Imperative focus request: {lat, lng, key}. `key` is a monotonic counter —
+ * re-focusing the SAME point must re-fly, so the effect depends on the whole
+ * object identity, not just coordinates. Zoom never zooms OUT (min 14: close
+ * enough to see the pin's context, far enough to keep street names readable).
+ */
+export interface RacingMapFocusPoint {
+  lat: number;
+  lng: number;
+  key: number;
+}
+
+function MapFocusFlyer({ focus }: { focus: RacingMapFocusPoint | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!focus) return;
+    if (!Number.isFinite(focus.lat) || !Number.isFinite(focus.lng)) return;
+    map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 14), { duration: 0.8 });
+  }, [focus, map]);
+  return null;
+}
+
 export function RacingMap({
   points,
   bounds,
@@ -82,6 +104,7 @@ export function RacingMap({
   onMapLongPress,
   onPointClick,
   tileLayer = "cartodb-dark",
+  focusPoint,
   children,
 }: {
   points: PointOfInterest[];
@@ -91,6 +114,8 @@ export function RacingMap({
   onMapLongPress?: (coords: [number, number]) => void;
   onPointClick?: (poi: PointOfInterest) => void;
   tileLayer?: TileLayerPreset;
+  /** Wall × map: fly to a geotagged post's marker (see MapFocusFlyer). */
+  focusPoint?: RacingMapFocusPoint | null;
   children?: ReactNode;
 }) {
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
@@ -215,6 +240,7 @@ export function RacingMap({
 
         {children}
         <MapInteractionCapture onMapClick={onMapClick} onMapLongPress={onMapLongPress} />
+        <MapFocusFlyer focus={focusPoint ?? null} />
       </MapContainer>
     </div>
   );

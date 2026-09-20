@@ -43,6 +43,7 @@ import {
   sanitizeReactionCounts,
   sanitizeWallPhotoInputs,
   sanitizeWallBikeIds,
+  sanitizeWallGeo,
   isValidWallReaction,
   extractHashtags,
   wallBusyUntilMap,
@@ -53,9 +54,13 @@ import {
   WALL_COMMENT_PREVIEW,
   WALL_COMMENTS_FETCH_LIMIT,
   WALL_FEED_PAGE_SIZE,
+  WALL_GEO_EXCERPT_LEN,
+  WALL_GEO_LABEL_MAX_LEN,
+  WALL_GEO_PINS_LIMIT,
   WALL_PHOTOS_MAX,
   WALL_POST_MAX_LEN,
   WALLPHOTO_BUCKET,
+  type WallGeoPinView,
 } from "@/app/franchize/lib/community-wall";
 import {
   assertWallRate,
@@ -104,6 +109,10 @@ type DbPostRow = {
   reaction_counts: unknown;
   is_pinned: boolean;
   created_at: string;
+  // Geotag (migration 20260922000000) — nulls for untagged posts.
+  geo_lat: number | null;
+  geo_lng: number | null;
+  geo_label: string | null;
 };
 type DbUserRow = {
   user_id: string;
@@ -527,6 +536,7 @@ export async function getCommunityWallAction(input: {
     rental: p.rental_id ? rentalRefs.get(p.rental_id) ?? null : null,
     photos: photosByPost.get(p.id) ?? [],
     bikes: bikesByPost.get(p.id) ?? [],
+    geo: sanitizeWallGeo({ lat: p.geo_lat, lng: p.geo_lng, label: p.geo_label }),
   }));
 
   return {
@@ -536,6 +546,84 @@ export async function getCommunityWallAction(input: {
     nextBefore: hasMore ? pageRows[pageRows.length - 1].created_at : null,
     viewer,
   };
+}
+
+// ── GEO PINS (wall × map interlink) ─────────────────────────────────────────
+
+export type GetWallGeotagsResult =
+  | { ok: true; pins: WallGeoPinView[] }
+  | { ok: false; error: string };
+
+/**
+ * Map-layer feed: latest geotagged posts of the crew (cap WALL_GEO_PINS_LIMIT).
+ * PUBLIC read on purpose — the map layer must work for the same audience that
+ * can read the wall anonymously; pins carry nothing the feed doesn't already
+ * show (excerpt ≤ 140 chars is rendered as plain text on the client).
+ */
+export async function getWallGeotagsAction(input: { slug: string }): Promise<GetWallGeotagsResult> {
+  const parsed = z.object({ slug: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос геотегов." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const { data: postRows, error } = await supabaseAdmin
+    .from("crew_posts")
+    .select("id, body, like_count, comment_count, geo_lat, geo_lng, geo_label, created_at, author_id")
+    .eq("crew_id", crew.id)
+    .eq("is_hidden", false)
+    .not("geo_lat", "is", null)
+    .not("geo_lng", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(WALL_GEO_PINS_LIMIT);
+  if (error) {
+    logger.error("[community-wall] geotag query failed:", error.message);
+    return { ok: false, error: "Не удалось загрузить метки постов. Попробуй ещё раз." };
+  }
+  const rows = (postRows ?? []) as unknown as DbPostRow[];
+  if (rows.length === 0) return { ok: true, pins: [] };
+
+  // Author naming (same bounded pattern as the feed — no PostgREST embeds).
+  const authorIds = [...new Set(rows.map((r) => r.author_id))];
+  const { data: authorRows } = await supabaseAdmin
+    .from("users")
+    .select("user_id, username, full_name, avatar_url")
+    .in("user_id", authorIds);
+  const authors = new Map<string, DbUserRow>();
+  for (const row of (authorRows ?? []) as DbUserRow[]) authors.set(row.user_id, row);
+
+  // First photo per post (position asc — same order the feed renders).
+  const { data: photoRows } = await supabaseAdmin
+    .from("crew_post_photos")
+    .select("post_id, storage_path, position")
+    .in("post_id", rows.map((r) => r.id))
+    .order("position", { ascending: true });
+  const firstPhotoByPost = new Map<string, string>();
+  for (const row of (photoRows ?? []) as { post_id: string; storage_path: string }[]) {
+    if (!firstPhotoByPost.has(row.post_id)) firstPhotoByPost.set(row.post_id, row.storage_path);
+  }
+
+  const pins: WallGeoPinView[] = [];
+  for (const row of rows) {
+    const geo = sanitizeWallGeo({ lat: row.geo_lat, lng: row.geo_lng, label: row.geo_label });
+    if (!geo) continue;
+    const author = authors.get(row.author_id);
+    pins.push({
+      postId: row.id,
+      excerpt: buildWallPostPreview(row.body, WALL_GEO_EXCERPT_LEN),
+      authorName: author?.full_name?.trim() || author?.username?.trim() || "Райдер",
+      authorAvatarUrl: author?.avatar_url ?? null,
+      photoUrl: firstPhotoByPost.has(row.id) ? wallPhotoPublicUrl(firstPhotoByPost.get(row.id) as string) : null,
+      lat: geo.lat,
+      lng: geo.lng,
+      label: geo.label,
+      createdAt: row.created_at,
+      // PostgREST may deliver int8 as a string — defensive coerce (family rule).
+      likeCount: typeof row.like_count === "number" ? row.like_count : Number(row.like_count) || 0,
+      commentCount: typeof row.comment_count === "number" ? row.comment_count : Number(row.comment_count) || 0,
+    });
+  }
+  return { ok: true, pins };
 }
 
 // ── CREATE POST ──────────────────────────────────────────────────────────────
@@ -551,6 +639,17 @@ const CreatePostInput = z.object({
   photos: z.unknown().optional(),
   // Catalogue bike mentions — shape-checked by sanitizeWallBikeIds.
   bikes: z.unknown().optional(),
+  // Optional geotag (wall × map): HARD shape gate — anything not exactly
+  // {lat,lng,label?} with finite in-range numbers is rejected as «Некорректный
+  // пост». The composer always sends well-formed geo; this only affects raw
+  // API callers. sanitizeWallGeo re-checks ranges before the insert.
+  geo: z
+    .object({
+      lat: z.number().finite().min(-90).max(90),
+      lng: z.number().finite().min(-180).max(180),
+      label: z.string().trim().min(1).max(WALL_GEO_LABEL_MAX_LEN).optional(),
+    })
+    .optional(),
 });
 
 export type CreateCommunityPostResult =
@@ -565,6 +664,7 @@ export async function createCommunityPostAction(input: {
   rentalId?: string;
   photos?: unknown;
   bikes?: unknown;
+  geo?: { lat: number; lng: number; label?: string };
 }): Promise<CreateCommunityPostResult> {
   const parsed = CreatePostInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный пост." };
@@ -597,8 +697,13 @@ export async function createCommunityPostAction(input: {
     return { ok: false, error: `Байков в посте — максимум ${WALL_BIKES_MAX}.` };
   }
 
-  if (!shareStats && body.length === 0 && photos.length === 0 && bikeIds.length === 0) {
-    return { ok: false, error: "Пост пустой — напиши пару слов или прикрепи фото." };
+  // Geotag: sanitizer is the single source of truth for the payload (zod above
+  // is the hard shape gate — numeric-string coords etc. fail fast there).
+  const composerGeo = sanitizeWallGeo(parsed.data.geo);
+
+  // A lone geotag IS a valid post (чекин-точка без текста) — count it here.
+  if (!shareStats && body.length === 0 && photos.length === 0 && bikeIds.length === 0 && !composerGeo) {
+    return { ok: false, error: "Пост пустой — напиши пару слов, прикрепи фото или точку." };
   }
   if (body.length > WALL_POST_MAX_LEN) return { ok: false, error: `Максимум ${WALL_POST_MAX_LEN} символов.` };
 
@@ -675,6 +780,12 @@ export async function createCommunityPostAction(input: {
     ? (JSON.parse(JSON.stringify(statsSnapshot)) as RentalStatsSnapshot)
     : null;
 
+  // Geotag columns: sanitize already ran above (geo-only posts are valid).
+  // Untagged posts keep explicit NULLs — mirrors the DB pair check constraint.
+  const geoColumns = composerGeo
+    ? { geo_lat: composerGeo.lat, geo_lng: composerGeo.lng, geo_label: composerGeo.label }
+    : { geo_lat: null, geo_lng: null, geo_label: null };
+
   const insertRow = {
     crew_id: crew.id,
     author_id: actor.userId,
@@ -683,6 +794,7 @@ export async function createCommunityPostAction(input: {
     body: finalBody,
     stats: statsJson,
     rental_id: verifiedRentalId,
+    ...geoColumns,
   };
   const { data: inserted, error } = await supabaseAdmin
     .from("crew_posts")
@@ -807,6 +919,7 @@ export async function createCommunityPostAction(input: {
     rental: rentalRef,
     photos: photoViews,
     bikes: bikeRefs,
+    geo: composerGeo,
   };
 
   // ── Crew notification: awaited ON PURPOSE (fire-and-forget freezes on
@@ -1934,6 +2047,7 @@ export async function getWallPostAction(input: {
     rental,
     photos,
     bikes,
+    geo: sanitizeWallGeo({ lat: postRow.geo_lat, lng: postRow.geo_lng, label: postRow.geo_label }),
   };
   return { ok: true, post };
 }

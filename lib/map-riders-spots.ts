@@ -185,3 +185,32 @@ export function findMotoSpotById(id: string | null | undefined): MotoSpot | null
 export function buildSpotCheckinText(spot: MotoSpot): string {
   return `📍 Отметился: ${spot.name} (${motoSpotKindLabel(spot.kind)}) — ${spot.address}. ${spot.hint} #mapriders`;
 }
+
+/**
+ * Расстояние по формуле гаверсинуса, метры. Чистая функция (без side effects) —
+ * нужна «nearest spot»-подписи геотега и тестируется напрямую.
+ */
+export function haversineMeters(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const lat1 = (a[0] * Math.PI) / 180;
+  const lat2 = (b[0] * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Ближайшая мототочка каталога не дальше maxMeters (иначе null). */
+export function findNearestMotoSpot(lat: number, lng: number, maxMeters = 250): MotoSpot | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  let best: MotoSpot | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const spot of NN_MOTO_SPOTS) {
+    const dist = haversineMeters([lat, lng], spot.coords);
+    if (dist < bestDist) {
+      best = spot;
+      bestDist = dist;
+    }
+  }
+  return best && bestDist <= maxMeters ? best : null;
+}

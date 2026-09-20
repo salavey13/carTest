@@ -244,12 +244,15 @@ describe("wall page interlink params", () => {
     expect(hook).toContain("onRideStopped?.(endedSessionId);");
   });
 
-  it("map client wires the spots layer + share button + meetup→wall link", () => {
+  it("map client wires the spots layer + in-sheet ride share + meetup→wall link", () => {
     const client = read("components/map-riders/MapRidersClientRefactored.tsx");
     expect(client).toContain("NN_MOTO_SPOTS.filter");
     expect(client).toContain("visibleSpots.map");
-    expect(client).toContain("community?spot=${spot.id}");
-    expect(client).toContain("community?ride=${endedRideSessionId}");
+    // Стена живёт в шите карты: чек-ин точки больше не уводит на /community —
+    // остаётся на map-riders с ?spot= (префилл композера в шите).
+    expect(client).toContain("map-riders?spot=${spot.id}");
+    // «Поделиться заездом» открывает черновик в шите (без смены URL).
+    expect(client).toContain("setSheetRideComposeId(endedRideSessionId)");
     expect(client).toContain("encodeURIComponent(m.title.slice(0, 60))");
     expect(client).toContain("spotKindFilter");
   });

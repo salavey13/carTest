@@ -61,15 +61,20 @@ import {
   zoomAtPoint,
   riderMilestoneBadge,
   toggleReactionOptimistic,
+  formatGeoCoords,
   WALL_BIKES_MAX,
   WALL_COMMENT_MAX_LEN,
   WALL_COMMENTS_FETCH_LIMIT,
+  WALL_GEO_LABEL_MAX_LEN,
   WALL_PHOTOS_MAX,
   WALL_POST_MAX_LEN,
   WALL_REACTIONS,
+  WALL_FOCUS_POST_EVENT,
+  WALL_POSTS_CHANGED_EVENT,
   type RentalStatsSnapshot,
   type WallBikeRefView,
   type WallPhotoView,
+  type WallPostGeo,
   type WallPostView,
   type WallViewerInfo,
 } from "@/app/franchize/lib/community-wall";
@@ -100,7 +105,7 @@ import {
 import { crewStandingsDisplayName } from "@/app/franchize/lib/crew-standings";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
-import { buildSpotCheckinText, findMotoSpotById } from "@/lib/map-riders-spots";
+import { buildSpotCheckinText, findMotoSpotById, findNearestMotoSpot } from "@/lib/map-riders-spots";
 import { buildTelegramAppLink, wallPostStartParam } from "@/lib/wall-deeplink";
 import { WhoReactedModal } from "./WhoReactedModal";
 
@@ -156,9 +161,15 @@ interface CommunityWallClientProps {
   initialQuery?: string | null;
   /** Spot check-in (?spot=<id>): предзаполнить композер текстом про мототочку. */
   checkinSpotId?: string | null;
+  /** Wall × map: точка, выбранная тапом на карте (map-riders sheet mode).
+   *  null/undefined = стены вне карты — «точка с карты» в композере скрыта. */
+  mapSelectedPoint?: [number, number] | null;
+  /** Wall × map: тап по геотег-чипу поста → карта летит к метке.
+   *  Не задан (страница стены) — чип ведёт на карту (?post=<id>). */
+  onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, mapSelectedPoint, onFocusGeotag }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -220,6 +231,14 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   const [standings, setStandings] = useState<{ standings: WallStandingsEntry[]; weekRides: number } | null>(null);
   const [newPostsCount, setNewPostsCount] = useState(0);
   const wallTopRef = useRef<HTMLDivElement>(null);
+
+  // ── geotag (wall × map interlink) ──
+  // Composer tag: attached point for the NEXT post (composer payload `geo`).
+  const [geoTag, setGeoTag] = useState<WallPostGeo | null>(null);
+  const [geoPickerOpen, setGeoPickerOpen] = useState(false);
+  const [geoBusy, setGeoBusy] = useState(false);
+  // Map → feed focus (map popup «показать в ленте»): mirrors the deeplink path.
+  const [eventFocus, setEventFocus] = useState<{ id: string; n: number } | null>(null);
 
   const loadFeed = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -334,12 +353,19 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   // добираем одним запросом (getWallPostAction) и вставляем сверху.
   const hashScrolledRef = useRef(false);
   const deepLinkPostFetchedRef = useRef(false);
-  const pendingDeepLinkPostId = highlightPostId ?? null;
-  // Пере-оружаемся при смене цели (in-place навигация на другой ?post=).
+  // Event focus wins over the static URL prop: on map-riders?post=A a tap on
+  // pin B must show B, not re-focus the stale ?post=A target forever.
+  const pendingDeepLinkPostId = eventFocus?.id ?? highlightPostId ?? null;
+  // A NEW ?post= (in-place navigation) supersedes a stale event focus.
+  useEffect(() => {
+    setEventFocus(null);
+  }, [highlightPostId]);
+  // Пере-оружаемся при смене цели (in-place навигация на другой ?post= ИЛИ
+  // повторный «показать в ленте» с карты — потому eventFocus.n, не только id).
   useEffect(() => {
     hashScrolledRef.current = false;
     deepLinkPostFetchedRef.current = false;
-  }, [pendingDeepLinkPostId]);
+  }, [pendingDeepLinkPostId, eventFocus?.n]);
   useEffect(() => {
     if (loading || hashScrolledRef.current) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
@@ -365,11 +391,26 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     return () => clearTimeout(t);
   }, [loading, posts, pendingDeepLinkPostId, slug, activeTag, activeQuery]);
 
+  // Wall × map: попап метки поста на карте → «Показать в ленте» → тот же
+  // скролл+подсветка, что у deeplinks (общий механизм через pendingDeepLinkPostId).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const postId = (e as CustomEvent<{ postId?: string }>).detail?.postId;
+      if (typeof postId === "string" && /^[0-9a-f-]{8,64}$/i.test(postId)) {
+        setEventFocus({ id: postId, n: Date.now() });
+      }
+    };
+    window.addEventListener(WALL_FOCUS_POST_EVENT, handler);
+    return () => window.removeEventListener(WALL_FOCUS_POST_EVENT, handler);
+  }, []);
+
   // ── compose draft («поделиться поездкой» из уведомления о закрытии аренды) ──
   const [composeDraft, setComposeDraft] = useState<WallRentalDraft | null>(null);
   const [composeDismissed, setComposeDismissed] = useState(false);
   useEffect(() => {
     if (!composeRentalId) return;
+    // New draft id = fresh banner (previous «убрать» applies to that draft only).
+    setComposeDismissed(false);
     let cancelled = false;
     void getWallRentalDraftAction({ slug, rentalId: composeRentalId, initData: withInitData() }).then((res) => {
       if (cancelled) return;
@@ -401,6 +442,8 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   const [rideDraftDismissed, setRideDraftDismissed] = useState(false);
   useEffect(() => {
     if (!composeRideId) return;
+    // New draft id = fresh banner (previous «убрать» applies to that draft only).
+    setRideDraftDismissed(false);
     let cancelled = false;
     void getWallRideDraftAction({ slug, sessionId: composeRideId, initData: withInitData() }).then((res) => {
       if (cancelled) return;
@@ -565,6 +608,41 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     });
   }, []);
 
+  // ── composer: geotag (wall × map) ──────────────────────────────────
+
+  /** Apply a raw point as the composer tag: nearest moto-spot name wins,
+   *  deterministic «lat, lng» string otherwise. Never throws. */
+  const applyGeoPoint = useCallback((lat: number, lng: number) => {
+    const spot = findNearestMotoSpot(lat, lng, 250);
+    setGeoTag({ lat, lng, label: spot ? spot.name : formatGeoCoords(lat, lng) });
+    setGeoPickerOpen(false);
+    setComposerError(null);
+  }, []);
+
+  const attachMapPointGeotag = useCallback(() => {
+    if (!mapSelectedPoint) return;
+    applyGeoPoint(mapSelectedPoint[0], mapSelectedPoint[1]);
+  }, [applyGeoPoint, mapSelectedPoint]);
+
+  const attachMyLocationGeotag = useCallback(() => {
+    if (!navigator.geolocation) {
+      setComposerError("Геолокация недоступна в этом браузере.");
+      return;
+    }
+    setGeoBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoBusy(false);
+        applyGeoPoint(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => {
+        setGeoBusy(false);
+        setComposerError("Не удалось получить геолокацию — разреши доступ или ткни точку на карте.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  }, [applyGeoPoint]);
+
   const pendingUploads = composerPhotos.some((p) => p.uploading);
   const failedUploads = composerPhotos.filter((p) => p.failed).length;
 
@@ -590,6 +668,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
         .filter((p) => p.path)
         .map((p) => ({ path: p.path, width: p.width, height: p.height, bytes: p.bytes })),
       bikes: selectedBikes.map((b) => b.bikeId),
+      geo: geoTag ? { lat: geoTag.lat, lng: geoTag.lng, label: geoTag.label ?? undefined } : undefined,
     });
     if (res.ok) {
       // Insert after pinned posts (pinned block always stays on top).
@@ -606,15 +685,19 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
       setComposerPhotosSync([]);
       setSelectedBikes([]);
       setBikePickerOpen(false);
+      setGeoTag(null);
+      setGeoPickerOpen(false);
       setComposeDraft(null);
       setComposeDismissed(false);
       setRideDraft(null);
       setRideDraftDismissed(false);
+      // Wall × map: новая метка могла появиться/исчезнуть — карта перечитает пины.
+      window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
     } else {
       setComposerError(res.error);
     }
     setPosting(false);
-  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, setComposerPhotosSync]);
+  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, geoTag, setComposerPhotosSync]);
 
   // ── likes / comments / moderation ──────────────────────────────────────────
 
@@ -722,6 +805,8 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     if (res.ok) {
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
       setWallNotice(hide ? "Пост скрыт из ленты." : null);
+      // Hidden post's marker must disappear from the map layer too.
+      window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
     } else {
       setWallNotice(res.error);
     }
@@ -733,6 +818,8 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     if (res.ok) {
       setPosts((prev) => prev.filter((p) => p.id !== post.id));
       setLightbox((cur) => (cur && cur.postId === post.id ? null : cur));
+      // Deleted post's marker must disappear from the map layer too.
+      window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
     } else {
       setWallNotice(res.error);
     }
@@ -1221,6 +1308,69 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
               </div>
             )}
 
+            {/* geotag chip (wall × map): пост появится меткой на карте экипажа */}
+            {geoTag && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="flex max-w-full items-center gap-1.5 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-2 pr-1 text-xs text-[var(--community-accent)]">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate font-semibold">{geoTag.label ?? formatGeoCoords(geoTag.lat, geoTag.lng)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setGeoTag(null)}
+                    aria-label="Убрать геотег"
+                    className="rounded-full p-0.5 transition hover:bg-[var(--community-accent)]/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+                <span className="text-[11px] text-[var(--community-muted)] opacity-75">пост появится меткой на карте</span>
+              </div>
+            )}
+
+            {/* geotag picker: карта экипажа (sheet-режим) или геолокация браузера */}
+            {geoPickerOpen && (
+              <div className="mt-3 rounded-xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--community-accent)]">
+                    <MapPin className="h-3.5 w-3.5" /> где это было?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setGeoPickerOpen(false)}
+                    aria-label="Закрыть выбор точки"
+                    className="rounded-full p-1 text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1.5 sm:flex-row">
+                  {mapSelectedPoint ? (
+                    <button
+                      type="button"
+                      onClick={attachMapPointGeotag}
+                      className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--community-accent)]/50 bg-[var(--community-accent)]/10 px-3 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Точка с карты: {mapSelectedPoint[0].toFixed(4)}, {mapSelectedPoint[1].toFixed(4)}
+                    </button>
+                  ) : (
+                    <span className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--community-border)] px-3 text-center text-[11px] text-[var(--community-muted)]">
+                      Открой карту экипажа — ткни точку, и она появится тут
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={attachMyLocationGeotag}
+                    disabled={geoBusy}
+                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--community-border)] px-3 text-xs font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] disabled:opacity-50"
+                  >
+                    {geoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                    {geoBusy ? "Ловим спутники…" : "Моя геолокация"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -1273,6 +1423,21 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                   <BarChart3 className="h-4 w-4" />
                   {statsLoading ? "Считаем поездки…" : "Статистика"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setGeoPickerOpen((cur) => !cur)}
+                  title="Прикрепить точку на карте"
+                  aria-label="Прикрепить точку на карте"
+                  aria-expanded={geoPickerOpen}
+                  className={`cw-press flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition ${
+                    geoPickerOpen || geoTag
+                      ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
+                      : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)]"
+                  }`}
+                >
+                  <MapPin className="h-4 w-4" />
+                  Точка
+                </button>
                 <span className="text-xs text-[var(--community-muted)] opacity-70">
                   {text.length} / {WALL_POST_MAX_LEN}
                 </span>
@@ -1283,7 +1448,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 disabled={
                   posting ||
                   pendingUploads ||
-                  (!text.trim() && !shareStats && composerPhotos.length === 0 && selectedBikes.length === 0)
+                  (!text.trim() && !shareStats && composerPhotos.length === 0 && selectedBikes.length === 0 && !geoTag)
                 }
                 className="cw-press flex items-center gap-2 rounded-full bg-[var(--community-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--community-accent-text)] shadow-[0_8px_26px_-10px_var(--community-accent)] transition disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -1372,6 +1537,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 onHideComment={(commentId) => void hideComment(post, commentId)}
                 onOpenPhoto={(index) => setLightbox({ postId: post.id, index })}
                 onOpenReactions={() => setWhoReacted(post.id)}
+                onFocusGeotag={onFocusGeotag}
                 deeplinkBotUsername={deeplinkBotUsername}
               />
             ))}
@@ -2366,8 +2532,12 @@ function ReactionBar({
 
       {pickerOpen && (
         <>
-          {/* click-away catcher */}
-          <div className="fixed inset-0 z-30" onClick={closePicker} aria-hidden="true" />
+          {/* click-away catcher — PORTAL: внутри шита карты backdrop-blur-предок
+              стал бы containing block для fixed, и клик «мимо» не закрывал бы
+              пикер на тапах по карте (та же ловушка, что у лайтбокса выше). */}
+          <WallOverlayPortal>
+            <div className="fixed inset-0 z-30" onClick={closePicker} aria-hidden="true" />
+          </WallOverlayPortal>
           <div
             role="menu"
             aria-label="Выбрать реакцию"
@@ -2529,6 +2699,9 @@ interface PostCardProps {
   onOpenPhoto: (index: number) => void;
   onHashtag: (tag: string) => void;
   deeplinkBotUsername?: string | null;
+  /** Wall × map: задан на карте (sheet) — чип летит к метке; на странице
+   *  стены не задан — чип ведёт на карту (?post=<id>). */
+  onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
 }
 
 function PostCard(props: PostCardProps) {
@@ -2701,6 +2874,33 @@ function PostCard(props: PostCardProps) {
 
       {/* bike mentions */}
       <PostBikeChips bikes={post.bikes} slug={slug} />
+
+      {/* geotag chip (wall × map): тап — карта летит к метке (sheet) или
+          переход на карту с этим постом (страница стены) */}
+      {post.geo && (
+        <div className="mt-2.5">
+          {props.onFocusGeotag ? (
+            <button
+              type="button"
+              onClick={() => props.onFocusGeotag?.(post.geo as WallPostGeo, post.id)}
+              title="Показать на карте экипажа"
+              className="cw-press inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+            >
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 truncate">{post.geo.label ?? formatGeoCoords(post.geo.lat, post.geo.lng)}</span>
+            </button>
+          ) : (
+            <Link
+              href={`/franchize/${slug}/map-riders?post=${post.id}`}
+              title="Показать на карте экипажа"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20"
+            >
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 truncate">{post.geo.label ?? formatGeoCoords(post.geo.lat, post.geo.lng)}</span>
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* stats snapshot */}
       {post.kind === "stats" && post.stats && (

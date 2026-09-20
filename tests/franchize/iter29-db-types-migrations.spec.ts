@@ -102,7 +102,8 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     // 168 → 169: 20260920040000_wall_engagement_300kb.sql (wall v4: engagement notify ledger + RPC `added` + wallpix 300 KB)
     // 169 → 170: 20260920050000_rpc_lockdown_anon.sql (security review: REVOKE EXECUTE from anon on server-only RPCs)
     // 170 → 171: 20260921000000_seed_nn_moto_spot_crews.sql (map ⇄ wall interlink: NN moto-spot dummy crews)
-    expect(files.length).toBe(171);
+    // 171 → 172: 20260922000000_crew_post_geotags.sql (wall × map: geo_lat/geo_lng/geo_label + partial feed index)
+    expect(files.length).toBe(172);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

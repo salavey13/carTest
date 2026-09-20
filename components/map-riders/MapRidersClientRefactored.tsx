@@ -12,24 +12,28 @@ import dynamic from "next/dynamic";
 import { Drawer } from "vaul";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme } from "next-themes";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useMaps } from "@/lib/maps/useMaps";
-import { MapRidersProvider, useMapRiders, useMapRidersState } from "@/hooks/useMapRidersContext";
-import { formatRideDuration, initialsFromName, riderDisplayName } from "@/lib/map-riders";
+import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
+import { initialsFromName, riderDisplayName } from "@/lib/map-riders";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
 import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
+import { CommunityWallClient } from "@/app/franchize/[slug]/community/CommunityWallClient";
+import { getWallGeotagsAction } from "@/app/franchize/server-actions/community-wall";
+import {
+  formatRelativeTimeRu,
+  WALL_FOCUS_POST_EVENT,
+  WALL_POSTS_CHANGED_EVENT,
+  type WallGeoPinView,
+} from "@/app/franchize/lib/community-wall";
 import { motoSpotKindLabel, MOTO_SPOT_KINDS, motoSpotKindIcon, NN_MOTO_SPOTS, type MotoSpot, type MotoSpotKind } from "@/lib/map-riders-spots";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
@@ -37,7 +41,6 @@ import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
-import { BeginnerRiderOnboardingQuiz } from "@/components/map-riders/BeginnerRiderOnboardingQuiz";
 import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 
 // Lazy-load map (SSR disabled)
@@ -119,8 +122,17 @@ const DRAWER_SNAP_POINTS: number[] = [...SNAP_POINTS];
 type SnapLabel = "Мини" | "Средне" | "Макс";
 const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.86: "Макс" };
 
+/** Deep-link params from /map-riders?post=|ride=|compose=|spot=|q= → wall in the sheet. */
+export interface MapRidersWallParams {
+  highlightPostId?: string | null;
+  composeRentalId?: string | null;
+  composeRideId?: string | null;
+  initialQuery?: string | null;
+  checkinSpotId?: string | null;
+}
+
 // ── Inner component (uses context) ──
-function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknown[] }) {
+function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; items?: unknown[]; wallParams?: MapRidersWallParams }) {
   const { dbUser } = useAppContext();
   const { resolvedTheme = "dark" } = useTheme();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
@@ -134,13 +146,20 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
   const [ridersDrawerOpen, setRidersDrawerOpen] = useState(false);
+  const [ridersDrawerTab, setRidersDrawerTab] = useState<string>("riders");
+  // Легенда мототочек — плавающий оверлей на карте (переехала из шита).
+  const [spotLegendOpen, setSpotLegendOpen] = useState(false);
   // Interlink карта → стена: id последнего завершённого заезда — даёт кнопку
   // «Поделиться заездом на стене» (→ /community?ride=<id>). Чистится при новом старте.
   const [endedRideSessionId, setEndedRideSessionId] = useState<string | null>(null);
-  // Round-2 enhance: per-kind фильтр мототочек (легенда-чипы в панели).
+  // Round-2 enhance: per-kind фильтр мототочек (легенда-чипы на карте).
   const [spotKindFilter, setSpotKindFilter] = useState<MotoSpotKind | "all">("all");
+  // ── Wall × map: геотег-пины постов + flyTo-фокус ──
+  const [geoPins, setGeoPins] = useState<WallGeoPinView[]>([]);
+  const [wallFocusPoint, setWallFocusPoint] = useState<{ lat: number; lng: number; key: number } | null>(null);
+  // In-page «поделиться заездом»: черновик открывается в стене шита без смены URL.
+  const [sheetRideComposeId, setSheetRideComposeId] = useState<string | null>(null);
   const lastMeetupActionAtRef = useRef(0);
-  const leaderboardRef = useRef<HTMLDivElement>(null);
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
@@ -163,17 +182,17 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
     ? (resolvedTheme === "light" ? "cartodb-light" : "cartodb-dark")
     : (mapData?.meta.tileLayer || "cartodb-dark");
   const { createMeetup } = useMeetupCreator(crewSlug);
+  // Общий обработчик конца заезда: и FAB/шит, и таб «Эфир» в листе райдеров
+  // должны поднять кнопку «Поделиться заездом» (иначе стоп из листа терял interlink).
+  const handleRideStopped = useCallback((endedSessionId: string) => {
+    setEndedRideSessionId(endedSessionId);
+    // Панель свернута (Мини) → подними до Средне, чтобы кнопка шеринга была видна.
+    setActiveSnap((snap) => (snap <= 0.2 ? 0.48 : snap));
+  }, []);
   const { canStart, canStop, startSession, stopSession } = useSessionManager({
     authErrorMessage: "Авторизуйся",
     stopSuccessMessage: "Заезд завершён",
-    onRideStopped: useCallback(
-      (endedSessionId: string) => {
-        setEndedRideSessionId(endedSessionId);
-        // Панель свернута (Мини) → подними до Средне, чтобы кнопка шеринга была видна.
-        setActiveSnap((snap) => (snap <= 0.2 ? 0.48 : snap));
-      },
-      [],
-    ),
+    onRideStopped: handleRideStopped,
   });
   const drawerEmptyStateCopy = useMemo(
     () => ({
@@ -270,27 +289,83 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
 
   // ── Event listeners for FranchizeMapBottomNav ──
   useEffect(() => {
-    const handleScrollToLeaderboard = () => {
-      // Expand sheet to make leaderboard visible
-      setActiveSnap(0.86);
-      setSheetOpen(true);
-      // Scroll to leaderboard section
-      setTimeout(() => {
-        leaderboardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 300);
-    };
-
-    const handleOpenRidersDrawer = () => {
+    const handleOpenRidersDrawer = (event?: Event) => {
+      // «Топ» открывает лист на табе «Эфир» (зал славы переехал туда),
+      // «Лист» — на табе райдеров.
+      const tab = (event as CustomEvent<{ tab?: string }> | undefined)?.detail?.tab;
+      setRidersDrawerTab(tab === "ride" ? "ride" : "riders");
       setRidersDrawerOpen(true);
     };
 
-    window.addEventListener("mapriders-scroll-to-leaderboard", handleScrollToLeaderboard);
+    const handleExpandSheet = () => {
+      // Стена теперь живёт в шите — «Стена» в нижней навигации просто раскрывает его.
+      setActiveSnap(0.86);
+      setSheetOpen(true);
+    };
+
     window.addEventListener("mapriders-open-riders-drawer", handleOpenRidersDrawer);
+    window.addEventListener("mapriders-expand-sheet", handleExpandSheet);
 
     return () => {
-      window.removeEventListener("mapriders-scroll-to-leaderboard", handleScrollToLeaderboard);
       window.removeEventListener("mapriders-open-riders-drawer", handleOpenRidersDrawer);
+      window.removeEventListener("mapriders-expand-sheet", handleExpandSheet);
     };
+  }, []);
+
+  // ── Wall × map: геотег-пины постов экипажа ──────────────────────────────────
+  // Лента стены и карта — один экран: пост с геотегом = метка на карте.
+  // Refetch: маунт + wall:posts-changed (пост создан/скрыт/удалён) + возврат
+  // во вкладку — debounce 2s не даёт спамить экшен при серийных правках.
+  const loadGeoPins = useCallback(async () => {
+    try {
+      const res = await getWallGeotagsAction({ slug: crewSlug });
+      if (res.ok) setGeoPins(res.pins);
+    } catch {
+      // transport-level throw (offline / 5xx HTML): keep the previous pins,
+      // the map layer is decorative and must never unmount the page's handlers
+    }
+  }, [crewSlug]);
+
+  useEffect(() => {
+    void loadGeoPins();
+  }, [loadGeoPins]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void loadGeoPins(), 2000);
+    };
+    const onWallChanged = () => {
+      scheduleReload();
+      // Заезд поделили → кнопка-источник больше не нужна (борьба с no-op ре-кликами).
+      setSheetRideComposeId(null);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") scheduleReload();
+    };
+    window.addEventListener(WALL_POSTS_CHANGED_EVENT, onWallChanged);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener(WALL_POSTS_CHANGED_EVENT, onWallChanged);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (timer) clearTimeout(timer);
+    };
+  }, [loadGeoPins]);
+
+  // Гео-чип поста в ленте (onFocusGeotag проп стены) — прямая интеграция:
+  // свернуть шит, чтобы карта стала видна, и лететь к метке.
+  const handleWallFocusGeotag = useCallback((geo: { lat: number; lng: number }) => {
+    setActiveSnap(0.2);
+    setSheetOpen(true);
+    setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
+  }, []);
+
+  /** Метка на карте → раскрыть шит и подсветить пост в ленте. */
+  const openWallPostFromMap = useCallback((postId: string) => {
+    window.dispatchEvent(new CustomEvent(WALL_FOCUS_POST_EVENT, { detail: { postId } }));
+    setActiveSnap(0.86);
+    setSheetOpen(true);
   }, []);
 
   // ── Build map points from state ──
@@ -354,8 +429,10 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
         </div>
         <div className="text-xs leading-snug opacity-80">{spot.hint}</div>
         <div className="flex flex-col gap-1 pt-1">
+          {/* Стена живёт в шите той же страницы: чек-ин остаётся на карте
+              (composer префиллится текстом точки через ?spot=). */}
           <Link
-            href={`/franchize/${crewSlug}/community?spot=${spot.id}`}
+            href={`/franchize/${crewSlug}/map-riders?spot=${spot.id}`}
             className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
             style={{ backgroundColor: "var(--community-accent, var(--mr-accent))", color: "var(--community-accent-text, var(--mr-base))" }}
           >
@@ -400,6 +477,51 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
     for (const spot of NN_MOTO_SPOTS) counts.set(spot.kind, (counts.get(spot.kind) ?? 0) + 1);
     return counts;
   }, []);
+
+  // ── Wall × map: геотег-метки постов (лента в шите ↔ слой на карте) ──
+  // preferCanvas у карты → цвет нужен КОНКРЕТНЫМ hex'ом, CSS-переменные
+  // canvas-рендерер не понимает. Авто-тема → фирменный amber VIP BIKE.
+  const wallPinColor = crew.theme.isAuto ? "#facc15" : crew.theme.palette.accentMain;
+
+  const wallPinPoints = useMemo(
+    () =>
+      geoPins.map((pin) => ({
+        id: `wallpost-${pin.postId}`,
+        name: `Пост · ${pin.authorName}${pin.label ? ` · ${pin.label}` : ""}`,
+        type: "point" as const,
+        icon: "::FaCameraRetro::",
+        color: wallPinColor,
+        coords: [[pin.lat, pin.lng]] as [number, number][],
+        markerClassName: SPOT_POPUP_CLASSNAME,
+        popup: (
+          <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
+            {pin.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- public wallpix CDN URL, same as the feed renders
+              <img src={pin.photoUrl} alt="" className="h-24 w-full rounded-lg object-cover" />
+            ) : null}
+            {pin.excerpt ? <div className="text-xs leading-snug">{pin.excerpt}</div> : null}
+            <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
+              <span className="truncate">{pin.authorName}</span>
+              <span className="shrink-0">{formatRelativeTimeRu(pin.createdAt)}</span>
+            </div>
+            {pin.label ? (
+              <div className="truncate text-[11px] font-semibold" style={{ color: wallPinColor }}>
+                📍 {pin.label}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => openWallPostFromMap(pin.postId)}
+              className="w-full rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+              style={{ backgroundColor: wallPinColor, color: crew.theme.isAuto ? "#030712" : crew.theme.palette.bgBase }}
+            >
+              Показать в ленте
+            </button>
+          </div>
+        ),
+      })),
+    [geoPins, wallPinColor, openWallPostFromMap, crew.theme.isAuto, crew.theme.palette.bgBase],
+  );
 
   const mapPoints = useMemo(() => {
     // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
@@ -468,8 +590,8 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
 
     // DEFAULT_ROUTES are always present (scenic routes around HQ) — they're filtered
     // out of staticMapPoints above to avoid duplication if the migration also seeded them.
-    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints];
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints]);
+    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints];
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -479,15 +601,6 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       offline: riders.filter((rider) => rider.status === "evicted").length,
     };
   }, [state.liveRiders]);
-
-  const heroStats = useMemo(
-    () => [
-      { label: "В эфире", value: state.stats.activeRiders, icon: "::FaSatelliteDish::" },
-      { label: "Точки встречи", value: state.stats.meetupCount, icon: "::FaUsersViewfinder::" },
-      { label: "Км за 7 дней", value: state.stats.totalWeeklyDistanceKm, icon: "::FaRoad::" },
-    ],
-    [state.stats.activeRiders, state.stats.meetupCount, state.stats.totalWeeklyDistanceKm],
-  );
 
   const handleQuickMeetupCreate = useCallback(async () => {
     if (!dbUser?.user_id) {
@@ -614,21 +727,6 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       className="relative flex-1 h-full w-full overflow-hidden"
       style={{ ...cssVars } as React.CSSProperties}
     >
-      {/* ── community band (consistency round) ─────────────────────────────
-          The same accent/live language as the wall: cw-live-dot + the
-          --community-* bridge the page sets on <main>. Top-right because the
-          Leaflet zoom lives top-left and the record FAB bottom-right. */}
-      <div className="pointer-events-auto absolute right-2 top-2 z-[500] flex items-center gap-2 rounded-full border border-[var(--community-border)] bg-[var(--community-card-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--community-text)] shadow-lg backdrop-blur">
-        <span className="cw-live-dot" aria-hidden />
-        <span className="hidden sm:inline">OnlyBike community</span>
-        <Link
-          href={`/franchize/${crewSlug}/community`}
-          className="text-[var(--community-accent)] transition hover:underline"
-        >
-          Стена →
-        </Link>
-      </div>
-
       {/* ── MAP (fullscreen background) ── */}
       <section className="absolute inset-0 z-0">
         <div className="absolute inset-0 pointer-events-auto">
@@ -638,6 +736,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
               className="h-full w-full"
               tileLayer={finalTileLayer}
+              focusPoint={wallFocusPoint}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);
                 dispatch({ type: "ui/select-meetup-point", payload: coords });
@@ -649,6 +748,9 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
                   setSelectedMeetupId(meetupId);
                   dispatch({ type: "ui/select-meetup-point", payload: null });
                 }
+                // wallpost-* метки: тап открывает leaflet-попап (фото/цитата/кнопка).
+                // Шит раскрывает только кнопка «Показать в ленте» внутри попапа —
+                // иначе попап мгновенно уходит под развернутый шит.
               }}
             >
               {state.sessionDetail?.points?.length ? <SpeedGradientRoute points={state.sessionDetail.points} /> : null}
@@ -706,6 +808,58 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
             </div>
           </div>
         </div>
+
+        {/* Легенда мототочек (переехала из шита): плавающий оверлей top-left
+            ПОД зумом Leaflet. Схлопнутая — одна кнопка-чип; раскрытая —
+            горизонтальная лента kind-фильтров, красится через --mr-*. */}
+        <div className="pointer-events-none absolute left-2 top-12 z-20 max-w-[calc(100%-6rem)] md:left-3">
+          <div className="pointer-events-auto rounded-2xl border border-[var(--mr-border)] bg-[var(--mr-card)]/80 shadow-2xl shadow-black/30 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setSpotLegendOpen((cur) => !cur)}
+              aria-expanded={spotLegendOpen}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-[var(--mr-text)]"
+            >
+              <VibeContentRenderer content={motoSpotKindIcon("landmark")} className="inline-block align-[-2px]" />
+              Мототочки {NN_MOTO_SPOTS.length}
+              <span className="text-[var(--mr-muted)]">{spotLegendOpen ? "▲" : "▼"}</span>
+            </button>
+            {spotLegendOpen && (
+              <div className="flex max-w-full gap-1.5 overflow-x-auto px-2.5 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSpotKindFilter("all")}
+                  aria-pressed={spotKindFilter === "all"}
+                  className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                  style={
+                    spotKindFilter === "all"
+                      ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
+                      : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
+                  }
+                >
+                  Все {NN_MOTO_SPOTS.length}
+                </button>
+                {MOTO_SPOT_KINDS.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => setSpotKindFilter((cur) => (cur === kind ? "all" : kind))}
+                    aria-pressed={spotKindFilter === kind}
+                    className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                    style={
+                      spotKindFilter === kind
+                        ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
+                        : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
+                    }
+                  >
+                    <VibeContentRenderer content={motoSpotKindIcon(kind)} className="mr-1 inline-block align-[-2px]" />
+                    {motoSpotKindLabel(kind)} {spotKindCounts.get(kind) ?? 0}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* ── DRAGGABLE TAXI-STYLE BOTTOM SHEET (vaul) ── */}
@@ -725,7 +879,7 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
             <div className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
             {/* Snap control buttons */}
             <div className="pointer-events-auto mb-3 flex items-center justify-between gap-2">
-              <h3 className="font-orbitron text-sm text-[var(--mr-text)]">Панель райдера</h3>
+              <h3 className="font-orbitron flex items-center gap-2 text-sm text-[var(--mr-text)]">Стена экипажа<span className="cw-live-dot" aria-hidden /></h3>
               <div className="pointer-events-auto flex gap-1.5">
                 {SNAP_POINTS.map((snap) => (
                   <Button
@@ -742,227 +896,61 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
               </div>
             </div>
             <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
-              <BeginnerRiderOnboardingQuiz crew={crew} />
-              {/* Мототочки НН (Chain-style discovery): легенда-фильтры по типу.
-                  Чипы красятся через --mr-* (crew palette), тач-таргет ≥ 36px. */}
-              <div className="mt-3 rounded-2xl border p-3" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--mr-text)" }}>
-                    Мототочки НН · {NN_MOTO_SPOTS.length}
-                  </h4>
-                  {spotKindFilter !== "all" ? (
-                    <button
+              {/* ── Ride strip: компактный статус эфира (start/stop — жёлтый FAB
+                  справа, полный пульт с приватностью — в листе райдеров, таб
+                  «Эфир»). Всё остальное устарело: шит теперь = стена экипажа. ── */}
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
+                <span className="cw-live-dot" aria-hidden />
+                <span className="text-xs font-semibold text-[var(--mr-text)]">
+                  {state.shareEnabled ? (state.sharePaused ? "Эфир на паузе" : "Ты в эфире") : "Эфир выключен"}
+                </span>
+                <span className="text-xs text-[var(--mr-muted)]">
+                  · {riderStatusCounts.live} live · {state.stats.totalWeeklyDistanceKm} км за 7 дней
+                </span>
+                <span className="ml-auto flex items-center gap-1.5">
+                  {isAdmin ? (
+                    <Button asChild variant="outline" size="sm" className="h-7 px-2 text-xs">
+                      <Link href="/admin/map-routes">Маршруты</Link>
+                    </Button>
+                  ) : null}
+                  {endedRideSessionId && !state.shareEnabled ? (
+                    <Button
                       type="button"
-                      onClick={() => setSpotKindFilter("all")}
-                      className="rounded-full px-2 py-1 text-[11px] font-medium underline-offset-2 hover:underline"
-                      style={{ color: "var(--mr-muted)" }}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        // Стена теперь в шите: черновик «поделиться заездом»
+                        // открывается здесь же, без ухода со страницы карты.
+                        setSheetRideComposeId(endedRideSessionId);
+                        setActiveSnap(0.86);
+                      }}
                     >
-                      сбросить
-                    </button>
-                  ) : (
-                    <span className="text-[11px]" style={{ color: "var(--mr-muted)" }}>на карте ↓</span>
-                  )}
-                </div>
-                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setSpotKindFilter("all")}
-                    aria-pressed={spotKindFilter === "all"}
-                    className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
-                    style={
-                      spotKindFilter === "all"
-                        ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
-                        : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
-                    }
-                  >
-                    Все {NN_MOTO_SPOTS.length}
-                  </button>
-                  {MOTO_SPOT_KINDS.map((kind) => (
-                    <button
-                      key={kind}
-                      type="button"
-                      onClick={() => setSpotKindFilter((cur) => (cur === kind ? "all" : kind))}
-                      aria-pressed={spotKindFilter === kind}
-                      className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
-                      style={
-                        spotKindFilter === kind
-                          ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
-                          : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
-                      }
-                    >
-                      <VibeContentRenderer content={motoSpotKindIcon(kind)} className="mr-1 inline-block align-[-2px]" />
-                      {motoSpotKindLabel(kind)} {spotKindCounts.get(kind) ?? 0}
-                    </button>
-                  ))}
-                </div>
+                      <VibeContentRenderer content="::FaShareNodes::" className="mr-1.5" />
+                      Поделиться заездом
+                    </Button>
+                  ) : null}
+                </span>
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr,1fr]">
 
-        {/* Stats card */}
-        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
-          <Badge className="mb-3 w-fit border" style={{ borderColor: `${crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}55`, backgroundColor: `${crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain}18`, color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}>
-            {(crew.header.brandName || crew.name || "VIP BIKE").toUpperCase()} • MAPRIDERS
-          </Badge>
-          <h2 className="mt-2 font-orbitron text-2xl" style={{ color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary }}>
-            Карта райдеров в реальном времени
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm" style={{ color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary }}>
-            Один тап — и экипаж видит твой маршрут, скорость и meetup-пины.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {heroStats.map((stat) => (
-              <div key={stat.label} className="rounded-xl border p-3" style={{ borderColor: `${crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft}aa`, backgroundColor: `${crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase}66` }}>
-                <div className="mb-2" style={{ color: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}>
-                  <VibeContentRenderer content={stat.icon} />
-                </div>
-                <div className="text-xl font-semibold" style={{ color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary }}>{stat.value}</div>
-                <div className="text-xs" style={{ color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary }}>{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Rider control panel */}
-        <div className="rounded-2xl border p-4 backdrop-blur-xl" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
-          <h3 className="font-orbitron text-xl" style={{ color: "var(--mr-text)" }}>Пульт райдера</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {state.shareEnabled ? "Ты сейчас в эфире на карте" : "Геошеринг выключен"}
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-2 py-2 text-emerald-100">
-              <div className="font-semibold">{riderStatusCounts.live}</div>
-              <div className="text-[10px] uppercase tracking-wide text-emerald-200/70">live</div>
-            </div>
-            <div className="rounded-xl border border-amber-300/20 bg-amber-500/10 px-2 py-2 text-amber-100">
-              <div className="font-semibold">{riderStatusCounts.stale}</div>
-              <div className="text-[10px] uppercase tracking-wide text-amber-200/70">stale</div>
-            </div>
-            <div className="rounded-xl border border-[var(--mr-border)] bg-[var(--mr-base)]/5 px-2 py-2 text-[var(--mr-text)]">
-              <div className="font-semibold">{queuedPoints}</div>
-              <div className="text-[10px] uppercase tracking-wide text-[var(--mr-muted)]">queue</div>
-            </div>
-          </div>
-          <div className="mt-4 space-y-3">
-            {isAdmin ? (
-              <Button asChild variant="outline" className="w-full justify-center">
-                <Link href="/admin/map-routes">Открыть маршруты карты</Link>
-              </Button>
-            ) : null}
-            <div className="space-y-2 rounded-xl border border-[var(--mr-border)] bg-[var(--mr-base)]/20 p-3">
-              <Label htmlFor="map-riders-ride-name" className="sr-only">
-                Название заезда
-              </Label>
-              <Input
-                id="map-riders-ride-name"
-                value={state.rideName}
-                onChange={(event) => dispatch({ type: "ui/set-ride-name", payload: event.target.value })}
-                placeholder="Название заезда"
-                className="h-9"
+              {/* ── Community wall merged into the sheet (sheet IS the feed) ──
+                  Тот же CommunityWallClient, что на странице /community: посты,
+                  фото, реакции, комментарии, зачёт, композер с геотегом.
+                  mapSelectedPoint → «Точка с карты» в пикере геотега;
+                  onFocusGeotag → карта сворачивает шит и летит к метке. */}
+              <CommunityWallClient
+                slug={crewSlug}
+                crewName={crew.header.brandName || crew.name || "Экипаж"}
+                botUsername={crew.contacts.telegramBotUsername || crew.contacts.telegram?.replace("@", "") || null}
+                deeplinkBotUsername={crew.contacts.telegramBotUsername || null}
+                highlightPostId={wallParams?.highlightPostId ?? null}
+                composeRentalId={wallParams?.composeRentalId ?? null}
+                composeRideId={sheetRideComposeId ?? wallParams?.composeRideId ?? null}
+                initialQuery={wallParams?.initialQuery ?? null}
+                checkinSpotId={wallParams?.checkinSpotId ?? null}
+                mapSelectedPoint={state.selectedMeetupPoint}
+                onFocusGeotag={handleWallFocusGeotag}
               />
-              <Label htmlFor="map-riders-vehicle-label" className="sr-only">
-                Мотоцикл
-              </Label>
-              <Input
-                id="map-riders-vehicle-label"
-                value={state.vehicleLabel}
-                onChange={(event) => dispatch({ type: "ui/set-vehicle-label", payload: event.target.value })}
-                placeholder="Мотоцикл"
-                className="h-9"
-              />
-              <Select
-                value={state.rideMode}
-                onValueChange={(value: "rental" | "personal") => dispatch({ type: "ui/set-ride-mode", payload: value })}
-              >
-                <SelectTrigger aria-label="Режим поездки" className="h-9">
-                  <SelectValue placeholder="Режим поездки" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rental">Аренда</SelectItem>
-                  <SelectItem value="personal">Личный</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Select value={state.visibilityMode} onValueChange={(value: "crew" | "public") => dispatch({ type: "privacy/set-visibility", payload: value })}>
-                    <SelectTrigger aria-label="Кто видит мою позицию" className="h-9">
-                      <SelectValue placeholder="Видимость" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="crew">Только экипаж</SelectItem>
-                      <SelectItem value="public">Все авторизованные</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Select value={String(state.autoExpireMinutes)} onValueChange={(value: "1" | "5" | "15" | "60") => dispatch({ type: "privacy/set-auto-expire", payload: Number(value) as 1 | 5 | 15 | 60 })}>
-                    <SelectTrigger aria-label="Автоматически остановить геошеринг" className="h-9">
-                      <SelectValue placeholder="Авто-стоп" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 мин</SelectItem>
-                      <SelectItem value="5">5 мин</SelectItem>
-                      <SelectItem value="15">15 мин</SelectItem>
-                      <SelectItem value="60">60 мин</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => dispatch({ type: "privacy/toggle-home-blur" })}>
-                {state.homeBlurEnabled ? "Дом размыт: ВКЛ" : "Дом размыт: ВЫКЛ"}
-              </Button>
-            </div>
-            <Button
-              type="button"
-              disabled={!canStart}
-              className="w-full text-black"
-              style={{ backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain }}
-              onClick={startSession}
-            >
-              <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
-              Включить геошеринг
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!state.shareEnabled}
-              className="w-full"
-              onClick={() => dispatch({ type: "privacy/toggle-pause" })}
-            >
-              <VibeContentRenderer content={state.sharePaused ? "::FaPlay::" : "::FaPause::"} className="mr-2" />
-              {state.sharePaused ? "Возобновить трансляцию" : "Пауза трансляции"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!canStop}
-              className="w-full"
-              onClick={stopSession}
-            >
-              <VibeContentRenderer content="::FaPowerOff::" className="mr-2" />
-              Завершить заезд
-            </Button>
-            {endedRideSessionId && !state.shareEnabled ? (
-              <Button asChild variant="outline" className="w-full">
-                <Link href={`/franchize/${crewSlug}/community?ride=${endedRideSessionId}`}>
-                  <VibeContentRenderer content="::FaShareNodes::" className="mr-2" />
-                  Поделиться заездом на стене
-                </Link>
-              </Button>
-            ) : null}
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`https://t.me/share/url?url=${encodeURIComponent(`https://t.me/oneBikePlsBot/app?startapp=mapriders_${crewSlug}`)}&text=${encodeURIComponent(`${crew.header.brandName || "VIP BIKE"} MapRiders`)}`}>
-                Поделиться в Telegram
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/franchize/${crewSlug}/community`}>События и партнёры</Link>
-            </Button>
-          </div>
-        </div>
-              </div>
-              <div className="mt-4" ref={leaderboardRef}>
-                <LeaderboardSection crew={crew} crewSlug={crewSlug} />
-              </div>
             </div>
           </div>
         </Drawer.Content>
@@ -971,9 +959,12 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
       <StatusOverlay />
       <RiderFAB />
       <RidersDrawer
+        crew={crew}
+        initialTab={ridersDrawerTab}
         emptyStateCopy={drawerEmptyStateCopy}
         externalOpen={ridersDrawerOpen}
         onExternalOpenChange={setRidersDrawerOpen}
+        onRideStopped={handleRideStopped}
       />
       <FranchizePromptModal
         open={isPromptOpen}
@@ -1004,42 +995,12 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   );
 }
 
-// ── Lazy-loaded leaderboard (own fetch) ──
-const LeaderboardSection = React.forwardRef<HTMLDivElement, { crew: FranchizeCrewVM; crewSlug: string }>(
-  ({ crew, crewSlug }, ref) => {
-  const { state } = useMapRidersState();
-
-  // Apply franchize theme CSS variables
-  useFranchizeTheme(crew.theme);
-
-  return (
-    <section className="rounded-2xl border p-6 backdrop-blur-xl" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
-      <h3 className="font-orbitron text-xl" style={{ color: "var(--mr-text)" }}>Недельный зал славы</h3>
-      <div className="mt-4 space-y-3">
-        {state.leaderboard.map((row) => (
-          <div key={row.userId} className="grid grid-cols-[56px,1fr,88px] items-center gap-3 rounded-2xl border border-[var(--mr-border)] bg-[var(--mr-base)]/20 px-4 py-3">
-            <div className="text-center font-orbitron text-xl text-amber-300">#{row.rank}</div>
-            <div>
-              <div className="font-medium text-[var(--mr-text)]">{row.riderName}</div>
-              <div className="text-xs text-[var(--mr-muted)]">{row.sessions} заезд(ов) • средняя {row.avgSpeedKmh} км/ч</div>
-            </div>
-            <div className="text-right text-lg text-[var(--mr-text)]">{row.distanceKm} км</div>
-          </div>
-        ))}
-        {!state.leaderboard.length && <div className="rounded-2xl border border-dashed border-[var(--mr-border)] p-4 text-sm text-[var(--mr-muted)]">Лидерборд наполнится после первых треков.</div>}
-      </div>
-    </section>
-  );
-});
-
-LeaderboardSection.displayName = "LeaderboardSection";
-
 // ── Exported wrapper with provider ──
-export function MapRidersClientRefactored({ crew, slug, items }: { crew: FranchizeCrewVM; slug?: string; items?: unknown[] }) {
+export function MapRidersClientRefactored({ crew, slug, items, wallParams }: { crew: FranchizeCrewVM; slug?: string; items?: unknown[]; wallParams?: MapRidersWallParams }) {
   const resolvedSlug = crew.slug || slug || "vip-bike";
   return (
     <MapRidersProvider crew={crew} slug={resolvedSlug}>
-      <MapRidersInner crew={crew} items={items} />
+      <MapRidersInner crew={crew} items={items} wallParams={wallParams} />
     </MapRidersProvider>
   );
 }

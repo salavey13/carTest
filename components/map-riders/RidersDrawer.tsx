@@ -11,12 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMapRiders } from "@/hooks/useMapRidersContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { riderDisplayName, formatRideDuration } from "@/lib/map-riders";
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
+import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
+import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { useRouter } from "next/navigation";
 
 type RidersDrawerEmptyStateCopy = {
@@ -28,6 +31,13 @@ type RidersDrawerProps = {
   emptyStateCopy?: RidersDrawerEmptyStateCopy;
   externalOpen?: boolean;
   onExternalOpenChange?: (open: boolean) => void;
+  /** Карта-хозяин (для акцента в табе «Эфир»); может не приходить. */
+  crew?: FranchizeCrewVM;
+  /** Таб, который просят открыть извне («Топ» в нижней навигации → ride). */
+  initialTab?: string;
+  /** Конец заезда, начатого/остановленного из таба «Эфир» — тот же
+   *  обработчик, что у FAB, чтобы кнопка «Поделиться заездом» поднялась. */
+  onRideStopped?: (endedSessionId: string) => void;
 };
 
 const DEFAULT_EMPTY_STATE_COPY: RidersDrawerEmptyStateCopy = {
@@ -35,7 +45,7 @@ const DEFAULT_EMPTY_STATE_COPY: RidersDrawerEmptyStateCopy = {
   meetups: "Пока тут пусто... maybe go ride first?",
 };
 
-export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, externalOpen, onExternalOpenChange }: RidersDrawerProps) {
+export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, externalOpen, onExternalOpenChange, crew, initialTab, onRideStopped }: RidersDrawerProps) {
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
   const { dbUser } = useAppContext();
   // Rider profile v1: name → public profile. A <Link> inside the row <button>
@@ -58,6 +68,11 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = externalOpen !== undefined ? externalOpen : internalIsOpen;
   const setIsOpen = onExternalOpenChange || setInternalIsOpen;
+  // Контролируемый таб: извне могут попросить ride («Топ» в нижней навигации).
+  const [tab, setTab] = useState<string>(initialTab ?? "riders");
+  useEffect(() => {
+    if (isOpen && initialTab) setTab(initialTab);
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -69,6 +84,8 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
   }, []);
 
   const drawerSnapPoints = useMemo(() => (prefersReducedMotion ? [1] : [0.64, 380 / 820, 640 / 820]), [prefersReducedMotion]);
+  // Акцент экипажа для таба «Эфир» (канвас-безопасный hex; авто-тема → amber).
+  const accentColor = crew?.theme.isAuto ? "#facc15" : crew?.theme.palette.accentMain || "#facc15";
   const activeHistoryWarmupSessions = useMemo(
     () => state.sessions.filter((session) => session.status === "active" && Number(session.total_distance_km || 0) <= 0),
     [state.sessions],
@@ -147,9 +164,9 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
             aria-label="Панель райдеров и meetup"
             className="pointer-events-auto mx-auto flex h-full w-full max-w-lg flex-col rounded-t-2xl bg-black/90 backdrop-blur-xl"
           >
-          <Tabs defaultValue="riders" className="flex h-full flex-col">
+          <Tabs value={tab} onValueChange={setTab} className="flex h-full flex-col">
             <div className="border-b border-white/10 px-4 pt-3">
-              <TabsList className="grid w-full grid-cols-3 bg-transparent">
+              <TabsList className="grid w-full grid-cols-4 bg-transparent">
                 <TabsTrigger value="riders" className="text-xs data-[state=active]:bg-white/10">
                   Riders ({state.sessions.length})
                 </TabsTrigger>
@@ -158,6 +175,9 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
                 </TabsTrigger>
                 <TabsTrigger value="history" className="text-xs data-[state=active]:bg-white/10">
                   History
+                </TabsTrigger>
+                <TabsTrigger value="ride" className="text-xs data-[state=active]:bg-white/10">
+                  Эфир
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -327,6 +347,14 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
                 )}
               </div>
             </TabsContent>
+
+            {/* ── Ride tab («Эфир»): пульт заезда + приватность + зал славы.
+                Сюда переехал бывший «Пульт райдера» из шита — шит теперь
+                целиком отдан стене экипажа. ── */}
+            <TabsContent value="ride" className="flex-1 overflow-auto p-4">
+              <RideControlsPanel accentColor={accentColor} onRideStopped={onRideStopped} />
+              <LeaderboardPanel accentColor={accentColor} />
+            </TabsContent>
           </Tabs>
           </Drawer.Content>
         ) : null}
@@ -340,6 +368,154 @@ export function RidersDrawer({ emptyStateCopy = DEFAULT_EMPTY_STATE_COPY, extern
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Пульт заезда: бывший «Пульт райдера» из шита. Start/stop дублирует жёлтый
+ * FAB, но здесь же живут название заезда, мотоцикл, режим, приватность
+ * (видимость / авто-стоп / размытие дома) и пауза трансляции.
+ */
+function RideControlsPanel({ accentColor, onRideStopped }: { accentColor: string; onRideStopped?: (endedSessionId: string) => void }) {
+  const { state, dispatch } = useMapRiders();
+  const { canStart, canStop, startSession, stopSession } = useSessionManager({
+    authErrorMessage: "Авторизуйся",
+    stopSuccessMessage: "Заезд завершён",
+    onRideStopped,
+  });
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-white">Эфир и заезд</h3>
+        <Badge className="w-fit border-none" style={{ backgroundColor: `${accentColor}22`, color: accentColor }}>
+          {state.shareEnabled ? (state.sharePaused ? "пауза" : "в эфире") : "выключен"}
+        </Badge>
+      </div>
+
+      <div className="space-y-2 rounded-xl border border-white/10 bg-black/30 p-3">
+        <Label htmlFor="map-riders-drawer-ride-name" className="sr-only">
+          Название заезда
+        </Label>
+        <Input
+          id="map-riders-drawer-ride-name"
+          value={state.rideName}
+          onChange={(event) => dispatch({ type: "ui/set-ride-name", payload: event.target.value })}
+          placeholder="Название заезда"
+          className="h-9 bg-transparent text-white"
+        />
+        <Label htmlFor="map-riders-drawer-vehicle-label" className="sr-only">
+          Мотоцикл
+        </Label>
+        <Input
+          id="map-riders-drawer-vehicle-label"
+          value={state.vehicleLabel}
+          onChange={(event) => dispatch({ type: "ui/set-vehicle-label", payload: event.target.value })}
+          placeholder="Мотоцикл"
+          className="h-9 bg-transparent text-white"
+        />
+        <Select
+          value={state.rideMode}
+          onValueChange={(value: "rental" | "personal") => dispatch({ type: "ui/set-ride-mode", payload: value })}
+        >
+          <SelectTrigger aria-label="Режим поездки" className="h-9 bg-transparent text-white">
+            <SelectValue placeholder="Режим поездки" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="rental">Аренда</SelectItem>
+            <SelectItem value="personal">Личный</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={state.visibilityMode} onValueChange={(value: "crew" | "public") => dispatch({ type: "privacy/set-visibility", payload: value })}>
+            <SelectTrigger aria-label="Кто видит мою позицию" className="h-9 bg-transparent text-white">
+              <SelectValue placeholder="Видимость" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="crew">Только экипаж</SelectItem>
+              <SelectItem value="public">Все авторизованные</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={String(state.autoExpireMinutes)} onValueChange={(value: "1" | "5" | "15" | "60") => dispatch({ type: "privacy/set-auto-expire", payload: Number(value) as 1 | 5 | 15 | 60 })}>
+            <SelectTrigger aria-label="Автоматически остановить геошеринг" className="h-9 bg-transparent text-white">
+              <SelectValue placeholder="Авто-стоп" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 мин</SelectItem>
+              <SelectItem value="5">5 мин</SelectItem>
+              <SelectItem value="15">15 мин</SelectItem>
+              <SelectItem value="60">60 мин</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="button" variant="outline" size="sm" className="w-full border-white/20 text-white" onClick={() => dispatch({ type: "privacy/toggle-home-blur" })}>
+          {state.homeBlurEnabled ? "Дом размыт: ВКЛ" : "Дом размыт: ВЫКЛ"}
+        </Button>
+      </div>
+
+      <Button
+        type="button"
+        disabled={!canStart}
+        className="w-full text-black"
+        style={{ backgroundColor: accentColor }}
+        onClick={startSession}
+      >
+        <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
+        Включить геошеринг
+      </Button>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!state.shareEnabled}
+          className="w-full border-white/20 text-white"
+          onClick={() => dispatch({ type: "privacy/toggle-pause" })}
+        >
+          <VibeContentRenderer content={state.sharePaused ? "::FaPlay::" : "::FaPause::"} className="mr-2" />
+          {state.sharePaused ? "Продолжить" : "Пауза"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!canStop}
+          className="w-full border-white/20 text-white"
+          onClick={stopSession}
+        >
+          <VibeContentRenderer content="::FaPowerOff::" className="mr-2" />
+          Завершить
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/** Недельный зал славы (переехал из шита без изменений логики). */
+function LeaderboardPanel({ accentColor }: { accentColor: string }) {
+  const { state } = useMapRiders();
+
+  return (
+    <section className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+        <span style={{ color: accentColor }}>🏆</span> Недельный зал славы
+      </h3>
+      <div className="mt-3 space-y-2">
+        {state.leaderboard.map((row) => (
+          <div key={row.userId} className="grid grid-cols-[44px,1fr,72px] items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+            <div className="text-center font-orbitron text-lg" style={{ color: accentColor }}>#{row.rank}</div>
+            <div>
+              <div className="text-sm font-medium text-white">{row.riderName}</div>
+              <div className="text-[11px] text-zinc-400">{row.sessions} заезд(ов) • средняя {row.avgSpeedKmh} км/ч</div>
+            </div>
+            <div className="text-right text-sm text-white">{row.distanceKm} км</div>
+          </div>
+        ))}
+        {!state.leaderboard.length && (
+          <div className="rounded-xl border border-dashed border-white/25 p-3 text-center text-xs text-muted-foreground">
+            Лидерборд наполнится после первых треков.
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

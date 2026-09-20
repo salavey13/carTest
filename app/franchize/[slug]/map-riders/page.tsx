@@ -23,8 +23,35 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   });
 }
 
-export default async function MapRidersPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function MapRidersPage(
+  { params, searchParams }: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  },
+) {
   const { slug } = await params;
+  const sp = await searchParams;
+  // Wall-in-sheet deep links — same contract as the /community page:
+  //   ?post=<uuid>     → highlight post in the sheet feed
+  //   ?compose=<uuid>  → composer draft «поделиться поездкой»
+  //   ?ride=<uuid>     → composer draft «поделиться заездом»
+  //   ?q=<≤60 chars>   → wall search prefill (meetup interlink)
+  //   ?spot=<id>       → spot check-in prefill (map popup «Отметиться»)
+  // IDs are validated by shape — everything else is silently ignored
+  // (the values arrive from untrusted URL).
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const rawPost = typeof sp.post === "string" ? sp.post.trim() : "";
+  const rawCompose = typeof sp.compose === "string" ? sp.compose.trim() : "";
+  const rawRide = typeof sp.ride === "string" ? sp.ride.trim() : "";
+  const rawQ = typeof sp.q === "string" ? sp.q.trim() : "";
+  const rawSpot = typeof sp.spot === "string" ? sp.spot.trim() : "";
+  const wallParams = {
+    highlightPostId: uuidRe.test(rawPost) ? rawPost : null,
+    composeRentalId: uuidRe.test(rawCompose) ? rawCompose : null,
+    composeRideId: uuidRe.test(rawRide) ? rawRide : null,
+    initialQuery: rawQ.slice(0, 60) || null,
+    checkinSpotId: /^[a-z0-9-]{1,64}$/i.test(rawSpot) ? rawSpot.toLowerCase() : null,
+  };
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/map-riders`;
@@ -56,7 +83,7 @@ export default async function MapRidersPage({ params }: { params: Promise<{ slug
       <div className="relative z-10">
         <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} showRail={false} />
       </div>
-      <MapRidersClient crew={crew} slug={crewSlug} items={items} />
+      <MapRidersClient crew={crew} slug={crewSlug} items={items} wallParams={wallParams} />
     </main>
   );
 }

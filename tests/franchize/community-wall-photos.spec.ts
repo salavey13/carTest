@@ -242,7 +242,8 @@ describe("community-wall server actions (v2)", () => {
 
   it("create: photo-only posts are allowed; fully empty posts are not", () => {
     expect(src).toContain("photos.length === 0 && bikeIds.length === 0");
-    expect(src).toContain("напиши пару слов или прикрепи фото");
+    // geo-only posts ARE valid (чекин-точка) — the check also counts !composerGeo
+    expect(src).toContain("напиши пару слов, прикрепи фото или точку");
   });
 
   it("bikes must belong to THIS crew's catalogue (count equality check)", () => {
