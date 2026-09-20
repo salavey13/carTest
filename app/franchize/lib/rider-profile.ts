@@ -89,6 +89,17 @@ export function riderProfileMetadataField(): "riderProfiles" {
 
 // ── Public stats (read-derived, money-free) ──────────────────────────────────
 
+/** Строка блока «Аренды» на профиле. ⚠️ Блок рендерится ТОЛЬКО self/staff —
+ *  total_cost (₽) наружу не утекает; чужой зритель получает пустой массив. */
+export interface RiderRentalRef {
+  rentalId: string;
+  bikeTitle: string;
+  status: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  totalCost: number | null;
+}
+
 export interface RiderPublicStats {
   ridesCount: number;
   hoursRented: number;

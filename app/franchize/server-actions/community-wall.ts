@@ -76,6 +76,8 @@ import {
   buildSuggestedWallPost,
   summarizeRide,
 } from "@/app/franchize/lib/ride-share-notify";
+import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import { resolveLeadNotifyRecipients } from "@/app/franchize/lib/new-lead-notify";
 
 // NOTE: cookies + telegram-actor-cookie are imported DYNAMICALLY inside
 // functions (same reason as server-actions/leads.ts — avoid `import
@@ -840,7 +842,8 @@ export async function createCommunityPostAction(input: {
       authorName,
       body: finalBody,
       postPreview: buildWallPostPreview(finalBody, 160),
-      botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+      // Бот экипажа из metadata (фикс 2026-09-21) — env в проде пуст.
+      botUsername: await resolveCrewBotUsername(crew.slug || slug),
     });
   } else {
     logger.warn("[community-wall] post vanished before notify — skipping + cleaning photos");
@@ -944,7 +947,7 @@ export async function togglePostReactionAction(input: {
           total: likeCount,
           topEmoji,
           postPreview: buildWallPostPreview(meta.body || "", 160),
-          botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+          botUsername: await resolveCrewBotUsername(crewSlugRaw),
         });
       }
     } catch (notifyErr) {
@@ -1130,6 +1133,32 @@ export async function addPostCommentAction(input: {
         recipients.push({ userId: u.user_id, reason: "mentioned" });
       }
     }
+    // Boss-request 2026-09-21 «notify crew owner and admin about almost
+    // everything»: арендатор (НЕ член экипажа) оставил комментарий → cc
+    // owner+админам с головой «Арендатор прокомментировал на стене».
+    // Комментарии своих членов экипажу и так видны на стене — cc не шумим.
+    try {
+      const { data: selfMember } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", postRow.crew_id)
+        .eq("user_id", actor.userId)
+        .eq("membership_status", "active") // codereview P2-2: паритет с isCrewStaffUser
+        .maybeSingle();
+      if (!selfMember) {
+        const watchSlug = (crewRow as { slug: string | null }).slug || "";
+        const watchIds = await resolveLeadNotifyRecipients(watchSlug, { includeMembers: false });
+        const seen = new Set(recipients.map((r) => r.userId));
+        for (const id of watchIds) {
+          if (id && id !== actor.userId && !seen.has(id)) {
+            seen.add(id);
+            recipients.push({ userId: id, reason: "crew_watch" });
+          }
+        }
+      }
+    } catch (watchErr) {
+      logger.warn("[community-wall] crew_watch recipients failed (non-fatal):", watchErr);
+    }
     const commenterName =
       (me as DbUserRow | null)?.full_name ||
       (me as DbUserRow | null)?.username ||
@@ -1145,7 +1174,10 @@ export async function addPostCommentAction(input: {
       commentBody: body.slice(0, 200),
       postPreview: buildWallPostPreview(postRow.body || "", 160),
       recipients,
-      botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+      // Бот экипажа из metadata (фикс 2026-09-21) — env в проде пуст.
+      botUsername: await resolveCrewBotUsername(
+        (crewRow as { slug: string | null; name: string | null }).slug || "",
+      ),
     });
   } catch (notifyErr) {
     logger.warn("[community-wall] comment notify failed (non-fatal):", notifyErr);

@@ -77,7 +77,7 @@ export function buildReactionMilestoneHtml(info: ReactionMilestoneNotifyInfo): s
   ].join("\n");
 }
 
-export type WallCommentNotifyReason = "post_author" | "reply_author" | "mentioned";
+export type WallCommentNotifyReason = "post_author" | "reply_author" | "mentioned" | "crew_watch";
 
 export interface CommentNotifyInfo {
   reason: WallCommentNotifyReason;
@@ -95,6 +95,10 @@ const COMMENT_REASON_HEADLINE: Record<WallCommentNotifyReason, string> = {
   post_author: "Новый комментарий на твой пост",
   reply_author: "Ответ на твой комментарий",
   mentioned: "Тебя упомянули в комментарии",
+  // Boss-request 2026-09-21 («notify crew owner and admin about almost
+  // everything»): отдельная голова для cc owner+admin — арендатор (не член
+  // экипажа) оставил комментарий. Членам экипажа cc НЕ уходит (анти-спам).
+  crew_watch: "Арендатор прокомментировал на стене",
 };
 
 export function buildCommentNotifyHtml(info: CommentNotifyInfo): string {

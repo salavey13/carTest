@@ -1,5 +1,6 @@
 // /app/franchize/[slug]/rental/[id]/page.tsx
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ExternalLink, Info } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -401,6 +402,21 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <p>
                 <span style={{ color: textSecondary }}>Арендатор:</span>{" "}
                 <span className="font-semibold">{rental.renterFullName}</span>
+                {/* Кроссслинк аренда → публичный профиль райдера (Chain-style):
+                    карточка аренды ведёт на визитку арендатора; сам профиль
+                    повторно проверяет связь райдера с экипажем серверно. */}
+                {rental.renterId ? (
+                  <Link
+                    href={`/franchize/${resolvedSlug}/rider/${rental.renterId}`}
+                    className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold align-middle"
+                    style={{
+                      color: accent,
+                      backgroundColor: isAuto ? "var(--franchize-card-soft, rgba(255,255,255,0.08))" : `${p?.accentMain || "#B8860B"}1a`,
+                    }}
+                  >
+                    Профиль райдера →
+                  </Link>
+                ) : null}
               </p>
             )}
             {/* Phone display + operator edit button (Set Phone modal)

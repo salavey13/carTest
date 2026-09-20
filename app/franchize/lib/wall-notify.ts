@@ -33,6 +33,7 @@ import {
   sanitizeLeadKey,
 } from "@/app/franchize/lib/new-lead-notify";
 import { filterWallNotifyRecipients } from "@/app/franchize/lib/wall-prefs";
+import { normalizeBotUsername, resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
 
 // NOTE: leadDeeplinkUrl сознательно НЕ ре-экспортируется и НЕ используется:
 // тот префиксует startapp как lead_… — кнопки стены на таком deeplink уводили
@@ -70,10 +71,12 @@ export interface WallPostNotifyResult {
 /** Deeplink на стену экипажа: t.me/<bot>/app?startapp=wall_<slug>.
  *  ⚠️ НЕ через leadDeeplinkUrl: тот клал префикс lead_ → startapp=lead_wall_<slug>
  *  → роутер матчил lead_-ветку и уводил на СТРАНИЦУ ЛИДОВ (баг времён wall v2,
- *  найден boss-ревью v4). Плюс web-фолбэк, когда имя бота не настроено. */
-export function wallDeeplinkUrl(slug: string): string {
+ *  найден boss-ревью v4). Плюс web-фолбэк, когда имя бота не настроено.
+ *  Фикс 2026-09-21: botUsername резолвится из crew metadata
+ *  (contacts.telegramBotUsername) вызывающим кодом; env — фолбэк. */
+export function wallDeeplinkUrl(slug: string, botUsername?: string | null): string {
   const safeSlug = sanitizeLeadKey(slug);
-  const bot = process.env.TELEGRAM_BOT_USERNAME;
+  const bot = normalizeBotUsername(botUsername) ?? normalizeBotUsername(process.env.TELEGRAM_BOT_USERNAME);
   if (bot) {
     try {
       return buildTelegramAppLink(bot, wallStartParam(safeSlug));
@@ -115,20 +118,25 @@ export async function notifyNewWallPost(
       return result;
     }
 
+    // Фикс 2026-09-21: бот из crew metadata, а не только env (в проде пуст →
+    // кнопки уводили на web-страницу вместо Mini App).
+    const crewBot = await resolveCrewBotUsername(input.slug);
+
     const deeplink =
       input.postId && isUuidLike(input.postId)
         ? // Точный пост: Mini App открывается сразу на нём (wall v4).
-          (() => {
-            try {
-              return buildTelegramAppLink(
-                process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot",
-                wallPostStartParam(input.postId!, input.slug),
-              );
-            } catch {
-              return wallDeeplinkUrl(input.slug);
-            }
-          })()
-        : wallDeeplinkUrl(input.slug);
+          // ⚠️ Без crewBot НЕ хардкодим «oneBikePlsBot»: у экипажа может быть
+          // СВОЙ бот (oneCrossPlsBot) — неверный бот = битая ссылка.
+          crewBot
+          ? (() => {
+              try {
+                return buildTelegramAppLink(crewBot, wallPostStartParam(input.postId!, input.slug));
+              } catch {
+                return wallDeeplinkUrl(input.slug, crewBot);
+              }
+            })()
+          : wallDeeplinkUrl(input.slug, crewBot)
+        : wallDeeplinkUrl(input.slug, crewBot);
     const text = buildWallPostNotifyHtml({
       authorName: input.authorName,
       body: input.body,

@@ -2429,6 +2429,77 @@ export async function updateRentalStatus(input: {
       }
     }
 
+    // ── 2026-09-21: cc owner+admins on EVERY status change ──
+    // Boss-request: «notify crew owner and admin about almost everything».
+    // Operators previously saw flips only in analytics; now each status change
+    // pings owner+admins (no member fanout) with a deeplink to the rental
+    // drawer (startapp=rental_<id> — FAST-path роутер ведёт в аналитику).
+    // Skips: silent (data-corrections), the actor (он сам это сделал), сам
+    // арендатор (получил свою копию выше). Non-fatal.
+    if (!silent && rental?.crew_id) {
+      try {
+        const { data: crewRow } = await supabaseAdmin
+          .from("crews")
+          .select("slug")
+          .eq("id", rental.crew_id)
+          .maybeSingle();
+        const ccSlug = (crewRow as { slug: string | null } | null)?.slug ?? null;
+        if (ccSlug) {
+          const { resolveLeadNotifyRecipients } = await import("@/app/franchize/lib/new-lead-notify");
+          const { resolveCrewBotUsername } = await import("@/app/franchize/lib/crew-bot");
+          const { telegramDeliver } = await import("@/lib/telegram-transport");
+          const { buildTelegramAppLink, isUuidLike } = await import("@/lib/wall-deeplink");
+          const ccTargets = (await resolveLeadNotifyRecipients(ccSlug, { includeMembers: false }))
+            .filter((id) => id && id !== actorUserId && id !== rental?.user_id);
+          if (ccTargets.length > 0) {
+            const ccVehicle = rental.vehicle as { make?: string | null; model?: string | null } | null;
+            const ccBike = ccVehicle ? `${ccVehicle.make || ""} ${ccVehicle.model || ""}`.trim() : "байк";
+            // HTML parse_mode: make/model/operatorMessage — пользовательский ввод,
+            // экранируем как в notification-templates (иначе <b> в сообщении
+            // обрушит отправку 400-й «Unsupported start tag»).
+            const escHtml = (v: string) =>
+              v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const ccLabels: Record<string, string> = {
+              pending_confirmation: "⏳ ожидает подтверждения", // codereview P2-3
+              active: "🚀 активирована",
+              completed: "✅ завершена",
+              cancelled: "❌ отменена",
+              confirmed: "📋 подтверждена",
+              disputed: "⚠️ спор",
+            };
+            const ccLines = [
+              `🛠 <b>Аренда ${ccLabels[status] || escHtml(status)}</b>`,
+              ``,
+              `🏍 ${escHtml(ccBike)} · 🔑 ${rentalId.slice(0, 8)}`,
+            ];
+            if (operatorMessage) ccLines.push(``, `💬 ${escHtml(operatorMessage.slice(0, 200))}`);
+            const ccPayload: Record<string, unknown> = {
+              text: ccLines.join("\n"),
+              parse_mode: "HTML",
+              disable_web_page_preview: true,
+            };
+            if (isUuidLike(rentalId)) {
+              try {
+                const bot = await resolveCrewBotUsername(ccSlug);
+                if (bot) {
+                  ccPayload.reply_markup = {
+                    inline_keyboard: [[{ text: "🔑 Открыть аренду", url: buildTelegramAppLink(bot, `rental_${rentalId}`) }]],
+                  };
+                }
+              } catch {
+                // deeplink — не критично
+              }
+            }
+            await Promise.allSettled(
+              ccTargets.map((chatId) => telegramDeliver("sendMessage", chatId, ccPayload)),
+            );
+          }
+        }
+      } catch (ccErr) {
+        console.warn("[update-rental-status] Owner/admin cc failed (non-fatal):", ccErr);
+      }
+    }
+
     // ── iter18: subrenter activation notification ──
     // A manual flip to "active" (e.g. from the drawer's «Активировать»)
     // means the bike was handed to the renter — the partner-owner must get

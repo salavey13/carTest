@@ -1772,14 +1772,19 @@ export async function confirmVehicleReturn(
             );
             let crewSlug: string | null = null;
             let crewName: string | null = null;
+            let crewContacts: unknown = undefined;
             if (rental.crew_id) {
                 const { data: crewRow } = await supabaseAdmin
                     .from("crews")
-                    .select("slug, name")
+                    .select("slug, name, contacts")
                     .eq("id", rental.crew_id)
                     .maybeSingle();
                 crewSlug = (crewRow as { slug: string | null } | null)?.slug ?? null;
                 crewName = (crewRow as { name: string | null } | null)?.name ?? null;
+                // Фикс 2026-09-21: бот экипажа теперь берётся из metadata
+                // (contacts.telegramBotUsername) — раньше кнопка «Поделиться
+                // на стене» уходила арендатору web-ссылкой (env пуст в проде).
+                crewContacts = (crewRow as { contacts?: unknown } | null)?.contacts ?? undefined;
             }
             const vehicleMeta = rental.vehicle as { make?: string | null; model?: string | null } | null;
             const rideBikeTitle = vehicleMeta
@@ -1806,6 +1811,7 @@ export async function confirmVehicleReturn(
                 summary,
                 renterChatId: receiptChatId,
                 ccCrew: true,
+                crewContacts,
             });
         } catch (rideShareErr) {
             logger.warn(`[confirmVehicleReturn] Ride-share notify failed (non-fatal):`, rideShareErr);

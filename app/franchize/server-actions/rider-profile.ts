@@ -27,6 +27,7 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { getCrewBySlug, resolveWallActor, isCrewStaffUser } from "@/app/franchize/lib/wall-access";
+import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
 import {
   EMPTY_RIDER_PROFILE_CUSTOM,
   RIDER_BIO_MAX_LEN,
@@ -38,6 +39,7 @@ import {
   sanitizeRiderProfileCustom,
   type RiderProfileCustom,
   type RiderPublicStats,
+  type RiderRentalRef,
   type RiderWallBadge,
 } from "@/app/franchize/lib/rider-profile";
 import {
@@ -105,6 +107,9 @@ export interface RiderProfileView {
   stats: RiderPublicStats;
   badges: RiderWallBadge[];
   garage: RiderGarageItem[];
+  /** Последние аренды — ТОЛЬКО self/crew staff (видимость по ролям):
+   *  чужой зритель получает пустой массив, ₽ наружу не утекает. */
+  recentRentals: RiderRentalRef[];
   /** «в экипаже с YYYY» — earliest of first ride / first post. */
   sinceLabel: string | null;
   /** Deeplink-friendly bot username for the «Написать в TG» button. */
@@ -203,7 +208,9 @@ export async function getRiderProfileAction(input: {
     slug,
     isSelf,
     isStaff,
-    botUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+    // Бот экипажа из metadata (фикс 2026-09-21): раньше только env — кнопка
+    // «Поделиться профилем» в проде деградировала до web-ссылки.
+    botUsername: await resolveCrewBotUsername(slug),
   };
 
   // «Скрыть профиль»: everyone except the owner and crew staff gets a
@@ -228,6 +235,7 @@ export async function getRiderProfileAction(input: {
         },
         badges: [],
         garage: [],
+        recentRentals: [],
         sinceLabel: null,
       },
     };
@@ -331,9 +339,62 @@ export async function getRiderProfileAction(input: {
       stats,
       badges: computeRiderWallBadges(stats),
       garage,
+      recentRentals: await loadRecentRentalsForStaffOrSelf({
+        crewId: crew.id,
+        riderId,
+        isSelf,
+        isStaff,
+      }),
       sinceLabel: riderSinceLabel(rental.firstRideAt, earliestPostAt),
     },
   };
+}
+
+// ── Блок «Аренды» (crosslink rent ↔ profile, видимость по ролям) ───────────
+// self видит СВОИ аренды, staff — аренды любого райдера экипажа; всем
+// остальным — пусто (визитка остаётся публичной, деньги — нет).
+async function loadRecentRentalsForStaffOrSelf(input: {
+  crewId: string;
+  riderId: string;
+  isSelf: boolean;
+  isStaff: boolean;
+}): Promise<RiderRentalRef[]> {
+  if (!input.isSelf && !input.isStaff) return [];
+  try {
+    const { data } = await supabaseAdmin
+      .from("rentals")
+      .select(
+        "rental_id, status, total_cost, agreed_start_date, agreed_end_date, vehicle:cars(make, model)",
+      )
+      .eq("user_id", input.riderId)
+      .eq("crew_id", input.crewId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    return (
+      (data ?? []) as unknown as {
+        rental_id: string;
+        status: string;
+        total_cost: number | string | null;
+        agreed_start_date: string | null;
+        agreed_end_date: string | null;
+        vehicle: { make?: string | null; model?: string | null } | { make?: string | null; model?: string | null }[] | null;
+      }[]
+    ).map((r) => {
+      const v = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
+      const costNum = r.total_cost == null ? null : Number(r.total_cost);
+      return {
+        rentalId: r.rental_id,
+        bikeTitle: v ? `${v.make || ""} ${v.model || ""}`.trim() || "байк" : "байк",
+        status: r.status,
+        startedAt: r.agreed_start_date,
+        endedAt: r.agreed_end_date,
+        totalCost: Number.isFinite(costNum as number) ? Math.round(costNum as number) : null,
+      };
+    });
+  } catch (error) {
+    logger.warn("[rider-profile] recent rentals load failed (non-fatal):", error);
+    return [];
+  }
 }
 
 // ── saveRiderProfileAction (owner-only) ──────────────────────────────────────

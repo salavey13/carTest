@@ -25,6 +25,7 @@ import {
   Check,
   Eye,
   EyeOff,
+  KeyRound,
   MapPin,
   MessageCircle,
   Pencil,
@@ -89,6 +90,22 @@ function pluralRuClient(n: number, forms: [string, string, string]): string {
   return forms[2];
 }
 
+function shortDateClient(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
+}
+
+const RENTAL_STATUS_LABEL: Record<string, { label: string; emoji: string }> = {
+  active: { label: "в аренде", emoji: "🚀" },
+  completed: { label: "завершена", emoji: "✅" },
+  cancelled: { label: "отменена", emoji: "❌" },
+  confirmed: { label: "подтверждена", emoji: "📋" },
+  pending_confirmation: { label: "ожидает", emoji: "⏳" },
+  disputed: { label: "спор", emoji: "⚠️" },
+};
+
 // ── main component ───────────────────────────────────────────────────────────
 
 export function RiderProfileClient({
@@ -102,7 +119,7 @@ export function RiderProfileClient({
   crewName: string;
   initialPosts: WallPostView[];
 }) {
-  const { rider, stats, badges, garage, isSelf } = profile;
+  const { rider, stats, badges, garage, recentRentals, isSelf, isStaff } = profile;
   const displayName = rider.fullName || rider.username || "Райдер";
   // The served customization payload as local view state — updated after a
   // successful save (server is the source of truth, it re-sanitizes).
@@ -439,6 +456,50 @@ export function RiderProfileClient({
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ── recent rentals — ТОЛЬКО self / crew staff (видимость по ролям).
+          Сервер уже отфильтровал: чужой зритель получает пустой массив. ── */}
+      {recentRentals.length > 0 && (
+        <section className="cw-card cw-rise p-5">
+          <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[var(--community-text)]">
+            <KeyRound className="h-4 w-4 text-[var(--community-accent)]" aria-hidden /> Аренды
+            <span className="ml-1 text-xs font-semibold normal-case text-[var(--community-muted)]">
+              {/* isCrewStaffUser = любой активный член экипажа (не только админ):
+                  честная формулировка вместо «только админам» (codereview P2-5). */}
+              {isStaff && !isSelf ? "— видно экипажу" : "— твои заезды"}
+            </span>
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {recentRentals.map((r) => {
+              const st = RENTAL_STATUS_LABEL[r.status] ?? { label: r.status, emoji: "•" };
+              const from = shortDateClient(r.startedAt);
+              const to = shortDateClient(r.endedAt);
+              return (
+                <li
+                  key={r.rentalId}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--community-border)] p-3"
+                  style={{ backgroundColor: "var(--community-card-faint)" }}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[var(--community-text)]">
+                      {st.emoji} {r.bikeTitle}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[var(--community-muted)]" suppressHydrationWarning>
+                      {st.label}
+                      {from ? ` · ${from}${to ? " → " + to : ""}` : ""}
+                    </p>
+                  </div>
+                  {r.totalCost != null && r.totalCost > 0 && (
+                    <span className="shrink-0 text-sm font-black text-[var(--community-text)]">
+                      {r.totalCost.toLocaleString("ru-RU")} ₽
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 

@@ -27,6 +27,11 @@ import {
   wallStartParam,
 } from "@/lib/wall-deeplink";
 import { resolveLeadNotifyRecipients } from "@/app/franchize/lib/new-lead-notify";
+import {
+  botUsernameFromContacts,
+  normalizeBotUsername,
+  resolveCrewBotUsername,
+} from "@/app/franchize/lib/crew-bot";
 
 // ── pure summary ─────────────────────────────────────────────────────────────
 
@@ -157,6 +162,11 @@ export interface RideFinishedNotifyInput {
   ccCrew?: boolean;
   /** Не слать cc-копию этому chat_id (например, если owner сам арендатор). */
   excludeCrewUserId?: string | null;
+  /** Бот экипажа (crews.contacts.telegramBotUsername) — если caller уже
+   *  прочитал crew row. Иначе резолвим по slug (TTL-кэш) → env. */
+  botUsername?: string | null;
+  /** contacts экипажа целиком — альтернатива botUsername (caller уже имеет row). */
+  crewContacts?: unknown;
 }
 
 export interface RideFinishedNotifyResult {
@@ -166,8 +176,18 @@ export interface RideFinishedNotifyResult {
   crewFailed: number;
 }
 
-function botUsername(): string | null {
-  return process.env.TELEGRAM_BOT_USERNAME || null;
+/** Бот экипажа: явный параметр → contacts из payload → резолв по slug (кэш) → env.
+ *  Фикс 2026-09-21: раньше читался только env (в проде пуст) — арендатор
+ *  получал сообщение БЕЗ кнопки, а cc-экипажу уходила WEB-ссылка вместо
+ *  t.me/<bot>/app?startapp=wall_<slug>. resolveCrewBotUsername зовётся
+ *  БЕЗУСЛОВНО (codereview P2-1): сам резолвер понимает пустой slug и
+ *  возвращает env-фолбэк — не теряем бота на мусорном crewSlug. */
+async function resolveBot(input: RideFinishedNotifyInput, slug: string | null): Promise<string | null> {
+  return (
+    normalizeBotUsername(input.botUsername) ??
+    botUsernameFromContacts(input.crewContacts) ??
+    (await resolveCrewBotUsername(slug))
+  );
 }
 
 /** Web-фолбэк, когда имя бота не настроено: стена всё равно публичная. */
@@ -176,8 +196,7 @@ function webWallUrl(slug: string): string {
   return `${site.replace(/\/+$/, "")}/franchize/${encodeURIComponent(slug)}/community`;
 }
 
-function composeDeepLinkUrl(slug: string, rentalId: string): string | null {
-  const bot = botUsername();
+function composeDeepLinkUrl(bot: string | null, slug: string, rentalId: string): string | null {
   if (!bot) return null;
   try {
     return buildTelegramAppLink(bot, wallComposeStartParam(rentalId, slug));
@@ -188,8 +207,7 @@ function composeDeepLinkUrl(slug: string, rentalId: string): string | null {
 
 /** Кнопка «Открыть стену» для cc: startapp=wall_<slug> (НЕ lead_!
  *  leadDeeplinkUrl клал префикс lead_ и роутер уводил на СТРАНИЦУ ЛИДОВ). */
-function wallDeepLinkUrl(slug: string): string {
-  const bot = botUsername();
+function wallDeepLinkUrl(bot: string | null, slug: string): string {
   if (bot) {
     try {
       return buildTelegramAppLink(bot, wallStartParam(slug));
@@ -216,6 +234,7 @@ export async function notifyRideFinishedAndSuggestPost(
   try {
     const slug = sanitizeWallSlug(input.crewSlug);
     const suggestedPost = buildSuggestedWallPost(input.summary);
+    const bot = await resolveBot(input, slug);
 
     // ── renter: сводка + готовый пост + кнопка «Поделиться на стене» ──
     if (input.renterChatId) {
@@ -224,7 +243,7 @@ export async function notifyRideFinishedAndSuggestPost(
         parse_mode: "HTML",
         disable_web_page_preview: true,
       };
-      const url = slug ? composeDeepLinkUrl(slug, input.rentalId) : null;
+      const url = slug ? composeDeepLinkUrl(bot, slug, input.rentalId) : null;
       if (url) {
         payload.reply_markup = {
           inline_keyboard: [[{ text: "🟣 Поделиться на стене экипажа", url }]],
@@ -246,7 +265,7 @@ export async function notifyRideFinishedAndSuggestPost(
       result.crewRecipients = recipients;
       if (recipients.length > 0) {
         const crewText = buildRideFinishedCrewHtml(input.summary);
-        const wallUrl = wallDeepLinkUrl(slug);
+        const wallUrl = wallDeepLinkUrl(bot, slug);
         const crewPayload: Record<string, unknown> = {
           text: crewText,
           parse_mode: "HTML",
