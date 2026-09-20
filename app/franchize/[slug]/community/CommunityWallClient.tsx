@@ -401,6 +401,8 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   // ── spot check-in (?spot=<id> с попапа точки на карте) ───────────────────────
   // Текст — только в пустой композер; id валидируется по каталогу (иначе тихо
   // игнорируем: параметр недоверенный — пришёл из URL).
+  const checkinSpot = findMotoSpotById(checkinSpotId);
+  const [checkinDismissed, setCheckinDismissed] = useState(false);
   useEffect(() => {
     const spot = findMotoSpotById(checkinSpotId);
     if (!spot) return;
@@ -944,6 +946,22 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                     setRideDraftDismissed(true);
                   }}
                   aria-label="Убрать черновик заезда"
+                  className="ml-auto rounded-full p-1 transition hover:bg-[var(--community-accent)]/20"
+                >
+                  <X className="h-3.5 w-3.5 text-[var(--community-accent)]" />
+                </button>
+              </div>
+            )}
+            {/* check-in banner: «отметился в мототочке» (с попапа карты) */}
+            {checkinSpot && !checkinDismissed && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 px-3 py-2 text-xs">
+                <span className="font-semibold text-[var(--community-accent)]">
+                  📍 Отметился: {checkinSpot.name} — {checkinSpot.address}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCheckinDismissed(true)}
+                  aria-label="Скрыть подсказку о точке"
                   className="ml-auto rounded-full p-1 transition hover:bg-[var(--community-accent)]/20"
                 >
                   <X className="h-3.5 w-3.5 text-[var(--community-accent)]" />

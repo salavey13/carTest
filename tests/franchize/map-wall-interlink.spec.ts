@@ -246,10 +246,12 @@ describe("wall page interlink params", () => {
 
   it("map client wires the spots layer + share button + meetup→wall link", () => {
     const client = read("components/map-riders/MapRidersClientRefactored.tsx");
-    expect(client).toContain("NN_MOTO_SPOTS.map");
+    expect(client).toContain("NN_MOTO_SPOTS.filter");
+    expect(client).toContain("visibleSpots.map");
     expect(client).toContain("community?spot=${spot.id}");
     expect(client).toContain("community?ride=${endedRideSessionId}");
     expect(client).toContain("encodeURIComponent(m.title.slice(0, 60))");
+    expect(client).toContain("spotKindFilter");
   });
 
   it("RacingMap renders only real React elements as rich popups (XSS guard)", () => {

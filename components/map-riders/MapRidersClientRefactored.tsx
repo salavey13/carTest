@@ -30,7 +30,7 @@ import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
 import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
-import { motoSpotKindLabel, NN_MOTO_SPOTS, type MotoSpot } from "@/lib/map-riders-spots";
+import { motoSpotKindLabel, MOTO_SPOT_KINDS, motoSpotKindIcon, NN_MOTO_SPOTS, type MotoSpot, type MotoSpotKind } from "@/lib/map-riders-spots";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
@@ -137,6 +137,8 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
   // Interlink карта → стена: id последнего завершённого заезда — даёт кнопку
   // «Поделиться заездом на стене» (→ /community?ride=<id>). Чистится при новом старте.
   const [endedRideSessionId, setEndedRideSessionId] = useState<string | null>(null);
+  // Round-2 enhance: per-kind фильтр мототочек (легенда-чипы в панели).
+  const [spotKindFilter, setSpotKindFilter] = useState<MotoSpotKind | "all">("all");
   const lastMeetupActionAtRef = useRef(0);
   const leaderboardRef = useRef<HTMLDivElement>(null);
 
@@ -370,9 +372,15 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
     [crewSlug],
   );
 
+  /** Легенда-фильтр: «all» показывает весь слой, иначе только выбранный kind. */
+  const visibleSpots = useMemo(
+    () => (spotKindFilter === "all" ? NN_MOTO_SPOTS : NN_MOTO_SPOTS.filter((s) => s.kind === spotKindFilter)),
+    [spotKindFilter],
+  );
+
   const spotPoints = useMemo(
     () =>
-      NN_MOTO_SPOTS.map((spot) => ({
+      visibleSpots.map((spot) => ({
         id: `spot-${spot.id}`,
         name: `${spot.name} · ${motoSpotKindLabel(spot.kind)}`,
         type: "point" as const,
@@ -382,8 +390,14 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
         markerClassName: SPOT_POPUP_CLASSNAME,
         popup: spotPopupFor(spot),
       })),
-    [spotPopupFor],
+    [visibleSpots, spotPopupFor],
   );
+
+  const spotKindCounts = useMemo(() => {
+    const counts = new Map<MotoSpotKind, number>();
+    for (const spot of NN_MOTO_SPOTS) counts.set(spot.kind, (counts.get(spot.kind) ?? 0) + 1);
+    return counts;
+  }, []);
 
   const mapPoints = useMemo(() => {
     // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
@@ -712,6 +726,59 @@ function MapRidersInner({ crew, items }: { crew: FranchizeCrewVM; items?: unknow
             </div>
             <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
               <BeginnerRiderOnboardingQuiz crew={crew} />
+              {/* Мототочки НН (Chain-style discovery): легенда-фильтры по типу.
+                  Чипы красятся через --mr-* (crew palette), тач-таргет ≥ 36px. */}
+              <div className="mt-3 rounded-2xl border p-3" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--mr-text)" }}>
+                    Мототочки НН · {NN_MOTO_SPOTS.length}
+                  </h4>
+                  {spotKindFilter !== "all" ? (
+                    <button
+                      type="button"
+                      onClick={() => setSpotKindFilter("all")}
+                      className="rounded-full px-2 py-1 text-[11px] font-medium underline-offset-2 hover:underline"
+                      style={{ color: "var(--mr-muted)" }}
+                    >
+                      сбросить
+                    </button>
+                  ) : (
+                    <span className="text-[11px]" style={{ color: "var(--mr-muted)" }}>на карте ↓</span>
+                  )}
+                </div>
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setSpotKindFilter("all")}
+                    aria-pressed={spotKindFilter === "all"}
+                    className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                    style={
+                      spotKindFilter === "all"
+                        ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
+                        : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
+                    }
+                  >
+                    Все {NN_MOTO_SPOTS.length}
+                  </button>
+                  {MOTO_SPOT_KINDS.map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => setSpotKindFilter((cur) => (cur === kind ? "all" : kind))}
+                      aria-pressed={spotKindFilter === kind}
+                      className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                      style={
+                        spotKindFilter === kind
+                          ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
+                          : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
+                      }
+                    >
+                      <VibeContentRenderer content={motoSpotKindIcon(kind)} className="mr-1 inline-block align-[-2px]" />
+                      {motoSpotKindLabel(kind)} {spotKindCounts.get(kind) ?? 0}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr,1fr]">
 
         {/* Stats card */}
