@@ -93,8 +93,11 @@ describe("iter15: web-order artifact inserts (crew_slug NOT NULL + phones)", () 
 
 describe("iter15: order notification uses Mini App deep links", () => {
   it("rentals link → t.me/<bot>/app?startapp=analytics_rentals_<date>", () => {
-    expect(RUNTIME_SRC).toContain("analytics_rentals_${deepLinkDate}");
-    expect(RUNTIME_SRC).toContain("https://t.me/${botUsername}/app?startapp=");
+    // de-hardcode (2026-09-21): ссылки собираются null-safe хелпером из
+    // crew metadata, а не ручной интерполяцией t.me/${botUsername};
+    // startapp строится одним шаблоном analytics_{kind}_{date}
+    expect(RUNTIME_SRC).toContain("const startapp = `analytics_${kind}_${deepLinkDate}`;");
+    expect(RUNTIME_SRC).toContain("const href = crewBotAppLink(crewBotUsername, startapp);");
   });
 
   it("no raw site-url rental links remain in the notification builder", () => {

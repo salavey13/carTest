@@ -102,3 +102,26 @@ export async function resolveCrewBotUsername(slug: string | null | undefined): P
 export function clearCrewBotCache(): void {
   botCache.clear();
 }
+
+/**
+ * Собрать deep link на Mini App бота экипажа.
+ * botUsername === null → null: ссылки НЕ существует, вызывающий код грейсфулly
+ * скрывает CTA (кнопку/строку), а не рендерит битую t.me/null/app.
+ * startapp у Telegram — ограниченный charset (A-Za-z0-9_-), encodeURIComponent
+ * на него не влияет, но страхует произвольные ключи (uuid, телефоны).
+ */
+export function crewBotAppLink(botUsername: string | null | undefined, startapp: string): string | null {
+  const bot = normalizeBotUsername(botUsername);
+  const safeParam = String(startapp ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .slice(0, 64);
+  if (!bot || !safeParam) return null;
+  return `https://t.me/${bot}/app?startapp=${encodeURIComponent(safeParam)}`;
+}
+
+/** База для кнопок-ссылок вида t.me/<bot>/app?startapp=... (без startapp). */
+export function crewBotAppBase(botUsername: string | null | undefined): string | null {
+  const bot = normalizeBotUsername(botUsername);
+  return bot ? `https://t.me/${bot}/app` : null;
+}

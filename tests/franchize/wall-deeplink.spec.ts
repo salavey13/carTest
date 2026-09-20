@@ -69,6 +69,20 @@ describe("parseWallDeepLink", () => {
   it("non-uuid garbage slug on wall_ degrades to own-crew wall, not dead link", () => {
     expect(parseWallDeepLink("wall_???")).toEqual({ kind: "wall", slug: null });
   });
+
+  it("parses the <slug>_community alias to the same wall destination", () => {
+    // crew-id_community form (boss request): same target as wall_<slug>
+    expect(parseWallDeepLink("vip-bike_community")).toEqual({ kind: "wall", slug: "vip-bike" });
+    // fixed prefixes always win over the suffix alias
+    expect(parseWallDeepLink("wall_vip-bike")).toEqual({ kind: "wall", slug: "vip-bike" });
+    expect(parseWallDeepLink(`post_${POST_ID}_vip-bike_community`)).toEqual({
+      kind: "post",
+      postId: POST_ID,
+      slug: "vip-bike_community",
+    });
+    // garbage slug + suffix → no route (not a dead "own crew" fallback)
+    expect(parseWallDeepLink("???_community")).toBeNull();
+  });
 });
 
 describe("builders", () => {

@@ -122,6 +122,14 @@ export function parseWallDeepLink(param: string | null | undefined): WallDeepLin
     return null;
   }
 
+  // Alias «<slug>_community» (crew-id_community) → the same wall destination
+  // as wall_<slug>. Checked LAST: fixed prefixes above win, so this suffix
+  // can never hijack a parameterised form. Garbage slug → null (no route).
+  if (p.endsWith("_community")) {
+    const slug = sanitizeWallSlug(p.slice(0, -"_community".length));
+    if (slug) return { kind: "wall", slug };
+  }
+
   return null;
 }
 

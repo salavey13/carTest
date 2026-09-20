@@ -17,7 +17,7 @@
 // the third part of one thing (wall · map · profile).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bike,
@@ -33,6 +33,7 @@ import {
   Send,
   ThumbsUp,
   Timer,
+  Trophy,
   X,
 } from "lucide-react";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
@@ -46,6 +47,7 @@ import {
   type RiderProfileCustom,
 } from "@/app/franchize/lib/rider-profile";
 import { saveRiderProfileAction, type RiderProfileView } from "@/app/franchize/server-actions/rider-profile";
+import { getWallStandingsAction } from "@/app/franchize/server-actions/community-wall";
 import type { WallPostView } from "@/app/franchize/lib/community-wall";
 
 // ── small building blocks ────────────────────────────────────────────────────
@@ -130,6 +132,22 @@ export function RiderProfileClient({
   const [draft, setDraft] = useState<RiderProfileCustom>(custom);
   const [savedFlash, setSavedFlash] = useState(false);
   const bioRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // «Зачёт экипажа»: this rider's rank in the crew's weekly standings. The
+  // standings are the SAME public payload the wall renders (money-free), so
+  // the profile stays consistent with the wall without extra server work.
+  const [weeklyRank, setWeeklyRank] = useState<{ rank: number; score: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void getWallStandingsAction({ slug: crewSlug }).then((res) => {
+      if (!alive || !res.ok) return;
+      const idx = res.standings.findIndex((e) => e.userId === rider.userId);
+      if (idx >= 0) setWeeklyRank({ rank: idx + 1, score: res.standings[idx].score });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [crewSlug, rider.userId]);
 
   const openStartEditing = () => {
     setDraft(custom);
@@ -391,6 +409,21 @@ export function RiderProfileClient({
         <StatTile icon={<Camera className="h-4 w-4" />} value={stats.photoPostsCount} label="фото-постов" />
         <StatTile icon={<MapPin className="h-4 w-4" />} value={stats.checkinCount} label="чек-инов" />
       </section>
+
+      {/* weekly standings rank (Зачёт экипажа) — hidden when the rider didn't
+          score this week: a silent zero beats a loud «you are not on the list».
+          Links to the wall, where the full weekly top-5 lives (crosslink). */}
+      {weeklyRank && (
+        <Link
+          href={`/franchize/${crewSlug}/community`}
+          className="cw-press flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--community-border)] bg-[var(--community-card-faint)] px-4 py-2.5 text-sm text-[var(--community-muted)] transition hover:border-[var(--community-accent)]"
+        >
+          <Trophy className="h-4 w-4 text-[var(--community-accent)]" aria-hidden="true" />
+          <span className="font-bold text-[var(--community-text)]">#{weeklyRank.rank}</span>
+          в зачёте экипажа за неделю · {weeklyRank.score}{" "}
+          {pluralRuClient(weeklyRank.score, ["очко", "очка", "очков"])}
+        </Link>
+      )}
 
       {/* ── badges ───────────────────────────────────────────────────────── */}
       <section className="cw-card cw-rise p-5">

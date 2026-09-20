@@ -24,6 +24,11 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import {
+  computeCrewStandings,
+  RIDE_SCORING_STATUSES,
+  type CrewStandingsUserRef,
+} from "@/app/franchize/lib/crew-standings";
+import {
   buildStatsPostBody,
   computeRiderStats,
   type RentalStatsSnapshot,
@@ -1602,6 +1607,100 @@ export async function getWallTrendingAction(input: { slug: string }): Promise<Ge
     .slice(0, 5);
 
   return { ok: true, tags, weekPosts: weekPosts ?? 0 };
+}
+
+// ── CREW STANDINGS («Зачёт экипажа») ─────────────────────────────────────────
+// The standout feature Chain cannot copy: our crews own a REAL fleet, so the
+// weekly leaderboard is built from real ride events (rentals on real bikes),
+// not from self-reported activity. Public + money-free: the same stance as
+// the wall itself (posts are public, ₽ never leaves staff surfaces).
+
+export interface WallStandingsEntry {
+  userId: string;
+  fullName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  rides: number;
+  checkins: number;
+  posts: number;
+  reactionsReceived: number;
+  score: number;
+}
+
+export type GetWallStandingsResult =
+  | {
+      ok: true;
+      /** Ranked entries (best first), capped — the wall shows top-5, the
+       *  rider profile finds its own row for the «#N недели» chip. */
+      standings: WallStandingsEntry[];
+      weekRides: number;
+      weekPosts: number;
+    }
+  | { ok: false; error: string };
+
+export async function getWallStandingsAction(input: { slug: string }): Promise<GetWallStandingsResult> {
+  const parsed = z.object({ slug: z.string().trim().min(1) }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Two bounded fetches (≤ ~2k rows each at NN scale — same budget as the
+  // trending strip). NO money columns are selected, ever: the standings are
+  // public while rental money stays a staff-only surface.
+  const [ridesRes, postsRes] = await Promise.all([
+    supabaseAdmin
+      .from("rentals")
+      .select("user_id, status, agreed_start_date, vehicle:cars(type)")
+      .eq("crew_id", crew.id)
+      .gte("agreed_start_date", weekAgo)
+      .limit(2000),
+    supabaseAdmin
+      .from("crew_posts")
+      .select("author_id, body, like_count")
+      .eq("crew_id", crew.id)
+      .eq("is_hidden", false)
+      .gte("created_at", weekAgo)
+      .limit(2000),
+  ]);
+
+  const rideRows = (ridesRes.data ?? []) as unknown as {
+    user_id: string | null;
+    status: string | null;
+    vehicle?: { type?: string | null } | null;
+  }[];
+  const postRows = (postsRes.data ?? []) as unknown as {
+    author_id: string | null;
+    body: string | null;
+    like_count?: number | string | null;
+  }[];
+
+  // Names/avatars for everyone who scored anything (≤ 50 rows via the lib cap).
+  const touched = new Set<string>();
+  for (const r of rideRows) if (r.user_id) touched.add(r.user_id);
+  for (const p of postRows) if (p.author_id) touched.add(p.author_id);
+  const usersById = new Map<string, CrewStandingsUserRef>();
+  if (touched.size > 0) {
+    const { data: userRows } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name, avatar_url")
+      .in("user_id", [...touched].slice(0, 200));
+    for (const row of (userRows ?? []) as { user_id: string; username: string | null; full_name: string | null; avatar_url: string | null }[]) {
+      usersById.set(row.user_id, { fullName: row.full_name, username: row.username, avatarUrl: row.avatar_url });
+    }
+  }
+
+  const standings: WallStandingsEntry[] = computeCrewStandings(
+    rideRows.map((r) => ({ user_id: r.user_id, status: r.status, vehicleType: r.vehicle?.type ?? null })),
+    postRows.map((p) => ({ author_id: p.author_id, body: p.body, like_count: p.like_count })),
+    usersById,
+  );
+
+  const weekRides = rideRows.filter((r) => RIDE_SCORING_STATUSES.has(r.status ?? "") && r.vehicle?.type === "bike").length;
+
+  return { ok: true, standings, weekRides, weekPosts: postRows.length };
 }
 
 // ── NEW-POSTS PROBE (background pill) ───────────────────────────────────────

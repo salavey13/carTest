@@ -29,6 +29,9 @@ import { formatRuDate } from "@/app/franchize/lib/date-utils";
 import { buildRequestedWindowMs, rentalRowBlocksWindow, type RentalOverlapRow } from "@/app/franchize/lib/rental-overlap";
 // v3 polish: centralized notification template builders (HTML-escaped, with inline buttons)
 import { buildCartCheckoutRenterMessage } from "@/app/franchize/lib/notification-templates";
+// crew-bot de-hardcode: бот экипажа резолвится из МЕТАДАННЫХ экипажа
+// (crews.contacts.telegramBotUsername), env — только глобальный фолбэк.
+import { resolveCrewBotUsername, crewBotAppLink, crewBotAppBase } from "@/app/franchize/lib/crew-bot";
 import { deriveNotificationKind, deriveNotificationSendTo } from "@/app/franchize/lib/notification-log";
 import {
   DEFAULT_AD_CARDS_TEXT,
@@ -3157,28 +3160,26 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // friction inside Telegram). t.me/<bot>/app?startapp=... opens the Mini App
     // directly on the right analytics day. The startapp router already
     // understands analytics_{rentals|sales|services}_{YYYY-MM-DD}.
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+    // De-hardcode: bot username resolves from the CREW's metadata
+    // (contacts.telegramBotUsername → env). No bot → the deeplink lines are
+    // simply omitted: a t.me/null/app link would be worse than none.
+    const crewBotUsername = await resolveCrewBotUsername(payload.slug);
     const deepLinkDate = payload.rentalStartDate || new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
-    const botAppUrl = (startapp: string) => `<a href="https://t.me/${botUsername}/app?startapp=${startapp}">${startapp}</a>`;
-    if (isServiceFlow) {
-      notificationParts.push(
-        ``,
-        `🔧 Сервис: ${botAppUrl(`analytics_services_${deepLinkDate}`)}`,
-        `📋 Лиды: ${botAppUrl(`analytics_services_${deepLinkDate}`)}`,
-      );
-    } else if (isSaleFlow) {
-      notificationParts.push(
-        ``,
-        `🛍️ Продажа: ${botAppUrl(`analytics_sales_${deepLinkDate}`)}`,
-        `📋 Лиды: ${botAppUrl(`analytics_sales_${deepLinkDate}`)}`,
-      );
-    } else {
-      notificationParts.push(
-        ``,
-        `🔗 Аренда: ${botAppUrl(`analytics_rentals_${deepLinkDate}`)}`,
-        `📋 Лиды: ${botAppUrl(`analytics_rentals_${deepLinkDate}`)}`,
-      );
-    }
+    // No bot → no lines: a t.me/null/app link would be worse than none.
+    const pushAnalytics = (label: string, kind: "rentals" | "sales" | "services") => {
+      const startapp = `analytics_${kind}_${deepLinkDate}`;
+      const href = crewBotAppLink(crewBotUsername, startapp);
+      if (href) {
+        notificationParts.push(
+          ``,
+          `${label} <a href="${href}">${startapp}</a>`,
+          `📋 Лиды: <a href="${href}">${startapp}</a>`,
+        );
+      }
+    };
+    if (isServiceFlow) pushAnalytics("🔧 Сервис:", "services");
+    else if (isSaleFlow) pushAnalytics("🛍️ Продажа:", "sales");
+    else pushAnalytics("🔗 Аренда:", "rentals");
 
     await notifyAdmin(notificationParts.join("\n"));
 
@@ -3225,14 +3226,21 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           totalCost: payload.totalAmount,
           depositRub: undefined, // deposit varies per bike; skip to avoid confusion
         });
-        // Add inline buttons: my contract + chat with manager
-        const botLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
-        userButtons = [
-          [
-            { text: "📄 Мой договор", url: `${botLink}?startapp=profile` },
-            { text: "💬 Чат с менеджером", url: `${botLink}?startapp=support` },
-          ],
-        ];
+        // Add inline buttons: my contract + chat with manager.
+        // De-hardcode: crew metadata bot first, NEXT_PUBLIC/TELEGRAM_BOT_LINK
+        // env as a deploy-time fallback; neither → no buttons (the message
+        // text itself still informs the renter).
+        const botLink =
+          crewBotAppBase(crewBotUsername) ??
+          (process.env.TELEGRAM_BOT_LINK || process.env.NEXT_PUBLIC_TELEGRAM_BOT_LINK || "").replace(/\/+$/, "");
+        if (botLink) {
+          userButtons = [
+            [
+              { text: "📄 Мой договор", url: `${botLink}?startapp=profile` },
+              { text: "💬 Чат с менеджером", url: `${botLink}?startapp=support` },
+            ],
+          ];
+        }
       } else {
         // Other flows — keep existing simple message format
         userNotification = [
@@ -3811,7 +3819,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         //      (bike names / recipient / phone never legitimately multiline).
         //   5. esc() HTML-escapes data — these messages go out as parse_mode HTML.
         if (createdRentals.length > 0) {
-          const botUsername = process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+          // De-hardcode: reuse the crew-metadata bot resolved earlier in this
+          // function (contacts.telegramBotUsername → env → null). null → the
+          // deeplink lines/buttons are omitted, the texts themselves still go.
+          const botUsername = crewBotUsername;
+          const botLinkOr = (startapp: string) => crewBotAppLink(botUsername, startapp);
           // Round-2 hardening lives in @/lib/tg-text (tested in
           // tests/tg-text.spec.ts): strips break-prone invisible chars,
           // nbsp family → space, and re-joins "о д н а  б у к в а" runs.
@@ -3835,6 +3847,19 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           ].join("\n"));
 
           const notifyTargets = new Set<string>([String(adminChatId), String(crewOwnerChatId || "")]);
+          const rentalsAnalyticsLink = botLinkOr("rentals_analytics");
+          const singleRentalUrl = createdRentals.length === 1 ? botLinkOr(`rental_${createdRentals[0].rentalId}`) : null;
+          const contractProfileUrl = botLinkOr("profile");
+          const rentalsButtons: Array<Array<{ text: string; url: string }>> | undefined = createdRentals.length === 1
+            ? singleRentalUrl
+              ? [[{ text: "🔑 Открыть аренду", url: singleRentalUrl }]]
+              : undefined
+            : createdRentals
+                .map((r) => {
+                  const url = botLinkOr(`rental_${r.rentalId}`);
+                  return url ? [{ text: `🔑 ${oneLine(r.bikeName)}`, url }] : null;
+                })
+                .filter((b): b is { text: string; url: string }[] => b !== null);
           for (const target of notifyTargets) {
             if (!target || target === "undefined") continue;
             try {
@@ -3849,12 +3874,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   `Получатель: ${esc(payload.recipient)}`,
                   `Телефон: ${esc(payload.phone)}`,
                   `Одометр подскажет страница аренды (последнее известное значение подгружено из карточки байка).`,
-                  ``,
-                  `<a href="https://t.me/${botUsername}/app?startapp=rentals_analytics">📈 Аналитика аренд</a>`,
+                  ...(rentalsAnalyticsLink ? [``, `<a href="${rentalsAnalyticsLink}">📈 Аналитика аренд</a>`] : []),
                 ].join("\n")),
-                createdRentals.length === 1
-                  ? [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }]]
-                  : createdRentals.map((r) => [{ text: `🔑 ${oneLine(r.bikeName)}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
+                rentalsButtons && rentalsButtons.length > 0 ? rentalsButtons : undefined,
                 // FIX: url-buttons need an INLINE keyboard — the default "reply"
                 // keyboard ignores/invalidates url buttons and pollutes the
                 // operator's chat with a one-time menu.
@@ -3867,15 +3889,23 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
           try {
             const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+            const renterButtons: Array<Array<{ text: string; url: string }>> | undefined = createdRentals.length === 1
+              ? (singleRentalUrl || contractProfileUrl
+                  ? [
+                      ...(singleRentalUrl ? [[{ text: "📸 Открыть страницу аренды", url: singleRentalUrl }]] : []),
+                      ...(contractProfileUrl ? [[{ text: "📄 Мой договор", url: contractProfileUrl }]] : []),
+                    ]
+                  : undefined)
+              : createdRentals
+                  .map((r) => {
+                    const url = botLinkOr(`rental_${r.rentalId}`);
+                    return url ? [{ text: `📸 ${oneLine(r.bikeName)}`, url }] : null;
+                  })
+                  .filter((b): b is { text: string; url: string }[] => b !== null);
             await sendComplexMessage(
               payload.telegramUserId,
               renterLines,
-              createdRentals.length === 1
-                ? [
-                    [{ text: "📸 Открыть страницу аренды", url: `https://t.me/${botUsername}/app?startapp=rental_${createdRentals[0].rentalId}` }],
-                    [{ text: "📄 Мой договор", url: `https://t.me/${botUsername}/app?startapp=profile` }],
-                  ]
-                : createdRentals.map((r) => [{ text: `📸 ${oneLine(r.bikeName)}`, url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]),
+              renterButtons && renterButtons.length > 0 ? renterButtons : undefined,
               { parseMode: "HTML", keyboardType: "inline" },
             );
           } catch (renterNotifyErr) {
@@ -3911,7 +3941,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   `Получатель: ${esc(payload.recipient)}`,
                   `Аренда ожидает активации оператором экипажа.`,
                 ].join("\n")),
-                [[{ text: "🔑 Открыть аренду", url: `https://t.me/${botUsername}/app?startapp=rental_${r.rentalId}` }]],
+                (() => {
+                  const subRentalUrl = botLinkOr(`rental_${r.rentalId}`);
+                  return subRentalUrl ? [[{ text: "🔑 Открыть аренду", url: subRentalUrl }]] : undefined;
+                })(),
                 { parseMode: "HTML", keyboardType: "inline" },
               );
             } catch (subrenterNotifyErr) {
@@ -5541,12 +5574,14 @@ async function createFranchizeOrderInvoiceInternal(
   const startParamPrefix = flowType === "rental" ? "rental" : "sale";
   const startParam = `${startParamPrefix}-${rentalId}`;
 
-  // Get crew bot username from metadata (or fallback to env var)
-  const crewBotUsername = process.env.TELEGRAM_BOT_USERNAME || "";
-  const botUsername = crewBotUsername || "oneBikePlsBot"; // Fallback for compatibility
-  const telegramWebappLink = `https://t.me/${botUsername}/app?startapp=${startParam}`;
+  // De-hardcode: bot username comes from the CREW's metadata
+  // (contacts.telegramBotUsername), env stays a global fallback. Neither →
+  // the invoice still carries the franchize web card link instead of a dead
+  // t.me link.
   const siteBaseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
   const franchizeRentalLink = `${siteBaseUrl}/franchize/${payload.slug}/rental/${rentalId}`;
+  const crewBotUsername = await resolveCrewBotUsername(payload.slug);
+  const telegramWebappLink = crewBotAppLink(crewBotUsername, startParam) ?? franchizeRentalLink;
 
   const cartText = payload.cartLines
     .map((line) => `• ${line.itemId} × ${line.qty} (${line.options.package}, ${line.options.duration}, ${line.options.perk}, ${line.options.auction})`)
@@ -5922,6 +5957,11 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
 }> {
   const safeSlug = slug.trim();
   const safeRentalId = rentalId.trim();
+  // De-hardcode: bot username from the crew's metadata (contacts → env →
+  // null). null → telegramDeepLink is "" and the renter CTA hides itself
+  // (RenterActionsPanel/GuestRentalCta already treat falsy as "no link").
+  const crewBotUsername = await resolveCrewBotUsername(safeSlug);
+  const telegramDeepLink = crewBotAppLink(crewBotUsername, `rental-${safeRentalId}`) ?? "";
   if (!safeSlug || !safeRentalId) {
     return {
       found: false,
@@ -5944,8 +5984,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docVerifierRecordId: "",
       contractSourceScope: "",
       contractOriginalSha256: "",
-      // Use env var for crew bot username in fallback case
-      telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${safeRentalId}`,
+      telegramDeepLink,
       renterFullName: "",
       renterTelegramChatId: "",
       renterPhone: "",
@@ -5991,8 +6030,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       docVerifierRecordId: "",
       contractSourceScope: "",
       contractOriginalSha256: "",
-      // Use env var for crew bot username in fallback case
-      telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${safeRentalId}`,
+      telegramDeepLink,
       renterFullName: "",
       renterTelegramChatId: "",
       renterPhone: "",
@@ -6143,8 +6181,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     docVerifierRecordId: typeof verifier?.docVerifierRecordId === "string" ? verifier.docVerifierRecordId : "",
     contractSourceScope: typeof verifier?.sourceScope === "string" ? verifier.sourceScope : "",
     contractOriginalSha256: typeof verifier?.originalSha256 === "string" ? verifier.originalSha256 : "",
-    // Use env var for crew bot username
-    telegramDeepLink: `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}/app?startapp=rental-${data.rental_id}`,
+    telegramDeepLink,
     renterFullName,
     renterTelegramChatId,
     renterPhone,

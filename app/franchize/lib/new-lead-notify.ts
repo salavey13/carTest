@@ -28,6 +28,7 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { telegramDeliver } from "@/lib/telegram-transport";
+import { crewBotAppBase, resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
 
 /** Ссылка на Mini App бота (deeplink-база). */
 export function telegramWebAppUrl(): string {
@@ -48,10 +49,13 @@ export function sanitizeLeadKey(leadKey: string | null | undefined): string {
     .slice(0, 60);
 }
 
-/** Deeplink на карточку лида: t.me/<bot>/app?startapp=lead_<key>. */
-export function leadDeeplinkUrl(leadKey: string): string {
+/** Deeplink на карточку лида: t.me/<bot>/app?startapp=lead_<key>.
+ *  base — необязательная crew-специфичная база (t.me/<crewBot>/app);
+ *  без неё используется глобальный telegramWebAppUrl() (env-фолбэк). */
+export function leadDeeplinkUrl(leadKey: string, base?: string): string {
   const key = sanitizeLeadKey(leadKey);
-  return `${telegramWebAppUrl()}?startapp=lead_${key}`;
+  const botBase = (base ?? telegramWebAppUrl()).replace(/\/+$/, "");
+  return `${botBase}?startapp=lead_${key}`;
 }
 
 function escHtml(value: string): string {
@@ -158,7 +162,11 @@ export async function notifyNewLead(
     return result;
   }
 
-  const deeplink = leadDeeplinkUrl(input.leadKey);
+  // Crew-aware deeplink: бот — бот ЭТОГО экипажа (metadata), а не глобальная
+  // константа деплоя. Metadata пуста → undefined → env-фолбэк внутри
+  // telegramWebAppUrl(). Никогда не бросает — резолвер сам глотает ошибки.
+  const crewBot = await resolveCrewBotUsername(input.slug);
+  const deeplink = leadDeeplinkUrl(input.leadKey, crewBotAppBase(crewBot) ?? undefined);
   const lines: string[] = [`🟡 <b>${escHtml(input.title)}</b>`, ""];
   if (input.bikeTitle) lines.push(`📦 Объявление: ${escHtml(input.bikeTitle)}`);
   if (input.name) lines.push(`👤 ${escHtml(input.name)}`);

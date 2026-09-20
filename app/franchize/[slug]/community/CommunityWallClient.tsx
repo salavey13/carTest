@@ -37,13 +37,16 @@ import {
   ImagePlus,
   Loader2,
   Lock,
+  MapPin,
   MessageCircle,
+  PenLine,
   Pin,
   PinOff,
   Search,
   Send,
   Share2,
   Trash2,
+  Trophy,
   X,
 } from "lucide-react";
 import {
@@ -82,6 +85,7 @@ import {
   getWallPostAction,
   getWallRentalDraftAction,
   getWallRideDraftAction,
+  getWallStandingsAction,
   getWallTrendingAction,
   hideCommunityCommentAction,
   hideCommunityPostAction,
@@ -90,8 +94,10 @@ import {
   type WallBikeOption,
   type WallRentalDraft,
   type WallRideDraft,
+  type WallStandingsEntry,
   type WallTrendingTag,
 } from "@/app/franchize/server-actions/community-wall";
+import { crewStandingsDisplayName } from "@/app/franchize/lib/crew-standings";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
 import { buildSpotCheckinText, findMotoSpotById } from "@/lib/map-riders-spots";
@@ -209,6 +215,9 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   const [activeQuery, setActiveQuery] = useState<string | null>(initialQuery ?? null);
   const [searchDraft, setSearchDraft] = useState(initialQuery ?? "");
   const [trending, setTrending] = useState<{ tags: WallTrendingTag[]; weekPosts: number } | null>(null);
+  // «Зачёт экипажа» — weekly leaderboard from REAL rides/posts/checkins.
+  // Loaded once per mount alongside the trending strip (bounded queries).
+  const [standings, setStandings] = useState<{ standings: WallStandingsEntry[]; weekRides: number } | null>(null);
   const [newPostsCount, setNewPostsCount] = useState(0);
   const wallTopRef = useRef<HTMLDivElement>(null);
 
@@ -260,6 +269,14 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   useEffect(() => {
     void getWallTrendingAction({ slug }).then((res) => {
       if (res.ok) setTrending({ tags: res.tags, weekPosts: res.weekPosts });
+    });
+  }, [slug]);
+
+  // crew standings (Зачёт недели) — same lazy one-shot as trending; a failed
+  // fetch just hides the block (the feed itself must never depend on it)
+  useEffect(() => {
+    void getWallStandingsAction({ slug }).then((res) => {
+      if (res.ok) setStandings({ standings: res.standings, weekRides: res.weekRides });
     });
   }, [slug]);
 
@@ -896,6 +913,80 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             </div>
           )}
         </div>
+
+        {/* Зачёт экипажа: weekly top-5 built from REAL rides/posts/checkins —
+            the thing Chain can't build (their groups don't own the rides).
+            Rows deep-link to rider profiles (wall ↔ profile crosslink), the
+            palette rides on the same --community-* vars as everything else. */}
+        {standings && standings.standings.length > 0 && (
+          <section
+            className="cw-rise cw-card rounded-2xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-4 md:p-5"
+            aria-label="Зачёт экипажа за неделю"
+            style={{ "--cw-i": 1 } as React.CSSProperties}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[var(--community-text)]">
+                <Trophy className="h-4 w-4 text-[var(--community-accent)]" />
+                Зачёт недели
+              </h3>
+              {standings.weekRides > 0 && (
+                <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--community-muted)] opacity-80">
+                  {standings.weekRides} {pluralRu(standings.weekRides, ["выезд", "выезда", "выездов"])} за 7 дней
+                </span>
+              )}
+            </div>
+            <ol className="mt-3 flex flex-col gap-1">
+              {standings.standings.slice(0, 5).map((entry, idx) => (
+                <li key={entry.userId}>
+                  <Link
+                    href={`/franchize/${slug}/rider/${entry.userId}`}
+                    className="cw-press flex min-h-[44px] items-center gap-3 rounded-xl border border-transparent px-2 py-1.5 transition hover:border-[var(--community-border)] hover:bg-[var(--community-card-soft)]"
+                  >
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                        idx === 0
+                          ? "bg-[var(--community-accent)] text-[var(--community-accent-text)] shadow-[0_0_14px_-4px_var(--community-accent)]"
+                          : "border border-[var(--community-border)] text-[var(--community-muted)]"
+                      }`}
+                    >
+                      {idx + 1}
+                    </span>
+                    <Avatar url={entry.avatarUrl} name={crewStandingsDisplayName(entry)} size={32} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-[var(--community-text)]">
+                        {crewStandingsDisplayName(entry)}
+                      </span>
+                      <span className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-[var(--community-muted)]">
+                        <span className="flex items-center gap-1">
+                          <Bike className="h-3 w-3" aria-hidden="true" />
+                          {entry.rides}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" aria-hidden="true" />
+                          {entry.checkins}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <PenLine className="h-3 w-3" aria-hidden="true" />
+                          {entry.posts}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Heart className="h-3 w-3" aria-hidden="true" />
+                          {entry.reactionsReceived}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-sm font-bold text-[var(--community-accent)]">{entry.score}</span>
+                      <span className="block text-[10px] uppercase tracking-[0.12em] text-[var(--community-muted)]">
+                        {pluralRu(entry.score, ["очко", "очка", "очков"])}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         {/* composer / locked state */}
         {isAnonymous ? (
