@@ -1413,6 +1413,8 @@ export function ItemModal({
   // touching 200+ style attributes while we migrate the visual
   // primitives to `T` one component at a time.
   const themeVars: React.CSSProperties = useMemo(
+    // CSS custom properties don't participate in CSSProperties' index signature —
+    // cast is the canonical pattern for var-only style objects.
     () => ({
       "--item-accent": T.accent,
       "--item-border": T.borderSoft,
@@ -1421,7 +1423,7 @@ export function ItemModal({
       "--item-text": T.text,
       "--item-accent-contrast": T.accentContrast,
       "--item-bg-elevated": T.bgElevated,
-    }),
+    } as React.CSSProperties),
     [T],
   );
   // Backward-compat shim so the dozens of existing `surface.card` /
@@ -1755,8 +1757,14 @@ export function ItemModal({
   const handleShareItem = useCallback(
     (flow: ItemShareFlow) => {
       if (!item) return;
+      // Зачистка хардкода 2026-09-22: без бота экипажа шарим публичную
+      // web-страницу экипажа (deep link в чужой Mini App — хуже web-ссылки).
       const links = buildItemDeepLinks(item.id, botUsername);
-      const url = flow === "rent" ? links.rent : links.sale;
+      const url = links
+        ? flow === "rent"
+          ? links.rent
+          : links.sale
+        : `${window.location.origin}/franchize/${slug}`;
       const text = buildItemShareText({
         title: item.title,
         flow,
@@ -1817,7 +1825,7 @@ export function ItemModal({
         showNote("Не удалось открыть отправку. Попробуйте ещё раз.");
       })();
     },
-    [item, botUsername],
+    [item, botUsername, slug],
   );
 
   const handleShareButtonClick = useCallback(() => {
@@ -1988,9 +1996,10 @@ export function ItemModal({
 
   const normalizedSpecs = (
     // For equipment items, use the equipment-specific specs with Russian labels
-    isEquipment ? equipmentSpecs :
-    // Otherwise, use item specs or fallback specs
-    (item.specs.length > 0 ? item.specs : fallbackSpecs)
+    // (IIFE returns null when not equipment — coalesce so downstream .filter is null-safe)
+    isEquipment ? (equipmentSpecs ?? []) :
+    // Otherwise, use item specs or fallback specs (item may be null before the modal opens)
+    (item && item.specs.length > 0 ? item.specs : fallbackSpecs)
   )
     // Filter out internal fields like "id" and "rent" that shouldn't be shown to customers
     .filter((s) => {

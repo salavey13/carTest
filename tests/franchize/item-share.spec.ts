@@ -35,9 +35,11 @@ describe("item-share: buildItemDeepLinks", () => {
     expect(links.rent).toBe("https://t.me/OneBikePls/app?startapp=rent_kawasaki-ex650k");
   });
 
-  it("falls back to oneBikePlsBot when no bot username is provided", () => {
-    const links = buildItemDeepLinks("falcon-gt-2026", "");
-    expect(links.sale).toContain("https://t.me/oneBikePlsBot/app?startapp=sale_falcon-gt-2026");
+  it("returns null when no bot username is provided (web fallback is the caller's job)", () => {
+    // Зачистка хардкода 2026-09-22: чужой oneBikePlsBot больше не подставляется —
+    // без бота lib отдаёт null, Item.tsx шарит публичную web-страницу экипажа.
+    expect(buildItemDeepLinks("falcon-gt-2026", "")).toBeNull();
+    expect(buildItemDeepLinks("falcon-gt-2026", "@@@")).toBeNull();
   });
 
   it("lowercases and trims the bike id", () => {

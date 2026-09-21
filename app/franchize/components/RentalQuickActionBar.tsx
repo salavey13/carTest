@@ -53,6 +53,8 @@ interface RentalQuickActionBarProps {
   ownerId?: string;
   renterId?: string;
   renterTelegramChatId?: string;
+  /** Subrenter identity — parity with FranchizeRentalRoleGuard inputs. */
+  subrenterChatId?: string;
   crewId?: string;
   /** goodmorning-fixes: crewSlug fallback — more reliable than crewId for matching */
   crewSlug?: string;

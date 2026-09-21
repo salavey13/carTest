@@ -29,11 +29,13 @@ function sanitizeBotUsername(botUsername: string): string {
 
 /**
  * Build the t.me/app deep-links for a bike (rent + sale).
- * Bot username falls back to oneBikePlsBot (the VIP Bike bot) when the crew
- * theme doesn't provide one.
+ * Зачистка хардкода 2026-09-22: no crew bot → null — НЕ подставляем чужой
+ * «oneBikePlsBot» (deep link в чужой Mini App хуже честной web-ссылки).
+ * Caller (Item.tsx) в этом случае шарит публичную web-страницу экипажа.
  */
-export function buildItemDeepLinks(bikeId: string, botUsername: string): ItemShareLinks {
-  const bot = sanitizeBotUsername(botUsername) || "oneBikePlsBot";
+export function buildItemDeepLinks(bikeId: string, botUsername: string): ItemShareLinks | null {
+  const bot = sanitizeBotUsername(botUsername);
+  if (!bot) return null;
   const id = String(bikeId || "").trim().toLowerCase();
   return {
     rent: `https://t.me/${bot}/app?startapp=rent_${id}`,

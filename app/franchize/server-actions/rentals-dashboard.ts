@@ -8,6 +8,10 @@ import {
   buildRentalStatusChangeMessage,
   buildActivationMessage,
 } from "@/app/franchize/lib/notification-templates";
+import {
+  botUsernameFromCrewMetadata,
+  normalizeBotUsername,
+} from "@/app/franchize/lib/crew-bot";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1310,9 +1314,12 @@ export async function resendRentalContract(input: {
 
     const isCrewOwner = crew?.owner_id === actorUserId;
 
-    // Extract crew bot username from metadata
-    const crewBotUsername = crew?.metadata?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME;
-    const botUsername = crewBotUsername || "oneBikePlsBot"; // Fallback for compatibility
+    // Extract crew bot username from metadata (зачистка хардкода 2026-09-22:
+    // «oneBikePlsBot» убран — бот экипажа живёт в metadata.franchize.contacts,
+    // env — глобальный фолбэк; без бота QR пропускается, DOCX уходит без него).
+    const botUsername =
+      botUsernameFromCrewMetadata(crew?.metadata) ||
+      normalizeBotUsername(process.env.TELEGRAM_BOT_USERNAME);
 
     if (!isAdmin && !isCrewOwner) {
       return { success: false, error: "Недостаточно прав для отправки." };
@@ -1406,17 +1413,20 @@ export async function resendRentalContract(input: {
     const docxBuf = docResult.bytes;
     const docSha256 = docResult.sha256;
 
-    // Generate QR code with crew-specific bot username
-    const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
-    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
-
+    // Generate QR code with crew-specific bot username (no bot → no QR: строка
+    // t.me//app дала бы мусорный код; DOCX ниже уходит и без QR — guard есть)
     let qrPngBuffer: Buffer | null = null;
-    try {
-      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
-      if (qrRes.ok) {
-        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
-      }
-    } catch {}
+    if (botUsername) {
+      const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
+      const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+      try {
+        const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+        if (qrRes.ok) {
+          qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+        }
+      } catch {}
+    }
 
     // Send via forward-telegram API
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-car-test.vercel.app";
@@ -2734,7 +2744,11 @@ export async function activateRental(input: {
     const now = new Date();
     const rentStartDate = rental.agreed_start_date || rental.requested_start_date || "";
     const rentEndDate = rental.agreed_end_date || rental.requested_end_date || "";
-    const crewBotUsername = (crew.metadata as any)?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
+    // Зачистка хардкода 2026-09-22: бот из metadata (franchize.contacts),
+    // env — фолбэк; без бота QR пропускается (t.me//app — мусорный код).
+    const crewBotUsername =
+      botUsernameFromCrewMetadata(crew.metadata) ||
+      normalizeBotUsername(process.env.TELEGRAM_BOT_USERNAME);
 
     const vars: Record<string, string> = {
       contract_number: `${now.getDate()}.${now.getMonth() + 1}/${vehicle.id}`,
@@ -2836,14 +2850,17 @@ export async function activateRental(input: {
     const docxBuf = docResult.bytes;
     const docSha256 = docResult.sha256;
 
-    // Generate QR code with crew-specific bot username
-    const qrDeepLink = `https://t.me/${crewBotUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
-    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+    // Generate QR code with crew-specific bot username (no bot → no QR: строка
+    // t.me//app дала бы мусорный код; активация ниже работает и без QR)
     let qrPngBuffer: Buffer | null = null;
-    try {
-      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
-      if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
-    } catch {}
+    if (crewBotUsername) {
+      const qrDeepLink = `https://t.me/${crewBotUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
+      const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+      try {
+        const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+        if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+      } catch {}
+    }
 
     // ── 5. Update rental status → active + save odometer in metadata ──
     const currentMeta = (rental.metadata || {}) as Record<string, unknown>;
@@ -3274,18 +3291,24 @@ export async function sendRentalDocByEmail(input: {
     const docxBuf = docResult.bytes;
     const docSha256 = docResult.sha256;
 
-    // Generate QR code
-    const botUsername = crewMetadata?.franchize?.contacts?.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot";
-    const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
-    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+    // Generate QR code (зачистка хардкода 2026-09-22: бот из metadata, env —
+    // фолбэк; без бота QR пропускается, письмо уходит с DOCX без QR)
+    const botUsername =
+      botUsernameFromCrewMetadata(crewMetadata) ||
+      normalizeBotUsername(process.env.TELEGRAM_BOT_USERNAME);
 
     let qrPngBuffer: Buffer | null = null;
-    try {
-      const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
-      if (qrRes.ok) {
-        qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
-      }
-    } catch {}
+    if (botUsername) {
+      const qrDeepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicle.id}_${docSha256}`;
+      const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff&margin=1`;
+
+      try {
+        const qrRes = await fetch(qrPngUrl, { signal: AbortSignal.timeout(8000) });
+        if (qrRes.ok) {
+          qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+        }
+      } catch {}
+    }
 
     // Configure SMTP
     const SMTP_HOST = process.env.SMTP_YANDEX_HOST || process.env.SMTP_GMAIL_HOST || "smtp.yandex.ru";

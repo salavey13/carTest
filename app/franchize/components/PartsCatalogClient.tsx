@@ -49,7 +49,9 @@ export function PartsCatalogClient({ initialParts, theme, telegramBotUsername }:
   const surface = crewPaletteForSurface(theme);
   const accentColor = palette.accentMain;
   const priceGlowStyle = getContrastingGlowStyle(accentColor);
-  const botUsername = telegramBotUsername || "oneBikePlsBot";
+  // Зачистка хардкода 2026-09-22: без бота экипажа CTA «Заказать в Telegram»
+  // не рендерится (t.me/<чужой-бот>?start=part_… — битая ссылка).
+  const botUsername = (telegramBotUsername || "").trim().replace(/^@/, "");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -511,20 +513,26 @@ export function PartsCatalogClient({ initialParts, theme, telegramBotUsername }:
                 Самовывоз: {PICKUP_ADDRESS}. Для заказа напишите нам в Telegram — менеджер подтвердит наличие и стоимость.
               </p>
 
-              {/* CTA */}
-              <a
-                href={orderHref(selectedPart)}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--parts-accent)] px-4 py-3 text-sm font-semibold text-[var(--parts-accent-contrast)] transition hover:opacity-90 active:scale-95"
-                style={{
-                  backgroundColor: isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-                  color: readableTextOnColor(palette.accentMain),
-                }}
-              >
-                <Send className="h-4 w-4" />
-                Заказать в Telegram
-              </a>
+              {/* CTA — only when the crew bot is known (no invented deep links) */}
+              {botUsername ? (
+                <a
+                  href={orderHref(selectedPart)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--parts-accent)] px-4 py-3 text-sm font-semibold text-[var(--parts-accent-contrast)] transition hover:opacity-90 active:scale-95"
+                  style={{
+                    backgroundColor: isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+                    color: readableTextOnColor(palette.accentMain),
+                  }}
+                >
+                  <Send className="h-4 w-4" />
+                  Заказать в Telegram
+                </a>
+              ) : (
+                <p className="rounded-xl border border-dashed px-4 py-3 text-center text-xs" style={{ borderColor: "var(--parts-border, rgba(128,128,128,.4))", color: "var(--parts-muted)" }}>
+                  Заказ через Telegram недоступен — у экипажа не настроен бот.
+                </p>
+              )}
             </div>
           </div>
         </div>

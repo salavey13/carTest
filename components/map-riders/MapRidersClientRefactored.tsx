@@ -956,11 +956,13 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                   Тот же CommunityWallClient, что на странице /community: посты,
                   фото, реакции, комментарии, зачёт, композер с геотегом.
                   mapSelectedPoint → «Точка с карты» в пикере геотега;
-                  onFocusGeotag → карта сворачивает шит и летит к метке. */}
+                  onFocusGeotag → карта сворачивает шит и летит к метке.
+                  Зачистка 2026-09-22: фолбэк на crew.contacts.telegram (@живой-человек,
+                  не бот!) давал битую ссылку t.me/I_O_S_NN/app?startapp=… — убран. */}
               <CommunityWallClient
                 slug={crewSlug}
                 crewName={crew.header.brandName || crew.name || "Экипаж"}
-                botUsername={crew.contacts.telegramBotUsername || crew.contacts.telegram?.replace("@", "") || null}
+                botUsername={crew.contacts.telegramBotUsername || null}
                 deeplinkBotUsername={crew.contacts.telegramBotUsername || null}
                 highlightPostId={wallParams?.highlightPostId ?? null}
                 composeRentalId={wallParams?.composeRentalId ?? null}

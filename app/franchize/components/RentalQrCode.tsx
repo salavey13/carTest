@@ -19,6 +19,8 @@ import { Copy, Check, AlertTriangle } from "lucide-react";
 interface RentalQrCodeProps {
   vehicleId: string;
   docSha256: string;
+  /** Бот экипажа (resolveCrewBotUsername). Пусто → graceful-карточка без QR:
+   *  deep link t.me//app был бы мусором (зачистка хардкода 2026-09-22). */
   botUsername: string;
   accentColor: string;
   borderColor: string;
@@ -37,7 +39,25 @@ export function RentalQrCode({
 }: RentalQrCodeProps) {
   const [copied, setCopied] = useState(false);
 
-  const deepLink = `https://t.me/${botUsername}/app?startapp=rent_${vehicleId}_${docSha256}`;
+  // No crew bot configured → there is no Mini App to deep link into. Render
+  // a staff-facing notice instead of a QR encoding a broken t.me//app URL.
+  const bot = botUsername.trim().replace(/^@/, "");
+  if (!bot) {
+    return (
+      <div className="rounded-xl border p-3" style={{ borderColor }}>
+        <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: textPrimary }}>
+          <AlertTriangle className="h-4 w-4 shrink-0" style={{ color: "#f59e0b" }} />
+          QR-код недоступен
+        </p>
+        <p className="mt-1 text-[11px]" style={{ color: textSecondary }}>
+          У экипажа не настроен Telegram-бот (metadata → franchize → contacts →
+          telegramBotUsername). Добавьте бота — и QR-карточка появится здесь.
+        </p>
+      </div>
+    );
+  }
+
+  const deepLink = `https://t.me/${bot}/app?startapp=rent_${vehicleId}_${docSha256}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(deepLink)}&color=000000&bgcolor=ffffff`;
 
   const handleCopy = async () => {

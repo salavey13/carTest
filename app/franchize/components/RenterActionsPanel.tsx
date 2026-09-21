@@ -35,7 +35,11 @@ interface RenterActionsPanelProps {
   ownerId?: string;
   renterId?: string;
   renterTelegramChatId?: string;
+  /** Subrenter identity — parity with FranchizeRentalRoleGuard inputs. */
+  subrenterChatId?: string;
   crewId?: string;
+  /** Crew slug — parity with the role-guard inputs (slug matching is more reliable). */
+  crewSlug?: string;
   contractVerified: boolean;
   contractDownloadUrl?: string | null;
   photoUploadHref?: string; // web app photo upload route

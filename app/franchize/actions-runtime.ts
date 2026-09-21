@@ -5920,6 +5920,9 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
   vehicleImageUrl: string;     // from cars.image_url or specs.gallery[0]
   renterId: string;
   ownerId: string;
+  /** rentals.created_at — DB column is the source of truth for the stage Timeline
+   *  (production metadata doesn't always carry created_at). */
+  createdAt: string | null;
   agreedStartDate: string | null;
   agreedEndDate: string | null;
   requestedEndDate: string | null;
@@ -5974,6 +5977,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleImageUrl: "",
       renterId: "",
       ownerId: "",
+      createdAt: null,
       agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
@@ -6004,7 +6008,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
 
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, vehicle_id, agreed_start_date, agreed_end_date, requested_end_date, metadata, start_photo_count, end_photo_count, vehicle:cars(make, model, image_url, specs), crew:crews!rentals_crew_id_fkey(id, slug)")
+    .select("rental_id, status, payment_status, total_cost, user_id, owner_id, vehicle_id, agreed_start_date, agreed_end_date, requested_end_date, created_at, metadata, start_photo_count, end_photo_count, vehicle:cars(make, model, image_url, specs), crew:crews!rentals_crew_id_fkey(id, slug)")
     .eq("rental_id", safeRentalId)
     .maybeSingle();
 
@@ -6020,6 +6024,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
       vehicleImageUrl: "",
       renterId: "",
       ownerId: "",
+      createdAt: null,
       agreedStartDate: null,
       agreedEndDate: null,
       requestedEndDate: null,
@@ -6171,6 +6176,7 @@ export async function getFranchizeRentalCard(slug: string, rentalId: string): Pr
     vehicleImageUrl,
     renterId: data.user_id ?? "",
     ownerId: data.owner_id ?? "",
+    createdAt: (data as any).created_at || null,
     agreedStartDate: (data as any).agreed_start_date || null,
     agreedEndDate: data.agreed_end_date || null,
     requestedEndDate: data.requested_end_date || null,

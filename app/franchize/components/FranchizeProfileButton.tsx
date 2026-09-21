@@ -253,14 +253,17 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
       );
     }
     // Outside Telegram (browser) — ALWAYS produce a working link.
-    // Use crew-specific bot if available, fallback to oneBikePlsBot.
+    // Зачистка хардкода 2026-09-22: без бота экипажа кнопка НЕ рендерится
+    // (t.me/oneBikePlsBot — чужой бот; лучше не давать битую ссылку).
     // Use t.me format (not web.telegram.org) — t.me properly redirects to Telegram Web on desktop.
-    const botName = telegramBotUsername || "oneBikePlsBot";
+    const botName = (telegramBotUsername || "").trim().replace(/^@/, "");
     const startappValue = effectiveSlug ? `franchize/${effectiveSlug}/profile` : "";
-    const tmeHref = startappValue
-      ? `https://t.me/${botName}/app?startapp=${encodeURIComponent(startappValue)}`
-      : `https://t.me/${botName}`;
-    const label = tmeHref.includes("/app?startapp=") ? "Открыть в TG" : "Написать в TG";
+    const tmeHref = botName
+      ? startappValue
+        ? `https://t.me/${botName}/app?startapp=${encodeURIComponent(startappValue)}`
+        : `https://t.me/${botName}`
+      : null;
+    const label = tmeHref?.includes("/app?startapp=") ? "Открыть в TG" : "Написать в TG";
     return (
       <div className="flex items-center gap-2">
         {/* Create-franchise shortcut — available to ALL visitors when enabled per-crew.
@@ -277,17 +280,19 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
             <span className="hidden sm:inline">Создать франшизу</span>
           </Link>
         )}
-        <a
-          href={tmeHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={label}
-          className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          style={{ backgroundColor: bgColor, color: textColor, borderColor }}
-        >
-          <Send className="h-4 w-4" />
-          <span className="hidden sm:inline">{label}</span>
-        </a>
+        {tmeHref ? (
+          <a
+            href={tmeHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={label}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{ backgroundColor: bgColor, color: textColor, borderColor }}
+          >
+            <Send className="h-4 w-4" />
+            <span className="hidden sm:inline">{label}</span>
+          </a>
+        ) : null}
       </div>
     );
   }
@@ -524,8 +529,12 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <button type="button" onClick={() => {
-                  const botName = telegramBotUsername || "oneBikePlsBot";
-            const url = `https://t.me/${botName}/app?startapp=crew_${effectiveSlug}_join_crew`;
+                  // Зачистка хардкода 2026-09-22: без бота — web-фолбэк инвайта
+                  // (тот же контракт, что у getCrewInviteInfoAction.webFallbackUrl).
+                  const botName = (telegramBotUsername || "").trim().replace(/^@/, "");
+                  const url = botName
+                    ? `https://t.me/${botName}/app?startapp=crew_${effectiveSlug}_join_crew`
+                    : `${window.location.origin}/franchize/${effectiveSlug}?join_crew=true`;
                   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VibeRider!")}`;
                   if (isInTelegramContext && tg) tg.openLink(shareUrl);
                   else window.open(shareUrl, "_blank");

@@ -37,7 +37,12 @@
     "app/franchize/[slug]/rider/[userId]/RiderProfileClient.tsx",
     "lib/wall-deeplink.ts",
     "hooks/useStartParamRouter.ts",
-    "app/franchize/server-actions/update-crew-member-role.ts"
+    "app/franchize/server-actions/update-crew-member-role.ts",
+    "app/franchize/lib/item-share.ts",
+    "app/franchize/modals/Item.tsx",
+    "app/franchize/components/PartsCatalogClient.tsx",
+    "app/franchize/components/RentalQrCode.tsx",
+    "app/franchize/[slug]/rental/[id]/page.tsx"
   ],
   "exclude": ["node_modules", ".next"]
 }

@@ -8,6 +8,8 @@ import { ChevronDown, PackageCheck } from "lucide-react";
 interface RentalReturnChecklistProps {
   rentalId: string;
   crewId: string;
+  /** Crew slug — parity with the role-guard inputs (slug matching is more reliable). */
+  crewSlug?: string;
   accentColor: string;
   borderColor: string;
   textPrimary: string;

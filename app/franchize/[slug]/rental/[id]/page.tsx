@@ -19,6 +19,7 @@ import { RentalReturnChecklist } from "../../../components/RentalReturnChecklist
 import { RentalPhotoGallery } from "../../../components/RentalPhotoGallery";
 // goodmorning-polish: removed RentalTelegramGuard import (no longer used after streamline)
 import { crewPaletteForSurface, readablePaletteTextOnColor } from "../../../lib/theme";
+import { resolveCrewBotUsername } from "../../../lib/crew-bot";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { formatRuDate, formatRuDateTime } from "../../../lib/date-utils";
 // goodmorning-fixes: removed RentalEscapeHatch import (component no longer used —
@@ -78,6 +79,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
     getFranchizeRentalCard(slug, id),
   ]);
   const resolvedSlug = crew.slug || slug;
+  // Зачистка хардкода 2026-09-22: бот QR-карточки аренды — из metadata экипажа
+  // (резолвер с TTL-кэшем), а не env-жёсткий «oneBikePlsBot». null → карточка
+  // сама отрисует graceful-состояние без QR.
+  const crewBotUsername = await resolveCrewBotUsername(resolvedSlug);
   const surface = crewPaletteForSurface(crew.theme);
   const p = crew.theme.palette;
   const isAuto = Boolean(crew.theme.isAuto);
@@ -476,7 +481,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               <RentalQrCode
                 vehicleId={rental.vehicleId}
                 docSha256={rental.docSha256}
-                botUsername={process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"}
+                botUsername={crewBotUsername || ""}
                 accentColor={accent}
                 borderColor={borderSoft}
                 textPrimary={textPrimary}
