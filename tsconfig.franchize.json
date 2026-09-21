@@ -34,7 +34,10 @@
     "app/franchize/[slug]/community/CommunityWallClient.tsx",
     "app/franchize/server-actions/rider-profile.ts",
     "app/franchize/[slug]/rider/[userId]/page.tsx",
-    "app/franchize/[slug]/rider/[userId]/RiderProfileClient.tsx"
+    "app/franchize/[slug]/rider/[userId]/RiderProfileClient.tsx",
+    "lib/wall-deeplink.ts",
+    "hooks/useStartParamRouter.ts",
+    "app/franchize/server-actions/update-crew-member-role.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

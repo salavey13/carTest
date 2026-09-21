@@ -1,7 +1,7 @@
 // /app/franchize/server-actions/update-crew-member-role.ts
 "use server";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { sendTelegramMessage } from "@/lib/telegram";
 import {
@@ -12,6 +12,10 @@ import {
   roleLabel,
   type AssignableRole,
 } from "@/app/franchize/lib/crew-roles";
+
+// Re-export so client UIs can import the role type next to the actions
+// (CrewMembersClient does exactly that).
+export type { AssignableRole } from "@/app/franchize/lib/crew-roles";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -136,6 +140,187 @@ export async function updateCrewMemberRole(
     return { success: true };
   } catch (error) {
     logger.error("updateCrewMemberRole error", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Внутренняя ошибка сервера",
+    };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin invite & owner promotion (dummy-crew onboarding, 2026-09-21)
+//
+// Flow: platform admin sends the invite deeplink (join_<slug>, built by
+// crewJoinStartParam) to a future crew owner → the person opens it in
+// Telegram, auto-joins the (dummy) crew as a MEMBER (JoinCrewBanner) →
+// later the admin opens the crew members page and promotes them to owner
+// with promoteCrewMemberToOwnerAction. Both actions are PLATFORM-ADMIN-only
+// (users.role ∈ admin|vpradmin) — crew owners must NOT mint owners.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type PromoteOwnerInput = {
+  crewSlug: string;
+  targetUserId: string;
+  actorTelegramUserId: string;
+};
+
+export type PromoteOwnerResult =
+  | { success: true; previousOwnerId: string | null }
+  | { success: false; error: string };
+
+async function assertPlatformAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("users")
+    .select("role, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const u = (data ?? null) as { role?: string | null; status?: string | null } | null;
+  const role = String(u?.role ?? "").toLowerCase();
+  const status = String(u?.status ?? "").toLowerCase();
+  return role === "admin" || role === "vpradmin" || status === "admin";
+}
+
+export async function promoteCrewMemberToOwnerAction(
+  input: PromoteOwnerInput,
+): Promise<PromoteOwnerResult> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  try {
+    if (!input.targetUserId || input.targetUserId === input.actorTelegramUserId) {
+      return { success: false, error: "Некорректный участник" };
+    }
+    if (!(await assertPlatformAdmin(supabase, input.actorTelegramUserId))) {
+      return { success: false, error: "Только платформенный админ может назначать владельцев" };
+    }
+
+    const { data: crew } = await supabase
+      .from("crews")
+      .select("id, name, owner_id")
+      .eq("slug", input.crewSlug)
+      .maybeSingle();
+    const crewRow = (crew ?? null) as { id: string; name: string; owner_id: string | null } | null;
+    if (!crewRow) return { success: false, error: "Экипаж не найден" };
+
+    // The target must already be a member (the invite flow adds them as one).
+    const { data: member } = await supabase
+      .from("crew_members")
+      .select("user_id, role")
+      .eq("user_id", input.targetUserId)
+      .eq("crew_id", crewRow.id)
+      .maybeSingle();
+    const memberRow = (member ?? null) as { user_id: string; role: string } | null;
+    if (!memberRow) {
+      return { success: false, error: "Пользователь ещё не участник экипажа — сначала отправь приглашение" };
+    }
+    if (crewRow.owner_id === input.targetUserId) {
+      return { success: false, error: "Пользователь уже владелец этого экипажа" };
+    }
+
+    // 1. crews.owner_id — the effective ownership source (effectiveActorRole
+    //    treats it as rank 4), so membership alone is not enough.
+    const { error: crewUpdateError } = await supabase
+      .from("crews")
+      .update({ owner_id: input.targetUserId })
+      .eq("id", crewRow.id);
+    if (crewUpdateError) {
+      logger.error("[promoteOwner] crews.owner_id update failed", crewUpdateError);
+      return { success: false, error: "Ошибка при передаче владения экипажем" };
+    }
+
+    // 2. Membership rows: target → owner; previous owner (if any, and if
+    //    they had a row) → co_owner so they keep seniority without ownership.
+    const { error: targetRoleError } = await supabase
+      .from("crew_members")
+      .update({ role: "owner" })
+      .eq("user_id", input.targetUserId)
+      .eq("crew_id", crewRow.id);
+    if (targetRoleError) logger.warn("[promoteOwner] target role update failed", targetRoleError);
+
+    const previousOwnerId =
+      crewRow.owner_id && crewRow.owner_id !== input.targetUserId ? crewRow.owner_id : null;
+    if (previousOwnerId) {
+      await supabase
+        .from("crew_members")
+        .update({ role: "co_owner" })
+        .eq("user_id", previousOwnerId)
+        .eq("crew_id", crewRow.id);
+    }
+
+    // Best-effort Telegram heads-up for the new owner (never blocks).
+    try {
+      await sendTelegramMessage(
+        input.targetUserId,
+        `👑 Ты назначен владельцем экипажа «${crewRow.name}». Добро пожаловать на капитанский мостик!`,
+      );
+    } catch (notifyError) {
+      logger.warn("[promoteOwner] notification failed", notifyError);
+    }
+
+    return { success: true, previousOwnerId };
+  } catch (error) {
+    logger.error("promoteCrewMemberToOwnerAction error", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Внутренняя ошибка сервера",
+    };
+  }
+}
+
+export type CrewInviteInfo =
+  | { success: true; botUsername: string | null; startParam: string; webFallbackUrl: string }
+  | { success: false; error: string };
+
+/**
+ * Everything the invite UI needs: the bot username resolved from crew
+ * metadata (never hardcoded), the join_<slug> start param and a plain web
+ * fallback for crews without a bot.
+ *
+ * Who may invite: PLATFORM ADMIN always; otherwise a senior member of THIS
+ * crew (owner / co_owner / admin). Join links only ever add a MEMBER — they
+ * grant no rights — so sharing them is benign (and the old UI already did).
+ * Promoting to owner is a separate platform-admin-only action below.
+ */
+export async function getCrewInviteInfoAction(input: {
+  slug: string;
+  actorTelegramUserId: string;
+}): Promise<CrewInviteInfo> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  try {
+    const slug = String(input.slug ?? "").trim().slice(0, 64);
+    if (!slug) return { success: false, error: "Экипаж не найден" };
+
+    const isPlatformAdmin = await assertPlatformAdmin(supabase, input.actorTelegramUserId);
+    if (!isPlatformAdmin) {
+      const { data: crew } = await supabase
+        .from("crews")
+        .select("id, owner_id")
+        .eq("slug", slug)
+        .maybeSingle();
+      const crewRow = (crew ?? null) as { id: string; owner_id: string | null } | null;
+      if (!crewRow) return { success: false, error: "Экипаж не найден" };
+      const isOwner = crewRow.owner_id === input.actorTelegramUserId;
+      let membershipRole: string | null = null;
+      if (!isOwner) {
+        const { data: membership } = await supabase
+          .from("crew_members")
+          .select("role")
+          .eq("user_id", input.actorTelegramUserId)
+          .eq("crew_id", crewRow.id)
+          .maybeSingle();
+        membershipRole = ((membership ?? null) as { role?: string | null } | null)?.role ?? null;
+      }
+      const senior = isOwner || ["owner", "co_owner", "admin"].includes(String(membershipRole));
+      if (!senior) return { success: false, error: "Инвайты доступны старшему составу экипажа" };
+    }
+
+    const { resolveCrewBotUsername } = await import("@/app/franchize/lib/crew-bot");
+    const { crewJoinStartParam } = await import("@/lib/wall-deeplink");
+    const botUsername = await resolveCrewBotUsername(slug);
+    const startParam = crewJoinStartParam(slug);
+    const webFallbackUrl = `/franchize/${slug}?join_crew=true`;
+    return { success: true, botUsername, startParam, webFallbackUrl };
+  } catch (error) {
+    logger.error("getCrewInviteInfoAction error", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Внутренняя ошибка сервера",

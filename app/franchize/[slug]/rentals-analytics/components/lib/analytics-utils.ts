@@ -74,6 +74,38 @@ export function formatShortDate(iso: string | null | undefined): string {
   }
 }
 
+/**
+ * Date WITH time for rental list cards (user request: "show time, not just
+ * dates"). Rentals store agreed dates as either full timestamps
+ * ("2026-09-21T10:30:00+03") or bare dates ("2026-09-21") depending on the
+ * flow that created them — render HH:mm only when the value actually carries
+ * a time, otherwise fall back to the plain date (never a bogus 00:00).
+ * Timezone-anchored like formatDateLong: the fleet lives on Moscow time.
+ */
+export function formatShortDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const hasTime = /(?:T|\s)\d{2}:\d{2}/.test(iso);
+  try {
+    if (!hasTime) {
+      // Date-only: anchor to UTC midnight so the calendar date is stable.
+      return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+        timeZone: "Europe/Moscow",
+      });
+    }
+    return new Date(iso).toLocaleString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Moscow",
+    });
+  } catch {
+    return "—";
+  }
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {

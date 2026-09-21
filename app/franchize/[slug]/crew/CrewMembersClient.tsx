@@ -8,13 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAppContext } from '@/contexts/AppContext';
+import { useIsAdmin } from '@/app/franchize/hooks/useIsAdmin';
 import Link from "next/link";
 import { Users, Crown, Shield, ArrowLeft, UserCog, Wrench } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
     updateCrewMemberRole,
+    promoteCrewMemberToOwnerAction,
+    getCrewInviteInfoAction,
     type AssignableRole,
+    type CrewInviteInfo,
 } from '../../server-actions/update-crew-member-role';
 import {
     roleLabel,
@@ -37,9 +41,14 @@ interface CrewMember {
 
 export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
     const { dbUser, userCrewMemberships } = useAppContext();
+    const isPlatformAdmin = useIsAdmin();
     const [crew, setCrew] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState<string | null>(null);
+    // Invite deeplink resolved server-side (bot from crew metadata; the old
+    // hardcoded `crew_<slug>_join_crew` startapp format was dead — the router
+    // never parsed it).
+    const [inviteInfo, setInviteInfo] = useState<CrewInviteInfo | null>(null);
 
     const refreshCrew = async () => {
         const res = await getCrewLiveDetails(crewSlug);
@@ -52,6 +61,18 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
         refreshCrew().finally(() => setLoading(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [crewSlug]);
+
+    // Invite deeplink — resolved SERVER-side (bot from crew metadata; the old
+    // hardcoded `crew_<slug>_join_crew` startapp format was dead — the router
+    // never parsed it). MUST live above the loading early-returns (hooks rule).
+    useEffect(() => {
+        if (!crewSlug || !dbUser?.user_id) return;
+        let cancelled = false;
+        getCrewInviteInfoAction({ slug: crewSlug, actorTelegramUserId: dbUser.user_id })
+            .then((res) => { if (!cancelled) setInviteInfo(res.success ? res : null); })
+            .catch(() => setInviteInfo(null));
+        return () => { cancelled = true; };
+    }, [crewSlug, dbUser?.user_id]);
 
     // Current user's effective role in this crew
     const myCrewRole: CrewRole | null = (() => {
@@ -133,19 +154,49 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
         }
     };
 
-    // Invite link generation
-    const inviteUrl = typeof window !== "undefined" && crewSlug
-        ? `https://t.me/oneBikePlsBot/app?startapp=crew_${crewSlug}_join_crew`
+    // Invite link — built from the server-resolved inviteInfo (see effect above).
+    const inviteUrl = inviteInfo?.success
+        ? (inviteInfo.botUsername
+            ? `https://t.me/${inviteInfo.botUsername}/app?startapp=${inviteInfo.startParam}`
+            : inviteInfo.webFallbackUrl)
         : "";
-    const shareInviteUrl = typeof window !== "undefined"
+    const shareInviteUrl = typeof window !== "undefined" && inviteUrl
         ? `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VIP Bike!")}`
         : "";
 
     const handleShareInvite = () => {
-        if (typeof window === "undefined") return;
+        if (typeof window === "undefined" || !shareInviteUrl) {
+            toast.error("Ссылка-приглашение ещё не готова");
+            return;
+        }
         const tg = (window as any).Telegram?.WebApp;
         if (tg?.openLink) tg.openLink(shareInviteUrl);
         else window.open(shareInviteUrl, "_blank");
+    };
+
+    // Platform-admin-only: transfer crew ownership to an existing member
+    // (dummy-crew onboarding: invite as member → promote later).
+    const handlePromoteOwner = async (userId: string, name: string) => {
+        if (!dbUser?.user_id) return;
+        if (!confirm(`Назначить ${name} владельцем экипажа?\n\nТекущий владелец (если есть) станет совладельцем.`)) return;
+        setBusyId(userId);
+        try {
+            const res = await promoteCrewMemberToOwnerAction({
+                crewSlug,
+                targetUserId: userId,
+                actorTelegramUserId: dbUser.user_id,
+            });
+            if (res.success) {
+                toast.success(`${name} теперь владелец экипажа 👑`);
+                await refreshCrew();
+            } else {
+                toast.error(res.error || "Не удалось назначить владельца");
+            }
+        } catch (e) {
+            toast.error("Ошибка: " + (e instanceof Error ? e.message : "unknown"));
+        } finally {
+            setBusyId(null);
+        }
     };
 
     const handleRemoveMember = async (userId: string, name: string) => {
@@ -297,6 +348,23 @@ export function FranchizeCrewMembersClient({ crewSlug }: { crewSlug: string }) {
                                         >
                                             <Trash2 className="h-3 w-3" />
                                             Удалить
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Platform admin: ownership transfer (dummy crews
+                                    → real owners). Hidden for the current owner. */}
+                                {isPlatformAdmin && member.role !== 'owner' && (
+                                    <div className="flex justify-end mt-3">
+                                        <button
+                                            type="button"
+                                            disabled={isBusy}
+                                            onClick={() => handlePromoteOwner(member.user_id, member.username || member.user_id)}
+                                            className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-500 transition-colors hover:bg-amber-500/10 disabled:opacity-40 min-h-[28px]"
+                                            aria-label="Назначить владельцем"
+                                        >
+                                            <Crown className="h-3 w-3" />
+                                            Сделать владельцем
                                         </button>
                                     </div>
                                 )}

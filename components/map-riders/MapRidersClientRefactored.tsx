@@ -117,10 +117,10 @@ const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 const SPOT_POPUP_CLASSNAME = "mr-spot-popup";
 
 // Snap labels for the 3-button control (matching vaul snapPoints)
-const SNAP_POINTS = [0.2, 0.48, 0.86] as const;
+const SNAP_POINTS = [0.2, 0.48, 0.66, 0.86] as const;
 const DRAWER_SNAP_POINTS: number[] = [...SNAP_POINTS];
-type SnapLabel = "Мини" | "Средне" | "Макс";
-const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.86: "Макс" };
+type SnapLabel = "Мини" | "Средне" | "Высоко" | "Макс";
+const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.66: "Высоко", 0.86: "Макс" };
 
 /** Deep-link params from /map-riders?post=|ride=|compose=|spot=|q= → wall in the sheet. */
 export interface MapRidersWallParams {
@@ -905,7 +905,16 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 ))}
               </div>
             </div>
-            <div className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}>
+            {/* ── Scrollable sheet body. data-vaul-no-drag: vaul 0.9 must NOT
+                claim touch gestures that start inside the feed — at scrollTop=0
+                it redirected the first downward swipe to "collapse the sheet",
+                so scrolling the wall felt like fighting the sheet (user report).
+                Drag-to-resize stays on the handle/header/buttons OUTSIDE this
+                div. overscroll-contain stops scroll chaining to the map page. */}
+            <div
+              data-vaul-no-drag
+              className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto overscroll-contain pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}
+            >
               {/* ── Ride strip: компактный статус эфира (start/stop — жёлтый FAB
                   справа, полный пульт с приватностью — в листе райдеров, таб
                   «Эфир»). Всё остальное устарело: шит теперь = стена экипажа. ── */}

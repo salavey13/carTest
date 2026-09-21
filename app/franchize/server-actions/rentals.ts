@@ -663,6 +663,136 @@ export interface ReturnTodo {
   category: string;
 }
 
+// ── Equipment → todos bootstrap (user request 2026-09-21) ────────────────────
+// Rentals created OUTSIDE the /doc telegram flow (web order, admin tools)
+// never got their lead_followup crew_todos — the rental page then fell back
+// to a STATIC hint list with no real helmet/glove counts and no persistence.
+// This bootstraps the REAL, persisted crew_todos from the rental's actual
+// equipment metadata ONCE (idempotent: scoped by rental_id regardless of
+// status, so completed checklists are never re-created). The same rows then
+// surface everywhere the todo system renders: rental page, rentals list
+// badges, leads page.
+const EQUIPMENT_LABELS: Record<string, { emoji: string; one: string; many: string; unit: string | null }> = {
+  helmets: { emoji: "🪖", one: "шлем", many: "шлем(а/ов)", unit: null },
+  gloves: { emoji: "🧤", one: "перчатка", many: "перчатки", unit: null },
+  jacket: { emoji: "🧥", one: "куртка", many: "куртку", unit: null },
+  boots: { emoji: "👢", one: "боты", many: "боты", unit: null },
+  net: { emoji: "🌐", one: "сетку", many: "сетку", unit: null },
+  backpack: { emoji: "🎒", one: "рюкзак", many: "рюкзак", unit: null },
+  bag: { emoji: "👜", one: "сумку", many: "сумку", unit: null },
+  charger: { emoji: "🔌", one: "зарядное устройство", many: "зарядное устройство", unit: null },
+  lock: { emoji: "🔒", one: "замок", many: "замок", unit: null },
+};
+
+async function ensureRentalEquipmentReturnTodos(
+  rentalId: string,
+  crewId: string,
+): Promise<void> {
+  const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Idempotency FIRST (cheap indexed check): any todos already linked to this
+  // rental — pending OR done — means the bootstrap ran before.
+  const { data: existing } = await supabase
+    .from("crew_todos")
+    .select("id")
+    .eq("crew_id", crewId)
+    .eq("rental_id", rentalId)
+    .eq("category", "lead_followup")
+    .limit(1);
+  if ((existing ?? []).length > 0) return;
+
+  const { data: rental } = await supabase
+    .from("rentals")
+    .select("rental_id, crew_id, user_id, vehicle_id, status, agreed_start_date, agreed_end_date, metadata")
+    .eq("rental_id", rentalId)
+    .maybeSingle();
+  const row = rental as
+    | { rental_id: string; crew_id: string; user_id: string | null; vehicle_id: string | number | null; status: string; agreed_start_date: string | null; agreed_end_date: string | null; metadata: Record<string, unknown> | null }
+    | null;
+  if (!row || String(row.crew_id) !== String(crewId)) return;
+
+  const meta = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, any>;
+
+  // Equipment lives in one of two shapes depending on the flow that made the
+  // rental: metadata.equipment { helmets, gloves, jacket, ... } (web/admin)
+  // or metadata.contract_draft.equipmentData { helmets_count, gloves_count,
+  // keys_count, ... } (contract draft). Merge both, prefer explicit values.
+  const eq = (meta.equipment ?? {}) as Record<string, any>;
+  const draft = ((meta.contract_draft ?? {}).equipmentData ?? {}) as Record<string, any>;
+  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) > 0 ? Number(v) : 0);
+  const equipment: Record<string, number | boolean> = {
+    helmets: num(eq.helmets) || num(draft.helmets_count),
+    gloves: num(eq.gloves) || num(draft.gloves_count),
+    jacket: eq.jacket ?? draft.jacket ?? false,
+    boots: eq.boots ?? draft.boots ?? false,
+    net: eq.net ?? draft.net ?? false,
+    backpack: eq.backpack ?? draft.backpack ?? false,
+    bag: eq.bag ?? draft.bag ?? false,
+    charger: eq.charger ?? draft.charger ?? false,
+    lock: eq.lock ?? draft.lock ?? false,
+  };
+
+  // Bike title for the operator-facing titles (doc-flow style).
+  let bikeTitle = "байк";
+  if (row.vehicle_id != null) {
+    const { data: bike } = await supabase
+      .from("cars")
+      .select("make, model")
+      .eq("id", String(row.vehicle_id))
+      .maybeSingle();
+    const b = bike as { make: string | null; model: string | null } | null;
+    const t = b ? `${b.make ?? ""} ${b.model ?? ""}`.trim() : "";
+    if (t) bikeTitle = t;
+  }
+
+  const odometerBefore =
+    num(meta.pickup_freeze?.odometer_km) ||
+    num(meta.odometer_before) ||
+    num(draft.pickupData?.odometer_km);
+  const endPart = row.agreed_end_date ? ` (${String(row.agreed_end_date).slice(0, 10)})` : "";
+
+  const todos: Array<{ title: string; priority: "low" | "medium" | "high" }> = [
+    { title: `🔧 Проверить ТС при возврате: ${bikeTitle}${endPart}`, priority: "high" },
+    { title: `🔑 Принять ключи от ${bikeTitle}`, priority: "high" },
+    { title: `📄 Проверить документы при возврате ${bikeTitle}`, priority: "medium" },
+    { title: `🔍 Осмотр на повреждения: ${bikeTitle}`, priority: "high" },
+    { title: `📸 Сфотографировать байк при возврате: ${bikeTitle}`, priority: "high" },
+    {
+      title: `📊 Зафиксировать одометр при возврате: ${bikeTitle}${odometerBefore > 0 ? ` (при выдаче: ${odometerBefore.toLocaleString("ru-RU")} км)` : ""}`,
+      priority: "high",
+    },
+    { title: `⚡ Проверить уровень заряда/топлива при возврате: ${bikeTitle}`, priority: "medium" },
+  ];
+  for (const [key, label] of Object.entries(EQUIPMENT_LABELS)) {
+    const v = equipment[key];
+    if (typeof v === "number" ? v > 0 : v === true) {
+      const title =
+        typeof v === "number" && v > 1
+          ? `${label.emoji} Принять ${v} ${label.many}`
+          : `${label.emoji} Принять ${label.one}`;
+      todos.push({ title, priority: key === "helmets" ? "medium" : "low" });
+    }
+  }
+
+  // Reuse the lead-flow creator: same table/shape/dedup semantics → the
+  // todos are indistinguishable from /doc-created ones everywhere.
+  const { createLeadFollowupTodos } = await import("./crew-todos");
+  await createLeadFollowupTodos({
+    crewId,
+    leadId: row.user_id || rentalId, // TG id when known, else a stable per-rental key
+    leadName: (meta.contract_draft?.renterData?.full_name as string) || "",
+    bikeId: row.vehicle_id != null ? String(row.vehicle_id) : undefined,
+    todos,
+    rentalId,
+    metadata: {
+      rental_id: rentalId,
+      source: "rental_page_bootstrap",
+    },
+  });
+}
+
 export async function getRentalReturnTodos(
   rentalId: string,
   crewId: string
@@ -672,32 +802,43 @@ export async function getRentalReturnTodos(
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Fetch ALL crew_todos for this crew that could be return-related.
-    const { data: allTodos, error } = await supabaseAdmin
-      .from("crew_todos")
-      .select("id, title, status, priority, category, description, rental_id")
-      .eq("crew_id", crewId)
-      .order("created_at", { ascending: true });
+    const loadRentalTodos = async () => {
+      // Fetch ALL crew_todos for this crew that could be return-related.
+      const { data: allTodos, error } = await supabaseAdmin
+        .from("crew_todos")
+        .select("id, title, status, priority, category, description, rental_id")
+        .eq("crew_id", crewId)
+        .order("created_at", { ascending: true });
+      if (error) {
+        console.error("[getRentalReturnTodos] Error:", error);
+        return null;
+      }
+      // Filter: `lead_followup` todos belonging to this rental.
+      return (allTodos || []).filter((t) => {
+        if (t.category !== "lead_followup") return false;
+        if (typeof t.rental_id === "string" && t.rental_id === rentalId) return true;
+        try {
+          const desc = JSON.parse(t.description || "{}");
+          return desc.rental_id === rentalId;
+        } catch { return false; }
+      });
+    };
 
-    if (error) {
-      console.error("[getRentalReturnTodos] Error:", error);
-      return { success: false, error: error.message };
-    }
+    let rentalTodos = await loadRentalTodos();
+    if (rentalTodos === null) return { success: false, error: "Не удалось загрузить чек-лист." };
 
-    // Filter: only `lead_followup` todos belonging to this rental.
-    const rentalTodos = (allTodos || []).filter((t) => {
-      if (t.category !== "lead_followup") return false;
-      if (typeof t.rental_id === "string" && t.rental_id === rentalId) return true;
+    // Empty checklist → bootstrap the real equipment todos (once) and reload.
+    // Previously this fell back to a STATIC UI list with no actual helmet
+    // presence and no persistence — the user-visible symptom was «чек-лист
+    // не показывает реальное снаряжение».
+    if (rentalTodos.length === 0) {
       try {
-        const desc = JSON.parse(t.description || "{}");
-        return desc.rental_id === rentalId;
-      } catch { return false; }
-    });
-
-    // NOTE: accessory/return todos live ONLY in crew_todos (created by
-    // createLeadFollowupTodos during /doc contract generation). Do NOT
-    // synthesize them here from rentals.metadata — metadata.equipment is kept
-    // for analytics/reference only and must not drive todo generation.
+        await ensureRentalEquipmentReturnTodos(rentalId, crewId);
+        rentalTodos = (await loadRentalTodos()) ?? [];
+      } catch (bootErr) {
+        console.error("[getRentalReturnTodos] bootstrap failed (non-fatal):", bootErr);
+      }
+    }
 
     return {
       success: true,

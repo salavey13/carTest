@@ -554,8 +554,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
         {/* Return checklist — OPERATOR ONLY. Single source of truth (was duplicated
             between RentalReturnChecklist in sidebar + RentalChecklistPanel in main).
             Removed RentalChecklistPanel entirely — its toggle was broken (local state
-            only, reset on every re-render). RentalReturnChecklist persists via API. */}
-        {rental.found && status === "active" && (
+            only, reset on every re-render). RentalReturnChecklist persists via API.
+            v2: also mounted BEFORE the ride (pending_confirmation/confirmed) — the
+            equipment bootstrap (see getRentalReturnTodos) fills it with the real
+            helmet/glove counts, so operators prep the handover from the same list. */}
+        {rental.found && ["pending_confirmation", "confirmed", "active"].includes(status) && (
           <FranchizeRentalRoleGuard
             allowedRoles={["operator", "admin", "owner", "subrenter"]}
             ownerId={rental.ownerId}

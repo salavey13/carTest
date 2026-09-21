@@ -258,8 +258,15 @@ const FeedInput = z.object({
   /** Free-text wall search (websearch syntax over the simple tsvector). */
   q: z.string().trim().min(1).max(60).optional(),
   /** Author filter (rider profile v1): «this rider's part of the wall».
-   *  uuid — cast failures from hostile callers just return an empty page. */
-  authorId: z.string().trim().uuid().optional(),
+   *  FIX (build-followup): users.user_id is the TG numeric id (author_id is
+   *  text REFERENCES users(user_id)) — the old .uuid() gate rejected every
+   *  real rider id, so the public profile always showed «Постов пока нет».
+   *  Digits-only keeps hostile callers from probing arbitrary text values. */
+  authorId: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{1,16}$/, "authorId must be a TG numeric id")
+    .optional(),
   // NOTE: no caller-supplied limit — pageSize is server-fixed so the
   // page-1-holds-all-pinned invariant (WALL_PIN_CAP « WALL_FEED_PAGE_SIZE)
   // cannot be broken from the outside.

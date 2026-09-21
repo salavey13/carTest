@@ -110,6 +110,12 @@ const RENTAL_STATUS_LABEL: Record<string, { label: string; emoji: string }> = {
 
 // ── main component ───────────────────────────────────────────────────────────
 
+/** Wall post annotated with its home crew (cross-crew fanout on the profile). */
+type RiderWallPostClient = WallPostView & {
+  viaCrewName?: string | null;
+  viaCrewSlug?: string | null;
+};
+
 export function RiderProfileClient({
   profile,
   crewSlug,
@@ -119,7 +125,7 @@ export function RiderProfileClient({
   profile: RiderProfileView;
   crewSlug: string;
   crewName: string;
-  initialPosts: WallPostView[];
+  initialPosts: RiderWallPostClient[];
 }) {
   const { rider, stats, badges, garage, recentRentals, isSelf, isStaff } = profile;
   const displayName = rider.fullName || rider.username || "Райдер";
@@ -550,10 +556,16 @@ export function RiderProfileClient({
           </p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {initialPosts.slice(0, 8).map((post) => (
+            {initialPosts.slice(0, 8).map((post) => {
+              // Cross-crew fanout: a post from another crew links to THAT
+              // crew's wall (the ?post= deeplink is crew-scoped) and gets a
+              // small «via» chip so the viewer knows where it lives.
+              const isForeign = !!post.viaCrewSlug && post.viaCrewSlug !== crewSlug;
+              const postHref = `/franchize/${post.viaCrewSlug || crewSlug}/community?post=${post.id}`;
+              return (
               <li key={post.id}>
                 <Link
-                  href={`/franchize/${crewSlug}/community?post=${post.id}`}
+                  href={postHref}
                   className="block rounded-2xl border border-[var(--community-border)] p-3 transition hover:border-[var(--community-accent)]"
                   style={{ backgroundColor: "var(--community-card-faint)" }}
                 >
@@ -569,6 +581,11 @@ export function RiderProfileClient({
                       <MessageCircle className="h-3 w-3" aria-hidden /> {post.commentCount}
                     </span>
                     {post.isPinned && <span className="text-[var(--community-accent)]">📌</span>}
+                    {isForeign && (
+                      <span className="ml-auto shrink-0 rounded-full border border-[var(--community-border)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--community-accent)]">
+                        {post.viaCrewName || post.viaCrewSlug}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-[var(--community-text)]">
                     {buildWallPostPreview(post.body || (post.photos.length > 0 ? "пост с фото" : ""), 160)}
@@ -588,7 +605,8 @@ export function RiderProfileClient({
                   )}
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>

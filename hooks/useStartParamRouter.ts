@@ -213,6 +213,9 @@ function parseAnalyticsDeepLink(param: string): {
  *   ride_<sessionId>_<slug>   → /franchize/<slug>/community?ride=<id>
  *   rider_<userId>_<slug>     → /franchize/<slug>/rider/<userId> (public
  *                               rider profile, Chain-style — profile v1)
+ *   join_<slug>               → /franchize/<slug>?join_crew=true (crew invite:
+ *                               admin sends to a future owner; the person
+ *                               auto-joins as member, promotion comes later)
  *
  * Bare forms (wall / post_<id>) need userCrewInfo to resolve the crew — they
  * stay on the gated path (this returns null for them).
@@ -231,6 +234,11 @@ function computeFastWallTarget(param: string): string | null {
   }
   if (link.kind === "rider") {
     return `/franchize/${link.slug}/rider/${link.userId}`;
+  }
+  if (link.kind === "join") {
+    // Invite links must work for people who are NOT members yet — route them
+    // on the fast path (no auth wait); JoinCrewBanner handles the rest.
+    return `/franchize/${link.slug}?join_crew=true`;
   }
   return `/franchize/${link.slug}/community?compose=${link.rentalId}`;
 }
@@ -267,14 +275,15 @@ export function useStartParamRouter() {
 
   const handleBio30Referral = useCallback(
     async (referrerId: string, referrerCode: string) => {
-      if (!dbUser?.user_id || dbUser.metadata?.referrer_id) {
+      if (!dbUser?.user_id || (dbUser.metadata as Record<string, unknown> | null)?.referrer_id) {
         return;
       }
 
       try {
+        // NOTE: setReferrer only takes { userId, referrerCode } — referrerId
+        // was always ignored (latent TS error surfaced by the strict slice).
         const result = await setReferrer({
           userId: dbUser.user_id,
-          referrerId,
           referrerCode,
         });
 
@@ -293,7 +302,7 @@ export function useStartParamRouter() {
 
   const handleSyndicateReferral = useCallback(
     async (refCode: string) => {
-      if (!dbUser?.user_id || dbUser.metadata?.referrer) {
+      if (!dbUser?.user_id || (dbUser.metadata as Record<string, unknown> | null)?.referrer) {
         return;
       }
 
@@ -714,6 +723,9 @@ export function useStartParamRouter() {
               // normally claimed by the FAST path; a slug-carried variant can
               // only land here if fast routing was skipped entirely.
               targetPath = `/franchize/${wallSlug}/rider/${link.userId}`;
+            } else if (link.kind === "join") {
+              // Same belt & suspenders for invites (fast path normally wins).
+              targetPath = `/franchize/${link.slug}?join_crew=true`;
             } else {
               targetPath = `/franchize/${wallSlug}/community`;
             }

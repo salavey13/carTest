@@ -8,10 +8,83 @@ import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { getCommunityWallAction } from "@/app/franchize/server-actions/community-wall";
 import { getRiderProfileAction, type RiderProfileView } from "@/app/franchize/server-actions/rider-profile";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import type { WallPostView } from "@/app/franchize/lib/community-wall";
+import { logger } from "@/lib/logger";
 import { RiderProfileClient } from "./RiderProfileClient";
 
 const RIDER_ID_RE = /^[0-9]{1,16}$/;
+/** Scan cap for «in which crews did this rider post» (NN-crew scale). */
+const RIDER_CREWS_SCAN_CAP = 400;
+/** Total cap for the merged cross-crew feed on the profile. */
+const RIDER_POSTS_MERGE_CAP = 30;
+
+/** A wall post annotated with its home crew (for the «в экипаже X» chip). */
+export type RiderWallPost = WallPostView & {
+  viaCrewName: string | null;
+  viaCrewSlug: string | null;
+};
+
+// Cross-crew fanout («combine all posts on all crews' walls from user»):
+// the profile aggregates the rider's public posts from EVERY crew they
+// posted in, not just the crew whose page is open. Walls are publicly
+// readable, so this exposes nothing that isn't already public — it just
+// spares the viewer from hopping between crews. Newest first, capped.
+async function loadRiderPostsAcrossCrews(input: {
+  riderId: string;
+}): Promise<RiderWallPost[]> {
+  const { riderId } = input;
+  try {
+    // 1. Distinct crews this rider has visible posts in (bounded scan).
+    const { data: postCrewRows } = await supabaseAdmin
+      .from("crew_posts")
+      .select("crew_id")
+      .eq("author_id", riderId)
+      .eq("is_hidden", false)
+      .limit(RIDER_CREWS_SCAN_CAP);
+    const crewIds = [...new Set(((postCrewRows ?? []) as { crew_id: string }[]).map((r) => r.crew_id))];
+    if (crewIds.length === 0) return [];
+
+    // 2. Crew labels/slugs (only ones that still exist and have a slug).
+    const { data: crewRows } = await supabaseAdmin
+      .from("crews")
+      .select("id, slug, name")
+      .in("id", crewIds);
+    const crews = (crewRows ?? []) as { id: string; slug: string | null; name: string | null }[];
+
+    // 3. Pull the rider's page-1 feed per crew (the same public action the
+    // wall uses — identical mapping/authz) and merge.
+    const results = await Promise.all(
+      crews.map(async (crew) => {
+        if (!crew.slug) return [];
+        const res = await getCommunityWallAction({ slug: crew.slug, authorId: riderId });
+        if (!res.ok) return [];
+        return res.posts
+          .filter((p) => p.author.userId === riderId)
+          .map<RiderWallPost>((p) => ({
+            ...p,
+            viaCrewName: crew.name ?? null,
+            viaCrewSlug: crew.slug ?? null,
+          }));
+      }),
+    );
+
+    const merged = results.flat();
+    // De-dupe (a post belongs to exactly one crew, but defensive) + newest first.
+    const seen = new Set<string>();
+    return merged
+      .filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      })
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      .slice(0, RIDER_POSTS_MERGE_CAP);
+  } catch (error) {
+    logger.warn("[rider-page] cross-crew posts load failed (non-fatal):", error);
+    return [];
+  }
+}
 
 interface RiderProfilePageProps {
   params: Promise<{ slug: string; userId: string }>;
@@ -55,17 +128,15 @@ export default async function RiderProfilePage({ params }: RiderProfilePageProps
     color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
   } as React.CSSProperties;
 
-  const [profileRes, wallRes] = await Promise.all([
+  const [profileRes, posts] = await Promise.all([
     getRiderProfileAction({ slug: crewSlug, riderId: userId.trim() }),
-    // «This rider's part of the wall»: their public posts (page 1). The
-    // actor is resolved server-side from the signed cookie — the same two
-    // identity paths as the wall itself.
-    getCommunityWallAction({ slug: crewSlug, authorId: userId.trim() }),
+    // «This rider's part of the wall» — across ALL crews they posted in,
+    // merged newest-first (walls are publicly readable; nothing new leaks).
+    loadRiderPostsAcrossCrews({ riderId: userId.trim() }),
   ]);
 
   if (!profileRes.ok) notFound();
   const profile: RiderProfileView = profileRes.profile;
-  const posts: WallPostView[] = wallRes.ok ? wallRes.posts.filter((p) => p.author.userId === profile.rider.userId) : [];
 
   return (
     <main className="min-h-screen" style={{ ...surface.page, ...themeVars }}>

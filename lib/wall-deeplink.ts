@@ -49,7 +49,8 @@ export type WallDeepLink =
   | { kind: "post"; postId: string; slug: string | null }
   | { kind: "compose"; rentalId: string; slug: string }
   | { kind: "compose-ride"; sessionId: string; slug: string }
-  | { kind: "rider"; userId: string; slug: string };
+  | { kind: "rider"; userId: string; slug: string }
+  | { kind: "join"; slug: string };
 
 /** TG user ids are pure digits (users.user_id / chat id). */
 const RIDER_ID_RE = /^[0-9]{1,16}$/;
@@ -106,6 +107,16 @@ export function parseWallDeepLink(param: string | null | undefined): WallDeepLin
     const slug = sanitizeWallSlug(rest.slice(sep + 1));
     if (!RIDER_ID_RE.test(userId) || !slug) return null;
     return { kind: "rider", userId, slug };
+  }
+
+  if (p.startsWith("join_")) {
+    // join_<slug> — crew invite (admin → future crew owner): the invitee
+    // lands on the crew page with ?join_crew=true and auto-joins as MEMBER
+    // (JoinCrewBanner); an admin promotes them to owner later. No bare
+    // fallback: an invite is always for a concrete crew, garbage → null.
+    const slug = sanitizeWallSlug(p.slice(5));
+    if (!slug) return null;
+    return { kind: "join", slug };
   }
 
   if (p.startsWith("post_")) {
@@ -182,6 +193,15 @@ export function riderProfileStartParam(userId: string, slug: string): string {
   const budget = 64 - 6 - id.length - 1;
   const s = sanitizeWallSlug(slug) ?? "vip-bike";
   return `rider_${id}_${s.slice(0, Math.max(1, budget))}`;
+}
+
+/** join_<slug> start param — crew invite link (admin → future owner).
+ *  Slug is required and budget-truncated (same rationale as wallp_). */
+export function crewJoinStartParam(slug: string): string {
+  const s = sanitizeWallSlug(slug);
+  if (!s) throw new Error(`crewJoinStartParam: invalid crew slug: ${slug}`);
+  const budget = 64 - 5;
+  return `join_${s.slice(0, Math.max(1, budget))}`;
 }
 
 export function wallRideStartParam(sessionId: string, slug: string): string {

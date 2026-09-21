@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildTelegramAppLink,
+  crewJoinStartParam,
   isUuidLike,
   parseWallDeepLink,
   sanitizeWallSlug,
@@ -142,6 +143,36 @@ describe("guards", () => {
     expect(sanitizeWallSlug("vip-bike_2")).toBe("vip-bike_2"); // underscores are legal in slugs
     expect(sanitizeWallSlug("bad slug!")).toBeNull();
     expect(sanitizeWallSlug(null)).toBeNull();
+  });
+});
+
+describe("join_<slug> (crew invite, admin → future owner)", () => {
+  it("parses join_<slug>", () => {
+    expect(parseWallDeepLink(`join_${SLUG}`)).toEqual({ kind: "join", slug: SLUG });
+    expect(parseWallDeepLink("join_spot-dvizh")).toEqual({ kind: "join", slug: "spot-dvizh" });
+  });
+
+  it("no bare fallback: garbage slug → null (invites are crew-specific)", () => {
+    expect(parseWallDeepLink("join_")).toBeNull();
+    expect(parseWallDeepLink("join_bad slug!")).toBeNull();
+  });
+
+  it("builder round-trips and refuses hostile slugs", () => {
+    expect(crewJoinStartParam(SLUG)).toBe(`join_${SLUG}`);
+    expect(parseWallDeepLink(crewJoinStartParam("spot-dvizh"))).toEqual({
+      kind: "join",
+      slug: "spot-dvizh",
+    });
+    expect(() => crewJoinStartParam("bad slug!")).toThrow(/slug/i);
+  });
+
+  it("join_ is not hijacked by the <slug>_community suffix alias", () => {
+    expect(parseWallDeepLink("join_x_community")).toEqual({ kind: "join", slug: "x_community" });
+  });
+
+  it("router fast path claims join links before the auth gate (source contract)", () => {
+    const src = read("hooks/useStartParamRouter.ts");
+    expect(src).toContain('return `/franchize/${link.slug}?join_crew=true`;');
   });
 });
 

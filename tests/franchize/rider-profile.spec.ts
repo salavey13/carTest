@@ -148,7 +148,10 @@ describe("rider deeplink", () => {
 describe("rider profile wiring", () => {
   it("feed action accepts authorId and filters the query (no mapping fork)", () => {
     const src = read("app/franchize/server-actions/community-wall.ts");
-    expect(src).toContain("authorId: z.string().trim().uuid().optional()");
+    // FIX 2026-09-21: author_id is TEXT (TG numeric users.user_id) — the old
+    // .uuid() gate rejected every real rider id, so the profile always showed
+    // «Постов пока нет». Digits-only keeps hostile probing out instead.
+    expect(src).toContain('regex(/^[0-9]{1,16}$/, "authorId must be a TG numeric id")');
     expect(src).toContain('if (authorId) query = query.eq("author_id", authorId);');
   });
 
@@ -156,7 +159,10 @@ describe("rider profile wiring", () => {
     const page = read("app/franchize/[slug]/rider/[userId]/page.tsx");
     expect(page).toContain('"--community-accent"');
     expect(page).toContain('"--community-accent-text"');
-    expect(page).toContain("getCommunityWallAction({ slug: crewSlug, authorId: userId.trim() })");
+    // Cross-crew fanout: the page aggregates the rider's posts from ALL their
+    // crews (loadRiderPostsAcrossCrews → getCommunityWallAction per crew).
+    expect(page).toContain("loadRiderPostsAcrossCrews({ riderId: userId.trim() })");
+    expect(page).toContain("getCommunityWallAction({ slug: crew.slug, authorId: riderId })");
     // riderId must be a TG numeric id — non-matching params 404 before any DB hit
     expect(page).toContain("RIDER_ID_RE.test(userId.trim())");
   });

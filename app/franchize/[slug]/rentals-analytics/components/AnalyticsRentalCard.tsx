@@ -15,7 +15,7 @@ import type { AnalyticsRentalRow } from "./types";
 import {
   computeSlaSignals,
   formatRubles,
-  formatShortDate,
+  formatShortDateTime,
   getDepositInfo,
   getHandoffStatus,
   getRentalBikeTitle,
@@ -88,7 +88,9 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
             style={{ color: T.textFaint }}
           >
             <span className="tabular-nums">
-              {formatShortDate(startDate)} → {formatShortDate(endDate)}
+              {/* user request: show TIME, not just dates — HH:mm renders when
+                  the stored value carries it (order flow stores timestamps) */}
+              {formatShortDateTime(startDate)} → {formatShortDateTime(endDate)}
             </span>
             <span className="font-semibold tabular-nums" style={{ color: T.text }}>
               {formatRubles(cost)}
