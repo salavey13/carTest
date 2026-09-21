@@ -29,18 +29,24 @@ def run(*args, check=True, capture=True):
 def main():
     print("=== Pushing catalog CSVs to repo (via git) ===\n")
 
-    staged = False
+    commits_made = 0
     for rel, msg in FILES:
         path = REPO_ROOT / rel
         if not path.exists():
             print(f"  {rel}: SKIP (local file not found: {path})")
             continue
         run("add", str(path))
-        run("commit", "-m", msg)
-        print(f"  commit: {run('log', '-1', '--oneline').stdout.strip()} {rel}")
-        staged = True
+        # `git commit` exits 1 when nothing is staged (CSV unchanged) —
+        # detect that first and skip, instead of crashing the whole cron run.
+        staged = run("diff", "--cached", "--quiet", check=False)
+        if staged.returncode != 0:
+            run("commit", "-m", msg)
+            print(f"  commit: {run('log', '-1', '--oneline').stdout.strip()}")
+            commits_made += 1
+        else:
+            print(f"  {rel}: unchanged — no commit")
 
-    if not staged:
+    if commits_made == 0:
         print("  no changes — nothing to push")
         return 0
 

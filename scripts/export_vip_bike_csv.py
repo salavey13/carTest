@@ -10,6 +10,8 @@ Source: Supabase public.cars table
   - type = 'bike'
   - crew_id = vip-bike crew (2d5fde70-1dd3-4f0d-8d72-66ccf6908746)
   - make != 'VipBike' (exclude internal placeholder bikes)
+  - specs.hidden truthy → excluded (same semantics as the site's server-side
+    filter in app/franchize/actions-runtime.ts)
 
 This script is DETERMINISTIC — no AI, no intelligence. Just selective extraction.
 Designed to be run by cron job or skill. Output is compact and clean:
@@ -152,6 +154,16 @@ def get_spec(specs, key, default=""):
     if not specs or not isinstance(specs, dict):
         return default
     return specs.get(key, default)
+
+
+def is_hidden(specs):
+    """
+    Mirror the site's server-side hidden filter (app/franchize/actions-runtime.ts):
+    specs.hidden is truthy when it is True, 1, or string "1"/"true" (any case).
+    Hidden items stay in the DB but must NOT leak into public CSVs.
+    """
+    hidden = get_spec(specs, "hidden", False)
+    return hidden is True or hidden == 1 or str(hidden).lower() in ("1", "true")
 
 
 # ════════════════════════════════════════════════════════════
@@ -409,9 +421,17 @@ def main():
     # Fetch
     bikes = fetch_bikes()
 
+    # Drop hidden bikes first (specs.hidden — same semantics as the site filter)
+    hidden_bikes = [b for b in bikes if is_hidden(b.get("specs", {}))]
+    visible_bikes = [b for b in bikes if not is_hidden(b.get("specs", {}))]
+    if hidden_bikes:
+        print(f"\nHidden filter: excluded {len(hidden_bikes)} bike(s):")
+        for b in hidden_bikes:
+            print(f"   - {b.get('make', '')} {b.get('model', '')} ({b.get('id', '')})")
+
     # Split into rent / sale
-    rent_bikes = [b for b in bikes if is_truthy(b.get("specs", {}).get("rent"))]
-    sale_bikes = [b for b in bikes if is_truthy(b.get("specs", {}).get("sale"))]
+    rent_bikes = [b for b in visible_bikes if is_truthy(b.get("specs", {}).get("rent"))]
+    sale_bikes = [b for b in visible_bikes if is_truthy(b.get("specs", {}).get("sale"))]
 
     print(f"\nSplit: {len(rent_bikes)} rent, {len(sale_bikes)} sale, {len(bikes)} total")
 
