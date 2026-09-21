@@ -300,6 +300,8 @@ export interface WallGeoPinView {
   postId: string;
   /** Plain-text excerpt of the body (≤ 140 chars) — render as TEXT only. */
   excerpt: string;
+  /** TG numeric id — enables the author → /rider/<id> crosslink in popups. */
+  authorId: string;
   authorName: string;
   authorAvatarUrl: string | null;
   /** First photo of the post (public CDN URL) or null. */

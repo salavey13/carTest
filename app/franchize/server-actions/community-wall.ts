@@ -611,6 +611,7 @@ export async function getWallGeotagsAction(input: { slug: string }): Promise<Get
     pins.push({
       postId: row.id,
       excerpt: buildWallPostPreview(row.body, WALL_GEO_EXCERPT_LEN),
+      authorId: row.author_id,
       authorName: author?.full_name?.trim() || author?.username?.trim() || "Райдер",
       authorAvatarUrl: author?.avatar_url ?? null,
       photoUrl: firstPhotoByPost.has(row.id) ? wallPhotoPublicUrl(firstPhotoByPost.get(row.id) as string) : null,

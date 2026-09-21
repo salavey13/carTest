@@ -31,7 +31,10 @@
     "app/franchize/server-actions/community-wall.ts",
     "app/api/franchize/wall-photo-upload/route.ts",
     "app/franchize/[slug]/community/page.tsx",
-    "app/franchize/[slug]/community/CommunityWallClient.tsx"
+    "app/franchize/[slug]/community/CommunityWallClient.tsx",
+    "app/franchize/server-actions/rider-profile.ts",
+    "app/franchize/[slug]/rider/[userId]/page.tsx",
+    "app/franchize/[slug]/rider/[userId]/RiderProfileClient.tsx"
   ],
   "exclude": ["node_modules", ".next"]
 }

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getFranchizeBySlug } from "../../actions";
-import { CrewFooter } from "../../components/CrewFooter";
-import { CrewHeader } from "../../components/CrewHeader";
+import { getFranchizeBySlug } from "@/app/franchize/actions";
+import { CrewFooter } from "@/app/franchize/components/CrewFooter";
+import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
-import { buildFranchizeSectionMetadata } from "../metadata";
+import { buildFranchizeSectionMetadata } from "../../metadata";
 import { getCommunityWallAction } from "@/app/franchize/server-actions/community-wall";
 import { getRiderProfileAction, type RiderProfileView } from "@/app/franchize/server-actions/rider-profile";
 import type { WallPostView } from "@/app/franchize/lib/community-wall";

@@ -501,7 +501,17 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
             ) : null}
             {pin.excerpt ? <div className="text-xs leading-snug">{pin.excerpt}</div> : null}
             <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
-              <span className="truncate">{pin.authorName}</span>
+              {/* Author → public rider page (profile v1 interlinking): the
+                  same identity chip the wall renders under each post. */}
+              <Link
+                href={`/franchize/${crewSlug}/rider/${pin.authorId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="max-w-[130px] truncate font-semibold transition hover:brightness-125"
+                style={{ color: wallPinColor }}
+                title={`Профиль райдера · ${pin.authorName}`}
+              >
+                {pin.authorName}
+              </Link>
               <span className="shrink-0">{formatRelativeTimeRu(pin.createdAt)}</span>
             </div>
             {pin.label ? (

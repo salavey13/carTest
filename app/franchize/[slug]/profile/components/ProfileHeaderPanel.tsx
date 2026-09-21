@@ -46,15 +46,22 @@ export function ProfileHeaderPanel({
         </div>
         <div className="flex flex-col items-end gap-2">
           {/* Rider profile v1: the CRM profile stays private (docs/earnings),
-              the public one is what the crew sees — keep both one tap apart. */}
+              the public one is what the crew sees — keep both one tap apart.
+              Config surface lives ON the public page (edit mode for isSelf):
+              bio, city, emoji-status and the hideProfile privacy toggle. */}
           {riderId && (
-            <a
-              href={`/franchize/${slug}/rider/${riderId}`}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-xs font-semibold transition hover:brightness-110"
-              style={{ borderColor: T.accent, color: T.accent }}
-            >
-              Публичный профиль →
-            </a>
+            <>
+              <a
+                href={`/franchize/${slug}/rider/${riderId}`}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-xs font-semibold transition hover:brightness-110"
+                style={{ borderColor: T.accent, color: T.accent }}
+              >
+                Публичный профиль →
+              </a>
+              <span className="max-w-[190px] text-right text-[10px] leading-snug" style={{ color: T.textMuted }}>
+                Виден экипажу: био, статус, гараж. Настраивается внутри.
+              </span>
+            </>
           )}
           <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
             В каталог
