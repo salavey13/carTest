@@ -2,12 +2,19 @@
 //
 // Фикс 2026-09-21 (boss-report): уведомление о закрытии аренды уводило на
 // WEB-ссылку https://v0-car-test.vercel.app/franchize/<slug>/community вместо
-// t.me/<bot>/app?startapp=… Имя бота берём из crew metadata
-// (crews.contacts.telegramBotUsername), env — только фолбэк.
+// t.me/<bot>/app?startapp=… Имя бота берём из crew metadata, env — только фолбэк.
+//
+// Фикс 2026-09-22 (boss-report №2, «share даёт v0-car-test.vercel.app»):
+// резолвер читал КОЛОНКУ crews.contacts — её в схеме НЕТ (только metadata
+// JSONB) → PostgREST PGRST204 → резолвер всегда null. Моки ниже читают
+// РЕАЛЬНУЮ форму: .select("metadata") + metadata.franchize.contacts.
+// telegramBotUsername. Старые моки маскировали баг — теперь контракт
+// воспроизводит прод-схему 1:1.
 //
 // Покрываем:
-//   1. pure-хелперы crew-bot (normalize/botUsernameFromContacts),
-//   2. resolveCrewBotUsername: contacts → env, TTL-кэш, never-throw,
+//   1. pure-хелперы crew-bot (normalize/botUsernameFromContacts/
+//      botUsernameFromCrewMetadata — prod-форма metadata.franchize.contacts),
+//   2. resolveCrewBotUsername: metadata → env, TTL-кэш, never-throw,
 //   3. ride-share-notify: арендатор получает t.me-кнопку по crewContacts
 //      даже когда env пуст; cc-экипаж получает wall_<slug>, не web-ссылку,
 //   4. owner/admin cc на смену статуса аренды (source-contract),
@@ -40,6 +47,7 @@ vi.mock("@/app/franchize/lib/new-lead-notify", () => ({
 
 import {
   botUsernameFromContacts,
+  botUsernameFromCrewMetadata,
   clearCrewBotCache,
   normalizeBotUsername,
   resolveCrewBotUsername,
@@ -67,19 +75,28 @@ const SUMMARY = summarizeRide({
   crewSlug: "vip-bike",
 });
 
-/** Мок crews-запроса: .from("crews").select("contacts").eq(slug).maybeSingle() */
-function mockCrewContacts(contacts: unknown) {
+/** Мок crews-запроса: .from("crews").select("metadata").eq(slug).maybeSingle()
+ *  ⚠️ РЕАЛЬНАЯ схема: колонки contacts в crews нет — только metadata JSONB
+ *  с ботом внутри metadata.franchize.contacts.telegramBotUsername. */
+function mockCrewMetadata(metadata: unknown) {
   (supabaseAdmin.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
     if (table !== "crews") throw new Error(`unexpected table ${table}`);
     return {
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: contacts ? { contacts } : null, error: null }),
+          maybeSingle: async () => ({ data: metadata ? { metadata } : null, error: null }),
         }),
       }),
     };
   });
 }
+
+/** Прод-форма metadata vip-bike (docs/sql/vip-bike-franchize-hydration.sql). */
+const VIP_BIKE_METADATA = {
+  franchize: {
+    contacts: { telegramBotUsername: "oneBikePlsBot", telegram: "@I_O_S_NN" },
+  },
+};
 
 beforeEach(async () => {
   // clearAllMocks чистит вызовы, но НЕ implementations — поэтому (codereview
@@ -109,17 +126,31 @@ describe("crew-bot pure helpers", () => {
     expect(botUsernameFromContacts("nonsense")).toBeNull();
     expect(botUsernameFromContacts(undefined)).toBeNull();
   });
+
+  it("botUsernameFromCrewMetadata reads the PROD shape metadata.franchize.contacts (bug №2 regression)", () => {
+    expect(botUsernameFromCrewMetadata(VIP_BIKE_METADATA)).toBe("oneBikePlsBot");
+    // @-префикс толерантно
+    expect(botUsernameFromCrewMetadata({ franchize: { contacts: { telegramBotUsername: "@oneCrossPlsBot" } } })).toBe("oneCrossPlsBot");
+    // top-level metadata.contacts — фолбэк-форма
+    expect(botUsernameFromCrewMetadata({ contacts: { telegramBotUsername: "flatBot" } })).toBe("flatBot");
+    // franchize без контактов → null (не бросает)
+    expect(botUsernameFromCrewMetadata({ franchize: {} })).toBeNull();
+    expect(botUsernameFromCrewMetadata({})).toBeNull();
+    expect(botUsernameFromCrewMetadata(null)).toBeNull();
+    expect(botUsernameFromCrewMetadata("junk")).toBeNull();
+    expect(botUsernameFromCrewMetadata(undefined)).toBeNull();
+  });
 });
 
 describe("resolveCrewBotUsername", () => {
-  it("resolves from crew contacts (metadata is the source of truth)", async () => {
-    mockCrewContacts({ telegramBotUsername: "oneBikePlsBot" });
+  it("resolves from crew metadata.franchize.contacts (metadata is the source of truth)", async () => {
+    mockCrewMetadata(VIP_BIKE_METADATA);
     expect(await resolveCrewBotUsername("vip-bike")).toBe("oneBikePlsBot");
   });
 
-  it("falls back to env when crew has no bot in contacts", async () => {
+  it("falls back to env when crew metadata has no bot", async () => {
     process.env.TELEGRAM_BOT_USERNAME = "envFallbackBot";
-    mockCrewContacts({ telegramBotUsername: "" });
+    mockCrewMetadata({ franchize: { contacts: { telegramBotUsername: "" } } });
     expect(await resolveCrewBotUsername("vip-bike")).toBe("envFallbackBot");
   });
 
@@ -131,7 +162,7 @@ describe("resolveCrewBotUsername", () => {
   });
 
   it("caches per slug (second call hits no extra queries)", async () => {
-    mockCrewContacts({ telegramBotUsername: "oneBikePlsBot" });
+    mockCrewMetadata(VIP_BIKE_METADATA);
     await resolveCrewBotUsername("cached-slug");
     const callsAfterFirst = (supabaseAdmin.from as ReturnType<typeof vi.fn>).mock.calls.length;
     await resolveCrewBotUsername("cached-slug");
@@ -183,9 +214,9 @@ describe("ride-share-notify × crew bot metadata (boss bug fix)", () => {
 
   it("renter bot-flow rental with NO bot anywhere: message still delivers, no web-link button", async () => {
     vi.mocked(telegramDeliver).mockClear();
-    // no env, no contacts, DB говорит «экипажа нет» → резолвер null → кнопки нет
+    // no env, no metadata, DB говорит «экипажа нет» → резолвер null → кнопки нет
     // (никогда не отдаём арендатору web-фолбэк на compose-действие).
-    mockCrewContacts(null);
+    mockCrewMetadata(null);
     const res = await notifyRideFinishedAndSuggestPost({
       rentalId: "0a1b2c3d-eeee-4fff-8123-456789abcdef",
       crewSlug: "vip-bike",
@@ -204,7 +235,9 @@ describe("ride-share-notify × crew bot metadata (boss bug fix)", () => {
 describe("wiring (source contracts)", () => {
   it("confirmVehicleReturn passes crew contacts into the ride-share notify", () => {
     const src = read("app/rentals/actions.ts");
-    expect(src).toContain('select("slug, name, contacts")');
+    // ⚠️ колонки contacts в crews НЕТ — читаем metadata и выводим бота хелпером
+    expect(src).toContain('select("slug, name, metadata")');
+    expect(src).toContain("botUsernameFromCrewMetadata");
     expect(src).toContain("crewContacts");
   });
 

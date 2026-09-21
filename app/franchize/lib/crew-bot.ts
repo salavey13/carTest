@@ -6,11 +6,22 @@
 // райдера на WEB-ссылку https://v0-car-test.vercel.app/franchize/<slug>/community
 // вместо Mini App deeplink t.me/<bot>/app?startapp=wall_<slug>. Причина:
 // notify-либы читали только process.env.TELEGRAM_BOT_USERNAME, а он в проде
-// не задан — при этом имя бота лежит в METADATA ЭКИПАЖА
-// (crews.contacts.telegramBotUsername = "oneBikePlsBot" для vip-bike).
+// не задан — при этом имя бота лежит в METADATA ЭКИПАЖА.
+//
+// БАГ №2 (сообщён boss'ом 2026-09-22, «share даёт v0-car-test.vercel.app
+// вместо t.me/<bot>/app»): резолвер читал КОЛОНКУ crews.contacts — а такой
+// колонки в таблице crews НЕТ (schema: id, name, description, logo_url,
+// owner_id, created_at, updated_at, slug, hq_location, metadata — см.
+// types/database.types.ts). PostgREST отвечал PGRST204 на каждый запрос,
+// catch глотал → резолвер ВСЕГДА возвращал null → вся цепочка шар
+// (профиль райдера, инвайт в экипаж, уведомления арендатору) деградировала
+// до web-ссылок. Тесты не ловили: мок подменял .select("contacts") как будто
+// колонка существует. Бот реально лежит в JSONB metadata:
+//   metadata.franchize.contacts.telegramBotUsername = "oneBikePlsBot" (vip-bike)
+//   (см. docs/sql/vip-bike-franchize-hydration.sql)
 //
 // Цепочка приоритетов (везде одинаковая):
-//   1. contacts экипажа (crews.contacts.telegramBotUsername) — источник правды;
+//   1. metadata экипажа (franchize.contacts → contacts top-level) — источник правды;
 //   2. process.env.TELEGRAM_BOT_USERNAME — глобальный дефолт;
 //   3. null → вызывающий код рендерит web-фолбэк (стена публичная).
 //
@@ -35,10 +46,27 @@ export function normalizeBotUsername(value: unknown): string | null {
   return BOT_USERNAME_RE.test(s) ? s : null;
 }
 
-/** Достать бота из contacts-объекта экипажа (crews.contacts.telegramBotUsername). */
+/** Достать бота из contacts-объекта экипажа ({ telegramBotUsername }).
+ *  Форма contacts-объекта из metadata.franchize.contacts (hydration SQL). */
 export function botUsernameFromContacts(contacts: unknown): string | null {
   if (!contacts || typeof contacts !== "object") return null;
   return normalizeBotUsername((contacts as Record<string, unknown>).telegramBotUsername);
+}
+
+/** Достать бота из crews.metadata JSONB (РЕАЛЬНАЯ схема — колонки contacts
+ *  в таблице crews нет, см. заголовок файла). Порядок:
+ *   1. metadata.franchize.contacts.telegramBotUsername — прод-форма (hydration);
+ *   2. metadata.contacts.telegramBotUsername — top-level метаданных, на случай
+ *      плоских конфигов; обе читаются толерантно к мусору в JSONB. */
+export function botUsernameFromCrewMetadata(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const m = metadata as Record<string, unknown>;
+  const franchize = m.franchize;
+  if (franchize && typeof franchize === "object") {
+    const hit = botUsernameFromContacts((franchize as Record<string, unknown>).contacts);
+    if (hit) return hit;
+  }
+  return botUsernameFromContacts(m.contacts);
 }
 
 function envBotUsername(): string | null {
@@ -81,12 +109,14 @@ export async function resolveCrewBotUsername(slug: string | null | undefined): P
   let value: string | null = null;
   try {
     const { supabaseAdmin } = await import("@/lib/supabase-server");
+    // ⚠️ select("metadata") — НЕ select("contacts"): колонки contacts в crews
+    // нет (PGRST204 → всегда null). metadata — единственный источник.
     const { data } = await supabaseAdmin
       .from("crews")
-      .select("contacts")
+      .select("metadata")
       .eq("slug", safeSlug)
       .maybeSingle();
-    value = botUsernameFromContacts((data as { contacts?: unknown } | null)?.contacts);
+    value = botUsernameFromCrewMetadata((data as { metadata?: unknown } | null)?.metadata);
   } catch {
     // metadata недоступна — падаем на env ниже
   }

@@ -95,6 +95,10 @@ interface ItemModalProps {
   items: CatalogItemVM[];
   slug: string;
   theme: FranchizeTheme;
+  /** Бот экипажа для share deep-links (crew.contacts.telegramBotUsername).
+   *  2026-09-22: раньше читался только theme-каст — у темы такого поля нет,
+   *  и шар ВСЕГДА падал в хардкод oneBikePlsBot (чужой бот для других экипажей). */
+  telegramBotUsername?: string;
   pickupAddress?: string;
   workingHours?: string;
   /** Crew business flow type — "rental" shows rental options, "order" hides them */
@@ -1280,6 +1284,7 @@ export function ItemModal({
   items,
   slug,
   theme,
+  telegramBotUsername,
   pickupAddress = "",
   workingHours = "",
   flowType = "rental",
@@ -1657,7 +1662,10 @@ export function ItemModal({
   }, [item, items]);
 
   // ── Bot username for deep-links (from crew config) ──
-  const botUsername = (theme as any)?.telegramBotUsername || "oneBikePlsBot";
+  // 2026-09-22: приоритет — явный проп из crew VM (contacts.telegramBotUsername),
+  // затем legacy theme-каст, затем документированный фолбэк внутри
+  // buildItemDeepLinks (lib/item-share.ts).
+  const botUsername = telegramBotUsername || (theme as any)?.telegramBotUsername || "";
 
   // Track a browser user who clicked "continue in Telegram" as a lead.
   const trackContinueInTgLead = useCallback(

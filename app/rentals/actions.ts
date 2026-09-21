@@ -1774,17 +1774,23 @@ export async function confirmVehicleReturn(
             let crewName: string | null = null;
             let crewContacts: unknown = undefined;
             if (rental.crew_id) {
+                // ⚠️ select("slug, name, metadata") — НЕ select("…, contacts"):
+                // колонки contacts в таблице crews НЕТ (см. lib/crew-bot.ts,
+                // баг №2 от 2026-09-22). Неизвестная колонка валит ВЕСЬ запрос
+                // (PGRST204) → терялись и slug, и имя экипажа, и бот.
                 const { data: crewRow } = await supabaseAdmin
                     .from("crews")
-                    .select("slug, name, contacts")
+                    .select("slug, name, metadata")
                     .eq("id", rental.crew_id)
                     .maybeSingle();
                 crewSlug = (crewRow as { slug: string | null } | null)?.slug ?? null;
                 crewName = (crewRow as { name: string | null } | null)?.name ?? null;
-                // Фикс 2026-09-21: бот экипажа теперь берётся из metadata
-                // (contacts.telegramBotUsername) — раньше кнопка «Поделиться
-                // на стене» уходила арендатору web-ссылкой (env пуст в проде).
-                crewContacts = (crewRow as { contacts?: unknown } | null)?.contacts ?? undefined;
+                // Фикс 2026-09-22: бот экипажа извлекается из metadata JSONB
+                // (metadata.franchize.contacts.telegramBotUsername); crewContacts
+                // держит форму { telegramBotUsername } — её ждёт ride-share-notify.
+                const { botUsernameFromCrewMetadata } = await import("@/app/franchize/lib/crew-bot");
+                const crewBot = botUsernameFromCrewMetadata((crewRow as { metadata?: unknown } | null)?.metadata);
+                crewContacts = crewBot ? { telegramBotUsername: crewBot } : undefined;
             }
             const vehicleMeta = rental.vehicle as { make?: string | null; model?: string | null } | null;
             const rideBikeTitle = vehicleMeta

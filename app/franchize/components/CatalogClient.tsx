@@ -1804,6 +1804,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         items={displayItems}
         slug={resolvedSlug}
         theme={crew.theme}
+        telegramBotUsername={crew.contacts.telegramBotUsername || undefined}
         pickupAddress={crew.contacts.address || crew.hqLocation}
         workingHours={crew.contacts.workingHours}
         flowType={displayMode === "service" ? "order" : displayMode === "rent" || displayMode === "equipment" ? "rental" : "order"}
