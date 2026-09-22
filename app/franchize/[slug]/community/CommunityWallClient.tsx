@@ -1029,12 +1029,22 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                     href={`/franchize/${slug}/rider/${entry.userId}`}
                     className="cw-press flex min-h-[44px] items-center gap-3 rounded-xl border border-transparent px-2 py-1.5 transition hover:border-[var(--community-border)] hover:bg-[var(--community-card-soft)]"
                   >
+                    {/* WALL v6 medals: gold/silver/bronze chips for the top-3
+                        — the зачёт reads as a podium, not a table. */}
                     <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                        idx === 0
-                          ? "bg-[var(--community-accent)] text-[var(--community-accent-text)] shadow-[0_0_14px_-4px_var(--community-accent)]"
-                          : "border border-[var(--community-border)] text-[var(--community-muted)]"
-                      }`}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+                      style={
+                        idx < 3
+                          ? {
+                              background: MEDAL_CHIP_BG[idx],
+                              color: "#1c1917",
+                              boxShadow: "0 3px 12px -6px rgba(0, 0, 0, 0.65)",
+                            }
+                          : {
+                              border: "1px solid var(--community-border)",
+                              color: "var(--community-muted)",
+                            }
+                      }
                     >
                       {idx + 1}
                     </span>
@@ -1806,11 +1816,13 @@ function StatsGrid({ stats, compact = false }: { stats: RentalStatsSnapshot; com
 //    4+ → 2×2 with «+N» tile — VK/IG habits, thumbs stay ≥44px) ───────────────
 
 function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (index: number) => void }) {
+  // WALL v6: photos bleed horizontally to the card edges (cw-bleed-x cancels
+  // cw-card's padding) — photo posts read as Telegram-style image shells.
   if (photos.length === 0) return null;
   if (photos.length === 1) {
     const p = photos[0];
     return (
-      <div className="mt-3">
+      <div className="cw-bleed-x mt-3">
         <button
           type="button"
           onClick={() => onOpen(0)}
@@ -1839,7 +1851,7 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
         ? "grid-cols-2 grid-rows-2 aspect-[4/3]"
         : "grid-cols-2 aspect-square";
   return (
-    <div className={`mt-3 grid gap-1.5 ${layout}`}>
+    <div className={`cw-bleed-x mt-3 grid gap-1.5 ${layout}`}>
       {shown.map((p, i) => (
         <button
           key={p.id}
@@ -2286,6 +2298,13 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
 const REACTION_PICKER_HOVER_MS = 250;
 const REACTION_LONG_PRESS_MS = 350;
 const REACTION_COACH_KEY = "onlybike-wall-reaction-coach";
+
+/** WALL v6: podium chips for the Зачёт недели top-3 (theme-independent). */
+const MEDAL_CHIP_BG = [
+  "linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)", // gold
+  "linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)", // silver
+  "linear-gradient(135deg, #fed7aa 0%, #ea580c 100%)", // bronze
+];
 
 /** Top emoji for the VK-style summary chip: counts desc, lib order as tiebreak. */
 function topReactions(counts: Record<string, number>, max = 3): string[] {

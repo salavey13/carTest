@@ -968,6 +968,26 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
     0 8px 30px -18px color-mix(in srgb, var(--community-accent) 70%, transparent);
 }
 
+/* ── 8b. Wall photo full-bleed (wall v6) ─────────────────────────────────── */
+/* Photos bleed to the card edges (Telegram-style photo-led cards): the
+   negative margin cancels cw-card's p-4 / md:p-5 so a photo post reads as an
+   image shell, not a thumbnail in a box. Side borders of .cw-photo are
+   dropped inside the bleed — they would double up with the card border. */
+.cw-bleed-x {
+  margin-left: -1rem;
+  margin-right: -1rem;
+}
+.cw-bleed-x .cw-photo {
+  border-left: none;
+  border-right: none;
+}
+@media (min-width: 768px) {
+  .cw-bleed-x {
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+  }
+}
+
 /* ── 9. Stats dashboard: dashboard panel, gauge draw, sparkles ─────────────── */
 .cw-dash {
   position: relative;

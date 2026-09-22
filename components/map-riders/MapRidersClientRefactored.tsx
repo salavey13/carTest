@@ -887,9 +887,11 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         <Drawer.Portal>
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
             <div className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
-            {/* Snap control buttons */}
-            <div className="pointer-events-auto mb-3 flex items-center justify-between gap-2">
+            {/* Snap control buttons — WALL v6: accent hairline under the sheet
+                title ties the sheet to the wall cards below (same accent). */}
+            <div className="pointer-events-auto relative mb-3 flex items-center justify-between gap-2 border-b border-[var(--mr-border)] pb-2.5">
               <h3 className="font-orbitron flex items-center gap-2 text-sm text-[var(--mr-text)]">Стена экипажа<span className="cw-live-dot" aria-hidden /></h3>
+              <span aria-hidden className="absolute inset-x-0 -bottom-px h-px" style={{ background: "linear-gradient(90deg, transparent, color-mix(in srgb, var(--mr-accent) 70%, transparent) 45%, transparent)" }} />
               <div className="pointer-events-auto flex gap-1.5">
                 {SNAP_POINTS.map((snap) => (
                   <Button

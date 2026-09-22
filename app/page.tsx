@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   motion, AnimatePresence, useInView, useScroll, useTransform, useSpring, useMotionValue,
 } from "framer-motion";
@@ -376,9 +377,34 @@ function MagneticButton({ children, href, primary = false, className = "", butto
   }, []);
   const handleLeave = useCallback(() => setPos({ x: 0, y: 0 }), []);
   const isInternal = href.startsWith("/");
+  // SPA LINKING FIX (2026-09-22): internal links used to be plain <a href>,
+  // which forced a FULL document reload on every landing → catalog tap. Each
+  // reload remounted AppProvider → the whole Telegram auth roundtrip (and the
+  // «Авторизация...» toast) reran — the user saw "authentication happening
+  // again" on every page change. router.push keeps it a client-side
+  // transition; external links keep native behavior (new tab).
+  const router = useRouter();
   const sizeClasses = size === "sm" ? "text-sm px-5 py-2" : "text-lg px-8 md:px-10 py-6";
   return (
-    <motion.a ref={ref} href={href} onMouseMove={handleMove} onMouseLeave={handleLeave} animate={{ x: pos.x, y: pos.y }} transition={{ type: "spring", stiffness: 200, damping: 15 }} target={isInternal ? undefined : "_blank"} rel={isInternal ? undefined : "noopener noreferrer"} className={`inline-block ${className}`}>
+    <motion.a
+      ref={ref}
+      href={href}
+      onClick={
+        isInternal
+          ? (e) => {
+              e.preventDefault();
+              router.push(href);
+            }
+          : undefined
+      }
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      animate={{ x: pos.x, y: pos.y }}
+      transition={{ type: "spring", stiffness: 200, damping: 15 }}
+      target={isInternal ? undefined : "_blank"}
+      rel={isInternal ? undefined : "noopener noreferrer"}
+      className={`inline-block ${className}`}
+    >
       <Button size={size === "sm" ? "sm" : "lg"} variant={primary ? "default" : "outline"} className={`rounded-full font-bold transition-all hover:scale-[1.03] ${sizeClasses} ${buttonClassName}`} style={{ backgroundColor: primary ? "var(--vip-accent-main)" : "transparent", color: primary ? "var(--vip-bg-base)" : "var(--vip-accent-main)", borderColor: "var(--vip-accent-main)", boxShadow: primary ? `0 10px 30px color-mix(in srgb, var(--vip-accent-main) 30%, transparent)` : "none", ...style }}>
         {children}
       </Button>
@@ -858,6 +884,9 @@ function SectionHeader({ badge, title, highlight, subtitle }: { badge: string; t
    ════════════════════════════════════════════════════════════ */
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  // SPA LINKING FIX: mobile-menu catalog CTA navigates client-side instead of
+  // a full document reload (which reran the whole Telegram auth roundtrip).
+  const router = useRouter();
   const navLinks = [
     { label: "Каталог", href: "#catalog" },
     { label: "Тарифы", href: "#pricing" }, { label: "Как это работает", href: "#how" },
@@ -912,7 +941,16 @@ export default function Home() {
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="md:hidden border-t overflow-hidden" style={{ borderColor: "var(--vip-border-soft)" }}>
                 <div className="px-4 py-4 flex flex-col gap-3">
                   {navLinks.map((link) => (<a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} className="py-2 transition-colors" style={{ color: "var(--vip-text-secondary)" }}>{link.label}</a>))}
-                  <a href={CATALOG_HREF} onClick={() => setMenuOpen(false)}>
+                  {/* SPA LINKING FIX: catalog tap used to reload the whole app
+                      (plain <a>) — router.push keeps the auth session alive. */}
+                  <a
+                    href={CATALOG_HREF}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setMenuOpen(false);
+                      router.push(CATALOG_HREF);
+                    }}
+                  >
                     <Button className="w-full rounded-full font-semibold" style={{ backgroundColor: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>Забронировать</Button>
                   </a>
                 </div>

@@ -57,14 +57,20 @@ function Avatar({ url, name, size = 72 }: { url: string | null; name: string; si
     const parts = name.trim().split(/\s+/).slice(0, 2);
     return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
   }, [name]);
+  // PROFILE v2: layered accent ring + soft outer glow — the avatar is the
+  // anchor of the hero band, it should read as such.
+  const ringStyle = {
+    boxShadow:
+      "0 0 0 2px color-mix(in srgb, var(--community-accent) 55%, transparent), 0 8px 26px -10px color-mix(in srgb, var(--community-accent) 75%, transparent)",
+  };
   if (url) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={name} width={size} height={size} className="rounded-full object-cover ring-2 ring-[var(--community-accent)]/40" style={{ width: size, height: size }} />;
+    return <img src={url} alt={name} width={size} height={size} className="rounded-full object-cover" style={{ width: size, height: size, ...ringStyle }} />;
   }
   return (
     <div
-      className="flex items-center justify-center rounded-full font-black text-[var(--community-accent-text)] ring-2 ring-[var(--community-accent)]/40"
-      style={{ width: size, height: size, backgroundColor: "var(--community-accent)", fontSize: size / 2.6 }}
+      className="flex items-center justify-center rounded-full font-black text-[var(--community-accent-text)]"
+      style={{ width: size, height: size, backgroundColor: "var(--community-accent)", fontSize: size / 2.6, ...ringStyle }}
       aria-hidden
     >
       {initials}
@@ -74,8 +80,14 @@ function Avatar({ url, name, size = 72 }: { url: string | null; name: string; si
 
 function StatTile({ icon, value, label }: { icon: React.ReactNode; value: number | string; label: string }) {
   return (
-    <div className="cw-card flex flex-col items-center gap-1 px-2 py-3 text-center">
-      <span className="text-[var(--community-muted)]" aria-hidden>
+    <div className="cw-card cw-press flex flex-col items-center gap-1.5 px-2 py-3 text-center">
+      {/* PROFILE v2: icon sits in an accent-tinted chip — the strip reads as a
+          dashboard row instead of five lookalike boxes. */}
+      <span
+        className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--community-accent)]"
+        style={{ backgroundColor: "color-mix(in srgb, var(--community-accent) 14%, transparent)" }}
+        aria-hidden
+      >
         {icon}
       </span>
       <span className="text-lg font-black leading-none text-[var(--community-text)]">{value}</span>
@@ -225,11 +237,78 @@ export function RiderProfileClient({
 
   return (
     <div className="space-y-5">
-      {/* ── header card ──────────────────────────────────────────────────── */}
-      <section className="cw-card cw-rise p-5 md:p-6">
-        <div className="flex flex-wrap items-start gap-4">
-          <Avatar url={rider.avatarUrl} name={displayName} />
-          <div className="min-w-0 flex-1">
+      {/* ── header card (PROFILE v2 hero) ──────────────────────────────────
+          Accent-gradient band + overlapping glowing avatar — the profile
+          reads as a personal page, not a form. All data/actions unchanged. */}
+      <section className="cw-card cw-rise overflow-hidden !p-0">
+        <div aria-hidden className="relative h-24 md:h-28">
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(135deg, color-mix(in srgb, var(--community-accent) 34%, transparent) 0%, color-mix(in srgb, var(--community-accent) 12%, transparent) 45%, transparent 78%)",
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(120% 150% at 88% -25%, color-mix(in srgb, var(--community-accent) 30%, transparent) 0%, transparent 55%)",
+            }}
+          />
+          <span className="absolute right-4 top-2 select-none text-[64px] leading-none opacity-15" aria-hidden>
+            🏍
+          </span>
+        </div>
+        <div className="px-5 pb-5 md:px-6 md:pb-6">
+          <div className="-mt-11 flex flex-wrap items-end justify-between gap-3">
+            <div className="relative">
+              {/* soft glow pad behind the avatar (the ring itself lives in Avatar) */}
+              <div
+                aria-hidden
+                className="absolute -inset-1.5 rounded-full opacity-60 blur-md"
+                style={{ backgroundColor: "color-mix(in srgb, var(--community-accent) 40%, transparent)" }}
+              />
+              <div className="relative">
+                <Avatar url={rider.avatarUrl} name={displayName} size={84} />
+              </div>
+            </div>
+            <div className="flex w-full flex-wrap gap-2 pb-1 sm:w-auto">
+              {isSelf && !editing && (
+                <button
+                  type="button"
+                  onClick={openStartEditing}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-[var(--community-accent)] px-4 py-2.5 text-sm font-bold text-[var(--community-accent-text)] transition hover:brightness-110 sm:flex-none"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden /> Редактировать
+                </button>
+              )}
+              {tgHref && (
+                <a
+                  href={tgHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--community-border)] px-4 py-2.5 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] sm:flex-none"
+                >
+                  <Send className="h-4 w-4" aria-hidden /> Написать
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={shareProfile}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--community-border)] px-4 py-2.5 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] sm:flex-none"
+              >
+                <Share2 className="h-4 w-4" aria-hidden /> Поделиться
+              </button>
+              {savedFlash && (
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-[var(--community-accent)]" role="status">
+                  <Check className="h-3.5 w-3.5" aria-hidden /> сохранено
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-black leading-tight text-[var(--community-text)]">{displayName}</h1>
               <span className="rounded-full border border-[var(--community-border)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--community-muted)]">
@@ -242,7 +321,7 @@ export function RiderProfileClient({
               )}
             </div>
             {(custom.statusEmoji || custom.statusText) && (
-              <p className="mt-1 text-sm font-semibold text-[var(--community-text)]">
+              <p className="mt-1.5 text-sm font-semibold text-[var(--community-text)]">
                 {custom.statusEmoji ? <span aria-hidden>{custom.statusEmoji} </span> : null}
                 {custom.statusText}
               </p>
@@ -258,43 +337,7 @@ export function RiderProfileClient({
             </p>
           </div>
 
-          {/* actions — own profile gets edit, everyone gets TG + share */}
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-col">
-            {isSelf && !editing && (
-              <button
-                type="button"
-                onClick={openStartEditing}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-[var(--community-accent)] px-4 py-2.5 text-sm font-bold text-[var(--community-accent-text)] transition hover:brightness-110 sm:flex-none"
-              >
-                <Pencil className="h-4 w-4" aria-hidden /> Редактировать
-              </button>
-            )}
-            {tgHref && (
-              <a
-                href={tgHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--community-border)] px-4 py-2.5 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] sm:flex-none"
-              >
-                <Send className="h-4 w-4" aria-hidden /> Написать
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={shareProfile}
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--community-border)] px-4 py-2.5 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)] sm:flex-none"
-            >
-              <Share2 className="h-4 w-4" aria-hidden /> Поделиться
-            </button>
-            {savedFlash && (
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-[var(--community-accent)]" role="status">
-                <Check className="h-3.5 w-3.5" aria-hidden /> сохранено
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* edit form (own profile only) */}
+          {/* edit form (own profile only) */}
         {isSelf && editing && (
           <form
             className="mt-5 space-y-3 rounded-2xl border border-[var(--community-border)] p-4"
@@ -405,6 +448,7 @@ export function RiderProfileClient({
             </div>
           </form>
         )}
+        </div>
       </section>
 
       {/* ── stats strip ──────────────────────────────────────────────────── */}
@@ -422,7 +466,12 @@ export function RiderProfileClient({
       {weeklyRank && (
         <Link
           href={`/franchize/${crewSlug}/community`}
-          className="cw-press flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--community-border)] bg-[var(--community-card-faint)] px-4 py-2.5 text-sm text-[var(--community-muted)] transition hover:border-[var(--community-accent)]"
+          className="cw-press flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-[var(--community-muted)] transition hover:border-[var(--community-accent)]"
+          style={{
+            borderColor: "color-mix(in srgb, var(--community-accent) 30%, var(--community-border))",
+            background:
+              "linear-gradient(120deg, color-mix(in srgb, var(--community-accent) 14%, transparent) 0%, transparent 70%)",
+          }}
         >
           <Trophy className="h-4 w-4 text-[var(--community-accent)]" aria-hidden="true" />
           <span className="font-bold text-[var(--community-text)]">#{weeklyRank.rank}</span>
@@ -445,10 +494,16 @@ export function RiderProfileClient({
           {[...unlockedBadges, ...lockedBadges].map((badge) => (
             <div
               key={badge.id}
-              className={`flex items-center gap-3 rounded-2xl border p-3 ${
+              className={`flex items-center gap-3 rounded-2xl border p-3 transition ${
                 badge.unlocked ? "border-[var(--community-accent)]" : "border-[var(--community-border)]"
               }`}
-              style={{ backgroundColor: badge.unlocked ? "color-mix(in srgb, var(--community-accent) 9%, transparent)" : "var(--community-card-faint)" }}
+              style={{
+                backgroundColor: badge.unlocked ? "color-mix(in srgb, var(--community-accent) 9%, transparent)" : "var(--community-card-faint)",
+                // PROFILE v2: earned badges get a soft accent glow — locked ones stay flat.
+                boxShadow: badge.unlocked
+                  ? "0 8px 26px -14px color-mix(in srgb, var(--community-accent) 70%, transparent)"
+                  : undefined,
+              }}
             >
               <span className={`text-2xl ${badge.unlocked ? "" : "opacity-40 grayscale"}`} aria-hidden>
                 {badge.emoji}
@@ -458,7 +513,13 @@ export function RiderProfileClient({
                 <p className="mt-0.5 truncate text-[11px] text-[var(--community-muted)]">{badge.unlocked ? badge.description : badge.hint ?? badge.description}</p>
                 {!badge.unlocked && (
                   <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[var(--community-border)]">
-                    <div className="h-full rounded-full bg-[var(--community-accent)]" style={{ width: `${Math.round(badge.progress * 100)}%` }} />
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.round(badge.progress * 100)}%`,
+                        background: "linear-gradient(90deg, color-mix(in srgb, var(--community-accent) 55%, transparent), var(--community-accent))",
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -475,15 +536,19 @@ export function RiderProfileClient({
           </h2>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {garage.map((bike) => (
-              <div key={bike.bikeId} className="overflow-hidden rounded-2xl border border-[var(--community-border)]" style={{ backgroundColor: "var(--community-card-faint)" }}>
-                {bike.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={bike.imageUrl} alt={bike.title} className="h-24 w-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="flex h-24 w-full items-center justify-center text-3xl" aria-hidden>
-                    🏍
-                  </div>
-                )}
+              <div key={bike.bikeId} className="group overflow-hidden rounded-2xl border border-[var(--community-border)] transition hover:border-[var(--community-accent)]" style={{ backgroundColor: "var(--community-card-faint)" }}>
+                <div className="relative h-24 w-full overflow-hidden">
+                  {bike.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={bike.imageUrl} alt={bike.title} className="h-24 w-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" />
+                  ) : (
+                    <div className="flex h-24 w-full items-center justify-center text-3xl" aria-hidden>
+                      🏍
+                    </div>
+                  )}
+                  {/* bottom fade so the title survives busy photos */}
+                  <div aria-hidden className="absolute inset-x-0 bottom-0 h-10" style={{ background: "linear-gradient(to top, color-mix(in srgb, var(--community-base-soft) 88%, transparent), transparent)" }} />
+                </div>
                 <div className="p-2.5">
                   <p className="truncate text-xs font-bold text-[var(--community-text)]" title={bike.title}>
                     {bike.title}
@@ -594,7 +659,7 @@ export function RiderProfileClient({
                     <div className="mt-2 flex gap-1.5 overflow-hidden">
                       {post.photos.slice(0, 4).map((photo) => (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo.id} src={photo.url} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover" />
+                        <img key={photo.id} src={photo.url} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover transition duration-300 hover:scale-105" />
                       ))}
                       {post.photos.length > 4 && (
                         <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-[var(--community-border)] text-xs font-bold text-[var(--community-text)]">

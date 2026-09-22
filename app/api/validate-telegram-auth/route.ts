@@ -8,6 +8,8 @@ import {
   TELEGRAM_ACTOR_COOKIE,
   TELEGRAM_ACTOR_COOKIE_MAX_AGE_SECONDS,
 } from "@/lib/telegram-actor-cookie";
+import { fetchUserData, createOrUpdateUser } from "@/lib/supabase-server";
+import type { Database } from "@/types/database.types";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BYPASS_VALIDATION_ENV =
@@ -139,8 +141,46 @@ export async function POST(req: NextRequest) {
 
     const result = await validateTelegramHash(initData, bypassValidation);
 
+    // ── AUTH IN ONE ROUNDTRIP (2026-09-22 routing speed fix) ──
+    // The client used to chain validate → fetchDbUserAction → (maybe)
+    // upsertTelegramUserAction — 2–3 sequential roundtrips BEFORE any
+    // startapp deep link behind the auth gate could route. We already know
+    // the validated tg user here, so resolve (and lazily sync) the
+    // users-table row in THIS request and hand it back. The hook falls back
+    // to the legacy server actions when dbUser is null (DB hiccup / bypass
+    // without user payload) — semantics unchanged, just fewer roundtrips.
+    let dbUser: Database["public"]["Tables"]["users"]["Row"] | null = null;
+    const validatedId = result.user?.id;
+    if (result.isValid && validatedId != null) {
+      const userId = String(validatedId);
+      const username = result.user.username || null;
+      const fullName = `${result.user.first_name || ""} ${result.user.last_name || ""}`.trim() || null;
+      const avatarUrl = result.user.photo_url || null;
+      const languageCode = result.user.language_code || null;
+      try {
+        const existing = await fetchUserData(userId);
+        const syncPayload = {
+          username: username || undefined,
+          first_name: fullName || undefined,
+          last_name: "", // legacy upsert contract: full name is pre-concatenated
+          photo_url: avatarUrl || undefined,
+          language_code: languageCode || undefined,
+        };
+        const changed =
+          !existing ||
+          existing.username !== username ||
+          existing.full_name !== fullName ||
+          existing.avatar_url !== avatarUrl ||
+          existing.language_code !== languageCode;
+        dbUser = changed ? await createOrUpdateUser(userId, syncPayload) : existing;
+      } catch (dbError) {
+        // Non-fatal: the client falls back to fetchDbUserAction/upsert actions.
+        logger.warn("[API_VALIDATE_POST_WARN] inline dbUser resolve failed:", dbError);
+      }
+    }
+
     const status = bypassValidation ? 200 : result.isValid ? 200 : 401;
-    const response = NextResponse.json(result, { status });
+    const response = NextResponse.json({ ...result, dbUser }, { status });
     const userId = result.user?.id;
     const actorCookie =
       result.isValid &&

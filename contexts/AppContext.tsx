@@ -175,7 +175,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [dbUser?.user_id]);
 
   useEffect(() => {
-    refreshActiveLobby();
+    // ROUTING SPEED (2026-09-22): the lobby probe is pure strikeball context —
+    // nothing on the critical first-paint path (franchize catalog/map/wall)
+    // needs it. Running it alongside fetchUserRuntimeSnapshotAction added one
+    // more server action to the auth window. Defer the INITIAL probe past the
+    // auth window; realtime-triggered refreshes below stay immediate.
+    const timer = setTimeout(() => {
+      void refreshActiveLobby();
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [refreshActiveLobby]);
 
   useEffect(() => {

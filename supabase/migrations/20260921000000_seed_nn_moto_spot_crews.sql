@@ -13,6 +13,13 @@
 -- ⚠️ Применять вручную в SQL editor (Supabase dashboard), как обычно.
 -- Синхронизировано с lib/map-riders-spots.ts (тест map-wall-interlink.spec.ts
 -- сверяет список slug в обе стороны).
+--
+-- Фикс координат 2026-09-22: сверка домов/адресов по OSM (Nominatim) —
+-- 7 точек стояли на 1.7–13 км от реального места (Роллинг Мото — Автозавод
+-- вместо Московского шоссе; Мотогор — Соцгород вместо Сормова; КроссМото —
+-- Дубки вместо Высоково; Мототехника-52 — Анкудиновка вместо Афонино;
+-- пл. Минина — Белинского вместо Кремля; набережная — русло Оки).
+-- Миграция идемпотентна (ON CONFLICT DO UPDATE) — просто перезапустить.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 begin;
@@ -39,14 +46,14 @@ with data as (
     ('nn-motomesto',        'nn-motomesto',        'Мотоместо НН',                  'club',     'Комсомольская ул., 1',               '56.2958, 43.9478',   jsonb_build_object('bgBase','#140a0c','bgCard','#1e1114','accentMain','#ef4444','accentMainHover','#f87171','textPrimary','#f5e8ea','textSecondary','#b79aa0','borderSoft','#4a2328')),
     ('nn-motoclub-cross',   'nn-motoclub-cross',   'MOTOCLUB НН • кросс',           'rental',   'ул. Придорожная, 31 (Сормово)',      '56.3272, 43.8595',   jsonb_build_object('bgBase','#071417','bgCard','#0c1e22','accentMain','#06b6d4','accentMainHover','#22d3ee','textPrimary','#e5f6f9','textSecondary','#93b8c0','borderSoft','#1a3d44')),
     ('nn-bikeland',         'nn-bikeland',         'Байк Ленд Нижний Новгород',     'shop',     'ул. Ошарская, 14',                   '56.32124, 44.00945', jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
-    ('nn-rolling-moto',     'nn-rolling-moto',     'Роллинг Мото',                  'shop',     'Московское шоссе, 137а',             '56.2652, 43.8560',   jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
-    ('nn-mototeh-nn',       'nn-mototeh-nn',       'Мототех НН',                    'shop',     'ул. Артельная, 15б',                 '56.2755, 43.9160',   jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
-    ('nn-motogor',          'nn-motogor',          'Мотогор',                       'shop',     'ул. Коминтерна, 35а (Автозавод)',    '56.2362, 43.8407',   jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
-    ('nn-motoservice-nn',   'nn-motoservice-nn',   'Мотосервис-НН',                 'service',  'Мотальный пер., 11А',                '56.2881, 43.9085',   jsonb_build_object('bgBase','#081309','bgCard','#0f1e12','accentMain','#22c55e','accentMainHover','#4ade80','textPrimary','#e8f6ea','textSecondary','#a0c2a7','borderSoft','#1e3d25')),
-    ('nn-krossmoto',        'nn-krossmoto',        'КроссМото НН',                  'school',   'ул. Мунина, 40к20',                  '56.2895, 43.9020',   jsonb_build_object('bgBase','#0f0a1a','bgCard','#181027','accentMain','#8b5cf6','accentMainHover','#a78bfa','textPrimary','#f0eaf9','textSecondary','#b3a4cd','borderSoft','#322651')),
-    ('nn-mototehnika52',    'nn-mototehnika52',    'Мототехника 52',                'service',  'Магистральная ул., 136Е (Афонино)',  '56.2447, 44.0292',   jsonb_build_object('bgBase','#081309','bgCard','#0f1e12','accentMain','#22c55e','accentMainHover','#4ade80','textPrimary','#e8f6ea','textSecondary','#a0c2a7','borderSoft','#1e3d25')),
-    ('nn-minin-square',     'nn-minin-square',     'пл. Минина и Пожарского',       'landmark', 'Верхняя часть города',               '56.3122, 44.0059',   jsonb_build_object('bgBase','#170e06','bgCard','#221509','accentMain','#f97316','accentMainHover','#fb923c','textPrimary','#f8ede2','textSecondary','#c4a88e','borderSoft','#4a2f18')),
-    ('nn-nizhnevolzhskaya', 'nn-nizhnevolzhskaya', 'Нижневолжская набережная',      'landmark', 'У Стрелки',                          '56.3103, 44.0002',   jsonb_build_object('bgBase','#170e06','bgCard','#221509','accentMain','#f97316','accentMainHover','#fb923c','textPrimary','#f8ede2','textSecondary','#c4a88e','borderSoft','#4a2f18'))
+    ('nn-rolling-moto',     'nn-rolling-moto',     'Роллинг Мото',                  'shop',     'Московское шоссе, 137а',             '56.31541, 43.90416', jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
+    ('nn-mototeh-nn',       'nn-mototeh-nn',       'Мототех НН',                    'shop',     'ул. Артельная, 15б',                 '56.29777, 43.99905', jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
+    ('nn-motogor',          'nn-motogor',          'Мотогор',                       'shop',     'ул. Коминтерна, 35а (Сормово)',      '56.34642, 43.88566', jsonb_build_object('bgBase','#0a0f1a','bgCard','#111a2b','accentMain','#3b82f6','accentMainHover','#60a5fa','textPrimary','#e8eef9','textSecondary','#9db1cd','borderSoft','#22334f')),
+    ('nn-motoservice-nn',   'nn-motoservice-nn',   'Мотосервис-НН',                 'service',  'Мотальный пер., 11А',                '56.29408, 43.94968', jsonb_build_object('bgBase','#081309','bgCard','#0f1e12','accentMain','#22c55e','accentMainHover','#4ade80','textPrimary','#e8f6ea','textSecondary','#a0c2a7','borderSoft','#1e3d25')),
+    ('nn-krossmoto',        'nn-krossmoto',        'КроссМото НН',                  'school',   'ул. Мунина, 40к20 (Высоково)',       '56.38103, 43.76542', jsonb_build_object('bgBase','#0f0a1a','bgCard','#181027','accentMain','#8b5cf6','accentMainHover','#a78bfa','textPrimary','#f0eaf9','textSecondary','#b3a4cd','borderSoft','#322651')),
+    ('nn-mototehnika52',    'nn-mototehnika52',    'Мототехника 52',                'service',  'Магистральная ул., 136Е (Афонино)',  '56.25533, 44.09768', jsonb_build_object('bgBase','#081309','bgCard','#0f1e12','accentMain','#22c55e','accentMainHover','#4ade80','textPrimary','#e8f6ea','textSecondary','#a0c2a7','borderSoft','#1e3d25')),
+    ('nn-minin-square',     'nn-minin-square',     'пл. Минина и Пожарского',       'landmark', 'Верхняя часть города',               '56.3273, 44.0069',   jsonb_build_object('bgBase','#170e06','bgCard','#221509','accentMain','#f97316','accentMainHover','#fb923c','textPrimary','#f8ede2','textSecondary','#c4a88e','borderSoft','#4a2f18')),
+    ('nn-nizhnevolzhskaya', 'nn-nizhnevolzhskaya', 'Нижневолжская набережная',      'landmark', 'У Чкаловской лестницы',              '56.33159, 44.00946', jsonb_build_object('bgBase','#170e06','bgCard','#221509','accentMain','#f97316','accentMainHover','#fb923c','textPrimary','#f8ede2','textSecondary','#c4a88e','borderSoft','#4a2f18'))
   ) as v(slug, spot_id, name, kind, address, hq_location, palette)
 )
 

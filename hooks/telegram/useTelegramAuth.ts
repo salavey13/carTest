@@ -36,7 +36,18 @@ const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === "
   photo_url: process.env.NEXT_PUBLIC_MOCK_USER_PHOTO || "",
 } : null;
 
-async function validateTelegramAuthWithApi(initDataString: string): Promise<WebAppUser | null> {
+/**
+ * Validate initData AND resolve the users-table row in ONE roundtrip.
+ *
+ * 2026-09-22 routing speed fix: the route now resolves (and lazily syncs)
+ * the dbUser server-side, so the hook can skip the legacy
+ * fetchDbUserAction → upsertTelegramUserAction chain (1–2 sequential
+ * roundtrips) when the row comes back. `dbUser: null` in the response means
+ * «fall back to the legacy actions» — semantics unchanged.
+ */
+async function validateTelegramAuthWithApi(
+  initDataString: string,
+): Promise<{ user: WebAppUser; dbUser: DatabaseUser } | null> {
   if (!initDataString) return null;
   try {
     const response = await fetch("/api/validate-telegram-auth", {
@@ -47,7 +58,12 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<WebA
     const result = await response.json();
     if (!response.ok || !result?.isValid || !result?.user?.id) return null;
     const tgUser = result.user as WebAppInitData["user"];
-    return tgUser ? { ...tgUser } as WebAppUser : null;
+    return tgUser
+      ? {
+          user: { ...tgUser } as WebAppUser,
+          dbUser: (result.dbUser ?? null) as DatabaseUser,
+        }
+      : null;
   } catch {
     return null;
   }
@@ -141,7 +157,10 @@ export function useTelegramAuth() {
           globalLogger.warn("[useTelegramAuth] webApp.initDataUnsafe.user.id access threw:", e);
         }
 
-        let candidate = await validateTelegramAuthWithApi(initData);
+        // Single-roundtrip auth: validation + dbUser resolve in one call.
+        const apiAuth = await validateTelegramAuthWithApi(initData);
+        let candidate = apiAuth?.user ?? null;
+        const fastDbUser: DatabaseUser = apiAuth?.dbUser ?? null;
 
         // Fallback 1: Use client-side user object in development
         if (!candidate && tgUserId && process.env.NODE_ENV === "development") {
@@ -168,7 +187,10 @@ export function useTelegramAuth() {
           return;
         }
 
-        const persisted = await handleAuthentication(candidate);
+        // Fast path: the validate API already resolved the users row.
+        // Legacy chain (fetchDbUser → maybe upsert) runs only when the API
+        // couldn't return it (DB hiccup, mock/dev fallback candidates).
+        const persisted = fastDbUser ?? (await handleAuthentication(candidate));
         if (can()) {
           setUser(candidate);
           setDbUser(persisted);

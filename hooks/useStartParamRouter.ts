@@ -243,6 +243,63 @@ function computeFastWallTarget(param: string): string | null {
   return `/franchize/${link.slug}/community?compose=${link.rentalId}`;
 }
 
+/**
+ * STATIC fast path (2026-09-22 routing speed fix).
+ *
+ * The OLD flow routed EVERYTHING behind `isAppLoading || isAuthenticating` —
+ * i.e. after the full Telegram auth roundtrip (validate-telegram-auth →
+ * fetchDbUser → maybe upsert). Deep links to static pages sat on the entry
+ * page long enough for the whole catalog to load before the transition —
+ * «catalog finishes loading before transition happens».
+ *
+ * Params whose target is fully determined by the param itself (no dbUser /
+ * userCrewInfo needed) route IMMEDIATELY, before the auth gate:
+ *   · every START_PARAM_PAGE_MAP key (rent-bike, crews, settings, …);
+ *   · mapriders_<slug> / mapriders-<slug> — slug carried in the param
+ *     (bare mapriders with no slug still needs userCrewInfo → gated);
+ *   · crew_<slug> and legacy <slug>_join_crew / crew_<slug>_join_crew;
+ *   · viz_<id>.
+ *
+ * Params that need auth data (rent_/cart_/testdrive_ claims, analytics/
+ * lead/rental slug via userCrewInfo, bare wall forms) stay on the gated
+ * path — the gate itself is now cheaper (auth is a single roundtrip since
+ * the validate API returns the dbUser).
+ */
+export function computeStaticFastTarget(param: string): string | null {
+  // Static page map — target is a constant, auth buys nothing.
+  if (START_PARAM_PAGE_MAP[param]) return START_PARAM_PAGE_MAP[param];
+
+  // mapriders_<slug> — self-contained (slug in the param).
+  if (param.startsWith("mapriders_") || param.startsWith("mapriders-")) {
+    const sep = param.includes("_") ? "_" : "-";
+    const slug = param.split(sep).slice(1).join(sep).trim();
+    if (slug && /^[a-z0-9-]{1,64}$/i.test(slug)) return `/franchize/${slug}/map-riders`;
+    // Bare mapriders — needs userCrewInfo → gated path decides.
+    return null;
+  }
+
+  // crew_<slug> / crew_<slug>_join_crew — self-contained.
+  if (param.startsWith("crew_")) {
+    const content = param.substring(5);
+    if (content.endsWith("_join_crew")) {
+      const slug = content.substring(0, content.length - 10);
+      if (slug) return `/franchize/${slug}?join_crew=true`;
+      return null;
+    }
+    if (content) return `/franchize/${content}`;
+    return null;
+  }
+
+  // viz_<id> — god-mode sandbox sim.
+  if (param.startsWith("viz_")) {
+    const simId = param.substring(4);
+    if (simId) return `/god-mode-sandbox?simId=${simId}`;
+    return null;
+  }
+
+  return null;
+}
+
 export function useStartParamRouter() {
   const router = useRouter();
   const pathname = usePathname();
@@ -489,6 +546,26 @@ export function useStartParamRouter() {
       }
 
       if (!startParamPayload && normalizedUrlStartParam && ignoredUrlStartParamRef.current === normalizedUrlStartParam) {
+        return;
+      }
+
+      // ── STATIC fast path: self-contained params route HERE, before the
+      // auth gate (START_PARAM_PAGE_MAP / mapriders_<slug> / crew_<slug> /
+      // viz_<id>) — see computeStaticFastTarget for the why. ──
+      const staticFastTarget = computeStaticFastTarget(paramToProcess);
+      if (staticFastTarget) {
+        if (lastHandledStartParamRef.current !== paramToProcess && activeStartParamRef.current !== paramToProcess) {
+          lastHandledStartParamRef.current = paramToProcess;
+          if (startParamPayload && normalizedUrlStartParam) {
+            ignoredUrlStartParamRef.current = normalizedUrlStartParam;
+          }
+          if (staticFastTarget !== pathname) {
+            logger.info(`[ClientLayout] FAST routing static deep link → ${staticFastTarget}`);
+            router.replace(staticFastTarget);
+          }
+          clearStartParam?.();
+        }
+        // Handled (or already handled) — never fall through to the gated logic.
         return;
       }
 
