@@ -11,6 +11,13 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-server";
 
 const franchizeIntentTypes = [
+  // app_open — every /franchize/<slug> open tracked by useTelegramAuth.
+  // The leads UI (SourceBadge/Avatar/lead-priority) already has full
+  // app_open labels; the zod enum + DB CHECK lagged behind, so these intent
+  // rows silently failed validation (TS2322 at the call site was the
+  // symptom). Aligned 2026-09-22 — see migration
+  // 20260922000000_add_app_open_intent_type.sql for the DB side.
+  "app_open",
   "callback_request",
   "checkout_start",
   "contact_click",

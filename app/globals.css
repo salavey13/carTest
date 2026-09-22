@@ -987,6 +987,17 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
     margin-right: -1.25rem;
   }
 }
+/* Pinned posts keep their 3px accent strip visible: inside cw-card-pinned
+   the photo does NOT bleed (the strip is an inset shadow — an edge-to-edge
+   photo would paint right over it). */
+.cw-card-pinned .cw-bleed-x {
+  margin-left: 0;
+  margin-right: 0;
+}
+.cw-card-pinned .cw-bleed-x .cw-photo {
+  border-left: 1px solid var(--community-border);
+  border-right: 1px solid var(--community-border);
+}
 
 /* ── 9. Stats dashboard: dashboard panel, gauge draw, sparkles ─────────────── */
 .cw-dash {
