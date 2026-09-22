@@ -78,6 +78,17 @@ export interface PointOfInterest {
    * validated against http(s)/data:image schemes in lib/map-poi-marker.ts.
    */
   imageUrl?: string | null;
+  /**
+   * Local initials badge (polish pass 2026-09-23) — zero-network marker for
+   * entities without a photo (live/demo riders, avatar-less users). Used when
+   * `imageUrl` is absent or fails the scheme guard; also reachable through the
+   * `initials:АК` icon grammar. Escaped + auto-contrasted by the builder.
+   */
+  initials?: string | null;
+  /** "lg" = 40px anchor marker with a wider popup offset (crew HQ). */
+  markerSize?: "md" | "lg";
+  /** Explicit halo pulse on the marker (anchor points like HQ). */
+  markerHalo?: boolean;
 }
 
 // === CORE PROJECTION MATH ===

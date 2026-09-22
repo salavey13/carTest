@@ -43,7 +43,9 @@ export interface MeetupPoint {
   lon: number;
   scheduled_at: string | null;
   created_at: string;
-  users?: { username?: string | null; full_name?: string | null } | null;
+  // avatar_url joins from the overview API (MR polish: creator's round picture
+  // on the meetup marker; no avatar → FaLocationDot badge fallback).
+  users?: { username?: string | null; full_name?: string | null; avatar_url?: string | null } | null;
 }
 
 export interface LeaderboardRow {

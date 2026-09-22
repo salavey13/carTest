@@ -25,7 +25,10 @@ export async function fetchOverviewData(crewSlug: string) {
       .limit(40),
     supabaseAdmin
       .from("map_rider_meetups")
-      .select("*, users:created_by_user_id(username, full_name)")
+      // MR polish: avatar_url joins too — meetup markers wear the creator's
+      // round picture (MapRidersClientRefactored → imageUrl), no avatar falls
+      // back to the FaLocationDot badge.
+      .select("*, users:created_by_user_id(username, full_name, avatar_url)")
       .eq("crew_slug", crewSlug)
       .order("created_at", { ascending: false })
       .limit(20),

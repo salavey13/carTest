@@ -280,7 +280,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   }, [state.shareEnabled]);
 
   // ── GPS tracking hook ──
-  const { isUsingTelegram, hasBrowserFix, refreshTelegramFix, lastBroadcastAt, queuedPoints } = useLiveRiders({
+  const { isUsingTelegram, hasBrowserFix, geoError, refreshTelegramFix, lastBroadcastAt, queuedPoints } = useLiveRiders({
     crewSlug,
     sessionId: state.sessionId,
     userId: dbUser?.user_id || null,
@@ -391,6 +391,11 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   }, []);
 
   // ── Build map points from state ──
+  // MR polish: riders wear their REAL avatar (sessions already join
+  // users.avatar_url) — the round-picture promise now covers people, not just
+  // places. No avatar → local initials badge (zero network; the old foreign
+  // placeholder-CDN URL was an extra round-trip per marker, slow/unreachable
+  // on RU mobile networks). Stale riders additionally dim via .mr-poi--stale.
   const riderPoints = useMemo(
     () =>
       Array.from(state.liveRiders.values())
@@ -399,13 +404,16 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
           const session = state.sessions.find((s) => s.user_id === rider.user_id);
           const name = riderDisplayName(session?.users, rider.user_id);
           const isStale = rider.status === "stale";
+          const avatar = session?.users?.avatar_url?.trim() || null;
           return {
             id: `live-rider-${rider.user_id}`,
             name: `${name} • ${Math.round(rider.speed_kmh)} км/ч`,
             type: "point" as const,
-            icon: `image:https://placehold.co/56x56/${rider.isSelf ? "facc15" : isStale ? "4b5563" : "111827"}/ffffff?text=${encodeURIComponent(initialsFromName(name))}`,
+            icon: `initials:${initialsFromName(name)}`,
+            imageUrl: avatar,
             color: rider.isSelf ? "#facc15" : isStale ? "#6b7280" : "#60a5fa",
             coords: [[rider.lat, rider.lng]] as [number, number][],
+            markerClassName: isStale ? "mr-poi--stale" : undefined,
           };
         }),
     [state.liveRiders, state.sessions],
@@ -618,9 +626,12 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       icon: "::FaLocationDot::",
       color: "#f97316",
       // «Round pictures if available»: HQ-точка = логотип экипажа (круглая
-      // аватарка); без логотипа RacingMap нарисует иконку-бейдж.
+      // аватарка); без логотипа RacingMap нарисует иконку-бейдж. HQ — якорь
+      // карты: крупнее обычных точек (lg) + halo-пульс для привлечения взгляда.
       imageUrl: crew.logoUrl || null,
       coords: [[HOME_BASE[0], HOME_BASE[1]]] as [number, number][],
+      markerSize: "lg" as const,
+      markerHalo: true,
     };
 
     const demoPoints = showDemo
@@ -629,7 +640,9 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
           // MR-020: Russian labels (was "Demo Rider A" — inconsistent with the rest of the UI)
           name: `Демо-райдер ${String.fromCharCode(65 + index)} • ${12 + index * 2} км/ч`,
           type: "point" as const,
-          icon: `image:https://placehold.co/56x56/111827/ffffff?text=${String.fromCharCode(65 + index)}`,
+          // MR polish: local initials badge instead of a per-marker request to
+          // a foreign placeholder CDN (offline-safe, instant).
+          icon: `initials:${String.fromCharCode(65 + index)}`,
           color: "#60a5fa",
           coords: [coords],
           markerClassName: "animate-in fade-in duration-300",
@@ -641,6 +654,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       name: `${m.title}${m.comment ? ` — ${m.comment}` : ""}`,
       type: "point" as const,
       icon: "::FaLocationDot::",
+      // MR polish: creator's avatar (overview API now joins avatar_url) —
+      // user-made points read as personal pins; no avatar → FaLocationDot
+      // badge (the icon grammar below stays the fallback chain).
+      imageUrl: m.users?.avatar_url?.trim() || null,
       color: "#f97316",
       coords: [[m.lat, m.lon]] as [number, number][],
       markerClassName: SPOT_POPUP_CLASSNAME,
@@ -679,7 +696,9 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     // DEFAULT_ROUTES are always present (scenic routes around HQ) — they're filtered
     // out of staticMapPoints above to avoid duplication if the migration also seeded them.
     return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems]);
+    // crew.logoUrl / crewSlug are read inside (HQ avatar, meetup popup link) —
+    // codereview N2: stale HQ avatar after a logo change otherwise lingers.
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -1030,8 +1049,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 </span>
                 <span className="ml-auto flex items-center gap-1.5">
                   {/* MR geo-fix: если W3C-геолокация в WebView мертва, а первый
-                      фикс пришёл из Telegram — ручной one-shot вместо автопопапов. */}
-                  {state.shareEnabled && isUsingTelegram && !hasBrowserFix ? (
+                      фикс пришёл из Telegram — ручной one-shot вместо автопопапов.
+                      Полировка: кнопка видна и при ошибке GPS (denied/timeout) —
+                      единственный осмысленный повтор теперь сознательный тап. */}
+                  {state.shareEnabled && !hasBrowserFix && (isUsingTelegram || geoError !== null) ? (
                     <Button
                       type="button"
                       variant="outline"
@@ -1066,6 +1087,24 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                     </Button>
                   ) : null}
                 </span>
+                {/* MR geo polish: раньше ошибка геолокации уходила только в
+                    console.warn — райдер видел «Ты в эфире» при не двигающейся
+                    точке. Теперь причина видна сразу; chip на всю ширину строки
+                    (basis-full заворачивает его под основной ряд). */}
+                {state.shareEnabled && geoError ? (
+                  <span
+                    role="status"
+                    className={`basis-full rounded-lg border px-2 py-1 text-[11px] leading-snug ${
+                      geoError === "denied"
+                        ? "border-red-400/30 bg-red-500/10 text-red-200"
+                        : "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                    }`}
+                  >
+                    {geoError === "denied"
+                      ? "Доступ к геолокации запрещён — разреши его в настройках Telegram, иначе точка на карте не двигается."
+                      : "GPS-сигнал недоступен — попробуй «Обновить гео» или выйди на открытое место."}
+                  </span>
+                ) : null}
               </div>
 
               {/* ── Community wall merged into the sheet (sheet IS the feed) ──

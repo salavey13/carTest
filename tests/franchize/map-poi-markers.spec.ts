@@ -14,9 +14,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildPoiMarkerIcon,
+  cssSafeUrlForMarker,
   fa6GlyphSvg,
   isSafeMarkerImageUrl,
   parsePoiIcon,
+  safeCssColor,
 } from "@/lib/map-poi-marker";
 
 const ROOT = process.cwd();
@@ -39,6 +41,12 @@ describe("parsePoiIcon grammar", () => {
   it("parses ::FaXxx:: glyph names", () => {
     expect(parsePoiIcon("::FaLocationDot::")).toEqual({ kind: "fa", name: "FaLocationDot" });
     expect(parsePoiIcon(":: FaMotorcycle ::")).toEqual({ kind: "fa", name: "FaMotorcycle" });
+  });
+
+  it("parses initials: badges and caps them at 3 chars", () => {
+    expect(parsePoiIcon("initials:АК")).toEqual({ kind: "initials", text: "АК" });
+    expect(parsePoiIcon("INITIALS: Super")).toEqual({ kind: "initials", text: "Sup" });
+    expect(parsePoiIcon("initials:")).toEqual({ kind: "none" });
   });
 
   it("returns none for empty/malformed values", () => {
@@ -98,25 +106,45 @@ describe("buildPoiMarkerIcon", () => {
     });
     expect(icon).toBeTruthy();
     const html = (icon as unknown as { options: { html: string } }).options.html;
-    expect(html).toContain('src="https://cdn.test/logo.png"');
+    // MR polish: the photo is a CSS background layer now — a broken URL just
+    // paints nothing (glyph fallback underneath), no <img> broken-icon ever.
+    expect(html).toContain("background-image:url('https://cdn.test/logo.png')");
     expect(html).toContain("mr-poi--halo"); // carried from mr-spot-popup
     expect((icon as unknown as { options: { iconSize: number[] } }).options.iconSize).toEqual([34, 34]);
+  });
+
+  it("layers the FA glyph UNDER the picture as the broken-image fallback", () => {
+    const icon = buildPoiMarkerIcon({
+      color: "#f97316",
+      imageUrl: "https://cdn.test/logo.png",
+      faName: "FaLocationDot",
+    });
+    const html = (icon as unknown as { options: { html: string } }).options.html;
+    expect(html).toContain("mr-poi__glyph");
+    expect(html).toContain("<svg");
+    expect(html).toContain("mr-poi__img");
+    // glyph first (bottom layer), photo second (top layer)
+    expect(html.indexOf("mr-poi__glyph")).toBeLessThan(html.indexOf("mr-poi__img"));
   });
 
   it("escapes hostile attribute characters and rejects unsafe schemes", () => {
     // scheme guard → falls back to the FA badge path; without faName → null
     expect(buildPoiMarkerIcon({ color: "#111111", imageUrl: "javascript:alert(1)" })).toBeNull();
 
-    // a https URL with a quote must be escaped, never break out of src=""
+    // A quote/paren smuggled into the URL must not break out of the CSS
+    // url('…') string (HTML entities alone are decoded BEFORE CSS parsing —
+    // cssSafeUrlForMarker percent-encodes the breakout chars instead).
     const sneaky = buildPoiMarkerIcon({
       color: "#111111",
-      imageUrl: 'https://x.test/a.png" onerror="alert(1)',
+      imageUrl: 'https://x.test/a.png\') ; background-image:url("https://evil.test',
       faName: "FaStore",
     });
     expect(sneaky).toBeTruthy();
     const html = (sneaky as unknown as { options: { html: string } }).options.html;
-    expect(html).toContain("&quot;");
-    expect(html).not.toContain('" onerror="');
+    expect(html).toContain("%27"); // ' → %27 — CSS string cannot terminate
+    expect(html).toContain("%22"); // " → %22
+    expect(html).toContain("%3B"); // ; → %3B — no property injection
+    expect(html).not.toContain("url('https://x.test/a.png')"); // raw breakout gone
   });
 
   it("builds a glyph badge for known FA names and null for unknown ones", () => {
@@ -127,6 +155,72 @@ describe("buildPoiMarkerIcon", () => {
 
     expect(buildPoiMarkerIcon({ color: "#f97316", faName: "NoSuchIcon" })).toBeNull();
     expect(buildPoiMarkerIcon({ color: "#f97316" })).toBeNull();
+  });
+
+  it("builds a local initials badge with auto-contrast text (polish 2026-09-23)", () => {
+    const onDark = buildPoiMarkerIcon({ color: "#111827", initials: "АК" });
+    expect(onDark).toBeTruthy();
+    let html = (onDark as unknown as { options: { html: string } }).options.html;
+    expect(html).toContain("mr-poi__initials");
+    expect(html).toContain(">АК</span>");
+    expect(html).toContain("color:#ffffff"); // dark disc → white text
+
+    // yellow self-rider disc → dark text (white on #facc15 was unreadable)
+    const onYellow = buildPoiMarkerIcon({ color: "#facc15", initials: "СБ" });
+    html = (onYellow as unknown as { options: { html: string } }).options.html;
+    expect(html).toContain("color:#0f172a");
+
+    // hostile initials are escaped (capped at 3 chars BEFORE escaping),
+    // never interpolated as markup
+    const hostile = buildPoiMarkerIcon({ color: "#111827", initials: "<b>" });
+    html = (hostile as unknown as { options: { html: string } }).options.html;
+    expect(html).toContain("&lt;b&gt;");
+    expect(html).not.toContain("<b>");
+  });
+
+  it("supports the lg anchor size (HQ) and the explicit halo", () => {
+    const lg = buildPoiMarkerIcon({ color: "#f97316", faName: "FaLocationDot", markerSize: "lg", halo: true });
+    const options = (lg as unknown as { options: { html: string; iconSize: number[]; iconAnchor: number[]; popupAnchor: number[] } }).options;
+    expect(options.iconSize).toEqual([40, 40]);
+    expect(options.iconAnchor).toEqual([20, 20]);
+    expect(options.popupAnchor).toEqual([0, -22]);
+    expect(options.html).toContain("mr-poi--lg");
+    expect(options.html).toContain("mr-poi--halo");
+
+    const md = buildPoiMarkerIcon({ color: "#f97316", faName: "FaLocationDot" });
+    const mdOptions = (md as unknown as { options: { iconSize: number[] } }).options;
+    expect(mdOptions.iconSize).toEqual([34, 34]);
+    expect(mdOptions.html).not.toContain("mr-poi--lg");
+  });
+
+  it("whitelists the disc color — a hostile 'red;…' cannot inject CSS declarations", () => {
+    expect(safeCssColor("red;background:url(https://evil.test)")).toBe("#f97316");
+    expect(safeCssColor("#facc15")).toBe("#facc15");
+    expect(safeCssColor("rgb(96 165 250)")).toBe("rgb(96 165 250)");
+    expect(safeCssColor("rgba(96, 165, 250, 0.5)")).toBe("rgba(96, 165, 250, 0.5)");
+    expect(safeCssColor("")).toBe("#f97316");
+    expect(safeCssColor(null)).toBe("#f97316");
+
+    const injected = buildPoiMarkerIcon({ color: "red;background:url(https://evil.test)", faName: "FaStore" });
+    const html = (injected as unknown as { options: { html: string } }).options.html;
+    expect(html).toContain('style="background-color:#f97316"');
+    expect(html).not.toContain("evil.test");
+  });
+
+  it("cssSafeUrlForMarker keeps the data:image structure but kills quote breakouts", () => {
+    // the ;base64, token and mime params must survive (data URL integrity)
+    expect(cssSafeUrlForMarker("data:image/png;base64,QUJD")).toBe("data:image/png;base64,QUJD");
+    const hostile = cssSafeUrlForMarker("data:image/png;base64,QU'JD\"BK\\C");
+    expect(hostile).toContain("%27");
+    expect(hostile).toContain("%22");
+    expect(hostile).toContain("%5C");
+    expect(hostile).toContain(";base64,");
+
+    // SF-1: a raw newline is a CSS BAD-STRING terminator — after it the parser
+    // resumes declarations at the next ';'. It must be encoded too.
+    const nl = cssSafeUrlForMarker("data:image/png;x\n;background:url(https://evil.test)");
+    expect(nl).toContain("%0A");
+    expect(nl).not.toContain("\n");
   });
 });
 
@@ -190,5 +284,70 @@ describe("POI marker wiring (source asserts)", () => {
     expect(action).toContain('.from("crews")');
     expect(action).toContain('"slug, logo_url"');
     expect(action).toContain("NN_MOTO_SPOTS.map((s) => s.slug)");
+  });
+});
+
+// ── polish pass 2026-09-23: people wear pictures too + GPS error surfacing ──
+
+describe("POI polish wiring (source asserts)", () => {
+  it("live riders use real avatars with a local initials fallback (no placehold.co)", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    // the foreign placeholder CDN round-trip is gone from the map page
+    expect(client).not.toContain("placehold.co");
+    expect(client).toContain("session?.users?.avatar_url");
+    expect(client).toContain("icon: `initials:${initialsFromName(name)}`");
+    expect(client).toContain("markerClassName: isStale ? \"mr-poi--stale\" : undefined");
+    // demo riders render locally too
+    expect(client).toContain("icon: `initials:${String.fromCharCode(65 + index)}`");
+  });
+
+  it("meetup markers wear the creator's avatar (API joins avatar_url)", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("imageUrl: m.users?.avatar_url?.trim() || null");
+    const shared = read("app/api/map-riders/_lib/shared.ts");
+    expect(shared).toContain("users:created_by_user_id(username, full_name, avatar_url)");
+    const types = read("lib/map-riders.ts");
+    expect(types).toContain("avatar_url?: string | null;");
+  });
+
+  it("HQ is the lg halo anchor", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain('markerSize: "lg" as const');
+    expect(client).toContain("markerHalo: true");
+  });
+
+  it("GPS failures surface as a plain-language chip, not a console-only warn", () => {
+    const hook = read("hooks/useLiveRiders.ts");
+    expect(hook).toContain("LiveRidersGeoError");
+    expect(hook).toContain("error.PERMISSION_DENIED");
+    expect(hook).toContain("error.POSITION_UNAVAILABLE");
+    expect(hook).toContain("setGeoError((prev) => (prev === kind ? prev : kind))");
+    // transient errors need a 2-in-a-row streak before the chip shows —
+    // a weak-signal timeout↔fix cycle must not flicker it (codereview S2)
+    expect(hook).toContain("watchErrorStreakRef");
+    expect(hook).toContain("watchErrorStreakRef.current >= 2");
+    // a real fix clears the chip; a landed Telegram fix clears soft errors too
+    expect(hook).toContain("setGeoError(null)");
+    expect(hook).toContain('prev === "denied" ? prev : null');
+    // codereview B1: the GPS pipeline must stay identity-stable — volatile
+    // inputs (paused/onPosition/privacy) are read through refs, not deps
+    expect(hook).toContain("onPositionRef");
+    expect(hook).toContain("pausedRef");
+    expect(hook).toContain("[broadcastPosition, hapticPulse]");
+    // codereview N3: manual refresh falls back to a W3C one-shot outside Telegram
+    expect(hook).toContain("getCurrentPosition(");
+
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("geoError");
+    expect(client).toContain("Доступ к геолокации запрещён");
+    expect(client).toContain("GPS-сигнал недоступен");
+    // manual refresh also covers the errored-but-no-telegram-fix case
+    expect(client).toContain("(isUsingTelegram || geoError !== null)");
+  });
+
+  it("the builder hardens CSS url() against injection (cssSafeUrlForMarker)", () => {
+    const lib = read("lib/map-poi-marker.ts");
+    expect(lib).toContain("cssSafeUrlForMarker");
+    expect(lib).toContain("background-image:url('${escAttr(cssSafeUrlForMarker(");
   });
 });

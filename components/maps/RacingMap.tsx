@@ -178,7 +178,8 @@ export function RacingMap({
             // «Instead of simple dots show real icons with round pictures if
             // available» (map-riders feedback): image URLs (crew logos, catalog
             // photos, wall pins) become round avatars, `::FaXxx::` icons become
-            // real glyph badges. Unparseable/missing icons keep the classic dot.
+            // real glyph badges, `initials:XX` becomes a local offline badge.
+            // Unparseable/missing icons keep the classic dot.
             // buildPoiMarkerIcon validates URL schemes and escapes attributes;
             // FA names are lookup keys, never interpolated markup.
             const parsedIcon = parsePoiIcon(poi.icon);
@@ -188,11 +189,17 @@ export function RacingMap({
                 : parsedIcon.kind === "image"
                   ? parsedIcon.url
                   : null;
-            const faName = imageUrl ? null : parsedIcon.kind === "fa" ? parsedIcon.name : null;
+            // The glyph doubles as the broken-photo fallback layer UNDER the
+            // picture (pure CSS), so it is passed even when an image exists.
+            const faName = parsedIcon.kind === "fa" ? parsedIcon.name : null;
+            const initials = parsedIcon.kind === "initials" ? parsedIcon.text : null;
             const poiMarkerIcon = buildPoiMarkerIcon({
               color: poi.color,
               imageUrl,
               faName,
+              initials: poi.initials ?? initials,
+              markerSize: poi.markerSize,
+              halo: poi.markerHalo,
               markerClassName: poi.markerClassName,
             });
 

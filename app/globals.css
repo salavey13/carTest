@@ -1196,6 +1196,7 @@ path.mr-spot-popup {
 }
 
 .mr-poi {
+  position: relative; /* anchor for the .mr-poi__img photo overlay */
   width: 34px;
   height: 34px;
   border-radius: 9999px;
@@ -1208,13 +1209,49 @@ path.mr-spot-popup {
   overflow: hidden;
 }
 
-.mr-poi > img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+/* Photo layer sits ON TOP of the (optional) glyph fallback. A failed
+   background-image paints nothing → the colored disc / glyph underneath
+   shows through. No inline JS error handlers needed. */
+.mr-poi__img {
+  position: absolute;
+  inset: 0;
   border-radius: 9999px;
-  display: block;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   pointer-events: none;
+}
+
+/* Local initials badge (no avatar, no glyph): bold, auto-contrasted color
+   comes inline from readableTextColorOn(). */
+.mr-poi__initials {
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Anchor markers (crew HQ): one size step up, glyph and initials scale too. */
+.mr-poi--lg {
+  width: 40px;
+  height: 40px;
+}
+
+.mr-poi--lg .mr-poi__glyph svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mr-poi--lg .mr-poi__initials {
+  font-size: 15px;
+}
+
+/* Stale riders: dim + desaturate, but keep the shape/color readable. */
+.mr-poi--stale {
+  opacity: 0.55;
+  filter: saturate(0.35);
 }
 
 .mr-poi__glyph {

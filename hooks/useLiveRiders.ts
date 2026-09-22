@@ -48,6 +48,17 @@ const SEND_THROTTLE_MS = 3000;
 const SOURCE_SWITCH_DEBOUNCE_MS = 500;
 type GpsSource = "telegram" | "browser";
 
+/** Why the continuous W3C watch has no fix — surfaced in the ride strip so a
+ *  silent GPS stream is never mistaken for a working one. */
+export type LiveRidersGeoError = "denied" | "unavailable" | "timeout" | null;
+
+/** Shared mapping for watch + one-shot error callbacks (same chip vocabulary). */
+function geoErrorKind(error: GeolocationPositionError): NonNullable<LiveRidersGeoError> {
+  if (error.code === error.PERMISSION_DENIED) return "denied";
+  if (error.code === error.POSITION_UNAVAILABLE) return "unavailable";
+  return "timeout";
+}
+
 // MR geo-fix: `WebApp.requestLocation` shows a NATIVE Telegram permission
 // popup on EVERY invocation. Polling it on an interval (the old design:
 // every GPS_INTERVAL_MS) produced the endless "allow location" dialog storm
@@ -75,12 +86,32 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   // While false (dead/incomplete WebView geolocation), the cockpit offers a
   // manual one-shot Telegram refresh instead of any automatic popup loop.
   const [hasBrowserFix, setHasBrowserFix] = useState(false);
+  // MR geo polish: the watch error callback used to swallow everything into a
+  // console.warn — a rider with denied permission saw «Ты в эфире» and a map
+  // that never moved, with zero explanation. Now the cockpit renders a
+  // plain-language chip (denied → settings hint, timeout/unavailable → retry).
+  const [geoError, setGeoError] = useState<LiveRidersGeoError>(null);
   const [lastBroadcastAt, setLastBroadcastAt] = useState<string | null>(null);
   const [queuedPoints, setQueuedPoints] = useState(0);
 
-  // Store latest privacy in a ref to stabilize flushBatch dependency
+  // Store latest privacy/paused/onPosition in refs so the GPS pipeline stays
+  // IDENTITY-STABLE: every dep we hang off acceptPointNow eventually reaches
+  // the main watch effect (acceptPointNow → acceptPoint →
+  // handleGeolocationPosition → effect deps), and an effect restart re-runs
+  // the ONE-SHOT Telegram popup + clears the error chip. An inline onPosition
+  // arrow (new identity each render) thus resurrected the popup storm exactly
+  // in the denied scenario, and the pause toggle restarted it too. Refs make
+  // the whole chain stable per enabled/userId session.
   const privacyRef = useRef(privacy);
   privacyRef.current = privacy;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const onPositionRef = useRef(onPosition);
+  onPositionRef.current = onPosition;
+  // Consecutive watch-error counter — transient kinds (timeout/unavailable)
+  // must repeat before the chip shows, so a weak-signal error↔fix cycle
+  // doesn't flicker it (denied is definitive and shows immediately).
+  const watchErrorStreakRef = useRef(0);
 
   const hapticPulse = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -112,7 +143,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     const currentPrivacy = privacyRef.current;
     const points = batchQueueRef.current.splice(0, BATCH_MAX_SIZE);
     setQueuedPoints(batchQueueRef.current.length);
-    if (points.length === 0 || !sessionId || !userId || paused) return;
+    if (points.length === 0 || !sessionId || !userId || pausedRef.current) return;
 
     try {
       const headers = await getMapRidersWriteHeaders();
@@ -146,12 +177,20 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       setQueuedPoints(batchQueueRef.current.length);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, userId, crewSlug, paused]); // privacy removed; read from ref
+  }, [sessionId, userId, crewSlug]); // privacy/paused read from refs
 
   const acceptPointNow = useCallback(
     (point: GPSPoint, source: GpsSource) => {
-      if (paused) return;
-      if (privacy?.expiresAt && new Date(privacy.expiresAt).getTime() <= Date.now()) return;
+      // MR geo polish: a landed Telegram fix proves positioning works, so the
+      // soft error chip (timeout/unavailable) must not keep claiming the
+      // opposite — even when the point is throttled or the stream is paused.
+      // "denied" stays — it describes the browser permission, which is exactly
+      // why the manual one-shot is the only working source then.
+      if (source === "telegram") {
+        setGeoError((prev) => (prev === "denied" ? prev : null));
+      }
+      if (pausedRef.current) return;
+      if (privacyRef.current?.expiresAt && new Date(privacyRef.current.expiresAt).getTime() <= Date.now()) return;
       const now = Date.now();
       const sourceLock = sourceLockRef.current;
       if (sourceLock && sourceLock !== source && now - sourceLockAtRef.current < SOURCE_SWITCH_DEBOUNCE_MS) {
@@ -178,10 +217,12 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       broadcastPosition(point);
       batchQueueRef.current.push(point);
       setQueuedPoints(batchQueueRef.current.length);
-      onPosition?.(point);
+      onPositionRef.current?.(point);
       hapticPulse();
     },
-    [broadcastPosition, onPosition, hapticPulse, paused, privacy?.expiresAt],
+    // Refs above keep this STABLE across renders — any identity churn here
+    // restarts the GPS effect below (popup + chip reset). See refs comment.
+    [broadcastPosition, hapticPulse],
   );
 
   const acceptPoint = useCallback(
@@ -207,6 +248,11 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
 
   const handleGeolocationPosition = useCallback(
     (position: GeolocationPosition) => {
+      // A real fix invalidates any stale error chip (React bails out when the
+      // value is unchanged, so the success stream causes no extra renders)
+      // and resets the consecutive-error streak.
+      watchErrorStreakRef.current = 0;
+      setGeoError(null);
       const point: GPSPoint = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
@@ -297,12 +343,28 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   /**
    * Manual one-shot Telegram fix (cockpit «Обновить гео» button). The ONLY
    * sanctioned way to re-invoke `WebApp.requestLocation` after the initial
-   * popup — one deliberate tap, one popup, never automatic.
+   * popup — one deliberate tap, one popup, never automatic. Outside Telegram
+   * (plain browser) it falls back to a silent W3C one-shot — no-op buttons
+   * are worse than the right fix from the same tap.
    */
   const refreshTelegramFix = useCallback(() => {
     if (!enabled) return;
-    void requestTelegramLocation();
-  }, [enabled, requestTelegramLocation]);
+    void requestTelegramLocation().then((ok) => {
+      if (ok) return;
+      if (!navigator.geolocation) {
+        setGeoError("unavailable");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        handleGeolocationPosition,
+        // Deliberate tap → immediate feedback, no streak threshold: a silent
+        // WebView (the exact scenario this button exists for) must still say
+        // WHY nothing moved.
+        (error) => setGeoError(geoErrorKind(error)),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      );
+    });
+  }, [enabled, requestTelegramLocation, handleGeolocationPosition]);
 
   useEffect(() => {
     if (!enabled || !userId) {
@@ -330,6 +392,8 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     const start = async () => {
       browserFixSeenRef.current = false;
       setHasBrowserFix(false);
+      setGeoError(null);
+      watchErrorStreakRef.current = 0;
 
       // ONE-SHOT native Telegram popup for a fast first fix (and to trigger
       // Telegram's own location grant). Must never be polled — see MR geo-fix.
@@ -343,6 +407,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       // it is the only source anyway). If the WebView's geolocation is dead,
       // the rider gets the manual «Обновить гео» one-shot instead of popups.
       if (!navigator.geolocation) {
+        setGeoError("unavailable");
         return;
       }
 
@@ -350,6 +415,17 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         handleGeolocationPosition,
         (error) => {
+          // MR geo polish: surface the failure instead of a console-only warn.
+          // Transient kinds (timeout/unavailable) must repeat twice before the
+          // chip shows — a weak-signal error↔fix cycle would otherwise flicker
+          // it. "denied" is definitive (permission returns only via settings)
+          // and shows immediately. watchPosition re-reports the same error —
+          // the functional update keeps identical kinds from re-rendering.
+          const kind = geoErrorKind(error);
+          watchErrorStreakRef.current += 1;
+          if (kind === "denied" || watchErrorStreakRef.current >= 2) {
+            setGeoError((prev) => (prev === kind ? prev : kind));
+          }
           console.warn("[useLiveRiders] Geolocation error:", error.message);
         },
         {
@@ -374,6 +450,8 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         clearTimeout(acceptDebounceTimerRef.current);
         acceptDebounceTimerRef.current = null;
       }
+      watchErrorStreakRef.current = 0;
+      setGeoError(null);
       setIsActive(false);
     };
   }, [enabled, handleGeolocationPosition, requestTelegramLocation]);
@@ -408,5 +486,5 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [enabled, handleGeolocationPosition]);
 
-  return { isActive, isUsingTelegram, hasBrowserFix, refreshTelegramFix, lastBroadcastAt, queuedPoints };
+  return { isActive, isUsingTelegram, hasBrowserFix, geoError, refreshTelegramFix, lastBroadcastAt, queuedPoints };
 }
