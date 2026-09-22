@@ -20,6 +20,7 @@ Every `specs` JSONB object **MUST** include a `spec_labels` sub-object that maps
 | `bike_subtype` | Тип мотоцикла | identity | — | — |
 | `brand_type` | Тип бренда | identity | — | — |
 | `license_class` | Категория прав | identity | — | — |
+| `condition` | Состояние | identity | — | — |
 | `color` | Цвет | identity | — | — |
 
 ### 1.2 Power & Dynamics
@@ -551,12 +552,13 @@ rent_price_label, rent_weekday_hour, rent_weekend_hour
 6. Add `video_url` (string) if a promo video exists — SalePageClient shows it as autoplay hero video instead of first image
 6. If multiple colors with separate gallery sets → add `color_variants`
 7. Set `brand_type`: `official_reseller` | `official_website_data` | `dealer_data` | `community`
-8. Set `source` URL for traceability
-9. Set `type: "Electric"` (used by contract skill for ICE/electro detection)
-10. Run the INSERT SQL (or add to `seed-bikes-full.sql`)
-11. Verify in compare UI that all rows render correctly
-12. **Set operational keys (§1.13):** `last_known_odometer` (initial reading) — then re-run `node scripts/apply-salary-specs.mjs --apply` so `salary` tier is computed from the price; if the bike is a partner (subrent) unit, ask the crew owner to assign `subrenter_chat_id` via the admin panel
-13. Test contract generation with `make-rental-contract-skill.mjs`
+8. Set `condition`: `new` | `used` (Состояние — обязательно для sale-байков: CSV-выгрузка сплитит `vip-bike-sale-new.csv` / `vip-bike-sale-used.csv` по этому ключу; пусто/не задано → байк попадает в USED-файл. Сайт показывает «Новое»/«Б/у» в specs-строке карточки)
+9. Set `source` URL for traceability
+10. Set `type: "Electric"` (used by contract skill for ICE/electro detection)
+11. Run the INSERT SQL (or add to `seed-bikes-full.sql`)
+12. Verify in compare UI that all rows render correctly
+13. **Set operational keys (§1.13):** `last_known_odometer` (initial reading) — then re-run `node scripts/apply-salary-specs.mjs --apply` so `salary` tier is computed from the price; if the bike is a partner (subrent) unit, ask the crew owner to assign `subrenter_chat_id` via the admin panel
+14. Test contract generation with `make-rental-contract-skill.mjs`
 
 ## 6.1. Rental Contract ПЭП (Digital Signature) — Operator Notes 🆕
 

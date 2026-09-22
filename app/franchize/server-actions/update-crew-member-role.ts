@@ -4,6 +4,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
 import {
   ASSIGNABLE_ROLES,
   assignableRolesFor,
@@ -247,10 +249,21 @@ export async function promoteCrewMemberToOwnerAction(
     }
 
     // Best-effort Telegram heads-up for the new owner (never blocks).
+    // 2026-09-22: с inline-кнопкой на страницу экипажа (deep link через бота;
+    // резолвер с платформенным фолбэком — ссылка есть даже у dummy-экипажей).
     try {
-      await sendTelegramMessage(
+      const botUsername = await resolveCrewBotUsername(input.crewSlug);
+      const crewAppUrl = botUsername
+        ? `https://t.me/${botUsername}/app?startapp=crew_${input.crewSlug.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64)}`
+        : null;
+      const buttons: Array<{ text: string; url: string }>[] = crewAppUrl
+        ? [[{ text: "🏍 Открыть экипаж", url: crewAppUrl }]]
+        : [];
+      await sendComplexMessage(
         input.targetUserId,
         `👑 Ты назначен владельцем экипажа «${crewRow.name}». Добро пожаловать на капитанский мостик!`,
+        buttons,
+        buttons.length ? { keyboardType: "inline" } : undefined,
       );
     } catch (notifyError) {
       logger.warn("[promoteOwner] notification failed", notifyError);

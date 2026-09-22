@@ -50,6 +50,7 @@ import {
   botUsernameFromCrewMetadata,
   clearCrewBotCache,
   normalizeBotUsername,
+  PLATFORM_TELEGRAM_BOT_DEFAULT,
   resolveCrewBotUsername,
 } from "@/app/franchize/lib/crew-bot";
 import { notifyRideFinishedAndSuggestPost, summarizeRide } from "@/app/franchize/lib/ride-share-notify";
@@ -154,11 +155,23 @@ describe("resolveCrewBotUsername", () => {
     expect(await resolveCrewBotUsername("vip-bike")).toBe("envFallbackBot");
   });
 
-  it("never throws even when the DB layer explodes", async () => {
+  it("falls back to the PLATFORM bot when neither metadata nor env has one (invite fix 2026-09-22)", async () => {
+    // Mini App один на все экипажи → deep link существует даже для dummy-экипажей
+    // (nn-rolling-moto и т.п.) — резолвер больше НЕ возвращает null в норме.
+    delete (process.env as Record<string, string | undefined>).TELEGRAM_BOT_USERNAME;
+    delete (process.env as Record<string, string | undefined>).NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+    mockCrewMetadata(null);
+    expect(await resolveCrewBotUsername("nn-rolling-moto")).toBe(PLATFORM_TELEGRAM_BOT_DEFAULT);
+  });
+
+  it("never throws even when the DB layer explodes (env пуст → платформенный дефолт)", async () => {
+    delete (process.env as Record<string, string | undefined>).TELEGRAM_BOT_USERNAME;
+    delete (process.env as Record<string, string | undefined>).NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
     (supabaseAdmin.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error("db down");
     });
-    expect(await resolveCrewBotUsername("vip-bike")).toBeNull();
+    // 2026-09-22: раньше тут ждали null → web-фолбэк; теперь платформенный бот.
+    expect(await resolveCrewBotUsername("vip-bike")).toBe(PLATFORM_TELEGRAM_BOT_DEFAULT);
   });
 
   it("caches per slug (second call hits no extra queries)", async () => {
@@ -212,10 +225,12 @@ describe("ride-share-notify × crew bot metadata (boss bug fix)", () => {
     }
   });
 
-  it("renter bot-flow rental with NO bot anywhere: message still delivers, no web-link button", async () => {
+  it("renter bot-flow rental with NO crew bot: platform-bot fallback button (never web-link)", async () => {
     vi.mocked(telegramDeliver).mockClear();
-    // no env, no metadata, DB говорит «экипажа нет» → резолвер null → кнопки нет
-    // (никогда не отдаём арендатору web-фолбэк на compose-действие).
+    // 2026-09-22 (платформенный фолбэк): раньше «нет бота → нет кнопки»;
+    // теперь Mini App один на все экипажи → резолвер отдаёт ПЛАТФОРМЕННОГО
+    // бота, и арендатор получает валидную t.me-кнопку (веб-фолбэк по-прежнему
+    // запрещён). Композиция wallp_<rental>_<slug> работает в том же Mini App.
     mockCrewMetadata(null);
     const res = await notifyRideFinishedAndSuggestPost({
       rentalId: "0a1b2c3d-eeee-4fff-8123-456789abcdef",
@@ -226,9 +241,11 @@ describe("ride-share-notify × crew bot metadata (boss bug fix)", () => {
     });
     expect(res.renterSent).toBe(true);
     const payload = vi.mocked(telegramDeliver).mock.calls[0][2] as {
-      reply_markup?: { inline_keyboard?: unknown };
+      reply_markup?: { inline_keyboard?: { text: string; url: string }[][] };
     };
-    expect(payload.reply_markup).toBeUndefined();
+    const btn = payload.reply_markup?.inline_keyboard?.[0]?.[0];
+    expect(btn?.url).toContain("https://t.me/oneBikePlsBot/app?startapp=wallp_");
+    expect(btn?.url).not.toContain("v0-car-test.vercel.app");
   });
 });
 

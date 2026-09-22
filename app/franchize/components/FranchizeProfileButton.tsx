@@ -9,6 +9,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useTheme } from "next-themes";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
+import { platformBotUsername } from "@/app/franchize/lib/crew-bot";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -529,12 +530,14 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <button type="button" onClick={() => {
-                  // Зачистка хардкода 2026-09-22: без бота — web-фолбэк инвайта
-                  // (тот же контракт, что у getCrewInviteInfoAction.webFallbackUrl).
-                  const botName = (telegramBotUsername || "").trim().replace(/^@/, "");
-                  const url = botName
-                    ? `https://t.me/${botName}/app?startapp=crew_${effectiveSlug}_join_crew`
-                    : `${window.location.origin}/franchize/${effectiveSlug}?join_crew=true`;
+                  // Инвайт-линк 2026-09-22: грамматика join_<slug> (её понимает
+                  // startapp-роутер, включая статический fast path), бот — свой
+                  // у экипажа, иначе платформенный (Mini App один на все экипажи).
+                  // Старый код слал мёртвый формат crew_<slug>_join_crew, а без
+                  // бота — веб-ссылку v0-car-test.vercel.app/franchize/...
+                  const botName =
+                    (telegramBotUsername || "").trim().replace(/^@/, "") || platformBotUsername();
+                  const url = `https://t.me/${botName}/app?startapp=join_${encodeURIComponent(effectiveSlug)}`;
                   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("Присоединяйся к нашему экипажу в VibeRider!")}`;
                   if (isInTelegramContext && tg) tg.openLink(shareUrl);
                   else window.open(shareUrl, "_blank");

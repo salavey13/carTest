@@ -4,8 +4,10 @@
 > сообщения покупателей из Avito и прикладывает результат к webhook'у
 > `/api/webhooks/avito`. Скопируйте текст из блока ниже и передайте агенту.
 >
-> Обновлён: 2026-09-04 · Версия контракта: analysis/1
-> Сопряжённые файлы: `vip-bike-rent.csv`, `vip-bike-sale.csv`, `vip-bike-rentals.csv`
+> Обновлён: 2026-09-22 · Версия контракта: analysis/1
+> Сопряжённые файлы: `vip-bike-rent.csv`, `vip-bike-sale-new.csv`,
+> `vip-bike-sale-used.csv` (новая/б-у техника — сплит по `specs.condition`),
+> `vip-bike-rentals.csv`
 > (флот и прайс — агент может подтягивать их для фактов), UI-движок
 > `app/franchize/[slug]/leads/lib/lead-scripts.ts` (fallback-шаблоны).
 

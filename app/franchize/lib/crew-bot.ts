@@ -22,8 +22,14 @@
 //
 // Цепочка приоритетов (везде одинаковая):
 //   1. metadata экипажа (franchize.contacts → contacts top-level) — источник правды;
-//   2. process.env.TELEGRAM_BOT_USERNAME — глобальный дефолт;
-//   3. null → вызывающий код рендерит web-фолбэк (стена публичная).
+//   2. process.env.TELEGRAM_BOT_USERNAME — глобальный дефолт деплоя;
+//   3. платформенный бот (NEXT_PUBLIC_TELEGRAM_BOT_USERNAME →
+//      PLATFORM_TELEGRAM_BOT_DEFAULT) — Mini App один на все экипажи, так что
+//      deep link t.me/<бот>/app существует ДАЖЕ для экипажей без своего бота
+//      (баг №3, сообщён 2026-09-22: инвайт-ссылки dummy-экипажей типа
+//      nn-rolling-moto деградировали в локальный путь
+//      /franchize/<slug>?join_crew=true, потому что резолвер возвращал null).
+//      Web-фолбэк остаётся только как last-resort контракт вызывающего кода.
 //
 // Резолвер кэшируется на 5 минут (позитивно и негативно) — фанкоуты стены
 // вызывают его по несколько раз за_action, а crews — горячая таблица.
@@ -73,6 +79,25 @@ function envBotUsername(): string | null {
   return normalizeBotUsername(process.env.TELEGRAM_BOT_USERNAME);
 }
 
+/**
+ * Платформенный бот — финальный фолбэк цепочки. Mini App публикуется ОДНИМ
+ * ботом на все экипажи (startapp-роутер сам разрулит slug), поэтому ссылка
+ * t.me/<платформенный-бот>/app?startapp=… валидна для любого экипажа — в том
+ * числе для dummy-экипажей мототочек, у которых своего бота нет.
+ * Переопределяется env-ами (TELEGRAM_BOT_USERNAME / NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)
+ * без правки кода; константа — задокументированное значение по умолчанию.
+ */
+export const PLATFORM_TELEGRAM_BOT_DEFAULT = "oneBikePlsBot";
+
+/** Клиентски-безопасный резолв платформенного бота (для UI-фолбэков). */
+export function platformBotUsername(): string {
+  return (
+    normalizeBotUsername(process.env.TELEGRAM_BOT_USERNAME) ||
+    normalizeBotUsername(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME) ||
+    PLATFORM_TELEGRAM_BOT_DEFAULT
+  );
+}
+
 // ── TTL-cache: slug → username | null (null = «нет бота», тоже кэшируем) ─────
 
 interface CacheEntry {
@@ -94,7 +119,10 @@ function cachedLookup(slug: string): CacheEntry | null {
 }
 
 /**
- * Резолвить бота экипажа по slug: contacts.telegramBotUsername → env → null.
+ * Резолвить бота экипажа по slug: metadata → env → платформенный дефолт.
+ * С 2026-09-22 (инвайт-фикс) НЕ возвращает null в норме — Mini App открывается
+ * платформенным ботом даже для экипажей без собственного. null возможен только
+ * если платформенный дефолт переопределён мусором в env.
  * Никогда не бросает; 1 лёгкий select по индексированному slug (TTL-кэш 5 мин).
  */
 export async function resolveCrewBotUsername(slug: string | null | undefined): Promise<string | null> {
@@ -118,9 +146,9 @@ export async function resolveCrewBotUsername(slug: string | null | undefined): P
       .maybeSingle();
     value = botUsernameFromCrewMetadata((data as { metadata?: unknown } | null)?.metadata);
   } catch {
-    // metadata недоступна — падаем на env ниже
+    // metadata недоступна — падаем на env/платформенный фолбэк ниже
   }
-  value = value ?? envBotUsername();
+  value = value ?? envBotUsername() ?? platformBotUsername();
 
   // Негативный ответ кэшим короче (60 с): бот могли только что прописать.
   botCache.set(safeSlug, { value, expiresAt: Date.now() + (value ? CACHE_TTL_MS : 60_000) });

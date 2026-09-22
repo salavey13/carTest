@@ -1,8 +1,8 @@
 ---
 name: catalog-csv-exporter
 description: |
-  Export VIP Bike catalog from Supabase to clean compact CSV files (rent + sale).
-  Deterministic script — no AI needed. Generates 2 CSVs: vip-bike-rent.csv and vip-bike-sale.csv.
+  Export VIP Bike catalog from Supabase to clean compact CSV files (rent + sale split by condition).
+  Deterministic script — no AI needed. Generates 3 CSVs: vip-bike-rent.csv, vip-bike-sale-new.csv, vip-bike-sale-used.csv.
   Pushes updated CSVs to repo at docs/autoreply/. Designed for cron job regeneration.
   Trigger phrases (RU): "экспорт каталога csv", "обновить csv аренды", "обновить csv продажи",
   "регенерировать каталог", "csv байков", "выгрузить байки в csv".
@@ -17,9 +17,10 @@ Export VIP Bike catalog from Supabase `public.cars` to clean, compact CSV files 
 ## What it does
 
 1. Queries Supabase for all vip-bike crew bikes (`type=bike`, `crew_id` = vip-bike, `make != VipBike`)
-2. Splits into 2 CSVs based on `specs.rent` and `specs.sale` flags:
-   - `vip-bike-rent.csv` — bikes available for rent (21 bikes as of 2026-08-14)
-   - `vip-bike-sale.csv` — bikes available for sale (19 bikes)
+2. Splits into 3 CSVs based on `specs.rent` / `specs.sale` flags and `specs.condition`:
+   - `vip-bike-rent.csv` — bikes available for rent
+   - `vip-bike-sale-new.csv` — for sale AND `specs.condition = new`
+   - `vip-bike-sale-used.csv` — for sale AND condition used/empty (вторичка — дефолт)
 3. Normalizes all fields to prevent CSV corruption:
    - `features` → semicolon-separated string (not comma — avoids CSV separator conflicts)
    - `gallery` → pipe-separated URLs
@@ -42,9 +43,10 @@ Export VIP Bike catalog from Supabase `public.cars` to clean, compact CSV files 
 python3 /home/z/my-project/scripts/export_vip_bike_csv.py
 ```
 
-This generates 2 files in `/home/z/my-project/download/`:
-- `vip-bike-rent.csv` (21 rows, 46 columns)
-- `vip-bike-sale.csv` (19 rows, 42 columns)
+This generates 3 files in `/home/z/my-project/download/`:
+- `vip-bike-rent.csv`
+- `vip-bike-sale-new.csv` (for sale, condition = new)
+- `vip-bike-sale-used.csv` (for sale, condition used or not set)
 
 ### Step 2: Push CSVs to repo
 
@@ -58,17 +60,18 @@ Or manually push via the standard push_file pattern (see push script).
 
 ### Step 3: Verify
 
-- Check that both CSVs appear at:
+- Check that all CSVs appear at:
   - `https://github.com/salavey13/carTest/blob/main/docs/autoreply/vip-bike-rent.csv`
-  - `https://github.com/salavey13/carTest/blob/main/docs/autoreply/vip-bike-sale.csv`
+  - `https://github.com/salavey13/carTest/blob/main/docs/autoreply/vip-bike-sale-new.csv`
+  - `https://github.com/salavey13/carTest/blob/main/docs/autoreply/vip-bike-sale-used.csv`
 - Download and open in a spreadsheet to verify no corruption (no 1-letter-per-line, no `[object Object]`)
 
 ## CSV schema
 
-### vip-bike-rent.csv columns (47)
+### vip-bike-rent.csv columns
 
 ```
-id, make, model, bike_subtype, type, year, license_class, description,
+id, make, model, bike_subtype, type, year, condition, license_class, description,
 daily_price, price_per_hour, price_per_3h, price_per_6h, price_per_12h,
 rent_weekday, rent_weekend, rent_2_4d, rent_5_10d, rent_11_30d, deposit_rub,
 image_url, gallery, features,
@@ -79,14 +82,15 @@ engine_cc, fuel_type, fuel_capacity_l, transmission, cooling,
 rent_link, webapp_link, vk_url
 ```
 
+- `condition`: `new` | `used` (from `specs.condition`; empty = not set)
 - `webapp_link`: direct Telegram WebApp link to rent this bike
   (`https://t.me/oneBikePlsBot/app?startapp=rent_{bike_id}`)
 - `vk_url`: VK Market product URL (from `specs.vk_url` — empty if not set yet)
 
-### vip-bike-sale.csv columns (43)
+### vip-bike-sale-new.csv / vip-bike-sale-used.csv columns (identical schema)
 
 ```
-id, make, model, bike_subtype, type, year, license_class, description,
+id, make, model, bike_subtype, type, year, condition, license_class, description,
 sale_price, original_price_rub, discount_percent, sold_count, recommend_percent, rating,
 image_url, gallery, features,
 power_kw, motor_peak_kw, power_hp, torque_nm, top_speed_kmh,
@@ -96,6 +100,9 @@ engine_cc, fuel_type, fuel_capacity_l, transmission, cooling,
 buy_colors_json, buy_options_json, rent_link, webapp_link, vk_url
 ```
 
+- Разница только в содержимом: NEW-файл = `specs.condition = new`,
+  USED-файл = used/пусто (дефолт вторички; пустые перечисляются в WARNING при экспорте)
+- `condition`: `new` | `used` (from `specs.condition`)
 - `webapp_link`: direct Telegram WebApp link to buy this bike
   (`https://t.me/oneBikePlsBot/app?startapp=buy_{bike_id}`)
 - `vk_url`: VK Market product URL (from `specs.vk_url` — empty if not set yet)
@@ -153,6 +160,6 @@ To regenerate CSVs nightly:
 
 - Script: `/home/z/my-project/scripts/export_vip_bike_csv.py`
 - Push script: `/home/z/my-project/scripts/push_catalog_csvs.py`
-- Output (local): `/home/z/my-project/download/vip-bike-rent.csv`, `vip-bike-sale.csv`
-- Output (repo): `docs/autoreply/vip-bike-rent.csv`, `docs/autoreply/vip-bike-sale.csv`
+- Output (local): `/home/z/my-project/download/vip-bike-rent.csv`, `vip-bike-sale-new.csv`, `vip-bike-sale-used.csv`
+- Output (repo): `docs/autoreply/vip-bike-rent.csv`, `docs/autoreply/vip-bike-sale-new.csv`, `docs/autoreply/vip-bike-sale-used.csv`
 - Supabase gold-standard schemas: `docs/gold-standard-ice-bike-spec-schema.md`, `docs/gold-standard-electro-bike-spec-schema.md`

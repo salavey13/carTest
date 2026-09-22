@@ -54,3 +54,4 @@ upload/DEAL_*.csv
 
 # critic loop throwaway harness + evidence
 .critic/
+__pycache__/

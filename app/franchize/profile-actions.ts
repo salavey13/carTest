@@ -391,6 +391,41 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
+  // 2026-09-22: crew-join gamification — обе стороны приглашения получают
+  // бейджи (joiner — за вступление, owner — за рост экипажа). Грантит
+  // crew-join-achievements.ts из autoJoinCrew; пороги рекрутера считаются по
+  // факту COUNT crew_members (не по counters). Категория growth — вербовка.
+  const crewJoinAchievements: FranchizeAchievementDefinition[] = [
+    {
+      id: "crew_first_join",
+      title: "Командный дух 🤝",
+      description: "Вступил в экипаж по приглашению. Теперь у тебя есть своя команда.",
+      category: "growth",
+      triggerSources: ["crew:auto_join"],
+    },
+    {
+      id: "crew_recruiter_first",
+      title: "Первый рекрут 🎖️",
+      description: "В твой экипаж вступил первый участник по приглашению.",
+      category: "growth",
+      triggerSources: ["crew:auto_join"],
+    },
+    {
+      id: "crew_recruiter_5",
+      title: "Вербовщик 📣",
+      description: "Пять райдеров присоединились к экипажу по приглашениям. Команда растёт!",
+      category: "growth",
+      triggerSources: ["crew:auto_join"],
+    },
+    {
+      id: "crew_recruiter_15",
+      title: "Кадровый магнат 👑",
+      description: "Пятнадцать участников в экипаже — это уже не бригада, а движение.",
+      category: "growth",
+      triggerSources: ["crew:auto_join"],
+    },
+  ];
+
   const vipBikeOnly: FranchizeAchievementDefinition[] = [
     {
       id: "vipbike_map_riders_ready",
@@ -401,8 +436,8 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
-  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...superlistAchievements, ...explorationAchievements, ...vipBikeOnly];
-  return [...shared, ...workAchievements, ...rentalAchievements, ...superlistAchievements, ...explorationAchievements];
+  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements, ...vipBikeOnly];
+  return [...shared, ...workAchievements, ...rentalAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements];
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {

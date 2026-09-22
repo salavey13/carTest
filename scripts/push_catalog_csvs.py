@@ -2,8 +2,11 @@
 """Push updated catalog CSVs to GitHub repo at public/docs/autoreply/.
 
 Pushes:
-  - vip-bike-rent.csv → public/docs/autoreply/vip-bike-rent.csv
-  - vip-bike-sale.csv → public/docs/autoreply/vip-bike-sale.csv
+  - vip-bike-rent.csv      → public/docs/autoreply/vip-bike-rent.csv
+  - vip-bike-sale-new.csv  → public/docs/autoreply/vip-bike-sale-new.csv
+  - vip-bike-sale-used.csv → public/docs/autoreply/vip-bike-sale-used.csv
+  (2026-09-22: единый vip-bike-sale.csv заменён парой new/used по
+   specs.condition — см. scripts/export_vip_bike_csv.py)
 
 Uses the repository's own git remote (credential.helper store) instead of
 hardcoded tokens or machine-specific paths — run from the repo checkout.
@@ -14,7 +17,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FILES = [
     ("public/docs/autoreply/vip-bike-rent.csv", "chore(catalog): regenerate rent CSV from Supabase"),
-    ("public/docs/autoreply/vip-bike-sale.csv", "chore(catalog): regenerate sale CSV from Supabase"),
+    ("public/docs/autoreply/vip-bike-sale-new.csv", "chore(catalog): regenerate sale NEW CSV from Supabase"),
+    ("public/docs/autoreply/vip-bike-sale-used.csv", "chore(catalog): regenerate sale USED CSV from Supabase"),
 ]
 BRANCH = "main"
 

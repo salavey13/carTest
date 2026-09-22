@@ -234,38 +234,39 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                 )}
 
                 {/* Platform admin: owner-onboarding card (dummy crews → real
-                    owners). The invitee auto-joins as MEMBER; promotion to
-                    owner lives on the members page (promote action). */}
+                    owners). 2026-09-22: трёхстрочная инструкция выпилена —
+                    кнопку «Пригласить» и так видно в шапке, ссылка теперь
+                    ВСЕГДА t.me/<бот>/app?startapp=join_<slug> (платформенный
+                    фолбэк в резолвере), «веб-ссылка» больше не существует. */}
                 {isPlatformAdmin && inviteInfo?.success && (
                     <Card className="md:col-span-2 border-amber-500/40">
                         <CardContent className="p-6">
-                            <div className="flex items-center gap-3 mb-3">
-                                <Crown className="h-6 w-6 text-amber-500" />
-                                <h2 className="text-lg font-semibold">Пригласить владельца экипажа</h2>
-                            </div>
-                            <p className="text-muted-foreground text-sm mb-4">
-                                Отправь ссылку будущему владельцу (напр. партнёру мототочки): он вступит
-                                как участник, а затем на странице «Участники» его можно назначить
-                                владельцем. Бот экипажа: {inviteInfo.botUsername ? `@${inviteInfo.botUsername}` : "не задан — веб-ссылка"}.
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <code className="max-w-full truncate rounded-lg border bg-muted px-3 py-2 text-xs" title={buildInviteUrl(inviteInfo)}>
-                                    {buildInviteUrl(inviteInfo)}
-                                </code>
-                                <button
-                                    type="button"
-                                    onClick={() => handleCopyInvite(inviteInfo)}
-                                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition hover:border-primary"
-                                >
-                                    <Copy className="h-4 w-4" /> Копировать
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleInviteClick}
-                                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition hover:border-primary"
-                                >
-                                    <Send className="h-4 w-4" /> Поделиться в TG
-                                </button>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <Crown className="h-6 w-6 shrink-0 text-amber-500" />
+                                    <code
+                                        className="min-w-0 flex-1 truncate rounded-lg border bg-muted px-3 py-2 text-xs"
+                                        title={buildInviteUrl(inviteInfo)}
+                                    >
+                                        {buildInviteUrl(inviteInfo)}
+                                    </code>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopyInvite(inviteInfo)}
+                                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition hover:border-primary"
+                                    >
+                                        <Copy className="h-4 w-4" /> Копировать
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleInviteClick}
+                                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition hover:border-primary"
+                                    >
+                                        <Send className="h-4 w-4" /> Поделиться в TG
+                                    </button>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

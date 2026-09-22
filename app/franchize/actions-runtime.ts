@@ -1133,6 +1133,11 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             "bike_engine_spec_line_3",
           ]);
           const priorityKeys = ["power", "top_speed", "engine", "range", "acceleration", "torque", "weight", "capacity"];
+          // condition spec (новое/б-у) — сырые значения из JSONB → RU-лейблы.
+          const CONDITION_VALUE_LABELS: Record<string, string> = {
+            new: "Новое",
+            used: "Б/у",
+          };
 
           return Object.entries(specs)
             .filter(([, value]) => typeof value === "string" || typeof value === "number")
@@ -1150,7 +1155,12 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
               label: typeof labels[key] === "string" && String(labels[key]).trim().length > 0
                 ? String(labels[key]).trim()
                 : key.replace(/_/g, " "),
-              value: String(value),
+              // condition (новое/б-у, 2026-09-22): человекочитаемые значения
+              // вместо сырых "new"/"used" — specs-строка карточки и модалки.
+              value:
+                key === "condition"
+                  ? CONDITION_VALUE_LABELS[String(value).trim().toLowerCase()] ?? String(value)
+                  : String(value),
             }));
         })(),
       };

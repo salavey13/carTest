@@ -5,6 +5,8 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import { sendComplexMessage } from "../webhook-handlers/actions/sendComplexMessage";
 import { getBaseUrl } from "@/lib/utils";
+import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import { grantCrewJoinAchievements } from "@/app/franchize/server-actions/crew-join-achievements";
 import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { sendTelegramInvoice } from "@/app/actions";
@@ -495,6 +497,12 @@ export async function getCrewForInvite(slug: string) {
 /**
  * Auto-join crew by invite link — adds user directly as active member.
  * No pending state, no owner confirmation. Used by ?join_crew=true flow.
+ *
+ * 2026-09-22 (notifications & achievements): владелец получает сообщение с
+ * inline-кнопкой на страницу экипажа (deep link через бота — резолвер с
+ * платформенным фолбэком, так что ссылка есть всегда), новичок — welcome-
+ * сообщение с той же кнопкой, и обе стороны получают достижения
+ * (crew_first_join / crew_recruiter_*, см. crew-join-achievements.ts).
  */
 export async function autoJoinCrew(userId: string, username: string, crewId: string, crewSlug: string) {
     noStore();
@@ -532,15 +540,52 @@ export async function autoJoinCrew(userId: string, username: string, crewId: str
         );
         if (error) throw error;
 
-        // Notify owner (informational only, no action needed)
         const { data: crew } = await supabaseAdmin.from('crews').select('owner_id, name').eq('id', crewId).single();
+        const crewName = crew?.name || crewSlug;
+        const safeCrewSlug = String(crewSlug || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
+        // Deep link на страницу экипажа: резолвер с платформенным фолбэком
+        // возвращает бота даже для dummy-экипажей → null только при мусорном env.
+        const botUsername = await resolveCrewBotUsername(safeCrewSlug);
+        const crewAppUrl = botUsername && safeCrewSlug
+            ? `https://t.me/${botUsername}/app?startapp=crew_${safeCrewSlug}`
+            : null;
+        const openCrewButton: Array<{ text: string; url: string }>[] = crewAppUrl
+            ? [[{ text: "🏍 Открыть экипаж", url: crewAppUrl }]]
+            : [];
+
+        // Notify owner (informational only, no action needed) — с кнопкой в экипаж
         if (crew?.owner_id) {
             try {
-                await sendComplexMessage(crew.owner_id, `👤 @${username || 'rider'} присоединился к вашему экипажу *'${crew.name}'* по приглашению.`);
+                await sendComplexMessage(
+                    crew.owner_id,
+                    `👤 @${username || 'rider'} присоединился к вашему экипажу *'${crewName}'* по приглашению.`,
+                    openCrewButton,
+                    openCrewButton.length ? { keyboardType: "inline" } : undefined,
+                );
             } catch (notifyErr) {
                 logger.warn('[autoJoinCrew] Failed to notify owner (non-critical):', notifyErr);
             }
         }
+
+        // Welcome новичку (новое): короткое приветствие + кнопка обратно в экипаж.
+        try {
+            await sendComplexMessage(
+                userId,
+                `🎉 Ты в экипаже *'${crewName}'*! Открывай страницу экипажа — смена, стена и карта уже доступны.`,
+                openCrewButton,
+                openCrewButton.length ? { keyboardType: "inline" } : undefined,
+            );
+        } catch (notifyErr) {
+            logger.warn('[autoJoinCrew] Failed to welcome the joiner (non-critical):', notifyErr);
+        }
+
+        // Достижения обеим сторонам (идемпотентно, best-effort, никогда не бросает).
+        await grantCrewJoinAchievements({
+            crewId,
+            crewSlug: safeCrewSlug,
+            joinerId: userId,
+            ownerId: crew?.owner_id ?? null,
+        });
 
         return { success: true, alreadyMember: false };
     } catch (e) {

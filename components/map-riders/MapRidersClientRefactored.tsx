@@ -35,6 +35,8 @@ import {
   type WallGeoPinView,
 } from "@/app/franchize/lib/community-wall";
 import { motoSpotKindLabel, MOTO_SPOT_KINDS, motoSpotKindIcon, NN_MOTO_SPOTS, type MotoSpot, type MotoSpotKind } from "@/lib/map-riders-spots";
+import { catalogGpsFromSpecs } from "@/lib/catalog-gps";
+import type { CatalogItemVM } from "@/app/franchize/actions";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
@@ -154,6 +156,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   const [endedRideSessionId, setEndedRideSessionId] = useState<string | null>(null);
   // Round-2 enhance: per-kind фильтр мототочек (легенда-чипы на карте).
   const [spotKindFilter, setSpotKindFilter] = useState<MotoSpotKind | "all">("all");
+  // Слой техники каталога (specs с GPS-координатами) — тумблер в легенде.
+  const [showCatalogItems, setShowCatalogItems] = useState(true);
   // ── Wall × map: геотег-пины постов + flyTo-фокус ──
   const [geoPins, setGeoPins] = useState<WallGeoPinView[]>([]);
   const [wallFocusPoint, setWallFocusPoint] = useState<{ lat: number; lng: number; key: number } | null>(null);
@@ -533,6 +537,52 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     [geoPins, wallPinColor, openWallPostFromMap, crew.theme.isAuto, crew.theme.palette.bgBase],
   );
 
+  // ── Каталог × карта: техника с GPS-координатами в specs ────────────────────
+  // «show catalog items on map in case it has gps coordinates in specs»:
+  // item.rawSpecs парсится толерантно (gps: "lat, lon" / объект / lat+lon),
+  // попап ведёт в каталог экипажа. preferCanvas → цвет конкретным hex'ом.
+  const catalogItemPinColor = crew.theme.isAuto ? "#38bdf8" : crew.theme.palette.accentMain;
+
+  const itemPoints = useMemo(() => {
+    const list = (items ?? []) as CatalogItemVM[];
+    return list.flatMap((item) => {
+      const coords = catalogGpsFromSpecs(item.rawSpecs);
+      if (!coords) return [];
+      return [{
+        id: `catitem-${item.id}`,
+        name: item.title,
+        type: "point" as const,
+        icon: "::FaMotorcycle::",
+        color: catalogItemPinColor,
+        coords: [coords] as [number, number][],
+        markerClassName: SPOT_POPUP_CLASSNAME,
+        popup: (
+          <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
+            {item.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- catalog image URL, same as the site renders
+              <img src={item.imageUrl} alt="" className="h-24 w-full rounded-lg object-cover" />
+            ) : null}
+            <div className="text-sm font-semibold" style={{ color: catalogItemPinColor }}>
+              {item.title}
+            </div>
+            {item.subtitle ? <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">{item.subtitle}</div> : null}
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-semibold">{item.rentPriceLabel}</span>
+              <span className="text-[var(--mr-muted)]">{item.availabilityLabel}</span>
+            </div>
+            <Link
+              href={`/franchize/${crewSlug}`}
+              className="block rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+              style={{ backgroundColor: catalogItemPinColor, color: crew.theme.isAuto ? "#030712" : crew.theme.palette.bgBase }}
+            >
+              Смотреть в каталоге
+            </Link>
+          </div>
+        ),
+      }];
+    });
+  }, [items, catalogItemPinColor, crewSlug, crew.theme.isAuto, crew.theme.palette.bgBase]);
+
   const mapPoints = useMemo(() => {
     // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
     // re-run or the DB POI is missing. Uses HOME_BASE constant (single source of truth).
@@ -600,8 +650,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
 
     // DEFAULT_ROUTES are always present (scenic routes around HQ) — they're filtered
     // out of staticMapPoints above to avoid duplication if the migration also seeded them.
-    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints];
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints]);
+    return [hqPoint, ...DEFAULT_ROUTES, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -869,6 +919,28 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
               </div>
             )}
           </div>
+
+          {/* Слой техники каталога: компактный тумблер под легендой. Виден
+              только когда в specs экипажа есть GPS-координаты — иначе лишний
+              чип на карте ничего не значил бы. */}
+          {itemPoints.length > 0 && (
+            <div className="pointer-events-auto mt-2 inline-flex max-w-full items-center rounded-2xl border border-[var(--mr-border)] bg-[var(--mr-card)]/80 shadow-2xl shadow-black/30 backdrop-blur-md">
+              <button
+                type="button"
+                onClick={() => setShowCatalogItems((cur) => !cur)}
+                aria-pressed={showCatalogItems}
+                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-[var(--mr-text)]"
+              >
+                <VibeContentRenderer content="::FaMotorcycle::" className="inline-block align-[-2px]" />
+                Техника {itemPoints.length}
+                <span
+                  aria-hidden
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: showCatalogItems ? catalogItemPinColor : "var(--mr-border)" }}
+                />
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
