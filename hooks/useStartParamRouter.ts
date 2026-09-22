@@ -28,7 +28,10 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   streamer: "/streamer",
   demo: "/about_en",
   wb: "/wblanding",
-  wb_dashboard: "/wblanding",
+  // ⚠️ wb_dashboard is intentionally NOT here: it must NOT enter the static
+  // fast path. The gated branch below upgrades it to /wb/<crewSlug> when the
+  // viewer's crew (userCrewInfo) is known — a static map entry would lock it
+  // to /wblanding for everyone (caught in the 41-b code review).
   "audit-tool": "/wblanding",
   // Route create_crew deep link directly to the inline "Создать экипаж" tab
   // on /franchize/create. That tab calls createCrew() and then transitions

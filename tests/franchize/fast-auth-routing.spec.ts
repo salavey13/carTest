@@ -52,6 +52,16 @@ describe("startapp router: STATIC fast path", () => {
   it("keeps the gated page-map fallback (defence in depth)", () => {
     expect(src).toContain("START_PARAM_PAGE_MAP[paramToProcess]");
   });
+
+  it("does NOT claim wb_dashboard on the static fast path (needs userCrewInfo)", () => {
+    // wb_dashboard routes crew users to /wb/<crewSlug> via the GATED branch
+    // (the viewer's crew is only known after auth). A START_PARAM_PAGE_MAP
+    // entry would let computeStaticFastTarget lock it to /wblanding for
+    // everyone — regression caught in the 41-b code review (bot /howto sends
+    // ?startapp=wb_dashboard).
+    expect(src).not.toContain('wb_dashboard: "/wblanding"');
+    expect(src).toContain('paramToProcess === "wb_dashboard"');
+  });
 });
 
 describe("auth in one roundtrip", () => {
