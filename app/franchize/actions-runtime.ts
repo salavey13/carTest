@@ -1132,8 +1132,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             "bike_engine_spec_line_2",
             "bike_engine_spec_line_3",
           ]);
-          const priorityKeys = ["power", "top_speed", "engine", "range", "acceleration", "torque", "weight", "capacity"];
+          const priorityKeys = ["power", "top_speed", "engine", "range", "acceleration", "torque", "weight", "capacity", "condition"];
           // condition spec (новое/б-у) — сырые значения из JSONB → RU-лейблы.
+          // (в priorityKeys — чтобы «Состояние» гарантированно попадало в топ-4
+          // specs-строки карточки, как обещает gold-standard schema §6 п.8)
           const CONDITION_VALUE_LABELS: Record<string, string> = {
             new: "Новое",
             used: "Б/у",

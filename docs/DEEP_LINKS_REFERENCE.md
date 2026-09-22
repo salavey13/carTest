@@ -82,7 +82,8 @@
 | startapp | Куда ведёт |
 |---|---|
 | `crew_{slug}` | `/franchize/{slug}` — страница экипажа |
-| `crew_{slug}_join_crew` | `/franchize/{slug}?join_crew=true` |
+| `join_{slug}` | `/franchize/{slug}?join_crew=true` — инвайт в экипаж (FAST path; канонический формат 2026-09-22, строит `crewJoinStartParam`; бот — экипажа или платформенный) |
+| `crew_{slug}_join_crew` (legacy) | `/franchize/{slug}?join_crew=true` — старый формат, роутер всё ещё понимает; в новых ссылках не использовать |
 | `create_crew` | `/franchize/create#create-crew-form` (скролл к форме создания) |
 | `mapriders_{slug}` / `mapriders-{slug}` | `/franchize/{slug}/map-riders` — карта райдеров |
 

@@ -2,14 +2,22 @@
 """
 Export VIP Bike catalog to clean, compact CSV files for agent use.
 
-Generates 2 CSV files:
-  - /home/z/my-project/download/vip-bike-rent.csv  (bikes with specs.rent = truthy)
-  - /home/z/my-project/download/vip-bike-sale.csv  (bikes with specs.sale = truthy)
+Generates 3 CSV files (2026-09-22: sale split by specs.condition — new/used):
+  - <repo>/public/docs/autoreply/vip-bike-rent.csv       (bikes with specs.rent = truthy)
+  - <repo>/public/docs/autoreply/vip-bike-sale-new.csv   (specs.sale truthy AND condition = new)
+  - <repo>/public/docs/autoreply/vip-bike-sale-used.csv  (specs.sale truthy AND condition != new)
+
+New/used spec: specs.condition ∈ {"new", "used"} (см.
+docs/gold-standard-electro-bike-spec-schema.md, раздел identity). Техника без
+condition в sale-выгрузке попадает в USED-файл (вторичка — дефолт) и
+перечисляется в WARNING.
 
 Source: Supabase public.cars table
   - type = 'bike'
   - crew_id = vip-bike crew (2d5fde70-1dd3-4f0d-8d72-66ccf6908746)
   - make != 'VipBike' (exclude internal placeholder bikes)
+  - specs.hidden truthy → excluded (same semantics as the site's server-side
+    filter in app/franchize/actions-runtime.ts)
 
 This script is DETERMINISTIC — no AI, no intelligence. Just selective extraction.
 Designed to be run by cron job or skill. Output is compact and clean:
@@ -18,6 +26,7 @@ Designed to be run by cron job or skill. Output is compact and clean:
   - gallery joined with | (pipe)
   - Nested objects (buy_colors, buy_options, spec_labels) serialized as clean JSON
   - All fields properly CSV-quoted
+  - Image URLs swapped to public mirror (rental.vip-bike.ru/supabase-mirror/carpix/)
 
 Usage:
   python3 export_vip_bike_csv.py
@@ -27,14 +36,33 @@ Output files are also pushed to repo at docs/autoreply/ by the companion skill.
 import json, csv, os, sys, urllib.request, datetime
 from pathlib import Path
 
+# Fix Unicode encoding on Windows
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 # ════════════════════════════════════════════════════════════
 # CONFIG
 # ════════════════════════════════════════════════════════════
 SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co"
-SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+
+# Service key: prefer env, fall back to the repo's .env.local (never hardcode).
+def _load_service_key() -> str:
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if key:
+        return key
+    env_local = Path(__file__).resolve().parent.parent / ".env.local"
+    if env_local.exists():
+        for line in env_local.read_text().splitlines():
+            if line.startswith("SUPABASE_SERVICE_ROLE_KEY="):
+                return line.split("=", 1)[1].strip()
+    raise SystemExit("SUPABASE_SERVICE_ROLE_KEY not found (set env or .env.local)")
+
+SERVICE_KEY = _load_service_key()
 VIP_BIKE_CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
 
-OUTPUT_DIR = Path(os.environ.get("CSV_DIR", "/opt/claudeclaw/vip-bike/data/catalog-csv"))
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "public" / "docs" / "autoreply"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ════════════════════════════════════════════════════════════
@@ -73,10 +101,29 @@ def normalize_gallery(gallery):
     if not gallery:
         return ""
     if isinstance(gallery, list):
-        return "|".join(g for g in gallery if g)
+        # Swap URLs in each gallery item
+        swapped = [swap_supabase_url(g) for g in gallery if g]
+        return "|".join(swapped)
     if isinstance(gallery, str):
-        return gallery
+        # Swap URLs in string (pipe-separated)
+        return "|".join(swap_supabase_url(g) for g in gallery.split("|") if g)
     return ""
+
+
+def swap_supabase_url(url):
+    """
+    Swap Supabase storage URL to public mirror URL.
+    From: https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/...
+    To:   https://rental.vip-bike.ru/supabase-mirror/carpix/...
+    """
+    if not url or not isinstance(url, str):
+        return url
+    # Match the exact Supabase storage prefix
+    old_prefix = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/"
+    new_prefix = "https://rental.vip-bike.ru/supabase-mirror/carpix/"
+    if url.startswith(old_prefix):
+        return url.replace(old_prefix, new_prefix, 1)
+    return url
 
 
 def serialize_nested(obj):
@@ -113,6 +160,32 @@ def get_spec(specs, key, default=""):
     if not specs or not isinstance(specs, dict):
         return default
     return specs.get(key, default)
+
+
+def is_hidden(specs):
+    """
+    Mirror the site's server-side hidden filter (app/franchize/actions-runtime.ts):
+    specs.hidden is truthy when it is True, 1, or string "1"/"true" (any case).
+    Hidden items stay in the DB but must NOT leak into public CSVs.
+    """
+    hidden = get_spec(specs, "hidden", False)
+    return hidden is True or hidden == 1 or str(hidden).lower() in ("1", "true")
+
+
+def normalize_condition(value):
+    """
+    Normalize specs.condition to a canonical lowercase token: "new" | "used".
+    Терпит RU-варианты ("новое"/"новый"/"б\\/у"/"бу"/"б-у") и регистр — спеки
+    пишутся руками. Пусто/нечитаемо → "" (caller решает бакет, дефолт used).
+    """
+    s = str(value or "").strip().lower()
+    if not s:
+        return ""
+    if s in ("new", "новое", "новый", "нова"):
+        return "new"
+    if s in ("used", "бу", "б/у", "б\\/у", "б-у", "с пробегом", "не новое"):
+        return "used"
+    return s
 
 
 # ════════════════════════════════════════════════════════════
@@ -154,6 +227,7 @@ RENT_CSV_COLUMNS = [
     "bike_subtype",
     "type",              # ICE or Electric
     "year",
+    "condition",         # new | used (specs.condition; empty = not set)
     "license_class",
     "description",
     "daily_price",
@@ -205,6 +279,7 @@ SALE_CSV_COLUMNS = [
     "bike_subtype",
     "type",
     "year",
+    "condition",         # new | used (specs.condition; empty = not set → used bucket)
     "license_class",
     "description",
     "sale_price",
@@ -255,6 +330,7 @@ def build_rent_row(bike):
         "bike_subtype": get_spec(specs, "bike_subtype"),
         "type": get_spec(specs, "type"),
         "year": get_spec(specs, "year"),
+        "condition": normalize_condition(get_spec(specs, "condition")),
         "license_class": get_spec(specs, "license_class"),
         "description": bike.get("description", ""),
         "daily_price": safe_str(bike.get("daily_price", 0)),
@@ -268,7 +344,7 @@ def build_rent_row(bike):
         "rent_5_10d": safe_str(get_spec(specs, "rent_5_10d")),
         "rent_11_30d": safe_str(get_spec(specs, "rent_11_30d")),
         "deposit_rub": safe_str(get_spec(specs, "deposit_rub")),
-        "image_url": bike.get("image_url", ""),
+        "image_url": swap_supabase_url(bike.get("image_url", "")),
         "gallery": normalize_gallery(get_spec(specs, "gallery")),
         "features": normalize_features(get_spec(specs, "features")),
         "power_kw": safe_str(get_spec(specs, "power_kw")),
@@ -310,6 +386,7 @@ def build_sale_row(bike):
         "bike_subtype": get_spec(specs, "bike_subtype"),
         "type": get_spec(specs, "type"),
         "year": get_spec(specs, "year"),
+        "condition": normalize_condition(get_spec(specs, "condition")),
         "license_class": get_spec(specs, "license_class"),
         "description": bike.get("description", ""),
         "sale_price": safe_str(get_spec(specs, "sale_price")),
@@ -318,7 +395,7 @@ def build_sale_row(bike):
         "sold_count": safe_str(get_spec(specs, "sold_count")),
         "recommend_percent": safe_str(get_spec(specs, "recommend_percent")),
         "rating": safe_str(get_spec(specs, "rating")),
-        "image_url": bike.get("image_url", ""),
+        "image_url": swap_supabase_url(bike.get("image_url", "")),
         "gallery": normalize_gallery(get_spec(specs, "gallery")),
         "features": normalize_features(get_spec(specs, "features")),
         "power_kw": safe_str(get_spec(specs, "power_kw")),
@@ -370,11 +447,40 @@ def main():
     # Fetch
     bikes = fetch_bikes()
 
-    # Split into rent / sale
-    rent_bikes = [b for b in bikes if is_truthy(b.get("specs", {}).get("rent"))]
-    sale_bikes = [b for b in bikes if is_truthy(b.get("specs", {}).get("sale"))]
+    # Drop hidden bikes first (specs.hidden — same semantics as the site filter)
+    hidden_bikes = [b for b in bikes if is_hidden(b.get("specs", {}))]
+    visible_bikes = [b for b in bikes if not is_hidden(b.get("specs", {}))]
+    if hidden_bikes:
+        print(f"\nHidden filter: excluded {len(hidden_bikes)} bike(s):")
+        for b in hidden_bikes:
+            print(f"   - {b.get('make', '')} {b.get('model', '')} ({b.get('id', '')})")
 
-    print(f"\nSplit: {len(rent_bikes)} rent, {len(sale_bikes)} sale, {len(bikes)} total")
+    # Split into rent / sale (sale — ещё и по состоянию: new | used)
+    rent_bikes = [b for b in visible_bikes if is_truthy(b.get("specs", {}).get("rent"))]
+    sale_bikes = [b for b in visible_bikes if is_truthy(b.get("specs", {}).get("sale"))]
+
+    # condition split: "new" → отдельный файл; всё остальное (used/пусто/мусор)
+    # → used-файл. Пустые и нераспознанные — в WARNING (вручную выставить spec).
+    sale_new_bikes = []
+    sale_used_bikes = []
+    sale_no_condition = []
+    for b in sale_bikes:
+        cond = normalize_condition(get_spec(b.get("specs", {}), "condition"))
+        if cond == "new":
+            sale_new_bikes.append(b)
+        elif cond == "used":
+            sale_used_bikes.append(b)
+        else:
+            sale_used_bikes.append(b)
+            sale_no_condition.append(b)
+
+    print(f"\nSplit: {len(rent_bikes)} rent, {len(sale_bikes)} sale "
+          f"({len(sale_new_bikes)} new / {len(sale_used_bikes)} used incl. {len(sale_no_condition)} without condition), "
+          f"{len(bikes)} total")
+    if sale_no_condition:
+        print(f"\n⚠️  WARNING: {len(sale_no_condition)} sale bike(s) missing/unrecognized condition (→ used file):")
+        for b in sale_no_condition:
+            print(f"   - {b.get('make', '')} {b.get('model', '')} ({b.get('id', '')})")
 
     # Check for missing license_class
     missing_lic = [b["id"] for b in bikes if not get_spec(b.get("specs", {}), "license_class")]
@@ -387,23 +493,28 @@ def main():
 
     # Build rows
     rent_rows = [build_rent_row(b) for b in rent_bikes]
-    sale_rows = [build_sale_row(b) for b in sale_bikes]
+    sale_new_rows = [build_sale_row(b) for b in sale_new_bikes]
+    sale_used_rows = [build_sale_row(b) for b in sale_used_bikes]
 
     # Sort by make, model
     rent_rows.sort(key=lambda r: (r["make"].lower(), r["model"].lower()))
-    sale_rows.sort(key=lambda r: (r["make"].lower(), r["model"].lower()))
+    sale_new_rows.sort(key=lambda r: (r["make"].lower(), r["model"].lower()))
+    sale_used_rows.sort(key=lambda r: (r["make"].lower(), r["model"].lower()))
 
     # Write CSVs
     print(f"\n=== Writing CSVs to {OUTPUT_DIR} ===")
     rent_path = OUTPUT_DIR / "vip-bike-rent.csv"
-    sale_path = OUTPUT_DIR / "vip-bike-sale.csv"
+    sale_new_path = OUTPUT_DIR / "vip-bike-sale-new.csv"
+    sale_used_path = OUTPUT_DIR / "vip-bike-sale-used.csv"
     write_csv(rent_rows, RENT_CSV_COLUMNS, rent_path)
-    write_csv(sale_rows, SALE_CSV_COLUMNS, sale_path)
+    write_csv(sale_new_rows, SALE_CSV_COLUMNS, sale_new_path)
+    write_csv(sale_used_rows, SALE_CSV_COLUMNS, sale_used_path)
 
     # Summary
     print(f"\n=== Summary ===")
     print(f"  Rent CSV: {len(rent_rows)} bikes → {rent_path}")
-    print(f"  Sale CSV: {len(sale_rows)} bikes → {sale_path}")
+    print(f"  Sale NEW CSV: {len(sale_new_rows)} bikes → {sale_new_path}")
+    print(f"  Sale USED CSV: {len(sale_used_rows)} bikes → {sale_used_path}")
     print(f"  Generated: {datetime.datetime.now().isoformat()}")
 
     # Print bike ID lists for verification
@@ -411,8 +522,12 @@ def main():
     for r in rent_rows:
         print(f"  - {r['id']}")
 
-    print(f"\n=== Sale bike IDs ({len(sale_rows)}) ===")
-    for r in sale_rows:
+    print(f"\n=== Sale NEW bike IDs ({len(sale_new_rows)}) ===")
+    for r in sale_new_rows:
+        print(f"  - {r['id']}")
+
+    print(f"\n=== Sale USED bike IDs ({len(sale_used_rows)}) ===")
+    for r in sale_used_rows:
         print(f"  - {r['id']}")
 
     return 0

@@ -31,7 +31,8 @@ describe("invite deeplink — FranchizeProfileButton (source contract)", () => {
   it("builds join_<slug> startapp via the crew bot", () => {
     expect(src).toContain("startapp=join_");
     expect(src).toContain("platformBotUsername()");
-    expect(src).toContain("telegramBotUsername || \"\").trim().replace(/^@/, \"\") || platformBotUsername()");
+    // Мусорный проп (сырой metadata passthrough) отбрасывается normalizeBotUsername
+    expect(src).toContain("normalizeBotUsername(telegramBotUsername) || platformBotUsername()");
   });
 
   it("no longer uses the dead crew_<slug>_join_crew format nor the web fallback", () => {

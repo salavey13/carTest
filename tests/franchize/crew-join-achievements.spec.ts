@@ -182,9 +182,13 @@ describe("autoJoinCrew wiring (source contract)", () => {
 
   it("sends a welcome message to the joiner + owner notification with the deep-link button", () => {
     expect(src).toContain("Ты в экипаже");
-    expect(src).toContain("startapp=crew_${safeCrewSlug}");
+    // Кнопка строится null-safe хелпером (санитизирует startapp)
+    expect(src).toContain("crewBotAppLink(botUsername, `crew_${safeCrewSlug}`)");
     expect(src).toContain("Открыть экипаж");
     expect(src).toContain("keyboardType: \"inline\"");
+    // HTML + экранирование имени экипажа (legacy Markdown падает 400 на */_[)
+    expect(src).toContain('parseMode: "HTML"');
+    expect(src).toContain("escTgHtml(crewName)");
   });
 
   it("resolves the bot through the platform-fallback resolver", () => {

@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import { sendComplexMessage } from "../webhook-handlers/actions/sendComplexMessage";
 import { getBaseUrl } from "@/lib/utils";
-import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import { resolveCrewBotUsername, crewBotAppLink } from "@/app/franchize/lib/crew-bot";
 import { grantCrewJoinAchievements } from "@/app/franchize/server-actions/crew-join-achievements";
 import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
@@ -543,24 +543,28 @@ export async function autoJoinCrew(userId: string, username: string, crewId: str
         const { data: crew } = await supabaseAdmin.from('crews').select('owner_id, name').eq('id', crewId).single();
         const crewName = crew?.name || crewSlug;
         const safeCrewSlug = String(crewSlug || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
-        // Deep link на страницу экипажа: резолвер с платформенным фолбэком
-        // возвращает бота даже для dummy-экипажей → null только при мусорном env.
+        // Deep link на страницу экипажа: crewBotAppLink нормализует бота и
+        // санитизирует startapp (резолвер с платформенным фолбэком возвращает
+        // бота даже для dummy-экипажей → null только при мусорном env/пустом slug).
         const botUsername = await resolveCrewBotUsername(safeCrewSlug);
-        const crewAppUrl = botUsername && safeCrewSlug
-            ? `https://t.me/${botUsername}/app?startapp=crew_${safeCrewSlug}`
-            : null;
+        const crewAppUrl = crewBotAppLink(botUsername, `crew_${safeCrewSlug}`);
         const openCrewButton: Array<{ text: string; url: string }>[] = crewAppUrl
             ? [[{ text: "🏍 Открыть экипаж", url: crewAppUrl }]]
             : [];
+        // Telegram legacy-Markdown падает 400 на */_[ в имени экипажа — шлём
+        // HTML с экранированием (codereview 42-b, NIT).
+        const escTgHtml = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safeCrewName = escTgHtml(crewName);
+        const safeUsername = escTgHtml(username || "rider");
 
         // Notify owner (informational only, no action needed) — с кнопкой в экипаж
         if (crew?.owner_id) {
             try {
                 await sendComplexMessage(
                     crew.owner_id,
-                    `👤 @${username || 'rider'} присоединился к вашему экипажу *'${crewName}'* по приглашению.`,
+                    `👤 @${safeUsername} присоединился к вашему экипажу <b>«${safeCrewName}»</b> по приглашению.`,
                     openCrewButton,
-                    openCrewButton.length ? { keyboardType: "inline" } : undefined,
+                    { keyboardType: "inline", parseMode: "HTML" },
                 );
             } catch (notifyErr) {
                 logger.warn('[autoJoinCrew] Failed to notify owner (non-critical):', notifyErr);
@@ -571,9 +575,9 @@ export async function autoJoinCrew(userId: string, username: string, crewId: str
         try {
             await sendComplexMessage(
                 userId,
-                `🎉 Ты в экипаже *'${crewName}'*! Открывай страницу экипажа — смена, стена и карта уже доступны.`,
+                `🎉 Ты в экипаже <b>«${safeCrewName}»</b>! Открывай страницу экипажа — смена, стена и карта уже доступны.`,
                 openCrewButton,
-                openCrewButton.length ? { keyboardType: "inline" } : undefined,
+                { keyboardType: "inline", parseMode: "HTML" },
             );
         } catch (notifyErr) {
             logger.warn('[autoJoinCrew] Failed to welcome the joiner (non-critical):', notifyErr);

@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import { resolveCrewBotUsername, crewBotAppLink } from "@/app/franchize/lib/crew-bot";
 import {
   ASSIGNABLE_ROLES,
   assignableRolesFor,
@@ -250,20 +250,21 @@ export async function promoteCrewMemberToOwnerAction(
 
     // Best-effort Telegram heads-up for the new owner (never blocks).
     // 2026-09-22: с inline-кнопкой на страницу экипажа (deep link через бота;
-    // резолвер с платформенным фолбэком — ссылка есть даже у dummy-экипажей).
+    // crewBotAppLink санитизирует startapp, резолвер с платформенным фолбэком —
+    // ссылка есть даже у dummy-экипажей). HTML + экранирование имени — legacy
+    // Markdown падает 400 на */_[ в названии экипажа (codereview 42-b).
     try {
       const botUsername = await resolveCrewBotUsername(input.crewSlug);
-      const crewAppUrl = botUsername
-        ? `https://t.me/${botUsername}/app?startapp=crew_${input.crewSlug.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64)}`
-        : null;
+      const crewAppUrl = crewBotAppLink(botUsername, `crew_${input.crewSlug}`);
       const buttons: Array<{ text: string; url: string }>[] = crewAppUrl
         ? [[{ text: "🏍 Открыть экипаж", url: crewAppUrl }]]
         : [];
+      const escTgHtml = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       await sendComplexMessage(
         input.targetUserId,
-        `👑 Ты назначен владельцем экипажа «${crewRow.name}». Добро пожаловать на капитанский мостик!`,
+        `👑 Ты назначен владельцем экипажа <b>«${escTgHtml(crewRow.name)}»</b>. Добро пожаловать на капитанский мостик!`,
         buttons,
-        buttons.length ? { keyboardType: "inline" } : undefined,
+        { keyboardType: "inline", parseMode: "HTML" },
       );
     } catch (notifyError) {
       logger.warn("[promoteOwner] notification failed", notifyError);
