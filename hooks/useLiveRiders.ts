@@ -48,14 +48,20 @@ const SEND_THROTTLE_MS = 3000;
 const SOURCE_SWITCH_DEBOUNCE_MS = 500;
 type GpsSource = "telegram" | "browser";
 
+// MR geo-fix: `WebApp.requestLocation` shows a NATIVE Telegram permission
+// popup on EVERY invocation. Polling it on an interval (the old design:
+// every GPS_INTERVAL_MS) produced the endless "allow location" dialog storm
+// reported by riders. It is now a ONE-SHOT per geosharing start; the
+// continuous stream always comes from the W3C `watchPosition` below.
+
 export function useLiveRiders(options: UseLiveRidersOptions) {
   const { crewSlug, sessionId, userId, enabled, paused = false, privacy, onPosition } = options;
   const watchIdRef = useRef<number | null>(null);
   const lastAcceptedRef = useRef<{ lat: number; lng: number; time: number } | null>(null);
   const batchQueueRef = useRef<GPSPoint[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const telegramTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowserClient>["channel"]> | null>(null);
+  const browserFixSeenRef = useRef(false);
   const lastTelegramTsRef = useRef<number>(0);
   const lastSendTsRef = useRef<number>(0);
   const sourceLockRef = useRef<GpsSource | null>(null);
@@ -65,6 +71,10 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   const lastBroadcastAtRef = useRef<string | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [isUsingTelegram, setIsUsingTelegram] = useState(false);
+  // True once the W3C watch produced at least one accepted point this session.
+  // While false (dead/incomplete WebView geolocation), the cockpit offers a
+  // manual one-shot Telegram refresh instead of any automatic popup loop.
+  const [hasBrowserFix, setHasBrowserFix] = useState(false);
   const [lastBroadcastAt, setLastBroadcastAt] = useState<string | null>(null);
   const [queuedPoints, setQueuedPoints] = useState(0);
 
@@ -149,9 +159,11 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       }
       sourceLockRef.current = source;
       sourceLockAtRef.current = now;
-      if (source === "telegram" && watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
+      // MR geo-fix: a Telegram fix must NOT clear the browser watch anymore —
+      // the watch is the CONTINUOUS source, Telegram is the one-shot booster.
+      if (source === "browser" && !browserFixSeenRef.current) {
+        browserFixSeenRef.current = true;
+        setHasBrowserFix(true);
       }
       if (now - lastSendTsRef.current < SEND_THROTTLE_MS) return;
       const last = lastAcceptedRef.current;
@@ -282,6 +294,16 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     return gotPoint;
   }, [acceptPoint]);
 
+  /**
+   * Manual one-shot Telegram fix (cockpit «Обновить гео» button). The ONLY
+   * sanctioned way to re-invoke `WebApp.requestLocation` after the initial
+   * popup — one deliberate tap, one popup, never automatic.
+   */
+  const refreshTelegramFix = useCallback(() => {
+    if (!enabled) return;
+    void requestTelegramLocation();
+  }, [enabled, requestTelegramLocation]);
+
   useEffect(() => {
     if (!enabled || !userId) {
       setIsActive(false);
@@ -306,20 +328,21 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     let cancelled = false;
 
     const start = async () => {
+      browserFixSeenRef.current = false;
+      setHasBrowserFix(false);
+
+      // ONE-SHOT native Telegram popup for a fast first fix (and to trigger
+      // Telegram's own location grant). Must never be polled — see MR geo-fix.
       const telegramSuccess = await requestTelegramLocation();
       if (cancelled) return;
+      setIsActive(true);
+      setIsUsingTelegram(telegramSuccess);
 
-      if (telegramSuccess) {
-        setIsActive(true);
-        setIsUsingTelegram(true);
-        telegramTimerRef.current = setInterval(() => {
-          requestTelegramLocation();
-        }, GPS_INTERVAL_MS);
-        return;
-      }
-
+      // Continuous source — ALWAYS the W3C watch (works inside Telegram
+      // WebViews on Android & iOS after the native grant; outside Telegram
+      // it is the only source anyway). If the WebView's geolocation is dead,
+      // the rider gets the manual «Обновить гео» one-shot instead of popups.
       if (!navigator.geolocation) {
-        setIsActive(false);
         return;
       }
 
@@ -335,8 +358,6 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
           maximumAge: highAccuracy ? 0 : 60000,
         },
       );
-      setIsActive(true);
-      setIsUsingTelegram(false);
     };
 
     start();
@@ -348,10 +369,6 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
-      }
-      if (telegramTimerRef.current) {
-        clearInterval(telegramTimerRef.current);
-        telegramTimerRef.current = null;
       }
       if (acceptDebounceTimerRef.current) {
         clearTimeout(acceptDebounceTimerRef.current);
@@ -372,13 +389,12 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
     };
   }, [enabled, flushBatch]);
 
+  // MR geo-fix: visibility refresh is BROWSER-ONLY now. The old branch re-ran
+  // `WebApp.requestLocation` on every app switch — another native popup each
+  // time the rider returned to the mini app. W3C getCurrentPosition never pops.
   useEffect(() => {
     const handleVisibility = () => {
       if (!enabled || document.visibilityState !== "visible") return;
-      if (isUsingTelegram) {
-        requestTelegramLocation();
-        return;
-      }
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           handleGeolocationPosition,
@@ -390,7 +406,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
 
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [enabled, handleGeolocationPosition, isUsingTelegram, requestTelegramLocation]);
+  }, [enabled, handleGeolocationPosition]);
 
-  return { isActive, isUsingTelegram, lastBroadcastAt, queuedPoints };
+  return { isActive, isUsingTelegram, hasBrowserFix, refreshTelegramFix, lastBroadcastAt, queuedPoints };
 }

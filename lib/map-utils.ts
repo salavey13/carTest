@@ -71,6 +71,13 @@ export interface PointOfInterest {
     animated?: boolean;
     dashArray?: string;
   };
+  /**
+   * Round-picture marker source («instead of simple dots show real icons with
+   * round pictures if available» — map-riders 2026-09-22). Crew logos, catalog
+   * item photos, wall-pin snapshots. Wins over an `image:` `icon` prefix;
+   * validated against http(s)/data:image schemes in lib/map-poi-marker.ts.
+   */
+  imageUrl?: string | null;
 }
 
 // === CORE PROJECTION MATH ===

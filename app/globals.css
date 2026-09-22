@@ -1184,3 +1184,69 @@ path.mr-spot-popup {
     animation: none !important;
   }
 }
+
+/* ── POI markers: round pictures / real FA badges (map-riders 2026-09-22 —
+   «instead of simple dots show real icons with round pictures if available»).
+   The divIcon root carries the colored disc; images sit inside a white ring,
+   FA glyphs are white-on-color. Halo keeps the old breathing-dot affordance
+   for discovery-layer points (mr-spot-popup carrier class). ── */
+.mr-poi-div-icon {
+  background: transparent;
+  border: 0;
+}
+
+.mr-poi {
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.55), 0 3px 8px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.mr-poi > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 9999px;
+  display: block;
+  pointer-events: none;
+}
+
+.mr-poi__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.mr-poi__glyph svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.mr-poi--halo {
+  animation: mr-poi-halo 2.8s ease-in-out infinite;
+}
+
+@keyframes mr-poi-halo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.55), 0 0 0 8px rgba(255, 255, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.55), 0 0 0 12px rgba(255, 255, 255, 0.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mr-poi--halo {
+    animation: none !important;
+  }
+}
+

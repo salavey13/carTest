@@ -28,6 +28,7 @@ import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfi
 import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
 import { CommunityWallClient } from "@/app/franchize/[slug]/community/CommunityWallClient";
 import { getWallGeotagsAction } from "@/app/franchize/server-actions/community-wall";
+import { getSpotCrewLogosAction, type SpotCrewLogoMap } from "@/app/franchize/server-actions/spot-crew-logos";
 import {
   formatRelativeTimeRu,
   WALL_FOCUS_POST_EVENT,
@@ -164,6 +165,23 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   // In-page «поделиться заездом»: черновик открывается в стене шита без смены URL.
   const [sheetRideComposeId, setSheetRideComposeId] = useState<string | null>(null);
   const lastMeetupActionAtRef = useRef(0);
+  // ── Круглые картинки crew-точек: logo_url dummy-экипажей мототочек.
+  // Пусто в БД → null → маркер рисует kind-иконку-бейдж (см. RacingMap).
+  const [spotLogos, setSpotLogos] = useState<SpotCrewLogoMap>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    getSpotCrewLogosAction()
+      .then((map) => {
+        if (!cancelled) setSpotLogos(map);
+      })
+      .catch(() => {
+        /* молча: фолбэк — иконки-бейджи */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Apply franchize theme CSS variables
   useFranchizeTheme(crew.theme);
@@ -262,7 +280,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   }, [state.shareEnabled]);
 
   // ── GPS tracking hook ──
-  const { isUsingTelegram, lastBroadcastAt, queuedPoints } = useLiveRiders({
+  const { isUsingTelegram, hasBrowserFix, refreshTelegramFix, lastBroadcastAt, queuedPoints } = useLiveRiders({
     crewSlug,
     sessionId: state.sessionId,
     userId: dbUser?.user_id || null,
@@ -467,13 +485,16 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         id: `spot-${spot.id}`,
         name: `${spot.name} · ${motoSpotKindLabel(spot.kind)}`,
         type: "point" as const,
-        icon: "::FaLocationDot::",
+        // Реальная иконка вместо точки (kind-бейдж в RacingMap) + круглая
+        // аватарка, когда у dummy-экипажа точки задан logo_url.
+        icon: motoSpotKindIcon(spot.kind),
+        imageUrl: spotLogos[spot.slug] || null,
         color: spot.color,
         coords: [spot.coords] as [number, number][],
         markerClassName: SPOT_POPUP_CLASSNAME,
         popup: spotPopupFor(spot),
       })),
-    [visibleSpots, spotPopupFor],
+    [visibleSpots, spotPopupFor, spotLogos],
   );
 
   const spotKindCounts = useMemo(() => {
@@ -494,6 +515,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         name: `Пост · ${pin.authorName}${pin.label ? ` · ${pin.label}` : ""}`,
         type: "point" as const,
         icon: "::FaCameraRetro::",
+        // Снимок поста → круглая аватарка на карте (фолбэк — камера-бейдж).
+        imageUrl: pin.photoUrl ?? null,
         color: wallPinColor,
         coords: [[pin.lat, pin.lng]] as [number, number][],
         markerClassName: SPOT_POPUP_CLASSNAME,
@@ -553,6 +576,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         name: item.title,
         type: "point" as const,
         icon: "::FaMotorcycle::",
+        // Фото техники → круглая аватарка маркера (фолбэк — мото-бейдж).
+        imageUrl: item.imageUrl || null,
         color: catalogItemPinColor,
         coords: [coords] as [number, number][],
         markerClassName: SPOT_POPUP_CLASSNAME,
@@ -592,6 +617,9 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       type: "point" as const,
       icon: "::FaLocationDot::",
       color: "#f97316",
+      // «Round pictures if available»: HQ-точка = логотип экипажа (круглая
+      // аватарка); без логотипа RacingMap нарисует иконку-бейдж.
+      imageUrl: crew.logoUrl || null,
       coords: [[HOME_BASE[0], HOME_BASE[1]]] as [number, number][],
     };
 
@@ -1001,6 +1029,20 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                   · {riderStatusCounts.live} live · {state.stats.totalWeeklyDistanceKm} км за 7 дней
                 </span>
                 <span className="ml-auto flex items-center gap-1.5">
+                  {/* MR geo-fix: если W3C-геолокация в WebView мертва, а первый
+                      фикс пришёл из Telegram — ручной one-shot вместо автопопапов. */}
+                  {state.shareEnabled && isUsingTelegram && !hasBrowserFix ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={refreshTelegramFix}
+                    >
+                      <VibeContentRenderer content="::FaLocationCrosshairs::" className="mr-1" />
+                      Обновить гео
+                    </Button>
+                  ) : null}
                   {isAdmin ? (
                     <Button asChild variant="outline" size="sm" className="h-7 px-2 text-xs">
                       <Link href="/admin/map-routes">Маршруты</Link>

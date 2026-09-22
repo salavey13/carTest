@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import React from "react";
-import { CircleMarker, GeoJSON, MapContainer, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, GeoJSON, MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
 import type { GeoJsonObject } from "geojson";
 import { MapInteractionCapture } from "@/components/maps/MapInteractionCapture";
 import type { PointOfInterest } from "@/lib/map-utils";
 import type { TileLayerPreset } from "@/lib/maps/map-types";
+import { buildPoiMarkerIcon, parsePoiIcon } from "@/lib/map-poi-marker";
 
 const TILE_LAYERS: Record<TileLayerPreset, string> = {
   "cartodb-dark": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
@@ -168,6 +169,48 @@ export function RacingMap({
             // value (JSONB string/object) can never smuggle markup — it is
             // ignored and the plain name fallback is used.
             const richPopup = React.isValidElement(poi.popup) ? poi.popup : null;
+            const popupNode = (
+              <Popup className={richPopup ? "mr-spot-popup-wrapper" : undefined}>
+                {richPopup ?? <div className="font-medium">{poi.name}</div>}
+              </Popup>
+            );
+
+            // «Instead of simple dots show real icons with round pictures if
+            // available» (map-riders feedback): image URLs (crew logos, catalog
+            // photos, wall pins) become round avatars, `::FaXxx::` icons become
+            // real glyph badges. Unparseable/missing icons keep the classic dot.
+            // buildPoiMarkerIcon validates URL schemes and escapes attributes;
+            // FA names are lookup keys, never interpolated markup.
+            const parsedIcon = parsePoiIcon(poi.icon);
+            const imageUrl =
+              poi.imageUrl && poi.imageUrl.trim()
+                ? poi.imageUrl
+                : parsedIcon.kind === "image"
+                  ? parsedIcon.url
+                  : null;
+            const faName = imageUrl ? null : parsedIcon.kind === "fa" ? parsedIcon.name : null;
+            const poiMarkerIcon = buildPoiMarkerIcon({
+              color: poi.color,
+              imageUrl,
+              faName,
+              markerClassName: poi.markerClassName,
+            });
+
+            if (poiMarkerIcon) {
+              return (
+                <Marker
+                  key={poi.id}
+                  position={center}
+                  icon={poiMarkerIcon}
+                  eventHandlers={{
+                    click: () => onPointClick?.(poi),
+                  }}
+                >
+                  {popupNode}
+                </Marker>
+              );
+            }
+
             return (
               <CircleMarker
                 key={poi.id}
@@ -187,9 +230,7 @@ export function RacingMap({
                 {/* poi.popup comes only from client-side in-repo constants
                     (spots/meetups) — DB JSON can't carry a React node, so
                     rendering it is safe (React renders strings as text). */}
-                <Popup className={richPopup ? "mr-spot-popup-wrapper" : undefined}>
-                  {richPopup ?? <div className="font-medium">{poi.name}</div>}
-                </Popup>
+                {popupNode}
               </CircleMarker>
             );
           }
