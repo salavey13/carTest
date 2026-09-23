@@ -42,6 +42,7 @@ import {
   PenLine,
   Pin,
   PinOff,
+  Play,
   Search,
   Send,
   Share2,
@@ -49,6 +50,11 @@ import {
   Trophy,
   X,
 } from "lucide-react";
+import {
+  extractYouTubeVideoIds,
+  youTubeEmbedUrl,
+  youTubeThumbUrl,
+} from "@/app/franchize/lib/wall-youtube";
 import {
   buildWallPostPreview,
   formatDateTimeRu,
@@ -2624,6 +2630,77 @@ function ReactionBar({
 }
 
 /**
+ * YouTube-видео в посте («show actual videos in posts»): ленивая карточка —
+ * превью-кадр с кнопкой ▶, по тапу подменяется на <iframe> youtube-nocookie
+ * (autoplay). В iframe попадает ТОЛЬКО валидированный 11-символьный id из
+ * lib/wall-youtube — текст поста туда не попадает никогда. Битый кадр
+ * (onError) тихо убирает карточку — ссылки в тексте остаются рабочими.
+ */
+function WallYouTubeCard({ videoId }: { videoId: string }) {
+  const [playing, setPlaying] = useState(false);
+  const [broken, setBroken] = useState(false);
+
+  if (broken) return null;
+  return (
+    <div
+      className="relative mt-3 overflow-hidden rounded-xl border border-[var(--community-border)] bg-black/50"
+      style={{ aspectRatio: "16 / 9" }}
+    >
+      {playing ? (
+        <iframe
+          src={youTubeEmbedUrl(videoId)}
+          title="Видео с YouTube"
+          className="absolute inset-0 h-full w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPlaying(true)}
+          className="group absolute inset-0 block h-full w-full cursor-pointer"
+          aria-label="Смотреть видео"
+          title="Смотреть видео"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- статический кадр с i.ytimg.com, next/image не нужен для произвольного внешнего хоста */}
+          <img
+            src={youTubeThumbUrl(videoId)}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setBroken(true)}
+          />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/10" aria-hidden="true" />
+          <span
+            className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full shadow-lg transition group-hover:scale-105"
+            style={{ backgroundColor: "var(--community-accent, #f97316)" }}
+            aria-hidden="true"
+          >
+            <Play className="ml-0.5 h-6 w-6 fill-current text-white" />
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Все YouTube-ссылки поста (≤ WALL_YOUTUBE_MAX) → карточки-плееры. */
+function WallPostVideos({ body }: { body: string }) {
+  const videos = useMemo(() => extractYouTubeVideoIds(body), [body]);
+  if (videos.length === 0) return null;
+  return (
+    <div>
+      {videos.map((id) => (
+        <WallYouTubeCard key={id} videoId={id} />
+      ))}
+    </div>
+  );
+}
+
+/**
  * Rich wall text: @mentions highlighted, #hashtags clickable (filter via the
  * parent handler), URLs open safely in a new tab. Rendering is token-based
  * (lib parseWallText) — no markdown, no HTML injection.
@@ -2890,6 +2967,9 @@ function PostCard(props: PostCardProps) {
 
       {/* photos */}
       <PostPhotoGrid photos={post.photos} onOpen={props.onOpenPhoto} />
+
+      {/* YouTube-видео из тела поста (ленивые карточки-плееры) */}
+      <WallPostVideos body={post.body ?? ""} />
 
       {/* bike mentions */}
       <PostBikeChips bikes={post.bikes} slug={slug} />

@@ -129,6 +129,9 @@ function normalizePoi(raw: any): PointOfInterest {
     coords,
     geojson: raw?.geojson,
     roadHighlight: raw?.roadHighlight,
+    // Surface/conditions note for route badges («песчаная пойма…») — passed
+    // through verbatim; RacingMap renders it as plain React text in the popup.
+    note: typeof raw?.note === "string" && raw.note.trim() ? raw.note.trim().slice(0, 300) : null,
   };
 }
 

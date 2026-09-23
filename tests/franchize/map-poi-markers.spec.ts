@@ -193,6 +193,16 @@ describe("buildPoiMarkerIcon", () => {
     expect(mdOptions.html).not.toContain("mr-poi--lg");
   });
 
+  it("supports the sm route-start badge size (dirt routes 2026-09-23)", () => {
+    const sm = buildPoiMarkerIcon({ color: "#eab308", faName: "FaFlag", markerSize: "sm" });
+    const options = (sm as unknown as { options: { html: string; iconSize: number[]; iconAnchor: number[]; popupAnchor: number[] } }).options;
+    expect(options.iconSize).toEqual([26, 26]);
+    expect(options.iconAnchor).toEqual([13, 13]);
+    expect(options.popupAnchor).toEqual([0, -15]);
+    expect(options.html).toContain("mr-poi--sm");
+    expect(options.html).not.toContain("mr-poi--lg");
+  });
+
   it("whitelists the disc color — a hostile 'red;…' cannot inject CSS declarations", () => {
     expect(safeCssColor("red;background:url(https://evil.test)")).toBe("#f97316");
     expect(safeCssColor("#facc15")).toBe("#facc15");

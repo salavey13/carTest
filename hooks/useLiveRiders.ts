@@ -46,6 +46,17 @@ const TELEGRAM_MIN_INTERVAL_MS = 2500;
 const ACCEPT_DEBOUNCE_MS = 800;
 const SEND_THROTTLE_MS = 3000;
 const SOURCE_SWITCH_DEBOUNCE_MS = 500;
+// Watchdog (robustness pass 2026-09-23): no accepted fix for 45 s → one
+// silent W3C kick. Freshness counts from the LATER of the last fix and the
+// session start, so a slow cold start (and the window while start() is still
+// awaiting Telegram's one-shot) never counts as staleness; kicks are also
+// cooldown-throttled. W3C never pops a native dialog — this cannot resurrect
+// the popup storm. Skipped while paused (the stream is deliberately stopped)
+// and while the chip says "denied" (permission can only return via settings;
+// kicking a denied watch is waste).
+const WATCHDOG_TICK_MS = 15000;
+const WATCHDOG_STALE_MS = 45000;
+const WATCHDOG_KICK_COOLDOWN_MS = 30000;
 type GpsSource = "telegram" | "browser";
 
 /** Why the continuous W3C watch has no fix — surfaced in the ride strip so a
@@ -108,10 +119,32 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   pausedRef.current = paused;
   const onPositionRef = useRef(onPosition);
   onPositionRef.current = onPosition;
+  // Mirror of the current chip kind for timer callbacks (never re-renders).
+  const geoErrorKindRef = useRef<LiveRidersGeoError>(null);
+  useEffect(() => {
+    geoErrorKindRef.current = geoError;
+  }, [geoError]);
   // Consecutive watch-error counter — transient kinds (timeout/unavailable)
   // must repeat before the chip shows, so a weak-signal error↔fix cycle
   // doesn't flicker it (denied is definitive and shows immediately).
   const watchErrorStreakRef = useRef(0);
+  // Robustness pass (2026-09-23):
+  //  · startTokenRef — guard against a stale async start() installing a watch
+  //    after a rapid enabled-toggle cleanup (double-watch race);
+  //  · degradedRef — after 4 consecutive watch errors with no fix at all the
+  //    watch restarts with enableHighAccuracy=false (some WebViews never get a
+  //    first GPS fix in high-accuracy mode but succeed immediately in
+  //    network-only mode — one-time, per geosharing session);
+  //  · watchdogTimerRef — 45 s with no accepted fix → one silent W3C kick
+  //    (never a Telegram popup) to re-seed a dead watch.
+  const startTokenRef = useRef(0);
+  const degradedRef = useRef(false);
+  const watchdogTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Watchdog anti-spam: freshness is measured from the LATER of the last fix
+  // and the session start (a slow cold start is not staleness), and kicks are
+  // cooldown-throttled so at most one silent kick per WATCHDOG_KICK_COOLDOWN_MS.
+  const startedAtRef = useRef(0);
+  const lastWatchdogKickAtRef = useRef(0);
 
   const hapticPulse = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -387,10 +420,16 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
   useEffect(() => {
     if (!enabled) return;
 
+    // Every toggle gets a fresh token: a start() awaiting Telegram's one-shot
+    // popup must notice it was superseded and bail before touching the map.
+    const token = ++startTokenRef.current;
     let cancelled = false;
 
     const start = async () => {
       browserFixSeenRef.current = false;
+      degradedRef.current = false;
+      startedAtRef.current = Date.now();
+      lastWatchdogKickAtRef.current = 0;
       setHasBrowserFix(false);
       setGeoError(null);
       watchErrorStreakRef.current = 0;
@@ -398,7 +437,7 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       // ONE-SHOT native Telegram popup for a fast first fix (and to trigger
       // Telegram's own location grant). Must never be polled — see MR geo-fix.
       const telegramSuccess = await requestTelegramLocation();
-      if (cancelled) return;
+      if (cancelled || token !== startTokenRef.current) return;
       setIsActive(true);
       setIsUsingTelegram(telegramSuccess);
 
@@ -411,35 +450,57 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
         return;
       }
 
-      const highAccuracy = document.visibilityState === "visible";
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        handleGeolocationPosition,
-        (error) => {
-          // MR geo polish: surface the failure instead of a console-only warn.
-          // Transient kinds (timeout/unavailable) must repeat twice before the
-          // chip shows — a weak-signal error↔fix cycle would otherwise flicker
-          // it. "denied" is definitive (permission returns only via settings)
-          // and shows immediately. watchPosition re-reports the same error —
-          // the functional update keeps identical kinds from re-rendering.
-          const kind = geoErrorKind(error);
-          watchErrorStreakRef.current += 1;
-          if (kind === "denied" || watchErrorStreakRef.current >= 2) {
-            setGeoError((prev) => (prev === kind ? prev : kind));
-          }
-          console.warn("[useLiveRiders] Geolocation error:", error.message);
-        },
-        {
-          enableHighAccuracy: highAccuracy,
-          timeout: highAccuracy ? 10000 : 30000,
-          maximumAge: highAccuracy ? 0 : 60000,
-        },
-      );
+      // Accuracy can degrade one step: high first (visible screen), network
+      // fallback after a dead high-accuracy streak (see degradedRef above).
+      const installWatch = (highAccuracy: boolean) => {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          handleGeolocationPosition,
+          (error) => {
+            // MR geo polish: surface the failure instead of a console-only warn.
+            // Transient kinds (timeout/unavailable) must repeat twice before the
+            // chip shows — a weak-signal error↔fix cycle would otherwise flicker
+            // it. "denied" is definitive (permission returns only via settings)
+            // and shows immediately. watchPosition re-reports the same error —
+            // the functional update keeps identical kinds from re-rendering.
+            const kind = geoErrorKind(error);
+            watchErrorStreakRef.current += 1;
+            if (kind === "denied" || watchErrorStreakRef.current >= 2) {
+              setGeoError((prev) => (prev === kind ? prev : kind));
+            }
+            console.warn("[useLiveRiders] Geolocation error:", error.message);
+            // Robustness: a brand-new session that keeps erroring in
+            // high-accuracy mode gets exactly ONE second chance in the cheaper
+            // network-only mode before the rider is left with a dead stream.
+            if (
+              !browserFixSeenRef.current &&
+              !degradedRef.current &&
+              kind !== "denied" &&
+              watchErrorStreakRef.current >= 4 &&
+              navigator.geolocation
+            ) {
+              degradedRef.current = true;
+              watchErrorStreakRef.current = 0;
+              if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+              console.warn("[useLiveRiders] Falling back to low-accuracy watch");
+              installWatch(false);
+            }
+          },
+          {
+            enableHighAccuracy: highAccuracy,
+            timeout: highAccuracy ? 10000 : 30000,
+            maximumAge: highAccuracy ? 0 : 60000,
+          },
+        );
+      };
+
+      installWatch(document.visibilityState === "visible");
     };
 
     start();
 
     return () => {
       cancelled = true;
+      startTokenRef.current += 1; // invalidate any in-flight start()
       sourceLockRef.current = null;
       sourceLockAtRef.current = 0;
       if (watchIdRef.current !== null) {
@@ -466,6 +527,45 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       }
     };
   }, [enabled, flushBatch]);
+
+  // Robustness watchdog: a watch that stops producing fixes (WebView killed
+  // the GPS thread, accuracy dead-loop) previously stayed silent until the
+  // rider noticed themselves. Every 15 s check the freshness of the last
+  // accepted fix; when it is older than WATCHDOG_STALE_MS (or never arrived)
+  // fire ONE silent W3C one-shot — W3C never pops a native dialog, so this
+  // cannot resurrect the popup storm. Skipped while paused (the stream is
+  // deliberately stopped) and while the chip says "denied" (permission can
+  // only return via settings; kicking a denied watch is waste).
+  useEffect(() => {
+    if (!enabled) return;
+    watchdogTimerRef.current = setInterval(() => {
+      if (pausedRef.current || document.visibilityState !== "visible") return;
+      if (!navigator.geolocation) return;
+      // "denied" can only clear via system settings — kick-waste; other kinds
+      // (timeout/unavailable) are exactly what the kick is for.
+      if (geoErrorKindRef.current === "denied") return;
+      // Cold start is not staleness: measure from the later of last fix / start.
+      const last = lastAcceptedRef.current;
+      const since = Math.max(last?.time ?? 0, startedAtRef.current);
+      if (Date.now() - since <= WATCHDOG_STALE_MS) return;
+      // Cooldown: a kick can take up to 15 s to resolve — never stack two.
+      if (Date.now() - lastWatchdogKickAtRef.current < WATCHDOG_KICK_COOLDOWN_MS) return;
+      lastWatchdogKickAtRef.current = Date.now();
+      navigator.geolocation.getCurrentPosition(
+        handleGeolocationPosition,
+        () => {
+          /* silent: the watch's own error pipeline already reports */
+        },
+        { enableHighAccuracy: !degradedRef.current, timeout: 15000, maximumAge: 30000 },
+      );
+    }, WATCHDOG_TICK_MS);
+    return () => {
+      if (watchdogTimerRef.current) {
+        clearInterval(watchdogTimerRef.current);
+        watchdogTimerRef.current = null;
+      }
+    };
+  }, [enabled, handleGeolocationPosition]);
 
   // MR geo-fix: visibility refresh is BROWSER-ONLY now. The old branch re-ran
   // `WebApp.requestLocation` on every app switch — another native popup each

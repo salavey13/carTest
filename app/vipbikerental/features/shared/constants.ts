@@ -83,8 +83,9 @@ export const fallbackMeetups = [
 // Scenic riding routes around HQ for the landing page map preview.
 // GeoJSON generated via OSRM (router.project-osrm.org) — each route follows actual roads
 // with hundreds of intermediate points.
-// Synced with DEFAULT_ROUTES in components/map-riders/MapRidersClientRefactored.tsx
-// and supabase/migrations/20260418000000_add_vip_bike_map_routes.sql.
+// Legacy landing-map preview. Map-riders itself stopped using hardcoded
+// DEFAULT_ROUTES (2026-09-23): its routes now live in the DB only
+// (migration 20260923000000_dirt_routes_between_bridges.sql).
 export const fallbackRoutes = [
   {
     id: "vip-route-city-cruise",

@@ -154,8 +154,8 @@ export interface PoiMarkerOptions {
    * the disc color.
    */
   initials?: string | null;
-  /** "lg" = 40px anchor marker (crew HQ); default "md" = 34px. */
-  markerSize?: "md" | "lg";
+  /** "lg" = 40px anchor marker (crew HQ); "sm" = 26px route-start badge; default "md" = 34px. */
+  markerSize?: "sm" | "md" | "lg";
   /** Explicit halo pulse (the legacy mr-spot-popup carry-over still works). */
   halo?: boolean;
   /** Extra classes carried over from the old CircleMarker (halo, entrance). */
@@ -217,6 +217,7 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   const color = safeCssColor(options.color);
   const extraClasses = (options.markerClassName || "").trim();
   const isLg = options.markerSize === "lg";
+  const isSm = options.markerSize === "sm";
 
   const wantsImage = options.imageUrl ? isSafeMarkerImageUrl(options.imageUrl) : false;
   // The glyph is rendered even under a picture now — it doubles as the
@@ -229,7 +230,7 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   // the explicit opt-in for anchor markers like HQ.
   const legacyHalo = extraClasses.includes("mr-spot-popup") ? " mr-poi--halo" : "";
   const optHalo = options.halo ? " mr-poi--halo" : "";
-  const sizeClass = isLg ? " mr-poi--lg" : "";
+  const sizeClass = isLg ? " mr-poi--lg" : isSm ? " mr-poi--sm" : "";
   const rootClass = `mr-poi${optHalo}${legacyHalo}${sizeClass}${extraClasses ? ` ${extraClasses}` : ""}`;
 
   let inner: string;
@@ -253,8 +254,8 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   return L.divIcon({
     html,
     className: "mr-poi-div-icon",
-    iconSize: isLg ? [40, 40] : [34, 34],
-    iconAnchor: isLg ? [20, 20] : [17, 17],
-    popupAnchor: [0, isLg ? -22 : -19],
+    iconSize: isLg ? [40, 40] : isSm ? [26, 26] : [34, 34],
+    iconAnchor: isLg ? [20, 20] : isSm ? [13, 13] : [17, 17],
+    popupAnchor: [0, isLg ? -22 : isSm ? -15 : -19],
   });
 }

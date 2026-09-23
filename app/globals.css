@@ -1248,6 +1248,19 @@ path.mr-spot-popup {
   font-size: 15px;
 }
 
+/* Route-start badges (dirt routes): one size step down — the badge marks the
+   trailhead without competing with rider/spot markers for attention. */
+.mr-poi--sm {
+  width: 26px;
+  height: 26px;
+  border-width: 1.5px;
+}
+
+.mr-poi--sm .mr-poi__glyph svg {
+  width: 11px;
+  height: 11px;
+}
+
 /* Stale riders: dim + desaturate, but keep the shape/color readable. */
 .mr-poi--stale {
   opacity: 0.55;

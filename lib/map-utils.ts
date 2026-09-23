@@ -59,6 +59,12 @@ export interface PointOfInterest {
   };
   markerClassName?: string;
   /**
+   * Short human note for route POIs (surface/conditions — «песчаная пойма,
+   * после дождя грязь»). Rendered in the route-start badge popup. DB-authored
+   * string → rendered as React text only, never HTML.
+   */
+  note?: string | null;
+  /**
    * Rich React popup (map-riders spots/meetups). Only ever attached
    * CLIENT-SIDE from in-repo constants — DB POIs arrive as parsed JSON, so a
    * React node can never be smuggled through the network (a string value
