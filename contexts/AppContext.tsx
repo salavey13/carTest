@@ -51,6 +51,15 @@ interface AppRuntimeContextData {
   clearStartParam: () => void;
   userCrewInfo: UserCrewInfo | null;
   userCrewMemberships: CrewMembership[];
+  /**
+   * Task 45: true once the runtime snapshot fetch for the current user has
+   * SETTLED (successfully or not). Consumers that gate admin-only UI on
+   * userCrewMemberships must distinguish "no admin memberships" from
+   * "memberships not fetched yet" — otherwise crew admins see an
+   * access-denied flash (or the inverse: foreign crew admin UI) for the
+   * first few hundred ms after mount.
+   */
+  userCrewMembershipsLoaded: boolean;
   userMetadataSlices: {
     cyberFitness: Record<string, unknown> | null;
     strikeball: Record<string, unknown> | null;
@@ -111,6 +120,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   const [userCrewInfo, setUserCrewInfo] = useState<UserCrewInfo | null>(null);
   const [userCrewMemberships, setUserCrewMemberships] = useState<CrewMembership[]>([]);
+  const [userCrewMembershipsLoaded, setUserCrewMembershipsLoaded] = useState(false);
   const [userMetadataSlices, setUserMetadataSlices] = useState<AppRuntimeContextData["userMetadataSlices"]>({
     cyberFitness: null,
     strikeball: null,
@@ -124,15 +134,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserCrewInfo(null);
         setUserCrewMemberships([]);
         setUserMetadataSlices({ cyberFitness: null, strikeball: null, franchizeProfiles: null });
+        setUserCrewMembershipsLoaded(true); // check settled — user has no id
         return;
       }
-      const [snapshot, memberships] = await Promise.all([
-        fetchUserRuntimeSnapshotAction(dbUser.user_id),
-        fetchUserCrewMembershipsAction(dbUser.user_id),
-      ]);
-      setUserCrewInfo(snapshot.crewInfo);
-      setUserCrewMemberships(memberships);
-      setUserMetadataSlices(snapshot.metadataSlices);
+      try {
+        const [snapshot, memberships] = await Promise.all([
+          fetchUserRuntimeSnapshotAction(dbUser.user_id),
+          fetchUserCrewMembershipsAction(dbUser.user_id),
+        ]);
+        setUserCrewInfo(snapshot.crewInfo);
+        setUserCrewMemberships(memberships);
+        setUserMetadataSlices(snapshot.metadataSlices);
+      } finally {
+        // Task 45: settled flag — even on fetch error we must not leave
+        // consumers waiting forever (they would render a loading state
+        // instead of the correct access-denied / allowed panel).
+        setUserCrewMembershipsLoaded(true);
+      }
     };
     fetchRuntimeSnapshot();
   }, [dbUser?.user_id]);
@@ -275,8 +293,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearStartParam,
     userCrewInfo,
     userCrewMemberships,
+    userCrewMembershipsLoaded,
     userMetadataSlices,
-  }), [startParamPayload, clearStartParam, userCrewInfo, userCrewMemberships, userMetadataSlices]);
+  }), [startParamPayload, clearStartParam, userCrewInfo, userCrewMemberships, userCrewMembershipsLoaded, userMetadataSlices]);
 
   const cartValue = useMemo<AppCartContextData>(() => ({
     cartScopeVersion: 1,
@@ -342,6 +361,7 @@ export const useAppContext = (): AppContextData => {
       clearStartParam: defaultClearStartParam,
       userCrewInfo: null,
       userCrewMemberships: [],
+      userCrewMembershipsLoaded: false,
       userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
       activeLobby: null,
       cartScopeVersion: 1,
@@ -361,6 +381,7 @@ export const useAppContext = (): AppContextData => {
       clearStartParam: defaultClearStartParam,
       userCrewInfo: null,
       userCrewMemberships: [],
+      userCrewMembershipsLoaded: false,
       userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
     }),
     ...(strikeball ?? { activeLobby: null }),

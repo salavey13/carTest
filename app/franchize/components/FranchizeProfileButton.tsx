@@ -105,8 +105,16 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   }, [userCrewMemberships, effectiveSlug]);
   // Only show crew operator links (leads, rentals, analytics) if user is admin
   // OR belongs to the crew whose page they're currently viewing.
+  // Task 45 fix: isCurrentCrewAdmin was MISSING here (though the iter6 comment
+  // promised "crew admins"). canViewCrewLinks relied on userCrewInfo — which
+  // is only the user's PRIMARY crew (owned crew, else one arbitrary membership
+  // row via maybeSingle()). For a crew admin/co_owner who owns nothing, or
+  // anyone owning several crews, userCrewInfo.slug !== effectiveSlug → the
+  // "Аналитика аренд" (and leads/dashboard) items randomly disappeared from
+  // the profile dropdown. userCrewMemberships is the deterministic per-crew
+  // source — gate on it too.
   const isCurrentCrewMember = !!(userCrewInfo?.slug && effectiveSlug && userCrewInfo.slug === effectiveSlug);
-  const canViewCrewLinks = userIsAdmin || isCurrentCrewMember;
+  const canViewCrewLinks = userIsAdmin || isCurrentCrewAdmin || isCurrentCrewMember;
   const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;
   const franchizeProfileHref = `/franchize/${effectiveSlug}/profile`;

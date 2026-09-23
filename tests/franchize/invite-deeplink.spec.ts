@@ -121,13 +121,17 @@ describe("map catalog layer (source contract)", () => {
 });
 
 describe("CSV export — condition spec + new/used split (source contract)", () => {
-  it("export script: condition column + sale-new/sale-used files + warning for missing", () => {
+  it("export script: condition column + sale-new/sale-used files + resolved condition", () => {
     const py = read("scripts/export_vip_bike_csv.py");
     expect(py).toContain('"condition"');
     expect(py).toContain("vip-bike-sale-new.csv");
     expect(py).toContain("vip-bike-sale-used.csv");
     expect(py).toContain("def normalize_condition");
-    expect(py).toContain("sale_no_condition");
+    // Task 44/45: каскад resolve_condition (явный spec → brand_type →
+    // модельный год → used); derived-список печатается вместо WARNING
+    expect(py).toContain("def resolve_condition");
+    expect(py).toContain("resolve_condition(specs)");
+    expect(py).toContain("sale_derived");
     // Старый единый sale-файл больше не пишется
     expect(py).not.toContain('"vip-bike-sale.csv"');
   });

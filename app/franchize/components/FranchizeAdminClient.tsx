@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/Loading";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme } from "next-themes";
-import { getEditableVehiclesForUser } from "@/app/rentals/actions";
+import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getCrewVehicles } from "@/app/franchize/server-actions/get-crew-vehicles";
 import {
   getFranchizeOrderNotificationFailures,
@@ -119,7 +119,7 @@ export function FranchizeAdminClient({
   editId,
   initialCrew,
 }: FranchizeAdminClientProps) {
-  const { dbUser, isLoading, userCrewMemberships } = useAppContext();
+  const { dbUser, isLoading, userCrewMemberships, userCrewMembershipsLoaded } = useAppContext();
   const crew = initialCrew || fallbackCrew;
   const [fleet, setFleet] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -164,15 +164,38 @@ export function FranchizeAdminClient({
     );
   }, [userCrewMemberships, crew?.slug]);
 
+  // Task 45 security fix: platform admins (users.status/role = admin, e.g.
+  // salavey13) manage any crew's garage, but the FLEET they see must still be
+  // that crew's own — never their personal cross-crew set.
+  const userIsPlatformAdmin = useIsAdmin();
+  const canManageCrewFleet = isCrewFleetAdmin || userIsPlatformAdmin;
+  // True only after the membership check SETTLED and the user is NOT allowed.
+  // While the check is pending we must NOT render the denial (crew admins
+  // would see an access-denied flash before memberships arrive).
+  const [fleetAccessDenied, setFleetAccessDenied] = useState(false);
+
   const loadFleet = useCallback(async () => {
     if (!dbUser?.user_id || !crew?.slug) return;
+
+    // Task 45 security fix: this panel is crew-scoped. Previously non-admins
+    // fell back to getEditableVehiclesForUser — ALL vehicles from ALL of the
+    // user's crews + personal — rendered under THIS crew's banner (opening
+    // /franchize/nn-mototeh-nn/admin showed vip-bike + sly13 items as
+    // "Мототех НН: админка гаража"). Now: no permission → no data at all,
+    // and allowed users ALWAYS get the crew's own fleet (getCrewVehicles).
+    if (!canManageCrewFleet) {
+      if (userCrewMembershipsLoaded) {
+        setFleetAccessDenied(true);
+        setFleet([]);
+        setFleetLoaded(true);
+      }
+      return;
+    }
+    setFleetAccessDenied(false);
     setLoadingFleet(true);
 
-    // Crew admins see ALL vehicles belonging to the crew
-    // Others fall back to personal editable vehicles
-    const res = isCrewFleetAdmin
-      ? await getCrewVehicles(crew.slug)
-      : await getEditableVehiclesForUser(dbUser.user_id);
+    // Fleet is ALWAYS the current crew's own vehicles (crew_id-scoped query).
+    const res = await getCrewVehicles(crew.slug);
 
     setLoadingFleet(false);
 
@@ -197,7 +220,7 @@ export function FranchizeAdminClient({
         );
       }
     }
-  }, [crew?.id, crew?.slug, dbUser?.user_id, editId, isCrewFleetAdmin]);
+  }, [crew?.id, crew?.slug, dbUser?.user_id, editId, canManageCrewFleet, userCrewMembershipsLoaded]);
 
   useEffect(() => {
     loadFleet();
@@ -207,13 +230,13 @@ export function FranchizeAdminClient({
   // arrives. The chain `userCrewMemberships → isCrewFleetAdmin (useMemo)
   // → loadFleet (useCallback) → useEffect` SHOULD work via React's dep
   // tracking, but in practice the initial render runs loadFleet with
-  // isCrewFleetAdmin=false (memberships not yet fetched) → calls
-  // getEditableVehiclesForUser → user sees only their personally-owned
-  // cars (11 in salavey13's case). When memberships arrive a few hundred
-  // ms later, isCrewFleetAdmin becomes true, but the re-load sometimes
-  // doesn't trigger reliably (React 18 batching). This explicit effect
-  // forces a re-load whenever userCrewMemberships changes from empty to
-  // populated, ensuring the second loadFleet call actually runs.
+  // isCrewFleetAdmin=false (memberships not yet fetched). When memberships
+  // arrive a few hundred ms later, isCrewFleetAdmin becomes true, but the
+  // re-load sometimes doesn't trigger reliably (React 18 batching). This
+  // explicit effect forces a re-load whenever userCrewMemberships changes
+  // from empty to populated, ensuring the second loadFleet call actually runs.
+  // Task 45: the fallback branch no longer loads personal cross-crew data —
+  // it renders the access gate instead, so the flash is benign either way.
   const prevMembershipsLen = useRef(0);
   useEffect(() => {
     const len = userCrewMemberships.length;
@@ -442,6 +465,30 @@ export function FranchizeAdminClient({
         </p>
       </div>
     );
+  }
+
+  // Task 45 security fix: while the membership check is still pending we
+  // keep loading (a crew admin must NOT see a denial flash for the first
+  // few hundred ms). Once settled and not allowed — render the gate INSTEAD
+  // of the whole operator panel (fleet, notifications, reviews, rentals).
+  if (!canManageCrewFleet) {
+    if (!userCrewMembershipsLoaded) {
+      return <Loading text="Проверяем доступ к гаражу экипажа..." />;
+    }
+    if (fleetAccessDenied) {
+      return (
+        <div className="rounded-2xl border-2 border-dashed p-8 text-center"
+          style={{ borderColor: "var(--fr-admin-border, #333)" }}>
+          <p className="text-2xl mb-2">🛡️</p>
+          <p className="text-sm font-semibold" style={{ color: "var(--fr-admin-text, #fff)" }}>
+            Панель владельца экипажа недоступна
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--fr-admin-muted, #999)" }}>
+            Управление гаражом доступно только владельцу и администраторам экипажа «{crew.header.brandName || crew.name || slug}».
+          </p>
+        </div>
+      );
+    }
   }
 
   return (
@@ -811,7 +858,7 @@ export function FranchizeAdminClient({
       </FranchizeOperatorPanel>
 
       <FranchizeOperatorPanel className="mt-4">
-        {isCrewFleetAdmin ? (
+        {canManageCrewFleet ? (
           <>
             <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr),auto]">
               <Select
@@ -923,7 +970,7 @@ export function FranchizeAdminClient({
         )}
       </FranchizeOperatorPanel>
 
-      <SubrenterManagerPanel slug={slug} canManage={isCrewFleetAdmin} />
+      <SubrenterManagerPanel slug={slug} canManage={canManageCrewFleet} />
 
       <FranchizeOperatorPanel className="mt-4">
         <div className="flex items-center justify-between gap-3">
