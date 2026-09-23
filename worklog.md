@@ -1,3 +1,14 @@
+# carTest — multi-agent worklog
+
+> ⚠️ ВОССТАНОВЛЕНИЕ 2026-09-23: файл был случайно перезаписан при записи Task 42
+> (Write вместо append). Восстановлено из снимка в репо (Tasks 1–14, коммит 62c1f93)
+> и вербатим-копии из контекста сессии (Tasks 30–32-b).
+> Tasks 15–29 и 33–41 сохранились только в сжатых хэндофф-резюме — их полный текст
+> утрачен вместе со средой; ключевые результаты тех итераций видны в git log
+> (c987f73, b6d9131, 4d53944, 20db889, 85cb00e, b45ebbc…).
+> ПРАВИЛО: после каждой записи — git add worklog.md && git commit, чтобы wipe среды
+> не уничтожал журнал.
+
 ---
 Task ID: 10
 Agent: main (Super Z)
@@ -395,3 +406,125 @@ Work Log:
 
 Stage Summary:
 - Новая инструкция на 3 000 000 ₽/мес чистыми создана, проверена 4 раза, запушена в docs/ и выдана файлами для скачивания (DOCX + PDF). Все цифры — из единой модели, привязаны к реальным тарифам каталога. Рекомендация на будущее: старые артефакты сразу пушить в репо — wipe среды их уничтожает.
+
+---
+## GAP — утраченные записи (восстановлены по хэндофф-резюме)
+
+- Tasks 15–29: уведомления арендатору + renters can post + startapp-роутер; красота стены;
+  crew palette из metadata; codereview/security; «Chain»-инвестигейт + interlink wall↔map-riders
+  + POI + dummy crews (миграция 20260921000000); кастомизация профиля + reviewer-агент;
+  deep-link renter-уведомления; зачистка хардкода oneBikePlsBot; merge community в map-riders
+  sliding sheet; 6 фиксов (c987f73).
+- Tasks 33–41: share deep links через metadata.franchize.contacts.telegramBotUsername
+  (root cause — несуществующая колонка crews.contacts; фикс b6d9131, одобрено «NICE!»);
+  инвайт-ссылки t.me/<бот>/app?startapp=join_<slug>; снос заглушек crew wall/page;
+  notifications/achievements инвайтов; каталог на карте по GPS из specs; spec new/used +
+  сплит CSV на new/used; SPA-auth; one-RTT startapp; OSM-сверка POI (4d53944);
+  geosharing one-shot fix (85cb00e); round pictures для людей (b45ebbc).
+
+---
+Task ID: 30
+Agent: Super Z (main)
+Task: carTest — «find where new leads are being added (webhook) → notify owner and admin about new lead with deeplink t.me/oneBikePlsBot/app?startapp=lead_[lead_id]».
+
+Work Log:
+- Клон salavey13/carTest (PAT classic, HEAD b32920418), bun install 1206.
+- Разведка потока лидов: Avito webhook (app/api/webhooks/avito/route.ts, createLead → franchize_intents, ключ лида на странице = "avito:<chatId>" или нормализованный телефон) + callback-lead (форма сайта, owner-only). Leads page (franchize/[slug]/leads) грузит через getFranchizeLeads; шторка открывается по selectedId=user_id; уже существовал openLeadById (с серверным поиском вне окна).
+- НАЙДЕН СКРЫТЫЙ БАГ: notifyCrewOwnerAsync в авито-вебхуке слал {chatId,text} в /api/forward-telegram, а тот ждёт {chat_id,method,payload} — ВСЕ уведомления о новых лидах падали с 400 незаметно (fire-and-forget). Тот же баг в legacy handleGenericCallback.
+- Новый app/franchize/lib/new-lead-notify.ts: resolveLeadNotifyRecipients (owner + admins owner/admin/co_owner active + опц. все active members + ADMIN_CHAT_ID=413553377; паттерн superlist-clear), leadDeeplinkUrl (NEXT_PUBLIC_TELEGRAM_BOT_LINK || t.me/oneBikePlsBot/app; sanitizeLeadKey под charset startapp), notifyNewLead (HTML + inline-кнопка «🟡 Открыть лид», telegramDeliver).
+- avito: notifyCrewOwnerAsync переписан на хелпер (+phone: createLead теперь возвращает {chatId, phone}); callback-lead VIP BIKE: получатели owner+админы+ADMIN (без рядовых членов), deeplink по цифрам телефона, доставка через telegramDeliver, state machine notificationSent сохранена; legacy-обработчик переведён на notifyNewLead.
+- LeadsClient: useSearchParams + openLeadFromDeeplink (кандидаты: user_id, "avito:"+key, avito?.chatId, цифры телефона; серверный поиск q=key вне окна) + effect по ?leadId= (гейт isAuthed/prefsSettled, ref-guard, history.replaceState чистит параметр).
+- Тесты: vip-bike-callback-lead.spec — «fails closed without token» обновлён под семантику транспорта (без токена форвард РАБОТАЕТ; fail-closed только когда недоступны все пути) + новый тест доставки без локального токена; callback-lead-site-integration — конверт {chat_id,method,payload} + ассерт deeplink lead_9031234567. Полный suite: 1657 passed / 23 skipped / 0 failed. tsc: в тронутых прод-файлах ошибок нет (базовый шум spec-типов остался).
+- Push: d275c52b4 → origin/main (b32920418..d275c52b4), Vercel автодеплой.
+
+Stage Summary:
+- Теперь: новый лид (Авито или форма сайта) → TG-сообщение owner + админам экипажа (+активным членам для Авито, +глобальный ADMIN) с кнопкой «Открыть лид» → Mini App → /franchize/vip-bike/leads?leadId=<key> → шторка лида (с поиском на сервере).
+- Починен давно молча сломанный пайплайн уведомлений о лидах (400 от forward-telegram).
+- Что проверить после деплоя: реальное сообщение о новом лиде в TG + тап по кнопке (бот oneBikePlsBot, Mini App URL должен вести на rental.vip-bike.ru).
+
+---
+Task ID: 31
+Agent: Super Z (main)
+Task: carTest — «enhance order page: investigate runtime crashes while filling passport/driver's licence + save entered data so reload/crash doesn't lose it».
+
+Work Log:
+- Аудит OrderPageClient.tsx (2159 строк) + цепочки: useFranchizeCart / useFranchizeCartLines (localStorage-корзина уже санитизирована), date-utils (defensive), telegram-links, useCrewTokens/useResolvedPalette, PhotoUploadButton (модуль-уровень createClient, но фича выключена), error.tsx.
+- ЛОВУШКА: grep/Read показывали «const asSavedDocs, ...]» в CartPageClient.tsx:42 как синтаксическую ошибку — od -c доказал, что строка ВАЛИДНА (const asSavedDocs...]); инструменты отображения съели «». Ничего не «чинилось» по ложному срабатыванию.
+- Диагноз «sometimes runtime error» (ранжировано): (1) некастедные обращения crew.reservationHold.* / crew.catalog.promoBanners.length — дрейф конфига экипажа = краш рендера; (2) todayISO() в рендере → hydration mismatch около полуночи UTC; (3) непойманные rejected server actions в prefill-эффектах; (4) на order-странице НЕ было локального error boundary (на остальных франшизных есть).
+- НОВОЕ app/franchize/lib/order-draft.ts: версионированный (v1) черновик формы в localStorage, ключ franchize-order-draft:{slug} (orderId минтится заново при каждом cart→order, поэтому в ключ не годится), TTL 14 дней, поле-по-полю sanitize (enum payment/delivery, капы 2000, hostile types → null), isOrderDraftMeaningful, never-throws storage API.
+- OrderPageClient: restore-эффект объявлен ДО prefill-эффектов (mount-порядок) — черновик побеждает серверный prefill (loadPrefill/loadRentalSecrets/phone-lookup делают early return при draftRestoredRef); watch-подписка сохраняет каждое значимое нажатие (debounce 400ms) + flush на pagehide; пустой черновик удаляется; clearOrderDraft после успешного checkout и в clearAllPrefillFields; чип «Мы восстановили введённые ранее данные · Очистить и ввести заново» под заголовком.
+- Hardening: reservationHold/percent/label/pickupAddress/requiredDocs через ?.; promoBanners?.length ?? 0; min={minVisitDate} после маунта; try/catch в loadPrefill/loadRentalSecrets; checkbox accent-prop → style accentColor.
+- Восстановление после краша: order/[id]/page.tsx обёрнут в FranchizeErrorBoundary (resetKey slug:id, фолбэк «данные сохранены — нажмите Повторить») + franchize/error.tsx получил кнопку reset («Попробовать ещё раз», URL не теряется). Remount → черновик сам заполняет форму.
+- Тесты: tests/franchize/order-draft.spec.ts (11 unit: round-trip, TTL, corrupted JSON, чужой slug/version, hostile types, enum-fallbacks, throwing storage, trim/cap) + order-draft-wiring.spec.ts (8 source-assertions в стиле iter17: порядок restore<prefill, draft-wins, watch+pagehide, очистки, hydration-фикс, defensive-гварды, boundary, reset). 2 моих первых ассерта были наивными (литерал min={todayISO()} в моём же комментарии; неверное допущение о порядке объявлений) — исправлены.
+- Верификация: full suite 1676 passed / 23 skipped / 0 failed; typecheck:franchize passed; eslint --max-warnings=0 clean; esbuild-parse touched файлов OK.
+- Push: rebase поверх a8faf5598 (CSV-regen) → decf093fe → origin/main, Vercel автодеплой.
+
+Stage Summary:
+- Введённые паспорт/ВУ/контакты/промо/оплата больше не пропадают: перезагрузка, краш, убийство WebView — форма восстанавливается из локального черновика; после успешного заказа черновик стирается.
+- Страница стала устойчивой к дрейфу конфига экипажа и hydration-рассинхрону; краш теперь показывает in-place «Повторить» вместо потери чекаута.
+- Проверить после деплоя: заполнить часть формы → перезагрузить страницу → поля на месте + чип восстановления; «Очистить и ввести заново» стирает; после успешного заказа черновик не воскресает.
+
+---
+Task ID: 32
+Agent: Super Z (main)
+Task: carTest — codereview двух последних коммитов (decf093 order-draft + d275c52 lead-notify), «no regression and silly mistakes», + по пути: (1) кнопка «Показать» в поиске главного каталога франшизы стоит не по центру вертикально; (2) подсвеченная «таблетка»-фильтр на странице каталога обрезается (glow/ring не «переливаются» за границы).
+
+Work Log:
+- Свежая среда: репо переехал — клонирован salavey13/carTest @ decf093 (обе ветки-цели в origin/main), bun install 1206 пакетов.
+- ЛОВУШКА №2 (опять): `const inVisitDate, setMinVisitDate]` в OrderPageClient выглядела как СИНТАКСИЧЕСКАЯ ОШИБКА — кодпоинтовый дамп доказал: файл ВАЛИДЕН, слой отображения инструментов снова съедает символы. Правило: подозрительные «синтакс-ошибки» проверять python-дампом кодпоинтов / esbuild-parse, не чинить по отображению.
+- Систематический ревью decf093: все 12 тронутых файлов esbuild-parse OK; typecheck:franchize OK (13 транзитивных долгов вне allowlist — старые); eslint --max-warnings=0 OK. Семантика: restore-эффект до prefill (порядок mount), draft-wins через draftRestoredRef, watch+pagehide flush, очистки после чекаута/сброса, stale extra-ID отфильтровываются самим submitPayload (extras из selectedExtraItems), appliedPromo сознательно НЕ восстанавливается (только текст инпута — ревалидация), несуществующие todayISO() в рендере устранены.
+- Систематический ревью d275c52: telegramDeliver(method, chatId, payload) → {ok,error} — контракт сходится; escHtml+sanitizeLeadKey корректны; vip-bike: includeMembers:false (owner+админы+глобальный), авито: по умолчанию все активные (сохранено прежнее поведение), deeplink по цифрам телефона / avito chatId; LeadsClient: гейты auth/prefs, one-shot по ключу, history.replaceState чистит URL, серверный поиск вне окна.
+- НАЙДЕНО (1 silly-mistake): generic-callback handler после отказа от битого forward-telegram потерял `await` (стал `void notifyNewLead`) — на Vercel файр-энд-фор.freeze после ответа = доставка рандомно пропадает. notifyNewLead не бросает (per-recipient guard) → фикс: `await` (гарантия доставки как в легаси). [34a84e2]
+- Наблюдение (НЕ чинил, вне скоупа): FranchizeErrorBoundary показывает сырой error.message вместо fallbackMessage на рентерском чекауте — улучшение UX на будущее.
+- UX-фиксы каталога (CatalogClient): (1) поиск: input py-3+border=46px, а кнопки top-1..bottom-1+min-h-11 (44px) — stretch всего 38px → min-height выигрывал, кнопка якорилась к top-1 и вылезала на ~2px снизу. Фикс: контейнер h-[52px] + input h-full → stretch ровно 44px, идеальная центровка. (2) «шарик»: активная пилюля фильтра с glow 0 0 8px + focus-rings обрезалась [overflow-y:clip] (pb-1, сверху 0). Фикс: pt-2.5/pb-2.5 ВНУТРИ скроллпорта (clip идёт по padding-edge) с компенсацией -mt-2.5/mb-3.5 — визуальные отступы пиксель-в-пиксель прежние (сверху 20 / снизу 24), бонус: 6px скроллбар больше не наезжает на пилюли. Грабли по пути: mb-5 и -mb-2.5 в одном className конфликтуют (порядок в CSS, не в атрибуте) → чистые mb-3.5.
+- Верификация: full suite 1676 passed / 23 skipped / 0 failed (94 файла); typecheck:franchize OK; eslint --max-warnings=0 OK (все тронутые).
+- PUSH PENDING: GITHUB_TOKEN в этой сессии редacted («could not read Username»). Коммит 34a84e2 готов локально; патч-фолбэк: download/cartest-codereview-fixes-34a84e2.patch (git am). Нужен свежий PAT от босса либо пуш с его машины.
+
+Stage Summary:
+- Регрессий в decf093/d275c52 НЕ найдено; найдена и закрыта 1 реальная дыра (потеря await → рандомные пропуски уведомлений из generic-формы) + 2 UI-дефекта каталога (центровка поиска, обрезанный glow фильтра).
+- Локальный коммит 34a84e2 поверх decf093; после пуша Vercel задеплоит автоматически.
+- Проверить на проде: (1) кнопка «Показать» строго по центру капсулы поиска; (2) активный фильтр («Байк»/tier-цвет) светится без обрезки, фокус-ринг тоже; (3) заявка с сайта (generic) стабильно приходит в TG.
+
+---
+Task ID: 32-b (push + hydration SQL locate)
+Agent: Super Z (main)
+Task: пуш 34a84e2 с полученным classic PAT + «where is the hydration SQL for victor/nikita?» + doublecheck.
+
+Work Log:
+- PAT classic (ghp_acXO…) верифицирован пушем: 34a84e2 → origin/main (decf093..34a84e2), Vercel автодеплой.
+- ГИДРАЦИЯ-SQL НАЙДЕН: Jeezzzy/traversa, ветка crawl/connectors-mock @ efc8ec6 (run-ветка crew-порта), файл docs/crew/traversa-franchize-hydration.sql. В cartest его НЕТ и не должно быть — это создание crew «TRAVERSA» в общей Supabase (inmctohsodgdohamhzag).
+- Doublecheck SQL: идемпотентный (ON CONFLICT (slug) — crews.slug UNIQUE по миграции xxxx_update_crews_with_slug; ON CONFLICT (crew_id, user_id) — UNIQUE-констрейнт 20240716000000); ссылка на шаблон docs/crewDocs/sly13-franchize-hydration.sql в carTest подтверждена; jsonb-контракт = полный надмножество sly13 (franchize/branding/theme/header/footer/contacts/cta/catalog/order/ui) + свои слоты contractDefaults/onec/etm (enabled=false, под шаг «1C settings в crew specs»); секретов в файле нет (пароли только VPS env); reservationHold отсутствует в ОБОИХ шаблонах (order-page с iter36-хардненингом деградирует безопасно).
+- ОДНО действие юзера: в SQL два TODO:000000000 — вписать реальные TG user id Виктора (owner, + crews.owner_id) и Никиты (admin); salavey13=413553377 уже вписан админом. Подсказка в файле: @userinfobot или первый вход в Mini App → строка появится в public.users.
+- Стейт веток: traversa main @ a7a629d — ветка crawl/connectors-mock (вкл. crew-порт) ещё НЕ смержена (PR на юзере). carTest main @ 34a84e2 — мои ревью-фиксы в проде.
+
+Stage Summary:
+- Пуш закрыт, патч-фолбэк больше не нужен (остался в download/ как артефакт).
+- Ответ юзеру: SQL в ветке Jeezzzy (crawl/connectors-mock → docs/crew/traversa-franchize-hydration.sql), не в cartest; перед прогоном в Supabase SQL Editor вписать 2 TODO-id.
+
+---
+Task ID: 42
+Agent: Super Z (main)
+Task: carTest — «continue enhancing icons on map-riders and robustness of geosharing; explain how to get api key for map (watermark); ditch old routes from map and investigate how to create new ones (dirt bike routes inbetween bridges along river nearby); add possibility to add youtube links to posts on wall, show actual videos in posts».
+
+Work Log:
+- Среда сброшена: re-clone salavey13/carTest @ 16cce33 (PAT в remote), bun install 1206. git log показал: geosharing-фикс (85cb00e) и круглые аватарки (b45ebbc) уже в main — новые задачи строил поверх.
+- Разведка: карта = Leaflet (react-leaflet 4.2.1), данные через /api/maps/capability (maps.points_of_interest); клиент инжектил 4 захардкоженных DEFAULT_ROUTES с 18KB geojson; в БД 3 старых маршрута (vip-fedorovsky-sormovo-loop, route-dd05b5ca «city center», route-138f5c07 «Off-road») + демо-райдеры; RacingMap рендерит routes как GeoJSON/Polyline без иконок; wall-посты рендерят тело через parseWallText (token-based, XSS-safe).
+- OSM-исследование (Overpass недоступен из среды — 406/unreachable; Nominatim + OSM API работают): реальные сходы мостов — Канавинский (way 168040093: 56.3280/43.9725 ↔ 56.3255/43.9780), Метромост (108685019: 56.3173/43.9699 ↔ 56.3222/43.9570), Мызинский (27804831: 56.2474/43.9529 ↔ 56.2537/43.9412); осевая Оки (relation 163223, polygon_threshold=0.0005) → NN-сегмент из 10 точек. Пыра (Пырские пески) — 56.297/43.353 у Дзержинска, НЕ между мостами НН — маршруты строил между тремя реальными мостами.
+- scripts/gen_dirt_routes.py (репо /home/z/my-project/scripts/): Catmull-Rom по якорям (реальные сходы + береговые смещения ~100–150 м) → 3 маршрута: dirt-kanavino-beach (1.5 км, песок, #eab308), dirt-meshcherskaya-pojma (8.4 км, #4ade80), dirt-priokskie-peski (6.5 км loop, #f97316); координаты [lat,lon] + geojson LineString [lon,lat] + note + dashArray 8,6.
+- Клиент: DEFAULT_ROUTES удалён полностью (константа, STALE_DEMO_POI_IDS, merge в mapPoints) — маршруты теперь только из БД. Ловушка display-eating снова стрельнула («return qPoint, …» / «[hqPoint»): hexdump-кодпоинтов доказал валидность файла, ничего не «чинил».
+- Миграция 20260923000000_dirt_routes_between_bridges.sql (ручной SQL editor): селективное удаление ПО ИМЕНИ (старые сид-треки + vip-demo-rider-%; точечные POI и админские route-* живут), append 3 dirt-маршрутов, идемпотентно.
+- Иконки: RacingMap рисует стартовые бейджи маршрутов (sm 26px FaFlag-диск, popup: имя · Петля/Трек · ≈км (haversine по geojson) · note); гейт Boolean(poi.note) — VPR-квиз-зоны (не имеют note) не получают флагов; кэш иконок per-color (routeBadgeIconCache, cap 32) — без setIcon-чурна на каждом rider-тике; normalizePoi прокидывает note (trim, 300 cap); PointOfInterest.note; .mr-poi--sm CSS.
+- Геошаринг robustness (useLiveRiders): (1) авто-деградация — после ≥4 подряд ошибок watch без единого фикса один раз перезапускается с enableHighAccuracy=false (installWatch/degradedRef); (2) watchdog 15s/45s — молчаливый W3C getCurrentPosition-кик при отсутствии фикса 45с, cold-start-aware (startedAtRef, Math.max(last,start)) + cooldown 30с + skip paused/hidden/denied (geoErrorKindRef); (3) startTokenRef race-guard — устаревший async start() не может поставить второй watch.
+- Тайловый оверрайд: NEXT_PUBLIC_MAP_TILE_URL/_ATTRIBUTION (build-time) в RacingMap — апгрейд-путь на keyed-провайдера; дефолт CARTO остаётся без ключа. Документация в .env.example.
+- Wall YouTube: app/franchize/lib/wall-youtube.ts — extractYouTubeVideoIds (https-only; youtube/youtu.be/nocookie/music; watch?v=|youtu.be/|shorts/|embed/|live/; строгий id [A-Za-z0-9_-]{11}; дедуп; cap WALL_YOUTUBE_MAX=2), youTubeThumbUrl/youTubeEmbedUrl (youtube-nocookie, playsinline); CommunityWallClient: WallYouTubeCard (ленивая карточка: превью i.ytimg.com + ▶ → тап → iframe autoplay; onError тихо убирает) + WallPostVideos в PostCard после фото (работает и на /community, и в шите карты).
+- Тесты: wall-youtube.spec (14: парсер кейсы + source-контракт), map-routes-dirt.spec (24: клиент без DEFAULT_ROUTES, селективная миграция, бейджи, watchdog, tile-override), map-poi-markers.spec +sm-размер, iter29 SQL-счётчик 173→174.
+- CODE REVIEW (2 итерации, reviewer-агент): iter1 — CRITICAL updated_at на maps (колонки НЕТ, миграция бы упала целиком, а клиент уже без маршрутов → карта пустая), MAJOR бейджи утекали в VPR-квиз, MINOR watchdog cold-start/иконок-чурн/удаление админских маршрутов при re-run, NIT env-текст/dead group-hover. ВСЁ исправлено; iter2 — верификация фиксов, вердикт SHIP (внесён и N1-найт: негативный ассерт → позитивный).
+- Верификация: typecheck:franchize ✓ (17 pre-existing debt — ровно тот же на чистом HEAD), eslint --max-warnings=0 ✓, full vitest 2126 passed / 23 skipped / 0 failed.
+- Push: b61bd06 → origin/main (16cce33..b61bd06), Vercel автодеплой.
+
+Stage Summary:
+- Карта map-riders: старые асфальтовые маршруты снесены (клиент+БД), вместо них 3 грунтовых «между мостами» вдоль Оки с реальной OSM-геометрией; у каждого маршрута флажок-старт с попапом (имя/км/покрытие).
+- Геошаринг дожат по надёжности: деградация точности, watchdog-кик, race-guard — попап-шторм исключён архитектурно.
+- Плеер YouTube в постах стены (карта+страница): превью → тап → nocookie-iframe.
+- ПОЛЬЗОВАТЕЛЮ: применить миграцию 20260923000000 вручную в Supabase SQL editor (до неё карта временно без маршрутов — старые снесёт и засеет грунтовые; она идемпотентна). Ключ карты НЕ нужен: CARTO/OSM бесплатны, полоска внизу — лицензионная атрибуция; для премиум-базemap — MapTiler key → NEXT_PUBLIC_MAP_TILE_URL/_ATTRIBUTION в Vercel (шаги в .env.example и ответе).
+- Проверить после деплоя: маршруты и флажки на карте (после миграции), пост с youtu.be-ссылкой в стене, геошаринг на слабом GPS.
