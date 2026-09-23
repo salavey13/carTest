@@ -248,13 +248,31 @@ describe("wall page interlink params", () => {
     const client = read("components/map-riders/MapRidersClientRefactored.tsx");
     expect(client).toContain("NN_MOTO_SPOTS.filter");
     expect(client).toContain("visibleSpots.map");
-    // Стена живёт в шите карты: чек-ин точки больше не уводит на /community —
-    // остаётся на map-riders с ?spot= (префилл композера в шите).
-    expect(client).toContain("map-riders?spot=${spot.id}");
+    // Чек-ин точки — кнопка с in-page префиллом шита (НЕ <Link> на тот же
+    // маршрут: same-route ?spot=-навигация выглядела как «не работает»).
+    expect(client).toContain("openSpotCheckin(spot.id)");
+    expect(client).not.toContain("map-riders?spot=${spot.id}");
     // «Поделиться заездом» открывает черновик в шите (без смены URL).
     expect(client).toContain("setSheetRideComposeId(endedRideSessionId)");
     expect(client).toContain("encodeURIComponent(m.title.slice(0, 60))");
     expect(client).toContain("spotKindFilter");
+  });
+
+  it("spot popup cross-links other crews through TG startapp grammar", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    // crew_<slug> → каталог чужого экипажа; wall_<slug> → его стена.
+    expect(client).toContain("crewCatalogStartParam(spot.slug)");
+    expect(client).toContain("wallStartParam(spot.slug)");
+    // Открывается через openTelegramLink (мини-апп перезапускается с новым
+    // startapp); без бота ИЛИ на броске билдера — веб-фолбэк тем же контролом.
+    expect(client).toContain("openCrewDeeplink(crewBot, param)");
+    expect(client).toContain("built = paramFactory()");
+    expect(client).toContain("crew.contacts.telegramBotUsername");
+    // URL в подсказке строится билдером, а не дублируется руками.
+    expect(client).toContain("title={buildTelegramAppLink(crewBot, param)}");
+    // In-page чек-ин пробрасывается в стену шита (+ nonce на повторный тап).
+    expect(client).toContain("checkinSpotId={wallCheckinSpot?.id ?? wallParams?.checkinSpotId ?? null}");
+    expect(client).toContain("checkinSpotNonce={wallCheckinSpot?.nonce}");
   });
 
   it("RacingMap renders only real React elements as rich popups (XSS guard)", () => {

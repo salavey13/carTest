@@ -167,6 +167,10 @@ interface CommunityWallClientProps {
   initialQuery?: string | null;
   /** Spot check-in (?spot=<id>): предзаполнить композер текстом про мототочку. */
   checkinSpotId?: string | null;
+  /** Меняется при повторном чек-ине ТОЙ ЖЕ точки (тап из попапа карты):
+   *  перезапускает префилл, когда checkinSpotId не изменился. URL-путь его
+   *  не передаёт — там достаточно самого ?spot=. */
+  checkinSpotNonce?: number;
   /** Wall × map: точка, выбранная тапом на карте (map-riders sheet mode).
    *  null/undefined = стены вне карты — «точка с карты» в композере скрыта. */
   mapSelectedPoint?: [number, number] | null;
@@ -175,7 +179,7 @@ interface CommunityWallClientProps {
   onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, mapSelectedPoint, onFocusGeotag }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, onFocusGeotag }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -475,9 +479,13 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   useEffect(() => {
     const spot = findMotoSpotById(checkinSpotId);
     if (!spot) return;
+    // Новый чек-ин = баннер снова показывается (снимаем dismissed прошлого
+    // чек-ина — тот же паттерн, что у ride-драфтов; тап по точке — явное
+    // действие пользователя, старое «скрыть» не должно его глушить).
+    setCheckinDismissed(false);
     setText((prev) => (prev.trim() ? prev : buildSpotCheckinText(spot)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkinSpotId]);
+  }, [checkinSpotId, checkinSpotNonce]);
 
   const applyTagFilter = useCallback((tag: string | null) => {
     setActiveTag((cur) => (tag !== null && cur === tag ? null : tag));

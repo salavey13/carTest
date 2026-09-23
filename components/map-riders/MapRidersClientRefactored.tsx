@@ -36,6 +36,7 @@ import {
   type WallGeoPinView,
 } from "@/app/franchize/lib/community-wall";
 import { motoSpotKindLabel, MOTO_SPOT_KINDS, motoSpotKindIcon, NN_MOTO_SPOTS, type MotoSpot, type MotoSpotKind } from "@/lib/map-riders-spots";
+import { buildTelegramAppLink, crewCatalogStartParam, wallStartParam } from "@/lib/wall-deeplink";
 import { catalogGpsFromSpecs } from "@/lib/catalog-gps";
 import type { CatalogItemVM } from "@/app/franchize/actions";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
@@ -118,6 +119,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   const [wallFocusPoint, setWallFocusPoint] = useState<{ lat: number; lng: number; key: number } | null>(null);
   // In-page «поделиться заездом»: черновик открывается в стене шита без смены URL.
   const [sheetRideComposeId, setSheetRideComposeId] = useState<string | null>(null);
+  // Чек-ин мототочки из попапа: композер стены шита префиллится БЕЗ роутинга
+  // (in-page, как sheetRideComposeId). nonce перезапускает префилл при повторном
+  // тапе по той же точке; URL-путь (?spot=) остаётся для внешних ссылок.
+  const [wallCheckinSpot, setWallCheckinSpot] = useState<{ id: string; nonce: number } | null>(null);
   const lastMeetupActionAtRef = useRef(0);
   // ── Круглые картинки crew-точек: logo_url dummy-экипажей мототочек.
   // Пусто в БД → null → маркер рисует kind-иконку-бейдж (см. RacingMap).
@@ -337,6 +342,34 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
   }, []);
 
+  /** Чек-ин мототочки из попапа: раскрыть шит на стене и префиллить композер.
+   *  Осознанно БЕЗ роутинга: раньше тут был <Link> на ТОТ ЖЕ маршрут с ?spot= —
+   *  same-route навигация не давала видимого эффекта («кнопка не работает»). */
+  const checkinNonceRef = useRef(0);
+  const openSpotCheckin = useCallback((spotId: string) => {
+    // Счётчик вместо Date.now(): строго монотонный, два тапа в одну миллисекунду
+    // не дают одинаковый nonce → повторный префилл гарантирован.
+    checkinNonceRef.current += 1;
+    setWallCheckinSpot({ id: spotId, nonce: checkinNonceRef.current });
+    setActiveSnap(0.86);
+    setSheetOpen(true);
+  }, []);
+
+  /** Чужой экипаж = отдельный запуск мини-аппа: t.me/<bot>/app?startapp=… через
+   *  openTelegramLink корректно перезапускает WebApp с новым startapp (полный
+   *  роутинг по грамматике: crew_<slug> / wall_<slug>), тогда как SPA-переход
+   *  на чужой экипаж ломает контекст (auth/crew snapshot текущего экипажа). */
+  const openCrewDeeplink = useCallback((bot: string, param: string) => {
+    const url = buildTelegramAppLink(bot, param);
+    const tg = (window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(url);
+      return;
+    }
+    // Обычный браузер: t.me-ссылка откроется Telegram'ом сам.
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
+
   /** Метка на карте → раскрыть шит и подсветить пост в ленте. */
   const openWallPostFromMap = useCallback((postId: string) => {
     window.dispatchEvent(new CustomEvent(WALL_FOCUS_POST_EVENT, { detail: { postId } }));
@@ -401,41 +434,82 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
 
   // ── Мототочки НН (Chain-style discovery layer) ─────────────────────────────
   // Каждая точка = dummy-экипаж (crews.slug = spot.slug, сеет миграция
-  // 20260921000000) → попап ссылается на стену точки и её карту, а «Отметиться»
-  // уводит на стену ТЕКУЩЕГО экипажа с ?spot=<id> (check-in текст в композере).
+  // 20260921000000). «Отметиться» — чек-ин на стене ТЕКУЩЕГО экипажа (in-page
+  // префилл шита); «Каталог/Стена экипажа» — TG-deeplinks на чужой экипаж.
   const spotPopupFor = useCallback(
-    (spot: MotoSpot) => (
-      // Community tokens (--community-*): same family as the wall's cards —
-      // the --mr-* fallbacks keep the popup readable on old embeds.
-      <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
-        <div className="text-sm font-semibold" style={{ color: spot.color }}>
-          {spot.name}
-        </div>
-        <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
-          {motoSpotKindLabel(spot.kind)} · {spot.address}
-        </div>
-        <div className="text-xs leading-snug opacity-80">{spot.hint}</div>
-        <div className="flex flex-col gap-1 pt-1">
-          {/* Стена живёт в шите той же страницы: чек-ин остаётся на карте
-              (composer префиллится текстом точки через ?spot=). */}
-          <Link
-            href={`/franchize/${crewSlug}/map-riders?spot=${spot.id}`}
-            className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
-            style={{ backgroundColor: "var(--community-accent, var(--mr-accent))", color: "var(--community-accent-text, var(--mr-base))" }}
+    (spot: MotoSpot) => {
+      // Бот текущего экипажа ведёт все startapp-ссылки попапа: роутер мини-аппа
+      // резолвит ЧУЖОЙ slug из параметра (crew_<slug> / wall_<slug>), так что
+      // openid-через-любой-бот работает одинаково. Нет бота → веб-пути.
+      const crewBot = crew.contacts.telegramBotUsername || null;
+      const deeplinkClass = "rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition hover:brightness-125";
+      const deeplinkStyle = { borderColor: "var(--community-border, var(--mr-border))", color: "var(--community-text, var(--mr-text))" };
+      // Чужой экипаж — через TG-грамматику (crew_<slug> → каталог (главная),
+      // wall_<slug> → стена чужого экипажа); роутер резолвит оба на FAST path
+      // (до auth), мини-апп перезапускается через openTelegramLink.
+      // paramFactory под try/catch: билдеры бросают на недоверенном slug, а
+      // попап рендерится внутри useMemo — карта никогда не должна падать
+      // целиком (фолбэк — обычная веб-ссылка).
+      const crossCrewControl = (paramFactory: () => string, webHref: string, label: string) => {
+        let built: string | null = null;
+        try {
+          built = paramFactory();
+        } catch {
+          // битый slug → веб-фолбэк тем же контролом
+        }
+        if (!crewBot || !built) {
+          return (
+            <Link href={webHref} className={deeplinkClass} style={deeplinkStyle}>
+              {label}
+            </Link>
+          );
+        }
+        const param = built; // const-алиас: TS-нароуинг внутрь onClick-замыкания
+        return (
+          <button
+            type="button"
+            onClick={() => openCrewDeeplink(crewBot, param)}
+            className={deeplinkClass}
+            style={deeplinkStyle}
+            // Единственный источник URL-формата — билдер (не дублируем его руками)
+            title={buildTelegramAppLink(crewBot, param)}
           >
-            Отметиться на стене экипажа
-          </Link>
-          <Link
-            href={`/franchize/${spot.slug}/community`}
-            className="rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition hover:brightness-125"
-            style={{ borderColor: "var(--community-border, var(--mr-border))", color: "var(--community-text, var(--mr-text))" }}
-          >
-            Стена точки
-          </Link>
+            {label}
+          </button>
+        );
+      };
+      return (
+        // Community tokens (--community-*): same family as the wall's cards —
+        // the --mr-* fallbacks keep the popup readable on old embeds.
+        <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
+          <div className="text-sm font-semibold" style={{ color: spot.color }}>
+            {spot.name}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
+            {motoSpotKindLabel(spot.kind)} · {spot.address}
+          </div>
+          <div className="text-xs leading-snug opacity-80">{spot.hint}</div>
+          <div className="flex flex-col gap-1 pt-1">
+            {/* Стена живёт в шите этой же страницы: чек-ин — кнопка с in-page
+                префиллом композера (раньше это был <Link> на тот же маршрут с
+                ?spot= — same-route навигация выглядела как «не работает»). */}
+            <button
+              type="button"
+              onClick={() => openSpotCheckin(spot.id)}
+              className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+              style={{ backgroundColor: "var(--community-accent, var(--mr-accent))", color: "var(--community-accent-text, var(--mr-base))" }}
+            >
+              Отметиться на стене экипажа
+            </button>
+            {/* Чужой экипаж — через TG-грамматику: crew_<slug> → каталог
+                (главная), wall_<slug> → стена чужого экипажа. */}
+            {crossCrewControl(() => crewCatalogStartParam(spot.slug), `/franchize/${spot.slug}`, "Каталог экипажа")}
+            {crossCrewControl(() => wallStartParam(spot.slug), `/franchize/${spot.slug}/community`, "Стена экипажа")}
+          </div>
         </div>
-      </div>
-    ),
-    [crewSlug],
+      );
+    },
+    [crew.contacts.telegramBotUsername, openCrewDeeplink, openSpotCheckin],
   );
 
   /** Легенда-фильтр: «all» показывает весь слой, иначе только выбранный kind. */
@@ -1080,7 +1154,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 composeRentalId={wallParams?.composeRentalId ?? null}
                 composeRideId={sheetRideComposeId ?? wallParams?.composeRideId ?? null}
                 initialQuery={wallParams?.initialQuery ?? null}
-                checkinSpotId={wallParams?.checkinSpotId ?? null}
+                checkinSpotId={wallCheckinSpot?.id ?? wallParams?.checkinSpotId ?? null}
+                checkinSpotNonce={wallCheckinSpot?.nonce}
                 mapSelectedPoint={state.selectedMeetupPoint}
                 onFocusGeotag={handleWallFocusGeotag}
               />

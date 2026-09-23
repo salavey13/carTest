@@ -22,6 +22,12 @@
 //                             the wall). userId is the Telegram numeric id
 //                             (users.user_id, digits only) — NO bare fallback:
 //                             the profile is crew-scoped, slug required.
+//   crew_<slug>             → another crew's catalog (main page). Routing is
+//                             NOT here: the STATIC fast path in
+//                             useStartParamRouter (computeStaticFastTarget)
+//                             handles crew_<slug> → /franchize/<slug> before
+//                             auth. This module only BUILDS the param (map
+//                             popups cross-linking to other crews).
 //
 // postId / rentalId are Postgres uuids (8-4-4-4-12 hex, hyphen-separated);
 // map-riders session ids are uuids too (gen_random_uuid).
@@ -211,6 +217,30 @@ export function wallRideStartParam(sessionId: string, slug: string): string {
   const budget = 64 - 5 - 36 - 1;
   const s = sanitizeWallSlug(slug) ?? "vip-bike";
   return `ride_${id}_${s.slice(0, Math.max(1, budget))}`;
+}
+
+/** crew_<slug> start param — «open this crew's catalog (main page)» from
+ *  map-riders popups and other cross-crew links. Truncate semantics like
+ *  crewJoinStartParam (over-budget slug → valid 59-char prefix; a wrong-crew
+ *  landing is a harmless catalog view); the parser lives in
+ *  computeStaticFastTarget (router).
+ *  Throws on hostile slugs — call sites that run during render must catch
+ *  and degrade to a web fallback. */
+export function crewCatalogStartParam(slug: string): string {
+  const s = sanitizeWallSlug(slug);
+  if (!s) throw new Error(`crewCatalogStartParam: invalid crew slug: ${slug}`);
+  const budget = 64 - 5; // "crew_" prefix
+  const param = `crew_${s.slice(0, Math.max(1, budget))}`;
+  // computeStaticFastTarget checks content.endsWith("_join_crew") BEFORE the
+  // plain-crew branch — a crew whose FINAL param ends with "_join_crew"
+  // misroutes to a phantom invite. Guard the param AFTER budget truncation,
+  // not just the input slug: a 60+ char slug can pass a slug-level check yet
+  // truncate into "_join_crew" (review iter-2, MINOR-1). slice(5) mirrors the
+  // router exactly (content = param.substring(5)), so no false positives.
+  if (param.slice(5).endsWith("_join_crew")) {
+    throw new Error(`crewCatalogStartParam: slug "${s}" collides with the crew_<slug>_join_crew invite grammar`);
+  }
+  return param;
 }
 
 /** https://t.me/<bot>/app?startapp=<param> — opens the Mini App on the spot. */

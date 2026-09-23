@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildTelegramAppLink,
+  crewCatalogStartParam,
   crewJoinStartParam,
   isUuidLike,
   parseWallDeepLink,
@@ -173,6 +174,59 @@ describe("join_<slug> (crew invite, admin → future owner)", () => {
   it("router fast path claims join links before the auth gate (source contract)", () => {
     const src = read("hooks/useStartParamRouter.ts");
     expect(src).toContain('return `/franchize/${link.slug}?join_crew=true`;');
+  });
+});
+
+describe("crew_<slug> (cross-crew catalog links, map popups)", () => {
+  it("builder builds crew_<slug>", () => {
+    expect(crewCatalogStartParam("nn-mototeh-nn")).toBe("crew_nn-mototeh-nn");
+    expect(crewCatalogStartParam(SLUG)).toBe(`crew_${SLUG}`);
+  });
+
+  it("builder refuses hostile/garbage slugs loudly", () => {
+    expect(() => crewCatalogStartParam("../../etc")).toThrow(/invalid crew slug/);
+    expect(() => crewCatalogStartParam("<script>alert(1)</script>")).toThrow(/invalid crew slug/);
+    expect(() => crewCatalogStartParam("")).toThrow(/invalid crew slug/);
+  });
+
+  it("refuses slugs colliding with the crew_<slug>_join_crew invite grammar", () => {
+    // computeStaticFastTarget checks _join_crew BEFORE the plain-crew branch —
+    // such a slug must never reach the router as crew_<slug>.
+    expect(() => crewCatalogStartParam("x_join_crew")).toThrow(/join_crew/);
+  });
+
+  it("guards the FINAL param: budget truncation must not create a _join_crew suffix", () => {
+    // 61-char slug does NOT end with _join_crew, but its 59-char truncated
+    // prefix does (49 filler + "_join_crew" = exactly the budget) — the
+    // param-level guard catches what a slug-level check would miss.
+    const tricky = `${"a".repeat(49)}_join_crewxx`;
+    expect(tricky.endsWith("_join_crew")).toBe(false);
+    expect(() => crewCatalogStartParam(tricky)).toThrow(/join_crew/);
+  });
+
+  it("budget: slugs that fit stay intact; real truncation kicks in past 59 chars", () => {
+    // 53-char slug fits the 59-char slug budget (64 - "crew_") untouched.
+    const longSlug = "a-very-long-crew-slug-that-definitely-does-not-fit-64";
+    expect(crewCatalogStartParam(longSlug)).toBe(`crew_${longSlug}`);
+    // 59-char slug sits exactly at the budget → intact ("+extra" would overflow).
+    expect(crewCatalogStartParam(`${longSlug}-extra`)).toBe(`crew_${longSlug}-extra`);
+    // 64-char slug → truncated to a VALID 59-char prefix (never an over-budget param).
+    const param = crewCatalogStartParam(`${longSlug}-extra-bits`);
+    expect(param.length).toBeLessThanOrEqual(64);
+    expect(param).toBe(`crew_${longSlug}-extra`); // 59 slug chars survive, "-bits" is cut
+  });
+
+  it("parseWallDeepLink does NOT claim crew_ (static fast path owns it)", () => {
+    // computeStaticFastTarget handles crew_<slug> → /franchize/<slug> BEFORE
+    // the wall handler; parseWallDeepLink returning null keeps that order
+    // conflict-free (no double interpretation of the same param).
+    expect(parseWallDeepLink("crew_nn-mototeh-nn")).toBeNull();
+  });
+
+  it("router static fast path routes crew_<slug> to the crew main page (source contract)", () => {
+    const src = read("hooks/useStartParamRouter.ts");
+    expect(src).toContain('param.startsWith("crew_")');
+    expect(src).toContain("if (content) return `/franchize/${content}`;");
   });
 });
 
