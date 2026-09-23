@@ -550,3 +550,21 @@ Stage Summary:
 - Список deeplinks всех 12 экипажей (vip-bike + 11 dummy из миграции 20260921000000) передан юзеру в ответе (crew_* / wall_* на каждый slug).
 - MapTiler-ключи юзера: достаточно redeploy — RacingMap уже поддерживает NEXT_PUBLIC_MAP_TILE_URL/_ATTRIBUTION.
 - Проверить после деплоя: тап по чужому экипажу → «Каталог экипажа» (мини-апп перезапустится на каталоге того экипажа), «Стена экипажа» → его стена; «Отметиться» → шит поднялся, композер с текстом точки.
+
+---
+Task ID: 44
+Agent: Super Z (main)
+Task: carTest — «vip-bike-sale-new.csv is empty, check how the script determines whether a bike is new or not. New ones are at least "sequence zero", "y-volt-surge-v", "falcons". Exclude hidden bikes as well (specs.hidden:true)».
+
+Work Log:
+- Диагностика (dump всех 32 байков vip-bike crew из Supabase): specs.condition НЕ заполнен НИ У ОДНОГО байка (None × 32) — скрипт split'ил по normalize_condition(specs.condition), всё падало в used-бакет (дефолт), sale-new.csv = пустой заголовок. Hidden-фильтр при этом уже работал (5 скрытых исключались).
+- Поиск реального сигнала: brand_type ∈ {official_reseller, dealer_data, dealer_used (BMW F800R, Honda CBR600RR), dealer_new (Jilang Max Pro, Leopard Asaka), manufacturer_data, community, None}; годы моделей: новинки 2025–2026 (Falcons, Sequence Zero, Y-VOLT Surge V, Rerode R1+), вторичка ≤ 2024 (BENDA LFC700 2024, BMW F800R 2015, Ducati 1199 2012).
+- Фикс scripts/export_vip_bike_csv.py: новый resolve_condition(specs) — каскад: (1) явный specs.condition; (2) brand_type dealer_new→new / dealer_used→used; (3) модельный год ≥ NEW_MODEL_YEAR_MIN (None → динамически «текущий год − 1», в 2026-м = 2025+) → new; (4) иначе used (безопасный дефолт). Колонка condition в CSV (rent+sale) теперь ВСЕГДА заполнена резолвнутым значением (раньше была пустая строка у всех). Split в main() переведён на resolve_condition; WARNING про «missing condition» заменён информационным списком выведенных condition. NEW_MODEL_YEAR_MIN — константа-ручка (можно зафиксировать порог).
+- Регенерация: 24 rent / 21 sale = 18 NEW + 3 USED; hidden исключены (bmw-s1000rr-electro-silver, ducati-panigale-s-electro-black-chain, kayo-tsd110, suzuki-gsx-s1000f, wenbox-u2-pro). В NEW попали все из списка юзера: 4×79BIKE Falcon (2025/26), Sequence Zero (2026), Y-VOLT Surge V (2025) + Ducati Panigale S Electro ×4 (2025), HMD M02, Jilang Max Pro (dealer_new 2023), Leopard Asaka (dealer_new 2023), LiveWire ONE, Motoland Breakout 300, Regulmoto Nibbler 300, Rerode R1+, Sotion EM01. USED: BENDA LFC700 (2024), BMW F800R (2015), Ducati 1199 Panigale (2012).
+- skills/catalog-csv-exporter/SKILL.md: описан каскад resolve_condition, hidden-шаг, скорректированы пути вывода (public/docs/autoreply/).
+- scripts/push_catalog_csvs.py не менялся (грузит те же 3 файла).
+
+Stage Summary:
+- Root cause: пустой specs.condition в БД (спек из gold-standard схемы заведён, но не заполнен) + жёсткий дефолт «всё в used». Теперь condition резолвится каскадом brand_type/год даже без явного спека.
+- Порог «новинки»: год ≥ (текущий год − 1) — самоподдерживающийся для cron; в 2027-м 2025-е байки уедут в used, если к тому моменту не проставить явный specs.condition (рекомендация: заполнять condition в спеках руками — тогда каскад не нужен).
+- Проверить после деплоя/раскатки CSV: sale-new 18 строк ( condition=new у всех), sale-used 3 строки.

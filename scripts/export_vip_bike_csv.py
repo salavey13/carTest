@@ -7,10 +7,15 @@ Generates 3 CSV files (2026-09-22: sale split by specs.condition — new/used):
   - <repo>/public/docs/autoreply/vip-bike-sale-new.csv   (specs.sale truthy AND condition = new)
   - <repo>/public/docs/autoreply/vip-bike-sale-used.csv  (specs.sale truthy AND condition != new)
 
-New/used spec: specs.condition ∈ {"new", "used"} (см.
-docs/gold-standard-electro-bike-spec-schema.md, раздел identity). Техника без
-condition в sale-выгрузке попадает в USED-файл (вторичка — дефолт) и
-перечисляется в WARNING.
+New/used spec: сначала явный specs.condition ∈ {"new", "used"} (см.
+docs/gold-standard-electro-bike-spec-schema.md, раздел identity). Если он не
+заполнен (2026-09: в БД не заполнен ни у одного байка — потому sale-new.csv
+был пуст), condition РЕЗОЛВИТСЯ каскадом (resolve_condition):
+  1. явный specs.condition;
+  2. specs.brand_type: dealer_new → new, dealer_used → used;
+  3. модельный год ≥ (текущий год − 1) → new (2025+ в 2026-м = новинки);
+  4. иначе → used (вторичка — безопасный дефолт).
+Колонка condition в CSV всегда заполнена резолвнутым значением.
 
 Source: Supabase public.cars table
   - type = 'bike'
@@ -172,6 +177,12 @@ def is_hidden(specs):
     return hidden is True or hidden == 1 or str(hidden).lower() in ("1", "true")
 
 
+# Модельный год, ниже которого техника считается вторичкой. None →
+# динамически «текущий год − 1» (в 2026-м это 2025+). Явно проставить число,
+# если порог нужно зафиксировать вне зависимости от даты запуска cron.
+NEW_MODEL_YEAR_MIN = None
+
+
 def normalize_condition(value):
     """
     Normalize specs.condition to a canonical lowercase token: "new" | "used".
@@ -186,6 +197,39 @@ def normalize_condition(value):
     if s in ("used", "бу", "б/у", "б\\/у", "б-у", "с пробегом", "не новое"):
         return "used"
     return s
+
+
+def resolve_condition(specs):
+    """
+    Resolve new/used даже когда specs.condition не заполнен (2026-09: не
+    заполнен ни у одного байка — из-за этого vip-bike-sale-new.csv был пуст).
+    Каскад (первый совпавший шаг выигрывает):
+      1. явный specs.condition (normalize_condition → new|used);
+      2. specs.brand_type: "dealer_new" → new, "dealer_used" → used;
+      3. модельный год ≥ NEW_MODEL_YEAR_MIN (по умолчанию текущий год − 1,
+         т.е. 2025+ в 2026-м) → new — текущее поколение моделей в продаже
+         (Sequence Zero 2026, Y-VOLT Surge V 2025, 79BIKE Falcon 2025/26);
+      4. иначе → used (вторичка — безопасный дефолт).
+    """
+    explicit = normalize_condition(get_spec(specs, "condition"))
+    if explicit in ("new", "used"):
+        return explicit
+    brand_type = str(get_spec(specs, "brand_type") or "").strip().lower()
+    if brand_type == "dealer_new":
+        return "new"
+    if brand_type == "dealer_used":
+        return "used"
+    year_raw = get_spec(specs, "year")
+    try:
+        year = int(str(year_raw)[:4])
+    except (TypeError, ValueError):
+        year = None
+    threshold = NEW_MODEL_YEAR_MIN
+    if threshold is None:
+        threshold = datetime.datetime.now().year - 1
+    if year is not None and year >= threshold:
+        return "new"
+    return "used"
 
 
 # ════════════════════════════════════════════════════════════
@@ -330,7 +374,7 @@ def build_rent_row(bike):
         "bike_subtype": get_spec(specs, "bike_subtype"),
         "type": get_spec(specs, "type"),
         "year": get_spec(specs, "year"),
-        "condition": normalize_condition(get_spec(specs, "condition")),
+        "condition": resolve_condition(specs),  # всегда new|used (каскад)
         "license_class": get_spec(specs, "license_class"),
         "description": bike.get("description", ""),
         "daily_price": safe_str(bike.get("daily_price", 0)),
@@ -386,7 +430,7 @@ def build_sale_row(bike):
         "bike_subtype": get_spec(specs, "bike_subtype"),
         "type": get_spec(specs, "type"),
         "year": get_spec(specs, "year"),
-        "condition": normalize_condition(get_spec(specs, "condition")),
+        "condition": resolve_condition(specs),  # всегда new|used (каскад)
         "license_class": get_spec(specs, "license_class"),
         "description": bike.get("description", ""),
         "sale_price": safe_str(get_spec(specs, "sale_price")),
@@ -459,28 +503,32 @@ def main():
     rent_bikes = [b for b in visible_bikes if is_truthy(b.get("specs", {}).get("rent"))]
     sale_bikes = [b for b in visible_bikes if is_truthy(b.get("specs", {}).get("sale"))]
 
-    # condition split: "new" → отдельный файл; всё остальное (used/пусто/мусор)
-    # → used-файл. Пустые и нераспознанные — в WARNING (вручную выставить spec).
+    # condition split через resolve_condition (каскад: явный spec →
+    # brand_type → модельный год → used). Всё, что resolved как "new", идёт в
+    # sale-new.csv, остальное — в sale-used.csv.
     sale_new_bikes = []
     sale_used_bikes = []
-    sale_no_condition = []
+    sale_derived = []  # (bike, cond) — condition выведен каскадом, не из spec
     for b in sale_bikes:
-        cond = normalize_condition(get_spec(b.get("specs", {}), "condition"))
+        specs = b.get("specs", {})
+        cond = resolve_condition(specs)
+        explicit = normalize_condition(get_spec(specs, "condition"))
+        if not explicit:
+            sale_derived.append((b, cond))
         if cond == "new":
             sale_new_bikes.append(b)
-        elif cond == "used":
-            sale_used_bikes.append(b)
         else:
             sale_used_bikes.append(b)
-            sale_no_condition.append(b)
 
     print(f"\nSplit: {len(rent_bikes)} rent, {len(sale_bikes)} sale "
-          f"({len(sale_new_bikes)} new / {len(sale_used_bikes)} used incl. {len(sale_no_condition)} without condition), "
+          f"({len(sale_new_bikes)} new / {len(sale_used_bikes)} used), "
           f"{len(bikes)} total")
-    if sale_no_condition:
-        print(f"\n⚠️  WARNING: {len(sale_no_condition)} sale bike(s) missing/unrecognized condition (→ used file):")
-        for b in sale_no_condition:
-            print(f"   - {b.get('make', '')} {b.get('model', '')} ({b.get('id', '')})")
+    if sale_derived:
+        print(f"\nℹ️  {len(sale_derived)} sale bike(s) без явного specs.condition — "
+              f"condition выведен каскадом (brand_type / модельный год ≥ "
+              f"{NEW_MODEL_YEAR_MIN or datetime.datetime.now().year - 1}):")
+        for b, cond in sale_derived:
+            print(f"   - [{cond}] {b.get('make', '')} {b.get('model', '')} ({b.get('id', '')})")
 
     # Check for missing license_class
     missing_lic = [b["id"] for b in bikes if not get_spec(b.get("specs", {}), "license_class")]

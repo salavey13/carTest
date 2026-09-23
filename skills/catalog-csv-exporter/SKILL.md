@@ -17,16 +17,25 @@ Export VIP Bike catalog from Supabase `public.cars` to clean, compact CSV files 
 ## What it does
 
 1. Queries Supabase for all vip-bike crew bikes (`type=bike`, `crew_id` = vip-bike, `make != VipBike`)
-2. Splits into 3 CSVs based on `specs.rent` / `specs.sale` flags and `specs.condition`:
+2. Excludes hidden bikes (`specs.hidden` truthy — same semantics as the site filter)
+3. Splits into 3 CSVs based on `specs.rent` / `specs.sale` flags and RESOLVED condition:
    - `vip-bike-rent.csv` — bikes available for rent
-   - `vip-bike-sale-new.csv` — for sale AND `specs.condition = new`
-   - `vip-bike-sale-used.csv` — for sale AND condition used/empty (вторичка — дефолт)
-3. Normalizes all fields to prevent CSV corruption:
+   - `vip-bike-sale-new.csv` — for sale AND resolved condition = new
+   - `vip-bike-sale-used.csv` — for sale AND resolved condition = used (вторичка — дефолт)
+4. Resolves condition by cascade `resolve_condition()` (2026-09: явный
+   `specs.condition` в БД не заполнен ни у одного байка — из-за этого
+   sale-new.csv был пуст):
+   1. явный `specs.condition` ("new"/"новое" → new, "бу" → used);
+   2. `specs.brand_type`: `dealer_new` → new, `dealer_used` → used;
+   3. модельный год ≥ текущий год − 1 (2025+ в 2026-м) → new;
+   4. иначе → used (безопасный дефолт).
+   Колонка `condition` в CSV всегда заполнена резолвнутым значением.
+5. Normalizes all fields to prevent CSV corruption:
    - `features` → semicolon-separated string (not comma — avoids CSV separator conflicts)
    - `gallery` → pipe-separated URLs
    - Nested objects (`buy_colors`, `buy_options`, `spec_labels`) → clean JSON strings
    - All fields properly CSV-quoted (`csv.QUOTE_ALL`)
-4. Pushes updated CSVs to repo at `docs/autoreply/`
+6. Pushes updated CSVs to repo at `docs/autoreply/`
 
 ## When to use
 
@@ -43,10 +52,10 @@ Export VIP Bike catalog from Supabase `public.cars` to clean, compact CSV files 
 python3 /home/z/my-project/scripts/export_vip_bike_csv.py
 ```
 
-This generates 3 files in `/home/z/my-project/download/`:
+This generates 3 files in the repo's `public/docs/autoreply/`:
 - `vip-bike-rent.csv`
-- `vip-bike-sale-new.csv` (for sale, condition = new)
-- `vip-bike-sale-used.csv` (for sale, condition used or not set)
+- `vip-bike-sale-new.csv` (for sale, resolved condition = new)
+- `vip-bike-sale-used.csv` (for sale, resolved condition = used)
 
 ### Step 2: Push CSVs to repo
 
