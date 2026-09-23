@@ -127,6 +127,9 @@ export default async function FranchizeCommunityPage(
         composeRideId={composeRideId}
         initialQuery={initialQuery}
         checkinSpotId={checkinSpotId}
+        // Task 46: на СТРАНИЦЕ стены карточки ленты идут от края до края
+        // экрана на телефонах (в sliding sheet карты — обычные, bleed=false).
+        bleed
       />
 
       <CrewFooter crew={crew} />

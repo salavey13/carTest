@@ -227,6 +227,9 @@ export function RiderProfileClient({
           <p className="text-sm text-[var(--community-muted)]">
             Райдер предпочёл скрыть профиль. Видны только имя и аватар — всё остальное доступно ему и админам экипажа.
           </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--community-muted)] opacity-70">
+            экипаж {crewName}
+          </p>
         </div>
       </section>
     );
@@ -656,13 +659,16 @@ export function RiderProfileClient({
                     {buildWallPostPreview(post.body || (post.photos.length > 0 ? "пост с фото" : ""), 160)}
                   </p>
                   {post.photos.length > 0 && (
-                    <div className="mt-2 flex gap-1.5 overflow-hidden">
+                    // Task 46: строка скроллится, а не режется — на 320-360px
+                    // экранах 4 миниатюры + «+N» не влезают, overflow-hidden
+                    // беззвучно съедал плитку «+N». Скроллбар спрятан.
+                    <div className="mt-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {post.photos.slice(0, 4).map((photo) => (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo.id} src={photo.url} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover transition duration-300 hover:scale-105" />
+                        <img key={photo.id} src={photo.url} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-xl object-cover transition duration-300 hover:scale-105" />
                       ))}
                       {post.photos.length > 4 && (
-                        <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-[var(--community-border)] text-xs font-bold text-[var(--community-text)]">
+                        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[var(--community-border)] text-xs font-bold text-[var(--community-text)]">
                           +{post.photos.length - 4}
                         </span>
                       )}

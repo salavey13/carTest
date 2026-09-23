@@ -586,3 +586,21 @@ Stage Summary:
 - «Аналитика аренд» больше не мигает/не пропадает у crew-админов и мульти-экипажных владельцев.
 - ПОЛЬЗОВАТЕЛЮ: применить 20260923210000_set_bike_condition_specs.sql вручную в SQL editor → перезапустить scripts/export_vip_bike_csv.py → в sale-new останутся 12 confirmed new + HMD/Ducati Electro (year-heuristic), 6 штук уедут в sale-used. Если HMD M02 / Ducati Panigale S Electro тоже used — добавить их в values миграции.
 - Остались: визуал rider page/стен (отдельный проход с reviewer-циклом), инвайт-ссылки join_<slug>, заглушки стены, GPS items на карте, скорость startapp-роутера.
+
+---
+Task ID: 46
+Agent: Super Z (main)
+Task: carTest — (1) «reduce number of tests, seems too much»; (2) визуал rider page/стен — отдельный проход с reviewer-циклом; (3) «Enhance posts card on the wall — don't wrap, let card fill full screen width»; (4) «Improve picture viewer regarding zoom (pinch on mobile)».
+
+Work Log:
+- Тесты (1): admin-ownership-gate.spec.ts ужат 13 it → 4 (по одному на гарантию: crew-scoped loader + gate-regex + отсутствие кросс-экипажного фолбэка; memberships-кнопки; AppContext-флаг; миграция condition — 12 id + idempotency). Пины сохранены усиленно: комментарии перед not.toContain вычищаются, добавлены назад 'from "@/app/rentals/actions"' и useIsAdmin(). Базлайн vitest: 2147 → 2138 passed / 23 skipped / 0 failed.
+- Full-bleed карточек (3): новый CSS-модификатор .cw-card-bleed (@media max-width 639.98px: radius 0, без боковых бордеров; spotlight ::after тоже). Включается пропом bleed (opt-in): ТОЛЬКО community/page.tsx; в sliding sheet карты (MapRidersClientRefactored) карточки обычные — там квадратные безбордные внутри паддинга панели выглядят сломанно (нашёл reviewer iter-1). Фотопосты (cw-bleed-x) и так тянутся к краю карточки → на телефоне фото от края до края экрана, VK-style.
+- PhotoLightbox pinch (4): слой жестов (pointer-хендлеры + touchAction:none) перенесён с дива размером с картинку на absolute inset-0 во весь stage — pinch теперь ловится и когда пальцы попадают на letterbox-поля (раньше зум заводился только если ОБА пальца легли на фото). transform-wrapper размером со stage → transform-origin строго = stageCenter(), вся зум-математика (zoomAtPoint/computeZoomOffset) не тронута. img max-h-[78vh] → max-h-full: 78vh кропал верх/низ на низких экранах (топбар + подсказка +/thumbstrip съедали высоту). Стейт-машина (pinch/pan/swipe/dbltap/wheel) не изменялась — reviewer проверил все переходы (2→1 палец re-anchor, hadTwo lastTap, swipe только при scale≤1.01).
+- Визуал (2): иконка заголовка стены BarChart3 → Newspaper (лента, не аналитика; BarChart3 остался на двух реальных стат-контролах); rider page: скрытый профиль показывает «экипаж <name>», превью фото постов h-14→h-16 rounded-xl, строка миниатюр overflow-hidden → overflow-x-auto со скрытым скроллбаром (на 320-360px «+N»-плитка беззвучно съедалась).
+- Reviewer-цикл: 2 полные итерации сторонним агентом. iter-1: APPROVE, 2 MINOR (bleed в sheet, потерянные пины) + 5 NIT — все исправлены (639.98px, комментарии-стрип, shrink-0). iter-2: независимая перепроверка (diff построчно + 191/191 wall-спеков + eslint + typecheck) — APPROVE, все 6 находок подтверждены закрытыми, новых нет.
+- Верификация: typecheck:franchize ✓ (те же 17 транзитивных долгов вне allowlist), eslint --max-warnings=0 ✓, полный vitest 2138/23/0 ✓.
+
+Stage Summary:
+- Лента на телефонах — сплошной VK-style фид от края до края (только страница стены), лайтбокс — pinch от любой точки stage, фото влезает целиком без кропа.
+- Suite полегчал на 9 тестов без потери гаранти (4 пина держат все 3 фикса Task 45).
+- Остались: инвайт-ссылки join_<slug>, заглушки стены, GPS items, скорость startapp-роутера, YouTube-эмбеды на стене (уже есть WallPostVideos), маршруты.

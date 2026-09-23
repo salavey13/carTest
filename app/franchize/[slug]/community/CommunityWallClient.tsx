@@ -39,6 +39,7 @@ import {
   Lock,
   MapPin,
   MessageCircle,
+  Newspaper,
   PenLine,
   Pin,
   PinOff,
@@ -177,9 +178,15 @@ interface CommunityWallClientProps {
   /** Wall × map: тап по геотег-чипу поста → карта летит к метке.
    *  Не задан (страница стены) — чип ведёт на карту (?post=<id>). */
   onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
+  /** Task 46: full-bleed посты — карточки ленты на телефонах идут от края
+   *  до края экрана (VK-style). Включает ТОЛЬКО страница стены
+   *  (community/page.tsx): в sliding sheet карты (map-riders) панель имеет
+   *  свои отступы и скругление — там квадратные безбордные карточки
+   *  выглядят сломанными, поэтому по умолчанию выключено. */
+  bleed?: boolean;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, onFocusGeotag }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, onFocusGeotag, bleed = false }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -882,7 +889,10 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
       <div className="cw-above flex flex-wrap items-center justify-between gap-3 border-b border-[var(--community-border)] px-4 py-4 md:px-8">
         <div className="flex items-center gap-3">
           <span className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10">
-            <BarChart3 className="h-5 w-5 text-[var(--community-accent)]" />
+            {/* Task 46: the wall header is a FEED — a bar-chart glyph read as
+                «аналитика»; Newspaper says «стена» at a glance. BarChart3
+                stays on the two actual stats controls below. */}
+            <Newspaper className="h-5 w-5 text-[var(--community-accent)]" />
           </span>
           <div>
             <h2 className="flex items-center gap-2 font-orbitron text-xl md:text-2xl text-[var(--community-text)]">
@@ -1531,13 +1541,17 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             </div>
           )
         ) : (
-          <div className="flex flex-col gap-4">
+          // Task 46: с bleed карточки дотягиваются до краёв экрана —
+          // -mx-3 гасит px-3 секции (см. выше); без bleed лента живёт
+          // в обычном паддинге (sliding sheet).
+          <div className={`flex flex-col gap-4 ${bleed ? "-mx-3 sm:mx-0" : ""}`}>
             {posts.map((post, i) => (
               <PostCard
                 key={post.id}
                 index={i}
                 post={post}
                 slug={slug}
+                bleed={bleed}
                 viewer={viewer}
                 canModerate={canModerate}
                 expanded={expanded.has(post.id)}
@@ -2225,10 +2239,17 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
         </button>
       </div>
 
-      {/* image stage */}
-      <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+      {/* image stage — Task 46: gestures live on a FULL-stage layer
+          (absolute inset-0), not on the image box: fingers landing on the
+          letterbox bars still reach pinch/pan/swipe (pinch used to engage
+          only when BOTH fingers hit the image itself). The transform wrapper
+          is stage-sized, so its transform-origin is exactly the stage centre
+          the zoom math anchors to. max-h-full fits the photo to the REAL
+          stage height — max-h-[78vh] cropped top/bottom on short screens
+          once the top bar + hint/thumbs took their share. */}
+      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden">
         <div
-          className="flex items-center justify-center"
+          className="absolute inset-0 flex items-center justify-center"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -2246,7 +2267,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
             src={photo.url}
             alt={`Фото ${index + 1}`}
             draggable={false}
-            className="max-h-[78vh] max-w-[94vw] select-none object-contain"
+            className="max-h-full max-w-full select-none object-contain"
           />
         </div>
 
@@ -2806,6 +2827,8 @@ interface PostCardProps {
   /** Wall × map: задан на карте (sheet) — чип летит к метке; на странице
    *  стены не задан — чип ведёт на карту (?post=<id>). */
   onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
+  /** Task 46: full-bleed карточка (только страница стены, см. ниже). */
+  bleed?: boolean;
 }
 
 function PostCard(props: PostCardProps) {
@@ -2875,7 +2898,7 @@ function PostCard(props: PostCardProps) {
       ref={cardRef}
       onPointerMove={onCardPointerMove}
       style={{ "--cw-i": props.index } as React.CSSProperties}
-      className={`cw-rise cw-card ${post.isPinned ? "cw-card-pinned" : ""} cw-spotlight p-4 md:p-5`}
+      className={`cw-rise cw-card ${props.bleed ? "cw-card-bleed" : ""} ${post.isPinned ? "cw-card-pinned" : ""} cw-spotlight p-4 md:p-5`}
     >
       {/* header */}
       <div className="flex items-start justify-between gap-3">
