@@ -34,12 +34,19 @@ export function RentalMessageInput({
     }
 
     startTransition(async () => {
-      const result = await sendRentalMessage(rentalId, message.trim(), dbUser.user_id);
-      if (result.success) {
-        toast.success("Сообщение отправлено владельцу");
-        setMessage("");
-      } else {
-        toast.error(result.error || "Ошибка отправки");
+      try {
+        // Task 47: `?.` — a transport-level failure resolves the action with
+        // undefined; a bare `.success` read then threw an uncaught TypeError
+        const result = await sendRentalMessage(rentalId, message.trim(), dbUser.user_id);
+        if (result?.success) {
+          toast.success("Сообщение отправлено владельцу");
+          setMessage("");
+        } else {
+          toast.error(result?.error || "Ошибка отправки");
+        }
+      } catch (err) {
+        console.error("[RentalMessageInput] send failed:", err);
+        toast.error("Ошибка отправки");
       }
     });
   };

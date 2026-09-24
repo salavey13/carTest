@@ -155,8 +155,10 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
         checklist,
         notes: freezeNotes,
       });
-      if (!result.success) {
-        toast.error(result.error || "Не удалось сохранить выдачу");
+      // Task 47: `?.` — a transport-level failure resolves the action with
+      // undefined; a bare `.success` read then threw an uncaught TypeError
+      if (!result?.success) {
+        toast.error(result?.error || "Не удалось сохранить выдачу");
         return;
       }
       toast.success("Выдача сохранена. Теперь можно подтверждать старт аренды.");
@@ -174,8 +176,8 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
         severity: damageSeverity,
         notes: damageNotes,
       });
-      if (!result.success) {
-        toast.error(result.error || "Не удалось добавить отчёт о повреждении");
+      if (!result?.success) {
+        toast.error(result?.error || "Не удалось добавить отчёт о повреждении");
         return;
       }
       setDamageNotes("");

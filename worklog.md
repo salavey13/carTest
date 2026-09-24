@@ -604,3 +604,20 @@ Stage Summary:
 - Лента на телефонах — сплошной VK-style фид от края до края (только страница стены), лайтбокс — pinch от любой точки stage, фото влезает целиком без кропа.
 - Suite полегчал на 9 тестов без потери гаранти (4 пина держат все 3 фикса Task 45).
 - Остались: инвайт-ссылки join_<slug>, заглушки стены, GPS items, скорость startapp-роутера, YouTube-эмбеды на стене (уже есть WallPostVideos), маршруты.
+
+---
+Task ID: 47
+Agent: Super Z (main)
+Task: carTest — «error boundary get triggered when closing active rent: Cannot read properties of undefined (reading 'success')» (rental/[id], intermittently).
+
+Work Log:
+- Диагностика: ВСЕ closure-actions (confirmVehicleReturn / abortRental / confirmVehiclePickup / initiateTelegramRentalPhotoUpload) возвращают объект на каждом пути — undefined из логики action невозможен. Источник — транспорт: Next.js резолвит промис Server Action в undefined при обрыве (сеть / таймаут Vercel-функции / устаревший action id после редеплоя) — прецедент в репо: OrderPageClient iter14. Клиент читал result.success на undefined → TypeError.
+- ВАЖНО (эмпирически проверено reviewer'ом на vendored React 18.3 canary): throw внутри startTransition async НЕ доходит до error boundary на этом стеке (0/3 эксперимент) — уходит в reportError/console. Скриншот boundary остался частично необъяснён (возможно старый клиентский бандл); зафиксировано в комментарии + follow-up: снять полный stack с boundary при следующем воспроизведении. Доказанно: reads .success были единственным производителем этого TypeError на странице — все закрыты.
+- Фикс (7 файлов): FranchizeRentalLifecycleActions — withAction ловит исключения (имя-осознанный тост: return/abort/pickup → SERVER_REPLY_LOST «действие могло пройти — карточка сейчас обновится», остальным retry); closure/abort — явная ветка if (!result) с тостом + router.refresh() (карточка сама покажет реальный статус; клиентский стейт модалки переживает RSC-refresh — черновики оператора не теряются); pickup/photo-* — result?.success. Остальное дерево rental-страницы (RentalExtendModal, RentalMessageInput +try/catch, FranchizeRentalDocumentsPanel ×2, RenterActionsPanel, RentalSetPhoneModal) — `?.`-guards; RentalReturnChecklist — `?.` + .catch (фолбэк на дефолтные пункты).
+- Тесты: tests/franchize/rental-action-reply-guards.spec.ts (3 it, source-grep с коммент-стрипом): lifecycle — pairwise порядок guard→bare read + lost-reply ветки с router.refresh() (оконный regex, не глобальный счёт); панели/модалки — только ?.; чек-лист — никогда не rejects unhandled. vitest 2138 → 2141 passed / 23 skipped / 0 failed.
+- Reviewer: 2 итерации, обе APPROVE. iter-1: 1 MAJOR (механизм в комментариях был неверен — исправлен на честный), 4 MINOR (name-aware catch copy; typecheck-allowlist заметка; pairwise-ассерт; diary) + NITs — применены: REPLY_MAY_HAVE_APPLIED Set вместо строкового сравнения, вы-form копи, зачистка 5 устаревших комментариев в соседних файлах, TODO-якорь в confirmVehicleReturn (уводить notify-цепочку — receipt ≤10s + nudge + ride-share + achievements — из awaited-пути; добавить "already completed" status-guard как в abortRental — сейчас повторный сабмит перезапускает квитанции/ачивки).
+
+Stage Summary:
+- Закрытие аренды при обрыве связи больше не «молча» ломается: оператор получает честный тост, карточка сама обновляется через router.refresh(), модалка с черновиками сохраняется для повтора.
+- ПОЛЬЗОВАТЕЛЮ: если boundary снова сработает — раскрыть «stack trace» и прислать полный стек (boundary его показывает) — это закроет вопрос об истинном пути до boundary.
+- Follow-ups (не блокер): server-side status-guard в confirmVehicleReturn + notify-цепочку из awaited-пути; SaleBikeLandingClient имеет тот же класс голых .success-reads.

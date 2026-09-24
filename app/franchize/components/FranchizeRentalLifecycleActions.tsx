@@ -12,6 +12,28 @@ import {
 } from "@/app/rentals/actions";
 // Photo gallery import removed — gallery is only on the rental detail page, not in the closure modal
 
+// Task 47: "error boundary when closing active rent — Cannot read properties
+// of undefined (reading 'success')". All closure actions return an object on
+// every code path, but the transport can still resolve a Server Action
+// promise with `undefined` (network blip, Vercel function timeout mid-flight,
+// stale action id after a redeploy) — the same failure OrderPageClient
+// documented at iter14. Every action reply below is therefore guarded.
+//
+// Mechanism note (verified against the vendored React 18.3 canary): a throw
+// inside a startTransition async callback does NOT reach an error boundary on
+// this stack — it surfaces via reportError/console. The boundary screenshot
+// the boss sent remains partially unexplained (possibly an older client
+// bundle); what IS proven is that these reply reads were the only producers
+// of the reported TypeError on this page. Follow-up: capture the boundary's
+// full stack next time it fires.
+const SERVER_REPLY_LOST =
+  "Ответ сервера не получен. Действие могло пройти — проверьте статус аренды: карточка сейчас обновится.";
+// Actions whose server UPDATE precedes the reply: a lost reply (undefined
+// resolve OR rejection) may still have applied — use the honest wording.
+// "pickup" mutates before replying too (confirmVehiclePickup writes the
+// freeze receipt first) — milder consequences, same set.
+const REPLY_MAY_HAVE_APPLIED = new Set(["return", "abort", "pickup"]);
+
 interface FranchizeRentalLifecycleActionsProps {
   rentalId: string;
   ownerId: string;
@@ -92,6 +114,19 @@ export function FranchizeRentalLifecycleActions({
     startTransition(async () => {
       try {
         await callback();
+      } catch (err) {
+        // Task 47: an unexpected throw/rejection here used to vanish into
+        // reportError (async transition throws do NOT replay to the error
+        // boundary on React 18; the spinner itself reset via finally) — the
+        // operator got NO feedback at all. For closure/abort a rejection
+        // means the reply was lost AFTER the server may have applied the
+        // UPDATE — same honest wording as the undefined-reply branch.
+        console.error(`[FranchizeRentalLifecycleActions] ${name} failed:`, err);
+        toast.error(
+          REPLY_MAY_HAVE_APPLIED.has(name)
+            ? SERVER_REPLY_LOST
+            : "Действие не выполнено. Попробуйте ещё раз.",
+        );
       } finally {
         setPendingAction(null);
       }
@@ -225,8 +260,8 @@ export function FranchizeRentalLifecycleActions({
                   return;
                 }
                 const result = await confirmVehiclePickup(rentalId, dbUser.user_id);
-                if (!result.success) {
-                  toast.error(result.error || "Не удалось подтвердить получение.");
+                if (!result?.success) {
+                  toast.error(result?.error || "Не удалось подтвердить получение.");
                   return;
                 }
                 toast.success("Получение подтверждено. Обновите карточку для актуального статуса.");
@@ -294,8 +329,8 @@ export function FranchizeRentalLifecycleActions({
                   return;
                 }
                 const result = await initiateTelegramRentalPhotoUpload(rentalId, dbUser.user_id, "start");
-                if (!result.success || !result.deepLink) {
-                  toast.error(result.error || "Не удалось открыть сценарий фото ДО.");
+                if (!result?.success || !result.deepLink) {
+                  toast.error(result?.error || "Не удалось открыть сценарий фото ДО.");
                   return;
                 }
                 navigateToDeepLink(result.deepLink);
@@ -318,8 +353,8 @@ export function FranchizeRentalLifecycleActions({
                   return;
                 }
                 const result = await initiateTelegramRentalPhotoUpload(rentalId, dbUser.user_id, "end");
-                if (!result.success || !result.deepLink) {
-                  toast.error(result.error || "Не удалось открыть сценарий фото ПОСЛЕ.");
+                if (!result?.success || !result.deepLink) {
+                  toast.error(result?.error || "Не удалось открыть сценарий фото ПОСЛЕ.");
                   return;
                 }
                 navigateToDeepLink(result.deepLink);
@@ -664,6 +699,16 @@ export function FranchizeRentalLifecycleActions({
                         },
                       } : {}),
                     });
+                    // Task 47: undefined reply = transport died mid-call; the
+                    // rental may already be completed server-side (the UPDATE
+                    // precedes all the non-fatal notifications). Refresh so
+                    // the card shows the REAL status instead of telling the
+                    // operator to check manually.
+                    if (!result) {
+                      toast.error(SERVER_REPLY_LOST);
+                      router.refresh();
+                      return;
+                    }
                     if (!result.success) {
                       toast.error(result.error || "Не удалось подтвердить возврат.");
                       return;
@@ -768,6 +813,11 @@ export function FranchizeRentalLifecycleActions({
                       reason: abortReason.trim() || undefined,
                       crewSlug,
                     });
+                    if (!result) {
+                      toast.error(SERVER_REPLY_LOST);
+                      router.refresh();
+                      return;
+                    }
                     if (!result.success) {
                       toast.error(result.error || "Не удалось отменить аренду.");
                       return;

@@ -122,9 +122,11 @@ export function RenterActionsPanel({
       return;
     }
     startSigningTransition(async () => {
+      // Task 47: `?.` — a transport-level failure resolves the action with
+      // undefined; a bare `.success` read then threw an uncaught TypeError
       const result = await signRentalContractPep(rentalId, dbUser!.user_id, initData);
-      if (!result.success) {
-        toast.error(result.error || "Не удалось подписать договор.");
+      if (!result?.success) {
+        toast.error(result?.error || "Не удалось подписать договор.");
         return;
       }
       setJustSigned(true);

@@ -138,8 +138,10 @@ export function RentalExtendModal({
           newStartDate: startDate,
           newEndDate: endDate,
         });
-        if (!result.success) {
-          toast.error(result.error || "Не удалось продлить аренду.");
+        // Task 47: `?.` — a transport-level failure resolves the action with
+        // undefined; a bare `.success` read then threw an uncaught TypeError
+        if (!result?.success) {
+          toast.error(result?.error || "Не удалось продлить аренду.");
           return;
         }
         toast.success(`Аренда продлена до ${endDate}. Новый договор отправлен.`);

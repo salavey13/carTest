@@ -34,13 +34,21 @@ export function RentalReturnChecklist({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getRentalReturnTodos(rentalId, crewId).then((result) => {
-      if (cancelled) return;
-      setLoading(false);
-      if (result.success && result.data) {
-        setTodos(result.data);
-      }
-    });
+    getRentalReturnTodos(rentalId, crewId)
+      .then((result) => {
+        if (cancelled) return;
+        setLoading(false);
+        // Task 47: `?.` — transport-level failure resolves the action with
+        // undefined; `.success` on it threw inside the .then callback.
+        if (result?.success && result.data) {
+          setTodos(result.data);
+        }
+      })
+      .catch((err) => {
+        // Non-fatal: the checklist falls back to the default items below.
+        if (!cancelled) setLoading(false);
+        console.error("[RentalReturnChecklist] load failed:", err);
+      });
     return () => { cancelled = true; };
   }, [rentalId, crewId]);
 

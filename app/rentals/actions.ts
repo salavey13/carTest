@@ -1716,6 +1716,14 @@ export async function confirmVehicleReturn(
             rental_id: rentalId, type: 'return_confirmed', created_by: userId
         });
         if(eventError) logger.error(`[confirmVehicleReturn] Rental updated but failed to create event for ${rentalId}:`, eventError);
+        // TODO(task47-follow-up): everything from here to the return statement
+        // is awaited INSIDE the action (receipt fetch ≤10s + review nudge +
+        // ride-share post + achievements) — the operator's spinner and the
+        // client's undefined-reply window span the whole chain. Move the
+        // notify block out of the awaited path (fire-and-forget with
+        // waitUntil-style routing) and add an "already completed" status
+        // guard right after the fetch above (abortRental has one, this
+        // action doesn't — a re-submit re-fires receipts/achievements).
         await notifyRentalLifecycle(rentalId, 'return_confirmed');
 
         // ── BUG B fix: send closure receipt to renter ──────────────────────────

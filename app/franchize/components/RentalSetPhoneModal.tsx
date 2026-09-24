@@ -103,8 +103,10 @@ export function RentalSetPhoneModal({
       try {
         const { setRentalPhone } = await import("@/app/rentals/actions");
         const result = await setRentalPhone({ rentalId, phone });
-        if (!result.success) {
-          toast.error(result.error || "Не удалось сохранить телефон.");
+        // Task 47: `?.` — a transport-level failure resolves the action with
+        // undefined; a bare `.success` read then threw an uncaught TypeError
+        if (!result?.success) {
+          toast.error(result?.error || "Не удалось сохранить телефон.");
           return;
         }
         toast.success("Телефон сохранён. Клиент сможет получить QR-код.");
