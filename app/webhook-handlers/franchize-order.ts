@@ -267,5 +267,42 @@ export const franchizeOrderHandler: WebhookHandler = {
       [[{ text: "Open rental", url: appLink }]],
       {},
     );
+
+    // ── 2026-09-24 (owner request «notify all members about new rents created
+    // via web app and send to crew email as well»): the messages above cover
+    // only the renter, the bike owner and the platform admin — this lib pings
+    // every OTHER active crew member + drops a line to the crew mailbox
+    // (private.crew_secrets.email → SMTP fallback). Sale-only orders are
+    // skipped — there is no handover to prep for. Fire-and-forget: a missing
+    // notification must never break the payment webhook (lib itself is
+    // non-fatal too, belt and suspenders).
+    if (metadata.flowType !== "sale") {
+      try {
+        const { notifyCrewOfNewWebAppRental } = await import(
+          "@/app/franchize/lib/crew-rent-notify"
+        );
+        const crewNotify = await notifyCrewOfNewWebAppRental({
+          slug,
+          rentalId,
+          bikeTitle: `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || "техника",
+          renterLabel: userData?.username ? `@${userData.username}` : userId,
+          renterPhone: typeof metadata.phone === "string" ? metadata.phone : null,
+          startDate: typeof metadata.rentalStartDate === "string" ? metadata.rentalStartDate : null,
+          endDate: typeof metadata.rentalEndDate === "string" ? metadata.rentalEndDate : null,
+          totalRub,
+          depositRub:
+            Number(metadata.depositAmount || metadata.reservationHold?.amountRub || 0) || null,
+          appLink,
+          // Renter / bike owner / platform admin already got their messages
+          // above — skip them here so nobody is double-pinged.
+          excludeChatIds: [userId, vehicle.owner_id, adminChatId],
+        });
+        console.log(
+          `[franchize-order] crew notify: tg=${crewNotify.notified.length} email=${crewNotify.emailedTo ?? "skipped"}`,
+        );
+      } catch (notifyErr) {
+        console.error("[franchize-order] crew notify failed (non-fatal):", notifyErr);
+      }
+    }
   },
 };

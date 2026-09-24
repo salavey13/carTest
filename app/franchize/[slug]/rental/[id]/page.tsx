@@ -514,9 +514,13 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   Active rental + operator: end odometer is a LIVE input with a
                   dynamic difference (autosaved draft) so the closure modal is
                   opened with the deposit deduction already known. Completed /
-                  no-edit rights: the passive start → end + delta card. */}
+                  no-edit rights: the passive start → end + delta card.
+                  2026-09-24 (owner request «give renter the powers»): the
+                  RENTER is allowed too — he types the return reading himself
+                  (the server route authorizes him via the signed actor
+                  cookie); the editor switches to renter-worded hints. */}
               <FranchizeRentalRoleGuard
-                allowedRoles={["owner", "operator", "admin", "subrenter"]}
+                allowedRoles={["owner", "operator", "admin", "subrenter", "renter"]}
                 ownerId={rental.ownerId}
                 renterId={rental.renterId}
                 renterTelegramChatId={rental.renterTelegramChatId}
@@ -544,6 +548,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   odometerAfter={odometerAfter}
                   odometerAfterDraft={odometerAfterDraft}
                   canEdit={status === "active"}
+                  renterId={rental.renterId}
+                  renterTelegramChatId={rental.renterTelegramChatId}
                   includedKm={rentalMeta?.included_km ?? null}
                   overageRatePerKm={rentalMeta?.overage_rate_per_km ?? null}
                   textPrimary={textPrimary}

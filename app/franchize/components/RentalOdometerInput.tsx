@@ -22,7 +22,12 @@ import { useAppContext } from "@/contexts/AppContext";
  *   - ACTIVE rental + operator: start reading (readonly) + end reading (input,
  *     debounced autosave to rentals.metadata.odometer_after_draft via
  *     POST /api/franchize/rental-odometer) + live Δ badge.
- *   - ACTIVE rental + renter/guest: passive "при выдаче" card (existing look).
+ *   - ACTIVE rental + renter: SAME live input (2026-09-24 owner request
+ *     «give renter the powers» — the renter types the return reading
+ *     himself), with renter-worded hints (no deposit-deduction operator
+ *     talk, overage still shown as «may be deducted from deposit»). The
+ *     server route authorizes the renter via the signed actor cookie.
+ *   - ACTIVE rental + guest: passive "при выдаче" card (existing look).
  *   - COMPLETED rental: passive start → end + delta card (existing look),
  *     the draft (if the operator typed it but closed via a path that skipped
  *     the odometer write) still renders as the end value.
@@ -37,6 +42,11 @@ interface RentalOdometerInputProps {
   /** Draft typed on this page before closure (metadata.odometer_after_draft). */
   odometerAfterDraft?: number | null;
   canEdit: boolean;
+  /** Rental's renter id (rentals.user_id) — lets the editor detect a renter
+   *  viewer and switch the hint copy from operator to renter wording. */
+  renterId?: string | null;
+  /** Fallback renter identity (rental_contract_artefacts chat id). */
+  renterTelegramChatId?: string | null;
   includedKm?: number | null;
   overageRatePerKm?: number | null;
   textPrimary: string;
@@ -53,6 +63,8 @@ export function RentalOdometerInput({
   odometerAfter,
   odometerAfterDraft,
   canEdit,
+  renterId,
+  renterTelegramChatId,
   includedKm,
   overageRatePerKm,
   textPrimary,
@@ -88,6 +100,8 @@ export function RentalOdometerInput({
       crewSlug={crewSlug}
       before={before}
       initialEnd={closureAfter ?? draft}
+      renterId={renterId}
+      renterTelegramChatId={renterTelegramChatId}
       includedKm={includedKm}
       overageRatePerKm={overageRatePerKm}
       textPrimary={textPrimary}
@@ -103,6 +117,8 @@ function OdometerEditor({
   crewSlug,
   before,
   initialEnd,
+  renterId,
+  renterTelegramChatId,
   includedKm,
   overageRatePerKm,
   textPrimary,
@@ -114,6 +130,8 @@ function OdometerEditor({
   crewSlug: string;
   before: number | null;
   initialEnd: number | null;
+  renterId?: string | null;
+  renterTelegramChatId?: string | null;
   includedKm?: number | null;
   overageRatePerKm?: number | null;
   textPrimary: string;
@@ -141,6 +159,16 @@ function OdometerEditor({
       : null;
 
   const { dbUser } = useAppContext();
+
+  // Renter viewer? The rental page passes rentals.user_id + the artefact
+  // chat-id fallback — same two identities FranchizeRentalRoleGuard uses
+  // for the "renter" role. Renter wording = no deposit-deduction operator
+  // talk in the footer hints.
+  const isRenterViewer = Boolean(
+    dbUser?.user_id &&
+      (dbUser.user_id === renterId ||
+        (renterTelegramChatId && dbUser.user_id === renterTelegramChatId)),
+  );
 
   const persist = useCallback(
     async (value: number | null) => {
@@ -302,10 +330,14 @@ function OdometerEditor({
       <div className="mt-2 flex min-h-[18px] items-center justify-between gap-2">
         <span className="text-[10px] opacity-70" style={{ color: textSecondary }}>
           {overage
-            ? `Превышение: ${overage.km} км${overage.charge > 0 ? ` × ${overageRatePerKm} ₽ = ${overage.charge.toLocaleString("ru-RU")} ₽ — удержите из депозита` : ""}`
+            ? `Превышение: ${overage.km} км${overage.charge > 0 ? ` × ${overageRatePerKm} ₽ = ${overage.charge.toLocaleString("ru-RU")} ₽${isRenterViewer ? " — может быть удержано из депозита" : " — удержите из депозита"}` : ""}`
             : before != null && liveDelta != null && !invalid
-              ? `Учитывайте разницу при возврате депозита в модалке закрытия.`
-              : `Сохранится в карточке аренды и подставится при закрытии.`}
+              ? isRenterViewer
+                ? `Показания сохранятся в карточке аренды — оператор увидит их при закрытии.`
+                : `Учитывайте разницу при возврате депозита в модалке закрытия.`
+              : isRenterViewer
+                ? `Сохранится в карточке аренды — оператор увидит при закрытии.`
+                : `Сохранится в карточке аренды и подставится при закрытии.`}
         </span>
         <span
           className="inline-flex items-center gap-1 text-[10px] font-semibold"

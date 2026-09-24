@@ -10,12 +10,22 @@
 //   rentals.metadata.odometer_after_draft = <km>
 // The closure flow (confirmVehicleReturn) keeps writing the authoritative
 // metadata.odometer_after. Auth: verifyCrewAccess (signed actor cookie /
-// password fallback) + the rental must belong to the caller's crew. Status
-// guard: only `active` rentals accept a draft (closed rentals are history).
+// password fallback) + the rental must belong to the caller's crew.
+// 2026-09-24 (owner request «give renter the powers»): the RENTER of the
+// rental can also type the draft from his own device — crew membership is
+// not required for him, a signed-cookie identity matching rentals.user_id
+// is enough. The bike's partner-owner (subrenter, cars.specs.subrenter_chat_id)
+// is accepted too — same role the photo-upload validateUpload grants him.
+// Status guard: only `active` rentals accept a draft (closed rentals are
+// history).
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyCrewAccess } from "@/app/api/franchize/_auth";
+import {
+  TELEGRAM_ACTOR_COOKIE,
+  verifyTelegramActorCookieValue,
+} from "@/lib/telegram-actor-cookie";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -47,15 +57,42 @@ export async function POST(request: NextRequest) {
 
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, crew_id, status, metadata")
+      .select("rental_id, crew_id, user_id, vehicle_id, status, metadata")
       .eq("rental_id", rentalId)
       .maybeSingle();
     if (rentalError || !rental) {
       return NextResponse.json({ success: false, error: "Аренда не найдена." }, { status: 404 });
     }
 
+    // Signed-cookie identity is required for the RENTER/SUBRENTER path — the
+    // forgeable x-telegram-user-id header stays crew-only (verifyCrewAccess).
+    const cookieUserId = verifyTelegramActorCookieValue(
+      request.cookies.get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
+
     const access = await verifyCrewAccess(request, rental.crew_id ?? undefined);
-    if (!access.ok) return access.response;
+    if (!access.ok) {
+      // Renter path: the caller is the rental's own renter (rentals.user_id).
+      const isRenter = Boolean(cookieUserId) && cookieUserId === rental.user_id;
+      // Subrenter path: partner-owner of THIS bike (cars.specs.subrenter_chat_id)
+      // — same role validateUpload grants him on photo uploads.
+      let isSubrenter = false;
+      if (!isRenter && cookieUserId && rental.vehicle_id) {
+        const { data: vehicleRow } = await supabaseAdmin
+          .from("cars")
+          .select("specs")
+          .eq("id", rental.vehicle_id)
+          .maybeSingle();
+        const sub = (vehicleRow?.specs as Record<string, unknown> | null)?.["subrenter_chat_id"];
+        // .trim() on the string branch — the webhook snapshot and
+        // subrenter-notify both trim subrenter_chat_id, padded values must
+        // still match (review 2026-09-24).
+        isSubrenter =
+          (typeof sub === "string" && (sub === cookieUserId || sub.trim() === cookieUserId)) ||
+          (typeof sub === "number" && String(sub) === cookieUserId);
+      }
+      if (!isRenter && !isSubrenter) return access.response;
+    }
 
     if (rental.status !== "active") {
       return NextResponse.json(
@@ -87,6 +124,17 @@ export async function POST(request: NextRequest) {
       logger.error("[rental-odometer] metadata update failed:", updateError.message);
       return NextResponse.json({ success: false, error: "Не удалось сохранить одометр." }, { status: 500 });
     }
+
+    // Audit trail: this draft feeds the deposit deduction at closure — record
+    // WHO typed it (crew path → verifyCrewAccess userId; renter/subrenter →
+    // signed-cookie identity) to settle future disputes cheaply
+    // (review 2026-09-24).
+    logger.info("[rental-odometer] draft saved", {
+      rentalId,
+      odometerAfter,
+      odometerBefore,
+      actor: access.ok ? access.userId : cookieUserId,
+    });
 
     const delta =
       odometerAfter !== null && odometerBefore !== null
