@@ -670,3 +670,22 @@ Stage Summary:
 - 4 ценовых фикса аренд применены и видны в CSV; артефакты договоров синхронизированы.
 - Map-riders: точки встречи носят фото круглой аватаркой, из попапа точки композер стены префиллится геотегом + названием — флоу «точка → пост» работает в обе стороны.
 - ПОЛЬЗОВАТЕЛЮ: (1) применить 20260925120000_meetup_photo_url.sql в SQL editor (до этого фото не привяжется — роут вернёт подсказку); (2) проверить на превью: тап по карте → + → фото → маркер с фото; попап точки → «Написать пост на стене» → геотег-чип с названием точки; (3) дубль-заказ 2db2248d Rerode R1+ (pending, 0 руб) — отменить руками при желании.
+
+---
+Task ID: 50
+Agent: Super Z (main)
+Task: «nice! please improve further» — map-riders interlink v2 (post → meetup point + popup meta).
+
+Work Log:
+- Скоуп выбран по состоянию кода: loop «точка ↔ стена» уже работал в обе стороны (meetup→compose и геотег-посты→пины), не хватало СОЗДАНИЯ точки из поста и мета-информации в попапе точки. Удаление meetup-точек уже существует (bottom bar при выбранной точке) — не дублировал.
+- lib/map-riders.ts: meetupDraftFromPost(label, text, authorName) — title из лейбла геотега (приоритет) или текста поста, whitespace-collapse, clampUtf16 (surrogate-pair-aware, бюджет UTF-16 для серверных max(80)/max(240)); comment «Из поста · <автор поста>» (создатель точки = тапнувший — их показывает мета-строка попапа; атрибуция автора поста осознанно в комментарии).
+- CommunityWallClient: опц. проп onMakeMeetupPoint — чип «Точкой на карту» рядом с геотег-чипом (только map-riders sheet; на странице стены проп не передаётся → кнопки нет). Иконка MapPinPlus.
+- MapRidersClientRefactored: handleMakeMeetupFromPost — guard dbUser + isCreatingMeetupFromPostRef (toast «Уже добавляем точку…») + общий MEETUP_ACTION_DEBOUNCE_MS; создание через createMeetup с явным point:[lat,lng] (не selectedMeetupPoint); успех → шит 0.2 + setWallFocusPoint (карта летит к новой точке). Попап meetup: + автор (riderDisplayName) + formatRelativeTimeRu — паритет с попапами геотег-пинов.
+- Тесты: +12 (map-wall-interlink: 5 unit на draft-helper включая 🏁-сплит и schema-sync пин + wiring-ассерты с негативом на страницу стены; map-meetup-photo: popup meta + порядок «мета до кнопки»). Suite 2200 passed / 23 skipped / 0 failed; typecheck:franchize OK; eslint --max-warnings=0 OK (5 файлов).
+- Reviewer-цикл (agent-c6948bd3): iter-1 APPROVE с minors (сплит суррогатной пары, дыры в пинах тестов) → все исправлены; iter-2 APPROVE (0 major/minor, 2 NIT carry-over: while-трим для заранее битых строк — вне композер-реалий; точный пин заголовка в 🏁-тесте).
+- ЛОВУШКА-3: строка 662 CommunityWallClient снова выглядела битой (`apPointCompose`) в rg/python-дампе — esbuild-parse доказал валидность (display-слой съедает «[x»). Не «чинить» по отображению.
+- Push: 7fd413c (5e28601..7fd413c → origin/main), Vercel автодеплой.
+
+Stage Summary:
+- Полный двусторонний loop: пост с геотегом → «Точкой на карту» → точка на карте (карта сама летит к ней); попап точки → пост на стене. Попапы точки и геотег-пина теперь информационно равны (фото/автор/время).
+- Проверить на проде: пост с геотегом в шите карты → чип «Точкой на карту» → точка появилась и карта к ней прилетела; попап точки показывает автора и «сколько времени назад».
