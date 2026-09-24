@@ -642,3 +642,31 @@ Stage Summary:
 - Reviewer-цикл: iter-1 REQUEST_CHANGES (MAJOR: reply-keyboard убивал URL-кнопку + SMTP без таймаутов + trim + audit log) — все исправлены; iter-2 APPROVE.
 - ПОЛЬЗОВАТЕЛЮ: (1) проверить в проде, что private.crew_secrets реально имеет колонки email/crew_id (миграции репо их не создают — похоже, добавлены руками; если нет — письмо уйдёт на SMTP-аккаунт, это graceful fallback); (2) crew email задаётся в private.crew_secrets.email по crew_id.
 - Follow-ups (не блокер): hot-lead пинг владельцу байка можно обогатить телефоном/датами; escHtml не экранирует кавычки (безопасно, нет атрибутов с юзер-фрагментами); first-paint flash рентерских подсказок (dbUser грузится асинхронно).
+
+---
+
+Task ID: 49
+Agent: Super Z (main)
+Task: «please update couple of recent rentals» (r6 → 6000, falcon gt + rerode-r1-plus → 6750, ducati-panigale-1199 first → free) + «enhance map-riders: photo for map points (icon on map) + create wall post backwards from map point»
+
+Work Log:
+- DATA FIXES (Supabase REST, service key; паттерн миграции 20260811000005: total_cost + metadata price_corrected_* + синк private.rental_contract_artifacts.total_sum):
+  * yamaha-r6-2007 a5f4aa2d (последняя, Sep 24): 12000 → 6000 («returned earlier»), payment_split.bank синк 6000, artifact total_sum 12000 → 6000.
+  * falcon-gt-2026 05f28d51 (active): 9150 → 6750, split.bank 6750. Rerode R1+ 2eaf59f8 (active): 9150 → 6750, split.bank 6750.
+  * ducati-1199-panigale-2012 7b2bab65 (первая, Aug 21): 18000 → 0 («actually free»), artifact total_sum 19000 → 1000 (0 + депозит 1000), daily_price 18000 → 0.
+  * CSV public/docs/autoreply/vip-bike-rentals.csv регенерирован (scripts/export_vip_bike_rentals.py), коммит 574dd98 запушен.
+  * Замечание оператору: рядом с активной есть дубль-заказ Rerode R1+ 2db2248d (pending_confirmation, 0 руб, Sep 24 11:01) — не трогал.
+- MAP-RIDERS: миграция 20260925120000_meetup_photo_url.sql (map_rider_meetups.photo_url, additive/idempotent) — ОЖИДАЕТ ручного прогона в SQL editor.
+- Роут /api/map-riders/meetup-photo-upload: guard+subject+membership+creator-only, sharp 640→384px ≤150KB, wallpix meetups/<meetupId>/<uuid>.jpg (финальный путь, без staging), photo_url update + PGRST204-подсказка про миграцию, rate-limit 10/мин.
+- useMeetupCreator: photoFile + возврат Promise<string|null> (id; truthiness для RidersDrawer сохранён), multipart headers(false).
+- MeetupCreateModal (новый, заменил FranchizePromptModal): название + опциональное фото (reduceImageResolution 1280/q0.7, blob-превью с revoke), submit-гейт ≥2 символа, сброс состояния целиком в close-эффекте.
+- Маркер: imageUrl = photo_url > avatar_url > FaLocationDot; попап показывает фото + кнопка «Написать пост на стене» (поиск-ссылка ?q= удалена).
+- Обратный interlink: CommunityWallClient проп mapPointCompose {lat,lng,label,text,nonce} — геотег = координаты точки (лейбл = название; явный тап перебивает геотег), текст только в пустой композер; MapRidersInner openWallComposeFromPoint поднимает шит на 0.86.
+- Тесты: map-meetup-photo.spec.ts 27; обновлены map-poi-markers / map-wall-interlink / iter29 (миграций 175 → 176). Suite 2203 passed / 8 skipped / 0 failed; typecheck:franchize; eslint --max-warnings=0.
+- Reviewer-цикл (agent-affba94a): iter-1 REQUEST_CHANGES (MAJOR stale-preview после отмены, MINOR потеря фото при неуспешном сабмите + NIT×4) → все исправлены → iter-2 APPROVE.
+- Push: 38d7b4b (574dd98..38d7b4b → origin/main), Vercel автодеплой.
+
+Stage Summary:
+- 4 ценовых фикса аренд применены и видны в CSV; артефакты договоров синхронизированы.
+- Map-riders: точки встречи носят фото круглой аватаркой, из попапа точки композер стены префиллится геотегом + названием — флоу «точка → пост» работает в обе стороны.
+- ПОЛЬЗОВАТЕЛЮ: (1) применить 20260925120000_meetup_photo_url.sql в SQL editor (до этого фото не привяжется — роут вернёт подсказку); (2) проверить на превью: тап по карте → + → фото → маркер с фото; попап точки → «Написать пост на стене» → геотег-чип с названием точки; (3) дубль-заказ 2db2248d Rerode R1+ (pending, 0 руб) — отменить руками при желании.
