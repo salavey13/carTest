@@ -311,13 +311,16 @@ describe("POI polish wiring (source asserts)", () => {
     expect(client).toContain("icon: `initials:${String.fromCharCode(65 + index)}`");
   });
 
-  it("meetup markers wear the creator's avatar (API joins avatar_url)", () => {
+  it("meetup markers wear the meetup PHOTO first, creator's avatar as fallback (API joins avatar_url)", () => {
     const client = read("components/map-riders/MapRidersClientRefactored.tsx");
-    expect(client).toContain("imageUrl: m.users?.avatar_url?.trim() || null");
+    // 2026-09-25: photo wins («add respective photo to be used for icon on map»),
+    // avatar stays the middle of the fallback chain → FaLocationDot badge.
+    expect(client).toContain("imageUrl: m.photo_url?.trim() || m.users?.avatar_url?.trim() || null");
     const shared = read("app/api/map-riders/_lib/shared.ts");
     expect(shared).toContain("users:created_by_user_id(username, full_name, avatar_url)");
     const types = read("lib/map-riders.ts");
     expect(types).toContain("avatar_url?: string | null;");
+    expect(types).toContain("photo_url?: string | null;");
   });
 
   it("HQ is the lg halo anchor", () => {

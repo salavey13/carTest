@@ -43,8 +43,11 @@ export interface MeetupPoint {
   lon: number;
   scheduled_at: string | null;
   created_at: string;
+  // photo_url: meetup photo (20260925120000_meetup_photo_url) — the marker wears
+  // it as its round picture; photo wins over the creator's avatar.
+  photo_url?: string | null;
   // avatar_url joins from the overview API (MR polish: creator's round picture
-  // on the meetup marker; no avatar → FaLocationDot badge fallback).
+  // on the meetup marker; no photo/avatar → FaLocationDot badge fallback).
   users?: { username?: string | null; full_name?: string | null; avatar_url?: string | null } | null;
 }
 

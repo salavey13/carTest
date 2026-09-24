@@ -254,7 +254,10 @@ describe("wall page interlink params", () => {
     expect(client).not.toContain("map-riders?spot=${spot.id}");
     // «Поделиться заездом» открывает черновик в шите (без смены URL).
     expect(client).toContain("setSheetRideComposeId(endedRideSessionId)");
-    expect(client).toContain("encodeURIComponent(m.title.slice(0, 60))");
+    // 2026-09-25: meetup→wall — обратный interlink «точка карты → пост на
+    // стене» (in-page compose с геотегом точки) заменил поиск-ссылку ?q=.
+    expect(client).toContain("openWallComposeFromPoint({ lat: m.lat, lng: m.lon, label: m.title, text: m.title })");
+    expect(client).not.toContain("encodeURIComponent(m.title.slice(0, 60))");
     expect(client).toContain("spotKindFilter");
   });
 

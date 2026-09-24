@@ -621,3 +621,24 @@ Stage Summary:
 - Закрытие аренды при обрыве связи больше не «молча» ломается: оператор получает честный тост, карточка сама обновляется через router.refresh(), модалка с черновиками сохраняется для повтора.
 - ПОЛЬЗОВАТЕЛЮ: если boundary снова сработает — раскрыть «stack trace» и прислать полный стек (boundary его показывает) — это закроет вопрос об истинном пути до boundary.
 - Follow-ups (не блокер): server-side status-guard в confirmVehicleReturn + notify-цепочку из awaited-пути; SaleBikeLandingClient имеет тот же класс голых .success-reads.
+
+---
+
+Task ID: 48
+Agent: Super Z (main)
+Task: «seems odometer is not showing up to renter, only to operator — try to allow renter himself enter odometer too; give renter the powers» + «notify all members about new rents created via web app and send to crew email as well»
+
+Work Log:
+- Re-clone after env reset; verified Task 47 fix already on remote (af973f3).
+- Odometer for renter: page.tsx odometer RoleGuard + "renter"; RentalOdometerInput renter-aware hints (isRenterViewer via renterId/renterTelegramChatId); API route: renter path (SIGNED cookie === rentals.user_id) + subrenter path (cars.specs.subrenter_chat_id, trim-tolerant), forgeable header stays crew-only.
+- Audit log "[rental-odometer] draft saved" (actor + values) on successful draft write.
+- New lib app/franchize/lib/crew-rent-notify.ts: notifyCrewOfNewWebAppRental — crew by slug → active crew_members → TG HTML summary (INLINE keyboard CTA — default reply keyboard dead-ends URL buttons) to all members except excludeChatIds (renter/bike owner/platform admin), dedup + String() coercion; then nodemailer email → private.crew_secrets.email (fallback SMTP account; SMTP_USER/YANDEX/GMAIL chain; connection/greeting/socket timeouts 10/10/15s). Non-fatal everywhere (mirrors subrenter-notify).
+- franchize-order.ts webhook: hook after admin ping, only flowType !== "sale", own try/catch.
+- tests/franchize/crew-rent-notify.spec.ts: 20 tests (behavior with mocked supabase/sendComplexMessage/nodemailer/private-secrets + source contracts incl. inline keyboard, bounded SMTP, audit trail, renter auth paths).
+
+Stage Summary:
+- Коммит f3cb840 запушен в origin/main.
+- Верификация: vitest 2176 passed / 8 skipped / 0 failed; typecheck:franchize OK; eslint --max-warnings=0 OK (6 файлов).
+- Reviewer-цикл: iter-1 REQUEST_CHANGES (MAJOR: reply-keyboard убивал URL-кнопку + SMTP без таймаутов + trim + audit log) — все исправлены; iter-2 APPROVE.
+- ПОЛЬЗОВАТЕЛЮ: (1) проверить в проде, что private.crew_secrets реально имеет колонки email/crew_id (миграции репо их не создают — похоже, добавлены руками; если нет — письмо уйдёт на SMTP-аккаунт, это graceful fallback); (2) crew email задаётся в private.crew_secrets.email по crew_id.
+- Follow-ups (не блокер): hot-lead пинг владельцу байка можно обогатить телефоном/датами; escHtml не экранирует кавычки (безопасно, нет атрибутов с юзер-фрагментами); first-paint flash рентерских подсказок (dbUser грузится асинхронно).

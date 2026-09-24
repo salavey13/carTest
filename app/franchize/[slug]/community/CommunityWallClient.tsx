@@ -175,6 +175,11 @@ interface CommunityWallClientProps {
   /** Wall × map: точка, выбранная тапом на карте (map-riders sheet mode).
    *  null/undefined = стены вне карты — «точка с карты» в композере скрыта. */
   mapSelectedPoint?: [number, number] | null;
+  /** Reverse interlink «точка карты → пост на стене» (попап meetup-точки на
+   *  карте map-riders): композер префиллится геотегом этой точки (label =
+   *  название точки) и, если поле пустое, текстом. nonce перезапускает
+   *  префилл при повторном тапе по той же точке. */
+  mapPointCompose?: { lat: number; lng: number; label?: string | null; text?: string | null; nonce: number } | null;
   /** Wall × map: тап по геотег-чипу поста → карта летит к метке.
    *  Не задан (страница стены) — чип ведёт на карту (?post=<id>). */
   onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
@@ -186,7 +191,7 @@ interface CommunityWallClientProps {
   bleed?: boolean;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, onFocusGeotag, bleed = false }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, mapPointCompose, onFocusGeotag, bleed = false }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -632,13 +637,29 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   // ── composer: geotag (wall × map) ──────────────────────────────────
 
   /** Apply a raw point as the composer tag: nearest moto-spot name wins,
-   *  deterministic «lat, lng» string otherwise. Never throws. */
-  const applyGeoPoint = useCallback((lat: number, lng: number) => {
+   *  deterministic «lat, lng» string otherwise. Never throws.
+   *  `labelOverride` — явное имя точки (reverse interlink из попапа meetup). */
+  const applyGeoPoint = useCallback((lat: number, lng: number, labelOverride?: string | null) => {
     const spot = findNearestMotoSpot(lat, lng, 250);
-    setGeoTag({ lat, lng, label: spot ? spot.name : formatGeoCoords(lat, lng) });
+    const label = labelOverride?.trim() || (spot ? spot.name : formatGeoCoords(lat, lng));
+    setGeoTag({ lat, lng, label });
     setGeoPickerOpen(false);
     setComposerError(null);
   }, []);
+
+  // ── reverse interlink «точка карты → пост на стене» (попап meetup-точки) ──
+  // Тап по кнопке в попапе точки: геотег = координаты точки (лейбл — название),
+  // текст — только в пустой композер (не затираем то, что человек пишет).
+  // Явное действие пользователя → существующий геотег перебивается координатами
+  // точки (иначе кнопка «написать пост об ЭТОЙ точке» выглядела бы сломанной).
+  useEffect(() => {
+    if (!mapPointCompose) return;
+    applyGeoPoint(mapPointCompose.lat, mapPointCompose.lng, mapPointCompose.label ?? null);
+    if (mapPointCompose.text?.trim()) {
+      setText((prev) => (prev.trim() ? prev : mapPointCompose.text!.trim()));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapPointCompose?.nonce]);
 
   const attachMapPointGeotag = useCallback(() => {
     if (!mapSelectedPoint) return;

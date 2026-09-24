@@ -48,6 +48,7 @@ export interface MeetupRow {
   lon: number;
   scheduled_at: string | null;
   created_at: string;
+  photo_url?: string | null;
   users?: {
     username?: string | null;
     full_name?: string | null;

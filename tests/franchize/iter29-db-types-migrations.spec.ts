@@ -106,7 +106,8 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     // 172 → 173: 20260922000000_add_app_open_intent_type.sql (franchize_intents CHECK: 'app_open' — app-open lead tracking stopped failing validation)
     // 173 → 174: 20260923000000_dirt_routes_between_bridges.sql (map-riders: старые треки снесены, грунтовые «между мостами» вдоль Оки засеяны)
     // 174 → 175: 20260923210000_set_bike_condition_specs.sql (catalog CSV: явные specs.condition new/used для 12 подтверждённых байков — годовой эвристики мало)
-    expect(files.length).toBe(175);
+    // 175 → 176: 20260925120000_meetup_photo_url.sql (map-riders: фото meetup-точки — маркер носит его круглой аватаркой)
+    expect(files.length).toBe(176);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

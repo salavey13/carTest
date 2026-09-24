@@ -25,7 +25,7 @@ import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
-import { FranchizePromptModal } from "@/app/franchize/components/FranchizePromptModal";
+import { MeetupCreateModal } from "@/components/map-riders/MeetupCreateModal";
 import { CommunityWallClient } from "@/app/franchize/[slug]/community/CommunityWallClient";
 import { getWallGeotagsAction } from "@/app/franchize/server-actions/community-wall";
 import { getSpotCrewLogosAction, type SpotCrewLogoMap } from "@/app/franchize/server-actions/spot-crew-logos";
@@ -119,6 +119,12 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   const [wallFocusPoint, setWallFocusPoint] = useState<{ lat: number; lng: number; key: number } | null>(null);
   // In-page «поделиться заездом»: черновик открывается в стене шита без смены URL.
   const [sheetRideComposeId, setSheetRideComposeId] = useState<string | null>(null);
+  // Reverse interlink «точка карты → пост на стене»: из попапа meetup-точки
+  // композер стены шита префиллится ТЕКСТОМ и ГЕОТЕГОМ этой точки (nonce
+  // перезапускает префилл при повторном тапе, как у checkinSpot выше).
+  const [wallMapPointCompose, setWallMapPointCompose] = useState<
+    { lat: number; lng: number; label: string | null; text: string | null; nonce: number } | null
+  >(null);
   // Чек-ин мототочки из попапа: композер стены шита префиллится БЕЗ роутинга
   // (in-page, как sheetRideComposeId). nonce перезапускает префилл при повторном
   // тапе по той же точке; URL-путь (?spot=) остаётся для внешних ссылок.
@@ -351,6 +357,23 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     // не дают одинаковый nonce → повторный префилл гарантирован.
     checkinNonceRef.current += 1;
     setWallCheckinSpot({ id: spotId, nonce: checkinNonceRef.current });
+    setActiveSnap(0.86);
+    setSheetOpen(true);
+  }, []);
+
+  /** «Точка карты → пост на стене» (обратный interlink): попап meetup-точки
+   *  просит стену префиллить композер геотегом этой точки (+ название точки
+   *  в текст, если композер пустой). Тот же nonce-паттерн, что у чек-ина. */
+  const mapPointComposeNonceRef = useRef(0);
+  const openWallComposeFromPoint = useCallback((point: { lat: number; lng: number; label?: string | null; text?: string | null }) => {
+    mapPointComposeNonceRef.current += 1;
+    setWallMapPointCompose({
+      lat: point.lat,
+      lng: point.lng,
+      label: point.label ?? null,
+      text: point.text ?? null,
+      nonce: mapPointComposeNonceRef.current,
+    });
     setActiveSnap(0.86);
     setSheetOpen(true);
   }, []);
@@ -685,27 +708,33 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       name: `${m.title}${m.comment ? ` — ${m.comment}` : ""}`,
       type: "point" as const,
       icon: "::FaLocationDot::",
-      // MR polish: creator's avatar (overview API now joins avatar_url) —
-      // user-made points read as personal pins; no avatar → FaLocationDot
-      // badge (the icon grammar below stays the fallback chain).
-      imageUrl: m.users?.avatar_url?.trim() || null,
+      // MR polish: meetup PHOTO (20260925120000_meetup_photo_url) wins —
+      // «add respective photo to be used for icon on map». Fallback chain:
+      // creator's avatar (overview API joins avatar_url) → FaLocationDot badge.
+      imageUrl: m.photo_url?.trim() || m.users?.avatar_url?.trim() || null,
       color: "#f97316",
       coords: [[m.lat, m.lon]] as [number, number][],
       markerClassName: SPOT_POPUP_CLASSNAME,
-      // Meetup → wall interlink: поиск по заголовку точки на стене экипажа.
+      // Meetup → wall interlink: «написать пост о точке» — композер стены шита
+      // префиллится геотегом этой точки (обратный interlink, как у чек-инов).
       popup: (
         <div className="min-w-[180px] max-w-[240px] space-y-1.5 p-1 text-[var(--mr-text)]">
+          {m.photo_url?.trim() ? (
+            // eslint-disable-next-line @next/next/no-img-element -- wallpix CDN URL, same as the wall-pin popup renders
+            <img src={m.photo_url.trim()} alt="" className="h-24 w-full rounded-lg object-cover" />
+          ) : null}
           <div className="text-sm font-semibold" style={{ color: "#f97316" }}>
             {m.title}
           </div>
           {m.comment ? <div className="text-xs opacity-80">{m.comment}</div> : null}
-          <Link
-            href={`/franchize/${crewSlug}/community?q=${encodeURIComponent(m.title.slice(0, 60))}`}
-            className="block rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+          <button
+            type="button"
+            onClick={() => openWallComposeFromPoint({ lat: m.lat, lng: m.lon, label: m.title, text: m.title })}
+            className="block w-full rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
             style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
           >
-            Обсудить на стене экипажа
-          </Link>
+            Написать пост на стене
+          </button>
         </div>
       ),
     }));
@@ -729,7 +758,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
     // crew.logoUrl / crewSlug are read inside (HQ avatar, meetup popup link) —
     // codereview N2: stale HQ avatar after a logo change otherwise lingers.
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug]);
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug, openWallComposeFromPoint]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -793,20 +822,32 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     setIsConfirmOpen(true);
   }, [dbUser?.user_id, selectedMeetup]);
 
-  const handlePromptSubmit = useCallback(
-    async (value: string) => {
-      if (!dbUser?.user_id || !state.selectedMeetupPoint) return;
-
-      setIsPromptOpen(false);
+  const handleMeetupSubmit = useCallback(
+    async (value: string, photoFile: File | null) => {
+      if (!dbUser?.user_id) {
+        toast.error("Авторизуйся в Telegram/VIP BIKE");
+        return;
+      }
+      if (!state.selectedMeetupPoint) {
+        toast.error("Сначала выбери точку на карте");
+        return;
+      }
+      // Модалка остаётся открытой до результата: при ошибке (сеть/валидация)
+      // текст и фото сохраняются для повторной попытки; при успехе close
+      // запускает open-effect модалки, который сбрасывает её состояние.
       setIsQuickMeetupSaving(true);
       try {
-        await createMeetup({
+        const created = await createMeetup({
           userId: dbUser.user_id,
           title: value,
           comment: "Добавлено с карты",
           point: state.selectedMeetupPoint,
-          successMessage: "Meetup добавлен по выбранной точке",
+          successMessage: photoFile
+            ? "Meetup добавлен — точка на карте носит твоё фото"
+            : "Meetup добавлен по выбранной точке",
+          photoFile,
         });
+        if (created) setIsPromptOpen(false);
       } finally {
         setIsQuickMeetupSaving(false);
       }
@@ -1157,6 +1198,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 checkinSpotId={wallCheckinSpot?.id ?? wallParams?.checkinSpotId ?? null}
                 checkinSpotNonce={wallCheckinSpot?.nonce}
                 mapSelectedPoint={state.selectedMeetupPoint}
+                mapPointCompose={wallMapPointCompose}
                 onFocusGeotag={handleWallFocusGeotag}
               />
             </div>
@@ -1174,13 +1216,14 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         onExternalOpenChange={setRidersDrawerOpen}
         onRideStopped={handleRideStopped}
       />
-      <FranchizePromptModal
+      <MeetupCreateModal
         open={isPromptOpen}
         onClose={() => setIsPromptOpen(false)}
-        onSubmit={handlePromptSubmit}
+        onSubmit={handleMeetupSubmit}
         title="Название точки встречи"
         placeholder="Точка встречи"
         defaultValue={promptValue}
+        saving={isQuickMeetupSaving}
       />
       <FranchizeConfirmModal
         open={isConfirmOpen}
