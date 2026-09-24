@@ -24,6 +24,7 @@ import {
   motoSpotKindLabel,
 } from "@/lib/map-riders-spots";
 import { buildRideSessionDraftText } from "@/app/franchize/lib/community-wall";
+import { meetupDraftFromPost } from "@/lib/map-riders";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -303,5 +304,84 @@ describe("wall page interlink params", () => {
 describe("uuid guard", () => {
   it("accepts the canonical fixture", () => {
     expect(isUuidLike(SESSION_ID)).toBe(true);
+  });
+});
+
+// ── interlink v2: «пост на стене → точка на карте» (обратная сторона) ────────
+
+describe("meetupDraftFromPost (post → meetup draft)", () => {
+  it("geo label wins over post text (label is the human place name)", () => {
+    const draft = meetupDraftFromPost("Площадь Комсомольская", "Собираемся тут вечером, заезжайте!", "Иван");
+    expect(draft.title).toBe("Площадь Комсомольская");
+    expect(draft.comment).toBe("Из поста · Иван");
+  });
+
+  it("falls back to post text when label is empty/short; collapses whitespace", () => {
+    const draft = meetupDraftFromPost("  ", "Собираемся\n\n  у старого моста,   вечерняя покатушка!", "Иван");
+    expect(draft.title).toBe("Собираемся у старого моста, вечерняя покатушка!");
+  });
+
+  it("respects the meetups POST schema caps: title ≤80, comment ≤240", () => {
+    const longText = "М".repeat(300);
+    const draft = meetupDraftFromPost(null, longText, "А".repeat(300));
+    expect(draft.title.length).toBeLessThanOrEqual(80);
+    expect(draft.comment.length).toBeLessThanOrEqual(240);
+    expect(draft.title).toBe("М".repeat(80));
+  });
+
+  it("sub-2-char sources fall back to «Точка из поста»; empty author → райдер", () => {
+    expect(meetupDraftFromPost(null, "  x ", "  ").title).toBe("Точка из поста");
+    expect(meetupDraftFromPost(null, null, "").comment).toBe("Из поста · райдер");
+  });
+
+  it("never splits a surrogate pair at the cut (emoji-heavy posts keep 🏁 whole)", () => {
+    const draft = meetupDraftFromPost(null, "М".repeat(79) + "🏁 финиш", "Иван");
+    expect(draft.title.length).toBeLessThanOrEqual(80);
+    expect(draft.title.endsWith("🏁")).toBe(false);
+    // сама высокоя суррогатная пара не остаётся «хвостом» строки
+    const last = draft.title.charCodeAt(draft.title.length - 1);
+    expect(last < 0xd800 || last > 0xdbff).toBe(true);
+  });
+});
+
+describe("post → meetup point wiring (interlink v2)", () => {
+  it("wall declares onMakeMeetupPoint (optional → страница стены кнопку не показывает)", () => {
+    const wall = read("app/franchize/[slug]/community/CommunityWallClient.tsx");
+    expect(wall).toMatch(/onMakeMeetupPoint\?:/);
+    expect(wall).toContain("authorName: string }) => void;");
+    // Кнопка рендерится ТОЛЬКО когда проп задан (map-riders sheet).
+    expect(wall).toContain("{props.onMakeMeetupPoint ? (");
+    expect(wall).toContain("Точкой на карту");
+    // Передаётся в PostCard вместе с onFocusGeotag.
+    expect(wall).toContain("onMakeMeetupPoint={onMakeMeetupPoint}");
+    // В meta уходит реальный текст поста и его автор (не заглушки).
+    expect(wall).toContain("text: post.body ?? null,");
+    expect(wall).toContain("authorName,");
+    // Страница стены рендерит CommunityWallClient БЕЗ этого пропа.
+    expect(read("app/franchize/[slug]/community/page.tsx")).not.toContain("onMakeMeetupPoint=");
+  });
+
+  it("helper caps stay in sync with the server zod schema (title 2..80, comment ≤240)", () => {
+    const route = read("app/api/map-riders/meetups/route.ts");
+    expect(route).toMatch(/title:\s*z\.string\(\)\.trim\(\)\.min\(2\)\.max\(80\)/);
+    expect(route).toMatch(/comment:\s*z\.string\(\)\.trim\(\)\.max\(240\)/);
+  });
+
+  it("map client passes the handler and flies to the new point after creation", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("onMakeMeetupPoint={handleMakeMeetupFromPost}");
+    // Точка создаётся в координатах поста (не selectedMeetupPoint!).
+    expect(client).toContain("point: [geo.lat, geo.lng],");
+    // Черновик (title/comment) — через общий helper, не руками.
+    expect(client).toContain("meetupDraftFromPost(geo.label, meta.text, meta.authorName)");
+    // Успех → шит сворачивается и карта летит к точке (пользователь её ВИДИТ).
+    expect(client).toContain("setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() })");
+  });
+
+  it("handler keeps the meetup-action hygiene: auth guard + debounce + double-tap ref", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("isCreatingMeetupFromPostRef.current = true;");
+    expect(client).toMatch(/handleMakeMeetupFromPost[\s\S]{0,900}lastMeetupActionAtRef\.current < MEETUP_ACTION_DEBOUNCE_MS/);
+    expect(client).toMatch(/handleMakeMeetupFromPost[\s\S]{0,400}toast\.error\("Авторизуйся в Telegram\/VIP BIKE"\)/);
   });
 });

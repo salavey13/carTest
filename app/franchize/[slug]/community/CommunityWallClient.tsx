@@ -38,6 +38,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  MapPinPlus,
   MessageCircle,
   Newspaper,
   PenLine,
@@ -183,6 +184,11 @@ interface CommunityWallClientProps {
   /** Wall × map: тап по геотег-чипу поста → карта летит к метке.
    *  Не задан (страница стены) — чип ведёт на карту (?post=<id>). */
   onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
+  /** Interlink v2 «пост → точка на карте»: задан ТОЛЬКО на карте (map-riders
+   *  sheet) — у геотег-чипа появляется сосед-кнопка «Точкой на карту»:
+   *  создаёт meetup-точку в координатах поста (карта сама флетится к ней).
+   *  Не задан (страница стены) — кнопка скрыта, флоу не доступен. */
+  onMakeMeetupPoint?: (geo: WallPostGeo, meta: { postId: string; text: string | null; authorName: string }) => void;
   /** Task 46: full-bleed посты — карточки ленты на телефонах идут от края
    *  до края экрана (VK-style). Включает ТОЛЬКО страница стены
    *  (community/page.tsx): в sliding sheet карты (map-riders) панель имеет
@@ -191,7 +197,7 @@ interface CommunityWallClientProps {
   bleed?: boolean;
 }
 
-export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, mapPointCompose, onFocusGeotag, bleed = false }: CommunityWallClientProps) {
+export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUsername, highlightPostId, composeRentalId, composeRideId, initialQuery, checkinSpotId, checkinSpotNonce, mapSelectedPoint, mapPointCompose, onFocusGeotag, onMakeMeetupPoint, bleed = false }: CommunityWallClientProps) {
   const [posts, setPosts] = useState<WallPostView[]>([]);
   const [viewer, setViewer] = useState<WallViewerInfo | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -1597,6 +1603,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 onOpenPhoto={(index) => setLightbox({ postId: post.id, index })}
                 onOpenReactions={() => setWhoReacted(post.id)}
                 onFocusGeotag={onFocusGeotag}
+                onMakeMeetupPoint={onMakeMeetupPoint}
                 deeplinkBotUsername={deeplinkBotUsername}
               />
             ))}
@@ -2848,6 +2855,9 @@ interface PostCardProps {
   /** Wall × map: задан на карте (sheet) — чип летит к метке; на странице
    *  стены не задан — чип ведёт на карту (?post=<id>). */
   onFocusGeotag?: (geo: WallPostGeo, postId: string) => void;
+  /** Interlink v2: задан на карте — рядом с геотег-чипом появляется кнопка
+   *  «Точкой на карту» (создать meetup-точку в координатах поста). */
+  onMakeMeetupPoint?: (geo: WallPostGeo, meta: { postId: string; text: string | null; authorName: string }) => void;
   /** Task 46: full-bleed карточка (только страница стены, см. ниже). */
   bleed?: boolean;
 }
@@ -3027,9 +3037,11 @@ function PostCard(props: PostCardProps) {
       <PostBikeChips bikes={post.bikes} slug={slug} />
 
       {/* geotag chip (wall × map): тап — карта летит к метке (sheet) или
-          переход на карту с этим постом (страница стены) */}
+          переход на карту с этим постом (страница стены). Interlink v2:
+          на карте рядом появляется «Точкой на карту» — meetup в координатах
+          поста (обратная сторона «точка → пост»). */}
       {post.geo && (
-        <div className="mt-2.5">
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           {props.onFocusGeotag ? (
             <button
               type="button"
@@ -3050,6 +3062,23 @@ function PostCard(props: PostCardProps) {
               <span className="min-w-0 truncate">{post.geo.label ?? formatGeoCoords(post.geo.lat, post.geo.lng)}</span>
             </Link>
           )}
+          {props.onMakeMeetupPoint ? (
+            <button
+              type="button"
+              onClick={() =>
+                props.onMakeMeetupPoint?.(post.geo as WallPostGeo, {
+                  postId: post.id,
+                  text: post.body ?? null,
+                  authorName,
+                })
+              }
+              title="Добавить точку встречи в координатах этого поста"
+              className="cw-press inline-flex items-center gap-1.5 rounded-full border border-[var(--community-border)] px-3 py-1.5 text-xs font-semibold text-[var(--community-muted)] transition hover:border-[var(--community-accent)]/60 hover:text-[var(--community-accent)]"
+            >
+              <MapPinPlus className="h-3.5 w-3.5 shrink-0" />
+              <span>Точкой на карту</span>
+            </button>
+          ) : null}
         </div>
       )}
 

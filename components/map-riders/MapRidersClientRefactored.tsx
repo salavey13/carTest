@@ -19,7 +19,7 @@ import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
-import { initialsFromName, riderDisplayName } from "@/lib/map-riders";
+import { initialsFromName, meetupDraftFromPost, riderDisplayName } from "@/lib/map-riders";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
@@ -727,6 +727,16 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
             {m.title}
           </div>
           {m.comment ? <div className="text-xs opacity-80">{m.comment}</div> : null}
+          {/* Кто и когда поставил точку — паритет с попапом геотег-меток
+              стены (author + formatRelativeTimeRu). */}
+          {m.users || m.created_at ? (
+            <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
+              <span className="max-w-[130px] truncate font-semibold normal-case tracking-normal text-[var(--mr-text)]">
+                {riderDisplayName(m.users)}
+              </span>
+              <span className="shrink-0">{formatRelativeTimeRu(m.created_at)}</span>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => openWallComposeFromPoint({ lat: m.lat, lng: m.lon, label: m.title, text: m.title })}
@@ -884,6 +894,53 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       setIsMeetupDeleting(false);
     }
   }, [crewSlug, dbUser, dispatch, fetchSnapshot, selectedMeetup]);
+
+  /** Interlink v2 «пост на стене → точка на карте»: тап по «Точкой на карту»
+   *  у геотег-чипа поста создаёт meetup в координатах поста. Название берём
+   *  из лейбла геотега (или текста поста — meetupDraftFromPost), автор поста
+   *  остался в комментарии. Успех: шит сворачивается (0.2) и карта летит к
+   *  новой точке (wallFocusPoint) — человек ВИДИТ, что точка появилась. */
+  const isCreatingMeetupFromPostRef = useRef(false);
+  const handleMakeMeetupFromPost = useCallback(
+    async (geo: { lat: number; lng: number; label?: string | null }, meta: { postId: string; text: string | null; authorName: string }) => {
+      if (!dbUser?.user_id) {
+        toast.error("Авторизуйся в Telegram/VIP BIKE");
+        return;
+      }
+      if (isCreatingMeetupFromPostRef.current) {
+        toast.info("Уже добавляем точку…");
+        return;
+      }
+      const now = Date.now();
+      if (now - lastMeetupActionAtRef.current < MEETUP_ACTION_DEBOUNCE_MS) {
+        toast.info("Подожди пару секунд перед следующим действием");
+        return;
+      }
+      lastMeetupActionAtRef.current = now;
+
+      isCreatingMeetupFromPostRef.current = true;
+      try {
+        const draft = meetupDraftFromPost(geo.label, meta.text, meta.authorName);
+        // meta.postId в контракте задел на будущий «исходный пост» — линк из
+        // попапа точки обратно на пост стены (сейчас не читается).
+        const created = await createMeetup({
+          userId: dbUser.user_id,
+          title: draft.title,
+          comment: draft.comment,
+          point: [geo.lat, geo.lng],
+          successMessage: "Точка встречи добавлена на карту",
+        });
+        if (created) {
+          setActiveSnap(0.2);
+          setSheetOpen(true);
+          setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
+        }
+      } finally {
+        isCreatingMeetupFromPostRef.current = false;
+      }
+    },
+    [createMeetup, dbUser?.user_id],
+  );
 
   const cssVars = useMemo(() => ({
     "--mr-accent": crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
@@ -1200,6 +1257,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 mapSelectedPoint={state.selectedMeetupPoint}
                 mapPointCompose={wallMapPointCompose}
                 onFocusGeotag={handleWallFocusGeotag}
+                onMakeMeetupPoint={handleMakeMeetupFromPost}
               />
             </div>
           </div>

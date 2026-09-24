@@ -205,3 +205,27 @@ describe("wall reverse interlink: mapPointCompose", () => {
     expect(wall).toMatch(/setGeoTag\(null\)/);
   });
 });
+
+// ── popup meta (interlink v2): author + relative time, wall-pin parity ──────
+
+describe("meetup popup meta", () => {
+  const src = read(CLIENT);
+
+  it("shows who placed the point (riderDisplayName over joined users) and when", () => {
+    expect(src).toContain("{riderDisplayName(m.users)}");
+    expect(src).toContain("{formatRelativeTimeRu(m.created_at)}");
+  });
+
+  it("meta row renders only when creator or timestamp exist (defensive against sparse rows)", () => {
+    expect(src).toContain("{m.users || m.created_at ? (");
+  });
+
+  it("keeps the compose button after the meta row (author info never hides the action)", () => {
+    const popup = src.slice(src.indexOf("const meetupPoints = state.meetups.map"), src.indexOf("const routePoints ="));
+    const metaIdx = popup.indexOf("formatRelativeTimeRu(m.created_at)");
+    const btnIdx = popup.indexOf("Написать пост на стене");
+    expect(metaIdx).toBeGreaterThan(-1);
+    expect(btnIdx).toBeGreaterThan(-1);
+    expect(metaIdx).toBeLessThan(btnIdx);
+  });
+});

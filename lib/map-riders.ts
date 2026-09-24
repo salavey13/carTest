@@ -105,3 +105,33 @@ export function formatRideDuration(seconds: number) {
 export function riderDisplayName(user: RiderSessionRow["users"] | MeetupRow["users"] | null | undefined, fallbackId?: string) {
   return user?.full_name || user?.username || fallbackId || "Rider";
 }
+
+/** Derive a meetup draft (title/comment) from a wall post with a geotag — the
+ *  «post → map point» interlink (reverse of the meetup popup's «Написать пост
+ *  на стене»). Title: geo label wins over post text (the label is the human
+ *  place name the author picked), whitespace collapsed to single spaces so
+ *  multi-line posts become one-line titles; both respect the meetups POST
+ *  schema caps (title ≤80/min 2, comment ≤240). Clamps are surrogate-pair
+ *  aware (emoji-heavy posts must not end in a lone half of 🏁). The comment
+ *  credits the POST author (the meetup creator is the tapper, shown by the
+ *  popup meta row) so the point's origin stays visible on the map. */
+export function meetupDraftFromPost(
+  label: string | null | undefined,
+  text: string | null | undefined,
+  authorName: string,
+): { title: string; comment: string } {
+  const source = [label?.trim(), text?.trim()].find((value) => (value?.length ?? 0) >= 2);
+  const collapsed = (source || "").replace(/\s+/g, " ").trim();
+  const title = clampUtf16(collapsed, 80);
+  const author = authorName.trim() || "райдер";
+  return { title: title.length >= 2 ? title : "Точка из поста", comment: clampUtf16(`Из поста · ${author}`, 240) };
+}
+
+/** UTF-16-budget clamp that never leaves a trailing lone surrogate (a sliced
+ *  🏁 renders as � and zod/Postgres happily store it). */
+function clampUtf16(value: string, max: number): string {
+  let cut = value.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) cut = cut.slice(0, -1);
+  return cut;
+}
