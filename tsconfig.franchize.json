@@ -42,7 +42,12 @@
     "app/franchize/modals/Item.tsx",
     "app/franchize/components/PartsCatalogClient.tsx",
     "app/franchize/components/RentalQrCode.tsx",
-    "app/franchize/[slug]/rental/[id]/page.tsx"
+    "app/franchize/[slug]/rental/[id]/page.tsx",
+    "app/franchize/lib/bike-rentals-report.ts",
+    "app/franchize/[slug]/bikes/BikeReportButton.tsx"
   ],
-  "exclude": ["node_modules", ".next"]
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
 }

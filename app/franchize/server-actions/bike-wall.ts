@@ -47,6 +47,12 @@ import {
   type WallPhoto,
 } from "@/app/franchize/lib/bike-wall";
 import { computePartnerSplit, resolveRentalSubrenterChatId } from "@/app/franchize/lib/rental-price-split";
+import { platformBotUsername, resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import {
+  buildBikeRentalsReport,
+  resolveReportClientName,
+  type BikeReportRentalRow,
+} from "@/app/franchize/lib/bike-rentals-report";
 
 const PHOTO_BUCKET = "rental-photos";
 /** 60 min — a wall browsing session; images die with the page, not before. */
@@ -763,6 +769,141 @@ export async function getBikeStoryAction(params: {
     };
   } catch (error) {
     logger.error("[getBikeStoryAction]", error);
+    return { success: false, error: error instanceof Error ? error.message : "Внутренняя ошибка" };
+  }
+}
+
+// ── per-bike rentals report (Мотопарк «Отчёт» button, 2026-09-26) ────────────
+//
+// Boss request: a button on every Мотопарк card that saves the one-pager
+// «Аренды за всё время — <байк>» markdown (summary + table + deep links),
+// exactly like the samples he pasted. All-time by design — the wall's month
+// selector does NOT scope it (the title says «за всё время»).
+//
+// Access: same resolveBikeWallAccess gate as the story action (owner / global
+// admin / active member / subrenter-scoped / password owner). The report
+// carries renter PII (names, payment status) — same visibility as the story
+// wall, nothing broader.
+
+interface ReportRentalsRow {
+  rental_id: string;
+  status: string | null;
+  payment_status: string | null;
+  total_cost: number | null;
+  agreed_start_date: string | null;
+  agreed_end_date: string | null;
+  requested_start_date: string | null;
+  requested_end_date: string | null;
+  created_at: string | null;
+  user_id: string | null;
+  /** metadata->>renter_name */
+  renter_name: string | null;
+}
+
+export async function getBikeRentalsReportAction(params: {
+  slug: string;
+  bikeId: string;
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
+  /** Telegram WebApp initData — HMAC-verified fallback, same as the wall. */
+  initData?: string;
+  /** "YYYY-MM" (MSK) — the wall's month selector; null = all-time report. */
+  month?: string | null;
+}): Promise<{
+  success: boolean;
+  data?: { filename: string; markdown: string };
+  error?: string;
+}> {
+  try {
+    const gate = await resolveBikeWallAccess(params);
+    if (!gate.ok) return { success: false, error: gate.error };
+    const { crewId, subrenterVehicleIds } = gate;
+
+    const bikeId = String(params.bikeId || "").trim();
+    if (!bikeId) return { success: false, error: "Не указано мото." };
+
+    const { data: car } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model")
+      .eq("id", bikeId)
+      .eq("crew_id", crewId)
+      .eq("type", "bike")
+      .maybeSingle();
+    if (!car) return { success: false, error: "Мото не найдено в этом экипаже." };
+    if (subrenterVehicleIds.length > 0 && !subrenterVehicleIds.includes(String(car.id))) {
+      return { success: false, error: "Это мото принадлежит другому партнёру." };
+    }
+
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("name")
+      .eq("id", crewId)
+      .maybeSingle();
+
+    // ALL bike rentals, all time. Service-work rows (vehicle_id = a svc
+    // price-list item) are excluded by design — this report is about RENTALS
+    // of the bike; service history stays on the story wall.
+    const { data: rentals, error: rentalsErr } = await supabaseAdmin
+      .from("rentals")
+      .select(
+        "rental_id,status,payment_status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,requested_end_date,created_at,user_id,metadata->>renter_name",
+      )
+      .eq("vehicle_id", bikeId)
+      .order("created_at", { ascending: true });
+    if (rentalsErr) return { success: false, error: `Не удалось загрузить аренды: ${rentalsErr.message}` };
+
+    const rawRows = (rentals ?? []) as unknown as ReportRentalsRow[];
+
+    // Client display name: users.full_name beats metadata.renter_name —
+    // verified against the boss samples («SERG», «Maxim», «Илья I.O.S.»).
+    const userIds = Array.from(
+      new Set(rawRows.map((r) => r.user_id).filter((v): v is string => typeof v === "string" && v.trim().length > 0)),
+    );
+    const usersByName = new Map<string, { fullName: string | null; username: string | null }>();
+    if (userIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users")
+        .select("user_id, full_name, username")
+        .in("user_id", userIds);
+      for (const u of users ?? []) {
+        usersByName.set(String(u.user_id), {
+          fullName: u.full_name ? String(u.full_name) : null,
+          username: u.username ? String(u.username) : null,
+        });
+      }
+    }
+
+    const rows: BikeReportRentalRow[] = rawRows.map((r) => ({
+      rentalId: String(r.rental_id),
+      status: r.status ?? null,
+      paymentStatus: r.payment_status ?? null,
+      totalCost: r.total_cost == null ? null : Number(r.total_cost),
+      agreedStart: r.agreed_start_date ?? null,
+      agreedEnd: r.agreed_end_date ?? null,
+      requestedStart: r.requested_start_date ?? null,
+      requestedEnd: r.requested_end_date ?? null,
+      createdAt: r.created_at ?? null,
+      clientName: resolveReportClientName(
+        r.user_id ? usersByName.get(String(r.user_id)) : undefined,
+        r.renter_name,
+      ),
+    }));
+
+    const { markdown, filename } = buildBikeRentalsReport({
+      bikeLabel: `${car.make || ""} ${car.model || ""}`.trim() || String(car.id),
+      bikeId: String(car.id),
+      crewName: crew?.name ? String(crew.name) : "",
+      rentals: rows,
+      month: normalizeMonthParam(params.month),
+      // Deep links must follow the crew-bot chain (metadata → env → platform
+      // default) — raw TELEGRAM_BOT_USERNAME is UNSET in prod; two boss bugs
+      // (2026-09-21/22) were exactly this class of wrong-bot links.
+      botUsername: (await resolveCrewBotUsername(params.slug)) || platformBotUsername(),
+    });
+
+    return { success: true, data: { filename, markdown } };
+  } catch (error) {
+    logger.error("[getBikeRentalsReportAction]", error);
     return { success: false, error: error instanceof Error ? error.message : "Внутренняя ошибка" };
   }
 }

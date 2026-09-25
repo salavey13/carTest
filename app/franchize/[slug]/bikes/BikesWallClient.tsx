@@ -14,6 +14,7 @@ import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import type { BikeWallSummary } from "@/app/franchize/lib/bike-wall";
 import { formatMoney, monthLabelRu, monthLabelShort } from "@/app/franchize/lib/bike-wall";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
+import { BikeReportButton } from "@/app/franchize/[slug]/bikes/BikeReportButton";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
@@ -255,7 +256,15 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sortedBikes.map((bike) => (
-            <BikeCard key={bike.bikeId} bike={bike} slug={slug} T={T} month={month} />
+            <BikeCard
+              key={bike.bikeId}
+              bike={bike}
+              slug={slug}
+              T={T}
+              month={month}
+              actorUserId={getActorUserId() || undefined}
+              isPasswordAuth={!!passwordAuthOwnerId}
+            />
           ))}
         </div>
       )}
@@ -268,37 +277,44 @@ function BikeCard({
   slug,
   T,
   month,
+  actorUserId,
+  isPasswordAuth,
 }: {
   bike: BikeWallSummary;
   slug: string;
   T: ReturnType<typeof useCrewTokens>;
   /** null = all-time; "YYYY-MM" = month-scoped money/rental tiles. */
   month: string | null;
+  /** forwarded to the «Отчёт» button (same auth as the wall fetch). */
+  actorUserId?: string;
+  isPasswordAuth: boolean;
 }) {
   const s = bike.stats;
+  const bikeHref = `/franchize/${slug}/bikes/${encodeURIComponent(bike.bikeId)}`;
   return (
-    <Link
-      href={`/franchize/${slug}/bikes/${encodeURIComponent(bike.bikeId)}`}
-      className="group block overflow-hidden rounded-2xl border transition active:scale-[0.985]"
+    <div
+      className="group overflow-hidden rounded-2xl border transition active:scale-[0.985]"
       style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}
     >
-      {/* photo */}
+      {/* photo — the Link is an UNDERLAY (tappable everywhere); the «Отчёт»
+          button is its SIBLING floating above, never a nested <button> in <a> */}
       <div className="relative aspect-[16/10] w-full overflow-hidden" style={{ backgroundColor: T.bgElevated }}>
+        <Link href={bikeHref} aria-hidden="true" tabIndex={-1} className="absolute inset-0 z-0" />
         {bike.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={bike.image}
             alt={bike.label}
             loading="lazy"
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="pointer-events-none relative z-[1] h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
+          <div className="pointer-events-none relative z-[1] flex h-full w-full items-center justify-center">
             <Bike className="h-10 w-10" style={{ color: T.textFaint }} />
           </div>
         )}
-        {/* top badges */}
-        <div className="absolute inset-x-2 top-2 flex items-start justify-between gap-2">
+        {/* top badges — decorative only, taps fall through to the Link underlay */}
+        <div className="pointer-events-none absolute inset-x-2 top-2 z-[1] flex items-start justify-between gap-2">
           {bike.onRentNow ? (
             <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={T.styles.accentPill}>
               ● в аренде
@@ -312,10 +328,19 @@ function BikeCard({
             </span>
           ) : null}
         </div>
+        <BikeReportButton
+          slug={slug}
+          bikeId={bike.bikeId}
+          bikeLabel={bike.label}
+          actorUserId={actorUserId}
+          isPasswordAuth={isPasswordAuth}
+          month={month}
+          className="absolute bottom-2 right-2 z-10"
+        />
       </div>
 
       {/* body */}
-      <div className="p-3.5">
+      <Link href={bikeHref} className="block p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="truncate text-[15px] font-semibold leading-tight" style={{ color: T.text }}>
@@ -363,7 +388,7 @@ function BikeCard({
             </span>
           ) : null}
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
