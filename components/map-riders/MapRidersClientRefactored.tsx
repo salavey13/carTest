@@ -19,13 +19,14 @@ import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
-import { initialsFromName, meetupDraftFromPost, riderDisplayName } from "@/lib/map-riders";
+import { initialsFromName, meetupDraftFromPost, riderDisplayName, yandexMapsRouteUrl } from "@/lib/map-riders";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
 import { MeetupCreateModal } from "@/components/map-riders/MeetupCreateModal";
+import { MapPhotoLightbox, type MapPhotoLightboxData } from "@/components/map-riders/MapPhotoLightbox";
 import { CommunityWallClient } from "@/app/franchize/[slug]/community/CommunityWallClient";
 import { getWallGeotagsAction } from "@/app/franchize/server-actions/community-wall";
 import { getSpotCrewLogosAction, type SpotCrewLogoMap } from "@/app/franchize/server-actions/spot-crew-logos";
@@ -117,6 +118,13 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   // ── Wall × map: геотег-пины постов + flyTo-фокус ──
   const [geoPins, setGeoPins] = useState<WallGeoPinView[]>([]);
   const [wallFocusPoint, setWallFocusPoint] = useState<{ lat: number; lng: number; key: number } | null>(null);
+  // Interlink v3: фуллскрин-просмотр фото из попапов (meetup / геотег-пин).
+  // Portal в body (MapPhotoLightbox) — leaflet-pane не даёт перекрыть экран
+  // изнутри попапа (z ~700 в собственном stacking context).
+  const [mapLightbox, setMapLightbox] = useState<MapPhotoLightboxData | null>(null);
+  // Стабильный close: без него ESC-эффект лайтбокса пересоздаётся на каждый
+  // ререндер клиента (live-райдеры тикают часто).
+  const closeLightbox = useCallback(() => setMapLightbox(null), []);
   // In-page «поделиться заездом»: черновик открывается в стене шита без смены URL.
   const [sheetRideComposeId, setSheetRideComposeId] = useState<string | null>(null);
   // Reverse interlink «точка карты → пост на стене»: из попапа meetup-точки
@@ -400,6 +408,66 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     setSheetOpen(true);
   }, []);
 
+  /** Внешняя ссылка (Яндекс.Карты и пр.): в Telegram WebApp — openLink,
+   *  в браузере — новая вкладка. НЕ openTelegramLink: это не t.me-грамматика. */
+  const openExternalUrl = useCallback((url: string) => {
+    const tg = (window as unknown as { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }).Telegram?.WebApp;
+    if (tg?.openLink) {
+      tg.openLink(url);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
+
+  /** Interlink v2 «пост на стене → точка на карте»: тап по «Точкой на карту»
+   *  у геотег-чипа поста создаёт meetup в координатах поста. Название берём
+   *  из лейбла геотега (или текста поста — meetupDraftFromPost), автор поста
+   *  остался в комментарии. Успех: шит сворачивается (0.2) и карта летит к
+   *  новой точке (wallFocusPoint) — человек ВИДИТ, что точка появилась.
+   *  Определён ДО useMemo с попапами (wallPinPoints): попап пина поста
+   *  переиспользует этот же handler — интерлинк симметричен чипу на стене. */
+  const isCreatingMeetupFromPostRef = useRef(false);
+  const handleMakeMeetupFromPost = useCallback(
+    async (geo: { lat: number; lng: number; label?: string | null }, meta: { postId: string; text: string | null; authorName: string }) => {
+      if (!dbUser?.user_id) {
+        toast.error("Авторизуйся в Telegram/VIP BIKE");
+        return;
+      }
+      if (isCreatingMeetupFromPostRef.current) {
+        toast.info("Уже добавляем точку…");
+        return;
+      }
+      const now = Date.now();
+      if (now - lastMeetupActionAtRef.current < MEETUP_ACTION_DEBOUNCE_MS) {
+        toast.info("Подожди пару секунд перед следующим действием");
+        return;
+      }
+      lastMeetupActionAtRef.current = now;
+
+      isCreatingMeetupFromPostRef.current = true;
+      try {
+        const draft = meetupDraftFromPost(geo.label, meta.text, meta.authorName);
+        // meta.postId в контракте задел на будущий «исходный пост» — линк из
+        // попапа точки обратно на пост стены (сейчас не читается).
+        const created = await createMeetup({
+          userId: dbUser.user_id,
+          title: draft.title,
+          comment: draft.comment,
+          point: [geo.lat, geo.lng],
+          successMessage: "Точка встречи добавлена на карту",
+        });
+        if (created) {
+          setActiveSnap(0.2);
+          setSheetOpen(true);
+          setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
+        }
+      } finally {
+        isCreatingMeetupFromPostRef.current = false;
+      }
+    },
+    [createMeetup, dbUser?.user_id],
+  );
+
   // ── Build map points from state ──
   // MR polish: riders wear their REAL avatar (sessions already join
   // users.avatar_url) — the round-picture promise now covers people, not just
@@ -585,8 +653,18 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         popup: (
           <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
             {pin.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- public wallpix CDN URL, same as the feed renders
-              <img src={pin.photoUrl} alt="" className="h-24 w-full rounded-lg object-cover" />
+              <button
+                type="button"
+                aria-label={`Открыть фото поста${pin.label ? ` · ${pin.label}` : ""}`}
+                className="block w-full cursor-zoom-in"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMapLightbox({ url: pin.photoUrl as string, caption: pin.label || pin.excerpt.slice(0, 60) });
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix CDN URL, same as the feed renders */}
+                <img src={pin.photoUrl} alt={pin.label || "Фото поста"} className="h-24 w-full rounded-lg object-cover" />
+              </button>
             ) : null}
             {pin.excerpt ? <div className="text-xs leading-snug">{pin.excerpt}</div> : null}
             <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
@@ -608,18 +686,37 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 📍 {pin.label}
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={() => openWallPostFromMap(pin.postId)}
-              className="w-full rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
-              style={{ backgroundColor: wallPinColor, color: crew.theme.isAuto ? "#030712" : crew.theme.palette.bgBase }}
-            >
-              Показать в ленте
-            </button>
+            {/* Interlink v3: попап пина симметричен чипу поста на стене —
+                «Показать в ленте» + «Точкой на карту» (тот же handler,
+                что у чипа: атрибуция автора сохраняется в комментарии). */}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => openWallPostFromMap(pin.postId)}
+                className="rounded-lg px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition hover:brightness-110"
+                style={{ backgroundColor: wallPinColor, color: crew.theme.isAuto ? "#030712" : crew.theme.palette.bgBase }}
+              >
+                Показать в ленте
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleMakeMeetupFromPost(
+                    { lat: pin.lat, lng: pin.lng, label: pin.label },
+                    { postId: pin.postId, text: pin.excerpt, authorName: pin.authorName },
+                  )
+                }
+                title="Добавить точку встречи в координатах этого поста"
+                className="rounded-lg border px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition hover:brightness-125"
+                style={{ borderColor: wallPinColor, color: wallPinColor }}
+              >
+                Точкой на карту
+              </button>
+            </div>
           </div>
         ),
       })),
-    [geoPins, wallPinColor, openWallPostFromMap, crew.theme.isAuto, crew.theme.palette.bgBase],
+    [geoPins, wallPinColor, openWallPostFromMap, handleMakeMeetupFromPost, crew.theme.isAuto, crew.theme.palette.bgBase],
   );
 
   // ── Каталог × карта: техника с GPS-координатами в specs ────────────────────
@@ -720,8 +817,18 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       popup: (
         <div className="min-w-[180px] max-w-[240px] space-y-1.5 p-1 text-[var(--mr-text)]">
           {m.photo_url?.trim() ? (
-            // eslint-disable-next-line @next/next/no-img-element -- wallpix CDN URL, same as the wall-pin popup renders
-            <img src={m.photo_url.trim()} alt="" className="h-24 w-full rounded-lg object-cover" />
+            <button
+              type="button"
+              aria-label={`Открыть фото точки · ${m.title}`}
+              className="block w-full cursor-zoom-in"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMapLightbox({ url: m.photo_url!.trim(), caption: m.title });
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- wallpix CDN URL, same as the wall-pin popup renders */}
+              <img src={m.photo_url.trim()} alt={m.title} className="h-24 w-full rounded-lg object-cover" />
+            </button>
           ) : null}
           <div className="text-sm font-semibold" style={{ color: "#f97316" }}>
             {m.title}
@@ -737,14 +844,28 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
               <span className="shrink-0">{formatRelativeTimeRu(m.created_at)}</span>
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={() => openWallComposeFromPoint({ lat: m.lat, lng: m.lon, label: m.title, text: m.title })}
-            className="block w-full rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
-            style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
-          >
-            Написать пост на стене
-          </button>
+          {/* Interlink v3: два действия — пост о точке и маршрут до неё
+              (Яндекс.Карты планирует от текущего местоположения; в App
+              openLink, в браузере — новая вкладка). */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => openWallComposeFromPoint({ lat: m.lat, lng: m.lon, label: m.title, text: m.title })}
+              className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+              style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
+            >
+              Пост на стене
+            </button>
+            <button
+              type="button"
+              onClick={() => openExternalUrl(yandexMapsRouteUrl(m.lat, m.lon))}
+              title="Маршрут до точки в Яндекс.Картах"
+              className="rounded-lg border px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-125"
+              style={{ borderColor: "var(--mr-accent)", color: "var(--mr-accent)" }}
+            >
+              Маршрут
+            </button>
+          </div>
         </div>
       ),
     }));
@@ -768,7 +889,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
     // crew.logoUrl / crewSlug are read inside (HQ avatar, meetup popup link) —
     // codereview N2: stale HQ avatar after a logo change otherwise lingers.
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug, openWallComposeFromPoint]);
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug, openWallComposeFromPoint, openExternalUrl]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -894,53 +1015,6 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       setIsMeetupDeleting(false);
     }
   }, [crewSlug, dbUser, dispatch, fetchSnapshot, selectedMeetup]);
-
-  /** Interlink v2 «пост на стене → точка на карте»: тап по «Точкой на карту»
-   *  у геотег-чипа поста создаёт meetup в координатах поста. Название берём
-   *  из лейбла геотега (или текста поста — meetupDraftFromPost), автор поста
-   *  остался в комментарии. Успех: шит сворачивается (0.2) и карта летит к
-   *  новой точке (wallFocusPoint) — человек ВИДИТ, что точка появилась. */
-  const isCreatingMeetupFromPostRef = useRef(false);
-  const handleMakeMeetupFromPost = useCallback(
-    async (geo: { lat: number; lng: number; label?: string | null }, meta: { postId: string; text: string | null; authorName: string }) => {
-      if (!dbUser?.user_id) {
-        toast.error("Авторизуйся в Telegram/VIP BIKE");
-        return;
-      }
-      if (isCreatingMeetupFromPostRef.current) {
-        toast.info("Уже добавляем точку…");
-        return;
-      }
-      const now = Date.now();
-      if (now - lastMeetupActionAtRef.current < MEETUP_ACTION_DEBOUNCE_MS) {
-        toast.info("Подожди пару секунд перед следующим действием");
-        return;
-      }
-      lastMeetupActionAtRef.current = now;
-
-      isCreatingMeetupFromPostRef.current = true;
-      try {
-        const draft = meetupDraftFromPost(geo.label, meta.text, meta.authorName);
-        // meta.postId в контракте задел на будущий «исходный пост» — линк из
-        // попапа точки обратно на пост стены (сейчас не читается).
-        const created = await createMeetup({
-          userId: dbUser.user_id,
-          title: draft.title,
-          comment: draft.comment,
-          point: [geo.lat, geo.lng],
-          successMessage: "Точка встречи добавлена на карту",
-        });
-        if (created) {
-          setActiveSnap(0.2);
-          setSheetOpen(true);
-          setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
-        }
-      } finally {
-        isCreatingMeetupFromPostRef.current = false;
-      }
-    },
-    [createMeetup, dbUser?.user_id],
-  );
 
   const cssVars = useMemo(() => ({
     "--mr-accent": crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
@@ -1283,6 +1357,9 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         defaultValue={promptValue}
         saving={isQuickMeetupSaving}
       />
+      {/* Interlink v3: фуллскрин-фото из попапов (portal → body, вне
+          leaflet-pane/шита). Кнопки попапов ставят mapLightbox. */}
+      <MapPhotoLightbox photo={mapLightbox} onClose={closeLightbox} />
       <FranchizeConfirmModal
         open={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}

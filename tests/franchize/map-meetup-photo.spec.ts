@@ -63,7 +63,7 @@ describe("meetup marker photo priority", () => {
 
   it("popup renders the photo when present (same pattern as wall-pin popups)", () => {
     expect(src).toMatch(/m\.photo_url\?\.trim\(\) \? \(/);
-    expect(src).toMatch(/<img src=\{m\.photo_url\.trim\(\)\}/);
+    expect(src).toMatch(/src=\{m\.photo_url\.trim\(\)\}/); // v3: <button>-обёртка a11y, точную вложенность не пиним
   });
 });
 
@@ -178,7 +178,7 @@ describe("wall reverse interlink: mapPointCompose", () => {
 
   it("map-riders popup button opens the wall composer with the point's coords + title", () => {
     expect(src).toMatch(/openWallComposeFromPoint\(\{ lat: m\.lat, lng: m\.lon, label: m\.title, text: m\.title \}\)/);
-    expect(src).toMatch(/Написать пост на стене/);
+    expect(src).toMatch(/Пост на стене/); // v3: парная кнопка «Маршрут», текст короче
     expect(src).toMatch(/setActiveSnap\(0\.86\)/);
     expect(src).toMatch(/setSheetOpen\(true\)/);
   });
@@ -223,9 +223,41 @@ describe("meetup popup meta", () => {
   it("keeps the compose button after the meta row (author info never hides the action)", () => {
     const popup = src.slice(src.indexOf("const meetupPoints = state.meetups.map"), src.indexOf("const routePoints ="));
     const metaIdx = popup.indexOf("formatRelativeTimeRu(m.created_at)");
-    const btnIdx = popup.indexOf("Написать пост на стене");
+    const btnIdx = popup.indexOf("Пост на стене");
     expect(metaIdx).toBeGreaterThan(-1);
     expect(btnIdx).toBeGreaterThan(-1);
     expect(metaIdx).toBeLessThan(btnIdx);
+  });
+});
+
+// ── interlink v3: photo lightbox from popups (portal out of leaflet panes) ──
+
+describe("map photo lightbox", () => {
+  const src = read(CLIENT);
+  const lightbox = read("components/map-riders/MapPhotoLightbox.tsx");
+
+  it("portal renders to document.body (leaflet-pane stacking context cannot cover the screen)", () => {
+    expect(lightbox).toContain("createPortal(");
+    expect(lightbox).toContain("document.body");
+    expect(lightbox).toMatch(/z-\[9999\]/);
+  });
+
+  it("closes on backdrop tap, ESC and swipe-down (>80px) — Telegram-safe gestures", () => {
+    expect(lightbox).toContain('if (event.key === "Escape") onClose();');
+    expect(lightbox).toContain("if (dragY > 80) onClose();");
+    expect(lightbox).toContain('className="fixed inset-0 z-[9999]');
+  });
+
+  it("meetup popup photo opens the lightbox with the point title as caption", () => {
+    expect(src).toMatch(/setMapLightbox\(\{ url: m\.photo_url!\.trim\(\), caption: m\.title \}\)/);
+    expect(src).toMatch(/cursor-zoom-in/);
+  });
+
+  it("wall-pin popup photo opens the lightbox (label wins, excerpt fallback)", () => {
+    expect(src).toContain("caption: pin.label || pin.excerpt.slice(0, 60)");
+  });
+
+  it("lightbox is rendered at the root next to the other franchize modals", () => {
+    expect(src).toContain("<MapPhotoLightbox photo={mapLightbox} onClose={closeLightbox} />");
   });
 });

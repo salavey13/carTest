@@ -135,3 +135,17 @@ function clampUtf16(value: string, max: number): string {
   if (last >= 0xd800 && last <= 0xdbff) cut = cut.slice(0, -1);
   return cut;
 }
+
+/** Deep-link to Yandex.Maps routing TO the given point: empty start segment
+ *  (`rtext=~lat,lng`) makes the app plan from the user's current location.
+ *  Used by the meetup popup «Маршрут» button — riders actually ride to these
+ *  points, and the in-app Leaflet map has no turn-by-turn navigation. */
+export function yandexMapsRouteUrl(lat: number, lng: number): string {
+  const a = Number(lat);
+  const b = Number(lng);
+  // DB-числовые координаты не бывают NaN, но деградация должна быть валидной
+  // ссылкой (карта без маршрута), а не rtext=~NaN,NaN.
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "https://yandex.ru/maps/";
+  const coord = `${a.toFixed(6)},${b.toFixed(6)}`;
+  return `https://yandex.ru/maps/?rtext=~${encodeURIComponent(coord)}`;
+}

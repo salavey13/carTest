@@ -24,7 +24,7 @@ import {
   motoSpotKindLabel,
 } from "@/lib/map-riders-spots";
 import { buildRideSessionDraftText } from "@/app/franchize/lib/community-wall";
-import { meetupDraftFromPost } from "@/lib/map-riders";
+import { meetupDraftFromPost, yandexMapsRouteUrl } from "@/lib/map-riders";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -383,5 +383,59 @@ describe("post → meetup point wiring (interlink v2)", () => {
     expect(client).toContain("isCreatingMeetupFromPostRef.current = true;");
     expect(client).toMatch(/handleMakeMeetupFromPost[\s\S]{0,900}lastMeetupActionAtRef\.current < MEETUP_ACTION_DEBOUNCE_MS/);
     expect(client).toMatch(/handleMakeMeetupFromPost[\s\S]{0,400}toast\.error\("Авторизуйся в Telegram\/VIP BIKE"\)/);
+  });
+});
+
+// ── interlink v3: popup polish (symmetry + route + lightbox) ────────────────
+
+describe("yandexMapsRouteUrl", () => {
+  it("plans a route TO the point with an empty start (rtext=~lat,lng)", () => {
+    expect(yandexMapsRouteUrl(56.291234, 43.987654)).toBe(
+      `https://yandex.ru/maps/?rtext=~${encodeURIComponent("56.291234,43.987654")}`,
+    );
+  });
+
+  it("normalizes inputs through Number+toFixed (strings/extra precision safe)", () => {
+    expect(yandexMapsRouteUrl("56.3" as unknown as number, 44)).toContain(encodeURIComponent("56.300000,44.000000"));
+  });
+
+  it("degrades to the plain maps URL on non-finite coords (no rtext=~NaN,NaN)", () => {
+    expect(yandexMapsRouteUrl(NaN, 44)).toBe("https://yandex.ru/maps/");
+    expect(yandexMapsRouteUrl(56.3, Infinity)).toBe("https://yandex.ru/maps/");
+  });
+});
+
+describe("popup polish wiring (interlink v3)", () => {
+  it("wall-pin popup is symmetric with the wall chip: «Показать в ленте» + «Точкой на карту»", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    // Тот же handler, что у чипа поста на стене (атрибуция автора сохраняется).
+    expect(client).toContain("handleMakeMeetupFromPost(");
+    expect(client).toContain("{ lat: pin.lat, lng: pin.lng, label: pin.label },");
+    expect(client).toContain("{ postId: pin.postId, text: pin.excerpt, authorName: pin.authorName },");
+  });
+
+  it("meetup popup: compose + «Маршрут» (Yandex) side-by-side via openExternalUrl", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("openExternalUrl(yandexMapsRouteUrl(m.lat, m.lon))");
+    expect(client).toContain("title=\"Маршрут до точки в Яндекс.Картах\"");
+    // Telegram WebApp: openLink (НЕ openTelegramLink — это внешняя ссылка).
+    expect(client).toContain("tg?.openLink");
+    expect(client).toContain("window.open(url, \"_blank\", \"noopener,noreferrer\")");
+  });
+
+  it("handler is declared BEFORE the popup useMemos (no TDZ at render time)", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    const handler = client.indexOf("const handleMakeMeetupFromPost");
+    const wallPin = client.indexOf("const wallPinPoints = useMemo");
+    const meetup = client.indexOf("const meetupPoints = state.meetups.map");
+    expect(handler).toBeGreaterThan(-1);
+    expect(handler).toBeLessThan(wallPin);
+    expect(handler).toBeLessThan(meetup);
+  });
+
+  it("useMemo deps stay honest (handleMakeMeetupFromPost / openExternalUrl listed)", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain("openWallPostFromMap, handleMakeMeetupFromPost, crew.theme.isAuto");
+    expect(client).toContain("openWallComposeFromPoint, openExternalUrl]);");
   });
 });
