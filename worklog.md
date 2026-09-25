@@ -708,3 +708,24 @@ Stage Summary:
 - Попапы карты полнофункциональны: фото на весь экран, маршрут в Яндекс.Картах, пост о точке, создание точки из поста — loop «стена ↔ карта» замкнут и симметричен в обе стороны.
 - Проверить на проде: тап по фото в попапе → фуллскрин (свайп вниз закрывает); «Маршрут» открывает Яндекс.Навигатор/Карты; у геотег-пина «Точкой на карту» создаёт точку и карта летит к ней.
 - Напоминание висит: миграция 20260925120000_meetup_photo_url.sql всё ещё ждёт SQL editor (без неё фото не привязывается).
+
+---
+Task ID: 53
+Agent: Super Z (main)
+Task: «create button in "мотопарк" to allow to save reports like these examples for each bike» — per-bike rentals one-pager (.md) + deliver salary-audit report (Task 52 file re-confirmed present).
+
+Work Log:
+- Разведка: формат образцов Paul сверен с живой БД (rentals yamaha-r6-2007 / suzuki-vzr1800-boulevard-2006): клиент = users.full_name («SERG», «Maxim», «Илья I.O.S.»), даты agreed_* с фолбэком requested_* (pending Suzuki 27.09 15:00→18:00 МСК), payment fully_paid→«оплачен» / interest_paid→«предоплата» / pending→«не оплачен», deeplink t.me/<bot>/app?startapp=rental_<id>.
+- app/franchize/lib/bike-rentals-report.ts (pure): boss-формат markdown (Сводка / Все аренды / Ссылки на аренды), MSK +03:00 fixed, длительность <24ч в часах (floor, никогда «24 ч») иначе дни, выручка = completed+active (effectiveStatus), avg check floor (38 000/3 → 12 666 — совпадает с образцом), разбивка статусов (неизвестные тоже), cap 1000 строк + примечание об усечении, санитизация заголовков (newlines/backticks), filename rentals_<bikeId>_<stamp>.md (месяц → _YYYY-MM).
+- getBikeRentalsReportAction (bike-wall.ts): тот же resolveBikeWallAccess gate (owner/global admin/active member/subrenter scope/password owner), crew_id+type=bike scoping, month-параметр через normalizeMonthParam, бот через crew-bot chain (resolveCrewBotUsername → platformBotUsername; в проде TELEGRAM_BOT_USERNAME НЕ задан — класс багов 21/22.09).
+- BikeReportButton.tsx: blob download (паттерн SalesAnalyticsClient) + Telegram-gated clipboard fallback (256 KiB guard), честные тосты (copied vs not), loading/done/failed состояния (X + красная рамка), hit-area span ~44px, focus-visible, haptics, unmount cleanup + disarm при re-enter loading.
+- BikeCard (BikesWallClient) перестроена: root div, фото = Link-underlay (aria-hidden/tabIndex -1) + img/badges pointer-events-none + кнопка-СИБЛИНГ z-10 (никогда <button> внутри <a>); body — отдельный Link. month прокинут в кнопку: отчёт по умолчанию «за всё время» (= образцы, дефолт стены), при выбранном месяце «Аренды за сентябрь 2026» — числа никогда не противоречат экрану.
+- Тесты: +30 (golden R6/Suzuki фикстуры из живых строк, money-дисциплина, month scope, cap, санитизация, source-guards: gate parity ×3, crew-bot chain, month piping, sibling-разметка). Оба новых файла в tsconfig.franchize allowlist. Suite 2242 passed / 23 skipped / 0 failed; typecheck:franchize OK; eslint --max-warnings=0 OK.
+- Live-реплика (scripts/replica-bike-rentals-report.ts): Suzuki = байт-в-байт образец Paul (вкл. «предоплату» и 12 666); R6 совпадает везде кроме ячейки «Длит.» 3ч-аренды (у Paul «1 дн» при «1 ч» у его же 1ч-аренды — сам образец внутренне противоречив; у нас консистентно «3 ч», как в его Suzuki-образце).
+- 3 раунда codereview (2 параллельных + верификационный): MAJOR-фиксы — raw-env bot resolution → crew-bot chain; month-scope противоречие; tap-target ~30px → ~44px. MINOR — timer race, clipboard clobbering (гейт на Telegram), ложный тост успеха, unknown-статусы выпадали из сводки, безлимитный отчёт, несанитизированные заголовки. R3: SHIP.
+- Push: f0c84ec (d0544d8..f0c84ec → origin/main), Vercel автодеплой.
+
+Stage Summary:
+- На каждой карточке Мотопарка — пилюля «Отчёт»: тап → скачивание .md-файла формата образцов (дефолт — «за всё время»), в Telegram копия дублируется в буфер; при выбранном месяце отчёт месячный.
+- Проверить на проде: тап «Отчёт» на карточке R6 → файл rentals_yamaha-r6-2007_<дата>.md; на iOS если файл не появился — тост скажет, копия в буфере; месяц-стрелки меняют скоуп отчёта.
+- Salary-audit отчёт (Task 52) доставлен: download/salary-audit_vip-bike_payperiod-2026-09-10_25.md.
