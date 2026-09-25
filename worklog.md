@@ -689,3 +689,22 @@ Work Log:
 Stage Summary:
 - Полный двусторонний loop: пост с геотегом → «Точкой на карту» → точка на карте (карта сама летит к ней); попап точки → пост на стене. Попапы точки и геотег-пина теперь информационно равны (фото/автор/время).
 - Проверить на проде: пост с геотегом в шите карты → чип «Точкой на карту» → точка появилась и карта к ней прилетела; попап точки показывает автора и «сколько времени назад».
+
+---
+Task ID: 51
+Agent: Super Z (main)
+Task: «nice, continue polishing further in this direction» — map-riders interlink v3 (popup symmetry + route + lightbox).
+
+Work Log:
+- Скоуп: (1) попап геотег-пина симметричен чипу поста — «Показать в ленте» + «Точкой на карту» (тот же handleMakeMeetupFromPost, атрибуция автора в комментарии); (2) попап meetup — «Пост на стене» + «Маршрут» (yandexMapsRouteUrl: rtext=~lat,lng, маршрут от текущего места; openExternalUrl = tg.openLink ?? window.open); (3) MapPhotoLightbox — фуллскрин фото из попапов.
+- MapPhotoLightbox: createPortal(document.body) z-[9999] (leaflet-pane z~700 и Vaul не перекрывают), закрытие по backdrop/X/ESC/свайпу вниз >80px, setPointerCapture в onPointerDown (мышь: без capture drag «замораживался» и фото гналось за курсором), a11y: dialog + сейв фокуса ДО императивного фокуса (autoFocus/commitMount перебивает пассивный сейв — ловля ревьюера R2), restore открывателя (isConnected-guard), Tab-trap.
+- yandexMapsRouteUrl: toFixed(6) + encodeURIComponent, Number.isFinite-guard → фолбэк «https://yandex.ru/maps/».
+- Инфраструктурные грабли: env снова сбросился (re-clone @ 9b8d6e8); MultiEdit применялся ЧАСТИЧНО при ошибке валидации → дубликат handleMakeMeetupFromPost, разрулен python-скриптами (scripts/move_handler.py, dedupe_handler.py); handler перенесён ВЫШЕ useMemo с попапами (TDZ), deps массивы пополнены (handleMakeMeetupFromPost в wallPinPoints, openExternalUrl в mapPoints).
+- Тесты: +13 (route-url с NaN/Infinity, wiring, порядок объявления, честность deps, контракт лайтбокса); 3 старых ассерта обновлены под смену UI (multiline img → button-обёртка, «Написать пост на стене» → «Пост на стене»). Suite 2212 passed / 23 skipped / 0 failed; typecheck:franchize; eslint --max-warnings=0.
+- Reviewer-цикл (agent-1092a516): R1 REQUEST_CHANGES (MAJOR pointer-capture + a11y minors) → fixed; R2 REQUEST_CHANGES (фокус-restore был мёртвым кодом: autoFocus в layout-фазе перебивает пассивный сейв; эмпирическое доказательство на react-dom 18.3.1) → fixed (+NaN-тест); R3 APPROVE.
+- Push: d8578f7 (rebase поверх 587b35d CSV-regen) → origin/main, Vercel автодеплой.
+
+Stage Summary:
+- Попапы карты полнофункциональны: фото на весь экран, маршрут в Яндекс.Картах, пост о точке, создание точки из поста — loop «стена ↔ карта» замкнут и симметричен в обе стороны.
+- Проверить на проде: тап по фото в попапе → фуллскрин (свайп вниз закрывает); «Маршрут» открывает Яндекс.Навигатор/Карты; у геотег-пина «Точкой на карту» создаёт точку и карта летит к ней.
+- Напоминание висит: миграция 20260925120000_meetup_photo_url.sql всё ещё ждёт SQL editor (без неё фото не привязывается).
