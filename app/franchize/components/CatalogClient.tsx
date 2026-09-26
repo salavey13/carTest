@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Search, ShoppingCart, Wrench, Layers } from "lucide-react";
+import { Search, ShoppingCart, Wrench, Layers, Snowflake } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
@@ -14,6 +14,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+import { WinterStorageModal } from "./WinterStorageModal";
 import { useDisplayMode } from "./DisplayModeContext";
 import { SHOW_CART } from "@/lib/feature-flags";
 import { ItemModal, type FlowType } from "../modals/Item";
@@ -554,6 +555,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [clearFocused, setClearFocused] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
+  // «Зимнее Хранение» offer — vip-bike crew only (single «Место хранения»
+  // entry, Стригинский переулок 13Б). Pill in the filter row opens the modal.
+  const [winterStorageOpen, setWinterStorageOpen] = useState(false);
+  const showWinterStoragePill = resolvedSlug === "vip-bike" || slug === "vip-bike";
   const [campaignIndex, setCampaignIndex] = useState(0);
   const [carouselActiveByCategory, setCarouselActiveByCategory] = useState<Record<string, number>>({});
   const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
@@ -1385,6 +1390,21 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               </button>
             );
           })}
+          {showWinterStoragePill && (
+            <button
+              type="button"
+              onClick={() => setWinterStorageOpen(true)}
+              aria-haspopup="dialog"
+              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+              style={{
+                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
+                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+              }}
+            >
+              <Snowflake className="mr-1 inline-block h-3 w-3 text-sky-400" aria-hidden="true" />
+              Зимнее хранение
+            </button>
+          )}
           {(quickFilter !== "all" || searchQuery.trim().length > 0) && (
             <button
               type="button"
@@ -1798,6 +1818,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           className={ctaPolicy?.floatingCartClassName}
         />
       )}
+
+      <WinterStorageModal
+        open={winterStorageOpen}
+        onClose={() => setWinterStorageOpen(false)}
+        telegramHandle={crew.contacts.telegram || ""}
+        phone={crew.contacts.phone || ""}
+      />
 
       <ItemModal
         item={selectedItem}

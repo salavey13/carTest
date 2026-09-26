@@ -23,6 +23,7 @@ import { sanitizeTelegramText, oneLine as oneLineValue, escapeHtmlText } from "@
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
+import { formatStorageMonthsLabel as storageSeasonMonthsLabel, storageValidUntilISO } from "@/app/franchize/lib/storage-season";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
@@ -1989,6 +1990,33 @@ function assertTestdriveIdentityDocs(payload: {
   }
 }
 
+/**
+ * Storage doc rule (2026-09-27, winter-storage flow): the OWNER signs the
+ * storage contract (не арендатор), so his passport is mandatory (реквизиты
+ * Владельца, раздел 11 шаблона) and the bike must be identified (марка) with
+ * an agreed estimated value (п. 1.3 — the liability anchor, п. 5.1).
+ * Validated before any writes so the owner can fix the data and retry.
+ */
+function assertStorageIdentityDocs(payload: {
+  flowType?: string;
+  passportSeries?: unknown;
+  passportNumber?: unknown;
+  storageDetails?: unknown;
+}): void {
+  if (payload.flowType !== "storage") return;
+  const ownerPassportFilled = String(payload.passportSeries || "").trim().length > 0
+    && String(payload.passportNumber || "").trim().length > 0;
+  const details = (payload.storageDetails ?? null) as Record<string, unknown> | null;
+  const bikeDescribed = Boolean(String(details?.bikeMake ?? "").trim())
+    && Boolean(Number(details?.bikeEstimatedValueRub) > 0);
+  const missing: Array<"storage_owner_passport" | "storage_bike_details"> = [];
+  if (!ownerPassportFilled) missing.push("storage_owner_passport");
+  if (!bikeDescribed) missing.push("storage_bike_details");
+  if (missing.length > 0) {
+    throw new FranchizeOrderDocValidationError(missing);
+  }
+}
+
 type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
   totalAmount: number;
   subtotal: number;
@@ -1996,7 +2024,11 @@ type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> &
 };
 
 type FranchizeOrderDocContactField = "renterBirthDate" | "renterPhone" | "renterEmail";
-type FranchizeOrderDocRequiredField = "renterPhone" | "testdrive_passport_or_license";
+type FranchizeOrderDocRequiredField =
+  | "renterPhone"
+  | "testdrive_passport_or_license"
+  | "storage_owner_passport"
+  | "storage_bike_details";
 const FRANCHIZE_DOC_REQUIRED_FIELDS: FranchizeOrderDocRequiredField[] = ["renterPhone"];
 
 type FranchizeOrderDocVariables = {
@@ -2012,9 +2044,21 @@ class FranchizeOrderDocValidationError extends Error {
     // 2026-09-11: the testdrive field gets a human phrase — the message goes
     // straight to the renter's toast (submitFranchizeOrderNotification maps
     // DocValidationError → error.message).
+    // 2026-09-27: storage fields get human phrases — the message goes
+    // straight to the owner's toast (DocValidationError → error.message).
+    const HUMAN_FIELD_PHRASES: Record<string, string> = {
+      testdrive_passport_or_license:
+        "Для договора тест-драйва заполните паспорт или водительское удостоверение (серия и номер) — достаточно одного.",
+      storage_owner_passport:
+        "Для договора хранения заполните паспорт владельца (серия и номер).",
+      storage_bike_details:
+        "Для договора хранения укажите марку мотоцикла и его оценочную стоимость.",
+    };
     super(
-      missingFields.includes("testdrive_passport_or_license")
-        ? "Для договора тест-драйва заполните паспорт или водительское удостоверение (серия и номер) — достаточно одного."
+      missingFields.some((field) => HUMAN_FIELD_PHRASES[field])
+        ? missingFields
+            .map((field) => HUMAN_FIELD_PHRASES[field] ?? `Обязательное поле: ${field}.`)
+            .join(" ")
         : `Для генерации договора не заполнены обязательные поля: ${missingFields.join(", ")}.`,
     );
     this.name = "FranchizeOrderDocValidationError";
@@ -2058,6 +2102,16 @@ function formatPhoneRu(raw: string): string {
       ? digits
       : "";
   return tail.length === 10 ? `+7${tail}` : "";
+}
+
+/**
+ * Human season length for the storage contract (п. 2.1 шаблона):
+ * 17.10.2025 → 1.06.2026 (inclusive) = «7,5 месяца».
+ * Lives in lib/storage-season.ts (pure, unit-tested); re-exported here for
+ * the consolidated storage doc builder.
+ */
+function formatStorageMonthsLabel(startRaw: unknown, endRaw: unknown): string {
+  return storageSeasonMonthsLabel(startRaw, endRaw);
 }
 
 function resolveFranchizeDocField(
@@ -2113,11 +2167,11 @@ function resolveAndValidateFranchizeDocVariables(
   };
 }
 
-type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive" | "service" | "equipment";
+type FranchizeOrderFlowType = "rental" | "sale" | "mixed" | "testdrive" | "service" | "equipment" | "storage";
 
 async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderFlowType): Promise<{ template: string; templateMode: "md" | "html" }> {
   const crewSensitive = await getCrewSensitiveDataOrDefault(slug, { source: "loadFranchizeDealTemplate" });
-  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : flowType === "service" ? "serviceDealTemplate" : flowType === "equipment" ? "equipmentDealTemplate" : "saleDealTemplate";
+  const secureTemplateKey = flowType === "rental" ? "rentalDealTemplate" : flowType === "service" ? "serviceDealTemplate" : flowType === "equipment" ? "equipmentDealTemplate" : flowType === "storage" ? "storageDealTemplate" : "saleDealTemplate";
   const secureTemplate = readPath(crewSensitive.docTemplates ?? {}, [secureTemplateKey], "");
   if (typeof secureTemplate === "string" && secureTemplate.trim().length > 0) {
     // Auto-detect mode from stored template content
@@ -2133,6 +2187,7 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
     const isTestdrive = flowType === "testdrive";
     const isService = flowType === "service";
     const isEquipment = flowType === "equipment";
+    const isStorage = flowType === "storage";
     const localTemplateFile = isEquipment
       ? "EQUIPMENT_RENTAL_DEAL_TEMPLATE.html"
       : isRental
@@ -2141,7 +2196,9 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
           ? "TESTDRIVE_DEAL_TEMPLATE.html"
           : isService
             ? "SERVICE_DEAL_TEMPLATE.html"
-            : "SALE_DEAL_TEMPLATE.html";
+            : isStorage
+              ? "WINTER_STORAGE_TEMPLATE.html"
+              : "SALE_DEAL_TEMPLATE.html";
     const defaultTemplateMode = "html" as const;
 
   // Check crew-specific template in crewDocs/ first
@@ -2177,7 +2234,9 @@ async function loadFranchizeDealTemplate(slug: string, flowType: FranchizeOrderF
           ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/TESTDRIVE_DEAL_TEMPLATE.html"
           : isService
             ? "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SERVICE_DEAL_TEMPLATE.html"
-            : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
+            : isStorage
+              ? "https://raw.githubusercontent.com/salavey13/carTest/main/docs/crewDocs/vip-bike_WINTER_STORAGE_TEMPLATE.html"
+              : "https://raw.githubusercontent.com/salavey13/cartTest/main/docs/SALE_DEAL_TEMPLATE.html";
   try {
     const response = await fetch(remoteTemplateUrl, { cache: "no-store" });
     if (!response.ok) {
@@ -2334,6 +2393,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const isSaleFlow = flowType === "sale" || flowType === "mixed";
     const isTestdrive = flowType === "testdrive";
     const isServiceFlow = flowType === "service";
+    const isStorageFlow = flowType === "storage";
     // Testdrive identity is validated EARLIER (assertTestdriveIdentityDocs) —
     // before the notification-log write — so a failed attempt can be fixed
     // and retried without tripping the idempotency guard.
@@ -2343,6 +2403,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const bikeFlowTypes = payload.cartLines.map((line) => {
       if (isServiceFlow) return "service";
       if (isTestdrive) return "testdrive";
+      if (isStorageFlow) return "storage";
       if (flowType === "sale") return "sale";
       if (flowType === "rental") return "rental";
       // Mixed flow: check if this specific bike is for sale or rent
@@ -2368,11 +2429,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     const needsSaleTemplate = bikeFlowTypes.includes("sale");
     const needsTestdriveTemplate = bikeFlowTypes.includes("testdrive");
     const needsServiceTemplate = bikeFlowTypes.includes("service");
+    const needsStorageTemplate = bikeFlowTypes.includes("storage");
 
     let rentalTemplate: string | null = null;
     let saleTemplate: string | null = null;
     let testdriveTemplate: string | null = null;
     let serviceTemplate: string | null = null;
+    let storageTemplate: string | null = null;
     let templateMode: "md" | "html" = "html";
 
     if (needsRentalTemplate) {
@@ -2393,6 +2456,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     if (needsServiceTemplate) {
       const result = await loadFranchizeDealTemplate(payload.slug, "service");
       serviceTemplate = result.template;
+      templateMode = result.templateMode;
+    }
+    if (needsStorageTemplate) {
+      const result = await loadFranchizeDealTemplate(payload.slug, "storage");
+      storageTemplate = result.template;
       templateMode = result.templateMode;
     }
     const privateReadContext = { source: "buildFranchizeOrderDocAndNotify", orderId: payload.orderId };
@@ -2639,6 +2707,136 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
+    // ── STORAGE flow: single consolidated winter-storage contract ──
+    // Like service (2026-09-27): the storage line describes the OWNER's bike,
+    // which is NOT a catalog item, so the per-bike loop would skip it (no car
+    // row). One contract per storage order is generated here, before the loop,
+    // from docs/crewDocs/vip-bike_WINTER_STORAGE_TEMPLATE.html. The contract
+    // season/valid-until/prices follow the audit fixes: one consistent season
+    // (п. 2.1) + 2-day validity buffer (п. 2.2), monthly rate × months (п. 3),
+    // estimated value as the liability anchor (п. 1.3/5.1).
+    if (isStorageFlow && storageTemplate) {
+      const now = new Date();
+      const details = (payload.storageDetails ?? {}) as {
+        bikeMake?: string;
+        bikeRegNumber?: string;
+        bikeColor?: string;
+        bikeVin?: string;
+        bikeYear?: string;
+        bikeMileage?: string;
+        bikeAccessories?: string;
+        bikeEstimatedValueRub?: number;
+        storageAddress?: string;
+        monthlyPriceRub?: number;
+        noticeAddress?: string;
+      };
+      const storagePassportStr = [payload.passportSeries, payload.passportNumber].filter(Boolean).join(" ").trim();
+
+      // Season dates: the checkout date pickers reuse rentalStartDate/End.
+      const storageStartRaw = payload.rentalStartDate || payload.time;
+      const storageEndRaw = payload.rentalEndDate || "";
+      const storageStartDateRu = formatDateDdMmYyyy(storageStartRaw);
+      const storageEndDateRu = formatDateDdMmYyyy(storageEndRaw);
+      // «до 3.06» rule from the boss's manual: the contract stays valid for
+      // 2 days past the season end so the pickup visit has legal coverage.
+      const storageValidUntilRu = (() => {
+        const iso = storageValidUntilISO(storageEndRaw);
+        return iso ? formatDateDdMmYyyy(iso) : storageEndDateRu;
+      })();
+      const storageMonthsLabel = formatStorageMonthsLabel(storageStartRaw, storageEndRaw);
+
+      const storageEstimatedRub = Math.round(Number(details.bikeEstimatedValueRub ?? 0));
+      const storageMonthlyRub = Math.round(Number(details.monthlyPriceRub ?? 0))
+        || (storageMonthsLabel
+          ? Math.round((payload.totalAmount || 0) / Math.max(0.5, Number(storageMonthsLabel.replace(",", "."))))
+          : 0);
+
+      // ПЭП block: same recipe as rental-contract-vars (MSK timestamp +
+      // initData fingerprint) — but the signer is the OWNER (owner_signature).
+      const storagePepVars = ((): Record<string, string> => {
+        if (!pepMeta) return { signature_timestamp: now.toLocaleString("ru-RU") };
+        const signedMs = new Date(pepMeta.signedAt).getTime();
+        const mskDate = new Date((Number.isFinite(signedMs) ? signedMs : Date.now()) + 3 * 3600 * 1000);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const mskStamp = `${pad(mskDate.getUTCDate())}.${pad(mskDate.getUTCMonth() + 1)}.${mskDate.getUTCFullYear()} ${pad(mskDate.getUTCHours())}:${pad(mskDate.getUTCMinutes())} (МСК)`;
+        return {
+          pep_signed: "1",
+          owner_signature: `Telegram ID ${pepMeta.telegramId}${pepMeta.username ? ` (@${pepMeta.username})` : ""}`,
+          signature_timestamp: mskStamp,
+        };
+      })();
+
+      const storageVariables: Record<string, string> = {
+        contract_number: `${payload.slug.toUpperCase()}-STORAGE-${payload.orderId}`,
+        day: String(now.getDate()).padStart(2, "0"),
+        month: now.toLocaleString("ru-RU", { month: "long" }),
+        year: String(now.getFullYear()),
+        // Хранитель = canonical vip-bike requisites (same as rental docs)
+        organization_name: crewSecrets.organizationName,
+        organization_short: crewSecrets.organizationShort,
+        issuer_name: crewSecrets.issuerName,
+        issuer_representative: crewSecrets.issuerRepresentative || crewSecrets.signatoryRole || crewSecrets.issuerName || "Менеджер",
+        ogrnip: crewSecrets.ogrnip,
+        inn: crewSecrets.inn,
+        legal_address: crewSecrets.legalAddress,
+        phone: crewSecrets.phone || "",
+        email: crewSecrets.email || "",
+        // Владелец = the order's client
+        owner_full_name: payload.recipient || "",
+        owner_short_name: (payload.recipient || "").split(" ").map((n, i) => i === 0 ? n : `${n[0]}.`).join(" "),
+        owner_birth_date: payload.birthDate || docIdentity.renterBirthDate || "",
+        owner_passport: storagePassportStr,
+        owner_phone: docIdentity.renterPhone || payload.phone || "",
+        owner_notice_address: details.noticeAddress || payload.registrationAddress || "",
+        // Мото-транспорт (owner's bike — not a catalog item)
+        bike_make: details.bikeMake || "",
+        bike_reg_number: details.bikeRegNumber || "",
+        bike_color: details.bikeColor || "",
+        bike_vin: details.bikeVin || "",
+        bike_year: details.bikeYear || "",
+        bike_mileage: details.bikeMileage || "",
+        bike_accessories: details.bikeAccessories || "уточняется по Акту приёма-передачи",
+        bike_estimated_value_rub: storageEstimatedRub > 0 ? formatMoney(storageEstimatedRub) : "",
+        bike_estimated_value_words: storageEstimatedRub > 0 ? numberToWords(storageEstimatedRub) : "",
+        storage_address: details.storageAddress || crewSecrets.returnAddress || crewSecrets.legalAddress,
+        storage_start_date: storageStartDateRu,
+        storage_end_date: storageEndDateRu,
+        storage_months: storageMonthsLabel,
+        contract_valid_until: storageValidUntilRu,
+        storage_monthly_price: formatMoney(storageMonthlyRub > 0 ? storageMonthlyRub : (payload.totalAmount || 0)),
+        storage_total_price: formatMoney(payload.totalAmount || 0),
+        storage_total_price_words: numberToWords(payload.totalAmount || 0),
+        ...storagePepVars,
+        document_key: `storage-${payload.slug}-${payload.orderId}`,
+      };
+
+      const storageDocFileName = `storage-${payload.slug}-${payload.orderId}.docx`;
+      const storageVerifierScope = `storage:${payload.slug}:${payload.orderId}`;
+      try {
+        const { bytes, sha256 } = await buildFranchizeDocxFromTemplate({
+          integrationScope: storageVerifierScope,
+          uploadedBy: "franchize-order-system",
+          documentKey: storageVariables.document_key,
+          fileName: storageDocFileName,
+          template: storageTemplate,
+          variables: storageVariables,
+          flowType: "storage" as any,
+          templateMode,
+        });
+        bikeDocs.push({
+          bytes,
+          fileName: storageDocFileName,
+          bikeName: details.bikeMake || "зимнее хранение",
+          bikeId: "storage",
+          documentKey: storageVariables.document_key,
+          sha256,
+          cartLineIndex: 0,
+        });
+      } catch (stErr) {
+        logger.error("[franchize] storage doc generation failed", { error: stErr instanceof Error ? stErr.message : String(stErr) });
+      }
+    }
+
     for (let bikeIndex = 0; bikeIndex < payload.cartLines.length; bikeIndex++) {
       const line = payload.cartLines[bikeIndex];
       const car = byId.get(line.itemId);
@@ -2652,6 +2850,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
       // ── SERVICE flow: already handled as consolidated doc above — skip per-bike ──
       if (bikeFlowTypes[bikeIndex] === "service") {
+        continue;
+      }
+
+      // ── STORAGE flow: already handled as consolidated doc above — skip per-bike ──
+      if (bikeFlowTypes[bikeIndex] === "storage") {
         continue;
       }
 
@@ -3124,8 +3327,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       : payload.time || "по согласованию";
 
     // ── Enhanced notification with bike label for ALL flows, accessories, and actual time ──
-    const flowEmoji = isServiceFlow ? "🔧" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
-    const flowLabel = isServiceFlow ? "Новая сервисная заявка" : flowType === "mixed" ? "Смешанный заказ (аренда + покупка)" : isSaleFlow ? "Новый заказ на покупку" : isTestdrive ? "Новый заказ на тест-драйв" : "Новый заказ на аренду";
+    const flowEmoji = isServiceFlow ? "🔧" : isStorageFlow ? "❄️" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
+    const flowLabel = isServiceFlow ? "Новая сервисная заявка" : isStorageFlow ? "Новый заказ на зимнее хранение" : flowType === "mixed" ? "Смешанный заказ (аренда + покупка)" : isSaleFlow ? "Новый заказ на покупку" : isTestdrive ? "Новый заказ на тест-драйв" : "Новый заказ на аренду";
 
     // For service flow, bike label should list actual service items
     const serviceBikeNames = isServiceFlow
@@ -3191,6 +3394,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     };
     if (isServiceFlow) pushAnalytics("🔧 Сервис:", "services");
     else if (isSaleFlow) pushAnalytics("🛍️ Продажа:", "sales");
+    else if (isStorageFlow) {
+      // Winter storage has no analytics wall yet — deeplinks would 404.
+    }
     else pushAnalytics("🔗 Аренда:", "rentals");
 
     await notifyAdmin(notificationParts.join("\n"));
@@ -3220,15 +3426,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
     // ── Send notification to creator too (Issue 4) ──
     if (payload.telegramUserId && payload.telegramUserId !== adminChatId) {
-      const userFlowEmoji = isServiceFlow ? "🔧" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
-      const userFlowLabel = isServiceFlow ? "Сервисная заявка" : flowType === "mixed" ? "Смешанный заказ" : isSaleFlow ? "Заказ на покупку" : isTestdrive ? "Заказ на тест-драйв" : "Заказ на аренду";
+      const userFlowEmoji = isServiceFlow ? "🔧" : isStorageFlow ? "❄️" : flowType === "mixed" ? "📦" : isSaleFlow ? "🛍️" : isTestdrive ? "🏁" : "🧾";
+      const userFlowLabel = isServiceFlow ? "Сервисная заявка" : isStorageFlow ? "Заявка на зимнее хранение" : flowType === "mixed" ? "Смешанный заказ" : isSaleFlow ? "Заказ на покупку" : isTestdrive ? "Заказ на тест-драйв" : "Заказ на аренду";
 
       // v3 polish: for rent flow, use centralized template builder with richer context
       // (total cost, deposit, pickup info, clear next-step CTA, inline buttons).
       // For other flows (sale/service/mixed/testdrive), keep the existing simple message.
       let userNotification: string;
       let userButtons: Array<Array<{ text: string; url: string }>> = [];
-      if (!isServiceFlow && !isSaleFlow && !isTestdrive && flowType !== "mixed") {
+      if (!isServiceFlow && !isSaleFlow && !isTestdrive && flowType !== "mixed" && flowType !== "storage") {
         // Rent flow — use template builder
         userNotification = buildCartCheckoutRenterMessage({
           orderId: payload.orderId,
@@ -4753,7 +4959,26 @@ const franchizeOrderInvoiceSchema = z.object({
   safetyQuizPassed: z.boolean().optional(),
   pickupAddress: z.string().trim().optional(),
   requiredDocs: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
-  flowType: z.enum(["rental", "sale", "mixed", "testdrive", "service"]).default("rental"),
+  flowType: z.enum(["rental", "sale", "mixed", "testdrive", "service", "storage"]).default("rental"),
+  // ── Winter-storage details (flowType = "storage") ──
+  // The storage contract describes the OWNER's bike (not a catalog item), so
+  // the checkout form collects the machine's identity, the agreed estimated
+  // value (п. 1.3 шаблона) and the storage place. Everything is optional at
+  // the schema level — assertStorageIdentityDocs enforces the legally required
+  // minimum (passport + bike make + estimated value) with human toasts.
+  storageDetails: z.object({
+    bikeMake: z.string().trim().max(120).optional(),
+    bikeRegNumber: z.string().trim().max(40).optional(),
+    bikeColor: z.string().trim().max(60).optional(),
+    bikeVin: z.string().trim().max(40).optional(),
+    bikeYear: z.string().trim().max(10).optional(),
+    bikeMileage: z.string().trim().max(20).optional(),
+    bikeAccessories: z.string().trim().max(600).optional(),
+    bikeEstimatedValueRub: z.number().finite().nonnegative().optional(),
+    storageAddress: z.string().trim().max(300).optional(),
+    monthlyPriceRub: z.number().finite().nonnegative().optional(),
+    noticeAddress: z.string().trim().max(300).optional(),
+  }).optional(),
   // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──
   // Full Telegram initData string forwarded by the client when the renter
   // tapped «Подписать договор» at checkout. Verified server-side via
@@ -4775,6 +5000,9 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   // Testdrive doc rule (2026-09-11): passport OR license required — validated
   // before any writes so the renter can fix the data and retry.
   assertTestdriveIdentityDocs(payload);
+  // Storage doc rule (2026-09-27): owner passport + bike identity + estimated
+  // value — same fail-fast contract, human toast messages.
+  assertStorageIdentityDocs(payload);
   const totalResult = await resolveFranchizeCheckoutTotal(payload);
   if (!totalResult.success) return totalResult;
   const effectiveTotal = totalResult.totalAmount;
