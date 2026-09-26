@@ -32,6 +32,11 @@ import {
   type ShiftLike,
   type AttributionSource,
 } from "@/app/franchize/lib/operator-attribution";
+import {
+  sumMemberPaidOut,
+  computeShiftAccrued,
+} from "@/app/franchize/lib/salary-paid-out";
+import { mskMonthWindowUtcIso } from "@/app/franchize/lib/msk-time";
 
 // ── 2026-09-09 salary refine: double-entry payout mirror ───────────────────
 //
@@ -60,6 +65,9 @@ async function mirrorPayoutToOwnerWallet(args: {
   memberId: string;
   amount: number;
   actorUserId?: string;
+  /** Formal-ledger tx id — lets the wallet row prove it must NOT be counted
+   *  as an ADDITIONAL payout (see sumMemberPaidOut dedup rules). */
+  txId?: string;
 }): Promise<void> {
   const { crewId, memberId, amount } = args;
   // Best-effort guard: without a crew id there is no wallet to mirror into
@@ -112,6 +120,11 @@ async function mirrorPayoutToOwnerWallet(args: {
       entry_date: entryDate,
       created_by: args.actorUserId ?? memberId,
       source: "profile",
+      // 2026-09-26 audit refine: explicit mirror link. The wallet-side «already
+      // paid» math (sumMemberPaidOut) skips rows carrying mirrorOfTx — the
+      // formal row itself is already counted — so both books stay consistent
+      // and the wallet-mirror trigger skips these rows too.
+      metadata: { book: "salary", mirrorOfTx: args.txId ?? null },
     });
 
     if (walletError) {
@@ -958,16 +971,7 @@ export async function recordPayoutForPeriod(params: {
       .gte("clock_in_time", periodStartIso)
       .lte("clock_in_time", periodEndIso);
 
-    const shiftAccrued = (shifts || []).reduce((sum: number, s: any) => {
-      const stored = Number(s.salary_amount || 0);
-      if (stored > 0) return sum + stored;
-      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
-      if (!start) return sum;
-      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
-      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
-      const rate = Number(s.hourly_rate || 0);
-      return sum + hours * rate;
-    }, 0);
+    const shiftAccrued = computeShiftAccrued(shifts || []);
 
     const { data: commissions } = await supabaseAdmin
       .from("cash_transactions")
@@ -984,19 +988,25 @@ export async function recordPayoutForPeriod(params: {
 
     const accrued = Math.round(shiftAccrued + commissionAccrued);
 
-    // Already paid out for this period — crew-scoped.
-    const { data: payouts } = await supabaseAdmin
-      .from("cash_transactions")
-      .select("amount")
-      .eq("crew_id", access.crewId)
-      .eq("to_user_id", memberId)
-      .eq("transaction_type", "expense_salary")
-      .gte("transaction_date", periodStartIso)
-      .lte("transaction_date", periodEndIso);
-    const alreadyPaid = (payouts || []).reduce(
-      (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
-      0,
-    );
+    // Already paid out for this period — crew-scoped, BOTH books, deduped.
+    // 2026-09-26 salary audit: used to sum ONLY cash_transactions
+    // expense_salary, so payouts logged just via the owner wallet / assistant
+    // bot («занеси выплату зарплаты…» → owner_cash_entries) were invisible
+    // here while the money had actually left — the page kept offering a
+    // balance for cash already handed out (double-pay risk).
+    // Best-effort like the mirror itself: a wallet read hiccup must never
+    // block a legitimate payout (the formal ledger stays the source of truth).
+    let alreadyPaid = 0;
+    try {
+      alreadyPaid = await sumMemberPaidOut(supabaseAdmin, {
+        crewId: access.crewId,
+        memberId,
+        startUtcIso: periodStartIso,
+        endUtcIso: periodEndIso,
+      }).then((r) => r.total);
+    } catch (paidErr) {
+      logger.warn("[recordPayoutForPeriod] Paid-out query failed (counting formal book only):", paidErr);
+    }
 
     const balanceDue = Math.max(0, accrued - alreadyPaid);
     if (balanceDue <= 0) {
@@ -1031,11 +1041,13 @@ export async function recordPayoutForPeriod(params: {
     }
 
     // 2026-09-09 refine: wallet side of the double entry (see helper docs).
+    // 2026-09-26: pass txId so the wallet row carries metadata.mirrorOfTx.
     await mirrorPayoutToOwnerWallet({
       crewId: access.crewId,
       memberId,
       amount: balanceDue,
       actorUserId: access.actorUserId,
+      txId: tx.id,
     });
 
     logger.info("[recordPayoutForPeriod] Recorded payout", {
@@ -1087,10 +1099,15 @@ export async function getMyEarnings(params: {
     // their salary plan + commission payments (data exposure).
     const secureUserId = access.actorUserId;
 
-    // Get current month plan
-    const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    // Get current month plan.
+    // 2026-09-26 audit: the window is now the MSK month (the app-wide money
+    // convention, same as getMyPayoutHistory). Previously `new Date(y, m, 1)`
+    // produced UTC-midnight bounds on the server, so the first 3 MSK hours of
+    // a month belonged to the previous month and the numbers on the profile
+    // disagreed with the owner's salary page.
+    const monthWindow = mskMonthWindowUtcIso();
+    const periodStart = monthWindow.startUtcIso;
+    const periodEnd = monthWindow.endUtcIso;
 
     const { data: plan } = await supabaseAdmin
       .from("salary_plans")
@@ -1123,16 +1140,7 @@ export async function getMyEarnings(params: {
     if (monthShiftErr) {
       logger.warn("[getMyEarnings] Shifts query failed:", monthShiftErr);
     }
-    const dynamicShiftAccrued = (monthShifts || []).reduce((sum: number, s: any) => {
-      const stored = Number(s.salary_amount || 0);
-      if (stored > 0) return sum + stored;
-      const start = s.clock_in_time ? new Date(s.clock_in_time) : null;
-      if (!start) return sum;
-      const end = s.clock_out_time ? new Date(s.clock_out_time) : new Date();
-      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
-      const rate = Number(s.hourly_rate || 0);
-      return sum + hours * rate;
-    }, 0);
+    const dynamicShiftAccrued = computeShiftAccrued(monthShifts || []);
 
     // Month-to-date commissions recorded against this member.
     const { data: monthCommissions, error: monthCommErr } = await supabaseAdmin
@@ -1151,33 +1159,29 @@ export async function getMyEarnings(params: {
       0,
     );
 
-    // Already-paid-out salary for this plan (so balanceDue excludes it).
-    // Sums all `expense_salary` transactions for the member in the plan's
-    // period (if a plan exists) — falls back to 0 if no plan.
-    let alreadyPaidThisPeriod = 0;
-    if (plan) {
-      const { data: payouts, error: payoutsErr } = await supabaseAdmin
-        .from("cash_transactions")
-        .select("amount")
-        .eq("crew_id", access.crewId)
-        .eq("to_user_id", secureUserId)
-        .eq("transaction_type", "expense_salary")
-        .gte("transaction_date", periodStart)
-        .lt("transaction_date", periodEnd);
-      if (payoutsErr) {
-        logger.warn("[getMyEarnings] Payouts query failed:", payoutsErr);
-      }
-      alreadyPaidThisPeriod = (payouts || []).reduce(
-        (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
-        0,
-      );
-    }
+    // Already-paid-out salary for this month (so balanceDue excludes it).
+    // 2026-09-26 audit: BOTH books via sumMemberPaidOut (formal ledger +
+    // wallet payouts that have no formal twin), deduped via the mirror links;
+    // and no longer gated on a salary_plan existing — the dynamic balance is
+    // shown even for members without a plan row, mirroring what the owner
+    // sees on the salary page.
 
     const dynamicAccrued = Math.round(dynamicShiftAccrued + dynamicCommissionAccrued);
     // balance_due reflects what the owner still owes for this period: the
     // higher of (dynamicAccrued − already paid, plan.balance_due). We prefer
     // the dynamic calc when it is non-zero (live data); otherwise fall back to
     // whatever the plan recorded.
+    let alreadyPaidThisPeriod = 0;
+    try {
+      alreadyPaidThisPeriod = await sumMemberPaidOut(supabaseAdmin, {
+        crewId: access.crewId,
+        memberId: secureUserId,
+        startUtcIso: periodStart,
+        endUtcIso: periodEnd,
+      }).then((r) => r.total);
+    } catch (paidErr) {
+      logger.warn("[getMyEarnings] Paid-out query failed:", paidErr);
+    }
     const dynamicBalanceDue = Math.max(0, dynamicAccrued - alreadyPaidThisPeriod);
     const planBalanceDue = plan ? Number(plan.balance_due || 0) : 0;
     const balanceDue = dynamicAccrued > 0 ? dynamicBalanceDue : planBalanceDue;

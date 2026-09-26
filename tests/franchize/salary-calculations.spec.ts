@@ -70,6 +70,7 @@ function buildChain(result: { data?: any; error?: any } = {}) {
     gt: vi.fn(() => chain),
     lte: vi.fn(() => chain),
     lt: vi.fn(() => chain),
+    ilike: vi.fn(() => chain),
     order: vi.fn(() => chain),
     limit: vi.fn(() => chain),
     maybeSingle: vi.fn(() => ({ data: result.data ?? null, error: result.error ?? null })),
@@ -340,11 +341,13 @@ describe("recordPayoutForPeriod", () => {
     }
   });
 
-  it("2026-09-09 regression: date-only periodEnd is END-OF-DAY (matches getOwnerSalaryOverview), not UTC midnight", async () => {
+  it("2026-09-09 regression (MSK since 2026-09-26): date-only periodEnd is END-OF-MSK-DAY, not UTC midnight", async () => {
     // Баг: `new Date("2026-08-25")` = полночь → целый последний день периода
     // (выплатной день по расписанию!) выпадал из начисления при выплате,
     // хотя страница зарплат его показывала. Теперь период нормализуется теми
-    // же хелперами, что и обзор: end = 23:59:59.999, фильтры .lte.
+    // же хелперами, что и обзор: end = конец MSK-дня (23:59:59.999+03:00),
+    // фильтры .lte. 2026-09-26: границы привязаны к МОСКВЕ (не UTC) — смена
+    // 00:30 MSK 25-го (21:30Z 24-го) больше не выпадает из периода 10–25.
     setAuthMocks({ isOwner: true });
     const filterCalls: Array<{ fn: string; col: string; val: string }> = [];
     let txCallCount = 0;
@@ -387,12 +390,13 @@ describe("recordPayoutForPeriod", () => {
     if (res.success && res.data) {
       expect(res.data.paidAmount).toBe(2000);
     }
-    // Границы периода: начало 00:00:00.000, конец 23:59:59.999 (как в обзоре).
+    // Границы периода: начало MSK-полуночи (21:00Z предыдущего дня), конец
+    // MSK 23:59:59.999 (20:59:59.999Z) — как в обзоре.
     const shiftGte = filterCalls.find((c) => c.col === "clock_in_time" && c.fn === "gte");
     const shiftLte = filterCalls.find((c) => c.col === "clock_in_time" && (c.fn === "lte" || c.fn === "lt"));
-    expect(shiftGte?.val).toBe("2026-08-10T00:00:00.000Z");
+    expect(shiftGte?.val).toBe("2026-08-09T21:00:00.000Z");
     expect(shiftLte?.fn).toBe("lte");
-    expect(shiftLte?.val).toBe("2026-08-25T23:59:59.999Z");
+    expect(shiftLte?.val).toBe("2026-08-25T20:59:59.999Z");
   });
 
   it("2026-09-09 refine: mirrors the payout into owner_cash_entries (double-entry)", async () => {
@@ -465,6 +469,10 @@ describe("recordPayoutForPeriod", () => {
     expect(w.source).toBe("profile");
     expect(w.created_by).toBe(OWNER_ID);
     expect(w.entry_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // 2026-09-26 audit refine: explicit mirror link so the wallet-side
+    // «already paid» sum (sumMemberPaidOut) and the wallet→ledger trigger
+    // never double count this payout.
+    expect(w.metadata).toEqual({ book: "salary", mirrorOfTx: "tx-1" });
   });
 
   it("2026-09-09 refine: wallet mirror failure does NOT fail the payout (best-effort)", async () => {

@@ -8,12 +8,13 @@
 // samples), the selected month when paged («Аренды за сентябрь 2026») — so
 // the report never contradicts the numbers on screen.
 //
-// WebView reality: blob-anchor download is the established in-app pattern
-// (SalesAnalyticsClient CSV export). Telegram iOS can silently ignore the
-// download AND reject the clipboard after the awaited action (transient
-// activation expiry), so the toast wording stays honest about both paths.
-// The clipboard fallback only runs inside Telegram — on desktop browsers the
-// download already worked and clobbering the clipboard is rude.
+// WebView reality (2026-09-26 refine): inside Telegram the .md file is SENT
+// TO THE USER'S CHAT by the bot via /api/forward-telegram (sendDocument,
+// base64) — iOS WebView silently ignores blob-anchor downloads, and a file
+// in the chat can be opened/saved/forwarded from any phone. The blob
+// download remains the non-Telegram path (SalesAnalyticsClient CSV recipe)
+// and the fallback if the forward API fails; the clipboard copy stays as a
+// second fallback inside Telegram (transient-activation aware).
 //
 // The button is a SIBLING of the card Link (never nested inside <a>) — valid
 // HTML, clicks stay unambiguous; the invisible padded span inside the button
@@ -49,6 +50,86 @@ function isTelegramWebView(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The signed-in user's own Telegram chat id — the delivery target for the
+ * report document. initDataUnsafe is not HMAC-verified, but it only chooses
+ * WHO receives a report the server action already produced for THIS actor;
+ * worst case a spoofed id mails the (already authorized) report to the
+ * spoofer's own chat with the bot.
+ */
+function getTelegramChatId(): string | null {
+  try {
+    const id = (
+      window as unknown as {
+        Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number | string } } } };
+      }
+    ).Telegram?.WebApp?.initDataUnsafe?.user?.id;
+    return id !== undefined && id !== null && String(id).length > 0 ? String(id) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** UTF-8-safe base64 in ~32k-byte chunks (no call-stack blowups on big md). */
+function utf8ToBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Send the .md report INTO the user's own Telegram chat via the forward
+ * API (same envelope as notify/QR flows): {chat_id, method, payload, files}.
+ */
+async function forwardReportToTelegram(
+  chatId: string,
+  markdown: string,
+  filename: string,
+  captionHtml: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const response = await fetch("/api/forward-telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        method: "sendDocument",
+        payload: {
+          caption: captionHtml,
+          parse_mode: "HTML",
+        },
+        files: {
+          document: {
+            data: utf8ToBase64(markdown),
+            filename,
+            contentType: "text/markdown;charset=utf-8",
+          },
+        },
+      }),
+    });
+    const json = (await response.json().catch(() => null)) as
+      | { ok?: boolean; error?: string }
+      | null;
+    if (!response.ok || !json?.ok) {
+      return { ok: false, error: json?.error || `HTTP ${response.status}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "forward failed" };
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function hapticLight(): void {
@@ -139,21 +220,44 @@ export function BikeReportButton({
           throw new Error(result.error || "Не удалось собрать отчёт");
         }
         const { markdown, filename } = result.data;
-        downloadMarkdown(markdown, filename);
-        hapticLight();
-        const copied =
-          isTelegramWebView() && markdown.length <= CLIPBOARD_MAX_CHARS
-            ? await copyToClipboard(markdown)
-            : false;
         const scope = month ? monthLabelRu(month) : "за всё время";
-        if (copied) {
-          toast.success(`Отчёт готов: ${bikeLabel}`, {
-            description: `${scope} · файл сохранён, копия — в буфере обмена`,
-          });
+
+        // In Telegram the chat IS the delivery channel — a document lands in
+        // the user's own chat, openable/savable on any phone (iOS WebView
+        // ignores blob downloads). Download remains the fallback when the
+        // forward API is unavailable.
+        const chatId = isTelegramWebView() ? getTelegramChatId() : null;
+        let deliveredInTg = false;
+        if (chatId) {
+          const forward = await forwardReportToTelegram(
+            chatId,
+            markdown,
+            filename,
+            `Отчёт по арендам — <b>${escapeHtml(bikeLabel)}</b> (${escapeHtml(scope)})`,
+          );
+          deliveredInTg = forward.ok;
+        }
+
+        if (!deliveredInTg) {
+          downloadMarkdown(markdown, filename);
+          const copied =
+            chatId && markdown.length <= CLIPBOARD_MAX_CHARS
+              ? await copyToClipboard(markdown)
+              : false;
+          if (copied) {
+            toast.success(`Отчёт готов: ${bikeLabel}`, {
+              description: `${scope} · файл сохранён, копия — в буфере обмена`,
+            });
+          } else {
+            toast.success(`Отчёт готов: ${bikeLabel}`, {
+              description: `${scope} · ${filename}. Если файл не появился — попробуйте ещё раз`,
+              duration: 6000,
+            });
+          }
         } else {
+          hapticLight();
           toast.success(`Отчёт готов: ${bikeLabel}`, {
-            description: `${scope} · ${filename}. Если файл не появился — попробуйте ещё раз`,
-            duration: 6000,
+            description: `${scope} · отправлен файлом в чат с ботом`,
           });
         }
         flashThenReset("done");

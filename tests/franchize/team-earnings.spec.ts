@@ -47,6 +47,7 @@ function buildChain(result: { data?: any; error?: any } = {}) {
     gt: vi.fn(() => chain),
     lte: vi.fn(() => chain),
     lt: vi.fn(() => chain),
+    ilike: vi.fn(() => chain),
     order: vi.fn(() => chain),
     limit: vi.fn(() => chain),
     maybeSingle: vi.fn(() => ({ data: result.data ?? null, error: result.error ?? null })),

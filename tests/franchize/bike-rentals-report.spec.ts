@@ -503,4 +503,21 @@ describe("bike-rentals-report: source guards", () => {
     // unmount cleanup for the reset timer
     expect(button).toContain("clearTimeout(resetTimer.current)");
   });
+
+  it("2026-09-26: inside Telegram the report is SENT to the user's chat via the forward API", () => {
+    // iOS WebView silently ignores blob downloads — the chat with the bot is
+    // the reliable delivery channel. The forward envelope must match
+    // /api/forward-telegram: {chat_id, method, payload, files}.
+    expect(button).toContain('"/api/forward-telegram"');
+    expect(button).toContain('method: "sendDocument"');
+    expect(button).toContain("initDataUnsafe");
+    // UTF-8-safe base64 (chunked — a report can exceed the spread limit)
+    expect(button).toContain("new TextEncoder().encode");
+    expect(button).toContain("function utf8ToBase64");
+    // download stays as the non-TG path AND the fallback when forwarding fails
+    expect(button).toContain("downloadMarkdown(markdown, filename)");
+    expect(button).toContain("deliveredInTg");
+    // caption is HTML-escaped (parse_mode: HTML)
+    expect(button).toContain("escapeHtml(bikeLabel)");
+  });
 });

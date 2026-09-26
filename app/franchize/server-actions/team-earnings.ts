@@ -13,6 +13,10 @@ import {
   type ActionResponse,
 } from "./shared/auth-helpers";
 import { DEFAULT_HOURLY_RATE } from "@/app/franchize/lib/salary-constants";
+import {
+  sumMemberPaidOut,
+  computeShiftAccrued,
+} from "@/app/franchize/lib/salary-paid-out";
 
 /**
  * Get team members' earnings for a period.
@@ -97,24 +101,25 @@ export async function getTeamEarnings(params: {
 
         // Get shifts for period — filter by crew_id too, otherwise shifts
         // from another crew the member belongs to would leak in.
+        // 2026-09-26 audit: salary_amount selected and honored (same math as
+        // the payout/overview) — the old duration×rate-only calc disagreed
+        // with every other salary screen for the same period.
         const { data: shifts } = await supabaseAdmin
           .from("crew_member_shifts")
-          .select("clock_in_time, clock_out_time, hourly_rate")
+          .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
           .eq("crew_id", crewId)
           .eq("member_id", memberId)
           .gte("clock_in_time", fromDate)
           .lte("clock_in_time", toDateIso);
 
         // Calculate shift income
+        const shiftIncome = computeShiftAccrued(shifts || []);
         let shiftHours = 0;
-        let shiftIncome = 0;
-
         (shifts || []).forEach((shift: any) => {
-          const start = new Date(shift.clock_in_time);
+          const start = shift.clock_in_time ? new Date(shift.clock_in_time) : null;
+          if (!start) return;
           const end = shift.clock_out_time ? new Date(shift.clock_out_time) : new Date();
-          const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          shiftHours += hours;
-          shiftIncome += hours * (shift.hourly_rate || DEFAULT_HOURLY_RATE);
+          shiftHours += Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
         });
 
         // Get commissions for period (expense_commission: money flowing OUT to employees)
@@ -128,7 +133,10 @@ export async function getTeamEarnings(params: {
           .gte("transaction_date", fromDate)
           .lte("transaction_date", toDateIso);
 
-        const commissionIncome = (commissions || []).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+        const commissionIncome = (commissions || []).reduce(
+          (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+          0,
+        );
 
         return {
           memberId,
@@ -205,9 +213,10 @@ export async function getMemberEarnings(params: {
     }
 
     // Get shifts for period — crew-scoped to prevent multi-crew leak.
+    // 2026-09-26 audit: salary_amount honored (parity with overview/payout).
     const { data: shifts } = await supabaseAdmin
       .from("crew_member_shifts")
-      .select("clock_in_time, clock_out_time, hourly_rate")
+      .select("clock_in_time, clock_out_time, hourly_rate, salary_amount")
       .eq("crew_id", crewId)
       .eq("member_id", targetMemberId)
       .gte("clock_in_time", fromDate)
@@ -215,17 +224,18 @@ export async function getMemberEarnings(params: {
       .order("clock_in_time", { ascending: false });
 
     // Calculate shift income and build breakdown
+    const shiftIncome = computeShiftAccrued(shifts || []);
     let shiftHours = 0;
-    let shiftIncome = 0;
     const breakdown: Array<{ date: string; description: string; amount: number }> = [];
 
     (shifts || []).forEach((shift: any) => {
-      const start = new Date(shift.clock_in_time);
+      const start = shift.clock_in_time ? new Date(shift.clock_in_time) : null;
+      if (!start) return;
       const end = shift.clock_out_time ? new Date(shift.clock_out_time) : new Date();
-      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
       shiftHours += hours;
-      const amount = hours * (shift.hourly_rate || DEFAULT_HOURLY_RATE);
-      shiftIncome += amount;
+      const stored = Number(shift.salary_amount || 0);
+      const amount = stored > 0 ? stored : hours * (shift.hourly_rate || DEFAULT_HOURLY_RATE);
 
       breakdown.push({
         date: shift.clock_in_time,
@@ -246,7 +256,10 @@ export async function getMemberEarnings(params: {
       .lte("transaction_date", toDateIso)
       .order("transaction_date", { ascending: false });
 
-    const commissionIncome = (commissions || []).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+    const commissionIncome = (commissions || []).reduce(
+      (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+      0,
+    );
 
     // Add commission breakdown
     (commissions || []).forEach((c: any) => {
@@ -383,20 +396,7 @@ export async function getOwnerSalaryOverview(params: {
           .gte("clock_in_time", periodStartIso)
           .lte("clock_in_time", periodEndIso);
 
-        let shiftIncome = 0;
-        (shifts || []).forEach((shift: any) => {
-          const stored = Number(shift.salary_amount || 0);
-          if (stored > 0) {
-            shiftIncome += stored;
-            return;
-          }
-          const start = shift.clock_in_time ? new Date(shift.clock_in_time) : null;
-          if (!start) return;
-          const end = shift.clock_out_time ? new Date(shift.clock_out_time) : new Date();
-          const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
-          const rate = Number(shift.hourly_rate || 0);
-          shiftIncome += hours * rate;
-        });
+        const shiftIncome = computeShiftAccrued(shifts || []);
 
         // Commissions for period (expense_commission to this member)
         // Crew-scoped to prevent multi-crew leak.
@@ -413,19 +413,24 @@ export async function getOwnerSalaryOverview(params: {
           0,
         );
 
-        // Already-paid-out salary in same period — crew-scoped.
-        const { data: payouts } = await supabaseAdmin
-          .from("cash_transactions")
-          .select("amount")
-          .eq("crew_id", crewId)
-          .eq("to_user_id", memberId)
-          .eq("transaction_type", "expense_salary")
-          .gte("transaction_date", periodStartIso)
-          .lte("transaction_date", periodEndIso);
-        const paid = (payouts || []).reduce(
-          (sum: number, p: any) => sum + (Number(p.amount) > 0 ? Number(p.amount) : 0),
-          0,
-        );
+        // Already-paid-out salary in same period — crew-scoped, BOTH books,
+        // deduped. 2026-09-26 salary audit: this used to count ONLY the
+        // formal ledger (cash_transactions.expense_salary), so payouts the
+        // owner logged via the assistant bot / wallet never reduced the
+        // balance — the page kept offering money that had already left
+        // (double-pay risk). sumMemberPaidOut adds wallet salary payouts
+        // that have no formal twin and skips mirrored twins either way.
+        let paid = 0;
+        try {
+          paid = await sumMemberPaidOut(supabaseAdmin, {
+            crewId,
+            memberId,
+            startUtcIso: periodStartIso,
+            endUtcIso: periodEndIso,
+          }).then((r) => r.total);
+        } catch (paidErr) {
+          logger.warn("[getOwnerSalaryOverview] Paid-out query failed:", paidErr);
+        }
 
         const accrued = Math.round(shiftIncome + commissionIncome);
         const balanceDue = Math.max(0, accrued - paid);
