@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink, Info } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
+import { getRentalPageTodos } from "../../../server-actions/rentals";
 import { CrewHeader } from "../../../components/CrewHeader";
 // goodmorning-polish: removed CrewFooter import (footer ditched on rental page)
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
@@ -14,7 +15,14 @@ import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRent
 // goodmorning-polish: removed RentalChecklistPanel import (broken local-state toggle,
 // was duplicating RentalReturnChecklist which persists via API)
 import { RentalMessageInput } from "../../../components/RentalMessageInput";
-import { RentalReturnChecklist } from "../../../components/RentalReturnChecklist";
+// 2026-09-28: replaced RentalReturnChecklist (crew-only "Что вернуть" with a
+// STATIC fallback list) with RentalTodosPanel — the SAME dynamic crew_todos
+// the rentals analytics shows, matched by rental_id (verification rows +
+// equipment return checklist + follow-ups), visible to the renter too.
+import { RentalTodosPanel } from "../../../components/RentalTodosPanel";
+// 2026-09-28: shared client-side draft store — the end-odometer typed on the
+// page is flushed into the closure modal prefill (no more re-typing).
+import { RentalOdometerDraftProvider } from "../../../components/RentalOdometerDraftContext";
 // I3: photo gallery component for ДО/ПОСЛЕ bike photos
 import { RentalPhotoGallery } from "../../../components/RentalPhotoGallery";
 // goodmorning-polish: removed RentalTelegramGuard import (no longer used after streamline)
@@ -167,6 +175,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   // ── Polish v2: extract closure data for IdealBadge + OdometerDelta + DepositTracker ──
   const rentalMeta = (rental.metadata as Record<string, any> | null) ?? null;
   const closureData = rentalMeta?.closure_data ?? rentalMeta?.closure ?? null;
+  // 2026-09-28: the start-odometer chain separated into CONFIRMED (freeze or
+  // a real odometer_before — doc flow / renter-set via the API) vs HINT
+  // (last-known / hint / catalog specs). The hint is what the new pre-pickup
+  // START editor offers as a pre-fill the renter can correct.
+  const hasPickupFreeze = Boolean(rentalMeta?.pickup_freeze?.frozen_at);
+  // True when the chain value above is a REAL reading (freeze / doc-flow
+  // odometer_before / renter-set via the API) rather than a hint fallback.
+  const odometerBeforeConfirmed =
+    typeof rentalMeta?.pickup_freeze?.odometer_km === "number" ||
+    typeof rentalMeta?.odometer_before === "number";
   // Odometer chain: freeze (operator entered at handover) → odometer_before
   // (from /doc contract) → last_known_odometer / odometer_before_hint (seeded
   // from bike specs at web-order creation so the card shows a reference value
@@ -230,6 +248,14 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   const endDate = endDateStr ? Date.parse(endDateStr) : Number.NaN;
   const isStale = status === "active" && !Number.isNaN(endDate) && endDate < Date.now();
 
+  // ── 2026-09-28: dynamic crew_todos for THIS rental (same rows the rentals
+  // analytics shows) + lazy verification/equipment bootstrap for web-flow
+  // rentals. Server-fetched once; the panel toggles via the lead-todo API.
+  const rentalPageTodos = rental.found && crew.id
+    ? await getRentalPageTodos(id, crew.id).catch(() => null)
+    : null;
+  const rentalTodosData = rentalPageTodos?.success ? (rentalPageTodos.data ?? []) : [];
+
   return (
     <main className="min-h-screen" style={surface.page}>
       <DisplayModeProvider>
@@ -253,6 +279,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           Also had excessive padding (py-8 + p-6 + rounded-[2rem]). Now: minimal padding,
           no backdrop-blur, no border shell. Content flows edge-to-edge with small margin. */}
       <div className="mx-auto w-full max-w-2xl px-3 py-3 space-y-4" style={shellVarsFallback}>
+        {/* 2026-09-28: shared draft store for the end-odometer — the inline
+            editor reports saves here, the closure modal flushes + pre-fills
+            from here. Wraps both sides (server-rendered children pass through). */}
+        <RentalOdometerDraftProvider initialDraft={odometerAfterDraft}>
         {/* Inline CSS for bottom spacer + portrait bike photo aspect ratio */}
         <style>{`
           @media (max-width: 768px) {
@@ -545,8 +575,10 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                   crewSlug={resolvedSlug}
                   status={status}
                   odometerBefore={odometerBefore}
+                  odometerBeforeIsHint={!odometerBeforeConfirmed}
                   odometerAfter={odometerAfter}
                   odometerAfterDraft={odometerAfterDraft}
+                  hasPickupFreeze={hasPickupFreeze}
                   canEdit={status === "active"}
                   renterId={rental.renterId}
                   renterTelegramChatId={rental.renterTelegramChatId}
@@ -562,37 +594,35 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           )}
         </section>
 
-        {/* Return checklist — OPERATOR ONLY. Single source of truth (was duplicated
-            between RentalReturnChecklist in sidebar + RentalChecklistPanel in main).
-            Removed RentalChecklistPanel entirely — its toggle was broken (local state
-            only, reset on every re-render). RentalReturnChecklist persists via API.
-            v2: also mounted BEFORE the ride (pending_confirmation/confirmed) — the
-            equipment bootstrap (see getRentalReturnTodos) fills it with the real
-            helmet/glove counts, so operators prep the handover from the same list. */}
-        {rental.found && ["pending_confirmation", "confirmed", "active"].includes(status) && (
+        {/* 2026-09-28: dynamic todos — the SAME crew_todos rows the rentals
+            analytics drawer shows (rental_id match: verification rows +
+            equipment-aware return checklist + crew follow-ups). Crew roles
+            toggle rows; the renter sees read-only progress on his own deal.
+            Replaced the crew-only RentalReturnChecklist whose static fallback
+            list was the only thing some rentals ever showed. */}
+        {rental.found && crew.id && (
           <FranchizeRentalRoleGuard
-            allowedRoles={["operator", "admin", "owner", "subrenter"]}
+            allowedRoles={["operator", "admin", "owner", "subrenter", "renter"]}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
             subrenterChatId={rental.subrenterChatId}
             crewId={crew.id}
             crewSlug={resolvedSlug}
-            fallback={
-              <div className="text-xs opacity-60 py-2" style={{ color: textSecondary }}>
-                📋 Чек-лист виден только операторам экипажа.
-              </div>
-            }
           >
-            <RentalReturnChecklist
+            <RentalTodosPanel
               rentalId={rental.rentalId}
               crewId={crew.id}
               crewSlug={resolvedSlug}
+              ownerId={rental.ownerId}
+              renterId={rental.renterId}
+              renterTelegramChatId={rental.renterTelegramChatId}
+              subrenterChatId={rental.subrenterChatId}
+              initialTodos={rentalTodosData}
               accentColor={accent}
               borderColor={borderSoft}
               textPrimary={textPrimary}
               textSecondary={textSecondary}
-              isAuto={isAuto}
             />
           </FranchizeRentalRoleGuard>
         )}
@@ -784,6 +814,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           <div className="rental-quick-bar-spacer" aria-hidden="true" />
         )}
         </FranchizeErrorBoundary>
+        </RentalOdometerDraftProvider>
       </div>
 
       {/* Quick-action floating bar (Idea B) — OUTSIDE the content div.

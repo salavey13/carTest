@@ -84,6 +84,45 @@ export const franchizeOrderHandler: WebhookHandler = {
       return {};
     })();
 
+    // ── 2026-09-28 (owner request: «think how to properly account rentals
+    // created via web app flow regarding salary bonus … see doc-manual.ts
+    // for bot doc creation flow as reference») ──
+    // The XTR-invoice path upserted the rental with cart lines ONLY — the
+    // metadata.equipment snapshot was missing, so
+    // countEquipmentUnits() in the salary engine saw 0 units and the crew
+    // member who ran the handover lost the 200₽/unit equipment bonus (the
+    // cash/card path in actions-runtime.ts already wrote it — parity gap).
+    // Same parser as actions-runtime (perk string → equipment map).
+    const equipmentSnapshot = (() => {
+      const perkStr = String(
+        (metadata?.cartLines as Array<{ options?: { perk?: unknown } }> | undefined)?.[0]?.options?.perk || "",
+      ).toLowerCase();
+      if (!perkStr) return {};
+      const m = perkStr.match(/шлем\s*[×x]\s*(\d+)/i);
+      return {
+        equipment: {
+          helmets: m ? Number(m[1]) : (/шлем/.test(perkStr) ? 1 : 0),
+          gloves: /перчатк/.test(perkStr) ? 1 : 0,
+          jacket: /куртк/.test(perkStr),
+          boots: /бот|сапог/.test(perkStr),
+          net: /сетк/.test(perkStr),
+          backpack: /рюкзак/.test(perkStr),
+          bag: /сумк|багажн/.test(perkStr),
+          charger: /зарядк/.test(perkStr),
+        },
+      };
+    })();
+    // doc-flow parity: seed the odometer hint from bike specs (the rental
+    // page chain falls back to specs anyway, but the CSV/salary consumers
+    // read the metadata keys).
+    const specsRecord = (vehicle?.specs ?? null) as Record<string, unknown> | null;
+    const specOdometerRaw = specsRecord?.last_known_odometer ?? specsRecord?.odometer;
+    const specOdometer = Number(specOdometerRaw);
+    const odometerHintSnapshot =
+      Number.isFinite(specOdometer) && specOdometer >= 0
+        ? { last_known_odometer: Math.round(specOdometer), odometer_before_hint: Math.round(specOdometer) }
+        : {};
+
     await upsertFranchizeIntent({
       slug,
       bikeId: firstItemId,
@@ -130,6 +169,8 @@ export const franchizeOrderHandler: WebhookHandler = {
           ...(metadata || {}),
           ...splitFromCart,
           ...subrenterSnapshot,
+          ...equipmentSnapshot,
+          ...odometerHintSnapshot,
           source: "franchize_order",
           franchise_slug: slug,
           hot_client: true,
@@ -142,6 +183,45 @@ export const franchizeOrderHandler: WebhookHandler = {
 
     if (upsertError) {
       throw new Error(`franchize_order rental upsert failed: ${upsertError.message}`);
+    }
+
+    // ── 2026-09-28: non-fatal post-creation side effects for the XTR path ──
+    // (1) dynamic crew_todos (verification + equipment return) — the cash
+    //     checkout path spawns them in actions-runtime; without this the
+    //     rental page degraded to a static checklist;
+    // (2) renter self-service achievement «Сам себе оператор» (+ streaks,
+    //     combo) — the web renter earns his own badges now.
+    try {
+      const [{ data: crewRow }, { data: carRow }] = await Promise.all([
+        supabase.from("crews").select("id").eq("slug", slug).maybeSingle(),
+        supabase.from("cars").select("crew_id").eq("id", vehicle.id).maybeSingle(),
+      ]);
+      const crewUuid = crewRow?.id ?? carRow?.crew_id ?? null;
+      if (crewUuid) {
+        const [{ createRentalVerificationTodos }, { ensureRentalEquipmentReturnTodosForWebhook }] = await Promise.all([
+          import("@/app/franchize/server-actions/rental-verification-todos"),
+          import("@/app/franchize/server-actions/rentals"),
+        ]);
+        await Promise.allSettled([
+          createRentalVerificationTodos(rentalId, crewUuid, userId),
+          ensureRentalEquipmentReturnTodosForWebhook(rentalId, crewUuid),
+        ]);
+      } else {
+        console.warn("[franchize-order] crew id not resolvable — todos skipped");
+      }
+    } catch (todoErr) {
+      console.error("[franchize-order] todo spawn failed (non-fatal):", todoErr);
+    }
+    try {
+      const { grantRenterWebRentCreated } = await import(
+        "@/app/franchize/server-actions/renter-self-service-achievements"
+      );
+      const ach = await grantRenterWebRentCreated({ userId, slug, rentalId });
+      if (ach.granted.length > 0) {
+        console.log(`[franchize-order] renter achievements granted: ${ach.granted.join(", ")}`);
+      }
+    } catch (achErr) {
+      console.error("[franchize-order] renter achievements failed (non-fatal):", achErr);
     }
 
     const documentKey = `${metadata.flowType === "sale" || metadata.flowType === "mixed" ? "sale" : "rental"}-${slug}-${orderId || ""}`;

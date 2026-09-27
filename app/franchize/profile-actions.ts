@@ -304,6 +304,45 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
       category: "operations",
       triggerSources: ["rental:return_confirmed"],
     },
+    // 2026-09-28: renter self-service badges — the web-app renter does the
+    // whole prep himself now (creates the deal, attaches «ДО» photos, sets
+    // the start odometer). Grants live in
+    // server-actions/renter-self-service-achievements.ts.
+    {
+      id: "rental_self_created",
+      title: "Сам себе оператор",
+      description: "Создал аренду через веб-приложение самостоятельно — без бота и операторов.",
+      category: "operations",
+      triggerSources: ["rental:web_created"],
+    },
+    {
+      id: "rental_self_created_3",
+      title: "Свой человек",
+      description: "Три аренды создано через веб-приложение. Уже как дома!",
+      category: "operations",
+      triggerSources: ["rental:web_created"],
+    },
+    {
+      id: "rental_own_photos_start",
+      title: "Фото до выезда",
+      description: "Прикрепил фотографии «ДО» к своей веб-аренде — фиксация состояния на старте.",
+      category: "operations",
+      triggerSources: ["rental:photo_uploaded"],
+    },
+    {
+      id: "rental_own_odometer_start",
+      title: "Стартовый замер",
+      description: "Сам указал стартовый одометр своей аренды — честный отсчёт пробега.",
+      category: "operations",
+      triggerSources: ["rental:odometer_before_set"],
+    },
+    {
+      id: "rental_full_selfservice",
+      title: "Полный цикл ⭐",
+      description: "Создал веб-аренду, прикрепил фото «ДО» и указал стартовый одометр. Абсолютная самостоятельность!",
+      category: "operations",
+      triggerSources: ["rental:web_created", "rental:photo_uploaded", "rental:odometer_before_set"],
+    },
   ];
 
   // 2026-09-09: SUPERLIST badges — «закрыл ВЕСЬ список "что делать сейчас"

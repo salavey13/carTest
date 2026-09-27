@@ -18,6 +18,16 @@
 // is accepted too — same role the photo-upload validateUpload grants him.
 // Status guard: only `active` rentals accept a draft (closed rentals are
 // history).
+//
+// 2026-09-28 (owner request «allow renter to set start odometer value for
+// rental he created via web app flow»): `field: "start"` writes the
+// HANDOVER reading (metadata.odometer_before) while the rental has NOT been
+// picked up yet (pending_confirmation/confirmed, no pickup_freeze). The
+// renter — who created the deal in the web app and knows the real dash
+// reading before the ride — no longer has to wait for the operator; the
+// freeze dialog (FranchizeRentalDocumentsPanel) pre-fills from this value.
+// The write mirrors the /doc flow (doc-manual.ts stores odometer_before at
+// creation) so salary/analytic consumers see the same shape.
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
@@ -34,6 +44,9 @@ interface OdometerDraftRequest {
   rentalId: string;
   /** Final odometer reading in km. `null` clears the draft. */
   odometerAfter: number | null;
+  /** Which reading to write: "end" (default, draft for closure) or "start"
+   *  (authoritative metadata.odometer_before before handout). */
+  field?: "start" | "end";
 }
 
 export async function POST(request: NextRequest) {
@@ -41,6 +54,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as OdometerDraftRequest;
     const rentalId = typeof body?.rentalId === "string" ? body.rentalId : "";
     const rawOdo = body?.odometerAfter;
+    const field = body?.field === "start" ? "start" : "end";
 
     if (!rentalId) {
       return NextResponse.json({ success: false, error: "rentalId обязателен." }, { status: 400 });
@@ -71,9 +85,12 @@ export async function POST(request: NextRequest) {
     );
 
     const access = await verifyCrewAccess(request, rental.crew_id ?? undefined);
+    // Hoisted for the start-mode actorKind label below (same predicate as the
+    // renter branch inside the access check).
+    const isRenterActor = Boolean(cookieUserId) && cookieUserId === rental.user_id;
     if (!access.ok) {
       // Renter path: the caller is the rental's own renter (rentals.user_id).
-      const isRenter = Boolean(cookieUserId) && cookieUserId === rental.user_id;
+      const isRenter = isRenterActor;
       // Subrenter path: partner-owner of THIS bike (cars.specs.subrenter_chat_id)
       // — same role validateUpload grants him on photo uploads.
       let isSubrenter = false;
@@ -94,14 +111,78 @@ export async function POST(request: NextRequest) {
       if (!isRenter && !isSubrenter) return access.response;
     }
 
+    const meta = (rental.metadata as Record<string, unknown> | null) ?? {};
+
+    if (field === "start") {
+      // ── Start-odometer mode ──
+      // The handover reading belongs to the PRE-pickup phase: once the
+      // operator saved the pickup freeze, the freeze owns the reading and
+      // the API no longer accepts overrides (the freeze is what the deposit
+      // math and the audit trail hang on). Closed/cancelled are history.
+      if (rental.status !== "pending_confirmation" && rental.status !== "confirmed") {
+        return NextResponse.json(
+          { success: false, error: "Стартовый одометр фиксируется до выдачи ТС." },
+          { status: 409 },
+        );
+      }
+      const existingFreeze = meta.pickup_freeze as { frozen_at?: unknown } | null | undefined;
+      if (existingFreeze?.frozen_at) {
+        return NextResponse.json(
+          { success: false, error: "Выдача уже зафиксирована — стартовый одометр изменить нельзя." },
+          { status: 409 },
+        );
+      }
+      const frozenValue = odometerAfter; // null clears nothing — start value is write-once-until-freeze
+      const actorKind = access.ok ? "operator" : isRenterActor ? "renter" : "subrenter";
+      const { error: startUpdateError } = await supabaseAdmin
+        .from("rentals")
+        .update({
+          metadata: {
+            ...meta,
+            ...(frozenValue === null
+              ? {}
+              : {
+                  odometer_before: frozenValue,
+                  odometer_before_source: actorKind,
+                  odometer_before_at: new Date().toISOString(),
+                }),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("rental_id", rentalId);
+      if (startUpdateError) {
+        logger.error("[rental-odometer] start update failed:", startUpdateError.message);
+        return NextResponse.json({ success: false, error: "Не удалось сохранить одометр." }, { status: 500 });
+      }
+      logger.info("[rental-odometer] start odometer saved", {
+        rentalId,
+        odometerBefore: frozenValue,
+        source: actorKind,
+        actor: access.ok ? access.userId : cookieUserId,
+      });
+
+      // 2026-09-28: renter self-service badge «Стартовый замер» (+ combo) —
+      // non-fatal, renter-path only (crew has its own odometer badges).
+      if (isRenterActor && !access.ok && cookieUserId) {
+        try {
+          const { grantRenterStartOdometer } = await import(
+            "@/app/franchize/server-actions/renter-self-service-achievements"
+          );
+          await grantRenterStartOdometer({ userId: cookieUserId, rentalId });
+        } catch (achErr) {
+          logger.warn("[rental-odometer] renter odometer achievement failed (non-fatal)", achErr);
+        }
+      }
+
+      return NextResponse.json({ success: true, field: "start", odometerBefore: frozenValue });
+    }
+
     if (rental.status !== "active") {
       return NextResponse.json(
         { success: false, error: "Финальный одометр фиксируется только для активной аренды." },
         { status: 409 },
       );
     }
-
-    const meta = (rental.metadata as Record<string, unknown> | null) ?? {};
 
     // Handover reading — same resolution chain the rental page uses.
     const pickupFreeze = meta.pickup_freeze as { odometer_km?: unknown } | null | undefined;

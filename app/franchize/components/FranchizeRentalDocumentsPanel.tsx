@@ -81,6 +81,10 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
   const knownOdometer = useMemo(() => {
     const freezeOdo = Number((metadata?.pickup_freeze as Record<string, any> | undefined)?.odometer_km);
     if (Number.isFinite(freezeOdo) && freezeOdo > 0) return String(freezeOdo);
+    // 2026-09-28: the START reading confirmed by the renter (or /doc flow)
+    // via the rental-page odometer editor — beats the hint/specs fallbacks.
+    const confirmedBefore = Number(metadata?.odometer_before);
+    if (Number.isFinite(confirmedBefore) && confirmedBefore > 0) return String(confirmedBefore);
     const lastKnown = Number(metadata?.last_known_odometer ?? metadata?.odometer_before_hint);
     if (Number.isFinite(lastKnown) && lastKnown > 0) return String(lastKnown);
     // iter15: bike-specs fallback — WITHOUT this the field renders empty for
@@ -95,6 +99,11 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
   const knownOdometerSource = useMemo((): string | null => {
     const freezeOdo = Number((metadata?.pickup_freeze as Record<string, any> | undefined)?.odometer_km);
     if (Number.isFinite(freezeOdo) && freezeOdo > 0) return "сохранённая фиксация выдачи";
+    const confirmedBefore = Number(metadata?.odometer_before);
+    if (Number.isFinite(confirmedBefore) && confirmedBefore > 0) {
+      const src = metadata?.odometer_before_source;
+      return src === "renter" ? "указано арендатором" : "подтверждённое показание";
+    }
     const lastKnown = Number(metadata?.last_known_odometer ?? metadata?.odometer_before_hint);
     if (Number.isFinite(lastKnown) && lastKnown > 0) return "последняя известная запись аренды";
     if (specsOdometerKm != null && Number.isFinite(Number(specsOdometerKm)) && Number(specsOdometerKm) >= 0) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
@@ -10,6 +10,8 @@ import {
   initiateTelegramRentalPhotoUpload,
   abortRental,
 } from "@/app/rentals/actions";
+import { useRentalOdometerDraft } from "./RentalOdometerDraftContext";
+import { useKeyboardAwareOverlay } from "./useKeyboardAwareOverlay";
 // Photo gallery import removed — gallery is only on the rental detail page, not in the closure modal
 
 // Task 47: "error boundary when closing active rent — Cannot read properties
@@ -189,6 +191,14 @@ export function FranchizeRentalLifecycleActions({
   const [closureDepositReturned, setClosureDepositReturned] = useState(true);
   const [closureReturnNotes, setClosureReturnNotes] = useState("");
 
+  // 2026-09-28: the draft typed on the page (RentalOdometerInput autosave)
+  // is the freshest client-side source for the prefill — the server prop
+  // lags behind until router.refresh(). flushAndGetDraft() also flushes a
+  // still-pending debounced save, so opening the modal right after typing
+  // no longer loses the value.
+  const draftStore = useRentalOdometerDraft();
+  const [draftHint, setDraftHint] = useState<number | null>(null);
+
   // ── I2: Penalty capture state ──
   // When operator withholds part of the deposit (damage, missing fuel, etc.),
   // they enter a penalty amount + destination + reason. confirmVehicleReturn
@@ -209,6 +219,13 @@ export function FranchizeRentalLifecycleActions({
   const [abortModalOpen, setAbortModalOpen] = useState(false);
   const [abortReason, setAbortReason] = useState("");
 
+  // Keyboard-aware overlay (mobile: the on-screen keyboard must not cover
+  // the bottom action row — see hook docblock). Declared after ALL the modal
+  // state it references (hooks read abortModalOpen at render time).
+  const closureOverlayRef = useRef<HTMLDivElement | null>(null);
+  const abortOverlayRef = useRef<HTMLDivElement | null>(null);
+  const { keyboardPx: closureKeyboardPx } = useKeyboardAwareOverlay(closureOverlayRef, closureModalOpen);
+  const { keyboardPx: abortKeyboardPx } = useKeyboardAwareOverlay(abortOverlayRef, abortModalOpen);
   // Themed CSS vars
   const lifecycleVars = useMemo(() => {
     if (isAuto) {
@@ -282,21 +299,32 @@ export function FranchizeRentalLifecycleActions({
               // calling confirmVehicleReturn. The modal collects odometer_after,
               // damage_notes, deposit_returned, return_notes — then the actual
               // confirmVehicleReturn call happens in handleSubmitClosure.
-              setClosureOdometer(odometerAfterDraft != null ? String(odometerAfterDraft) : "");
-              setClosureDamageNotes("");
-              setClosureDamageLevel("none");
-              setClosureDepositReturned(true);
-              setClosureReturnNotes("");
-              // I2: reset penalty state too — don't carry over from previous rental
-              setClosurePenaltyAmount("");
-              setClosurePenaltyDestination("cash");
-              setClosurePenaltyReason("");
-              setClosureModalOpen(true);
-              // Scroll to modal after render
-              setTimeout(() => {
-                const modal = document.querySelector('[role="dialog"]');
-                if (modal) modal.scrollIntoView({ behavior: "smooth", block: "center" });
-              }, 50);
+              // 2026-09-28: prefill from the SHARED DRAFT STORE (flushes a
+              // pending debounced save first) — falls back to the server prop.
+              void (async () => {
+                let draft = odometerAfterDraft;
+                try {
+                  draft = (await draftStore?.flushAndGetDraft()) ?? odometerAfterDraft;
+                } catch {
+                  /* fall back to the server prop */
+                }
+                setClosureOdometer(draft != null ? String(draft) : "");
+                setDraftHint(draft ?? null);
+                setClosureDamageNotes("");
+                setClosureDamageLevel("none");
+                setClosureDepositReturned(true);
+                setClosureReturnNotes("");
+                // I2: reset penalty state too — don't carry over from previous rental
+                setClosurePenaltyAmount("");
+                setClosurePenaltyDestination("cash");
+                setClosurePenaltyReason("");
+                setClosureModalOpen(true);
+                // Scroll to modal after render
+                setTimeout(() => {
+                  const modal = document.querySelector('[role="dialog"]');
+                  if (modal) modal.scrollIntoView({ behavior: "smooth", block: "center" });
+                }, 50);
+              })();
             }}
             className="rounded-xl bg-[var(--lifecycle-accent-hover)] px-3 py-2 text-sm font-semibold text-[#16130A] transition-colors hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lifecycle-accent)]"
           >
@@ -382,19 +410,30 @@ export function FranchizeRentalLifecycleActions({
           not tracked, damage wasn't recorded. */}
       {closureModalOpen && (
         <div
+          ref={closureOverlayRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="closure-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.85)" }}
+          // 2026-09-28 UX: bottom-sheet on mobile (items-end) — the keyboard can
+          // never cover the sheet's action row, because the sheet starts at the
+          // bottom edge and the overlay padding tracks the keyboard height
+          // (visualViewport). Desktop keeps the centered dialog look.
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto sm:items-center sm:p-4"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            paddingBottom: closureKeyboardPx > 0 ? closureKeyboardPx : undefined,
+          }}
           onClick={() => !isPending && setClosureModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-md my-8 rounded-2xl border p-5"
+            className="relative w-full max-w-md rounded-t-2xl border p-5 sm:my-8 sm:rounded-2xl"
             style={{
               backgroundColor: "var(--lifecycle-bg)",
               borderColor: "var(--lifecycle-border)",
               boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              maxHeight: `calc(100dvh - ${closureKeyboardPx > 0 ? closureKeyboardPx : 0}px - 1rem)`,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -404,6 +443,14 @@ export function FranchizeRentalLifecycleActions({
             <p className="text-xs mb-4" style={{ color: "var(--lifecycle-muted)" }}>
               Заполните поля перед закрытием аренды. Все данные сохранятся в карточку.
             </p>
+            {/* 2026-09-28: transparency — show WHERE the prefill came from when
+                a draft was typed on the page (owner report: the saved value
+                "didn't appear" in the modal). */}
+            {draftHint != null && (
+              <p className="mb-3 rounded-lg px-2.5 py-1.5 text-[11px] font-medium" style={{ color: "var(--lifecycle-muted)", backgroundColor: "color-mix(in srgb, var(--lifecycle-accent) 8%, transparent)" }}>
+                📏 Подставлен черновик со страницы: {draftHint.toLocaleString("ru-RU")} км — при необходимости поправьте.
+              </p>
+            )}
 
             <div className="space-y-3">
               <label className="block">
@@ -740,16 +787,21 @@ export function FranchizeRentalLifecycleActions({
       {/* ── Abort modal ── */}
       {abortModalOpen && (
         <div
+          ref={abortOverlayRef}
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4"
+          style={{ paddingBottom: abortKeyboardPx > 0 ? abortKeyboardPx : undefined }}
           onClick={() => !isPending && setAbortModalOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border p-5"
+            className="w-full max-w-md rounded-t-2xl border p-5 sm:my-8 sm:rounded-2xl"
             style={{
               backgroundColor: "var(--lifecycle-bg)",
               borderColor: "rgba(244, 63, 94, 0.5)",
+              maxHeight: `calc(100dvh - ${abortKeyboardPx > 0 ? abortKeyboardPx : 0}px - 1rem)`,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
             }}
             onClick={(e) => e.stopPropagation()}
           >

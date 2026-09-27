@@ -462,6 +462,24 @@ export async function uploadRentalPhoto(
       logger.warn("[uploadRentalPhoto] Event insert failed (non-fatal):", eventError);
     }
 
+    // ── 2026-09-28: photo achievements (non-fatal) ──
+    // renter: «Фото до выезда» (start photos on his own web rent) + the
+    // «Полный цикл ⭐» combo; anyone: rental_photo_master (10 distinct
+    // rentals with photos — the catalog trigger had NO grant site before).
+    try {
+      const { grantRentalPhotoAchievements } = await import(
+        "@/app/franchize/server-actions/renter-self-service-achievements"
+      );
+      await grantRentalPhotoAchievements({
+        userId: uploaderUserId,
+        rentalId,
+        isRenter: derivedRole === "renter",
+        photoType,
+      });
+    } catch (achErr) {
+      logger.warn("[uploadRentalPhoto] photo achievements failed (non-fatal):", achErr);
+    }
+
     logger.info("[uploadRentalPhoto] Success", {
       rentalId,
       photoType,

@@ -5,6 +5,7 @@ import { Gauge, TrendingUp, AlertTriangle, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { RentalOdometerDelta } from "./RentalOdometerDelta";
 import { useAppContext } from "@/contexts/AppContext";
+import { useRentalOdometerDraft } from "./RentalOdometerDraftContext";
 
 /**
  * RentalOdometerInput
@@ -27,20 +28,36 @@ import { useAppContext } from "@/contexts/AppContext";
  *     himself), with renter-worded hints (no deposit-deduction operator
  *     talk, overage still shown as «may be deducted from deposit»). The
  *     server route authorizes the renter via the signed actor cookie.
+ *   - PENDING/CONFIRMED rental without a pickup freeze (2026-09-28 owner
+ *     request «allow renter to set start odometer value for rental he
+ *     created via web app flow»): the START reading becomes an active
+ *     input (autosave to metadata.odometer_before via field:"start") —
+ *     the renter who created the deal confirms the real dash reading
+ *     himself; the freeze dialog pre-fills from this value afterwards.
  *   - ACTIVE rental + guest: passive "при выдаче" card (existing look).
  *   - COMPLETED rental: passive start → end + delta card (existing look),
  *     the draft (if the operator typed it but closed via a path that skipped
  *     the odometer write) still renders as the end value.
+ *
+ * Draft sync (2026-09-28): every successful autosave is REPORTED to
+ * RentalOdometerDraftContext, and a pending debounced save is flushable —
+ * the closure modal awaits the flush before pre-filling, so the value
+ * typed here can no longer go missing there.
  */
 interface RentalOdometerInputProps {
   rentalId: string;
   crewSlug: string;
   status: string;
   odometerBefore?: number | null;
+  /** True when the start value came from a hint/last-known/specs chain —
+   *  NOT a confirmed handover reading (metadata.odometer_before / freeze). */
+  odometerBeforeIsHint?: boolean;
   /** Authoritative end value (set by confirmVehicleReturn at closure). */
   odometerAfter?: number | null;
   /** Draft typed on this page before closure (metadata.odometer_after_draft). */
   odometerAfterDraft?: number | null;
+  /** Pickup freeze already saved → the handover reading is locked. */
+  hasPickupFreeze?: boolean;
   canEdit: boolean;
   /** Rental's renter id (rentals.user_id) — lets the editor detect a renter
    *  viewer and switch the hint copy from operator to renter wording. */
@@ -60,8 +77,10 @@ export function RentalOdometerInput({
   crewSlug,
   status,
   odometerBefore,
+  odometerBeforeIsHint,
   odometerAfter,
   odometerAfterDraft,
+  hasPickupFreeze,
   canEdit,
   renterId,
   renterTelegramChatId,
@@ -76,6 +95,25 @@ export function RentalOdometerInput({
   const closureAfter = typeof odometerAfter === "number" ? odometerAfter : null;
   const draft = typeof odometerAfterDraft === "number" ? odometerAfterDraft : null;
   const isActive = status === "active";
+  // Pre-pickup phase: the handover reading is not locked yet — whoever the
+  // role guard lets through (operator / renter / subrenter) can set it.
+  const canEditStart =
+    (status === "pending_confirmation" || status === "confirmed") && !hasPickupFreeze;
+
+  // Pre-pickup: editable START reading (web-flow self-service).
+  if (canEditStart) {
+    return (
+      <OdometerStartEditor
+        rentalId={rentalId}
+        initialStart={before}
+        isHint={Boolean(odometerBeforeIsHint) || before == null}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+        borderSoft={borderSoft}
+        accentColor={accentColor}
+      />
+    );
+  }
 
   // Passive render for completed rentals or when the operator can't edit:
   // the start → end + delta card (or start-only for active w/o edit rights).
@@ -112,6 +150,195 @@ export function RentalOdometerInput({
   );
 }
 
+/** Shared save-status pill (сохраняем… / сохранено / ошибка). */
+function SaveStatePill({
+  saveState,
+  textSecondary,
+}: {
+  saveState: "idle" | "saving" | "saved" | "error";
+  textSecondary: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-semibold"
+      style={{
+        color: saveState === "error" ? "#ef4444" : saveState === "saved" ? "#22c55e" : textSecondary,
+      }}
+    >
+      {saveState === "saving" && <Loader2 className="h-3 w-3 animate-spin" />}
+      {saveState === "saved" && <Check className="h-3 w-3" />}
+      {saveState === "saving"
+        ? "сохраняем…"
+        : saveState === "saved"
+          ? "сохранено"
+          : saveState === "error"
+            ? "ошибка сохранения"
+            : ""}
+    </span>
+  );
+}
+
+/** Parse a raw odometer string → km number | null (empty) | NaN (invalid). */
+function parseOdometer(raw: string): number | null | typeof NaN {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Math.round(Number(trimmed));
+  return Number.isFinite(n) && n >= 0 ? n : NaN;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// START-odometer editor (pre-pickup phase, web-flow self-service)
+// ─────────────────────────────────────────────────────────────────────────────
+function OdometerStartEditor({
+  rentalId,
+  initialStart,
+  isHint,
+  textPrimary,
+  textSecondary,
+  borderSoft,
+  accentColor,
+}: {
+  rentalId: string;
+  initialStart: number | null;
+  isHint: boolean;
+  textPrimary: string;
+  textSecondary: string;
+  borderSoft: string;
+  accentColor: string;
+}) {
+  const [startValue, setStartValue] = useState<string>(initialStart != null ? String(initialStart) : "");
+  const [savedValue, setSavedValue] = useState<number | null>(initialStart);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { dbUser } = useAppContext();
+
+  const parsed = parseOdometer(startValue);
+  const invalid = Number.isNaN(parsed);
+  const unchanged = parsed === savedValue || (parsed === null && savedValue === null);
+
+  const persist = useCallback(
+    async (value: number | null) => {
+      setSaveState("saving");
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (dbUser?.user_id) headers["x-telegram-user-id"] = dbUser.user_id;
+        const res = await fetch("/api/franchize/rental-odometer", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ rentalId, odometerAfter: value, field: "start" }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.error || `HTTP ${res.status}`);
+        }
+        setSavedValue(value);
+        setSaveState("saved");
+      } catch (e) {
+        console.warn("[RentalOdometerInput] start save failed:", e);
+        setSaveState("error");
+        toast.error("Не удалось сохранить одометр. Проверьте соединение и повторите.");
+      }
+    },
+    [rentalId, dbUser?.user_id],
+  );
+
+  // Debounced autosave (700ms) — same cadence as the end-odometer editor.
+  useEffect(() => {
+    if (invalid || unchanged) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSaveState("saving");
+    const value = parsed;
+    debounceRef.current = setTimeout(() => {
+      void persist(value);
+    }, 700);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startValue, invalid]);
+
+  // Flush a pending save when the tab hides / component unmounts.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (invalid) return;
+      const value = parseOdometer(startValue);
+      if (value === savedValue) return;
+      void persist(value);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startValue, invalid, savedValue]);
+
+  return (
+    <div
+      className="rounded-xl border p-3"
+      style={{ borderColor: isHint ? "#f59e0b60" : borderSoft }}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: `${accentColor}25`, color: accentColor }}
+        >
+          <Gauge className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="text-xs uppercase tracking-wider opacity-60" style={{ color: textSecondary }}>
+            Одометр при выдаче
+          </p>
+          <p className="text-sm font-bold" style={{ color: textPrimary }}>
+            {isHint ? "Подтвердите показание" : "Показание зафиксировано"}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-3">
+        <label className="min-w-0 flex-1">
+          <span className="text-xs font-semibold opacity-70" style={{ color: textSecondary }}>
+            Пробег на момент выдачи (км)
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={startValue}
+            onChange={(e) => {
+              setStartValue(e.target.value);
+              setSaveState((s) => (s === "saved" ? "idle" : s));
+            }}
+            placeholder="например, 12345"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-semibold outline-none focus:ring-2"
+            style={{
+              backgroundColor: "transparent",
+              borderColor: invalid ? "#ef4444" : borderSoft,
+              color: textPrimary,
+            }}
+          />
+        </label>
+      </div>
+
+      <div className="mt-2 flex min-h-[18px] items-center justify-between gap-2">
+        <span className="text-[10px] opacity-70" style={{ color: textSecondary }}>
+          {invalid
+            ? "Проверьте число — нужны целые километры."
+            : isHint
+              ? "Значение из карточки байка — поправьте по реальным показаниям спидометра."
+              : "Эти показания зафиксируются при выдаче — по ним считается пробег за аренду."}
+        </span>
+        <SaveStatePill saveState={saveState} textSecondary={textSecondary} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// END-odometer editor (active rental — operator or renter)
+// ─────────────────────────────────────────────────────────────────────────────
 function OdometerEditor({
   rentalId,
   crewSlug,
@@ -170,6 +397,15 @@ function OdometerEditor({
         (renterTelegramChatId && dbUser.user_id === renterTelegramChatId)),
   );
 
+  // ── Draft context (2026-09-28): report saves + expose a flush so the
+  // closure modal always opens with the freshest value, even when the
+  // operator clicks «Подтвердить возврат» within the 700ms debounce window.
+  const draftStore = useRentalOdometerDraft();
+  // Live state mirror for the flush closure (no stale deps).
+  const stateRef = useRef({ endValue, savedValue, invalid });
+  stateRef.current = { endValue, savedValue, invalid };
+  const pendingRef = useRef<number | null | undefined>(undefined); // undefined = nothing pending
+
   const persist = useCallback(
     async (value: number | null) => {
       setSaveState("saving");
@@ -190,14 +426,33 @@ function OdometerEditor({
         }
         setSavedValue(value);
         setSaveState("saved");
+        // Forward to the shared draft store — the closure modal reads it.
+        draftStore?.reportSaved(value);
       } catch (e) {
-        loggerWarn(e);
+        console.warn("[RentalOdometerInput] save failed:", e);
         setSaveState("error");
         toast.error("Не удалось сохранить одометр. Проверьте соединение и повторите.");
       }
     },
-    [rentalId, dbUser?.user_id],
+    [rentalId, dbUser?.user_id, draftStore],
   );
+
+  // Register the flush: cancels a pending debounced save and persists it
+  // immediately, resolving with the freshest known value.
+  useEffect(() => {
+    if (!draftStore) return;
+    draftStore.registerFlush(async () => {
+      if (pendingRef.current !== undefined) {
+        const value = pendingRef.current;
+        pendingRef.current = undefined;
+        await persist(value);
+        return value;
+      }
+      const { savedValue: saved } = stateRef.current;
+      return saved;
+    });
+    return () => draftStore.registerFlush(null);
+  }, [draftStore, persist]);
 
   // Debounced autosave: 700ms after the last keystroke. Before unmount /
   // navigation flush the pending change immediately so the closure modal
@@ -206,12 +461,17 @@ function OdometerEditor({
     if (invalid) return;
     const value = endValue.trim() === "" ? null : Math.round(Number(endValue));
     const unchanged = value === savedValue || (value === null && savedValue === null);
-    if (unchanged) return;
+    if (unchanged) {
+      pendingRef.current = undefined;
+      return;
+    }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setSaveState("saving");
+    pendingRef.current = value;
     debounceRef.current = setTimeout(() => {
       latestRef.current.sentAt = Date.now();
+      pendingRef.current = undefined;
       void persist(value);
     }, 700);
     return () => {
@@ -339,29 +599,8 @@ function OdometerEditor({
                 ? `Сохранится в карточке аренды — оператор увидит при закрытии.`
                 : `Сохранится в карточке аренды и подставится при закрытии.`}
         </span>
-        <span
-          className="inline-flex items-center gap-1 text-[10px] font-semibold"
-          style={{
-            color:
-              saveState === "error" ? "#ef4444" : saveState === "saved" ? "#22c55e" : textSecondary,
-          }}
-        >
-          {saveState === "saving" && <Loader2 className="h-3 w-3 animate-spin" />}
-          {saveState === "saved" && <Check className="h-3 w-3" />}
-          {saveState === "saving"
-            ? "сохраняем…"
-            : saveState === "saved"
-              ? "сохранено"
-              : saveState === "error"
-                ? "ошибка сохранения"
-                : ""}
-        </span>
+        <SaveStatePill saveState={saveState} textSecondary={textSecondary} />
       </div>
     </div>
   );
-}
-
-function loggerWarn(e: unknown) {
-  // Local console only — avoid pulling the server logger into a client bundle.
-  console.warn("[RentalOdometerInput] save failed:", e);
 }

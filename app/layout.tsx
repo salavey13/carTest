@@ -55,6 +55,12 @@ export async function generateViewport(): Promise<Viewport> {
   return {
     width: 'device-width',
     initialScale: 1,
+    // 2026-09-28 (owner report: keyboard covers the bottom button of rental
+    // modals on mobile): Chromium ≥108 (Android TG WebView included) resizes
+    // the layout viewport (100dvh) when the on-screen keyboard shows instead
+    // of painting over the page. iOS Safari keeps its own behaviour — handled
+    // per-modal via useKeyboardAwareOverlay (visualViewport padding).
+    interactiveWidget: 'resizes-content',
     themeColor: [ 
       { media: '(prefers-color-scheme: light)', color: 'hsl(220 25% 98%)' }, 
       { media: '(prefers-color-scheme: dark)', color: 'hsl(263 80% 6%)' }, 

@@ -32,16 +32,22 @@ export function AchievementToastSync({ slug }: { slug: string }) {
     const delay = window.setTimeout(() => {
       void (async () => {
         try {
-          // FIX (iter14): achievements are crew gamification — ordinary
-          // renters must not get achievement toasts. Skip silently for
-          // non-crew users before even fetching the profile.
+          // iter14: achievements used to be crew-only gamification — non-crew
+          // users were skipped before fetching the profile.
+          // 2026-09-28: the web-app RENTER earns his own badges now
+          // («Сам себе оператор», «Фото до выезда», «Стартовый замер», … —
+          // server-actions/renter-self-service-achievements.ts), so the hard
+          // skip became conditional: crew users keep the old path, renters
+          // toast only what they actually hold (empty profile → silence,
+          // exactly the outcome iter14 wanted — no spam for ordinary renters).
           // PROBE: shared single-flight+TTL check — dedupes with LeadsClient
           // and AchievementExplorer on the same page (1 server call total).
           const access = await probeCrewAccess(slug);
-          if (cancelled || !access.canOpen) return;
+          if (cancelled) return;
 
           const result = await getFranchizeProfileBySlugAction({ slug, userId: dbUser.user_id! });
           if (cancelled || !result.success || !result.data?.achievements) return;
+          if (!access.canOpen && Object.keys(result.data.achievements).length === 0) return;
 
           const storageKey = `${SEEN_STORAGE_PREFIX}${slug}`;
           let seen: string[] = [];

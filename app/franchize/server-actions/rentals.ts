@@ -857,6 +857,105 @@ export async function getRentalReturnTodos(
 }
 
 // ============================================================================
+// getRentalPageTodos — ALL dynamic crew_todos linked to a rental (2026-09-28)
+// ============================================================================
+// Owner report: «dynamic todos are present in rental analytics, but in rental
+// page itself it shows static todos only». The analytics drawer filters
+// crew_todos by rental_id (verification + follow-up rows), while the rental
+// page rendered the return-checklist only — and for rentals created via the
+// XTR-invoice webhook (no todo spawn at checkout) even that degraded to the
+// static fallback list.
+//
+// This helper is the rental-page counterpart of the analytics query:
+//   - ALL categories for the rental (rental_verification, lead_followup, …),
+//     matched by the crew_todos.rental_id column OR description.rental_id
+//     (the same dual match the analytics drawer uses);
+//   - lazily bootstraps verification todos ONCE for rentals that have none
+//     (covers web-flow rows created before the webhook spawned them);
+//   - equipment-return bootstrap is delegated to getRentalReturnTodos /
+//     ensureRentalEquipmentReturnTodos (kept for the crew checklist path).
+export async function getRentalPageTodos(
+  rentalId: string,
+  crewId: string,
+): Promise<{ success: boolean; data?: ReturnTodo[]; error?: string }> {
+  try {
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const loadTodos = async (): Promise<ReturnTodo[] | null> => {
+      const { data: allTodos, error } = await supabaseAdmin
+        .from("crew_todos")
+        .select("id, title, status, priority, category, description, rental_id, created_at")
+        .eq("crew_id", crewId)
+        .order("created_at", { ascending: true });
+      if (error) {
+        console.error("[getRentalPageTodos] Error:", error);
+        return null;
+      }
+      // Same rental linkage rule as the analytics drawer (F12 fix): the
+      // rental_id column first, description JSON as the legacy fallback.
+      return (allTodos || []).filter((t) => {
+        if (typeof t.rental_id === "string" && t.rental_id === rentalId) return true;
+        try {
+          const desc = JSON.parse(t.description || "{}");
+          return desc.rental_id === rentalId;
+        } catch {
+          return false;
+        }
+      });
+    };
+
+    let todos = await loadTodos();
+    if (todos === null) return { success: false, error: "Не удалось загрузить задачи." };
+
+    // Lazy bootstraps (each idempotent, each non-fatal) — cover web-flow rows
+    // created before the webhook spawned todos, no matter which half is gone:
+    //   - rental_verification todos missing → the 5 standard verification rows;
+    //   - lead_followup (equipment return) todos missing → the equipment-aware
+    //     return checklist (helmet/glove counts from metadata.equipment).
+    try {
+      const hasVerification = todos.some((t) => t.category === "rental_verification");
+      const hasFollowup = todos.some((t) => t.category === "lead_followup");
+      const jobs: Promise<unknown>[] = [];
+      if (!hasVerification) {
+        jobs.push(
+          import("./rental-verification-todos").then(({ createRentalVerificationTodos }) =>
+            createRentalVerificationTodos(rentalId, crewId, null),
+          ),
+        );
+      }
+      if (!hasFollowup) {
+        jobs.push(ensureRentalEquipmentReturnTodos(rentalId, crewId));
+      }
+      if (jobs.length > 0) {
+        await Promise.allSettled(jobs);
+        todos = (await loadTodos()) ?? todos;
+      }
+    } catch (bootErr) {
+      console.error("[getRentalPageTodos] bootstrap failed (non-fatal):", bootErr);
+    }
+
+    return { success: true, data: todos };
+  } catch (error) {
+    console.error("[getRentalPageTodos] Error:", error);
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+/**
+ * Webhook-facing wrapper around the private equipment-return bootstrap —
+ * the franchize_order XTR webhook spawns the same persisted checklist the
+ * cash/card checkout path creates in actions-runtime (2026-09-28 parity).
+ */
+export async function ensureRentalEquipmentReturnTodosForWebhook(
+  rentalId: string,
+  crewId: string,
+): Promise<void> {
+  return ensureRentalEquipmentReturnTodos(rentalId, crewId);
+}
+
+// ============================================================================
 // Legacy runtime exports
 // ============================================================================
 
