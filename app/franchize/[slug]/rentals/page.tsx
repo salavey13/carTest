@@ -32,7 +32,7 @@ export default async function FranchizeRentalsPage({ params }: FranchizeRentalsP
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} items={items} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/rentals · crew-operations`}

@@ -1,5 +1,6 @@
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { DEFAULT_FRANCHIZE_CONTENT_BLOCKS } from "@/app/franchize/lib/content-blocks";
+import { resolveStorageConfig } from "@/app/franchize/lib/storage-config";
 
 /**
  * Fallback crew object used by admin & dashboard clients
@@ -77,4 +78,6 @@ export const fallbackCrew: FranchizeCrewVM = {
     buttonLabel: "",
     buttonHref: "",
   },
+  // Legacy rule: without a metadata.storage block, storage is vip-bike-only.
+  storage: resolveStorageConfig(null, "vip-bike"),
 };

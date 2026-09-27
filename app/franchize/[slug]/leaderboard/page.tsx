@@ -51,7 +51,7 @@ export default async function LeaderboardPage({
       <CrewHeader
         crew={crew}
         activePath={activePath}
-        sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)}
+        sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })}
       />
       <FranchizeLeaderboardClient crew={crew} slug={crewSlug} />
       <CrewFooter crew={crew} />

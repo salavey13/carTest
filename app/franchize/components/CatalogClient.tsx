@@ -555,10 +555,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const [clearFocused, setClearFocused] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
-  // «Зимнее Хранение» offer — vip-bike crew only (single «Место хранения»
-  // entry, Стригинский переулок 13Б). Pill in the filter row opens the modal.
+  // «Зимнее Хранение» offer — config-driven (admin/crewowner config via
+  // crew.storage, legacy vip-bike fallback when the metadata block is absent).
+  // Pill in the filter row opens the modal.
   const [winterStorageOpen, setWinterStorageOpen] = useState(false);
-  const showWinterStoragePill = resolvedSlug === "vip-bike" || slug === "vip-bike";
+  const storageConfig = crew.storage;
+  const showWinterStoragePill = storageConfig?.enabled ?? (resolvedSlug === "vip-bike" || slug === "vip-bike");
   const [campaignIndex, setCampaignIndex] = useState(0);
   const [carouselActiveByCategory, setCarouselActiveByCategory] = useState<Record<string, number>>({});
   const [carouselParallaxByItem, setCarouselParallaxByItem] = useState<Record<string, { x: number; y: number }>>({});
@@ -1825,6 +1827,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         telegramHandle={crew.contacts.telegram || ""}
         phone={crew.contacts.phone || ""}
         slug={resolvedSlug}
+        storageAddress={storageConfig?.address}
+        monthlyPriceRub={storageConfig?.defaultMonthlyPriceRub}
       />
 
       <ItemModal

@@ -177,6 +177,9 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
     contractDefaultsJson: "",
     docTemplatesJson: "",
     advancedJson: "",
+    storageEnabled: false,
+    storageAddress: "",
+    storageDefaultMonthlyPriceRub: "2000",
   });
   const [message, setMessage] = useState("Укажите slug, подберите цвета, проверьте локально и сохраните.");
   const [canEdit, setCanEdit] = useState(false);
@@ -478,8 +481,9 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       if (result.errors) setFieldErrors(result.errors);
       if (result.data) setForm(result.data);
       if (typeof result.canEdit === "boolean") setCanEdit(result.canEdit);
-      // U4: clear draft on successful save
-      if (result.success) {
+      // U4: clear draft on successful save (FranchizeConfigState.ok — the
+      // form previously read a nonexistent `.success`, so drafts never cleared)
+      if (result.ok) {
         try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       }
     });
@@ -850,6 +854,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
           <label className="text-sm">Оценка байка (прописью)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.bikeValueWords} onChange={(e) => updateField("bikeValueWords", e.target.value)} /></label>
           <label className="text-sm">Штраф за просрочку (руб)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.lateReturnPenaltyRub} onChange={(e) => updateField("lateReturnPenaltyRub", e.target.value)} /></label>
           <label className="text-sm md:col-span-2">Адрес возврата<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.returnAddress} onChange={(e) => updateField("returnAddress", e.target.value)} /></label>
+          <h3 className="md:col-span-3 mt-2 text-base font-semibold" style={{ color: ui.text }}>Зимнее хранение (metadata.franchize.storage)</h3>
+          <label className="text-sm flex items-center gap-2 md:col-span-3"><input type="checkbox" checked={form.storageEnabled} onChange={(e) => updateField("storageEnabled", e.target.checked)} /> Включить услугу «Зимнее хранение» (вкладка «Хранение», каталог-пилюля, онлайн-заявка)</label>
+          <label className="text-sm md:col-span-2">Место хранения<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.storageAddress} onChange={(e) => updateField("storageAddress", e.target.value)} placeholder="Стригинский переулок, 13Б" /></label>
+          <label className="text-sm">Ставка от (₽/мес)<input className={inputClass} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.storageDefaultMonthlyPriceRub} onChange={(e) => updateField("storageDefaultMonthlyPriceRub", e.target.value)} inputMode="numeric" placeholder="2000" /></label>
           <label className="text-sm md:col-span-3">Настройки договора JSON (private.crew_secrets.contract_defaults)
             <textarea className={`${inputClass} min-h-24 font-mono text-xs`} style={{ borderColor: ui.border, backgroundColor: ui.inputBg, color: ui.text }} value={form.contractDefaultsJson} onChange={(e) => updateField("contractDefaultsJson", e.target.value)} />
           </label>

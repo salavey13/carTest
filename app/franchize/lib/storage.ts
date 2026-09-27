@@ -77,15 +77,32 @@ export function storageMonthsCount(startRaw: unknown, endRaw: unknown): number {
 
 /**
  * Season presets for the order form: 15 октября → 1 июня (vip-bike season).
- * Before the season opens (≤ 14 Oct) the current season is offered; after —
- * the next one.
+ * Before the season opens (≤ season start day-month) the current season is
+ * offered; after — the next one.
+ *
+ * Per-crew config may override the day-month anchors (MM-DD strings from
+ * storage-config); invalid overrides fall back to the vip-bike defaults.
  */
-export function storageSeasonDefaults(now: Date = new Date()): { start: string; end: string } {
+export function storageSeasonDefaults(
+  now: Date = new Date(),
+  seasonMMDD?: { start: string; end: string },
+): { start: string; end: string } {
+  const parse = (raw: string | undefined, fallbackM: number, fallbackD: number) => {
+    const m = String(raw ?? "").match(/^(\d{2})-(\d{2})$/);
+    const month = m ? Math.min(12, Math.max(1, Number(m[1]))) : fallbackM;
+    const day = m ? Math.min(31, Math.max(1, Number(m[2]))) : fallbackD;
+    return { month, day };
+  };
+  const start = parse(seasonMMDD?.start, 10, 15);
+  const end = parse(seasonMMDD?.end, 6, 1);
+
   const y = now.getFullYear();
-  const seasonStartYear = now.getTime() < new Date(y, 9, 15).getTime() ? y : y + 1;
+  const seasonStartYear =
+    now.getTime() < new Date(y, start.month - 1, start.day).getTime() ? y : y + 1;
+  const pad = (n: number) => String(n).padStart(2, "0");
   return {
-    start: `${seasonStartYear}-10-15`,
-    end: `${seasonStartYear + 1}-06-01`,
+    start: `${seasonStartYear}-${pad(start.month)}-${pad(start.day)}`,
+    end: `${seasonStartYear + 1}-${pad(end.month)}-${pad(end.day)}`,
   };
 }
 
@@ -137,11 +154,30 @@ export function storageFormatRub(value: number): string {
 
 export interface StorageBikeEventVM {
   id: number;
+  /** Free-form string on purpose (DB CHECK guards the set) — renderers map it via STORAGE_EVENT_TYPE_LABELS. */
   type: string;
   status: StorageBikeStatus | null;
   actorName: string;
   message: string;
   createdAt: string;
+}
+
+/**
+ * Human label per event type — the wall/story timelines render through this,
+ * so new event kinds (payment, owner_linked) never show up as «Статус: Заявка».
+ * Unknown types fall back to the raw type string.
+ */
+export const STORAGE_EVENT_TYPE_LABELS: Record<string, string> = {
+  created: "Заявка создана",
+  status_changed: "Статус",
+  note: "Заметка",
+  doc: "Документ",
+  payment: "Оплата",
+  owner_linked: "Владелец привязан",
+};
+
+export function storageEventLabel(type: string): string {
+  return STORAGE_EVENT_TYPE_LABELS[String(type ?? "")] ?? String(type ?? "");
 }
 
 export interface StorageBikeVM {
@@ -169,6 +205,8 @@ export interface StorageBikeVM {
   orderId: string | null;
   docPath: string | null;
   pepSigned: boolean;
+  /** One-shot season payment marker (NULL = не оплачено). */
+  paidUntil: string | null;
   source: "checkout" | "owner_add" | "crew_add";
   events: StorageBikeEventVM[];
 }
@@ -194,6 +232,80 @@ export const STORAGE_SOURCE_LABELS: Record<StorageBikeVM["source"], string> = {
   owner_add: "Добавлен владельцем",
   crew_add: "Добавлен экипажем",
 };
+
+// ── money (season is paid one-shot — the contract's оплата единовременно) ──
+
+export interface StorageMoneyStats {
+  /** Сумма сезона по активным байкам (requested + in_storage). */
+  activeRub: number;
+  /** Из них уже на хранении. */
+  inStorageRub: number;
+  /** Активные и оплаченные (paid_until покрывает сегодня). */
+  paidRub: number;
+  /** Активные и НЕ оплаченные — «ждёт оплаты» tile. */
+  unpaidRub: number;
+}
+
+/**
+ * «Оплачено» = paid_until is a date >= today (MSK wall-clock, the app tz).
+ * Injectable `today` (ISO date or timestamp) keeps the pure function honest
+ * in tests — mirrors the report builder's nowMs pattern.
+ */
+export function storagePaidCovered(paidUntil: string | null | undefined, today?: string | number | Date): boolean {
+  if (!paidUntil) return false;
+  const paid = String(paidUntil).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paid)) return false;
+  let todayIso: string;
+  if (typeof today === "string" && /^\d{4}-\d{2}-\d{2}/.test(today)) {
+    todayIso = today.slice(0, 10);
+  } else {
+    const ts = today === undefined ? Date.now() : new Date(today as string | number).getTime();
+    if (Number.isNaN(ts)) return false;
+    todayIso = new Date(ts).toLocaleDateString("en-CA", { timeZone: "Europe/Moscow" });
+  }
+  return paid >= todayIso;
+}
+
+export function storageMoneyStatsOf(bikes: Array<{ status: string; totalPriceRub: number; paidUntil: string | null }>, today?: string | number | Date): StorageMoneyStats {
+  const stats: StorageMoneyStats = { activeRub: 0, inStorageRub: 0, paidRub: 0, unpaidRub: 0 };
+  for (const b of bikes) {
+    if (b.status !== "requested" && b.status !== "in_storage") continue;
+    const rub = Math.max(0, Math.round(Number(b.totalPriceRub) || 0));
+    stats.activeRub += rub;
+    if (b.status === "in_storage") stats.inStorageRub += rub;
+    if (storagePaidCovered(b.paidUntil, today)) stats.paidRub += rub;
+    else stats.unpaidRub += rub;
+  }
+  return stats;
+}
+
+// ── wall triage: status filter + sort (Мотопарк parity) ─────────────────────
+
+export type StorageStatusFilter = "all" | StorageBikeStatus;
+
+export function filterStorageBikes<T extends { status: StorageBikeStatus }>(bikes: T[], filter: StorageStatusFilter): T[] {
+  if (!filter || filter === "all") return bikes;
+  return bikes.filter((b) => b.status === filter);
+}
+
+export type StorageSortMode = "recent" | "money" | "title";
+
+/** Full-history cap for the story page + report (bike-wall WALL_EVENTS_CAP recipe). */
+export const STORAGE_STORY_EVENTS_CAP = 80;
+
+export const STORAGE_SORT_LABELS: Record<StorageSortMode, string> = {
+  recent: "По свежести",
+  money: "По сумме",
+  title: "По названию",
+};
+
+export function sortStorageBikes<T extends { createdAt: string; totalPriceRub: number; bikeTitle: string }>(bikes: T[], mode: StorageSortMode): T[] {
+  const copy = [...bikes];
+  if (mode === "money") copy.sort((a, b) => (Number(b.totalPriceRub) || 0) - (Number(a.totalPriceRub) || 0));
+  else if (mode === "title") copy.sort((a, b) => String(a.bikeTitle || "").localeCompare(String(b.bikeTitle || ""), "ru"));
+  else copy.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  return copy;
+}
 
 /** Source of truth for the wall: how the VM is assembled from DB rows. */
 export function storageStatsOf(bikes: Array<{ status: string }>): StorageWallStats {

@@ -186,18 +186,22 @@ describe("storage flow wiring (actions-runtime)", () => {
 });
 
 describe("catalog: «Зимнее Хранение» pill + «Место хранения» modal", () => {
-  it("CatalogClient wires the pill (vip-bike only) and renders the modal", () => {
+  it("CatalogClient wires the pill (config-driven, legacy vip-bike fallback) and renders the modal", () => {
     const src = read("app/franchize/components/CatalogClient.tsx");
-    expect(src.includes('showWinterStoragePill = resolvedSlug === "vip-bike" || slug === "vip-bike"')).toBe(true);
+    // 2026-09-27 v3: pill follows crew.storage?.enabled (admin/crewowner config);
+    // crews without the metadata block keep the legacy vip-bike behaviour.
+    expect(src.includes("showWinterStoragePill = storageConfig?.enabled ?? (resolvedSlug === \"vip-bike\" || slug === \"vip-bike\")")).toBe(true);
     expect(src.includes("<WinterStorageModal")).toBe(true);
     expect(src.includes("Зимнее хранение")).toBe(true);
   });
 
-  it("modal carries the storage place (Стригинский 13Б), care duties, price and ПЭП promise", () => {
+  it("modal carries the storage place (Стригинский 13Б legacy fallback), care duties, config price and ПЭП promise", () => {
     const src = read("app/franchize/components/WinterStorageModal.tsx");
     expect(src.includes("Стригинский переулок, 13Б")).toBe(true);
     expect(src.includes("подзарядка аккумулятора")).toBe(true);
-    expect(src.includes("от 2 000 ₽ / месяц")).toBe(true);
+    // price is config-driven now — the legacy 2 000 ₽ stays the fallback
+    expect(src.includes("LEGACY_MONTHLY_PRICE_RUB = 2000")).toBe(true);
+    expect(src.includes("storageFormatRub(monthlyPriceRub ?? LEGACY_MONTHLY_PRICE_RUB)")).toBe(true);
     expect(src.includes("ПЭП")).toBe(true);
     // 2026-09-27 iteration: primary CTA is now the ONLINE checkout, the
     // manager link stays as the human fallback.

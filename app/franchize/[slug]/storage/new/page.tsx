@@ -28,6 +28,10 @@ export default async function FranchizeStorageOrderPage({ params }: FranchizeSto
   const { crew } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteWithCssVars(crew.theme);
+  // Admin/crewowner config (metadata.franchize.storage) — the legacy
+  // Стригинский place / 2 000 ₽ defaults live in resolveStorageConfig.
+  const storageConfig = crew.storage;
+  const serviceEnabled = storageConfig?.enabled ?? true;
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -39,11 +43,23 @@ export default async function FranchizeStorageOrderPage({ params }: FranchizeSto
           fallbackHref={`/franchize/${resolvedSlug}/storage`}
           fallbackLinkLabel="К стене хранения"
         >
-          <StorageOrderForm
-            slug={resolvedSlug}
-            crewName={crew.name}
-            storagePlace={crew.contacts.address || "Стригинский переулок, 13Б"}
-          />
+          {serviceEnabled ? (
+            <StorageOrderForm
+              slug={resolvedSlug}
+              crewName={crew.name}
+              storagePlace={storageConfig?.address || crew.contacts.address || "Стригинский переулок, 13Б"}
+              defaultMonthlyPriceRub={storageConfig?.defaultMonthlyPriceRub}
+              seasonStartMMDD={storageConfig?.seasonStartMMDD}
+              seasonEndMMDD={storageConfig?.seasonEndMMDD}
+            />
+          ) : (
+            <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-6 text-center">
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">Зимнее хранение временно недоступно</p>
+              <p className="mt-2 text-sm text-amber-600/80 dark:text-amber-400/80">
+                Экипаж приостановил приём заявок на сезон. Вопросы — по телефону {crew.contacts.phone || "или в Telegram"}.
+              </p>
+            </div>
+          )}
         </FranchizeErrorBoundary>
       </FranchizePageShell>
       <CrewFooter crew={crew} />

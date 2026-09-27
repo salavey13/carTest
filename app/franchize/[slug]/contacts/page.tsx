@@ -62,7 +62,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
 
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} items={items} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} />
 
       <FranchizePageShell theme={crew.theme}>
         <FranchizeHero

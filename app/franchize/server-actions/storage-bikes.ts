@@ -37,10 +37,11 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { telegramDeliver } from "@/lib/telegram-transport";
 import { resolveLeadNotifyRecipients } from "@/app/franchize/lib/new-lead-notify";
-import { resolveCrewBotUsername, crewBotAppLink } from "@/app/franchize/lib/crew-bot";
+import { resolveCrewBotUsername, crewBotAppLink, platformBotUsername } from "@/app/franchize/lib/crew-bot";
 import { formatStorageMonthsLabel } from "@/app/franchize/lib/storage-season";
 import {
   canTransitionStorageStatus,
+  STORAGE_STORY_EVENTS_CAP,
   storageDocPublicUrl,
   storageFormatRub,
   storageIsoToRu,
@@ -55,6 +56,7 @@ import {
   type StorageBikeVM,
   type StorageWallVM,
 } from "@/app/franchize/lib/storage";
+import { buildStorageBikeReport } from "@/app/franchize/lib/storage-bike-report";
 
 // ── identity ─────────────────────────────────────────────────────────────────
 
@@ -157,6 +159,7 @@ interface StorageBikeRow {
   id: string;
   created_at: string;
   status: string;
+  owner_user_id: string | null;
   owner_name: string;
   owner_phone: string;
   make: string;
@@ -177,6 +180,7 @@ interface StorageBikeRow {
   order_id: string | null;
   doc_path: string | null;
   pep_signed: boolean | null;
+  paid_until: string | null;
   source: string | null;
 }
 
@@ -216,6 +220,7 @@ function mapBike(row: StorageBikeRow, events: StorageEventRow[]): StorageBikeVM 
     orderId: row.order_id,
     docPath: row.doc_path,
     pepSigned: Boolean(row.pep_signed),
+    paidUntil: row.paid_until ?? null,
     source: (["checkout", "owner_add", "crew_add"].includes(source) ? source : "checkout"),
     events: events.map((e) => ({
       id: e.id,
@@ -228,6 +233,9 @@ function mapBike(row: StorageBikeRow, events: StorageEventRow[]): StorageBikeVM 
   };
 }
 
+/** Wall renders ~top events; the story page fetches its own capped history. */
+const WALL_EVENTS_PER_CHUNK = 300;
+
 async function loadEventsFor(bikeIds: string[]): Promise<Map<string, StorageEventRow[]>> {
   const byBike = new Map<string, StorageEventRow[]>();
   if (bikeIds.length === 0) return byBike;
@@ -239,7 +247,7 @@ async function loadEventsFor(bikeIds: string[]): Promise<Map<string, StorageEven
       .select("id, bike_id, type, status, actor_name, message, created_at")
       .in("bike_id", chunk)
       .order("created_at", { ascending: false })
-      .limit(300);
+      .limit(WALL_EVENTS_PER_CHUNK);
     if (error) {
       logger.warn("[storage] events load failed:", error.message);
       continue;
@@ -319,7 +327,7 @@ async function actorDisplayName(actorUserId: string): Promise<string> {
 
 async function insertStorageEvent(params: {
   bikeId: string;
-  type: "created" | "status_changed" | "note" | "doc";
+  type: "created" | "status_changed" | "note" | "doc" | "payment" | "owner_linked";
   status?: string | null;
   actor: string;
   actorName: string;
@@ -665,4 +673,248 @@ export async function getStorageDocUrlAction(input: unknown): Promise<{ success:
   if (!resolved.actor.isStaff && !isMine) return { success: false, error: "Договор доступен владельцу и экипажу." };
   if (!bike.doc_path) return { success: true, url: "" };
   return { success: true, url: storageDocPublicUrl(bike.doc_path) };
+}
+
+// ── story page / report / payment / owner-link (transparency parity v2) ────
+
+interface StorageStoryLoad {
+  row: StorageBikeRow;
+  isStaff: boolean;
+  isMine: boolean;
+  actorUserId: string;
+}
+
+/**
+ * Load one bike with the crew_slug scope enforced on EVERY query (a valid
+ * uuid from another crew must behave exactly like a missing one). Returns
+ * null on ANY gate failure — the caller answers with a data-free error so
+ * the story page never echoes row data to an unauthorized viewer.
+ */
+async function loadStoryBike(params: { slug: string; bikeId: string; actorUserId?: string; initData?: string }): Promise<StorageStoryLoad | null> {
+  const resolved = await resolveStorageActor({ slug: params.slug, actorUserId: params.actorUserId, initData: params.initData });
+  if (!resolved?.actor) return null;
+  const { data: row, error } = await supabaseAdmin
+    .from("storage_bikes")
+    .select("*")
+    .eq("id", params.bikeId)
+    .eq("crew_slug", params.slug)
+    .maybeSingle();
+  if (error || !row) return null;
+  const bikeRow = row as unknown as StorageBikeRow;
+  const isMine = Boolean(bikeRow.owner_user_id) && String(bikeRow.owner_user_id) === resolved.actor.actorUserId;
+  if (!resolved.actor.isStaff && !isMine) return null;
+  return { row: bikeRow, isStaff: resolved.actor.isStaff, isMine, actorUserId: resolved.actor.actorUserId };
+}
+
+async function loadStoryEvents(bikeId: string): Promise<StorageEventRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("storage_bike_events")
+    .select("id, bike_id, type, status, actor_name, message, created_at")
+    .eq("bike_id", bikeId)
+    .order("created_at", { ascending: false })
+    .limit(STORAGE_STORY_EVENTS_CAP);
+  if (error) {
+    logger.warn("[storage] story events load failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as unknown as StorageEventRow[];
+}
+
+/** The shareable per-bike story («Мотопарк story» parity): staff or owner. */
+export async function getStorageBikeStoryAction(input: unknown): Promise<{ success: boolean; story?: StorageBikeVM; access?: "staff" | "owner"; error?: string }> {
+  const parsed = slugSchema.extend({ bikeId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос карточки хранения." };
+  const { slug, bikeId, initData, actorUserId } = parsed.data;
+
+  const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
+  if (!loaded) return { success: false, error: "Карточка недоступна: войдите через Telegram как владелец или экипаж." };
+
+  const events = await loadStoryEvents(bikeId);
+  return {
+    success: true,
+    access: loaded.isStaff ? "staff" : "owner",
+    story: mapBike(loaded.row, events),
+  };
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Staff marks the one-shot season payment (contract п. 3 — оплата
+ * единовременно). Default target = season_end; a custom date is clamped
+ * within ±31 days of the season so a typo can't mark a bike paid into 2030.
+ */
+export async function markStorageBikePaidAction(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = slugSchema
+    .extend({
+      bikeId: z.string().uuid(),
+      paidUntil: z.string().trim().regex(ISO_DATE_RE, "Дата в формате ГГГГ-ММ-ДД").optional(),
+      note: z.string().trim().max(300).optional(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректная отметка оплаты — дата в формате ГГГГ-ММ-ДД." };
+  const { slug, bikeId, initData, actorUserId, note } = parsed.data;
+
+  const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
+  if (!loaded) return { success: false, error: "Байк не найден." };
+  if (!loaded.isStaff) return { success: false, error: "Оплату отмечает экипаж — запросите менеджера." };
+
+  const row = loaded.row;
+  let target = parsed.data.paidUntil || row.season_end || "";
+  if (!ISO_DATE_RE.test(target)) {
+    return { success: false, error: "Укажите дату оплаты (сезон не задан — нет значения по умолчанию)." };
+  }
+  // Clamp within ±31 days of the season window when the season is known.
+  if (row.season_start || row.season_end) {
+    const lo = row.season_start ? Date.parse(row.season_start) - 31 * 86400000 : Number.NEGATIVE_INFINITY;
+    const hi = row.season_end ? Date.parse(row.season_end) + 31 * 86400000 : Number.POSITIVE_INFINITY;
+    const ts = Date.parse(target);
+    if (Number.isNaN(ts) || ts < lo || ts > hi) {
+      return {
+        success: false,
+        error: `Дата оплаты должна быть в пределах сезона (${storageIsoToRu(row.season_start) || "—"} → ${storageIsoToRu(row.season_end) || "—"}, ±31 день).`,
+      };
+    }
+    target = new Date(ts).toISOString().slice(0, 10);
+  }
+
+  if (row.paid_until === target) return { success: true }; // already marked — no duplicate event
+
+  const staffId = loaded.actorUserId;
+  const actorName = await actorDisplayName(staffId);
+  try {
+    const { error: updateErr } = await supabaseAdmin
+      .from("storage_bikes")
+      .update({ paid_until: target })
+      .eq("id", bikeId)
+      .eq("crew_slug", slug);
+    if (updateErr) throw new Error(updateErr.message);
+
+    await insertStorageEvent({
+      bikeId,
+      type: "payment",
+      status: null,
+      actor: staffId,
+      actorName,
+      message: `Оплата отмечена до ${storageIsoToRu(target)}${note ? ` — ${note}` : ""}`,
+    });
+  } catch (err) {
+    logger.warn("[storage] payment mark failed:", err instanceof Error ? err.message : String(err));
+    return { success: false, error: "Не удалось сохранить отметку оплаты — миграция v2 (paid_until) ещё не применена?" };
+  }
+
+  await notifyStorageMove({
+    slug,
+    text: [
+      `❄️ <b>Оплата хранения: ${escHtml(row.make || "мотоцикл")}${row.reg_number ? ` (${escHtml(row.reg_number)})` : ""}</b>`,
+      `Оплачено до: <b>${storageIsoToRu(target)}</b>`,
+      `Сезон: ${storageFormatRub(row.total_price_rub ?? 0)} ₽`,
+      `Отметил: ${escHtml(actorName)}`,
+      note ? `Комментарий: ${escHtml(note)}` : "",
+    ].filter(Boolean).join("\n"),
+    alsoChatIds: row.owner_user_id ? [String(row.owner_user_id)] : [],
+    excludeChatIds: [staffId],
+  });
+
+  return { success: true };
+}
+
+/**
+ * Crew attaches a Telegram owner to a bike (web checkouts arrive with
+ * owner_user_id = NULL — without this the guest buyer never gets owner
+ * transparency). Empty string detaches. STAFF ONLY.
+ */
+export async function linkStorageBikeOwnerAction(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = slugSchema
+    .extend({
+      bikeId: z.string().uuid(),
+      ownerTgUserId: z.string().trim().max(32).regex(/^\d*$/, "Telegram id — только цифры"),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { success: false, error: "Telegram id владельца — только цифры." };
+  const { slug, bikeId, initData, actorUserId } = parsed.data;
+
+  const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
+  if (!loaded) return { success: false, error: "Байк не найден." };
+  if (!loaded.isStaff) return { success: false, error: "Привязать владельца может только экипаж." };
+
+  const row = loaded.row;
+  const digits = parsed.data.ownerTgUserId; // "" = detach
+  if (String(row.owner_user_id ?? "") === digits) return { success: true }; // no change
+
+  const staffId = loaded.actorUserId;
+  const actorName = await actorDisplayName(staffId);
+  try {
+    const { error: updateErr } = await supabaseAdmin
+      .from("storage_bikes")
+      .update({ owner_user_id: digits || null })
+      .eq("id", bikeId)
+      .eq("crew_slug", slug);
+    if (updateErr) throw new Error(updateErr.message);
+
+    await insertStorageEvent({
+      bikeId,
+      type: "owner_linked",
+      status: null,
+      actor: staffId,
+      actorName,
+      message: digits
+        ? `Владелец привязан к Telegram (id ${digits}) — стену и уведомления видит владелец`
+        : "Привязка владельца снята — заявка остаётся на стене экипажа",
+    });
+  } catch (err) {
+    logger.warn("[storage] owner link failed:", err instanceof Error ? err.message : String(err));
+    return { success: false, error: "Не удалось привязать владельца — повторите позже." };
+  }
+
+  await notifyStorageMove({
+    slug,
+    text: [
+      `❄️ <b>Хранение: ${escHtml(row.make || "мотоцикл")}${row.reg_number ? ` (${escHtml(row.reg_number)})` : ""}</b>`,
+      digits
+        ? `Владелец привязан к Telegram — теперь ему видна стена и приходят уведомления`
+        : `Привязка владельца снята`,
+      `Изменил: ${escHtml(actorName)}`,
+    ].join("\n"),
+    alsoChatIds: digits ? [digits] : [],
+    excludeChatIds: [staffId],
+  });
+
+  return { success: true };
+}
+
+/** Per-bike markdown one-pager («Отчёт» pill) — staff or the bike's owner. */
+export async function getStorageBikeReportAction(input: unknown): Promise<{ success: boolean; data?: { markdown: string; filename: string }; error?: string }> {
+  const parsed = slugSchema.extend({ bikeId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос отчёта." };
+  const { slug, bikeId, initData, actorUserId } = parsed.data;
+
+  const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
+  if (!loaded) return { success: false, error: "Отчёт доступен владельцу байка и экипажу." };
+
+  let botUsername: string | null = null;
+  try {
+    botUsername = (await resolveCrewBotUsername(slug)) || platformBotUsername();
+  } catch {
+    botUsername = platformBotUsername();
+  }
+  const wallUrl = crewBotAppLink(botUsername, storageStartParam(slug)) || undefined;
+  const docUrl = loaded.row.doc_path ? storageDocPublicUrl(loaded.row.doc_path) : "";
+
+  const events = await loadStoryEvents(bikeId);
+  const { data: crewRow } = await supabaseAdmin
+    .from("crews")
+    .select("name")
+    .eq("slug", slug)
+    .maybeSingle();
+  const crewName = String((crewRow as { name?: string } | null)?.name ?? slug);
+
+  const report = buildStorageBikeReport({
+    bike: mapBike(loaded.row, events),
+    crewName,
+    botUsername: botUsername || undefined,
+    wallUrl,
+    docUrl: docUrl || undefined,
+  });
+  return { success: true, data: report };
 }

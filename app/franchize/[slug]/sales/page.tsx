@@ -62,7 +62,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} />
       <div
         className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-20 md:pt-24"
         style={{

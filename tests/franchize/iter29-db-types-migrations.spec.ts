@@ -109,7 +109,8 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     // 175 → 176: 20260925120000_meetup_photo_url.sql (map-riders: фото meetup-точки — маркер носит его круглой аватаркой)
     // 176 → 177: 20260926120000_salary_wallet_mirror.sql (salary audit: кошелёк → формальный леджер — триггер-зеркало + бэкфилл + view, «уже выплачено» по обеим книгам)
     // 177 → 178: 20260927120000_winter_storage.sql (зимнее хранение: storage_bikes + storage_bike_events — стена для владельцев, трекинг каждого перемещения, RLS owner-read)
-    expect(files.length).toBe(178);
+    // 178 → 179: 20260927130000_winter_storage_v2.sql (зимнее хранение v2: paid_until + события payment/owner_linked — прозрачность владельца на уровне Мотопарка)
+    expect(files.length).toBe(179);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

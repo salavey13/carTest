@@ -46,7 +46,7 @@ export default async function VerifyDocPage({ params, searchParams }: VerifyDocP
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
-        sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)}
+        sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })}
         items={items}
       />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6">

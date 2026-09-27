@@ -25,6 +25,7 @@ import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, ty
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
 import { formatStorageMonthsLabel as storageSeasonMonthsLabel, storageValidUntilISO } from "@/app/franchize/lib/storage-season";
 import { storageMonthsCount, storageSeasonDateToIso, storageStartParam } from "@/app/franchize/lib/storage";
+import { resolveStorageConfig, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
@@ -247,6 +248,9 @@ export interface FranchizeCrewVM {
   // Per-crew UI overrides from metadata.franchize.ui (hydration SQL).
   // Optional: crews without overrides keep every default (labels, rail, buttons).
   ui?: FranchizeCrewUiVM;
+  // «Зимнее хранение» per-crew config (metadata.franchize.storage) — resolved
+  // via resolveStorageConfig (legacy vip-bike fallback when the block is absent).
+  storage?: StorageCrewConfig;
 }
 
 export interface CtaBlock {
@@ -321,6 +325,12 @@ export interface FranchizeConfigInput {
   contractDefaultsJson: string;
   docTemplatesJson: string;
   advancedJson: string;
+  // «Зимнее хранение» (admin/crewowner config, 2026-09-27). Address/price are
+  // the editor-visible subset; season/careDuties stay metadata-only
+  // (advancedJson) to avoid a second date-format foot-gun in the form.
+  storageEnabled: boolean;
+  storageAddress: string;
+  storageDefaultMonthlyPriceRub: string;
 }
 
 export interface FranchizeConfigState {
@@ -383,6 +393,15 @@ const franchizeConfigSchema = z.object({
   contractDefaultsJson: z.string().default(""),
   docTemplatesJson: z.string().default(""),
   advancedJson: z.string().default(""),
+  storageEnabled: z.preprocess(
+    // "false" strings (bot scripts / hand-edited JSON) must NOT enable the
+    // service — z.coerce.boolean() alone would coerce any non-empty string
+    // to true. Real booleans and true/false strings map explicitly.
+    (value) => (value === "true" ? true : value === "false" ? false : value),
+    z.coerce.boolean().default(false),
+  ),
+  storageAddress: z.string().trim().default(""),
+  storageDefaultMonthlyPriceRub: z.string().trim().default(""),
 });
 
 const defaultFranchizeConfig: FranchizeConfigInput = {
@@ -435,6 +454,9 @@ const defaultFranchizeConfig: FranchizeConfigInput = {
   contractDefaultsJson: "",
   docTemplatesJson: "",
   advancedJson: "",
+  storageEnabled: false,
+  storageAddress: "",
+  storageDefaultMonthlyPriceRub: "",
 };
 
 function readPath<T>(obj: unknown, path: string[], fallback: T): T {
@@ -691,6 +713,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
   },
   reservationHold: buildFranchizeReservationHold({}, ""),
   contentBlocks: cloneFranchizeContentBlocks(),
+  storage: resolveStorageConfig(null, slug),
   cta: {
     title: "Тест-драйв",
     description: "",
@@ -984,6 +1007,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       // metadata.franchize.ui — crew specs UI overrides (tab labels/visibility,
       // showCreateButton). Sanitized in lib/crew-ui; undefined when absent.
       ui: buildFranchizeCrewUi(readPath<unknown>(franchize, ["ui"], null)),
+      // «Зимнее хранение» config — metadata.franchize.storage, legacy vip-bike
+      // fallback when the block is absent (resolveStorageConfig).
+      storage: resolveStorageConfig(franchize, crew.slug ?? safeSlug),
     };
 
     const items: CatalogItemVM[] = (cars ?? [])
@@ -1479,6 +1505,12 @@ async function toFranchizeConfigInput(crew: UnknownRecord, slug: string): Promis
     contractDefaultsJson: JSON.stringify(contractDefaults, null, 2),
     docTemplatesJson: JSON.stringify(docTemplates, null, 2),
     advancedJson: JSON.stringify(franchize, null, 2),
+    storageEnabled: (() => {
+      const raw = readPath(franchize, ["storage", "enabled"], slug === "vip-bike");
+      return raw === true || raw === "true";
+    })(),
+    storageAddress: String(readPath(franchize, ["storage", "address"], "") ?? ""),
+    storageDefaultMonthlyPriceRub: String(readPath(franchize, ["storage", "defaultMonthlyPriceRub"], "") ?? ""),
   };
 }
 
@@ -1665,6 +1697,17 @@ export async function saveFranchizeConfig(input: FranchizeConfigInput, actorUser
       deliveryModes: splitCsv(payload.deliveryModesText),
       paymentOptions: splitCsv(payload.paymentOptionsText),
       defaultMode: payload.defaultMode,
+    },
+    // «Зимнее хранение» — editor fields (enabled/address/price) override, the
+    // rest of the block (seasonStart/End, careDuties) is preserved for the
+    // advancedJson path to manage.
+    storage: {
+      ...(readPath(sourceFranchize, ["storage"], {}) as UnknownRecord),
+      enabled: payload.storageEnabled,
+      address: payload.storageAddress,
+      ...(Number(payload.storageDefaultMonthlyPriceRub) > 0
+        ? { defaultMonthlyPriceRub: Math.round(Number(payload.storageDefaultMonthlyPriceRub)) }
+        : {}),
     },
   };
 
@@ -2018,6 +2061,27 @@ function assertStorageIdentityDocs(payload: {
   }
 }
 
+/**
+ * Crew config gate (2026-09-27 v3): a crew that switched «Зимнее хранение»
+ * off in the admin/crewowner config must not receive new signed storage
+ * orders — the editor checkbox promises «онлайн-заявка» off. Runs on BOTH
+ * checkout paths (submitFranchizeOrderNotification + createFranchizeOrder-
+ * Checkout), BEFORE any writes; throws the human storage_disabled phrase.
+ */
+async function assertStorageServiceEnabled(slug: string): Promise<void> {
+  const { data: crewRow } = await supabaseAdmin
+    .from("crews")
+    .select("slug, metadata")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!crewRow) return; // unknown crew → the existing crew-not-found paths handle it
+  const metadata = ((crewRow as { metadata?: Record<string, unknown> | null }).metadata ?? {}) as Record<string, unknown>;
+  const franchizeMeta = (metadata.franchize ?? metadata) as Record<string, unknown>;
+  if (!resolveStorageConfig(franchizeMeta, String((crewRow as { slug?: string }).slug ?? slug)).enabled) {
+    throw new FranchizeOrderDocValidationError(["storage_disabled"]);
+  }
+}
+
 type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
   totalAmount: number;
   subtotal: number;
@@ -2029,7 +2093,8 @@ type FranchizeOrderDocRequiredField =
   | "renterPhone"
   | "testdrive_passport_or_license"
   | "storage_owner_passport"
-  | "storage_bike_details";
+  | "storage_bike_details"
+  | "storage_disabled";
 const FRANCHIZE_DOC_REQUIRED_FIELDS: FranchizeOrderDocRequiredField[] = ["renterPhone"];
 
 type FranchizeOrderDocVariables = {
@@ -2054,6 +2119,8 @@ class FranchizeOrderDocValidationError extends Error {
         "Для договора хранения заполните паспорт владельца (серия и номер).",
       storage_bike_details:
         "Для договора хранения укажите марку мотоцикла и его оценочную стоимость.",
+      storage_disabled:
+        "Зимнее хранение сейчас недоступно в этом экипаже — напишите менеджеру в Telegram.",
     };
     super(
       missingFields.some((field) => HUMAN_FIELD_PHRASES[field])
@@ -5117,6 +5184,10 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   // Storage doc rule (2026-09-27): owner passport + bike identity + estimated
   // value — same fail-fast contract, human toast messages.
   assertStorageIdentityDocs(payload);
+  // Storage config gate: crew disabled the service → no new storage orders.
+  if (payload.flowType === "storage") {
+    await assertStorageServiceEnabled(payload.slug);
+  }
   const totalResult = await resolveFranchizeCheckoutTotal(payload);
   if (!totalResult.success) return totalResult;
   const effectiveTotal = totalResult.totalAmount;
@@ -6097,6 +6168,19 @@ export async function createFranchizeOrderCheckout(
   // the idempotency/notification-log writes so the renter can fix the data and
   // resubmit the SAME orderId (a pending log row would swallow the retry).
   assertTestdriveIdentityDocs(payload);
+  // Storage config gate (v3): crew disabled «Зимнее хранение» → reject before
+  // the idempotency log would swallow the retry (same pre-write spot). The
+  // throw is OUTSIDE the try below, so surface the human phrase directly.
+  if (payload.flowType === "storage") {
+    try {
+      await assertStorageServiceEnabled(payload.slug);
+    } catch (gateError) {
+      if (gateError instanceof FranchizeOrderDocValidationError) {
+        return { success: false, error: gateError.message };
+      }
+      throw gateError;
+    }
+  }
 
   // ── iter35: DB-backed idempotency — the durable duplicate guard ─────────
   // The in-memory cooldown Map below does NOT survive Vercel lambda rotation:

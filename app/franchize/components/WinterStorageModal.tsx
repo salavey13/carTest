@@ -20,14 +20,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BatteryCharging, Camera, Car, CheckCircle2, FileSignature, Gauge, Home, ShieldCheck, Snowflake } from "lucide-react";
+import { storageFormatRub } from "@/app/franchize/lib/storage";
 
-/** vip-bike's single storage place (boss's manual: Стригинский переулок 13Б). */
+/** Legacy vip-bike storage place (boss's manual: Стригинский переулок 13Б) — config fallback. */
 const STORAGE_PLACE = {
   title: "Место хранения",
   name: "Стригинский переулок, 13Б",
   description:
     "Крытое помещение с ограниченным доступом в Нижнем Новгороде. Мотоцикл стоит на твёрдом покрытии, третьи лица доступ к нему не имеют.",
 };
+
+/** City-neutral description for crews with their own configured place. */
+const GENERIC_PLACE_DESCRIPTION =
+  "Крытое помещение с ограниченным доступом. Мотоцикл стоит на твёрдом покрытии, третьи лица доступ к нему не имеют.";
+
+/** Legacy entry price — overridden by the crew's storage config when present. */
+const LEGACY_MONTHLY_PRICE_RUB = 2000;
 
 const CARE_POINTS = [
   { icon: Home, text: "Крытое помещение с ограниченным доступом" },
@@ -47,9 +55,13 @@ type WinterStorageModalProps = {
   phone: string;
   /** Crew slug — enables the self-service online checkout CTA. */
   slug?: string;
+  /** Admin/crewowner config (metadata.franchize.storage) — overrides the legacy place. */
+  storageAddress?: string;
+  /** Config entry price — overrides the legacy 2 000 ₽. */
+  monthlyPriceRub?: number;
 };
 
-export function WinterStorageModal({ open, onClose, telegramHandle, phone, slug }: WinterStorageModalProps) {
+export function WinterStorageModal({ open, onClose, telegramHandle, phone, slug, storageAddress, monthlyPriceRub }: WinterStorageModalProps) {
   const managerHref = useMemo(() => {
     const handle = telegramHandle.replace("@", "").trim();
     return handle ? `https://t.me/${handle}` : "";
@@ -87,8 +99,10 @@ export function WinterStorageModal({ open, onClose, telegramHandle, phone, slug 
         {/* Место хранения — the single storage place entry */}
         <div className="rounded-xl border border-[var(--dialog-border)] p-3.5" style={{ backgroundColor: "hsl(var(--muted) / 0.35)" }}>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--dialog-muted)]">{STORAGE_PLACE.title}</p>
-          <p className="mt-1 text-sm font-bold">{STORAGE_PLACE.name}</p>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--dialog-muted)]">{STORAGE_PLACE.description}</p>
+          <p className="mt-1 text-sm font-bold">{storageAddress || STORAGE_PLACE.name}</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--dialog-muted)]">
+            {storageAddress ? GENERIC_PLACE_DESCRIPTION : STORAGE_PLACE.description}
+          </p>
         </div>
 
         {/* What the keeper does (mirrors п. 4.1.3 of the storage contract) */}
@@ -104,7 +118,7 @@ export function WinterStorageModal({ open, onClose, telegramHandle, phone, slug 
         {/* Money + оформление */}
         <div className="rounded-xl border border-[var(--dialog-border)] p-3.5" style={{ backgroundColor: "hsl(var(--muted) / 0.35)" }}>
           <p className="text-sm">
-            <span className="text-lg font-extrabold">от 2 000 ₽ / месяц</span>
+            <span className="text-lg font-extrabold">от {storageFormatRub(monthlyPriceRub ?? LEGACY_MONTHLY_PRICE_RUB)} ₽ / месяц</span>
             <span className="ml-2 text-xs text-[var(--dialog-muted)]">оплата единовременно за сезон</span>
           </p>
           <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-[var(--dialog-muted)]">

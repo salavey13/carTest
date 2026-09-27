@@ -75,7 +75,7 @@ export default async function FranchizeCommunityPage(
 
   return (
     <main className="min-h-screen" style={{ ...surface.page, ...themeVars }}>
-      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} />
+      <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} />
 
       {/* compact intro — no legacy schedule/guide/partner filler, just the two live CTAs */}
       <div className="mx-auto w-full max-w-6xl px-4 pt-20 md:pt-24">

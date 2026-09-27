@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { getFranchizeBySlug } from "../../../actions";
 import { CrewFooter } from "../../../components/CrewFooter";
 import { CrewHeader } from "../../../components/CrewHeader";
@@ -8,27 +7,26 @@ import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { buildFranchizeIntentLinks } from "../../../lib/section-links";
 import { crewPaletteWithCssVars } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
-import { BikeStoryClient } from "./BikeStoryClient";
+import { StorageBikeStoryClient } from "../StorageBikeStoryClient";
 
-interface FranchizeBikeStoryPageProps {
+interface FranchizeStorageStoryPageProps {
   params: Promise<{ slug: string; bikeId: string }>;
 }
 
-export async function generateMetadata({ params }: FranchizeBikeStoryPageProps): Promise<Metadata> {
-  const { slug, bikeId } = await params;
+export async function generateMetadata({ params }: FranchizeStorageStoryPageProps): Promise<Metadata> {
+  const { slug } = await params;
   return buildFranchizeSectionMetadata(slug, {
-    sectionTitle: "История мото",
-    sectionDescription: `Стена мото: аренды, сервис, выручка и пробег — вся история одного мото.`,
-    pathSuffix: `/bikes/${bikeId}`,
+    sectionTitle: "Карточка хранения",
+    sectionDescription: "Карточка байка на зимнем хранении: сезон, оплаты, история перемещений и договор.",
+    pathSuffix: "/storage",
   });
 }
 
-export default async function FranchizeBikeStoryPage({ params }: FranchizeBikeStoryPageProps) {
+export default async function FranchizeStorageStoryPage({ params }: FranchizeStorageStoryPageProps) {
   const { slug, bikeId } = await params;
   const { crew, items } = await getFranchizeBySlug(slug);
-  if (!crew?.slug) notFound();
   const resolvedSlug = crew.slug || slug;
-  const activePath = `/franchize/${resolvedSlug}/bikes`;
+  const activePath = `/franchize/${resolvedSlug}/storage`;
   const surface = crewPaletteWithCssVars(crew.theme);
 
   return (
@@ -36,12 +34,18 @@ export default async function FranchizeBikeStoryPage({ params }: FranchizeBikeSt
       <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-5">
         <FranchizeErrorBoundary
-          resetKey={`${slug}-${bikeId}`}
-          fallbackTitle="История мото временно недоступна"
-          fallbackHref={`/franchize/${resolvedSlug}/bikes`}
-          fallbackLinkLabel="Вернуться в мотопарк"
+          resetKey={`${resolvedSlug}:storage-story`}
+          fallbackTitle="Карточка хранения временно недоступна"
+          fallbackHref={`/franchize/${resolvedSlug}/storage`}
+          fallbackLinkLabel="К стене хранения"
         >
-          <BikeStoryClient initialSlug={resolvedSlug} initialBikeId={bikeId} crew={crew} />
+          <StorageBikeStoryClient
+            initialSlug={resolvedSlug}
+            bikeId={bikeId}
+            crewName={crew.name}
+            contactsPhone={crew.contacts.phone || ""}
+            storageConfig={crew.storage}
+          />
         </FranchizeErrorBoundary>
       </FranchizePageShell>
       <CrewFooter crew={crew} />

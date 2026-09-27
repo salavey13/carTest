@@ -92,13 +92,28 @@ export function StorageOrderForm({
   slug,
   crewName,
   storagePlace,
+  defaultMonthlyPriceRub,
+  seasonStartMMDD,
+  seasonEndMMDD,
 }: {
   slug: string;
   crewName: string;
   storagePlace: string;
+  /** Config entry price (admin/crewowner) — pre-fill only, staff confirms the final rate. */
+  defaultMonthlyPriceRub?: number;
+  /** Config season anchors (MM-DD) — pre-fill only. */
+  seasonStartMMDD?: string;
+  seasonEndMMDD?: string;
 }) {
   const { user, dbUser, isInTelegramContext } = useAppContext();
-  const defaults = useMemo(() => storageSeasonDefaults(), []);
+  const defaults = useMemo(
+    () =>
+      storageSeasonDefaults(new Date(), {
+        start: seasonStartMMDD || "10-15",
+        end: seasonEndMMDD || "06-01",
+      }),
+    [seasonStartMMDD, seasonEndMMDD],
+  );
   const [pepInitData, setPepInitData] = useState<string | null>(null);
   const [pepUserOptedOut, setPepUserOptedOut] = useState(false);
   const [submitPhase, setSubmitPhase] = useState<"idle" | "sending">("idle");
@@ -121,7 +136,7 @@ export function StorageOrderForm({
     resolver: zodResolver(storageOrderSchema),
     mode: "onBlur",
     defaultValues: {
-      monthlyPriceRub: 2000,
+      monthlyPriceRub: defaultMonthlyPriceRub ?? 2000,
       seasonStart: defaults.start,
       seasonEnd: defaults.end,
       recipient: dbUser?.full_name || "",

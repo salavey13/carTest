@@ -2110,6 +2110,9 @@ export interface Database {
           pep_signed: boolean
           order_id: string | null
           doc_path: string | null
+          // hand-added 2026-09-27 (migration 20260927130000 v2) — gen:db-types
+          // regenerates 1:1 after Paul runs it in Supabase SQL Editor.
+          paid_until: string | null
           source: string
           notes: string
           created_at: string
@@ -2140,6 +2143,7 @@ export interface Database {
           pep_signed?: boolean
           order_id?: string | null
           doc_path?: string | null
+          paid_until?: string | null
           source?: string
           notes?: string
           created_at?: string
@@ -2170,6 +2174,7 @@ export interface Database {
           pep_signed?: boolean
           order_id?: string | null
           doc_path?: string | null
+          paid_until?: string | null
           source?: string
           notes?: string
           created_at?: string

@@ -44,7 +44,20 @@
     "app/franchize/components/RentalQrCode.tsx",
     "app/franchize/[slug]/rental/[id]/page.tsx",
     "app/franchize/lib/bike-rentals-report.ts",
-    "app/franchize/[slug]/bikes/BikeReportButton.tsx"
+    "app/franchize/[slug]/bikes/BikeReportButton.tsx",
+    "app/franchize/lib/storage.ts",
+    "app/franchize/lib/storage-config.ts",
+    "app/franchize/lib/storage-bike-report.ts",
+    "app/franchize/server-actions/storage-bikes.ts",
+    "app/franchize/[slug]/storage/page.tsx",
+    "app/franchize/[slug]/storage/StorageWallClient.tsx",
+    "app/franchize/[slug]/storage/StorageReportButton.tsx",
+    "app/franchize/[slug]/storage/StorageBikeStoryClient.tsx",
+    "app/franchize/[slug]/storage/StorageOrderForm.tsx",
+    "app/franchize/[slug]/storage/new/page.tsx",
+    "app/franchize/[slug]/storage/[bikeId]/page.tsx",
+    "app/franchize/create/CreateFranchizeForm.tsx",
+    "app/franchize/components/WinterStorageModal.tsx"
   ],
   "exclude": [
     "node_modules",

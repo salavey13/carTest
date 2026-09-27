@@ -31,7 +31,7 @@ export default async function FranchizeStoragePage({ params }: FranchizeStorageP
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)} items={items} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={items.map((item) => item.category)} sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-5">
         <FranchizeErrorBoundary
           resetKey={slug}
@@ -43,6 +43,8 @@ export default async function FranchizeStoragePage({ params }: FranchizeStorageP
             initialSlug={resolvedSlug}
             crewName={crew.name}
             contactsPhone={crew.contacts.phone || ""}
+            storageConfig={crew.storage}
+            serviceEnabled={crew.storage?.enabled ?? true}
           />
         </FranchizeErrorBoundary>
       </FranchizePageShell>

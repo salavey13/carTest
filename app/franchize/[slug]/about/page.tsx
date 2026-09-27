@@ -146,7 +146,7 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
-        sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath)}
+        sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })}
       />
       <FranchizePageShell theme={crew.theme} className="pb-14">
         <FranchizeHero

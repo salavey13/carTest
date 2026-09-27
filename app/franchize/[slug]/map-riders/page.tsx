@@ -81,7 +81,7 @@ export default async function MapRidersPage(
       <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_map_riders" />
       {/* Wrap header in z-index container to isolate from map */}
       <div className="relative z-10">
-        <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath)} items={items} showRail={false} />
+        <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} showRail={false} />
       </div>
       <MapRidersClient crew={crew} slug={crewSlug} items={items} wallParams={wallParams} />
     </main>
