@@ -197,13 +197,26 @@ export async function POST(request: NextRequest) {
       const knownRaw = meta.last_known_odometer ?? meta.odometer_before_hint;
       const known = typeof knownRaw === "number" && Number.isFinite(knownRaw) ? knownRaw : null;
       const belowKnown = known != null && startValue < known;
-      const cas = await casUpdate((freshMeta) => ({
-        ...freshMeta,
-        odometer_before: startValue,
-        odometer_before_source: actorKind,
-        odometer_before_at: new Date().toISOString(),
-        ...(belowKnown ? { odometer_before_below_known: true } : {}),
-      }));
+      // R3 hardening: the freeze can land between the pre-check and a CAS
+      // retry — the merge builder re-checks the freeze on the FRESH metadata
+      // and bails via a sentinel (mapped to the same human 409 below).
+      class FrozenMidRetryError extends Error {}
+      const cas = await casUpdate((freshMeta) => {
+        const freshFreeze = freshMeta.pickup_freeze as { frozen_at?: unknown } | null | undefined;
+        if (freshFreeze?.frozen_at) throw new FrozenMidRetryError();
+        return {
+          ...freshMeta,
+          odometer_before: startValue,
+          odometer_before_source: actorKind,
+          odometer_before_at: new Date().toISOString(),
+          ...(belowKnown ? { odometer_before_below_known: true } : {}),
+        };
+      }).catch((err) => {
+        if (err instanceof FrozenMidRetryError) {
+          return { ok: false, conflict: true, error: "Выдача уже зафиксирована — стартовый одометр изменить нельзя." };
+        }
+        throw err;
+      });
       if (!cas.ok) {
         if (cas.conflict) {
           return NextResponse.json({ success: false, error: cas.error }, { status: 409 });

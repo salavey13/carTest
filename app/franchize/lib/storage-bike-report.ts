@@ -41,7 +41,7 @@ export interface StorageReportInput {
   botUsername?: string;
   /** Absolute wall URL (server action builds the startapp link — it knows the slug). */
   wallUrl?: string;
-  /** Absolute public contract URL (server action resolves via storageDocPublicUrl). */
+  /** Absolute contract URL — a 1h SIGNED url minted by the gated server action. */
   docUrl?: string;
   /** injectable clock (tests); defaults to Date.now() */
   nowMs?: number;
@@ -202,7 +202,9 @@ export function buildStorageBikeReport(input: StorageReportInput): StorageReport
   L.push(`${docIndex}. Стена «Хранение» в мини-аппе: ${input.wallUrl || `t.me/${bot}/app`}`);
   if (input.docUrl) {
     docIndex += 1;
+    // R3: the url is a 1-hour signed link (PII inside) — say so in the report.
     L.push(`${docIndex}. Договор хранения (DOCX): ${input.docUrl}`);
+    L.push(`   ссылка действует 1 час — свежую выдаст кнопка «Договор» в карточке`);
   }
 
   const day = new Date(now + 3 * 60 * 60 * 1000);

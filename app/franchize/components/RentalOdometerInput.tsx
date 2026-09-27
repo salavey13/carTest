@@ -375,7 +375,6 @@ function OdometerEditor({
   const [savedValue, setSavedValue] = useState<number | null>(initialEnd);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestRef = useRef<{ value: string; sentAt: number }>({ value: initialEnd != null ? String(initialEnd) : "", sentAt: 0 });
 
   const parsed = (() => {
     const trimmed = endValue.trim();
@@ -499,7 +498,6 @@ function OdometerEditor({
     setSaveState("saving");
     pendingRef.current = value;
     debounceRef.current = setTimeout(() => {
-      latestRef.current.sentAt = Date.now();
       pendingRef.current = undefined;
       runPersist(value);
     }, 700);

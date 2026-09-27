@@ -5228,10 +5228,19 @@ export async function submitFranchizeOrderNotification(input: unknown): Promise<
   const payload = parsed.data;
   // Testdrive doc rule (2026-09-11): passport OR license required — validated
   // before any writes so the renter can fix the data and retry.
-  assertTestdriveIdentityDocs(payload);
-  // Storage doc rule (2026-09-27): owner passport + bike identity + estimated
-  // value — same fail-fast contract, human toast messages.
-  assertStorageIdentityDocs(payload);
+  // Boss R3: convert the validation throw into a clean reply (same as the
+  // live checkout path) — an escaped throw becomes a masked action error.
+  try {
+    assertTestdriveIdentityDocs(payload);
+    // Storage doc rule (2026-09-27): owner passport + bike identity + estimated
+    // value — same fail-fast contract, human toast messages.
+    assertStorageIdentityDocs(payload);
+  } catch (gateError) {
+    if (gateError instanceof FranchizeOrderDocValidationError) {
+      return { success: false, error: gateError.message };
+    }
+    throw gateError;
+  }
   // Storage config gate: crew disabled the service → no new storage orders.
   if (payload.flowType === "storage") {
     await assertStorageServiceEnabled(payload.slug);
@@ -6215,13 +6224,19 @@ export async function createFranchizeOrderCheckout(
   // Testdrive doc rule (2026-09-11): passport OR license required — run BEFORE
   // the idempotency/notification-log writes so the renter can fix the data and
   // resubmit the SAME orderId (a pending log row would swallow the retry).
-  assertTestdriveIdentityDocs(payload);
-  // Boss review R2 #3: the storage IDENTITY gate belongs on the LIVE checkout
-  // path too — it previously ran only in submitFranchizeOrderNotification
-  // (the retry path), so a crafted call could mint a storage contract (and a
-  // wall row) with empty passport rows. Same pre-write spot as the gates
-  // above so a fixed resubmission of the SAME orderId is never swallowed.
-  assertStorageIdentityDocs(payload);
+  // Boss R3 (required fix): the identity asserts THROW FranchizeOrderDoc-
+  // ValidationError — unwrapped, Next.js masks the throw and the renter sees
+  // a misleading «соединение прервано» toast. Catch + convert, same as the
+  // storage config gate below.
+  try {
+    assertTestdriveIdentityDocs(payload);
+    assertStorageIdentityDocs(payload);
+  } catch (gateError) {
+    if (gateError instanceof FranchizeOrderDocValidationError) {
+      return { success: false, error: gateError.message };
+    }
+    throw gateError;
+  }
   // Storage config gate (v3): crew disabled «Зимнее хранение» → reject before
   // the idempotency log would swallow the retry (same pre-write spot). The
   // throw is OUTSIDE the try below, so surface the human phrase directly.

@@ -174,41 +174,69 @@ export const franchizeOrderHandler: WebhookHandler = {
     const rentalAlreadyExisted = Boolean(existingRental);
     const existingRentalMetadata = (existingRental?.metadata ?? null) as Record<string, any> | null;
 
-    const { error: upsertError } = await supabase.from("rentals").upsert(
-      {
-        rental_id: rentalId,
-        user_id: userId,
-        vehicle_id: vehicle.id,
-        owner_id: vehicle.owner_id,
-        status: "confirmed",
-        payment_status: "interest_paid",
-        interest_amount: interestStars,
-        total_cost: totalRub,
-        agreed_start_date: metadata?.rentalStartDate || new Date().toISOString(),
-        agreed_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
-        requested_start_date: metadata?.rentalStartDate || new Date().toISOString(),
-        requested_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
-        metadata: {
-          ...(metadata || {}),
-          ...splitFromCart,
-          ...subrenterSnapshot,
-          ...equipmentSnapshot,
-          ...odometerHintSnapshot,
-          // Retry: the live row's metadata (renter-set odometer, freeze,
-          // closure data…) beats the stale invoice snapshot.
-          ...(rentalAlreadyExisted && existingRentalMetadata ? existingRentalMetadata : {}),
-          source: "franchize_order",
-          franchise_slug: slug,
-          hot_client: true,
-          hold_confirmed_at: new Date().toISOString(),
-          invoice_id: invoice.id,
+    if (rentalAlreadyExisted) {
+      // ── Retry path (boss R1 #2 + R3): refresh ONLY the metadata ──
+      // A blind upsert would also overwrite the SCALARS — a very late
+      // redelivery could demote an active/completed rental back to
+      // «confirmed» and rewind the agreed dates. The live row's business
+      // state is authoritative; the metadata merge below refreshes the
+      // invoice-owned keys while the renter/crew keys win.
+      const { error: retryUpdateError } = await supabase
+        .from("rentals")
+        .update({
+          metadata: {
+            ...(metadata || {}),
+            ...splitFromCart,
+            ...subrenterSnapshot,
+            ...equipmentSnapshot,
+            ...odometerHintSnapshot,
+            // The live row's metadata (renter-set odometer, freeze, closure
+            // data…) beats the stale invoice snapshot.
+            ...(existingRentalMetadata ?? {}),
+            source: "franchize_order",
+            franchise_slug: slug,
+            hot_client: true,
+            invoice_id: invoice.id,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("rental_id", rentalId);
+      if (retryUpdateError) {
+        throw new Error(`franchize_order retry metadata update failed: ${retryUpdateError.message}`);
+      }
+    } else {
+      const { error: upsertError } = await supabase.from("rentals").upsert(
+        {
+          rental_id: rentalId,
+          user_id: userId,
+          vehicle_id: vehicle.id,
+          owner_id: vehicle.owner_id,
+          status: "confirmed",
+          payment_status: "interest_paid",
+          interest_amount: interestStars,
+          total_cost: totalRub,
+          agreed_start_date: metadata?.rentalStartDate || new Date().toISOString(),
+          agreed_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
+          requested_start_date: metadata?.rentalStartDate || new Date().toISOString(),
+          requested_end_date: metadata?.rentalEndDate || new Date(Date.now() + 7 * 86400000).toISOString(),
+          metadata: {
+            ...(metadata || {}),
+            ...splitFromCart,
+            ...subrenterSnapshot,
+            ...equipmentSnapshot,
+            ...odometerHintSnapshot,
+            source: "franchize_order",
+            franchise_slug: slug,
+            hot_client: true,
+            hold_confirmed_at: new Date().toISOString(),
+            invoice_id: invoice.id,
+          },
         },
-      },
-      { onConflict: "rental_id" },
-    );
-
-    if (upsertError) {
-      throw new Error(`franchize_order rental upsert failed: ${upsertError.message}`);
+        { onConflict: "rental_id" },
+      );
+      if (upsertError) {
+        throw new Error(`franchize_order rental upsert failed: ${upsertError.message}`);
+      }
     }
 
     // ── 2026-09-28: non-fatal post-creation side effects for the XTR path ──

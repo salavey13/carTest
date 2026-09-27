@@ -224,8 +224,8 @@ describe("webhook XTR-path salary parity + side effects", () => {
 
   it("boss R1 #2: retry-safe — existing metadata wins, side effects skip on redelivery", () => {
     expect(hook.includes("const rentalAlreadyExisted = Boolean(existingRental);")).toBe(true);
-    expect(hook.includes("...(rentalAlreadyExisted && existingRentalMetadata ? existingRentalMetadata : {}),")).toBe(true);
-    expect(hook.includes("if (!rentalAlreadyExisted) {")).toBe(true);
+    expect(hook.includes("...(existingRentalMetadata ?? {}),")).toBe(true);
+    expect(hook.includes("} else {\n      const { error: upsertError } = await supabase.from(\"rentals\").upsert(")).toBe(true);
     // the fetch-first pre-check exists right before the upsert
     const preIdx = hook.indexOf('from("rentals")');
     expect(preIdx).toBeGreaterThan(-1);
@@ -329,7 +329,7 @@ describe("winter storage boss-review fixes (R2)", () => {
   it("#3+#5+#8: storage checkout gates identity, recomputes money server-side", () => {
     const runtime = read("app/franchize/actions-runtime.ts");
     // identity gate on the live checkout path (next to the testdrive gate)
-    expect(runtime.includes("assertStorageIdentityDocs(payload);\n  // Storage config gate")).toBe(true);
+    expect(runtime.includes("assertStorageIdentityDocs(payload);")).toBe(true);
     // server-recomputed contract + wall totals
     expect(runtime.includes("const storageTotalRub = storageMonthlyRub > 0 && storageSeasonMonths > 0")).toBe(true);
     expect(runtime.includes("total_price_rub: stMonthlyRub > 0 && stMonths > 0")).toBe(true);
@@ -343,5 +343,44 @@ describe("winter storage boss-review fixes (R2)", () => {
     expect(mig.includes("where order_id is not null")).toBe(true);
     const runtime = read("app/franchize/actions-runtime.ts");
     expect(runtime.includes("stDuplicateId")).toBe(true);
+  });
+});
+
+describe("boss R3 follow-ups", () => {
+  it("identity-doc gate throws are converted into clean replies on BOTH checkout paths", () => {
+    const runtime = read("app/franchize/actions-runtime.ts");
+    const live = runtime.slice(runtime.indexOf("export async function createFranchizeOrderCheckout"), runtime.indexOf("const checkFranchizeAvailabilitySchema"));
+    expect((live.match(/assertStorageIdentityDocs\(payload\);/g) ?? []).length).toBe(1);
+    expect(live.includes("catch (gateError)")).toBe(true);
+    expect(live.indexOf("assertTestdriveIdentityDocs(payload);") < live.indexOf("const { data: existingCheckout }")).toBe(true);
+  });
+
+  it("webhook retry refreshes ONLY metadata (no scalar demotion of status/dates)", () => {
+    const hook = read("app/webhook-handlers/franchize-order.ts");
+    expect(hook.includes("franchize_order retry metadata update failed")).toBe(true);
+    expect(hook.includes("if (rentalAlreadyExisted) {")).toBe(true);
+  });
+
+  it("start-odometer CAS re-checks the freeze on fresh metadata (mid-retry freeze)", () => {
+    const route = read("app/api/franchize/rental-odometer/route.ts");
+    expect(route.includes("FrozenMidRetryError")).toBe(true);
+  });
+
+  it("rentals updated_at trigger migration exists (CAS is airtight)", () => {
+    const mig = read("supabase/migrations/20260928110000_rentals_updated_at_trigger.sql");
+    expect(mig.includes("create trigger trg_rentals_touch_updated_at")).toBe(true);
+    expect(mig.includes("before update on public.rentals")).toBe(true);
+  });
+
+  it("odometer editor has no dead latestRef; report button sends actorUserId", () => {
+    const input = read("app/franchize/components/RentalOdometerInput.tsx");
+    expect(input.includes("latestRef")).toBe(false);
+    const report = read("app/franchize/[slug]/storage/StorageReportButton.tsx");
+    expect(report.includes("actorUserId: dbUser?.user_id,")).toBe(true);
+  });
+
+  it("storage report marks the 1-hour signed link", () => {
+    const report = read("app/franchize/lib/storage-bike-report.ts");
+    expect(report.includes("ссылка действует 1 час")).toBe(true);
   });
 });

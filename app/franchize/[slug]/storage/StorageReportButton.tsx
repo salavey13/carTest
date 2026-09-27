@@ -19,6 +19,7 @@ import { Check, FileDown, Loader2, X } from "lucide-react";
 
 import { getStorageBikeReportAction } from "@/app/franchize/server-actions/storage-bikes";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
+import { useAppContext } from "@/contexts/AppContext";
 
 interface StorageReportButtonProps {
   slug: string;
@@ -155,6 +156,7 @@ const CLIPBOARD_MAX_CHARS = 256 * 1024;
 type ButtonState = "idle" | "loading" | "done" | "failed";
 
 export function StorageReportButton({ slug, bikeId, bikeLabel, className = "" }: StorageReportButtonProps) {
+  const { dbUser } = useAppContext(); // boss R3: the claimed id feeds the initData fallback ladder
   const [state, setState] = useState<ButtonState>("idle");
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -180,6 +182,7 @@ export function StorageReportButton({ slug, bikeId, bikeLabel, className = "" }:
         const result = await getStorageBikeReportAction({
           slug,
           bikeId,
+          actorUserId: dbUser?.user_id,
           initData: getTelegramInitData(),
         });
         if (!result.success || !result.data) {
