@@ -281,6 +281,15 @@ export function computeStaticFastTarget(param: string): string | null {
     return null;
   }
 
+  // storage_<slug> — the «Зимнее хранение» owner wall (2026-09-27). The page
+  // itself adapts: staff sees the season board, a logged-in owner his bikes,
+  // a guest the offer — so no auth data is needed to route (self-contained).
+  if (param.startsWith("storage_")) {
+    const slug = param.substring(8);
+    if (slug && /^[A-Za-z0-9_-]{1,64}$/.test(slug)) return `/franchize/${slug}/storage`;
+    return null;
+  }
+
   // crew_<slug> / crew_<slug>_join_crew — self-contained.
   if (param.startsWith("crew_")) {
     const content = param.substring(5);

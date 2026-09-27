@@ -2040,6 +2040,145 @@ export interface Database {
           },
         ]
       }
+      // 20260927120000_winter_storage.sql — hand-added strict shapes (the
+      // migration is manual for the boss; after it lands, `npm run
+      // gen:db-types` regenerates these from the live spec verbatim).
+      storage_bike_events: {
+        Row: {
+          id: number
+          bike_id: string
+          type: string
+          status: string | null
+          actor: string
+          actor_name: string
+          message: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          bike_id: string
+          type?: string
+          status?: string | null
+          actor?: string
+          actor_name?: string
+          message?: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          bike_id?: string
+          type?: string
+          status?: string | null
+          actor?: string
+          actor_name?: string
+          message?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_bike_events_bike_id_fkey"
+            columns: ["bike_id"]
+            isOneToOne: false
+            referencedRelation: "storage_bikes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_bikes: {
+        Row: {
+          id: string
+          crew_slug: string
+          owner_user_id: string | null
+          owner_name: string
+          owner_phone: string
+          make: string
+          model: string
+          reg_number: string
+          vin: string
+          bike_year: number | null
+          color: string
+          mileage_km: number | null
+          accessories: string
+          estimated_value_rub: number
+          monthly_price_rub: number
+          total_price_rub: number
+          storage_address: string
+          notice_address: string
+          season_start: string | null
+          season_end: string | null
+          status: string
+          pep_signed: boolean
+          order_id: string | null
+          doc_path: string | null
+          source: string
+          notes: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          crew_slug: string
+          owner_user_id?: string | null
+          owner_name?: string
+          owner_phone?: string
+          make?: string
+          model?: string
+          reg_number?: string
+          vin?: string
+          bike_year?: number | null
+          color?: string
+          mileage_km?: number | null
+          accessories?: string
+          estimated_value_rub?: number
+          monthly_price_rub?: number
+          total_price_rub?: number
+          storage_address?: string
+          notice_address?: string
+          season_start?: string | null
+          season_end?: string | null
+          status?: string
+          pep_signed?: boolean
+          order_id?: string | null
+          doc_path?: string | null
+          source?: string
+          notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          crew_slug?: string
+          owner_user_id?: string | null
+          owner_name?: string
+          owner_phone?: string
+          make?: string
+          model?: string
+          reg_number?: string
+          vin?: string
+          bike_year?: number | null
+          color?: string
+          mileage_km?: number | null
+          accessories?: string
+          estimated_value_rub?: number
+          monthly_price_rub?: number
+          total_price_rub?: number
+          storage_address?: string
+          notice_address?: string
+          season_start?: string | null
+          season_end?: string | null
+          status?: string
+          pep_signed?: boolean
+          order_id?: string | null
+          doc_path?: string | null
+          source?: string
+          notes?: string
+          created_at?: string
+          updated_at?: string
+        }
+        // No owner_user_id FK on purpose (migration 20260927120000): checkout
+        // rows can carry a non-users id — the column is a soft reference.
+        Relationships: []
+      }
       // NOT exposed in the REST spec (private schema or dropped) — kept loose:
       sale_contract_artifacts: LooseSupabaseTable
       service_types: LooseSupabaseTable

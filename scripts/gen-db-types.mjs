@@ -83,6 +83,8 @@ const STRICT_TABLES = [
   "salary_calculations",
   "salary_plans",
   "sale_contract_artifacts",
+  "storage_bike_events",
+  "storage_bikes",
   "subrent_contract_artifacts",
   "testdrive_contract_artifacts",
   "user_purchases",

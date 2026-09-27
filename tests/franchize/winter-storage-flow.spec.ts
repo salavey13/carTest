@@ -172,12 +172,16 @@ describe("storage flow wiring (actions-runtime)", () => {
     expect(gate).toBeGreaterThan(-1);
   });
 
-  it("notifications: ❄️ winter-storage labels and no rent-template/analytics-deeplink path", () => {
+  it("notifications: ❄️ winter-storage labels, no rent-template path, wall deeplink", () => {
     expect(src.includes('isStorageFlow ? "❄️"')).toBe(true);
     expect(src.includes('"Новый заказ на зимнее хранение"')).toBe(true);
     expect(src.includes('"Заявка на зимнее хранение"')).toBe(true);
     expect(src.includes('flowType !== "mixed" && flowType !== "storage"')).toBe(true);
-    expect(src.includes("// Winter storage has no analytics wall yet — deeplinks would 404.")).toBe(true);
+    // 2026-09-27 iteration: the dead-end comment is GONE — the «Хранение»
+    // wall exists, so the crew notification deep-links into it instead.
+    expect(src.includes("deeplinks would 404")).toBe(false);
+    expect(src.includes("storageStartParam(payload.slug)")).toBe(true);
+    expect(src.includes("Открыть «Хранение»")).toBe(true);
   });
 });
 
@@ -195,6 +199,9 @@ describe("catalog: «Зимнее Хранение» pill + «Место хра�
     expect(src.includes("подзарядка аккумулятора")).toBe(true);
     expect(src.includes("от 2 000 ₽ / месяц")).toBe(true);
     expect(src.includes("ПЭП")).toBe(true);
-    expect(src.includes("Оставить заявку")).toBe(true);
+    // 2026-09-27 iteration: primary CTA is now the ONLINE checkout, the
+    // manager link stays as the human fallback.
+    expect(src.includes("Оформить онлайн")).toBe(true);
+    expect(src.includes("Написать менеджеру")).toBe(true);
   });
 });

@@ -24,6 +24,7 @@ import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
 import { formatStorageMonthsLabel as storageSeasonMonthsLabel, storageValidUntilISO } from "@/app/franchize/lib/storage-season";
+import { storageMonthsCount, storageSeasonDateToIso, storageStartParam } from "@/app/franchize/lib/storage";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
@@ -3299,6 +3300,103 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
+    // ── STORAGE flow: persist the season row (2026-09-27, «Хранение» wall) ──
+    // The contract used to vanish after the TG notification — the owner had
+    // no way to track his bike. The checkout now lands a storage_bikes row
+    // (+ the created event) so /franchize/<slug>/storage can track every
+    // move. Guarded end-to-end: a missing table (the migration is manual)
+    // logs and continues — the checkout itself has already succeeded by now.
+    if (isStorageFlow) {
+      try {
+        const stDetails = (payload.storageDetails ?? {}) as {
+          bikeMake?: string;
+          bikeRegNumber?: string;
+          bikeColor?: string;
+          bikeVin?: string;
+          bikeYear?: string;
+          bikeMileage?: string;
+          bikeAccessories?: string;
+          bikeEstimatedValueRub?: number;
+          monthlyPriceRub?: number;
+          storageAddress?: string;
+          noticeAddress?: string;
+        };
+        const stDoc = bikeDocs.find((d) => d.bikeId === "storage");
+        // Web checkouts from an anonymous browser carry a non-numeric
+        // telegramUserId ("manual-order") — only a real TG chat id claims
+        // the owner link (the wall shows the owner his own bikes).
+        const stOwnerChatId = /^\d+$/.test(String(payload.telegramUserId ?? ""))
+          ? String(payload.telegramUserId)
+          : null;
+        const stSeasonStart = storageSeasonDateToIso(payload.rentalStartDate || payload.time);
+        const stSeasonEnd = storageSeasonDateToIso(payload.rentalEndDate);
+        const stMonths = storageMonthsCount(stSeasonStart, stSeasonEnd);
+        const stMonthlyRub = Math.round(Number(stDetails.monthlyPriceRub ?? 0))
+          || (stMonths > 0 ? Math.round((payload.totalAmount || 0) / stMonths) : 0);
+
+        // Idempotency: the checkout retry path (failed notification row) can
+        // reach the doc builder twice — one season row per orderId, ever.
+        const { data: stExisting } = await supabaseAdmin
+          .from("storage_bikes")
+          .select("id")
+          .eq("crew_slug", payload.slug)
+          .eq("order_id", payload.orderId)
+          .maybeSingle();
+        if (!stExisting) {
+          const { data: stRow, error: stErr } = await supabaseAdmin
+            .from("storage_bikes")
+            .insert({
+              crew_slug: payload.slug,
+              owner_user_id: stOwnerChatId,
+              owner_name: payload.recipient || "",
+              owner_phone: docIdentity.renterPhone || payload.phone || "",
+              make: stDetails.bikeMake || "",
+              model: "",
+              reg_number: stDetails.bikeRegNumber || "",
+              vin: stDetails.bikeVin || "",
+              bike_year: Number(stDetails.bikeYear) > 0 ? Number(stDetails.bikeYear) : null,
+              color: stDetails.bikeColor || "",
+              mileage_km: Number(String(stDetails.bikeMileage ?? "").replace(/\D/g, "")) > 0
+                ? Number(String(stDetails.bikeMileage).replace(/\D/g, ""))
+                : null,
+              accessories: stDetails.bikeAccessories || "",
+              estimated_value_rub: Math.round(Number(stDetails.bikeEstimatedValueRub ?? 0)),
+              monthly_price_rub: stMonthlyRub,
+              total_price_rub: Math.round(payload.totalAmount || 0),
+              storage_address: stDetails.storageAddress || "",
+              notice_address: stDetails.noticeAddress || payload.registrationAddress || "",
+              season_start: stSeasonStart,
+              season_end: stSeasonEnd,
+              status: "requested",
+              pep_signed: Boolean(pepMeta),
+              order_id: payload.orderId,
+              doc_path: (stDoc as { storagePath?: string } | undefined)?.storagePath || null,
+              source: "checkout",
+            })
+            .select("id")
+            .single();
+          if (stErr) throw new Error(stErr.message);
+          const stBikeId = String((stRow as { id: string } | null)?.id ?? "");
+          if (stBikeId) {
+            await supabaseAdmin.from("storage_bike_events").insert({
+              bike_id: stBikeId,
+              type: "created",
+              status: "requested",
+              actor: "system",
+              actor_name: "Оформление онлайн",
+              message: `Заявка оформлена онлайн (заказ #${payload.orderId})`,
+            });
+            logger.info("[franchize] storage row created", { orderId: payload.orderId, bikeId: stBikeId });
+          }
+        }
+      } catch (stRowErr) {
+        logger.warn("[franchize] storage row persist failed (non-fatal):", {
+          orderId: payload.orderId,
+          error: stRowErr instanceof Error ? stRowErr.message : String(stRowErr),
+        });
+      }
+    }
+
     const adminChatId = process.env.ADMIN_CHAT_ID;
     if (!adminChatId) {
       throw new Error("ADMIN_CHAT_ID not configured");
@@ -3395,7 +3493,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     if (isServiceFlow) pushAnalytics("🔧 Сервис:", "services");
     else if (isSaleFlow) pushAnalytics("🛍️ Продажа:", "sales");
     else if (isStorageFlow) {
-      // Winter storage has no analytics wall yet — deeplinks would 404.
+      // 2026-09-27: the «Хранение» wall exists now — the crew lands right on
+      // the season board instead of a dead 404 deeplink.
+      const storageHref = crewBotAppLink(crewBotUsername, storageStartParam(payload.slug));
+      if (storageHref) {
+        notificationParts.push(
+          ``,
+          `🧊 Стена хранения: <a href="${storageHref}">Открыть «Хранение»</a>`,
+        );
+      }
     }
     else pushAnalytics("🔗 Аренда:", "rentals");
 
@@ -3471,6 +3577,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}`
               : "",
         ].filter(Boolean).join("\n");
+        // 2026-09-27: storage owners get their own tracking wall button —
+        // every move on the bike now lands in this chat as well.
+        if (isStorageFlow) {
+          const storageHref = crewBotAppLink(crewBotUsername, storageStartParam(payload.slug));
+          if (storageHref) {
+            userButtons = [[{ text: "🧊 Моё хранение", url: storageHref }]];
+          }
+        }
       }
 
       try {

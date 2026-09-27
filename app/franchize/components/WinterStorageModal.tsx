@@ -11,6 +11,7 @@
 // ПЭП п. 10.2); the flowType="storage" checkout generates it server-side.
 
 import { useMemo } from "react";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -44,9 +45,11 @@ type WinterStorageModalProps = {
   telegramHandle: string;
   /** Fallback phone for the «Позвонить» secondary link. */
   phone: string;
+  /** Crew slug — enables the self-service online checkout CTA. */
+  slug?: string;
 };
 
-export function WinterStorageModal({ open, onClose, telegramHandle, phone }: WinterStorageModalProps) {
+export function WinterStorageModal({ open, onClose, telegramHandle, phone, slug }: WinterStorageModalProps) {
   const managerHref = useMemo(() => {
     const handle = telegramHandle.replace("@", "").trim();
     return handle ? `https://t.me/${handle}` : "";
@@ -115,23 +118,33 @@ export function WinterStorageModal({ open, onClose, telegramHandle, phone }: Win
 
         {/* CTA row */}
         <div className="flex flex-col gap-2 sm:flex-row">
+          {slug ? (
+            <Link
+              href={`/franchize/${slug}/storage/new`}
+              onClick={onClose}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+            >
+              <FileSignature className="h-4 w-4" aria-hidden="true" />
+              Оформить онлайн
+            </Link>
+          ) : null}
           {managerHref ? (
             <a
               href={managerHref}
               target="_blank"
               rel="noopener noreferrer"
               onClick={onClose}
-              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--dialog-border)] px-4 py-2.5 text-sm font-bold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dialog-border)]"
             >
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              Оставить заявку
+              Написать менеджеру
             </a>
           ) : null}
           {phoneHref ? (
             <a
               href={phoneHref}
               onClick={onClose}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-[var(--dialog-border)] px-4 py-2.5 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dialog-border)]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--dialog-border)] px-4 py-2.5 text-sm font-semibold transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dialog-border)]"
             >
               {phone}
             </a>

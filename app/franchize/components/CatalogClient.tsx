@@ -1824,6 +1824,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         onClose={() => setWinterStorageOpen(false)}
         telegramHandle={crew.contacts.telegram || ""}
         phone={crew.contacts.phone || ""}
+        slug={resolvedSlug}
       />
 
       <ItemModal
