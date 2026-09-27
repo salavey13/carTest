@@ -29,6 +29,13 @@ export const franchizeOrderHandler: WebhookHandler = {
     if (!firstItemId) {
       throw new Error(`franchize_order metadata missing cart item for invoice ${invoice.id}`);
     }
+    // Documented gap (boss R1 #8): the XTR path upserts ONE rental bound to
+    // cartLines[0] — the cash/card path generates one rental per bike line
+    // instead. Multi-bike XTR carts are structurally unsupported: the second
+    // bike's money lands in total_cost with no rental row and its gear perks
+    // never reach the salary engine. UI carts are single-bike in practice
+    // (cart allows it, the invoice flow does not) — if that changes, spawn a
+    // rental per line here.
 
     const { data: vehicle, error: vehicleError } = await supabase
       .from("cars")
@@ -151,6 +158,22 @@ export const franchizeOrderHandler: WebhookHandler = {
       },
     });
 
+    // ── 2026-09-28 (boss R1 #2): retry-safe upsert ──
+    // Telegram re-delivers successful_payment at-least-once, and the admin
+    // rental-tester can replay the invoice. A blind upsert REPLACED metadata
+    // with the invoice snapshot — a late retry silently erased the renter's
+    // odometer_before / odometer_after_draft / pickup_freeze written after
+    // the first delivery. Fetch-first: when the row exists, the EXISTING
+    // metadata wins (the invoice refreshes only the fields it owns) and the
+    // post-creation side effects (todos + achievements) are skipped.
+    const { data: existingRental } = await supabase
+      .from("rentals")
+      .select("rental_id, metadata")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+    const rentalAlreadyExisted = Boolean(existingRental);
+    const existingRentalMetadata = (existingRental?.metadata ?? null) as Record<string, any> | null;
+
     const { error: upsertError } = await supabase.from("rentals").upsert(
       {
         rental_id: rentalId,
@@ -171,6 +194,9 @@ export const franchizeOrderHandler: WebhookHandler = {
           ...subrenterSnapshot,
           ...equipmentSnapshot,
           ...odometerHintSnapshot,
+          // Retry: the live row's metadata (renter-set odometer, freeze,
+          // closure data…) beats the stale invoice snapshot.
+          ...(rentalAlreadyExisted && existingRentalMetadata ? existingRentalMetadata : {}),
           source: "franchize_order",
           franchise_slug: slug,
           hot_client: true,
@@ -191,37 +217,42 @@ export const franchizeOrderHandler: WebhookHandler = {
     //     rental page degraded to a static checklist;
     // (2) renter self-service achievement «Сам себе оператор» (+ streaks,
     //     combo) — the web renter earns his own badges now.
-    try {
-      const [{ data: crewRow }, { data: carRow }] = await Promise.all([
-        supabase.from("crews").select("id").eq("slug", slug).maybeSingle(),
-        supabase.from("cars").select("crew_id").eq("id", vehicle.id).maybeSingle(),
-      ]);
-      const crewUuid = crewRow?.id ?? carRow?.crew_id ?? null;
-      if (crewUuid) {
-        const [{ createRentalVerificationTodos }, { ensureRentalEquipmentReturnTodosForWebhook }] = await Promise.all([
-          import("@/app/franchize/server-actions/rental-verification-todos"),
-          import("@/app/franchize/server-actions/rentals"),
+    // Boss R1 #2: BOTH are skipped on a webhook retry (the row already
+    // existed) — the todo creators are idempotent anyway, but the
+    // achievement counter must not inflate per redelivery.
+    if (!rentalAlreadyExisted) {
+      try {
+        const [{ data: crewRow }, { data: carRow }] = await Promise.all([
+          supabase.from("crews").select("id").eq("slug", slug).maybeSingle(),
+          supabase.from("cars").select("crew_id").eq("id", vehicle.id).maybeSingle(),
         ]);
-        await Promise.allSettled([
-          createRentalVerificationTodos(rentalId, crewUuid, userId),
-          ensureRentalEquipmentReturnTodosForWebhook(rentalId, crewUuid),
-        ]);
-      } else {
-        console.warn("[franchize-order] crew id not resolvable — todos skipped");
+        const crewUuid = crewRow?.id ?? carRow?.crew_id ?? null;
+        if (crewUuid) {
+          const [{ createRentalVerificationTodos }, { ensureRentalEquipmentReturnTodosForWebhook }] = await Promise.all([
+            import("@/app/franchize/server-actions/rental-verification-todos"),
+            import("@/app/franchize/server-actions/rentals"),
+          ]);
+          await Promise.allSettled([
+            createRentalVerificationTodos(rentalId, crewUuid, userId),
+            ensureRentalEquipmentReturnTodosForWebhook(rentalId, crewUuid),
+          ]);
+        } else {
+          console.warn("[franchize-order] crew id not resolvable — todos skipped");
+        }
+      } catch (todoErr) {
+        console.error("[franchize-order] todo spawn failed (non-fatal):", todoErr);
       }
-    } catch (todoErr) {
-      console.error("[franchize-order] todo spawn failed (non-fatal):", todoErr);
-    }
-    try {
-      const { grantRenterWebRentCreated } = await import(
-        "@/app/franchize/server-actions/renter-self-service-achievements"
-      );
-      const ach = await grantRenterWebRentCreated({ userId, slug, rentalId });
-      if (ach.granted.length > 0) {
-        console.log(`[franchize-order] renter achievements granted: ${ach.granted.join(", ")}`);
+      try {
+        const { grantRenterWebRentCreated } = await import(
+          "@/app/franchize/server-actions/renter-self-service-achievements"
+        );
+        const ach = await grantRenterWebRentCreated({ userId, slug, rentalId });
+        if (ach.granted.length > 0) {
+          console.log(`[franchize-order] renter achievements granted: ${ach.granted.join(", ")}`);
+        }
+      } catch (achErr) {
+        console.error("[franchize-order] renter achievements failed (non-fatal):", achErr);
       }
-    } catch (achErr) {
-      console.error("[franchize-order] renter achievements failed (non-fatal):", achErr);
     }
 
     const documentKey = `${metadata.flowType === "sale" || metadata.flowType === "mixed" ? "sale" : "rental"}-${slug}-${orderId || ""}`;

@@ -111,7 +111,8 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     // 177 → 178: 20260927120000_winter_storage.sql (зимнее хранение: storage_bikes + storage_bike_events — стена для владельцев, трекинг каждого перемещения, RLS owner-read)
     // 178 → 179: 20260927130000_winter_storage_v2.sql (зимнее хранение v2: paid_until + события payment/owner_linked — прозрачность владельца на уровне Мотопарка)
     // 179 → 180: 20260927140000_winter_storage_v3.sql (зимнее хранение v3: фотофиксация — photo_paths jsonb на событиях + тип 'photo' + публичный бакет storagepix)
-    expect(files.length).toBe(180);
+    // 180 → 181: 20260928100000_storage_bikes_order_uniq.sql (boss R2 #4: partial UNIQUE (crew_slug, order_id) — чекаут идемпотентен и на уровне БД)
+    expect(files.length).toBe(181);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

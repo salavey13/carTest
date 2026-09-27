@@ -1,9 +1,14 @@
 // /app/franchize/[slug]/rental/[id]/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ExternalLink, Info } from "lucide-react";
 import { getFranchizeBySlug, getFranchizeRentalCard } from "../../../actions";
 import { getRentalPageTodos } from "../../../server-actions/rentals";
+import {
+  TELEGRAM_ACTOR_COOKIE,
+  verifyTelegramActorCookieValue,
+} from "@/lib/telegram-actor-cookie";
 import { CrewHeader } from "../../../components/CrewHeader";
 // goodmorning-polish: removed CrewFooter import (footer ditched on rental page)
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
@@ -251,8 +256,18 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   // ── 2026-09-28: dynamic crew_todos for THIS rental (same rows the rentals
   // analytics shows) + lazy verification/equipment bootstrap for web-flow
   // rentals. Server-fetched once; the panel toggles via the lead-todo API.
+  // Boss R1 #3: the lazy bootstrap WRITES — it runs only for a signed-actor
+  // (cookie identity) viewer; guests get a read-only fetch.
+  let viewerActorId: string | null = null;
+  try {
+    viewerActorId = verifyTelegramActorCookieValue(
+      (await cookies()).get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
+  } catch {
+    viewerActorId = null;
+  }
   const rentalPageTodos = rental.found && crew.id
-    ? await getRentalPageTodos(id, crew.id).catch(() => null)
+    ? await getRentalPageTodos(id, crew.id, { bootstrap: Boolean(viewerActorId) }).catch(() => null)
     : null;
   const rentalTodosData = rentalPageTodos?.success ? (rentalPageTodos.data ?? []) : [];
 

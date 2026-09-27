@@ -54,7 +54,11 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as OdometerDraftRequest;
     const rentalId = typeof body?.rentalId === "string" ? body.rentalId : "";
     const rawOdo = body?.odometerAfter;
-    const field = body?.field === "start" ? "start" : "end";
+    const fieldRaw = body?.field;
+    if (fieldRaw !== undefined && fieldRaw !== "start" && fieldRaw !== "end") {
+      return NextResponse.json({ success: false, error: "field должен быть start или end." }, { status: 400 });
+    }
+    const field = fieldRaw === "start" ? "start" : "end";
 
     if (!rentalId) {
       return NextResponse.json({ success: false, error: "rentalId обязателен." }, { status: 400 });
@@ -71,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, crew_id, user_id, vehicle_id, status, metadata")
+      .select("rental_id, crew_id, user_id, vehicle_id, status, metadata, updated_at")
       .eq("rental_id", rentalId)
       .maybeSingle();
     if (rentalError || !rental) {
@@ -113,6 +117,54 @@ export async function POST(request: NextRequest) {
 
     const meta = (rental.metadata as Record<string, unknown> | null) ?? {};
 
+    // ── CAS metadata merge (boss review R1 #1) ──
+    // The metadata jsonb is a shared document: the pickup-freeze dialog,
+    // this route (end draft) and the webhook's contract_verifier update all
+    // write it. A plain read-modify-write could resurrect a STALE object and
+    // silently delete a concurrent pickup_freeze (the deposit-math anchor).
+    // The update is therefore conditioned on the updated_at seen at read
+    // time (compare-and-swap); 0 affected rows → re-read, re-check the
+    // guards, merge on top of the FRESH metadata, retry (bounded).
+    let seenUpdatedAt = (rental as { updated_at?: string | null }).updated_at ?? null;
+    const casUpdate = async (
+      buildMetadata: (freshMeta: Record<string, unknown>) => Record<string, unknown> | null,
+    ): Promise<{ ok: boolean; error?: string; conflict?: boolean }> => {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        // The caller re-reads metadata inside buildMetadata via the loop —
+        // first attempt uses the already-fetched row, retries re-read.
+        let freshMeta = meta;
+        if (attempt > 0) {
+          const { data: fresh } = await supabaseAdmin
+            .from("rentals")
+            .select("metadata, updated_at")
+            .eq("rental_id", rentalId)
+            .maybeSingle();
+          if (!fresh) return { ok: false, error: "Аренда не найдена." };
+          freshMeta = (fresh.metadata as Record<string, unknown> | null) ?? {};
+          seenUpdatedAt = (fresh as { updated_at?: string | null }).updated_at ?? null;
+        }
+        const nextMetadata = buildMetadata(freshMeta);
+        if (nextMetadata === null) return { ok: true }; // no-op requested
+        let updateQuery = supabaseAdmin
+          .from("rentals")
+          .update(
+            { metadata: nextMetadata, updated_at: new Date().toISOString() },
+            { count: "exact" }, // CAS needs the affected-rows count
+          )
+          .eq("rental_id", rentalId);
+        // updated_at может быть NULL (старые строки) — тогда CAS-условие «IS NULL».
+        updateQuery =
+          seenUpdatedAt == null
+            ? updateQuery.is("updated_at", null)
+            : updateQuery.eq("updated_at", seenUpdatedAt);
+        const { error: casError, count } = await updateQuery.select("rental_id");
+        if (casError) return { ok: false, error: casError.message };
+        if ((count ?? 0) > 0) return { ok: true };
+        // count === 0 → concurrent writer won; loop re-reads and retries.
+      }
+      return { ok: false, conflict: true, error: "Одометр не сохранён — карточка параллельно изменяется. Повторите попытку." };
+    };
+
     if (field === "start") {
       // ── Start-odometer mode ──
       // The handover reading belongs to the PRE-pickup phase: once the
@@ -132,32 +184,38 @@ export async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
-      const frozenValue = odometerAfter; // null clears nothing — start value is write-once-until-freeze
+      const startValue = odometerAfter; // null = no-op (start value is write-once-until-freeze)
       const actorKind = access.ok ? "operator" : isRenterActor ? "renter" : "subrenter";
-      const { error: startUpdateError } = await supabaseAdmin
-        .from("rentals")
-        .update({
-          metadata: {
-            ...meta,
-            ...(frozenValue === null
-              ? {}
-              : {
-                  odometer_before: frozenValue,
-                  odometer_before_source: actorKind,
-                  odometer_before_at: new Date().toISOString(),
-                }),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("rental_id", rentalId);
-      if (startUpdateError) {
-        logger.error("[rental-odometer] start update failed:", startUpdateError.message);
+      if (startValue === null) {
+        // R1 #7: «clear» is not a legal start-mode operation — respond honestly
+        // instead of a metadata touch that would bump updated_at for nothing.
+        return NextResponse.json({ success: true, field: "start", odometerBefore: null, noop: true });
+      }
+      // R1 #6 (soft anomaly flag): a start reading BELOW the last known
+      // odometer (specs / previous closure) understates the season delta.
+      // Not rejected — the hint can be stale — but flagged for the audit.
+      const knownRaw = meta.last_known_odometer ?? meta.odometer_before_hint;
+      const known = typeof knownRaw === "number" && Number.isFinite(knownRaw) ? knownRaw : null;
+      const belowKnown = known != null && startValue < known;
+      const cas = await casUpdate((freshMeta) => ({
+        ...freshMeta,
+        odometer_before: startValue,
+        odometer_before_source: actorKind,
+        odometer_before_at: new Date().toISOString(),
+        ...(belowKnown ? { odometer_before_below_known: true } : {}),
+      }));
+      if (!cas.ok) {
+        if (cas.conflict) {
+          return NextResponse.json({ success: false, error: cas.error }, { status: 409 });
+        }
+        logger.error("[rental-odometer] start update failed:", cas.error ?? "unknown");
         return NextResponse.json({ success: false, error: "Не удалось сохранить одометр." }, { status: 500 });
       }
       logger.info("[rental-odometer] start odometer saved", {
         rentalId,
-        odometerBefore: frozenValue,
+        odometerBefore: startValue,
         source: actorKind,
+        belowKnown,
         actor: access.ok ? access.userId : cookieUserId,
       });
 
@@ -174,7 +232,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ success: true, field: "start", odometerBefore: frozenValue });
+      return NextResponse.json({ success: true, field: "start", odometerBefore: startValue, belowKnown: belowKnown || undefined });
     }
 
     if (rental.status !== "active") {
@@ -194,15 +252,12 @@ export async function POST(request: NextRequest) {
       ?? null;
     const odometerBefore = typeof beforeRaw === "number" && Number.isFinite(beforeRaw) ? beforeRaw : null;
 
-    const { error: updateError } = await supabaseAdmin
-      .from("rentals")
-      .update({
-        metadata: { ...meta, odometer_after_draft: odometerAfter },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("rental_id", rentalId);
-    if (updateError) {
-      logger.error("[rental-odometer] metadata update failed:", updateError.message);
+    const endCas = await casUpdate((freshMeta) => ({ ...freshMeta, odometer_after_draft: odometerAfter }));
+    if (!endCas.ok) {
+      if (endCas.conflict) {
+        return NextResponse.json({ success: false, error: endCas.error }, { status: 409 });
+      }
+      logger.error("[rental-odometer] metadata update failed:", endCas.error ?? "unknown");
       return NextResponse.json({ success: false, error: "Не удалось сохранить одометр." }, { status: 500 });
     }
 

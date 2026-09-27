@@ -68,6 +68,12 @@ const VERIFICATION_TODO_TEMPLATES: Array<{
 /**
  * Создаёт 5 verification todos при создании аренды.
  * Вызывается из actions-runtime.ts после успешного insert в rentals.
+ *
+ * 2026-09-28 (boss R1 #2): IDEMPOTENT — the XTR webhook can be re-delivered
+ * (Telegram at-least-once, admin replay), and a blind 5-row insert per pass
+ * duplicated the verification set on every retry. An existing todo for this
+ * rental short-circuits the whole creation, same semantics as the sibling
+ * ensureRentalEquipmentReturnTodos bootstrap.
  */
 export async function createRentalVerificationTodos(
   rentalId: string,
@@ -77,6 +83,18 @@ export async function createRentalVerificationTodos(
   try {
     if (!rentalId) {
       return { success: false, created: 0, error: "rentalId is required" };
+    }
+
+    // Idempotency first (cheap indexed check): any verification todo already
+    // linked to this rental means the set was created before — never re-seed.
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("crew_todos")
+      .select("id")
+      .eq("rental_id", rentalId)
+      .eq("category", "rental_verification")
+      .limit(1);
+    if (!existingError && existing && existing.length > 0) {
+      return { success: true, created: 0 };
     }
 
     console.log(`[rental-verification-todos] Creating todos for rental ${rentalId}${leadId ? `, lead ${leadId}` : ""}`);

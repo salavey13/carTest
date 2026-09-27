@@ -2818,6 +2818,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         || (storageMonthsLabel
           ? Math.round((payload.totalAmount || 0) / Math.max(0.5, Number(storageMonthsLabel.replace(",", "."))))
           : 0);
+      // Boss R2 #5 + #8: the contract total is SERVER-RECOMPUTED from the
+      // monthly rate × season length (numeric storageMonthsCount — the old
+      // label-parsing fallback produced NaN for «7,5 месяца» and silently
+      // degraded to the client total). A crafted payload can no longer book
+      // a 2 000 ₽/мес season for 1 ₽ in the CONTRACT either.
+      const storageSeasonMonths = storageMonthsCount(storageStartRaw, storageEndRaw);
+      const storageTotalRub = storageMonthlyRub > 0 && storageSeasonMonths > 0
+        ? Math.round(storageMonthlyRub * storageSeasonMonths)
+        : Math.round(payload.totalAmount || 0);
 
       // ПЭП block: same recipe as rental-contract-vars (MSK timestamp +
       // initData fingerprint) — but the signer is the OWNER (owner_signature).
@@ -2872,8 +2881,8 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         storage_months: storageMonthsLabel,
         contract_valid_until: storageValidUntilRu,
         storage_monthly_price: formatMoney(storageMonthlyRub > 0 ? storageMonthlyRub : (payload.totalAmount || 0)),
-        storage_total_price: formatMoney(payload.totalAmount || 0),
-        storage_total_price_words: numberToWords(payload.totalAmount || 0),
+        storage_total_price: formatMoney(storageTotalRub),
+        storage_total_price_words: numberToWords(storageTotalRub),
         ...storagePepVars,
         document_key: `storage-${payload.slug}-${payload.orderId}`,
       };
@@ -3403,12 +3412,18 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
         // Idempotency: the checkout retry path (failed notification row) can
         // reach the doc builder twice — one season row per orderId, ever.
+        // Boss R2 #4: the DB now ENFORCES it too — partial unique index
+        // storage_bikes_crew_order_uniq (20260928100000) on
+        // (crew_slug, order_id) where order_id is not null; a unique
+        // violation below means the row already landed → keep going with
+        // the existing id instead of failing the checkout.
         const { data: stExisting } = await supabaseAdmin
           .from("storage_bikes")
           .select("id")
           .eq("crew_slug", payload.slug)
           .eq("order_id", payload.orderId)
           .maybeSingle();
+        let stDuplicateId: string | null = null; // boss R2 #4 — a concurrent retry already landed the row
         if (!stExisting) {
           const { data: stRow, error: stErr } = await supabaseAdmin
             .from("storage_bikes")
@@ -3429,7 +3444,16 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               accessories: stDetails.bikeAccessories || "",
               estimated_value_rub: Math.round(Number(stDetails.bikeEstimatedValueRub ?? 0)),
               monthly_price_rub: stMonthlyRub,
-              total_price_rub: Math.round(payload.totalAmount || 0),
+              // Boss R2 #5: the storage total is SERVER-RECOMPUTED from the
+              // monthly rate × season length — a hand-crafted payload could
+              // otherwise book a 2 000 ₽/мес season for 1 ₽ (the wall row AND
+              // {{storage_total_price}} in the contract both derive from it).
+              // Falls back to the client total only when the season math is
+              // unusable (the contract validation would have rejected that
+              // above already).
+              total_price_rub: stMonthlyRub > 0 && stMonths > 0
+                ? Math.round(stMonthlyRub * stMonths)
+                : Math.round(payload.totalAmount || 0),
               storage_address: stDetails.storageAddress || "",
               notice_address: stDetails.noticeAddress || payload.registrationAddress || "",
               season_start: stSeasonStart,
@@ -3442,9 +3466,33 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             })
             .select("id")
             .single();
-          if (stErr) throw new Error(stErr.message);
-          const stBikeId = String((stRow as { id: string } | null)?.id ?? "");
-          if (stBikeId) {
+          if (stErr) {
+            // Boss R2 #4: unique-violation = a concurrent retry landed the
+            // row first — the season exists, keep its id (NO duplicate event)
+            // and continue the checkout flow. Anything else: non-fatal failure.
+            const code = (stErr as { code?: string }).code ?? "";
+            if (code === "23505" || /duplicate key|unique constraint/i.test(stErr.message)) {
+              const { data: winner } = await supabaseAdmin
+                .from("storage_bikes")
+                .select("id")
+                .eq("crew_slug", payload.slug)
+                .eq("order_id", payload.orderId)
+                .maybeSingle();
+              if (winner?.id) {
+                stDuplicateId = String(winner.id);
+                logger.info("[franchize] storage row already landed (concurrent retry)", {
+                  orderId: payload.orderId,
+                  bikeId: stDuplicateId,
+                });
+              } else {
+                throw new Error(stErr.message);
+              }
+            } else {
+              throw new Error(stErr.message);
+            }
+          }
+          const stBikeId = stDuplicateId ?? String((stRow as { id: string } | null)?.id ?? "");
+          if (stBikeId && !stDuplicateId) {
             await supabaseAdmin.from("storage_bike_events").insert({
               bike_id: stBikeId,
               type: "created",
@@ -6168,6 +6216,12 @@ export async function createFranchizeOrderCheckout(
   // the idempotency/notification-log writes so the renter can fix the data and
   // resubmit the SAME orderId (a pending log row would swallow the retry).
   assertTestdriveIdentityDocs(payload);
+  // Boss review R2 #3: the storage IDENTITY gate belongs on the LIVE checkout
+  // path too — it previously ran only in submitFranchizeOrderNotification
+  // (the retry path), so a crafted call could mint a storage contract (and a
+  // wall row) with empty passport rows. Same pre-write spot as the gates
+  // above so a fixed resubmission of the SAME orderId is never swallowed.
+  assertStorageIdentityDocs(payload);
   // Storage config gate (v3): crew disabled «Зимнее хранение» → reject before
   // the idempotency log would swallow the retry (same pre-write spot). The
   // throw is OUTSIDE the try below, so surface the human phrase directly.

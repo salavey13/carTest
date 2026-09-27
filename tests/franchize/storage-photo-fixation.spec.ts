@@ -273,7 +273,10 @@ describe("storage photo UI wiring", () => {
     expect(story).toMatch(/event\.type === "photo"\s*\?\s*"#8b5cf6"/);
     expect(story).toMatch(/<StorageEventPhotoGrid paths=\{event\.photoPaths\} T=\{T\} onDelete=\{onDeletePhoto\} \/>/);
     expect(story).toMatch(/deleteStorageBikePhotoAction/);
-    expect(story).toMatch(/window\.confirm\("Удалить это фото из истории хранения\?"\)/);
+    // boss R2 #2: TG WebView swallows window.confirm — the confirmation is a
+    // sonner toast with an action button (in-app DOM, always works).
+    expect(story).toMatch(/toast\("Удалить это фото из истории хранения\?"/);
+    expect(story.includes("window.confirm(")).toBe(false);
   });
 
   it("wall: photo panel on accept/return (shared targets, draft reset on switch) + timeline grid", () => {

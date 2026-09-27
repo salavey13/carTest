@@ -877,11 +877,40 @@ export async function getRentalReturnTodos(
 export async function getRentalPageTodos(
   rentalId: string,
   crewId: string,
+  opts: { bootstrap?: boolean } = {},
 ): Promise<{ success: boolean; data?: ReturnTodo[]; error?: string }> {
   try {
     const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // ── Crew-match guard (boss review R1 #3) ──
+    // The rental page calls this with the SLUG's crewId, but the rental row
+    // can belong to another crew (a hand-crafted /franchize/<slugA>/rental/<
+    // rental-of-crewB> URL). Without this check the lazy bootstrap below
+    // seeded crew_todos into the WRONG crew from an unauthenticated GET.
+    // Mismatch → read-only empty answer, zero writes, zero row leakage.
+    const { data: rentalRow } = await supabaseAdmin
+      .from("rentals")
+      .select("crew_id, vehicle_id")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+    if (!rentalRow) return { success: true, data: [] };
+    let rentalCrewId = typeof rentalRow.crew_id === "string" ? rentalRow.crew_id : null;
+    if (!rentalCrewId && rentalRow.vehicle_id) {
+      // XTR rows historically relied on trg_rentals_set_crew_id; the vehicle
+      // fallback covers rows where the trigger has not fired.
+      const { data: carRow } = await supabaseAdmin
+        .from("cars")
+        .select("crew_id")
+        .eq("id", rentalRow.vehicle_id)
+        .maybeSingle();
+      rentalCrewId = typeof carRow?.crew_id === "string" ? carRow.crew_id : null;
+    }
+    // Mismatch (or unresolvable crew) → read-only: no bootstrap writes, and
+    // the crew_todos query below is crew-scoped anyway so nothing leaks.
+    const bootstrap =
+      opts.bootstrap === true && rentalCrewId != null && rentalCrewId === crewId;
 
     const loadTodos = async (): Promise<ReturnTodo[] | null> => {
       const { data: allTodos, error } = await supabaseAdmin
@@ -914,26 +943,30 @@ export async function getRentalPageTodos(
     //   - rental_verification todos missing → the 5 standard verification rows;
     //   - lead_followup (equipment return) todos missing → the equipment-aware
     //     return checklist (helmet/glove counts from metadata.equipment).
-    try {
-      const hasVerification = todos.some((t) => t.category === "rental_verification");
-      const hasFollowup = todos.some((t) => t.category === "lead_followup");
-      const jobs: Promise<unknown>[] = [];
-      if (!hasVerification) {
-        jobs.push(
-          import("./rental-verification-todos").then(({ createRentalVerificationTodos }) =>
-            createRentalVerificationTodos(rentalId, crewId, null),
-          ),
-        );
+    // R1 #3: writes only run when the viewer is authenticated AND the rental
+    // is proven to belong to this crew — an anonymous GET stays read-only.
+    if (bootstrap) {
+      try {
+        const hasVerification = todos.some((t) => t.category === "rental_verification");
+        const hasFollowup = todos.some((t) => t.category === "lead_followup");
+        const jobs: Promise<unknown>[] = [];
+        if (!hasVerification) {
+          jobs.push(
+            import("./rental-verification-todos").then(({ createRentalVerificationTodos }) =>
+              createRentalVerificationTodos(rentalId, crewId, null),
+            ),
+          );
+        }
+        if (!hasFollowup) {
+          jobs.push(ensureRentalEquipmentReturnTodos(rentalId, crewId));
+        }
+        if (jobs.length > 0) {
+          await Promise.allSettled(jobs);
+          todos = (await loadTodos()) ?? todos;
+        }
+      } catch (bootErr) {
+        console.error("[getRentalPageTodos] bootstrap failed (non-fatal):", bootErr);
       }
-      if (!hasFollowup) {
-        jobs.push(ensureRentalEquipmentReturnTodos(rentalId, crewId));
-      }
-      if (jobs.length > 0) {
-        await Promise.allSettled(jobs);
-        todos = (await loadTodos()) ?? todos;
-      }
-    } catch (bootErr) {
-      console.error("[getRentalPageTodos] bootstrap failed (non-fatal):", bootErr);
     }
 
     return { success: true, data: todos };

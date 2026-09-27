@@ -15,7 +15,6 @@ import { dirname, join } from "node:path";
 
 import {
   canTransitionStorageStatus,
-  storageDocPublicUrl,
   storageFormatRub,
   storageMonthsCount,
   storageSeasonDateToIso,
@@ -88,14 +87,25 @@ describe("storage season math (lib/storage mirror of storage-season)", () => {
     expect(storageFormatRub(0)).toBe("0");
   });
 
-  it("doc URL points into the rental-contracts public storage", () => {
-    // The helper reads NEXT_PUBLIC_SUPABASE_URL lazily — vitest env has no
-    // .env, so pin it (same project the app builds URLs from).
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co";
-    const url = storageDocPublicUrl("vip-bike/storage-vip-bike-o1.docx");
-    expect(url).toContain("/storage/v1/object/public/rental-contracts/");
-    expect(url.startsWith("https://")).toBe(true);
-    expect(storageDocPublicUrl("")).toBe("");
+  it("contract delivery uses SIGNED urls, never /object/public (boss R2 #1)", () => {
+    // storageDocPublicUrl() was removed: the rental-contracts bucket is
+    // PRIVATE and the storage contract carries the owner's passport. The
+    // source must not build public object URLs and must mint signed URLs
+    // inside the gated server actions instead.
+    const lib = read("app/franchize/lib/storage.ts");
+    expect(lib.includes("export function storageDocPublicUrl")).toBe(false);
+    expect(lib.includes("/object/public/rental-contracts/")).toBe(false);
+    const actions = read("app/franchize/server-actions/storage-bikes.ts");
+    expect(actions.includes("createSignedUrl")).toBe(true);
+    expect(actions.includes("/object/public/rental-contracts/")).toBe(false);
+    for (const client of [
+      "app/franchize/[slug]/storage/StorageWallClient.tsx",
+      "app/franchize/[slug]/storage/StorageBikeStoryClient.tsx",
+    ]) {
+      const src = read(client);
+      expect(src.includes("openStorageDoc(")).toBe(true);
+      expect(src.includes("/object/public/rental-contracts/")).toBe(false);
+    }
   });
 
   it("wall stats bucket every status", () => {

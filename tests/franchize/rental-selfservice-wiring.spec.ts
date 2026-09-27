@@ -44,7 +44,7 @@ describe("rental page self-service wiring", () => {
   });
 
   it("fetches dynamic rental todos server-side and feeds RentalTodosPanel", () => {
-    expect(page.includes("getRentalPageTodos(id, crew.id)")).toBe(true);
+    expect(page.includes("getRentalPageTodos(id, crew.id, { bootstrap: Boolean(viewerActorId) })")).toBe(true);
     expect(page.includes("<RentalTodosPanel")).toBe(true);
     expect(page.includes("initialTodos={rentalTodosData}")).toBe(true);
     // the static-fallback checklist is gone from the page
@@ -74,9 +74,30 @@ describe("rental odometer API: start mode", () => {
   });
 
   it("writes odometer_before + source + timestamp (doc-flow parity)", () => {
-    expect(route.includes("odometer_before: frozenValue")).toBe(true);
+    expect(route.includes("odometer_before: startValue")).toBe(true);
     expect(route.includes("odometer_before_source: actorKind")).toBe(true);
     expect(route.includes("odometer_before_at: new Date().toISOString()")).toBe(true);
+  });
+
+  it("boss R1 #1: metadata writes are CAS-conditional on updated_at (no lost updates)", () => {
+    expect(route.includes("const casUpdate = async (")).toBe(true);
+    expect(route.includes('{ count: "exact" }')).toBe(true);
+    expect(route.includes('updateQuery.is("updated_at", null)')).toBe(true);
+    expect(route.includes('updateQuery.eq("updated_at", seenUpdatedAt)')).toBe(true);
+    // both modes route their writes through the CAS helper
+    expect((route.match(/await casUpdate\(/g) ?? []).length).toBe(2);
+  });
+
+  it("boss R1 #6: a start reading below the last-known odometer is flagged", () => {
+    expect(route.includes("odometer_before_below_known: true")).toBe(true);
+  });
+
+  it("boss R1 #7: a null start value is an honest no-op (no metadata touch)", () => {
+    expect(route.includes("noop: true")).toBe(true);
+  });
+
+  it("unknown field values are rejected, not silently defaulted", () => {
+    expect(route.includes("field должен быть start или end.")).toBe(true);
   });
 
   it("grants the renter odometer achievement on the renter path only", () => {
@@ -154,6 +175,22 @@ describe("dynamic todos", () => {
     expect(fn.includes("ensureRentalEquipmentReturnTodos(rentalId, crewId)")).toBe(true);
   });
 
+  it("boss R1 #3: crew-match guard + auth-gated bootstrap (no anonymous writes)", () => {
+    const fn = server.slice(server.indexOf("export async function getRentalPageTodos"), server.indexOf("ensureRentalEquipmentReturnTodosForWebhook"));
+    expect(fn.includes("const bootstrap =")).toBe(true);
+    expect(fn.includes("opts.bootstrap === true && rentalCrewId != null && rentalCrewId === crewId")).toBe(true);
+    const page = read("app/franchize/[slug]/rental/[id]/page.tsx");
+    expect(page.includes("verifyTelegramActorCookieValue")).toBe(true);
+    expect(page.includes("{ bootstrap: Boolean(viewerActorId) }")).toBe(true);
+  });
+
+  it("verification todo creation is idempotent (webhook retry-safe)", () => {
+    const ver = read("app/franchize/server-actions/rental-verification-todos.ts");
+    const fn = ver.slice(ver.indexOf("export async function createRentalVerificationTodos"));
+    expect(fn.indexOf('eq("category", "rental_verification")')).toBeGreaterThan(-1);
+    expect(fn.indexOf("return { success: true, created: 0 }")).toBeGreaterThan(-1);
+  });
+
   it("panel is toggle-only for crew and read-only for the renter", () => {
     const panel = read("app/franchize/components/RentalTodosPanel.tsx");
     expect(panel.includes('["owner", "admin", "co_owner", "member"].includes(membership.role)')).toBe(true);
@@ -183,6 +220,19 @@ describe("webhook XTR-path salary parity + side effects", () => {
 
   it("grants the renter self-service achievement (non-fatal)", () => {
     expect(hook.includes("grantRenterWebRentCreated({ userId, slug, rentalId })")).toBe(true);
+  });
+
+  it("boss R1 #2: retry-safe — existing metadata wins, side effects skip on redelivery", () => {
+    expect(hook.includes("const rentalAlreadyExisted = Boolean(existingRental);")).toBe(true);
+    expect(hook.includes("...(rentalAlreadyExisted && existingRentalMetadata ? existingRentalMetadata : {}),")).toBe(true);
+    expect(hook.includes("if (!rentalAlreadyExisted) {")).toBe(true);
+    // the fetch-first pre-check exists right before the upsert
+    const preIdx = hook.indexOf('from("rentals")');
+    expect(preIdx).toBeGreaterThan(-1);
+  });
+
+  it("boss R1 #8: single-bike XTR assumption documented at firstItemId", () => {
+    expect(hook.includes("Documented gap (boss R1 #8)")).toBe(true);
   });
 });
 
@@ -215,8 +265,8 @@ describe("renter self-service achievements", () => {
   });
 
   it("photo master counts DISTINCT rentals from rental_photos (≥10)", () => {
-    expect(mod.includes('.select("rental_id", { count: "exact", head: true })')).toBe(true);
-    expect(mod.includes("(count ?? 0) >= 10")).toBe(true);
+    expect(mod.includes('.from("rental_photos")')).toBe(true);
+    expect(mod.includes("distinctRentals.size >= 10")).toBe(true);
   });
 
   it("slug resolution walks rental.crew_id → cars.crew_id → crews.slug", () => {
@@ -234,5 +284,64 @@ describe("renter self-service achievements", () => {
   it("renters with badges see toasts (hard crew skip became conditional)", () => {
     const sync = read("app/franchize/components/AchievementToastSync.tsx");
     expect(sync.includes("!access.canOpen && Object.keys(result.data.achievements).length === 0")).toBe(true);
+  });
+});
+
+describe("winter storage boss-review fixes (R2)", () => {
+  it("#2: photo deletion confirms via toast action, never window.confirm", () => {
+    const story = read("app/franchize/[slug]/storage/StorageBikeStoryClient.tsx");
+    expect(story.includes("if (!window.confirm")).toBe(false);
+    expect((story.match(/window\.confirm\(/g) ?? []).length).toBe(0);
+    expect(story.includes('toast("Удалить это фото из истории хранения?"')).toBe(true);
+  });
+
+  it("#6+#7: delete is staff-only, removes the file FIRST, logs a tamper event", () => {
+    const actions = read("app/franchize/server-actions/storage-bikes.ts");
+    const fn = actions.slice(actions.indexOf("export async function deleteStorageBikePhotoAction"));
+    const body = fn.slice(0, fn.indexOf("/**") === -1 ? undefined : fn.indexOf("/**", 10));
+    expect(body.includes("if (!loaded.isStaff)")).toBe(true);
+    expect(body.indexOf("storage.from(STORAGE_PHOTO_BUCKET).remove")).toBeGreaterThan(-1);
+    expect(body.indexOf("remove") < body.indexOf("contains(\"photo_paths\"")).toBe(true);
+    expect(body.includes("Фото удалено из истории")).toBe(true);
+  });
+
+  it("#10: status move is conditional on the loaded status (CAS)", () => {
+    const actions = read("app/franchize/server-actions/storage-bikes.ts");
+    expect(actions.includes('.eq("status", currentStatus)')).toBe(true);
+    expect(actions.includes("Статус уже изменён кем-то из экипажа")).toBe(true);
+  });
+
+  it("#9: initData fallback is freshness-capped", () => {
+    const actions = read("app/franchize/server-actions/storage-bikes.ts");
+    expect(actions.includes("isTelegramInitDataFresh(params.initData)")).toBe(true);
+  });
+
+  it("#12: storage mutations pass actorUserId alongside initData", () => {
+    for (const client of [
+      "app/franchize/[slug]/storage/StorageWallClient.tsx",
+      "app/franchize/[slug]/storage/StorageBikeStoryClient.tsx",
+    ]) {
+      const src = read(client);
+      expect((src.match(/actorUserId: dbUser\?\.user_id,/g) ?? []).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("#3+#5+#8: storage checkout gates identity, recomputes money server-side", () => {
+    const runtime = read("app/franchize/actions-runtime.ts");
+    // identity gate on the live checkout path (next to the testdrive gate)
+    expect(runtime.includes("assertStorageIdentityDocs(payload);\n  // Storage config gate")).toBe(true);
+    // server-recomputed contract + wall totals
+    expect(runtime.includes("const storageTotalRub = storageMonthlyRub > 0 && storageSeasonMonths > 0")).toBe(true);
+    expect(runtime.includes("total_price_rub: stMonthlyRub > 0 && stMonths > 0")).toBe(true);
+    // months-label NaN fallback replaced by numeric season math
+    expect(runtime.includes("const storageSeasonMonths = storageMonthsCount(storageStartRaw, storageEndRaw);")).toBe(true);
+  });
+
+  it("#4: unique-index migration exists for (crew_slug, order_id)", () => {
+    const mig = read("supabase/migrations/20260928100000_storage_bikes_order_uniq.sql");
+    expect(mig.includes("create unique index if not exists storage_bikes_crew_order_uniq")).toBe(true);
+    expect(mig.includes("where order_id is not null")).toBe(true);
+    const runtime = read("app/franchize/actions-runtime.ts");
+    expect(runtime.includes("stDuplicateId")).toBe(true);
   });
 });

@@ -29,9 +29,10 @@ import { logger } from "@/lib/logger";
 import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Crew-slug resolution — rentals created via the XTR-invoice webhook have NO
-// crew_id column set, so walk vehicle → cars.crew_id → crews.slug with a
-// rental.crew_id shortcut. Returns null → caller skips granting (non-fatal).
+// Crew-slug resolution — walk vehicle → cars.crew_id → crews.slug with a
+// rental.crew_id shortcut (the trg_rentals_set_crew_id trigger normally fills
+// it; the vehicle fallback covers rows where it has not fired). Returns null →
+// caller skips granting (non-fatal).
 // ─────────────────────────────────────────────────────────────────────────────
 export async function resolveCrewSlugForRental(rentalId: string): Promise<string | null> {
   try {
@@ -300,12 +301,15 @@ export async function grantRentalPhotoAchievements(params: {
       });
     }
 
-    // rental_photo_master — distinct rentals with ANY photo from this user.
-    const { count } = await supabaseAdmin
+    // rental_photo_master — DISTINCT rentals with ANY photo from this user
+    // (boss R1 #5: the badge means «фото для 10 аренд», not 10 rows — without
+    // the dedupe five start + five end shots on ONE rental unlocked it).
+    const { data: rentalIds } = await supabaseAdmin
       .from("rental_photos")
-      .select("rental_id", { count: "exact", head: true })
+      .select("rental_id")
       .eq("uploaded_by", userId);
-    if ((count ?? 0) >= 10) {
+    const distinctRentals = new Set((rentalIds ?? []).map((r: { rental_id: string | null }) => r.rental_id).filter(Boolean));
+    if (distinctRentals.size >= 10) {
       await tryGrant({
         slug,
         userId,

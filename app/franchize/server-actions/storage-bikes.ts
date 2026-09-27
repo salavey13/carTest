@@ -46,7 +46,6 @@ import {
   STORAGE_PHOTO_BUCKET,
   storagePhotoPathRe,
   STORAGE_STORY_EVENTS_CAP,
-  storageDocPublicUrl,
   storageFormatRub,
   storageIsoToRu,
   storageMonthsCount,
@@ -62,6 +61,28 @@ import {
   type StorageWallVM,
 } from "@/app/franchize/lib/storage";
 import { buildStorageBikeReport } from "@/app/franchize/lib/storage-bike-report";
+
+// ── contract delivery (boss review R2 #1) ────────────────────────────────────
+//
+// The storage contract carries the OWNER'S PASSPORT data, and `rental-contracts`
+// is a PRIVATE bucket (20260618000001_rental_contracts_storage.sql) — a
+// /object/public/ URL is either a dead 403 link or, if someone "fixes" it by
+// flipping the bucket public, passport PII becomes world-readable. Every
+// delivery therefore mints a SHORT-LIVED SIGNED URL inside the already
+// staff/owner-gated server action (the same pattern the rental artifacts use
+// in actions-runtime.ts).
+const STORAGE_DOC_SIGNED_TTL_SECONDS = 3600;
+
+async function signedStorageDocUrl(docPath: string): Promise<string> {
+  const { data, error } = await supabaseAdmin.storage
+    .from("rental-contracts")
+    .createSignedUrl(docPath, STORAGE_DOC_SIGNED_TTL_SECONDS);
+  if (error || !data?.signedUrl) {
+    logger.warn("[storage] contract signed URL failed:", error?.message ?? "no url");
+    return "";
+  }
+  return data.signedUrl;
+}
 
 // ── identity ─────────────────────────────────────────────────────────────────
 
@@ -135,14 +156,17 @@ async function resolveStorageActor(params: {
     logger.warn("[storage] cookie identity check failed:", err instanceof Error ? err.message : String(err));
   }
 
-  // 2. initData fallback — HMAC-verified, claimed id must match the signature.
+  // 2. initData fallback — HMAC-verified + freshness-capped (24h, same cap
+  // as the ПЭП verification and the upload route — boss R2 #9: an unlimited
+  // leaked initData string would otherwise grant the identity ladder forever),
+  // claimed id must match the signature.
   if (params.initData && params.actorUserId) {
     try {
-      const { computeTelegramWebAppHash } = await import("@/lib/telegram-webapp-auth");
+      const { computeTelegramWebAppHash, isTelegramInitDataFresh } = await import("@/lib/telegram-webapp-auth");
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       if (botToken) {
         const validation = await computeTelegramWebAppHash(params.initData, botToken);
-        if (validation.isValid) {
+        if (validation.isValid && isTelegramInitDataFresh(params.initData)) {
           const userJson = new URLSearchParams(params.initData).get("user");
           const tgUserId = userJson ? String((JSON.parse(userJson) as { id?: number | string }).id ?? "") : "";
           if (tgUserId && tgUserId === String(params.actorUserId).trim()) {
@@ -594,12 +618,20 @@ export async function updateStorageBikeStatusAction(input: unknown): Promise<{ s
   const actorName = await actorDisplayName(staffId);
   let warning: string | undefined;
   try {
-    const { error: updateErr } = await supabaseAdmin
+    // Boss R2 #10: conditional update — the write only lands when the status
+    // is STILL what we loaded, so two simultaneous staff moves can't both
+    // commit from the same origin state (second one re-reads and reports).
+    const { data: moved, error: updateErr } = await supabaseAdmin
       .from("storage_bikes")
       .update({ status })
       .eq("id", bikeId)
-      .eq("crew_slug", slug);
+      .eq("crew_slug", slug)
+      .eq("status", currentStatus)
+      .select("id");
     if (updateErr) throw new Error(updateErr.message);
+    if (!moved || moved.length === 0) {
+      return { success: false, error: "Статус уже изменён кем-то из экипажа — обновите карточку и проверьте текущее состояние." };
+    }
 
     const inserted = await insertStorageEvent({
       bikeId,
@@ -785,11 +817,15 @@ export async function addStorageBikePhotosAction(input: unknown): Promise<{ succ
  * Deletes one storagepix photo. The quota in the upload route is a HARD wall
  * (60 files/bike) — without a delete path the bike would be locked out of
  * uploads forever once the folder fills (boss review R1 finding #3).
- * Gate = staff, or the bike's owner (same as upload/notes). The path must be
- * exactly this bike's folder shape; the object is removed from storagepix AND
- * stripped from any event that referenced it (timeline stays consistent).
- * Doubles as the janitor for orphaned uploads (failed actions leave dead
- * files that nothing references).
+ *
+ * Gate = STAFF ONLY (boss review R2 #6): the acceptance/return shots are the
+ * Акт приёма-передачи evidence in damage disputes — the bike's owner keeps
+ * UPLOAD rights but cannot scrub evidence from his own timeline. Every
+ * successful removal writes a tamper-evident `note` event so the timeline
+ * always shows what disappeared and who removed it.
+ * The path must be exactly this bike's folder shape. Doubles as the janitor
+ * for orphaned uploads (failed actions leave dead files that nothing
+ * references).
  */
 const deleteStorageBikePhotoSchema = z.object({
   slug: z.string().trim().min(1).max(64),
@@ -806,13 +842,26 @@ export async function deleteStorageBikePhotoAction(input: unknown): Promise<{ su
 
   const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
   if (!loaded) return { success: false, error: "Байк не найден." };
+  if (!loaded.isStaff) {
+    return { success: false, error: "Удаление фото делает экипаж — фото приёма/возврата это доказательная база акта." };
+  }
   if (!storagePhotoPathRe(bikeId).test(photoPath)) {
     return { success: false, error: "Чужое фото удалить нельзя — путь не из папки этого байка." };
   }
 
-  // Strip the path from every event that references it (no-op when nothing
-  // references it — orphan cleanup). A removed object must never stay visible
-  // on a timeline. Pre-v3 DBs have no photo_paths column — degrade quietly.
+  // R2 #7: REMOVE the object FIRST — if the storage removal fails, the
+  // timeline keeps its references (nothing visually lost) and the caller can
+  // retry. Stripping events only after a confirmed removal guarantees the
+  // file never outlives its references (the orphan-janitor direction).
+  const { error: removeError } = await supabaseAdmin.storage.from(STORAGE_PHOTO_BUCKET).remove([photoPath]);
+  if (removeError) {
+    logger.warn("[storage] photo remove failed:", removeError.message);
+    return { success: false, error: "Не удалось удалить файл — повторите позже." };
+  }
+
+  // Strip the path from every event that referenced it (no-op when nothing
+  // references it — orphan cleanup). Pre-v3 DBs have no photo_paths column —
+  // degrade quietly.
   try {
     const { data: referencing } = await supabaseAdmin
       .from("storage_bike_events")
@@ -831,10 +880,18 @@ export async function deleteStorageBikePhotoAction(input: unknown): Promise<{ su
     logger.warn("[storage] photo strip from events failed:", err instanceof Error ? err.message : String(err));
   }
 
-  const { error: removeError } = await supabaseAdmin.storage.from(STORAGE_PHOTO_BUCKET).remove([photoPath]);
-  if (removeError) {
-    logger.warn("[storage] photo remove failed:", removeError.message);
-    return { success: false, error: "Не удалось удалить файл — повторите позже." };
+  // Tamper-evident trail: the removal itself becomes a timeline row.
+  try {
+    await insertStorageEvent({
+      bikeId,
+      type: "note",
+      status: null,
+      actor: loaded.actorUserId,
+      actorName: await actorDisplayName(loaded.actorUserId),
+      message: `🗑 Фото удалено из истории (${photoPath.split("/").pop() || photoPath}) — удалил экипаж`,
+    });
+  } catch (err) {
+    logger.warn("[storage] photo-removal event failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
   await notifyStorageMove({
@@ -870,7 +927,7 @@ export async function getStorageDocUrlAction(input: unknown): Promise<{ success:
   const isMine = bike.owner_user_id && String(bike.owner_user_id) === resolved.actor.actorUserId;
   if (!resolved.actor.isStaff && !isMine) return { success: false, error: "Договор доступен владельцу и экипажу." };
   if (!bike.doc_path) return { success: true, url: "" };
-  return { success: true, url: storageDocPublicUrl(bike.doc_path) };
+  return { success: true, url: await signedStorageDocUrl(bike.doc_path) };
 }
 
 // ── story page / report / payment / owner-link (transparency parity v2) ────
@@ -1097,7 +1154,7 @@ export async function getStorageBikeReportAction(input: unknown): Promise<{ succ
     botUsername = platformBotUsername();
   }
   const wallUrl = crewBotAppLink(botUsername, storageStartParam(slug)) || undefined;
-  const docUrl = loaded.row.doc_path ? storageDocPublicUrl(loaded.row.doc_path) : "";
+  const docUrl = loaded.row.doc_path ? await signedStorageDocUrl(loaded.row.doc_path) : "";
 
   const events = await loadStoryEvents(bikeId);
   const { data: crewRow } = await supabaseAdmin

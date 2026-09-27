@@ -52,7 +52,6 @@ import {
   STORAGE_STORY_EVENTS_CAP,
   STORAGE_STATUS_META,
   STORAGE_STATUS_TRANSITIONS,
-  storageDocPublicUrl,
   storageEventLabel,
   storageFormatRub,
   storageIsoToRu,
@@ -64,6 +63,7 @@ import type { StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import type { StorageStatusMeta } from "@/app/franchize/lib/storage";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { StorageEventPhotoGrid, StoragePhotoStrip, useStoragePhotoUpload } from "./StoragePhotos";
+import { openStorageDoc } from "./openStorageDoc";
 import { DEFAULT_FRANCHIZE_THEME, type FranchizeTheme } from "@/lib/franchize-config";
 
 /** Crew theme in «auto» mode — follows the app's light/dark preference. */
@@ -116,8 +116,8 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
       const result = await getStorageBikeStoryAction({
         slug,
         bikeId,
-        actorUserId: dbUser?.user_id || undefined,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (epoch !== fetchEpochRef.current) return;
       if (!result.success || !result.story) {
@@ -183,31 +183,47 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
   const meta = STORAGE_STATUS_META[story.status] ?? STORAGE_STATUS_META.requested;
   const tone = TONE_STYLES[meta.tone] ?? TONE_STYLES.default;
   const targets = (STORAGE_STATUS_TRANSITIONS[story.status] ?? []) as StorageBikeStatus[];
-  const docUrl = story.docPath ? storageDocPublicUrl(story.docPath) : "";
+  // Boss R2 #1: the contract (owner passport inside!) is served via a
+  // short-lived SIGNED URL minted per click by getStorageDocUrlAction —
+  // never a /object/public/ link against the private rental-contracts bucket.
   const paid = storagePaidCovered(story.paidUntil);
   const activeStatus = story.status === "requested" || story.status === "in_storage";
   const phoneDigits = story.ownerPhone.replace(/\D/g, "");
 
-  /** Staff AND the bike's owner may remove a photo (the action re-verifies).
-   * Frees the storagepix quota and strips the shot from the event. */
-  const deletePhoto = async (photoPath: string) => {
-    if (!window.confirm("Удалить это фото из истории хранения?")) return;
-    try {
-      const result = await deleteStorageBikePhotoAction({
-        slug,
-        bikeId,
-        photoPath,
-        initData: getTelegramInitData(),
-      });
-      if (!result.success) {
-        toast.error(result.error ?? "Не удалось удалить фото.");
-        return;
-      }
-      toast.success("Фото удалено");
-      void fetchStory();
-    } catch {
-      toast.error("Нет связи — попробуйте ещё раз.");
-    }
+  /** STAFF ONLY (boss R2 #6 — the owner keeps upload rights, deletion of
+   * act evidence is the crew's call; the action re-verifies and logs the
+   * removal into the timeline).
+   * Boss R2 #2: NO window.confirm — the Telegram iOS/Android WebView
+   * silently swallows native confirm()/prompt(); the confirmation is a
+   * sonner toast with an action button (plain in-app DOM, always works). */
+  const deletePhoto = (photoPath: string) => {
+    toast("Удалить это фото из истории хранения?", {
+      duration: 7000,
+      action: {
+        label: "Удалить",
+        onClick: () => {
+          void (async () => {
+            try {
+              const result = await deleteStorageBikePhotoAction({
+                slug,
+                bikeId,
+                photoPath,
+                initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
+              });
+              if (!result.success) {
+                toast.error(result.error ?? "Не удалось удалить фото.");
+                return;
+              }
+              toast.success("Фото удалено");
+              void fetchStory();
+            } catch {
+              toast.error("Нет связи — попробуйте ещё раз.");
+            }
+          })();
+        },
+      },
+    });
   };
 
   return (
@@ -283,17 +299,16 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
               ПЭП ✓
             </span>
           ) : null}
-          {docUrl ? (
-            <a
-              href={docUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+          {story.docPath ? (
+            <button
+              type="button"
+              onClick={() => void openStorageDoc({ slug, bikeId: story.id, label: story.bikeTitle })}
               className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]"
               style={{ backgroundColor: T.bgElevated, color: T.textMuted }}
             >
               <FileText className="h-3 w-3" aria-hidden="true" />
               Договор (DOCX)
-            </a>
+            </button>
           ) : null}
           <StorageReportButton
             slug={slug}
@@ -416,6 +431,7 @@ function MoveButton({
   onDone: () => void;
   T: ReturnType<typeof useCrewTokens>;
 }) {
+  const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -437,6 +453,7 @@ function MoveButton({
         message: message.trim() || undefined,
         photos: upload.paths.length > 0 ? upload.paths : undefined,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось изменить статус.");
@@ -544,6 +561,7 @@ function PaymentControl({
   onDone: () => void;
   T: ReturnType<typeof useCrewTokens>;
 }) {
+  const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(currentPaidUntil || seasonEnd || "");
   const [note, setNote] = useState("");
@@ -562,6 +580,7 @@ function PaymentControl({
         paidUntil: date,
         note: note.trim() || undefined,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось отметить оплату.");
@@ -628,6 +647,7 @@ function PaymentControl({
 }
 
 function OwnerLinkControl({ slug, bikeId, onDone, T }: { slug: string; bikeId: string; onDone: () => void; T: ReturnType<typeof useCrewTokens> }) {
+  const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [open, setOpen] = useState(false);
   const [tgId, setTgId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -640,6 +660,7 @@ function OwnerLinkControl({ slug, bikeId, onDone, T }: { slug: string; bikeId: s
         bikeId,
         ownerTgUserId: detach ? "" : tgId.trim(),
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось привязать владельца.");
@@ -716,6 +737,7 @@ function NoteControl({
   T: ReturnType<typeof useCrewTokens>;
   staffLabel?: boolean;
 }) {
+  const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [open, setOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -730,6 +752,7 @@ function NoteControl({
         bikeId,
         message,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось сохранить заметку.");
@@ -802,6 +825,7 @@ function PhotoFixationControl({
   T: ReturnType<typeof useCrewTokens>;
   staffLabel?: boolean;
 }) {
+  const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [open, setOpen] = useState(false);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
@@ -834,6 +858,7 @@ function PhotoFixationControl({
         message: caption.trim() || undefined,
         photos: upload.paths,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось сохранить фото.");

@@ -364,10 +364,11 @@ describe("storage-bikes server actions v3 — gates and scoping", () => {
     expect(linkBlock).toContain("alsoChatIds: digits ? [digits] : []");
   });
 
-  it("report action builds markdown via the lib with wall deeplink and public doc url", () => {
+  it("report action builds markdown via the lib with wall deeplink and a SIGNED doc url (boss R2 #1)", () => {
     expect(src.includes("buildStorageBikeReport(")).toBe(true);
     expect(src.includes("crewBotAppLink(botUsername, storageStartParam(slug))")).toBe(true);
-    expect(src.includes("storageDocPublicUrl(loaded.row.doc_path)")).toBe(true);
+    expect(src.includes("signedStorageDocUrl(loaded.row.doc_path)")).toBe(true);
+    expect(src.includes("storageDocPublicUrl")).toBe(false);
     expect(src.includes("platformBotUsername()")).toBe(true);
   });
 

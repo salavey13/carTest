@@ -34,7 +34,6 @@ import {
   STORAGE_STATUS_TRANSITIONS,
   filterStorageBikes,
   sortStorageBikes,
-  storageDocPublicUrl,
   storageEventLabel,
   storageFormatRub,
   storageIsoToRu,
@@ -52,6 +51,7 @@ import type { StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { DEFAULT_FRANCHIZE_THEME, type FranchizeTheme } from "@/lib/franchize-config";
 import { StorageEventPhotoGrid, StoragePhotoStrip, useStoragePhotoUpload } from "./StoragePhotos";
+import { openStorageDoc } from "./openStorageDoc";
 
 /** Crew theme in «auto» mode — follows the app's light/dark preference. */
 const AUTO_THEME: FranchizeTheme = { ...DEFAULT_FRANCHIZE_THEME, isAuto: true };
@@ -114,8 +114,8 @@ export function StorageWallClient({ initialSlug, crewName, contactsPhone, storag
     try {
       const result = await getStorageWallAction({
         slug,
-        actorUserId: dbUser?.user_id || undefined,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (epoch !== fetchEpochRef.current) return; // a newer request already committed
       if (!result.success || !result.wall) {
@@ -437,6 +437,7 @@ function StorageBikeCard({
   T: ReturnType<typeof useCrewTokens>;
   onChanged: () => void;
 }) {
+  const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [open, setOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -451,7 +452,9 @@ function StorageBikeCard({
   const tone = TONE_STYLES[meta.tone] ?? TONE_STYLES.default;
   const isStaff = access === "staff";
   const targets = (STORAGE_STATUS_TRANSITIONS[bike.status] ?? []) as StorageBikeStatus[];
-  const docUrl = bike.docPath ? storageDocPublicUrl(bike.docPath) : "";
+  // Boss R2 #1: the contract opens via a per-click SIGNED URL from the
+  // gated server action — never a /object/public/ link on passport-bearing
+  // documents.
   const paid = storagePaidCovered(bike.paidUntil);
   const activeStatus = bike.status === "requested" || bike.status === "in_storage";
   const storyHref = `/franchize/${slug}/storage/${bike.id}`;
@@ -469,8 +472,8 @@ function StorageBikeCard({
         slug,
         bikeId: bike.id,
         status,
-        actorUserId: undefined,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось изменить статус.");
@@ -524,8 +527,8 @@ function StorageBikeCard({
         status: moveTarget,
         message: moveMessage.trim() || undefined,
         photos: upload.paths.length > 0 ? upload.paths : undefined,
-        actorUserId: undefined,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось изменить статус.");
@@ -558,6 +561,7 @@ function StorageBikeCard({
         bikeId: bike.id,
         message,
         initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось сохранить заметку.");
@@ -648,17 +652,16 @@ function StorageBikeCard({
               оплата ждёт
             </span>
           ) : null}
-          {docUrl ? (
-            <a
-              href={docUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+          {bike.docPath ? (
+            <button
+              type="button"
+              onClick={() => void openStorageDoc({ slug, bikeId: bike.id, label: bike.bikeTitle })}
               className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition active:scale-[0.98]"
               style={{ backgroundColor: T.bgElevated, color: T.textMuted }}
             >
               <FileText className="h-3 w-3" aria-hidden="true" />
               Договор
-            </a>
+            </button>
           ) : null}
           <Link
             href={storyHref}

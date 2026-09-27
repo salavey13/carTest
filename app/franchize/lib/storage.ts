@@ -137,13 +137,11 @@ export function storageStartParam(slug: string): string {
   const s = String(slug ?? "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
   return s ? `storage_${s}` : "storage";
 }
-
-/** Public URL of the generated contract in the rental-contracts bucket. */
-export function storageDocPublicUrl(docPath: string): string {
-  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
-  if (!base || !docPath) return "";
-  return `${base}/storage/v1/object/public/rental-contracts/${docPath.split("/").map(encodeURIComponent).join("/")}`;
-}
+// NOTE (boss review R2 #1): the former storageDocPublicUrl() helper is GONE —
+// it built a public-objects URL against the PRIVATE rental-contracts bucket
+// and the contracts carry the owner's passport. Delivery now goes through the
+// short-lived signed URL minted inside getStorageDocUrlAction /
+// getStorageBikeReportAction (storage-bikes.ts).
 
 // ── фотофиксация (acceptance/return photos in the event timeline) ───────────
 

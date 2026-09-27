@@ -214,7 +214,11 @@ function OdometerStartEditor({
 
   const parsed = parseOdometer(startValue);
   const invalid = Number.isNaN(parsed);
-  const unchanged = parsed === savedValue || (parsed === null && savedValue === null);
+  // R1 #7 (honest clear): the start reading is write-once-until-freeze and the
+  // server treats null as a no-op — an emptied field must not flip the badge
+  // to «сохранено». We simply don't autosave an empty field; the last saved
+  // value stays in the card until the user types a number again.
+  const unchanged = parsed === savedValue || (parsed === null && savedValue === null) || parsed === null;
 
   const persist = useCallback(
     async (value: number | null) => {
@@ -263,6 +267,7 @@ function OdometerStartEditor({
       if (document.visibilityState !== "hidden") return;
       if (invalid) return;
       const value = parseOdometer(startValue);
+      if (value === null) return; // honest clear — nothing to persist
       if (value === savedValue) return;
       void persist(value);
     };
@@ -398,13 +403,17 @@ function OdometerEditor({
   );
 
   // ── Draft context (2026-09-28): report saves + expose a flush so the
-  // closure modal always opens with the freshest value, even when the
-  // operator clicks «Подтвердить возврат» within the 700ms debounce window.
+  // closure modal always opens with the freshest value. R1 #4: the flush
+  // must also await an IN-FLIGHT persist (debounce already fired but the
+  // POST is still on the wire — slow mobile networks in the TG WebView),
+  // otherwise the modal pre-fills the stale value and the owner-reported
+  // symptom resurfaces.
   const draftStore = useRentalOdometerDraft();
   // Live state mirror for the flush closure (no stale deps).
   const stateRef = useRef({ endValue, savedValue, invalid });
   stateRef.current = { endValue, savedValue, invalid };
   const pendingRef = useRef<number | null | undefined>(undefined); // undefined = nothing pending
+  const inFlightRef = useRef<Promise<number | null> | null>(null);
 
   const persist = useCallback(
     async (value: number | null) => {
@@ -437,22 +446,42 @@ function OdometerEditor({
     [rentalId, dbUser?.user_id, draftStore],
   );
 
+  /** persist + remember the promise, resolving with the attempted value. */
+  const runPersist = useCallback(
+    (value: number | null) => {
+      const p = persist(value)
+        .then(() => value)
+        .catch(() => value);
+      inFlightRef.current = p;
+      void p.finally(() => {
+        if (inFlightRef.current === p) inFlightRef.current = null;
+      });
+      return p;
+    },
+    [persist],
+  );
+
   // Register the flush: cancels a pending debounced save and persists it
-  // immediately, resolving with the freshest known value.
+  // immediately, or awaits an in-flight POST, resolving with the freshest
+  // value either way.
   useEffect(() => {
     if (!draftStore) return;
     draftStore.registerFlush(async () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
       if (pendingRef.current !== undefined) {
         const value = pendingRef.current;
         pendingRef.current = undefined;
-        await persist(value);
-        return value;
+        return runPersist(value);
       }
+      if (inFlightRef.current) return inFlightRef.current;
       const { savedValue: saved } = stateRef.current;
       return saved;
     });
     return () => draftStore.registerFlush(null);
-  }, [draftStore, persist]);
+  }, [draftStore, runPersist]);
 
   // Debounced autosave: 700ms after the last keystroke. Before unmount /
   // navigation flush the pending change immediately so the closure modal
@@ -472,7 +501,7 @@ function OdometerEditor({
     debounceRef.current = setTimeout(() => {
       latestRef.current.sentAt = Date.now();
       pendingRef.current = undefined;
-      void persist(value);
+      runPersist(value);
     }, 700);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -487,7 +516,7 @@ function OdometerEditor({
       if (invalid) return;
       const value = endValue.trim() === "" ? null : Math.round(Number(endValue));
       if (value === savedValue) return;
-      void persist(value);
+      runPersist(value);
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
