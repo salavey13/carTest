@@ -35,6 +35,7 @@ import {
   type WallPhoto,
 } from "@/app/franchize/lib/bike-wall";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
+import { BikeReportButton } from "@/app/franchize/[slug]/bikes/BikeReportButton";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
@@ -354,6 +355,27 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
           </div>
         );
       })()}
+
+      {/* ── REPORT ACTION ROW ───────────────────────────────────── */}
+      {/* 2026-09-27: the «Отчёт» moved here from the Мотопарк wall cards
+          (boss: the overlay pill was almost cropped away on mobile, and the
+          report ignored the wall's month selector). Wired to the SAME month
+          state as the selector above — the .md lands in the user's TG chat
+          (sendDocument via forward api) or downloads as a fallback, and its
+          scope always matches the KPI band on screen. */}
+      <BikeReportButton
+        slug={slug}
+        bikeId={bikeId}
+        bikeLabel={bike.label}
+        actorUserId={getActorUserId() || undefined}
+        isPasswordAuth={!!passwordAuthOwnerId}
+        month={month}
+        bgColor={T.bgCard}
+        borderColor={T.borderSoft}
+        textColor={T.text}
+        chipBg={T.bgElevated}
+        chipText={T.textMuted}
+      />
 
       {/* ── KPI BAND (horizontal scroll on mobile) ────────────── */}
       <div className="-mx-1 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: "none" }}>

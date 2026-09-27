@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Menu, Send, Wrench } from "lucide-react";
+import { ArrowLeft, Menu, Send, Snowflake, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
@@ -89,6 +89,10 @@ export function CrewHeader({
   // pills (sanitizer refuses to hide ALL of them). Defaults = classic rail.
   const tabLabels = resolveCrewTabLabels(crew.ui);
   const hiddenTabs = new Set<FranchizeTabKey>(crew.ui?.hiddenTabs ?? []);
+  // 2026-09-27: the «Хранение» rail pill is ALSO gated on the crew's storage
+  // config — the VM hydrates it through resolveStorageConfig, which keeps the
+  // legacy rule (vip-bike ON unless the crew explicitly opts out) built in.
+  const storageEnabled = crew.storage?.enabled ?? false;
 
   // ── Logo loading state machine ──
   const [brokenLogoUrls, setBrokenLogoUrls] = useState<Record<string, true>>({});
@@ -392,14 +396,19 @@ export function CrewHeader({
               { key: "service" as const, label: tabLabels.service, count: items?.filter(hasServicePrice).length ?? 0 },
               { key: "equipment" as const, label: tabLabels.equipment, count: items?.filter(hasEquipmentPrice).length ?? 0, isEquipment: true },
               { key: "parts" as const, label: tabLabels.parts, count: 0, icon: Wrench, isExternal: true },
-            ]).filter((pill) => !hiddenTabs.has(pill.key)).map((pill) => {
-              // Equipment and Parts use pathname-based active state (separate routes);
-              // rent/sale/service use displayMode-based active state
+              // 2026-09-27: «Хранение» — route pill to the winter-storage wall
+              // (same pattern as parts; visibility gated on storageEnabled).
+              { key: "storage" as const, label: tabLabels.storage, count: 0, icon: Snowflake, isStorage: true },
+            ]).filter((pill) => !hiddenTabs.has(pill.key) && (pill.key !== "storage" || storageEnabled)).map((pill) => {
+              // Equipment/Parts/Storage use pathname-based active state (separate
+              // routes); rent/sale/service use displayMode-based active state
               const isActive = pill.isEquipment
                 ? pathname === `${mainCatalogPath}/${EQUIPMENT_PATH}`
                 : pill.isExternal
                   ? pathname === `${mainCatalogPath}/parts`
-                  : displayMode === pill.key && !pathname.includes(`/${EQUIPMENT_PATH}`) && !pathname.includes(`/parts`);
+                  : pill.isStorage
+                    ? pathname.startsWith(`${mainCatalogPath}/storage`)
+                    : displayMode === pill.key && !pathname.includes(`/${EQUIPMENT_PATH}`) && !pathname.includes(`/parts`);
               const handlePillClick = () => {
                 if (pill.isEquipment) {
                   router.push(`${mainCatalogPath}/${EQUIPMENT_PATH}`);
@@ -409,12 +418,21 @@ export function CrewHeader({
                   router.push(`${mainCatalogPath}/parts`);
                   return;
                 }
-                if (isOnCatalogPage) {
-                  setDisplayMode(pill.key);
-                } else {
-                  // On non-catalog pages — navigate to main catalog with mode param
-                  const modeParam = pill.key === 'rent' ? '' : `?mode=${pill.key}`;
-                  router.push(`${mainCatalogPath}${modeParam}`);
+                if (pill.isStorage) {
+                  router.push(`${mainCatalogPath}/storage`);
+                  return;
+                }
+                // Only the three catalog filter modes may fall through here —
+                // equipment/parts/storage already returned above; the explicit
+                // key check narrows the union for setDisplayMode's DisplayMode.
+                if (pill.key === "rent" || pill.key === "sale" || pill.key === "service") {
+                  if (isOnCatalogPage) {
+                    setDisplayMode(pill.key);
+                  } else {
+                    // On non-catalog pages — navigate to main catalog with mode param
+                    const modeParam = pill.key === 'rent' ? '' : `?mode=${pill.key}`;
+                    router.push(`${mainCatalogPath}${modeParam}`);
+                  }
                 }
               };
               return (

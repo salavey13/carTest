@@ -114,7 +114,9 @@ describe('crew-ui wiring', () => {
   it('CrewHeader resolves labels from crew.ui and applies hiddenTabs', () => {
     expect(crewHeaderSrc).toContain('resolveCrewTabLabels(crew.ui)');
     expect(crewHeaderSrc).toContain('label: tabLabels.rent');
-    expect(crewHeaderSrc).toContain('.filter((pill) => !hiddenTabs.has(pill.key))');
+    // 2026-09-27: the filter also drops the storage pill when the crew has
+    // storage disabled (pill.key !== "storage" || storageEnabled).
+    expect(crewHeaderSrc).toContain('.filter((pill) => !hiddenTabs.has(pill.key) && (pill.key !== "storage" || storageEnabled))');
     // no hardcoded rail labels left in the component
     expect(crewHeaderSrc).not.toContain('label: "Аренда"');
   });
@@ -130,7 +132,20 @@ describe('crew-ui wiring', () => {
   });
 
   it('rail keys and lib keys stay in sync', () => {
-    const keys: FranchizeTabKey[] = ['rent', 'sale', 'service', 'equipment', 'parts'];
+    // 2026-09-27: + "storage" — the «Зимнее хранение» route pill (CrewHeader
+    // additionally gates its visibility on crew.storage.enabled).
+    const keys: FranchizeTabKey[] = ['rent', 'sale', 'service', 'equipment', 'parts', 'storage'];
     expect(FRANCHIZE_TAB_KEYS).toEqual(keys);
+  });
+
+  it('CrewHeader renders the «Хранение» rail pill, gated on crew.storage.enabled', () => {
+    // 2026-09-27: the pill navigates to the winter-storage wall like the
+    // parts/equipment route pills; visibility = NOT hiddenTabs-hidden AND
+    // storage enabled (resolveStorageConfig keeps the vip-bike legacy rule).
+    expect(crewHeaderSrc).toContain('key: "storage" as const');
+    expect(crewHeaderSrc).toContain("pill.key !== \"storage\" || storageEnabled");
+    expect(crewHeaderSrc).toContain('pathname.startsWith(`${mainCatalogPath}/storage`)');
+    expect(crewHeaderSrc).toContain('router.push(`${mainCatalogPath}/storage`)');
+    expect(crewHeaderSrc).toContain('const storageEnabled = crew.storage?.enabled ?? false;');
   });
 });

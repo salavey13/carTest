@@ -428,6 +428,7 @@ describe("bike-rentals-report: empty history", () => {
 describe("bike-rentals-report: source guards", () => {
   const action = read(`${APP}/server-actions/bike-wall.ts`);
   const wall = read(`${APP}/[slug]/bikes/BikesWallClient.tsx`);
+  const story = read(`${APP}/[slug]/bikes/[bikeId]/BikeStoryClient.tsx`);
   const button = read(`${APP}/[slug]/bikes/BikeReportButton.tsx`);
 
   it("server action exists and reuses the wall access gate (not a weaker check)", () => {
@@ -456,18 +457,25 @@ describe("bike-rentals-report: source guards", () => {
     expect(reportBody).toContain("resolveReportClientName");
   });
 
-  it("the wall renders the report button with the same auth as the wall fetch", () => {
-    expect(wall).toContain("BikeReportButton");
-    expect(wall).toContain("actorUserId={getActorUserId() || undefined}");
-    expect(wall).toContain("isPasswordAuth={!!passwordAuthOwnerId}");
+  it("2026-09-27: the report row lives on the BIKE STORY page (not on the wall cards)", () => {
+    // The wall-card pill was nearly cropped away on mobile and ignored the
+    // month selector — it moved into the story page as a full-width row.
+    expect(story).toContain("BikeReportButton");
+    expect(wall).not.toContain("BikeReportButton");
   });
 
-  it("the button never nests inside the card Link (sibling overlay, not <a><button>)", () => {
-    // The photo section opens the button as a SIBLING of the underlay Link:
-    expect(wall).toContain("className=\"absolute bottom-2 right-2 z-10\"");
-    // and the card root is a plain div, not the Link itself:
-    expect(wall).not.toContain('className="group block overflow-hidden rounded-2xl border transition active:scale-[0.985]"');
-    expect(wall).toContain('className="group overflow-hidden rounded-2xl border transition active:scale-[0.985]"');
+  it("the story page renders the report row with the same auth as the story fetch", () => {
+    expect(story).toContain("actorUserId={getActorUserId() || undefined}");
+    expect(story).toContain("isPasswordAuth={!!passwordAuthOwnerId}");
+  });
+
+  it("the report row is a full-width action row, not a floating overlay pill", () => {
+    expect(button).toContain("flex w-full items-center justify-between");
+    // scope chip — the selected range is visible BEFORE the tap
+    expect(button).toContain("за всё время");
+    expect(button).toContain("monthLabelRu(month)");
+    // no more absolute hit-area pad over the photo
+    expect(button).not.toContain("-inset-x-3 -inset-y-2.5");
   });
 
   it("deep links resolve the bot via the crew-bot chain (prod has NO TELEGRAM_BOT_USERNAME env)", () => {
@@ -478,8 +486,8 @@ describe("bike-rentals-report: source guards", () => {
     expect(reportBody).not.toContain('process.env.TELEGRAM_BOT_USERNAME || "oneBikePlsBot"');
   });
 
-  it("month selector pipes through wall → card → button → action (numbers never contradict)", () => {
-    expect(wall).toContain("month={month}");
+  it("month selector pipes through story → button → action (numbers never contradict)", () => {
+    expect(story).toContain("month={month}");
     expect(button).toContain("month?: string | null");
     const reportIdx = action.indexOf("getBikeRentalsReportAction");
     const reportBody = action.slice(reportIdx);
@@ -495,8 +503,7 @@ describe("bike-rentals-report: source guards", () => {
     expect(button).toContain("isTelegramWebView()");
     expect(button).toContain("CLIPBOARD_MAX_CHARS");
     expect(button).toContain("navigator.clipboard.writeText");
-    // hit-area pad + focus ring + failure feedback
-    expect(button).toContain("-inset-x-3 -inset-y-2.5");
+    // focus ring + failure feedback
     expect(button).toContain("focus-visible:outline-2");
     expect(button).toContain("failed ? (");
     expect(button).toContain("e.stopPropagation()");

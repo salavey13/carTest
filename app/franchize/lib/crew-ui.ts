@@ -8,10 +8,14 @@
 //     "tabLabels": { "rent": "Заявки", ... },     // CrewHeader rail pill captions
 //     "hiddenTabs": ["equipment", "parts"]        // pills to hide from the rail
 //   }
+// 2026-09-27: "storage" — the «Зимнее хранение» rail pill (route pill like
+// "parts", navigates to /storage). Visibility is ALSO gated on the crew's
+// storage config (crew.storage.enabled) in CrewHeader — hiddenTabs is the
+// per-crew override on top of that.
 // Everything unknown/hostile is dropped; an empty payload yields undefined so
 // crews without overrides keep the classic rail bit-for-bit.
 
-export type FranchizeTabKey = "rent" | "sale" | "service" | "equipment" | "parts";
+export type FranchizeTabKey = "rent" | "sale" | "service" | "equipment" | "parts" | "storage";
 
 export const FRANCHIZE_TAB_KEYS = [
   "rent",
@@ -19,6 +23,7 @@ export const FRANCHIZE_TAB_KEYS = [
   "service",
   "equipment",
   "parts",
+  "storage",
 ] as const satisfies readonly FranchizeTabKey[];
 
 export interface FranchizeCrewUiVM {
@@ -33,6 +38,7 @@ export const DEFAULT_TAB_LABELS: Record<FranchizeTabKey, string> = {
   service: "Сервис",
   equipment: "Экипировка",
   parts: "Запчасти",
+  storage: "Хранение",
 };
 
 // Pills are `px-4 text-xs` — 24 chars keeps the widest label inside the rail

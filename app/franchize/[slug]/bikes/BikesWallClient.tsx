@@ -3,6 +3,12 @@
 // /app/franchize/[slug]/bikes/BikesWallClient.tsx
 // iter28 — «Мотопарк»: fleet wall index. Mobile-first: single column of photo
 // cards, every bike with its live stats. Tap a card → the bike's story wall.
+//
+// 2026-09-27: the per-card «Отчёт» pill MOVED to the bike's story page
+// ([bikeId]/BikeStoryClient.tsx) — on the wall it sat absolutely-positioned
+// over the photo and was nearly cropped away on mobile; on the story page it
+// is a full-width action row scoped by the story's month selector (reports
+// follow the selected range instead of silently being all-time).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -14,7 +20,6 @@ import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import type { BikeWallSummary } from "@/app/franchize/lib/bike-wall";
 import { formatMoney, monthLabelRu, monthLabelShort } from "@/app/franchize/lib/bike-wall";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
-import { BikeReportButton } from "@/app/franchize/[slug]/bikes/BikeReportButton";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
@@ -262,8 +267,6 @@ export function BikesWallClient({ initialSlug, crew }: BikesWallClientProps) {
               slug={slug}
               T={T}
               month={month}
-              actorUserId={getActorUserId() || undefined}
-              isPasswordAuth={!!passwordAuthOwnerId}
             />
           ))}
         </div>
@@ -277,17 +280,12 @@ function BikeCard({
   slug,
   T,
   month,
-  actorUserId,
-  isPasswordAuth,
 }: {
   bike: BikeWallSummary;
   slug: string;
   T: ReturnType<typeof useCrewTokens>;
   /** null = all-time; "YYYY-MM" = month-scoped money/rental tiles. */
   month: string | null;
-  /** forwarded to the «Отчёт» button (same auth as the wall fetch). */
-  actorUserId?: string;
-  isPasswordAuth: boolean;
 }) {
   const s = bike.stats;
   const bikeHref = `/franchize/${slug}/bikes/${encodeURIComponent(bike.bikeId)}`;
@@ -296,8 +294,8 @@ function BikeCard({
       className="group overflow-hidden rounded-2xl border transition active:scale-[0.985]"
       style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}
     >
-      {/* photo — the Link is an UNDERLAY (tappable everywhere); the «Отчёт»
-          button is its SIBLING floating above, never a nested <button> in <a> */}
+      {/* photo — the Link is an UNDERLAY (tappable everywhere); the whole
+          card opens the bike's story page, where the «Отчёт» action row lives */}
       <div className="relative aspect-[16/10] w-full overflow-hidden" style={{ backgroundColor: T.bgElevated }}>
         <Link href={bikeHref} aria-hidden="true" tabIndex={-1} className="absolute inset-0 z-0" />
         {bike.image ? (
@@ -328,15 +326,6 @@ function BikeCard({
             </span>
           ) : null}
         </div>
-        <BikeReportButton
-          slug={slug}
-          bikeId={bike.bikeId}
-          bikeLabel={bike.label}
-          actorUserId={actorUserId}
-          isPasswordAuth={isPasswordAuth}
-          month={month}
-          className="absolute bottom-2 right-2 z-10"
-        />
       </div>
 
       {/* body */}

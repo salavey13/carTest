@@ -1,12 +1,20 @@
 "use client";
 
 // /app/franchize/[slug]/bikes/BikeReportButton.tsx
-// «Отчёт» button on every Мотопарк card (2026-09-26): fetches the bike's
-// rentals one-pager from getBikeRentalsReportAction and saves it as a .md
-// file (boss format: summary + table + deep links). Scope follows the wall's
-// month selector — all-time by default («Аренды за всё время», the boss
-// samples), the selected month when paged («Аренды за сентябрь 2026») — so
-// the report never contradicts the numbers on screen.
+// «Отчёт» action row on the BIKE STORY page (2026-09-27): fetches the bike's
+// rentals one-pager from getBikeRentalsReportAction and delivers it as a .md
+// file (boss format: summary + table + deep links). Scope follows the story
+// page's month selector — all-time by default («Вся история»), the selected
+// month when paged («Аренды за сентябрь 2026») — so the report never
+// contradicts the numbers on screen.
+//
+// HISTORY: it used to be a small overlay pill on every Мотопарк wall card —
+// absolutely positioned over the photo it was nearly cropped away on mobile
+// (boss: "barely partially visible, almost missed it"), and the wall's own
+// month selector made it look month-scoped while the report silently stayed
+// all-time. Moving it into the story page fixed both: full-width row below
+// the month selector (impossible to miss, native tap target) and month
+// wiring straight from the same selector that scopes the KPI band.
 //
 // WebView reality (2026-09-26 refine): inside Telegram the .md file is SENT
 // TO THE USER'S CHAT by the bot via /api/forward-telegram (sendDocument,
@@ -15,11 +23,6 @@
 // download remains the non-Telegram path (SalesAnalyticsClient CSV recipe)
 // and the fallback if the forward API fails; the clipboard copy stays as a
 // second fallback inside Telegram (transient-activation aware).
-//
-// The button is a SIBLING of the card Link (never nested inside <a>) — valid
-// HTML, clicks stay unambiguous; the invisible padded span inside the button
-// widens the hit area to ~44px because a mis-tap here lands on the card Link
-// underneath.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -36,8 +39,15 @@ interface BikeReportButtonProps {
   /** Server-verified actor id from the wall (dbUser or password owner). */
   actorUserId?: string | null;
   isPasswordAuth: boolean;
-  /** "YYYY-MM" (MSK) — the wall's selected month; null = all-time report. */
+  /** "YYYY-MM" (MSK) — the story's selected month; null = all-time report. */
   month?: string | null;
+  /** Crew-theme tokens (useCrewTokens) — on-page row must follow the theme. */
+  bgColor?: string;
+  borderColor?: string;
+  textColor?: string;
+  /** Scope-chip face — defaults fit the legacy dark-glass fallback look. */
+  chipBg?: string;
+  chipText?: string;
   className?: string;
 }
 
@@ -177,6 +187,11 @@ export function BikeReportButton({
   actorUserId,
   isPasswordAuth,
   month,
+  bgColor = "rgba(15, 18, 22, 0.72)",
+  borderColor,
+  textColor = "#ffffff",
+  chipBg,
+  chipText,
   className = "",
 }: BikeReportButtonProps) {
   const [state, setState] = useState<ButtonState>("idle");
@@ -271,6 +286,7 @@ export function BikeReportButton({
   );
 
   const failed = state === "failed";
+  const scope = month ? monthLabelRu(month) : "за всё время";
   return (
     <button
       type="button"
@@ -278,25 +294,34 @@ export function BikeReportButton({
       disabled={state === "loading"}
       aria-label={`Сохранить отчёт по арендам — ${bikeLabel}${month ? `, ${monthLabelRu(month)}` : ", за всё время"}`}
       title={`Отчёт по арендам — ${bikeLabel}`}
-      className={`relative inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold shadow-lg backdrop-blur-sm transition active:scale-95 disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${className}`}
+      className={`flex w-full items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition active:scale-[0.99] disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 ${className}`}
       style={{
-        backgroundColor: "rgba(15, 18, 22, 0.72)",
-        borderColor: failed ? "rgba(248, 113, 113, 0.65)" : "rgba(255, 255, 255, 0.22)",
-        color: "#ffffff",
+        backgroundColor: bgColor,
+        borderColor: failed ? "rgba(248, 113, 113, 0.65)" : borderColor ?? "rgba(255, 255, 255, 0.22)",
+        color: textColor,
       }}
     >
-      {/* invisible hit-area pad — visual pill stays small, taps forgive ~10px */}
-      <span aria-hidden="true" className="absolute -inset-x-3 -inset-y-2.5 rounded-full" />
-      {state === "loading" ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : state === "done" ? (
-        <Check className="h-3.5 w-3.5" />
-      ) : failed ? (
-        <X className="h-3.5 w-3.5" />
-      ) : (
-        <FileDown className="h-3.5 w-3.5" />
-      )}
-      <span>{state === "loading" ? "Готовим…" : "Отчёт"}</span>
+      <span className="inline-flex min-w-0 items-center gap-2">
+        {state === "loading" ? (
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+        ) : state === "done" ? (
+          <Check className="h-4 w-4 shrink-0" />
+        ) : failed ? (
+          <X className="h-4 w-4 shrink-0" />
+        ) : (
+          <FileDown className="h-4 w-4 shrink-0" />
+        )}
+        <span className="truncate">{state === "loading" ? "Готовим отчёт…" : state === "done" ? "Отчёт отправлен" : state === "failed" ? "Не удалось — повторить?" : "Отчёт по арендам"}</span>
+      </span>
+      <span
+        className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium"
+        style={{
+          backgroundColor: chipBg ?? "rgba(255, 255, 255, 0.08)",
+          color: chipText ?? textColor,
+        }}
+      >
+        {scope}
+      </span>
     </button>
   );
 }
