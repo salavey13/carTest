@@ -27,6 +27,7 @@ import {
   updateStorageBikeStatusAction,
 } from "@/app/franchize/server-actions/storage-bikes";
 import {
+  STORAGE_PHOTO_WORTHY_TARGETS,
   STORAGE_SORT_LABELS,
   STORAGE_SOURCE_LABELS,
   STORAGE_STATUS_META,
@@ -50,6 +51,7 @@ import {
 import type { StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { DEFAULT_FRANCHIZE_THEME, type FranchizeTheme } from "@/lib/franchize-config";
+import { StorageEventPhotoGrid, StoragePhotoStrip, useStoragePhotoUpload } from "./StoragePhotos";
 
 /** Crew theme in «auto» mode — follows the app's light/dark preference. */
 const AUTO_THEME: FranchizeTheme = { ...DEFAULT_FRANCHIZE_THEME, isAuto: true };
@@ -439,6 +441,11 @@ function StorageBikeCard({
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [busy, setBusy] = useState(false);
+  // фотофиксация panel: the photo-worthy move being prepared (null = none).
+  const [moveTarget, setMoveTarget] = useState<StorageBikeStatus | null>(null);
+  const [moveMessage, setMoveMessage] = useState("");
+  const upload = useStoragePhotoUpload(slug, bike.id);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const meta = STORAGE_STATUS_META[bike.status] ?? STORAGE_STATUS_META.requested;
   const tone = TONE_STYLES[meta.tone] ?? TONE_STYLES.default;
@@ -451,6 +458,11 @@ function StorageBikeCard({
   const phoneDigits = bike.ownerPhone.replace(/\D/g, "");
 
   const move = async (status: StorageBikeStatus) => {
+    // A direct (non-photo) move must not leave a stale photo panel behind —
+    // after refetch it would show the old target with orphaned drafts.
+    upload.reset();
+    setMoveMessage("");
+    setMoveTarget(null);
     setBusy(true);
     try {
       const result = await updateStorageBikeStatusAction({
@@ -464,7 +476,70 @@ function StorageBikeCard({
         toast.error(result.error ?? "Не удалось изменить статус.");
         return;
       }
+      if (result.warning) toast.warning(result.warning);
       toast.success(`Статус: ${meta.label} → ${STORAGE_STATUS_META[status].label}`);
+      onChanged();
+    } catch {
+      toast.error("Нет связи — попробуйте ещё раз.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Tap on a move button: photo-worthy moves open the панель, others go straight.
+   * Switching/clearing the target resets the draft — acceptance photos must
+   * never ride onto the return act (boss review R1 finding #2). */
+  const handleMoveTap = (target: StorageBikeStatus) => {
+    if (!STORAGE_PHOTO_WORTHY_TARGETS.includes(target)) {
+      void move(target);
+      return;
+    }
+    if (moveTarget !== target) {
+      upload.reset();
+      setMoveMessage("");
+    }
+    setMoveTarget((cur) => (cur === target ? null : target));
+  };
+
+  const addMoveFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      await upload.addFiles(files);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось загрузить фото.");
+    }
+  };
+
+  const confirmMoveWithPhotos = async () => {
+    if (!moveTarget) return;
+    if (upload.hasPending) {
+      toast.error("Фото ещё загружаются — секунду.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await updateStorageBikeStatusAction({
+        slug,
+        bikeId: bike.id,
+        status: moveTarget,
+        message: moveMessage.trim() || undefined,
+        photos: upload.paths.length > 0 ? upload.paths : undefined,
+        actorUserId: undefined,
+        initData: getTelegramInitData(),
+      });
+      if (!result.success) {
+        toast.error(result.error ?? "Не удалось изменить статус.");
+        return;
+      }
+      toast.success(
+        upload.paths.length > 0
+          ? `Статус: → ${STORAGE_STATUS_META[moveTarget].label} · ${upload.paths.length} фото`
+          : `Статус: → ${STORAGE_STATUS_META[moveTarget].label}`,
+      );
+      if (result.warning) toast.warning(result.warning);
+      upload.reset();
+      setMoveMessage("");
+      setMoveTarget(null);
       onChanged();
     } catch {
       toast.error("Нет связи — попробуйте ещё раз.");
@@ -602,7 +677,7 @@ function StorageBikeCard({
                 key={target}
                 type="button"
                 disabled={busy}
-                onClick={() => move(target)}
+                onClick={() => handleMoveTap(target)}
                 className="inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold transition active:scale-[0.98] disabled:opacity-50"
                 style={
                   target === "cancelled"
@@ -623,6 +698,54 @@ function StorageBikeCard({
               <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden="true" />
               Заметка
             </button>
+          </div>
+        ) : null}
+
+        {/* фотофиксация panel — opens under the move buttons for accept/return */}
+        {isStaff && moveTarget ? (
+          <div className="mt-2 space-y-2 rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+            <p className="text-xs font-bold" style={{ color: T.text }}>
+              {STORAGE_STATUS_META[moveTarget].emoji} {MOVE_BUTTON_LABELS[moveTarget]} — фотофиксация
+            </p>
+            <StoragePhotoStrip photos={upload.photos} onRemove={upload.removePhoto} onAdd={() => fileRef.current?.click()} T={T} />
+            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addMoveFiles(e.target.files); e.target.value = ""; }} />
+            <input
+              value={moveMessage}
+              onChange={(e) => setMoveMessage(e.target.value)}
+              maxLength={500}
+              placeholder="Комментарий (необязательно)…"
+              className="h-11 w-full rounded-xl border px-3 text-sm outline-none"
+              style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px]" style={{ color: T.textFaint }}>
+                📸 До 6 фото — владелец увидит их в таймлайне и отчёте.
+              </p>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    upload.reset();
+                    setMoveMessage("");
+                    setMoveTarget(null);
+                  }}
+                  className="inline-flex min-h-11 items-center rounded-xl border px-3 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-50"
+                  style={{ borderColor: T.borderSoft, color: T.textMuted }}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || upload.hasPending}
+                  onClick={confirmMoveWithPhotos}
+                  className="inline-flex min-h-11 items-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
+                >
+                  {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+                  Подтвердить
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
         {!isStaff && access === "owner" ? (
@@ -691,7 +814,7 @@ function StorageBikeCard({
                   <li key={event.id} className="flex gap-2.5 text-xs">
                     <span
                       className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: event.type === "payment" ? "#d97706" : eventTone.fg }}
+                      style={{ backgroundColor: event.type === "payment" ? "#d97706" : event.type === "photo" ? "#8b5cf6" : eventTone.fg }}
                       aria-hidden="true"
                     />
                     <div className="min-w-0">
@@ -700,6 +823,7 @@ function StorageBikeCard({
                           {event.type === "status_changed"
                             ? `Статус: ${storageStatusLabelSafe(event.status)}`
                             : storageEventLabel(event.type) || "Событие"}
+                          {event.photoUrls.length > 0 ? ` 📸 ${event.photoUrls.length}` : ""}
                         </b>
                         {" · "}
                         <span style={{ color: T.textFaint }}>
@@ -707,6 +831,7 @@ function StorageBikeCard({
                         </span>
                       </p>
                       {event.message ? <p style={{ color: T.textMuted }}>{event.message}</p> : null}
+                      {event.photoPaths.length > 0 ? <StorageEventPhotoGrid paths={event.photoPaths} T={T} size={44} /> : null}
                       {event.actorName ? <p style={{ color: T.textFaint }}>{event.actorName}</p> : null}
                     </div>
                   </li>

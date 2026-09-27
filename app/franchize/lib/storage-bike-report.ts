@@ -123,6 +123,18 @@ export function buildStorageBikeReport(input: StorageReportInput): StorageReport
   const truncated = events.length - MAX_REPORT_EVENTS;
   const rows = truncated > 0 ? events.slice(0, MAX_REPORT_EVENTS) : events;
 
+  // Фотофиксация counts (v3): photos ride on any event — the summary names the
+  // acceptance/return anchor points, the history table marks each event.
+  // Totals run over the FULL history (pre-slice) — the summary line claims a
+  // total, so truncation must not undercount it (boss review R1 finding #5).
+  const photoCount = (list: StorageBikeVM["events"]) =>
+    list.reduce((sum, e) => sum + (Array.isArray(e.photoUrls) ? e.photoUrls.length : 0), 0);
+  const photosByStatus = (status: string, list: StorageBikeVM["events"]): number =>
+    photoCount(list.filter((e) => e.type === "status_changed" && e.status === status));
+  const photosTotal = photoCount(events);
+  const photosAccepted = photosByStatus("in_storage", events);
+  const photosReturned = photosByStatus("returned", events);
+
   const L: string[] = [];
   L.push(`# Хранение — ${titleBits.join(" (")}${titleBits.length > 1 ? ")" : ""}`);
   L.push("");
@@ -139,6 +151,9 @@ export function buildStorageBikeReport(input: StorageReportInput): StorageReport
   L.push(`- Оплата: **${storageReportPaymentLine(bike.paidUntil, now)}**`);
   L.push(`- Оценочная стоимость (ответственность Хранителя): **${storageReportMoney(bike.estimatedValueRub)}**`);
   L.push(`- Место хранения: ${line(bike.storageAddress) || "—"} · не для аренды ❄️`);
+  if (photosTotal > 0) {
+    L.push(`- Фотофиксация: **${photosTotal} фото** (приём — ${photosAccepted}, возврат — ${photosReturned}, остальное — осмотры)`);
+  }
   L.push("");
   L.push("## Мотоцикл");
   L.push("");
@@ -168,8 +183,10 @@ export function buildStorageBikeReport(input: StorageReportInput): StorageReport
         event.type === "status_changed" && event.status
           ? `${storageEventLabel(event.type)}: ${storageReportStatusLabel(event.status)}`
           : storageEventLabel(event.type);
+      const whatWithPhotos =
+        Array.isArray(event.photoUrls) && event.photoUrls.length > 0 ? `${what} · 📸 ${event.photoUrls.length}` : what;
       L.push(
-        `| ${i + 1} | ${cell(storageReportDateTime(event.createdAt))} | ${cell(what)} | ${cell(event.actorName || "—")} | ${cell(event.message || "—")} |`,
+        `| ${i + 1} | ${cell(storageReportDateTime(event.createdAt))} | ${cell(whatWithPhotos)} | ${cell(event.actorName || "—")} | ${cell(event.message || "—")} |`,
       );
     });
     if (truncated > 0) {

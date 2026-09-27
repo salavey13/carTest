@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BadgeCheck,
+  Camera,
   ChevronLeft,
   FileText,
   Link2,
@@ -38,12 +39,15 @@ import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { dateDividerLabel } from "@/app/franchize/lib/bike-wall";
 import {
   addStorageBikeNoteAction,
+  addStorageBikePhotosAction,
+  deleteStorageBikePhotoAction,
   getStorageBikeStoryAction,
   linkStorageBikeOwnerAction,
   markStorageBikePaidAction,
   updateStorageBikeStatusAction,
 } from "@/app/franchize/server-actions/storage-bikes";
 import {
+  STORAGE_PHOTO_WORTHY_TARGETS,
   STORAGE_SOURCE_LABELS,
   STORAGE_STORY_EVENTS_CAP,
   STORAGE_STATUS_META,
@@ -59,6 +63,7 @@ import {
 import type { StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import type { StorageStatusMeta } from "@/app/franchize/lib/storage";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
+import { StorageEventPhotoGrid, StoragePhotoStrip, useStoragePhotoUpload } from "./StoragePhotos";
 import { DEFAULT_FRANCHIZE_THEME, type FranchizeTheme } from "@/lib/franchize-config";
 
 /** Crew theme in «auto» mode — follows the app's light/dark preference. */
@@ -182,6 +187,28 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
   const paid = storagePaidCovered(story.paidUntil);
   const activeStatus = story.status === "requested" || story.status === "in_storage";
   const phoneDigits = story.ownerPhone.replace(/\D/g, "");
+
+  /** Staff AND the bike's owner may remove a photo (the action re-verifies).
+   * Frees the storagepix quota and strips the shot from the event. */
+  const deletePhoto = async (photoPath: string) => {
+    if (!window.confirm("Удалить это фото из истории хранения?")) return;
+    try {
+      const result = await deleteStorageBikePhotoAction({
+        slug,
+        bikeId,
+        photoPath,
+        initData: getTelegramInitData(),
+      });
+      if (!result.success) {
+        toast.error(result.error ?? "Не удалось удалить фото.");
+        return;
+      }
+      toast.success("Фото удалено");
+      void fetchStory();
+    } catch {
+      toast.error("Нет связи — попробуйте ещё раз.");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -316,6 +343,7 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
             T={T}
           />
           <NoteControl slug={slug} bikeId={story.id} onDone={fetchStory} T={T} staffLabel />
+          <PhotoFixationControl slug={slug} bikeId={story.id} onDone={fetchStory} T={T} staffLabel />
         </section>
       ) : null}
 
@@ -323,6 +351,7 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
       {!isStaff ? (
         <section className="rounded-2xl border p-4" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
           <NoteControl slug={slug} bikeId={story.id} onDone={fetchStory} T={T} />
+          <PhotoFixationControl slug={slug} bikeId={story.id} onDone={fetchStory} T={T} />
         </section>
       ) : null}
 
@@ -337,7 +366,7 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
         {story.events.length === 0 ? (
           <p className="px-4 pb-4 text-xs" style={{ color: T.textMuted }}>Событий пока не было — заявка создана, но перемещений ещё не отмечали.</p>
         ) : (
-          <StorageTimeline events={story.events} T={T} />
+          <StorageTimeline events={story.events} T={T} onDeletePhoto={deletePhoto} />
         )}
       </section>
     </div>
@@ -370,6 +399,8 @@ function Row({ label, value, wide, T }: { label: string; value: string; wide?: b
   );
 }
 
+/** Moves that deserve фотофиксация live in lib/storage (STORAGE_PHOTO_WORTHY_TARGETS) — shared with the wall. */
+
 function MoveButton({
   slug,
   bikeId,
@@ -386,20 +417,40 @@ function MoveButton({
   T: ReturnType<typeof useCrewTokens>;
 }) {
   const [busy, setBusy] = useState(false);
-  const move = async () => {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const upload = useStoragePhotoUpload(slug, bikeId);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const withPhotos = STORAGE_PHOTO_WORTHY_TARGETS.includes(target);
+
+  const submit = async () => {
+    if (upload.hasPending) {
+      toast.error("Фото ещё загружаются — секунду.");
+      return;
+    }
     setBusy(true);
     try {
       const result = await updateStorageBikeStatusAction({
         slug,
         bikeId,
         status: target,
+        message: message.trim() || undefined,
+        photos: upload.paths.length > 0 ? upload.paths : undefined,
         initData: getTelegramInitData(),
       });
       if (!result.success) {
         toast.error(result.error ?? "Не удалось изменить статус.");
         return;
       }
-      toast.success(`Статус: → ${STORAGE_STATUS_META[target].label}`);
+      toast.success(
+        upload.paths.length > 0
+          ? `Статус: → ${STORAGE_STATUS_META[target].label} · ${upload.paths.length} фото`
+          : `Статус: → ${STORAGE_STATUS_META[target].label}`,
+      );
+      if (result.warning) toast.warning(result.warning);
+      upload.reset();
+      setMessage("");
+      setOpen(false);
       onDone();
     } catch {
       toast.error("Нет связи — попробуйте ещё раз.");
@@ -407,21 +458,74 @@ function MoveButton({
       setBusy(false);
     }
   };
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      await upload.addFiles(files);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось загрузить фото.");
+    }
+  };
+
+  // Cancel (and any photo-less move) stays a single tap — no friction where
+  // фотофиксация adds nothing.
+  if (!withPhotos) {
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={submit}
+        className="inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold transition active:scale-[0.98] disabled:opacity-50"
+        style={{ border: `1px solid ${T.borderSoft}`, color: T.textMuted }}
+      >
+        {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+        {label}
+      </button>
+    );
+  }
+
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={move}
-      className="inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold transition active:scale-[0.98] disabled:opacity-50"
-      style={
-        target === "cancelled"
-          ? { border: `1px solid ${T.borderSoft}`, color: T.textMuted }
-          : { backgroundColor: "#0ea5e9", color: "#ffffff" }
-      }
-    >
-      {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
-      {label}
-    </button>
+    <div className="inline-flex flex-col">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold transition active:scale-[0.98] disabled:opacity-50"
+        style={{ backgroundColor: "#0ea5e9", color: "#ffffff" }}
+      >
+        {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+        {label}
+      </button>
+      {open ? (
+        <div className="mt-2 w-full space-y-2 rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+          <StoragePhotoStrip photos={upload.photos} onRemove={upload.removePhoto} onAdd={() => fileRef.current?.click()} T={T} />
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            maxLength={500}
+            placeholder="Комментарий (необязательно)…"
+            className="h-11 w-full rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard, color: T.text }}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px]" style={{ color: T.textFaint }}>
+              📸 Фото состояния — до 6 шт. (кузов, спидометр, комплектность). Владелец увидит их в таймлайне.
+            </p>
+            <button
+              type="button"
+              disabled={busy || upload.hasPending}
+              onClick={submit}
+              className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+              Подтвердить
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -679,8 +783,128 @@ function NoteControl({
   );
 }
 
+/**
+ * Standalone «📸 Фотофиксация» — condition shots into the timeline WITHOUT a
+ * status move. Staff AND the bike's owner both get it (same gate as notes):
+ * acceptance/return photos ride on the status-move panel above, this is for
+ * everything in between (owner dropped a new helmet, rain leak check, …).
+ */
+function PhotoFixationControl({
+  slug,
+  bikeId,
+  onDone,
+  T,
+  staffLabel,
+}: {
+  slug: string;
+  bikeId: string;
+  onDone: () => void;
+  T: ReturnType<typeof useCrewTokens>;
+  staffLabel?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [caption, setCaption] = useState("");
+  const [busy, setBusy] = useState(false);
+  const upload = useStoragePhotoUpload(slug, bikeId);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      await upload.addFiles(files);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось загрузить фото.");
+    }
+  };
+
+  const submit = async () => {
+    if (upload.paths.length === 0) {
+      toast.error("Прикрепите хотя бы одно фото.");
+      return;
+    }
+    if (upload.hasPending) {
+      toast.error("Фото ещё загружаются — секунду.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await addStorageBikePhotosAction({
+        slug,
+        bikeId,
+        message: caption.trim() || undefined,
+        photos: upload.paths,
+        initData: getTelegramInitData(),
+      });
+      if (!result.success) {
+        toast.error(result.error ?? "Не удалось сохранить фото.");
+        return;
+      }
+      toast.success("Фотофиксация добавлена в историю");
+      if (result.warning) toast.warning(result.warning);
+      upload.reset();
+      setCaption("");
+      setOpen(false);
+      onDone();
+    } catch {
+      toast.error("Нет связи — попробуйте ещё раз.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition active:scale-[0.98]"
+        style={{ borderColor: T.borderSoft, color: T.textMuted }}
+      >
+        <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+        Фотофиксация
+        {staffLabel ? "" : " (для экипажа)"}
+      </button>
+      {open ? (
+        <div className="mt-2 space-y-2">
+          <StoragePhotoStrip photos={upload.photos} onRemove={upload.removePhoto} onAdd={() => fileRef.current?.click()} T={T} />
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+          <input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            maxLength={300}
+            placeholder="Подпись (необязательно)…"
+            className="h-11 w-full rounded-xl border px-3 text-sm outline-none"
+            style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated, color: T.text }}
+          />
+          <button
+            type="button"
+            disabled={busy || upload.hasPending || upload.paths.length === 0}
+            onClick={submit}
+            className="inline-flex min-h-11 items-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+            Прикрепить в историю
+          </button>
+          <p className="text-[10px]" style={{ color: T.textFaint }}>
+            Фото появятся в истории карточки и в отчёте — вторая сторона получит уведомление в Telegram.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** VK-style feed with «Сегодня/Вчера» dividers (Мотопарк story recipe). */
-function StorageTimeline({ events, T }: { events: StorageBikeVM["events"]; T: ReturnType<typeof useCrewTokens> }) {
+function StorageTimeline({
+  events,
+  T,
+  onDeletePhoto,
+}: {
+  events: StorageBikeVM["events"];
+  T: ReturnType<typeof useCrewTokens>;
+  /** Present → ✕ on every photo thumb (staff / the bike's owner). */
+  onDeletePhoto?: (photoPath: string) => void;
+}) {
   const chrono = [...events].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
   let lastDivider = "";
   return (
@@ -708,9 +932,11 @@ function StorageTimeline({ events, T }: { events: StorageBikeVM["events"]; T: Re
                       ? "#d97706"
                       : event.type === "owner_linked"
                         ? "#0284c7"
-                        : event.type === "note"
-                          ? T.textFaint
-                          : tone.fg,
+                        : event.type === "photo"
+                          ? "#8b5cf6"
+                          : event.type === "note"
+                            ? T.textFaint
+                            : tone.fg,
                 }}
                 aria-hidden="true"
               />
@@ -727,6 +953,7 @@ function StorageTimeline({ events, T }: { events: StorageBikeVM["events"]; T: Re
                   </span>
                 </p>
                 {event.message ? <p style={{ color: T.textMuted }}>{event.message}</p> : null}
+                {event.photoPaths.length > 0 ? <StorageEventPhotoGrid paths={event.photoPaths} T={T} onDelete={onDeletePhoto} /> : null}
                 {event.actorName ? <p style={{ color: T.textFaint }}>{event.actorName}</p> : null}
               </div>
             </div>

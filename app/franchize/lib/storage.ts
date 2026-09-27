@@ -145,6 +145,61 @@ export function storageDocPublicUrl(docPath: string): string {
   return `${base}/storage/v1/object/public/rental-contracts/${docPath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+// ── фотофиксация (acceptance/return photos in the event timeline) ───────────
+
+/** Public bucket for storage bike photos (winter_storage_v3 migration). */
+export const STORAGE_PHOTO_BUCKET = "storagepix";
+
+/** Photos per event — the wall composer cap, reused for the timeline parity. */
+export const STORAGE_PHOTOS_MAX = 6;
+
+/**
+ * Moves that deserve фотофиксация (Акт приёма-передачи photo fixation).
+ * Single source shared by the wall + story move panels.
+ */
+export const STORAGE_PHOTO_WORTHY_TARGETS: StorageBikeStatus[] = ["in_storage", "returned"];
+
+/**
+ * Public URL of a storage photo. Paths arrive from the DB (server-sanitized
+ * `bikes/<bikeId>/<32hex>.jpg`), so encoding per segment is enough.
+ */
+export function storagePhotoPublicUrl(photoPath: string): string {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  if (!base || !photoPath) return "";
+  return `${base}/storage/v1/object/public/${STORAGE_PHOTO_BUCKET}/${photoPath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/**
+ * Exact shape the upload route produces: bikes/<bikeId>/<32 hex>.jpg.
+ * Anything else (../, other bikes' folders, .png, weird names) is rejected —
+ * a raw API caller can only reference files that exist in THIS bike's folder,
+ * and the folder is only writable through the identity-checked route.
+ */
+export function storagePhotoPathRe(bikeId: string): RegExp {
+  const id = String(bikeId || "").replace(/[^a-fA-F0-9-]/g, "");
+  return new RegExp(`^bikes/${id}/[0-9a-f]{32}\\.jpg$`);
+}
+
+/**
+ * Photos payload gate (mirror of the wall's sanitizeWallPhotoInputs): absent
+ * payload → [] (no photos), valid array → deduped paths strictly from THIS
+ * bike's folder, anything else → null (caller answers with a human error).
+ * null vs [] matters: null = hand-crafted/invalid payload, [] = simply none.
+ */
+export function sanitizeStoragePhotoPaths(raw: unknown, bikeId: string): string[] | null {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) return null;
+  if (raw.length > STORAGE_PHOTOS_MAX) return null;
+  const re = storagePhotoPathRe(bikeId);
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") return null;
+    if (!re.test(item)) return null;
+    if (!out.includes(item)) out.push(item);
+  }
+  return out;
+}
+
 /** 15000 → «15 000» (plain spaces — Telegram-safe, no U+00A0). */
 export function storageFormatRub(value: number): string {
   return Math.round(Number(value) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -160,12 +215,16 @@ export interface StorageBikeEventVM {
   actorName: string;
   message: string;
   createdAt: string;
+  /** Фотофиксация: PUBLIC URLs (server resolves storagepix paths) — empty for text-only events. */
+  photoUrls: string[];
+  /** Raw storagepix paths — the delete action's currency (URLs are display-only). */
+  photoPaths: string[];
 }
 
 /**
  * Human label per event type — the wall/story timelines render through this,
- * so new event kinds (payment, owner_linked) never show up as «Статус: Заявка».
- * Unknown types fall back to the raw type string.
+ * so new event kinds (payment, owner_linked, photo) never show up as
+ * «Статус: Заявка». Unknown types fall back to the raw type string.
  */
 export const STORAGE_EVENT_TYPE_LABELS: Record<string, string> = {
   created: "Заявка создана",
@@ -174,6 +233,7 @@ export const STORAGE_EVENT_TYPE_LABELS: Record<string, string> = {
   doc: "Документ",
   payment: "Оплата",
   owner_linked: "Владелец привязан",
+  photo: "Фотофиксация",
 };
 
 export function storageEventLabel(type: string): string {

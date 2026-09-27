@@ -56,6 +56,8 @@
     "app/franchize/[slug]/storage/StorageOrderForm.tsx",
     "app/franchize/[slug]/storage/new/page.tsx",
     "app/franchize/[slug]/storage/[bikeId]/page.tsx",
+    "app/franchize/[slug]/storage/StoragePhotos.tsx",
+    "app/api/franchize/storage-photo-upload/route.ts",
     "app/franchize/create/CreateFranchizeForm.tsx",
     "app/franchize/components/WinterStorageModal.tsx"
   ],

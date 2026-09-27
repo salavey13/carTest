@@ -110,7 +110,8 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     // 176 → 177: 20260926120000_salary_wallet_mirror.sql (salary audit: кошелёк → формальный леджер — триггер-зеркало + бэкфилл + view, «уже выплачено» по обеим книгам)
     // 177 → 178: 20260927120000_winter_storage.sql (зимнее хранение: storage_bikes + storage_bike_events — стена для владельцев, трекинг каждого перемещения, RLS owner-read)
     // 178 → 179: 20260927130000_winter_storage_v2.sql (зимнее хранение v2: paid_until + события payment/owner_linked — прозрачность владельца на уровне Мотопарка)
-    expect(files.length).toBe(179);
+    // 179 → 180: 20260927140000_winter_storage_v3.sql (зимнее хранение v3: фотофиксация — photo_paths jsonb на событиях + тип 'photo' + публичный бакет storagepix)
+    expect(files.length).toBe(180);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

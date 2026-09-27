@@ -41,11 +41,16 @@ import { resolveCrewBotUsername, crewBotAppLink, platformBotUsername } from "@/a
 import { formatStorageMonthsLabel } from "@/app/franchize/lib/storage-season";
 import {
   canTransitionStorageStatus,
+  sanitizeStoragePhotoPaths,
+  STORAGE_PHOTOS_MAX,
+  STORAGE_PHOTO_BUCKET,
+  storagePhotoPathRe,
   STORAGE_STORY_EVENTS_CAP,
   storageDocPublicUrl,
   storageFormatRub,
   storageIsoToRu,
   storageMonthsCount,
+  storagePhotoPublicUrl,
   storageSeasonDateToIso as toSeasonIso,
   storageStartParam,
   STORAGE_STATUS_META,
@@ -192,6 +197,8 @@ interface StorageEventRow {
   actor_name: string;
   message: string;
   created_at: string;
+  /** фотофиксация: storagepix paths — pre-v3 DBs return the default []. */
+  photo_paths: string[] | null;
 }
 
 function mapBike(row: StorageBikeRow, events: StorageEventRow[]): StorageBikeVM {
@@ -222,14 +229,19 @@ function mapBike(row: StorageBikeRow, events: StorageEventRow[]): StorageBikeVM 
     pepSigned: Boolean(row.pep_signed),
     paidUntil: row.paid_until ?? null,
     source: (["checkout", "owner_add", "crew_add"].includes(source) ? source : "checkout"),
-    events: events.map((e) => ({
-      id: e.id,
-      type: e.type,
-      status: (e.status as StorageBikeStatus | null) ?? null,
-      actorName: e.actor_name ?? "",
-      message: e.message ?? "",
-      createdAt: e.created_at,
-    })),
+    events: events.map((e) => {
+      const paths = (e.photo_paths ?? []).filter(Boolean);
+      return {
+        id: e.id,
+        type: e.type,
+        status: (e.status as StorageBikeStatus | null) ?? null,
+        actorName: e.actor_name ?? "",
+        message: e.message ?? "",
+        createdAt: e.created_at,
+        photoUrls: paths.map(storagePhotoPublicUrl).filter(Boolean),
+        photoPaths: paths,
+      };
+    }),
   };
 }
 
@@ -244,7 +256,7 @@ async function loadEventsFor(bikeIds: string[]): Promise<Map<string, StorageEven
     const chunk = bikeIds.slice(i, i + 100);
     const { data, error } = await supabaseAdmin
       .from("storage_bike_events")
-      .select("id, bike_id, type, status, actor_name, message, created_at")
+      .select("id, bike_id, type, status, actor_name, message, created_at, photo_paths")
       .in("bike_id", chunk)
       .order("created_at", { ascending: false })
       .limit(WALL_EVENTS_PER_CHUNK);
@@ -327,23 +339,42 @@ async function actorDisplayName(actorUserId: string): Promise<string> {
 
 async function insertStorageEvent(params: {
   bikeId: string;
-  type: "created" | "status_changed" | "note" | "doc" | "payment" | "owner_linked";
+  type: "created" | "status_changed" | "note" | "doc" | "payment" | "owner_linked" | "photo";
   status?: string | null;
   actor: string;
   actorName: string;
   message: string;
-}): Promise<void> {
-  const { error } = await supabaseAdmin.from("storage_bike_events").insert({
+  /** фотофиксация — storagepix paths already sanitized by the caller. */
+  photoPaths?: string[];
+}): Promise<{ saved: boolean; photosDropped: boolean }> {
+  const payload = {
     bike_id: params.bikeId,
     type: params.type,
     status: params.status ?? null,
     actor: params.actor,
     actor_name: params.actorName,
     message: params.message,
-  });
-  if (error) {
-    logger.warn("[storage] event insert failed:", error.message);
+    photo_paths: params.photoPaths ?? [],
+  };
+  const { error } = await supabaseAdmin.from("storage_bike_events").insert(payload);
+  if (!error) return { saved: true, photosDropped: false };
+  // Migration v3 not applied yet (photo_paths column missing): the EVENT must
+  // survive even if the photos cannot be attached — retry the pre-v3 shape.
+  // PostgREST reports a missing INSERT column as PGRST204 (schema cache);
+  // raw 42703 + the message regex stay as belt-and-suspenders.
+  const code = (error as { code?: string }).code ?? "";
+  if (code === "42703" || code === "PGRST204" || /photo_paths/i.test(error.message)) {
+    logger.warn("[storage] photo_paths column missing — event saved without photos:", error.message);
+    const { photo_paths: _drop, ...legacy } = payload;
+    const retry = await supabaseAdmin.from("storage_bike_events").insert(legacy);
+    if (retry.error) {
+      logger.warn("[storage] legacy event insert failed:", retry.error.message);
+      return { saved: false, photosDropped: (params.photoPaths?.length ?? 0) > 0 };
+    }
+    return { saved: true, photosDropped: (params.photoPaths?.length ?? 0) > 0 };
   }
+  logger.warn("[storage] event insert failed:", error.message);
+  return { saved: false, photosDropped: false };
 }
 
 // ── actions ──────────────────────────────────────────────────────────────────
@@ -522,9 +553,12 @@ const updateStorageBikeStatusSchema = z.object({
   bikeId: z.string().uuid(),
   status: z.enum(["requested", "in_storage", "returned", "cancelled"]),
   message: z.string().trim().max(500).optional(),
+  // фотофиксация: storagepix paths from /api/franchize/storage-photo-upload —
+  // shape-checked by sanitizeStoragePhotoPaths (strict bike-folder gate).
+  photos: z.unknown().optional(),
 });
 
-export async function updateStorageBikeStatusAction(input: unknown): Promise<{ success: boolean; error?: string }> {
+export async function updateStorageBikeStatusAction(input: unknown): Promise<{ success: boolean; error?: string; warning?: string }> {
   const parsed = updateStorageBikeStatusSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Некорректный перевод статуса." };
   const { slug, bikeId, status, message, initData, actorUserId } = parsed.data;
@@ -550,7 +584,15 @@ export async function updateStorageBikeStatusAction(input: unknown): Promise<{ s
     return { success: false, error: `Переход «${storageStatusLabel(currentStatus)}» → «${storageStatusLabel(status)}» недоступен.` };
   }
 
+  // фотофиксация приёма/возврата: paths must live in THIS bike's folder
+  // (null = hand-crafted payload → human error, [] = simply no photos).
+  const photoPaths = sanitizeStoragePhotoPaths(parsed.data.photos, bikeId);
+  if (photoPaths === null) {
+    return { success: false, error: `Фото: максимум ${STORAGE_PHOTOS_MAX} на событие и только загруженные для этого байка.` };
+  }
+
   const actorName = await actorDisplayName(staffId);
+  let warning: string | undefined;
   try {
     const { error: updateErr } = await supabaseAdmin
       .from("storage_bikes")
@@ -559,14 +601,22 @@ export async function updateStorageBikeStatusAction(input: unknown): Promise<{ s
       .eq("crew_slug", slug);
     if (updateErr) throw new Error(updateErr.message);
 
-    await insertStorageEvent({
+    const inserted = await insertStorageEvent({
       bikeId,
       type: "status_changed",
       status,
       actor: staffId,
       actorName,
       message: message || `${STORAGE_STATUS_META[currentStatus as StorageBikeStatus]?.label ?? storageStatusLabel(currentStatus)} → ${storageStatusLabel(status)}`,
+      photoPaths,
     });
+    // Honest degradation instead of silently swallowing the move's history:
+    // pre-v3 DB → photos could not attach; unrelated DB error → no event at all.
+    if (!inserted.saved) {
+      warning = "Перемещение сохранено, но событие не записалось в историю — проверьте позже.";
+    } else if (inserted.photosDropped) {
+      warning = "Перемещение сохранено, но фото не прикрепились — миграция v3 (фотофиксация) ещё не применена.";
+    }
   } catch (err) {
     logger.warn("[storage] status move failed:", err instanceof Error ? err.message : String(err));
     return { success: false, error: "Не удалось сохранить статус — миграция зимнего хранения ещё не применена?" };
@@ -579,6 +629,7 @@ export async function updateStorageBikeStatusAction(input: unknown): Promise<{ s
     text: [
       `❄️ <b>Хранение: ${escHtml(bike.make || "мотоцикл")}${bike.reg_number ? ` (${escHtml(bike.reg_number)})` : ""}</b>`,
       `Статус: ${storageStatusLabel(currentStatus)} → <b>${storageStatusLabel(status)}</b>`,
+      photoPaths.length > 0 ? `📸 Фотофиксация: ${photoPaths.length} фото — в карточке хранения` : "",
       `Изменено: ${escHtml(actorName)}`,
       message ? `Комментарий: ${escHtml(message)}` : "",
       ownerLine,
@@ -588,7 +639,7 @@ export async function updateStorageBikeStatusAction(input: unknown): Promise<{ s
     excludeChatIds: [staffId],
   });
 
-  return { success: true };
+  return { success: true, warning };
 }
 
 const addStorageBikeNoteSchema = z.object({
@@ -652,6 +703,153 @@ export async function addStorageBikeNoteAction(input: unknown): Promise<{ succes
   return { success: true };
 }
 
+/**
+ * Standalone «📸 Фотофиксация» — condition shots attached to the timeline
+ * WITHOUT a status move (mid-season checks, owner's own shots of the bike).
+ * The same gate as notes: staff on any bike of the crew, owner on HIS bike.
+ * 1..STORAGE_PHOTOS_MAX photos required — a photo event without photos is
+ * pointless by definition (use the note action for text-only).
+ */
+const addStorageBikePhotosSchema = z.object({
+  slug: z.string().trim().min(1).max(64),
+  actorUserId: z.string().trim().max(64).optional(),
+  initData: z.string().trim().max(8192).optional(),
+  bikeId: z.string().uuid(),
+  message: z.string().trim().max(300).optional(),
+  // storagepix paths from /api/franchize/storage-photo-upload — shape-checked
+  // by sanitizeStoragePhotoPaths (strict bike-folder gate, ≤ STORAGE_PHOTOS_MAX).
+  photos: z.unknown().optional(),
+});
+
+export async function addStorageBikePhotosAction(input: unknown): Promise<{ success: boolean; error?: string; warning?: string }> {
+  const parsed = addStorageBikePhotosSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос фотофиксации." };
+  const { slug, bikeId, message, initData, actorUserId } = parsed.data;
+
+  const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
+  if (!loaded) return { success: false, error: "Байк не найден." };
+
+  const { actorUserId: senderId, isStaff } = loaded;
+
+  const photoPaths = sanitizeStoragePhotoPaths(parsed.data.photos, bikeId);
+  if (photoPaths === null) {
+    return { success: false, error: `Фото: максимум ${STORAGE_PHOTOS_MAX} на событие и только загруженные для этого байка.` };
+  }
+  if (photoPaths.length === 0) {
+    return { success: false, error: "Прикрепите хотя бы одно фото." };
+  }
+
+  const actorName = await actorDisplayName(senderId);
+  try {
+    const inserted = await insertStorageEvent({
+      bikeId,
+      type: "photo",
+      status: null,
+      actor: senderId,
+      actorName,
+      message: message || `Фотофиксация состояния — ${photoPaths.length} фото`,
+      photoPaths,
+    });
+    if (!inserted.saved) {
+      // The event IS the deliverable here — no event means nothing happened.
+      return { success: false, error: "Не удалось сохранить фото в историю — повторите позже." };
+    }
+    if (inserted.photosDropped) {
+      // pre-v3 DB: the event survived, the photos could not be attached.
+      return {
+        success: true,
+        warning: "Событие сохранено, но фото не прикрепились — миграция v3 (фотофиксация) ещё не применена.",
+      };
+    }
+  } catch (err) {
+    logger.warn("[storage] photo event failed:", err instanceof Error ? err.message : String(err));
+    return { success: false, error: "Не удалось сохранить фото — повторите позже." };
+  }
+
+  await notifyStorageMove({
+    slug,
+    text: [
+      `❄️ 📸 <b>Фотофиксация: ${escHtml(loaded.row.make || "мотоцикл")}${loaded.row.reg_number ? ` (${escHtml(loaded.row.reg_number)})` : ""}</b>`,
+      `${photoPaths.length} фото — в карточке хранения`,
+      message ? `${escHtml(actorName)}: ${escHtml(message)}` : `Добавил: ${escHtml(actorName)}`,
+    ].join("\n"),
+    // Owner photos → crew hears it; crew photos → owner hears it (note routing).
+    alsoChatIds: isStaff ? (loaded.row.owner_user_id ? [String(loaded.row.owner_user_id)] : []) : [senderId],
+    excludeChatIds: [senderId],
+  });
+
+  return { success: true };
+}
+
+/**
+ * Deletes one storagepix photo. The quota in the upload route is a HARD wall
+ * (60 files/bike) — without a delete path the bike would be locked out of
+ * uploads forever once the folder fills (boss review R1 finding #3).
+ * Gate = staff, or the bike's owner (same as upload/notes). The path must be
+ * exactly this bike's folder shape; the object is removed from storagepix AND
+ * stripped from any event that referenced it (timeline stays consistent).
+ * Doubles as the janitor for orphaned uploads (failed actions leave dead
+ * files that nothing references).
+ */
+const deleteStorageBikePhotoSchema = z.object({
+  slug: z.string().trim().min(1).max(64),
+  actorUserId: z.string().trim().max(64).optional(),
+  initData: z.string().trim().max(8192).optional(),
+  bikeId: z.string().uuid(),
+  photoPath: z.string().trim().min(1).max(300),
+});
+
+export async function deleteStorageBikePhotoAction(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = deleteStorageBikePhotoSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос удаления фото." };
+  const { slug, bikeId, photoPath, initData, actorUserId } = parsed.data;
+
+  const loaded = await loadStoryBike({ slug, bikeId, actorUserId, initData });
+  if (!loaded) return { success: false, error: "Байк не найден." };
+  if (!storagePhotoPathRe(bikeId).test(photoPath)) {
+    return { success: false, error: "Чужое фото удалить нельзя — путь не из папки этого байка." };
+  }
+
+  // Strip the path from every event that references it (no-op when nothing
+  // references it — orphan cleanup). A removed object must never stay visible
+  // on a timeline. Pre-v3 DBs have no photo_paths column — degrade quietly.
+  try {
+    const { data: referencing } = await supabaseAdmin
+      .from("storage_bike_events")
+      .select("id, photo_paths")
+      .eq("bike_id", bikeId)
+      .contains("photo_paths", [photoPath]);
+    for (const row of (referencing ?? []) as Array<{ id: number; photo_paths: string[] | null }>) {
+      const next = (row.photo_paths ?? []).filter((p) => p !== photoPath);
+      const { error: updErr } = await supabaseAdmin
+        .from("storage_bike_events")
+        .update({ photo_paths: next })
+        .eq("id", row.id);
+      if (updErr) logger.warn("[storage] photo strip update failed:", updErr.message);
+    }
+  } catch (err) {
+    logger.warn("[storage] photo strip from events failed:", err instanceof Error ? err.message : String(err));
+  }
+
+  const { error: removeError } = await supabaseAdmin.storage.from(STORAGE_PHOTO_BUCKET).remove([photoPath]);
+  if (removeError) {
+    logger.warn("[storage] photo remove failed:", removeError.message);
+    return { success: false, error: "Не удалось удалить файл — повторите позже." };
+  }
+
+  await notifyStorageMove({
+    slug,
+    text: [
+      `❄️ <b>Фото удалено из истории: ${escHtml(loaded.row.make || "мотоцикл")}${loaded.row.reg_number ? ` (${escHtml(loaded.row.reg_number)})` : ""}</b>`,
+      `Удалил: ${escHtml(await actorDisplayName(loaded.actorUserId))}`,
+    ].join("\n"),
+    alsoChatIds: loaded.isStaff ? (loaded.row.owner_user_id ? [String(loaded.row.owner_user_id)] : []) : [loaded.actorUserId],
+    excludeChatIds: [loaded.actorUserId],
+  });
+
+  return { success: true };
+}
+
 /** Doc link for the wall card — staff or the bike's owner only. */
 export async function getStorageDocUrlAction(input: unknown): Promise<{ success: boolean; url?: string; error?: string }> {
   const parsed = slugSchema.extend({ bikeId: z.string().uuid() }).safeParse(input);
@@ -709,7 +907,7 @@ async function loadStoryBike(params: { slug: string; bikeId: string; actorUserId
 async function loadStoryEvents(bikeId: string): Promise<StorageEventRow[]> {
   const { data, error } = await supabaseAdmin
     .from("storage_bike_events")
-    .select("id, bike_id, type, status, actor_name, message, created_at")
+    .select("id, bike_id, type, status, actor_name, message, created_at, photo_paths")
     .eq("bike_id", bikeId)
     .order("created_at", { ascending: false })
     .limit(STORAGE_STORY_EVENTS_CAP);

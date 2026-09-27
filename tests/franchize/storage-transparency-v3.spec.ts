@@ -320,7 +320,9 @@ describe("storage-bikes server actions v3 — gates and scoping", () => {
 
   it("'use server' file exports only async functions (STORAGE_STORY_EVENTS_CAP moved to lib)", () => {
     expect(src.includes('export const STORAGE_STORY_EVENTS_CAP')).toBe(false);
-    expect(src.includes('import {\n  canTransitionStorageStatus,\n  STORAGE_STORY_EVENTS_CAP,')).toBe(true);
+    // photo-fixation v4 imports ride before it — the lib import stays intact
+    expect(src.includes('import {\n  canTransitionStorageStatus,\n  sanitizeStoragePhotoPaths,')).toBe(true);
+    expect(src.includes('  STORAGE_STORY_EVENTS_CAP,')).toBe(true);
     // every export is an async function — the Next.js "use server" constraint
     const exports = [...src.matchAll(/^export (async function|const|function|class) (\w+)/gm)].map((m) => `${m[1]} ${m[2]}`);
     expect(exports.length).toBeGreaterThan(0);
