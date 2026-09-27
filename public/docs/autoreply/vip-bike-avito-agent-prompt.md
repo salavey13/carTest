@@ -8,7 +8,9 @@
 > Сопряжённые файлы: `vip-bike-rent.csv`, `vip-bike-sale-new.csv`,
 > `vip-bike-sale-used.csv` (новая/б-у техника — сплит по `specs.condition`),
 > `vip-bike-rentals.csv`
-> (флот и прайс — агент может подтягивать их для фактов), UI-движок
+> (флот и прайс — агент может подтягивать их для фактов),
+> `vip-bike-knowledge-base.md` (база знаний: адрес, условия, сервис, правила —
+> статичные факты компании; модельный состав и цены НЕ там, а в CSV), UI-движок
 > `app/franchize/[slug]/leads/lib/lead-scripts.ts` (fallback-шаблоны).
 
 ---
