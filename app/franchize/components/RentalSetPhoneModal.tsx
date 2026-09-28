@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Phone, Loader2, X, Check } from "lucide-react";
+import { useKeyboardAwareOverlay } from "./useKeyboardAwareOverlay";
 
 /**
  * RentalSetPhoneModal
@@ -56,6 +57,13 @@ export function RentalSetPhoneModal({
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // 2026-09-28: keyboard-aware overlay — autofocus on the tel input pops the
+  // keyboard IMMEDIATELY on mobile, and the TG iOS WebView paints over the
+  // bottom of the centered card (the save row became unreachable). The
+  // overlay gets paddingBottom = keyboard height (visualViewport gap);
+  // desktop / no keyboard → 0 (no visual change).
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const { keyboardPx } = useKeyboardAwareOverlay(overlayRef, open);
 
   // Reset phone field when modal opens (in case currentPhone changed externally)
   useEffect(() => {
@@ -152,12 +160,16 @@ export function RentalSetPhoneModal({
 
       {open && (
         <div
+          ref={overlayRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="set-phone-modal-title"
           aria-describedby="set-phone-modal-desc"
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            paddingBottom: keyboardPx > 0 ? keyboardPx : undefined,
+          }}
           onClick={() => !isPending && setOpen(false)}
         >
           <div
@@ -168,6 +180,9 @@ export function RentalSetPhoneModal({
               backgroundColor: "var(--franchize-bg-card, #1a1a1a)",
               color: textPrimary,
               boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              maxHeight: `calc(100dvh - ${keyboardPx > 0 ? keyboardPx : 0}px - 2rem)`,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
             }}
             onClick={(e) => e.stopPropagation()}
           >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { addRentalDamageReport, saveRentalPickupFreeze } from "@/app/rentals/actions";
@@ -112,6 +112,21 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
     return null;
   }, [metadata, specsOdometerKm]);
   const [odometerKm, setOdometerKm] = useState(knownOdometer);
+  // 2026-09-28 (owner re-report «odometer passed to modal inconsistently»):
+  // useState above only reads knownOdometer ONCE at mount. When a fresh
+  // metadata prop lands later (router.refresh() after the RENTER confirmed
+  // the start reading from his own device, or any other writer),
+  // knownOdometer recomputes but this field kept the stale mount-time value
+  // — the freeze dialog then showed an out-of-date prefill and the operator
+  // had to re-type it. Follow the fresh prefill, but never stomp a value the
+  // operator has already edited away from the previous prefill.
+  const lastKnownOdometerRef = useRef(knownOdometer);
+  useEffect(() => {
+    const prev = lastKnownOdometerRef.current;
+    if (prev === knownOdometer) return;
+    lastKnownOdometerRef.current = knownOdometer;
+    setOdometerKm((cur) => (cur === prev || cur === "" ? knownOdometer : cur));
+  }, [knownOdometer]);
   const [fuelLevel, setFuelLevel] = useState("4/5");
   const [freezeNotes, setFreezeNotes] = useState("");
   const [checklist, setChecklist] = useState<string[]>(freezeChecklistOptions.slice(0, 2));

@@ -28,6 +28,14 @@
 // freeze dialog (FranchizeRentalDocumentsPanel) pre-fills from this value.
 // The write mirrors the /doc flow (doc-manual.ts stores odometer_before at
 // creation) so salary/analytic consumers see the same shape.
+//
+// 2026-09-28b (owner re-report «odometer passed to modal inconsistently»):
+// GET returns the current readings (odometer_before / odometer_after_draft)
+// so the closure modal can pull the DB truth at OPEN time — the client draft
+// store only knows about saves made on THIS device, a draft typed by the
+// renter (or on the operator's other device) never reached it and the modal
+// opened with an empty field. Same auth as POST (crew access, or the
+// rental's own renter / the bike's subrenter via the signed actor cookie).
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
@@ -293,6 +301,74 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, odometerAfter, odometerBefore, delta });
   } catch (e) {
     logger.error("[rental-odometer] Unexpected error:", e);
+    return NextResponse.json({ success: false, error: "Внутренняя ошибка." }, { status: 500 });
+  }
+}
+
+/**
+ * GET /api/franchize/rental-odometer?rentalId=<id>
+ * Read-only companion for the closure modal prefill (2026-09-28b): returns
+ * the CURRENT metadata readings so a modal opened on a device that never
+ * typed the draft still shows the value another device (or the renter)
+ * saved. Auth mirrors POST: verifyCrewAccess first, then the renter
+ * (rentals.user_id) / subrenter (cars.specs.subrenter_chat_id) via the
+ * signed actor cookie.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const rentalId = new URL(request.url).searchParams.get("rentalId") ?? "";
+    if (!rentalId) {
+      return NextResponse.json({ success: false, error: "rentalId обязателен." }, { status: 400 });
+    }
+    const { data: rental, error } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, crew_id, user_id, vehicle_id, status, metadata")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+    if (error || !rental) {
+      return NextResponse.json({ success: false, error: "Аренда не найдена." }, { status: 404 });
+    }
+
+    const cookieUserId = verifyTelegramActorCookieValue(
+      request.cookies.get(TELEGRAM_ACTOR_COOKIE)?.value,
+    );
+    const access = await verifyCrewAccess(request, rental.crew_id ?? undefined);
+    if (!access.ok) {
+      const isRenter = Boolean(cookieUserId) && cookieUserId === rental.user_id;
+      let isSubrenter = false;
+      if (!isRenter && cookieUserId && rental.vehicle_id) {
+        const { data: vehicleRow } = await supabaseAdmin
+          .from("cars")
+          .select("specs")
+          .eq("id", rental.vehicle_id)
+          .maybeSingle();
+        const sub = (vehicleRow?.specs as Record<string, unknown> | null)?.["subrenter_chat_id"];
+        isSubrenter =
+          (typeof sub === "string" && (sub === cookieUserId || sub.trim() === cookieUserId)) ||
+          (typeof sub === "number" && String(sub) === cookieUserId);
+      }
+      if (!isRenter && !isSubrenter) return access.response;
+    }
+
+    const meta = (rental.metadata as Record<string, unknown> | null) ?? {};
+    const pickupFreeze = meta.pickup_freeze as { odometer_km?: unknown } | null | undefined;
+    const beforeRaw =
+      (typeof pickupFreeze?.odometer_km === "number" ? pickupFreeze.odometer_km : undefined)
+      ?? meta.odometer_before
+      ?? meta.last_known_odometer
+      ?? meta.odometer_before_hint
+      ?? null;
+    return NextResponse.json({
+      success: true,
+      status: rental.status,
+      odometer_before: typeof beforeRaw === "number" && Number.isFinite(beforeRaw) ? beforeRaw : null,
+      odometer_after_draft:
+        typeof meta.odometer_after_draft === "number" && Number.isFinite(meta.odometer_after_draft)
+          ? meta.odometer_after_draft
+          : null,
+    });
+  } catch (e) {
+    logger.error("[rental-odometer] GET unexpected error:", e);
     return NextResponse.json({ success: false, error: "Внутренняя ошибка." }, { status: 500 });
   }
 }

@@ -20,7 +20,7 @@
 --     and b.order_id = a.order_id
 --     and b.crew_slug = a.crew_slug
 --     and (b.created_at < a.created_at
-        or (b.created_at = a.created_at and b.id < a.id)); -- R3: tie-breaker for identical created_at
+--         or (b.created_at = a.created_at and b.id < a.id)); -- R3: tie-breaker for identical created_at
 --
 -- MANUAL MIGRATION (Paul).
 -- ─────────────────────────────────────────────────────────────────────────────

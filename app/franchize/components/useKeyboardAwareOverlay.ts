@@ -55,28 +55,55 @@ export function useKeyboardAwareOverlay(
     vv?.addEventListener("scroll", recompute);
     window.addEventListener("orientationchange", recompute);
 
-    // Focused input → scroll it into the visible area once the keyboard
-    // has finished animating.
-    const onFocusIn = (event: FocusEvent) => {
-      const target = event.target as HTMLElement | null;
-      const overlay = overlayRef.current;
-      if (!target || !overlay) return;
-      if (!overlay.contains(target)) return;
+    // 2026-09-28 hardening (owner re-report «keyboard overlaps buttons»):
+    // some iOS WKWebView builds (Telegram in particular) fire the
+    // visualViewport resize UNRELIABLY during the keyboard slide animation —
+    // the event may land before the layout settles or not at all until the
+    // next touch. Every focus/blur of a typable control therefore schedules
+    // a few delayed recomputes (120/350/700ms) so the padding tracks the
+    // keyboard even when the resize event is swallowed. Cheap (a state set
+    // with the same value is a React no-op) and covers both keyboard OPEN
+    // and CLOSE timing.
+    const scheduleRecomputes = () => {
+      [120, 350, 700].forEach((delay) => window.setTimeout(recompute, delay));
+    };
+
+    const isTypableTarget = (target: EventTarget | null): target is HTMLElement => {
+      if (!target || !(target instanceof HTMLElement)) return false;
       const tag = target.tagName;
-      const isTypable =
-        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
-      if (!isTypable) return;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+    };
+    const overlayContains = (target: EventTarget | null): boolean => {
+      const overlay = overlayRef.current;
+      return Boolean(target && overlay && overlay.contains(target as Node));
+    };
+
+    // Focused input → recompute the gap as the keyboard animates in and
+    // scroll the control into the visible area once it has settled.
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!overlayContains(target)) return;
+      if (!isTypableTarget(target)) return;
+      scheduleRecomputes();
       window.setTimeout(() => {
         target.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 300);
     };
+    // Focus leaving the overlay entirely → the keyboard is closing; release
+    // the padding as soon as the viewport settles (no ghost offset).
+    const onFocusOut = (event: FocusEvent) => {
+      if (overlayContains(event.relatedTarget)) return;
+      scheduleRecomputes();
+    };
     overlayRef.current?.addEventListener("focusin", onFocusIn);
+    overlayRef.current?.addEventListener("focusout", onFocusOut);
 
     return () => {
       vv?.removeEventListener("resize", recompute);
       vv?.removeEventListener("scroll", recompute);
       window.removeEventListener("orientationchange", recompute);
       overlayRef.current?.removeEventListener("focusin", onFocusIn);
+      overlayRef.current?.removeEventListener("focusout", onFocusOut);
     };
   }, [active, overlayRef]);
 

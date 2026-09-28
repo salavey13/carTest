@@ -308,6 +308,28 @@ export function FranchizeRentalLifecycleActions({
                 } catch {
                   /* fall back to the server prop */
                 }
+                // 2026-09-28b (owner re-report «odometer passed to modal
+                // inconsistently»): the draft store only knows about saves made
+                // on THIS device — a draft typed by the RENTER (his own end
+                // reading) or on the operator's other device never reached it.
+                // Before showing an empty field, pull the DB truth; report it
+                // back to the store so reopen skips the round-trip.
+                if (draft == null) {
+                  try {
+                    const res = await fetch(
+                      `/api/franchize/rental-odometer?rentalId=${encodeURIComponent(rentalId)}`,
+                      { cache: "no-store" },
+                    );
+                    const json = await res.json().catch(() => null);
+                    const serverDraft: unknown = json?.odometer_after_draft;
+                    if (res.ok && json?.success && typeof serverDraft === "number") {
+                      draft = serverDraft;
+                      draftStore?.reportSaved(serverDraft);
+                    }
+                  } catch {
+                    /* offline — the operator types the value manually */
+                  }
+                }
                 setClosureOdometer(draft != null ? String(draft) : "");
                 setDraftHint(draft ?? null);
                 setClosureDamageNotes("");

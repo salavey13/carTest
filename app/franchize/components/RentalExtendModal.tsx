@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Calendar, Loader2, X, RefreshCw } from "lucide-react";
+import { useKeyboardAwareOverlay } from "./useKeyboardAwareOverlay";
 
 /**
  * RentalExtendModal
@@ -66,6 +67,13 @@ export function RentalExtendModal({
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  // 2026-09-28: keyboard-aware overlay — the date inputs pop the on-screen
+  // keyboard on mobile and the TG iOS WebView paints OVER the bottom of the
+  // centered card (the action row became unreachable). The overlay gets
+  // paddingBottom = keyboard height (visualViewport gap) so the card sits
+  // above the keyboard; desktop / no keyboard → 0 (no visual change).
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const { keyboardPx } = useKeyboardAwareOverlay(overlayRef, open);
 
   // S4 fix: use locale-aware date (sv-SE = YYYY-MM-DD format) instead of toISOString()
   // which returns UTC. In Moscow (UTC+3), toISOString().slice(0,10) returns YESTERDAY
@@ -181,12 +189,16 @@ export function RentalExtendModal({
 
       {open && (
         <div
+          ref={overlayRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="extend-modal-title"
           aria-describedby="extend-modal-desc"
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            paddingBottom: keyboardPx > 0 ? keyboardPx : undefined,
+          }}
           onClick={() => !isPending && setOpen(false)}
         >
           <div
@@ -197,6 +209,9 @@ export function RentalExtendModal({
               backgroundColor: "var(--franchize-bg-card, #1a1a1a)",
               color: textPrimary,
               boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              maxHeight: `calc(100dvh - ${keyboardPx > 0 ? keyboardPx : 0}px - 2rem)`,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
             }}
             onClick={(e) => e.stopPropagation()}
           >
