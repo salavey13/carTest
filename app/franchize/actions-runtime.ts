@@ -21,8 +21,15 @@ import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { sanitizeTelegramText, oneLine as oneLineValue, escapeHtmlText } from "@/lib/tg-text";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
-import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables } from "@/app/lib/rental-contract-vars";
+import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables, WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB, WEB_ORDER_DEFAULT_EQUIPMENT_DEPOSIT_RUB } from "@/app/lib/rental-contract-vars";
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
+import {
+  buildWebOrderPaymentSplit,
+  depositMethodColumnValue as depositMethodColumnValueFor,
+  depositMethodMetadataLabel,
+  expectedSecurityDepositFromLines,
+  resolveDepositRail,
+} from "@/app/franchize/lib/deposit-rail";
 import { formatStorageMonthsLabel as storageSeasonMonthsLabel, storageValidUntilISO } from "@/app/franchize/lib/storage-season";
 import { storageMonthsCount, storageSeasonDateToIso, storageStartParam } from "@/app/franchize/lib/storage";
 import { resolveStorageConfig, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
@@ -2017,13 +2024,21 @@ function parseDurationDays(rawDuration: string): number {
  */
 function assertTestdriveIdentityDocs(payload: {
   flowType?: string;
+  cartLines?: Array<{ options?: { action?: string; duration?: string } | null }>;
   passportSeries?: unknown;
   passportNumber?: unknown;
   hasLicense?: unknown;
   licenseSeries?: unknown;
   licenseNumber?: unknown;
 }): void {
-  if (payload.flowType !== "testdrive") return;
+  // reviewer R3 follow-up: the identity gate must cover PER-LINE testdrives
+  // too — since a testdrive line inside a rental/mixed cart produces a real
+  // testdrive doc, that doc must never leave without a passport OR licence
+  // (same rule as the global testdrive flow).
+  const hasPerLineTestdrive = (payload.cartLines ?? []).some(
+    (line) => line.options?.action === "testdrive" || line.options?.duration === "10 минут",
+  );
+  if (payload.flowType !== "testdrive" && !hasPerLineTestdrive) return;
   const tdPassportFilled = String(payload.passportSeries || "").trim().length > 0
     && String(payload.passportNumber || "").trim().length > 0;
   const tdLicenseFilled = payload.hasLicense !== false
@@ -2473,6 +2488,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       if (isTestdrive) return "testdrive";
       if (isStorageFlow) return "storage";
       if (flowType === "sale") return "sale";
+      // reviewer R2: a testdrive line inside a rental/mixed cart is a FREE
+      // 10-minute ride — mark it per-line so it gets a testdrive doc (branch
+      // below) and NO rental row / phantom deposit (mirrors the cart VM
+      // markers in useFranchizeCartLines).
+      if (line.options?.action === "testdrive" || line.options?.duration === "10 минут") return "testdrive";
       if (flowType === "rental") return "rental";
       // Mixed flow: check if this specific bike is for sale or rent
       const car = byId.get(line.itemId);
@@ -2486,7 +2506,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       return "rental";
     });
 
-    const rentDays = Math.max(...payload.cartLines.map((line) => parseDurationDays(line.options.duration)));
+    const rentDays = Math.max(
+      // reviewer R3 follow-up: a testdrive line's "10 минут" parsed as 10
+      // DAYS and inflated every rental doc's rent_days in a mixed cart —
+      // testdrive lines carry no rental period and are excluded here.
+      ...payload.cartLines
+        .filter((line) => line.options?.action !== "testdrive" && line.options?.duration !== "10 минут")
+        .map((line) => parseDurationDays(line.options.duration)),
+      1,
+    );
     const rentStartDate = payload.rentalStartDate || payload.time;
     const rentEndDate = payload.rentalEndDate || payload.time;
 
@@ -2914,6 +2942,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       }
     }
 
+    // ── Deposit rail (boss 2026-09-29) — resolved ONCE for the order ──
+    // The signed contract's payment split AND the rentals row must agree
+    // with each other and with what the renter chose at checkout, so the
+    // rail is resolved a single time here (old clients without the field
+    // default to "same as rent"; XTR can't hold a deposit → cash).
+    const orderDepositRail = resolveDepositRail(payload.depositMethod, payload.payment);
+
     for (let bikeIndex = 0; bikeIndex < payload.cartLines.length; bikeIndex++) {
       const line = payload.cartLines[bikeIndex];
       const car = byId.get(line.itemId);
@@ -3134,19 +3169,36 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         charger: /зарядк/.test(perkStr),
       };
 
-      // ── Payment split: cash = deposit, bank = rest (or all cash / all bank) ──
-      const depositNum = Number(String(specs.deposit_rub || specs.deposit || 20000).replace(/[^\d]/g, "")) || 20000;
-      const lineTotal = line.lineTotal || 0;
-      const paymentSplit = (() => {
-        if (payload.payment === "cash") {
-          return { cashAmount: lineTotal + depositNum, bankAmount: 0 };
-        }
-        // card / sbp → cash = deposit, bank = rent + equipment
-        return { cashAmount: depositNum, bankAmount: lineTotal };
-      })();
-
       // Detect equipment-only rentals: no bike ID in the line or type='equipment'
       const isEquipmentOnlyLine = !car.id || car.type === 'equipment';
+
+      // ── Payment split — boss 2026-09-29 ──────────────────────────────────
+      // Rent follows the main rail; the deposit follows the renter-chosen
+      // rail (orderDepositRail — the SAME resolution the rentals row uses
+      // below), so the signed contract can no longer contradict
+      // metadata.payment_split / deposit_amount. depositNum mirrors the
+      // contract's own printed deposit (rental-contract-vars
+      // resolveDepositAmount: specs → 20000 bike / 5000 equipment) — the
+      // split must move the SAME number the document shows.
+      const depositNum = isEquipmentOnlyLine
+        ? WEB_ORDER_DEFAULT_EQUIPMENT_DEPOSIT_RUB
+        : (() => {
+            const parsed = Number(String(specs.deposit_rub ?? specs.deposit ?? "").replace(/[^\d]/g, ""));
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB;
+          })();
+      const lineTotal = line.lineTotal || 0;
+      // reviewer R2: qty≥2 — the contract covers the WHOLE cart line (its rent
+      // part is the qty-inclusive line.lineTotal), so the deposit it prints
+      // and moves must be qty × per-unit too — otherwise the signed page
+      // contradicts rentals.metadata.deposit_amount / the checkout display.
+      const lineDeposit = depositNum * (line.qty || 1);
+      const contractSplit = buildWebOrderPaymentSplit({
+        mainPayment: payload.payment,
+        depositRail: orderDepositRail,
+        lineTotal,
+        depositRub: lineDeposit,
+      });
+      const paymentSplit = { cashAmount: contractSplit.cash, bankAmount: contractSplit.bank };
 
       // ── Merged equipment document (first equipment line only) ────────────
       // Equipment-only cart lines produce ONE document listing ALL items in
@@ -3268,6 +3320,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         // Web app specific overrides that aren't in the shared builder
         rent_days: String(rentDays),
         total_price_rub: formatMoney(effectiveLineTotal || payload.totalAmount),
+        // reviewer R2: the printed deposit must match the row/checkout for
+        // qty≥2 lines (the contract covers the whole line, not one unit).
+        deposit_rub: formatMoney(lineDeposit),
         // Use formatMoney for price fields that expect formatted strings
         hourly_price_rub: formatMoney(Number(specs.price_per_hour || 0)),
         daily_price_rub: formatMoney(dailyPriceRub),
@@ -3576,6 +3631,33 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         `Экипировка: ${accessoriesStr}`,
       );
     }
+    // ── Deposit line for the crew (reviewer R1: the person at handover must
+    // know the amount AND the rail — e.g. bring the card terminal for a
+    // «Картой» deposit). Same helper as the order page → same number.
+    if (!isServiceFlow && !isTestdrive && !isStorageFlow) {
+      const expectedOrderDeposit = expectedSecurityDepositFromLines(
+        payload.cartLines.map((cartLine, cartLineIndex) => {
+          const catalogItem = byId.get(cartLine.itemId);
+          return {
+            qty: cartLine.qty,
+            flowType: bikeFlowTypes[cartLineIndex] ?? "rental",
+            item: {
+              type: catalogItem?.type,
+              rawSpecs: ((catalogItem?.specs ?? {}) as Record<string, unknown>),
+            },
+            priceBreakdown: (cartLine as { priceBreakdown?: { depositRub: number } | null }).priceBreakdown ?? null,
+            options: cartLine.options,
+          };
+        }),
+        flowType,
+      );
+      if (expectedOrderDeposit > 0) {
+        const railLabel = orderDepositRail === "cash" ? "наличными" : orderDepositRail === "sbp" ? "СБП" : "картой";
+        notificationParts.push(
+          `Залог: ${formatMoney(expectedOrderDeposit).replace(/[  ]/g, " ")} ₽ (${railLabel}, при получении)`,
+        );
+      }
+    }
     notificationParts.push(
       `Оплата: ${payload.payment}`,
       `Доставка: ${payload.delivery}`,
@@ -3883,7 +3965,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               // reservation hold in payload.depositAmount — different things).
               // boss-R1 fix 3: a testdrive is free — the bike's specs deposit
               // (20 000 ₽) leaked into the artifact as a phantom charge.
-              deposit_rub: flowType === "testdrive"
+              // reviewer R2: the guard must be PER-LINE — a testdrive line
+              // inside a rental/mixed cart used to leak its specs deposit.
+              deposit_rub: flowType === "testdrive" || bikeFlowTypes[doc.cartLineIndex] === "testdrive"
                 ? "0"
                 : (() => {
                     const specs = ((byId.get(doc.bikeId)?.specs as Record<string, unknown> | undefined) ?? {});
@@ -3973,7 +4057,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           // For mixed flow, only create rental rows for rental bikes (not sale bikes)
           const bikeIndex = doc.cartLineIndex;
           const bikeFlowType = bikeFlowTypes[bikeIndex];
-          if (bikeFlowType === "sale") continue; // Skip sale bikes in mixed flow
+          // Skip sale AND testdrive lines in mixed flow (reviewer R2: a
+          // testdrive is a free ride — no rental row, no phantom deposit).
+          if (bikeFlowType === "sale" || bikeFlowType === "testdrive") continue;
 
           // Merged equipment document: sum ALL equipment-only lines' totals
           const docTotal =
@@ -3989,33 +4075,45 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           // ── iter15: real deposit + payment split for the rental row ──────
           // payload.depositAmount is the CREW RESERVATION HOLD (often 500₽) —
           // NOT the security deposit. The real expected deposit lives in bike
-          // specs (specs.deposit_rub, e.g. 20 000 ₽ for kawasaki-ex650k). Store
-          // the real value in metadata so rental page / analytics never show
-          // the meaningless 500. Payment split mirrors the /doc shape
+          // specs (specs.deposit_rub, e.g. 20 000 ₽ for kawasaki-ex650k).
+          // Store the real value in metadata so rental page / analytics never
+          // show the meaningless 500. Payment split mirrors the /doc shape
           // ({bank, cash, card_destination}) so getPaymentSplit works for both.
-          const expectedDepositRub = (() => {
-            const parsed = Number(String(bikeSpecs.deposit_rub ?? bikeSpecs.deposit ?? "").replace(/[^\d]/g, ""));
-            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-          })();
-          const rentalPaymentSplit = (() => {
-            const lineTotal = payload.cartLines[bikeIndex]?.lineTotal || 0;
-            const cardDestination = payload.payment === "card" ? "tbank" : null;
-            if (payload.payment === "cash") {
-              return { bank: 0, cash: lineTotal + (expectedDepositRub ?? 0), card_destination: null };
-            }
-            // card / sbp → deposit collected in cash at handover, rest via transfer
-            return { bank: lineTotal, cash: expectedDepositRub ?? 0, card_destination: cardDestination };
-          })();
-          // iter20: deposit METHOD — derived from the same split shape so the
-          // analytics item sheet shows «наличные» instead of «способ не указан».
-          // The split always routes the deposit into its cash part (cash payment
-          // = everything in cash; card/sbp = rent by transfer + deposit in cash
-          // at handout), so the expected collection method is cash. Mirrored
-          // into the rentals table columns as well (deposit_amount was always 0
+          // boss 2026-09-29 fixes (reviewer R1):
+          //   - specs WITHOUT deposit_rub fall back to the SAME default the
+          //     contract prints (WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB) — before,
+          //     checkout showed 20 000 ₽ while the row stored nothing;
+          //   - qty multiplies — the renter leaves qty × deposit physically,
+          //     one row per cart line, so the row carries the line total;
+          //   - equipment-only rows still carry no deposit (parity with the
+          //     gear flow; the equipment CONTRACT prints its own 5000 default).
+          const lineQty = payload.cartLines[bikeIndex]?.qty || 1;
+          const expectedDepositRub = doc.isEquipmentOnlyLine
+            ? null
+            : (() => {
+                const parsed = Number(String(bikeSpecs.deposit_rub ?? bikeSpecs.deposit ?? "").replace(/[^\d]/g, ""));
+                const base = Number.isFinite(parsed) && parsed > 0 ? parsed : WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB;
+                return base * lineQty;
+              })();
+          // Rail resolved ONCE per order (above the doc loop) — the contract
+          // split and this row can no longer disagree.
+          const resolvedDepositMethod = orderDepositRail;
+          const rentalPaymentSplit = buildWebOrderPaymentSplit({
+            mainPayment: payload.payment,
+            depositRail: resolvedDepositMethod,
+            lineTotal: payload.cartLines[bikeIndex]?.lineTotal || 0,
+            depositRub: expectedDepositRub,
+          });
+          // iter20: deposit METHOD — explicit now: the renter (or the
+          // "same as rent" default) decides how the deposit is collected, so
+          // the analytics item sheet shows the real rail instead of the old
+          // "deposit always rides the cash part" derivation. Mirrored into
+          // the rentals table columns as well (deposit_amount was always 0
           // for web orders — the cron CSV reads the TABLE columns).
           const expectedDepositMethod = expectedDepositRub
-            ? (rentalPaymentSplit.cash >= expectedDepositRub ? "cash" : rentalPaymentSplit.card_destination)
+            ? depositMethodMetadataLabel(resolvedDepositMethod)
             : null;
+          const depositMethodColumnValue = depositMethodColumnValueFor(resolvedDepositMethod);
           // Equipment parsed from the cart-line perk string (parity with /doc).
           const rentalEquipment = (() => {
             const perkStr = String(payload.cartLines[bikeIndex]?.options?.perk || "").toLowerCase();
@@ -4077,9 +4175,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                 total_cost: Math.round(docTotal || payload.totalAmount),
                 // iter20: real table-column mirror of the expected deposit so
                 // the cron CSV (which reads rentals.deposit_amount / .deposit_method)
-                // stops showing 0 / empty for web orders.
+                // stops showing 0 / empty for web orders. Boss 2026-09-29:
+                // the method honours the renter's deposit rail choice
+                // (CHECK: cash|bank_transfer|telegram_stars|none).
                 ...(expectedDepositRub ? { deposit_amount: expectedDepositRub } : {}),
-                ...(expectedDepositMethod ? { deposit_method: expectedDepositMethod } : {}),
+                ...(expectedDepositRub ? { deposit_method: depositMethodColumnValue } : {}),
                 metadata: {
                   source: "franchize_web_order",
                   order_id: payload.orderId,
@@ -4111,9 +4211,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
                   // aligned with /doc (never the 500₽ reservation hold).
                   // iter20: + deposit_method so the analytics sheet shows the
                   // expected collection method, not «способ не указан».
+                  // boss 2026-09-29: the rail is the RENTER'S CHOICE
+                  // (cash | tbank | sbp — "same as rent" resolved at checkout),
+                  // and payment_split routes the deposit into its cash/bank
+                  // part accordingly.
                   ...(expectedDepositRub ? { deposit_amount: expectedDepositRub } : {}),
                   ...(expectedDepositRub ? { deposit_rub: expectedDepositRub } : {}),
                   ...(expectedDepositMethod ? { deposit_method: expectedDepositMethod } : {}),
+                  ...(expectedDepositRub ? { deposit_method_choice: resolvedDepositMethod } : {}),
                   payment_split: rentalPaymentSplit,
                   equipment: rentalEquipment,
                   ...(chargedSplit as Record<string, number>),
@@ -5181,6 +5286,12 @@ const franchizeOrderInvoiceSchema = z.object({
       .default({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона" }),
   })).min(1),
   depositAmount: z.number().finite().nonnegative().optional(),
+  // ── Deposit rail (boss 2026-09-29) ──
+  // The SECURITY deposit (залог, returned after the ride) may be collected on
+  // a different rail than the rent — mirrors /doc's deposit_destination step
+  // (doc-manual.ts). Resolved client-side ("same" → main payment method);
+  // absent for old clients / flows without a deposit.
+  depositMethod: z.enum(["cash", "card", "sbp"]).optional(),
   checkoutBlockers: z.array(z.object({
     id: z.string().trim().min(1).max(80),
     label: z.string().trim().min(1).max(180),

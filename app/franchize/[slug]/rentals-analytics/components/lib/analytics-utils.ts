@@ -280,6 +280,9 @@ const DEPOSIT_METHOD_LABELS: Record<string, string> = {
   t_bank: "Т-Банк карта",
   sber: "Сбербанк карта",
   card: "карта",
+  // boss 2026-09-29: web-flow deposit rail choice — renter may route the
+  // deposit through СБП instead of the crew's card or cash.
+  sbp: "СБП",
 };
 
 /** Deposit from metadata.deposit_amount/deposit_method/deposit_returned with

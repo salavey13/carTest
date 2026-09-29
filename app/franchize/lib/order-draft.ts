@@ -37,6 +37,10 @@ export const orderDraftStorageKey = (slug: string): string =>
 
 export type OrderDraftPayment = "card" | "cash" | "sbp";
 
+/** Deposit rail choice — "same" = follow the main payment (boss 2026-09-29).
+ *  Optional-at-restore (old v1 drafts lack the field → default "same"). */
+export type OrderDraftDepositChoice = "same" | "cash" | "card" | "sbp";
+
 export type OrderDraftForm = {
   recipient: string;
   phone: string;
@@ -53,6 +57,7 @@ export type OrderDraftForm = {
   licenseCategories: string;
   licenseExpiryDate: string;
   payment: OrderDraftPayment;
+  depositMethodChoice: OrderDraftDepositChoice;
   deliveryMode: "pickup" | "delivery";
   selectedExtras: string[];
   promo: string;
@@ -70,6 +75,7 @@ export type OrderDraft = OrderDraftForm & {
 };
 
 const PAYMENT_VALUES: OrderDraftPayment[] = ["card", "cash", "sbp"];
+const DEPOSIT_CHOICE_VALUES: OrderDraftDepositChoice[] = ["same", "cash", "card", "sbp"];
 
 const asTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -136,6 +142,9 @@ export function sanitizeOrderDraft(raw: unknown, slug: string): OrderDraft | nul
       payment: PAYMENT_VALUES.includes(record.payment as OrderDraftPayment)
         ? (record.payment as OrderDraftPayment)
         : "card",
+      depositMethodChoice: DEPOSIT_CHOICE_VALUES.includes(record.depositMethodChoice as OrderDraftDepositChoice)
+        ? (record.depositMethodChoice as OrderDraftDepositChoice)
+        : "same",
       deliveryMode: record.deliveryMode === "delivery" ? "delivery" : "pickup",
       selectedExtras: Array.isArray(record.selectedExtras)
         ? record.selectedExtras

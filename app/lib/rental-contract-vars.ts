@@ -254,6 +254,14 @@ const DEFAULT_EQUIPMENT = "ключ(и) 1 шт.; шлем 1";
 const DEFAULT_EQUIPMENT_DEPOSIT = 5000;
 const DEFAULT_EQUIPMENT_DAILY_PRICE = 500;
 
+// boss 2026-09-29: single source of truth for the DEFAULT deposit the
+// contract prints (resolveDepositAmount below). The web-order deposit rail
+// (app/franchize/lib/deposit-rail.ts) and the rentals-row insert MUST move
+// the same number the signed document prints — otherwise the contract
+// contradicts metadata.payment_split / deposit_amount.
+export const WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB = DEFAULT_DEPOSIT;
+export const WEB_ORDER_DEFAULT_EQUIPMENT_DEPOSIT_RUB = DEFAULT_EQUIPMENT_DEPOSIT;
+
 // ─────────────────────────────────────────────────────────────────────────
 // Helper functions
 // ─────────────────────────────────────────────────────────────────────────

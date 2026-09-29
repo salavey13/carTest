@@ -30,6 +30,7 @@ import {
 } from "../lib/date-utils";
 import { ruPluralDays } from "../lib/catalog-utils";
 import { clearCartAppliedPromo, loadCartAppliedPromo } from "../lib/cart-promo";
+import { expectedSecurityDepositFromLines, resolveDepositRail } from "../lib/deposit-rail";
 import {
   buildOrderDraft,
   clearOrderDraft,
@@ -56,6 +57,24 @@ const payments = [
 
 type PaymentMethod = (typeof payments)[number]["id"];
 
+/** Human labels for the resolved deposit rail — used in the deposit card and
+ *  the order summary aside. "same" never reaches here (resolved upstream). */
+const DEPOSIT_METHOD_CHOICE_LABELS: Record<"cash" | "card" | "sbp", string> = {
+  cash: "наличными",
+  card: "картой",
+  sbp: "СБП",
+};
+
+/** Deposit rail selector options — "same" = follow the main payment method.
+ *  СБП included for /doc parity (schema accepts it; reviewer R1: the renter
+ *  must be able to VERIFY the resolved rail even in the default). */
+const DEPOSIT_CHOICES = [
+  { id: "same" as const, label: "Как и оплата" },
+  { id: "cash" as const, label: "Наличными" },
+  { id: "card" as const, label: "Картой" },
+  { id: "sbp" as const, label: "СБП" },
+];
+
 const orderExtras = [
   { id: "priority-prep", label: "Приоритетная подготовка", amount: 1200 },
   { id: "full-insurance", label: "Расширенная страховка", amount: 1800 },
@@ -70,6 +89,10 @@ type CheckoutPayload = {
   phone: string;
   time: string;
   comment: string;
+  /** Renter-chosen deposit collection method — resolved (never "same").
+   *  Mirrors the /doc deposit_destination step (doc-manual.ts): the deposit
+   *  is a separate money event and can ride a different rail than the rent. */
+  depositMethod?: "cash" | "card" | "sbp";
   rentalStartDate?: string;
   rentalEndDate?: string;
   // ── Personal data for contract generation (aligned with /doc flow) ──
@@ -174,6 +197,17 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     setSubmitPhase("idle");
   };
   const [paymentRetryHint, setPaymentRetryHint] = useState<string | null>(null);
+  // ── Deposit (залог) — boss 2026-09-29 ──
+  // The security deposit is a SEPARATE money event from the rent and may be
+  // collected on a different rail (doc-manual.ts gold reference: the /doc flow
+  // asks «Где получен депозит?» with cash / Tinkoff / Sber / split options).
+  // The web flow previously hard-coded "deposit always in cash" for card/sbp
+  // payments and never showed the amount — both fixed here:
+  //   - the amount comes from the SAME source the Item modal shows
+  //     (price calculator → bike specs.deposit_rub),
+  //   - the method defaults to the main payment rail ("Как и оплата") and can
+  //     be overridden to cash or card per renter's preference.
+  const [depositMethodChoice, setDepositMethodChoice] = useState<"same" | "cash" | "card" | "sbp">("same");
   // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──
   // The renter taps «Подписать договор (ПЭП)» at checkout; we forward
   // Telegram's initData (HMAC-signed by Telegram) with the order — the
@@ -274,6 +308,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const draftRestoredRef = useRef(false);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDraftRef = useRef<OrderDraftForm | null>(null);
+  // ── Deposit rail choice rides the same crash-safe draft (reviewer R1):
+  // the choice is NOT an RHF field, so watch() can't see it — it is mirrored
+  // through this ref into the watch snapshot and persisted explicitly on
+  // change (a WebView reload must not reset an explicit «Картой» silently).
+  const depositChoiceRef = useRef<"same" | "cash" | "card" | "sbp">(depositMethodChoice);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     mode: "onChange",
@@ -521,6 +560,27 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     ? configuredRequiredDocs
     : ["Паспорт", "Водительское удостоверение", "Электронная подпись договора"];
 
+  // ── Deposit (залог) amount — boss 2026-09-29 ──
+  // SECURITY deposit (returned after the ride), NOT the reservation hold
+  // (holdDepositAmount above is the booking prepayment — different things).
+  // Pure helper (lib/deposit-rail.ts) mirrors the Item modal's «Залог: N ₽»
+  // source and is unit-tested (tests/franchize/deposit-rail.spec.ts).
+  const expectedSecurityDeposit = useMemo(
+    () => expectedSecurityDepositFromLines(cartLines, flowType),
+    [cartLines, flowType]);
+  // Resolved deposit rail: explicit renter choice wins; otherwise the deposit
+  // follows the main payment method (XTR can't hold a deposit → cash).
+  const resolvedDepositMethod: "cash" | "card" | "sbp" = resolveDepositRail(
+    depositMethodChoice,
+    payment,
+  );
+  const depositMethodLabel = DEPOSIT_METHOD_CHOICE_LABELS[resolvedDepositMethod];
+  // Reviewer R1: «Как и оплата» alone is opaque (СБП main was invisible) —
+  // always name the resolved rail next to the default marker.
+  const depositResolvedHint = depositMethodChoice === "same"
+    ? `как и оплата — ${depositMethodLabel}`
+    : depositMethodLabel;
+
   const submitPayload = useMemo<CheckoutPayload>(
     () => ({
       orderId,
@@ -564,12 +624,16 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         options: line.options,
       })),
       depositAmount: holdDepositAmount,
+      // ── Deposit rail (boss 2026-09-29): renter-chosen method for the
+      // security deposit — defaults to the main payment, overridable. The
+      // server uses it for payment_split + rentals.deposit_method.
+      depositMethod: expectedSecurityDeposit > 0 ? resolvedDepositMethod : undefined,
       checkoutBlockers: checkoutBlockers.map((blocker) => ({ id: blocker.id, label: blocker.label })),
       pickupAddress,
       requiredDocs,
       flowType,
     }),
-    [appliedPromo, birthDate, cartLines, checkoutBlockers, comment, deliveryMode, extrasTotal, flowType, hasLicense, holdDepositAmount, licenseCategories, licenseExpiryDate, licenseNumber, licenseSeries, orderId, passportIssuedBy, passportIssueDate, passportNumber, passportSeries, payment, phone, pickupAddress, promoDiscount, recipient, registrationAddress, rentalEndDate, rentalStartDate, requiredDocs, selectedExtraItems, totalAmount, user?.id],
+    [appliedPromo, birthDate, cartLines, checkoutBlockers, comment, deliveryMode, expectedSecurityDeposit, extrasTotal, flowType, hasLicense, holdDepositAmount, licenseCategories, licenseExpiryDate, licenseNumber, licenseSeries, orderId, passportIssuedBy, passportIssueDate, passportNumber, passportSeries, payment, phone, pickupAddress, promoDiscount, recipient, registrationAddress, rentalEndDate, rentalStartDate, requiredDocs, resolvedDepositMethod, selectedExtraItems, totalAmount, user?.id],
   );
 
   const recoveryDepositAmount = flowType === "sale" ? Math.round(totalAmount * 0.1) : holdDepositAmount;
@@ -672,6 +736,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     if (draft.licenseCategories) setValue("licenseCategories", draft.licenseCategories, { shouldDirty: true, shouldValidate: false });
     if (draft.licenseExpiryDate) setValue("licenseExpiryDate", draft.licenseExpiryDate, { shouldDirty: true, shouldValidate: false });
     setValue("payment", draft.payment, { shouldDirty: true, shouldValidate: false });
+    if (draft.depositMethodChoice !== "same") setDepositMethodChoice(draft.depositMethodChoice);
     setValue("deliveryMode", draft.deliveryMode, { shouldDirty: true, shouldValidate: false });
     if (draft.selectedExtras.length > 0) setValue("selectedExtras", draft.selectedExtras, { shouldDirty: true, shouldValidate: false });
     if (draft.promo) setValue("promo", draft.promo, { shouldDirty: true, shouldValidate: false });
@@ -720,6 +785,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         licenseCategories: (values.licenseCategories ?? "").trim(),
         licenseExpiryDate: (values.licenseExpiryDate ?? "").trim(),
         payment: ((values.payment as OrderDraftPayment) || "card"),
+        depositMethodChoice: depositChoiceRef.current,
         deliveryMode: values.deliveryMode === "delivery" ? "delivery" : "pickup",
         selectedExtras: Array.isArray(values.selectedExtras) ? values.selectedExtras : [],
         promo: (values.promo ?? "").trim(),
@@ -747,6 +813,28 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       }
     };
   }, [watch, slug, orderId, user?.id]);
+
+  // ── Deposit choice → draft (immediate, not waiting for the next keystroke)
+  useEffect(() => {
+    depositChoiceRef.current = depositMethodChoice;
+    if (typeof window === "undefined") return;
+    const snapshot = latestDraftRef.current;
+    if (!snapshot) return; // nothing typed yet — the choice alone isn't a draft
+    const withChoice: OrderDraftForm = { ...snapshot, depositMethodChoice };
+    latestDraftRef.current = withChoice;
+    if (isOrderDraftMeaningful(withChoice)) {
+      saveOrderDraft(
+        window.localStorage,
+        buildOrderDraft(withChoice, {
+          slug,
+          orderId,
+          tgUserId: user?.id ? String(user.id) : undefined,
+        }),
+      );
+    } else {
+      clearOrderDraft(window.localStorage, slug);
+    }
+  }, [depositMethodChoice, slug, orderId, user?.id]);
 
   useEffect(() => {
     const loadPrefill = async () => {
@@ -1078,6 +1166,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     const submitFingerprint = JSON.stringify({
       orderId,
       payment: values.payment,
+      depositMethod: resolvedDepositMethod, // deposit rail participates in dedup — two submits differing only in the deposit rail are NOT duplicates
       recipient: values.recipient.trim(),
       phone: values.phone.trim(),
       rentalStartDate: submitPayload.rentalStartDate,
@@ -1149,6 +1238,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         extras: submitPayload.extras,
         cartLines: submitPayload.cartLines,
         depositAmount: submitPayload.depositAmount,
+        depositMethod: submitPayload.depositMethod,
         checkoutBlockers: submitPayload.checkoutBlockers,
         pickupAddress: submitPayload.pickupAddress,
         requiredDocs: submitPayload.requiredDocs,
@@ -1395,6 +1485,8 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     setValue("licenseNumber", "", { shouldDirty: true, shouldValidate: true });
     setValue("licenseCategories", "", { shouldDirty: true, shouldValidate: true });
     setValue("licenseExpiryDate", "", { shouldDirty: true, shouldValidate: true });
+    // The deposit rail choice rides the draft — a full wipe resets it too.
+    setDepositMethodChoice("same");
     setFieldSources({});
     toast.message("Все поля очищены. Введите данные заново.");
   };
@@ -2094,6 +2186,42 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 </button>
               ))}
             </div>
+            {expectedSecurityDeposit > 0 && (
+              <div className="mt-3 rounded-xl border p-3" style={surface.subtleCard}>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                  <p className="text-sm font-medium">
+                    Залог: {expectedSecurityDeposit.toLocaleString("ru-RU")} ₽
+                  </p>
+                  <p className="text-xs" style={surface.mutedText}>возвращается после аренды</p>
+                </div>
+                <p className="mt-1 text-xs" style={surface.mutedText}>
+                  Вносится при получении байка и не входит в сумму «Итого». Способ внесения залога:
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {DEPOSIT_CHOICES.map((choice) => {
+                    const active = depositMethodChoice === choice.id;
+                    return (
+                      <button
+                        key={choice.id}
+                        type="button"
+                        onClick={() => setDepositMethodChoice(choice.id)}
+                        className="rounded-xl border px-2 py-2 text-xs font-medium transition hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                        style={{
+                          borderColor: active ? "var(--order-accent)" : "var(--order-border)",
+                          color: active ? "var(--order-accent)" : undefined,
+                          ...focusRingOutlineStyle(crew.theme),
+                        }}
+                      >
+                        {choice.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs" style={surface.mutedText}>
+                  Сейчас: {depositResolvedHint}
+                </p>
+              </div>
+            )}
             {paymentRetryHint ? (
               <div
                 className="mt-2 rounded-2xl border p-3"
@@ -2189,6 +2317,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
                 {/* flex-wrap + min-w-0: long values (dates, promo codes) wrap to
                     the next line instead of pushing the aside wider than the screen */}
                 <p className="mt-1 flex flex-wrap justify-between gap-x-2"><span>Оплата</span><span className="min-w-0 break-words text-right">{payments.find((item) => item.id === payment)?.label ?? payment}</span></p>
+                {expectedSecurityDeposit > 0 && (
+                  <p className="mt-1 flex flex-wrap justify-between gap-x-2">
+                    <span>Залог</span>
+                    <span className="min-w-0 break-words text-right">
+                      {expectedSecurityDeposit.toLocaleString("ru-RU")} ₽ · {depositResolvedHint}
+                    </span>
+                  </p>
+                )}
                 {resolvedStartDate && resolvedEndDate && (
                   <p className="mt-1 flex flex-wrap justify-between gap-x-2"><span>Период</span><span className="min-w-0 break-words text-right">{formatRuDateFromISO(resolvedStartDate)} → {formatRuDateFromISO(resolvedEndDate)}</span></p>
                 )}
