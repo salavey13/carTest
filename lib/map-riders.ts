@@ -149,3 +149,41 @@ export function yandexMapsRouteUrl(lat: number, lng: number): string {
   const coord = `${a.toFixed(6)},${b.toFixed(6)}`;
   return `https://yandex.ru/maps/?rtext=~${encodeURIComponent(coord)}`;
 }
+
+/** WCAG relative luminance of an sRGB channel (0..1 input). */
+function srgbLuminanceComponent(v: number): number {
+  return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+
+/**
+ * Is the given CSS color dark? Pure heuristic for the map-riders sliding
+ * sheet: a translucent sheet over a LIGHT map tile layer needs a dark tint,
+ * and the tint must follow the CARD theme, not the app theme (a fixed
+ * light-themed crew keeps a light sheet in the rider's dark mode).
+ * Understands #rgb/#rrggbb/rgba()/rgb()/hsl(); anything unparsable (CSS
+ * vars, color-mix, …) conservatively reports DARK — the vip-bike-style dark
+ * crews are the case the tint exists for.
+ */
+export function isDarkCssColor(color: string | null | undefined): boolean {
+  const raw = (color ?? "").trim().toLowerCase();
+  if (!raw || raw.startsWith("var(") || raw.startsWith("color-mix(")) return true;
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/;
+  if (hex.test(raw)) {
+    const body = raw.slice(1);
+    const full = body.length === 3 ? body.split("").map((c) => c + c).join("") : body;
+    const r = parseInt(full.slice(0, 2), 16) / 255;
+    const g = parseInt(full.slice(2, 4), 16) / 255;
+    const b = parseInt(full.slice(4, 6), 16) / 255;
+    return 0.2126 * srgbLuminanceComponent(r) + 0.7152 * srgbLuminanceComponent(g) + 0.0722 * srgbLuminanceComponent(b) < 0.2;
+  }
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.%]+))?\s*\)$/;
+  const m = rgb.exec(raw);
+  if (m) {
+    const r = Number(m[1]) / 255;
+    const g = Number(m[2]) / 255;
+    const b = Number(m[3]) / 255;
+    if ([r, g, b].some((v) => !Number.isFinite(v) || v < 0 || v > 1)) return true;
+    return 0.2126 * srgbLuminanceComponent(r) + 0.7152 * srgbLuminanceComponent(g) + 0.0722 * srgbLuminanceComponent(b) < 0.2;
+  }
+  return true;
+}

@@ -113,7 +113,8 @@ describe("iter29: migrations apply path is cloner-safe", () => {
     // 179 → 180: 20260927140000_winter_storage_v3.sql (зимнее хранение v3: фотофиксация — photo_paths jsonb на событиях + тип 'photo' + публичный бакет storagepix)
     // 180 → 181: 20260928100000_storage_bikes_order_uniq.sql (boss R2 #4: partial UNIQUE (crew_slug, order_id) — чекаут идемпотентен и на уровне БД)
     // 181 → 182: 20260928110000_rentals_updated_at_trigger.sql (boss R3: BEFORE UPDATE trigger — CAS на metadata в rental-odometer непроницаем для всех писателей)
-    expect(files.length).toBe(182);
+    // 182 → 183: 20260929100000_crew_posts_metadata.sql (wall v7: metadata jsonb на crew_posts — серверный ledger рассылки «прошлым арендаторам», chat_id не хранятся)
+    expect(files.length).toBe(183);
     expect(files.every((f) => f.endsWith(".sql"))).toBe(true);
     expect(files.some((f) => /cron/i.test(f))).toBe(false);
     expect(files.some((f) => /NOTAPPLIED/i.test(f))).toBe(false);

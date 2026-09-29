@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   BarChart3,
   Bike,
@@ -39,6 +40,7 @@ import {
   Lock,
   MapPin,
   MapPinPlus,
+  Megaphone,
   MessageCircle,
   Newspaper,
   PenLine,
@@ -65,8 +67,6 @@ import {
   hashtagKey,
   parseWallText,
   pluralRu,
-  computeZoomOffset,
-  zoomAtPoint,
   riderMilestoneBadge,
   toggleReactionOptimistic,
   formatGeoCoords,
@@ -115,6 +115,7 @@ import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
 import { buildSpotCheckinText, findMotoSpotById, findNearestMotoSpot } from "@/lib/map-riders-spots";
 import { buildTelegramAppLink, wallPostStartParam } from "@/lib/wall-deeplink";
+import { usePhotoZoomGestures } from "@/hooks/usePhotoZoomGestures";
 import { WhoReactedModal } from "./WhoReactedModal";
 
 /** A photo being attached in the composer (upload → staging → post). */
@@ -209,6 +210,11 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   // composer state
   const [text, setText] = useState("");
   const [shareStats, setShareStats] = useState(false);
+  // ── Staff fanout (boss 2026-09-29): «разослать прошлым арендаторам».
+  // Флаг виден только crew-staff (viewer.isCrewStaff); сервер перепроверяет.
+  const [notifyRenters, setNotifyRenters] = useState(false);
+  const [notifyAudience, setNotifyAudience] = useState<"recent" | "past" | "all">("recent");
+  const [notifyPanelOpen, setNotifyPanelOpen] = useState(false);
   const [statsPreview, setStatsPreview] = useState<RentalStatsSnapshot | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -696,6 +702,37 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
   // ── publish ────────────────────────────────────────────────────────────────
 
+  /** Staff kick рассылки «прошлым арендаторам» после публикации поста
+   *  (exactly-once по ledger в crew_posts.metadata.notify_job; хвост добивает
+   *  крон). Никогда не бросает, тост — фактические счётчики доставки. */
+  const kickRenterFanout = useCallback(async (postId: string) => {
+    try {
+      const res = await fetch("/api/franchize/wall-renter-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId, slug, initData: withInitData() }),
+      });
+      const json = (await res.json().catch(() => null)) as { success?: boolean; sent?: number; remaining?: number; error?: string } | null;
+      if (res.ok && json?.success) {
+        const sent = json.sent ?? 0;
+        const remaining = json.remaining ?? 0;
+        if (sent > 0) {
+          toast.success(
+            remaining > 0
+              ? `Разослано ${sent} арендаторам — ${remaining} добьёт фоновая рассылка`
+              : `Разослано ${sent} арендаторам`,
+          );
+        } else {
+          toast.info("Пост опубликован — арендаторов для рассылки не нашлось");
+        }
+      } else {
+        toast.warning(json?.error || "Пост опубликован, рассылка не запустилась — добьётся кроном");
+      }
+    } catch {
+      toast.warning("Пост опубликован, рассылка не запустилась — добьётся кроном");
+    }
+  }, [slug, withInitData]);
+
   const submitPost = useCallback(async () => {
     if (posting) return;
     if (failedUploads > 0) {
@@ -717,6 +754,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
         .map((p) => ({ path: p.path, width: p.width, height: p.height, bytes: p.bytes })),
       bikes: selectedBikes.map((b) => b.bikeId),
       geo: geoTag ? { lat: geoTag.lat, lng: geoTag.lng, label: geoTag.label ?? undefined } : undefined,
+      notifyRenters: notifyRenters ? { audience: notifyAudience } : undefined,
     });
     if (res.ok) {
       // Insert after pinned posts (pinned block always stays on top).
@@ -739,13 +777,20 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
       setComposeDismissed(false);
       setRideDraft(null);
       setRideDraftDismissed(false);
+      setNotifyRenters(false);
+      setNotifyPanelOpen(false);
       // Wall × map: новая метка могла появиться/исчезнуть — карта перечитает пины.
       window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
+      // Staff fanout: kick после публикации (job уже в metadata, аудитория
+      // проверена сервером на этапе создания).
+      if (notifyRenters) {
+        await kickRenterFanout(res.post.id);
+      }
     } else {
       setComposerError(res.error);
     }
     setPosting(false);
-  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, geoTag, setComposerPhotosSync]);
+  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, geoTag, setComposerPhotosSync, notifyRenters, notifyAudience, kickRenterFanout]);
 
   // ── likes / comments / moderation ──────────────────────────────────────────
 
@@ -1432,6 +1477,69 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
               </div>
             )}
 
+            {/* Staff fanout panel: аудитория рассылки прошлым арендаторам.
+                Telegram-лимиты: пакеты по 20 сообщений (~18/сек, потолок бота
+                ~30/сек); длинные очереди добивает фоновая рассылка. */}
+            {notifyPanelOpen && viewer?.isCrewStaff && (
+              <div className="mt-3 rounded-xl border border-[var(--community-border)] bg-[var(--community-card-faint)] p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--community-accent)]">
+                    <Megaphone className="h-3.5 w-3.5" /> уведомить арендаторов
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setNotifyPanelOpen(false)}
+                    aria-label="Закрыть панель рассылки"
+                    className="rounded-full p-1 text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <label className="mb-2 flex min-h-[44px] cursor-pointer items-center gap-2.5 rounded-xl border border-[var(--community-border)] px-3 py-2 transition hover:border-[var(--community-accent)]/60">
+                  <input
+                    type="checkbox"
+                    checked={notifyRenters}
+                    onChange={(e) => setNotifyRenters(e.target.checked)}
+                    className="h-4 w-4 accent-[var(--community-accent)]"
+                  />
+                  <span className="text-xs leading-snug text-[var(--community-text)]">
+                    Разослать уведомление в Telegram всем, кто арендовал байки экипажа
+                    <span className="block text-[11px] text-[var(--community-muted)]">
+                      члены экипажа получат одну копию, автор и отписавшиеся — ни одной
+                    </span>
+                  </span>
+                </label>
+                {notifyRenters && (
+                  <div className="grid gap-1.5 sm:grid-cols-3">
+                    {([
+                      { value: "recent" as const, label: "Недавние", hint: "за 30 дней" },
+                      { value: "past" as const, label: "Старые", hint: "1–6 месяцев" },
+                      { value: "all" as const, label: "Все", hint: "за всё время" },
+                    ]).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setNotifyAudience(option.value)}
+                        aria-pressed={notifyAudience === option.value}
+                        className={`rounded-xl border p-2 text-left transition ${
+                          notifyAudience === option.value
+                            ? "border-[var(--community-accent)] bg-[var(--community-accent)]/10"
+                            : "border-[var(--community-border)] hover:border-[var(--community-accent)]/50"
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold text-[var(--community-text)]">{option.label}</span>
+                        <span className="block text-[11px] text-[var(--community-muted)]">{option.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[10px] leading-snug text-[var(--community-muted)] opacity-75">
+                  Telegram пропускает ~30 сообщений/сек на бота — шлём пакетами по 20 (~18/сек);
+                  очередь больше ~800 добирается фоновой рассылкой, никто не получает дубликат.
+                </p>
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -1499,6 +1607,24 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                   <MapPin className="h-4 w-4" />
                   Точка
                 </button>
+                {/* Staff-only: разослать пост прошлым арендаторам (boss 2026-09-29).
+                    Флаг косметический — сервер отдельно проверяет crew-staff. */}
+                {viewer?.isCrewStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setNotifyPanelOpen((cur) => !cur)}
+                    title="Разослать пост прошлым арендаторам"
+                    aria-expanded={notifyPanelOpen}
+                    className={`cw-press flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition ${
+                      notifyPanelOpen || notifyRenters
+                        ? "border-[var(--community-accent)] bg-[var(--community-accent)]/15 text-[var(--community-accent)]"
+                        : "border-[var(--community-border)] text-[var(--community-muted)] hover:border-[var(--community-accent)]"
+                    }`}
+                  >
+                    <Megaphone className="h-4 w-4" />
+                    Арендаторам
+                  </button>
+                )}
                 <span className="text-xs text-[var(--community-muted)] opacity-70">
                   {text.length} / {WALL_POST_MAX_LEN}
                 </span>
@@ -1882,15 +2008,34 @@ function PostPhotoGrid({ photos, onOpen }: { photos: WallPhotoView[]; onOpen: (i
         <button
           type="button"
           onClick={() => onOpen(0)}
-          className="cw-photo block w-full"
+          className="cw-photo relative block w-full"
           aria-label="Открыть фото"
         >
+          {/* BOSS 2026-09-29 — portrait fix: `w-full object-cover` + the 560px
+              cap cropped 9:16 photos from top AND bottom on the community page
+              (wide card → box aspect ≠ image aspect → cover eats the overflow).
+              Now the photo renders at its own aspect ratio (w-auto, capped),
+              and a blurred oversized copy fills the shell behind it — no crop,
+              no ugly gutters, same Telegram-style image shell. Landscape
+              photos keep the old full-bleed look (max-w-full still stretches
+              them edge to edge). */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs, same as the feed renders */}
+          <img
+            src={p.url}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover opacity-45 blur-2xl"
+            // Inline (not a class): .cw-photo:hover img's hover-scale must not
+            // override the deliberate 1.25 oversize of the backdrop copy.
+            style={{ transform: "scale(1.25)" }}
+          />
           {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
           <img
             src={p.url}
             alt="Фото поста"
             loading="lazy"
-            className="mx-auto max-h-[560px] w-full object-cover"
+            className="relative mx-auto block max-h-[560px] w-auto max-w-full"
           />
           <span className="cw-photo-veil" aria-hidden="true" />
         </button>
@@ -1981,11 +2126,12 @@ function PostBikeChips({ bikes, slug }: { bikes: WallBikeRefView[]; slug: string
   );
 }
 
-// ── fullscreen lightbox with pinch-zoom / pan / double-tap / swipe ──────────
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v));
-}
+// ── fullscreen lightbox — единый жестовый движок (usePhotoZoomGestures) ──────
+// BOSS 2026-09-29: щипок/двойной тап/пан/свайп как раньше (движок вынесен в
+// hooks/usePhotoZoomGestures.ts), ПЛЮС: кнопка закрытия по центру сверху
+// (углы экрана заняты нативными кнопками Telegram), улучшенные стрелки
+// (иконки, крупная цель 44px, видны и на телефоне) и закрытие тапом ВНЕ
+// фотографии — как у лайтбокса rental-страницы.
 
 interface PhotoLightboxProps {
   photos: WallPhotoView[];
@@ -1995,40 +2141,30 @@ interface PhotoLightboxProps {
 }
 
 function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxProps) {
-  // gesture state — refs avoid re-renders on every pointermove
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [smooth, setSmooth] = useState(true); // CSS transition when NOT gesturing
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const pinchStart = useRef<{ dist: number; scale: number; ox: number; oy: number; midX: number; midY: number } | null>(null);
-  const panStart = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
-  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
-  // Chrome Android synthesizes dblclick from touch — the mouse-only zoom path
-  // must not fire after a touch gesture (it would instantly cancel it).
-  const lastPointerType = useRef<string>("mouse");
-  // The stage container (NOT the transformed image — its own rect moves with
-  // the transform) is the transform-origin reference for zoom anchoring.
-  const stageRef = useRef<HTMLDivElement | null>(null);
+  const {
+    scale,
+    offset,
+    smooth,
+    stageRef,
+    imgRef,
+    reset,
+    go,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onDoubleClick,
+    canPrev,
+    canNext,
+  } = usePhotoZoomGestures({
+    count: photos.length,
+    index,
+    onIndexChange,
+    onClose,
+    // Тап мимо фото закрывает (tap = без движения, без жестов, натуральный зум).
+    closeOnTapOutside: true,
+  });
 
   const photo = photos[index];
-
-  const reset = useCallback(() => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
-    setSmooth(true);
-  }, []);
-
-  const go = useCallback(
-    (delta: number) => {
-      const next = clamp(index + delta, 0, photos.length - 1);
-      if (next !== index) {
-        reset();
-        onIndexChange(next);
-      }
-    },
-    [index, photos.length, onIndexChange, reset],
-  );
 
   // scroll lock + keyboard nav + focus management (a11y):
   // focus moves into the dialog on open, Tab is trapped inside, focus returns
@@ -2068,179 +2204,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     };
   }, [onClose, go]);
 
-  // Wheel state mirrored into a ref: the native wheel listener registers ONCE
-  // (no teardown/re-add churn per zoom step) and always reads fresh values.
-  const wheelState = useRef({ scale: 1, offset: { x: 0, y: 0 } });
-  useEffect(() => {
-    wheelState.current = { scale, offset };
-  }, [scale, offset]);
-
-  // Wheel zoom-to-cursor. Registered NATIVELY with { passive: false } —
-  // React 18 attaches wheel at the root as passive, so e.preventDefault()
-  // inside a React onWheel prop would be a silent no-op. Lives BEFORE the
-  // early return (Rules of Hooks).
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const onWheelNative = (e: WheelEvent) => {
-      e.preventDefault();
-      const { scale: curScale, offset: curOffset } = wheelState.current;
-      const nextScale = clamp(curScale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 5);
-      if (nextScale === 1) {
-        setScale(1);
-        setOffset({ x: 0, y: 0 });
-        return;
-      }
-      setOffset(zoomAtPoint(curScale, curOffset, { x: e.clientX, y: e.clientY }, stageCenter(), nextScale));
-      setScale(nextScale);
-    };
-    el.addEventListener("wheel", onWheelNative, { passive: false });
-    return () => el.removeEventListener("wheel", onWheelNative);
-  }, []);
-
   if (!photo) return null;
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    lastPointerType.current = e.pointerType;
-    setSmooth(false);
-
-    if (pointers.current.size === 1) {
-      // Double-tap detection — TOUCH only, at ANY scale (so a double-tap while
-      // zoomed resets). For mice the native dblclick handler is the path: the
-      // pointerdown detector would otherwise fire first at 2.5× and dblclick
-      // would instantly cancel it.
-      if (e.pointerType !== "mouse") {
-        const now = Date.now();
-        const last = lastTap.current;
-        if (last && now - last.time < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 30) {
-          if (scale > 1) {
-            setScale(1);
-            setOffset({ x: 0, y: 0 });
-          } else {
-            setScale(2.5);
-            setOffset(
-              zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5),
-            );
-          }
-          lastTap.current = null;
-          swipeStart.current = null;
-          panStart.current = null;
-          return;
-        }
-        lastTap.current = { time: now, x: e.clientX, y: e.clientY };
-      }
-      if (scale > 1) {
-        panStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
-      } else {
-        swipeStart.current = { x: e.clientX, y: e.clientY };
-      }
-    } else if (pointers.current.size === 2) {
-      const [a, b] = [...pointers.current.values()];
-      pinchStart.current = {
-        dist: Math.hypot(a.x - b.x, a.y - b.y),
-        scale,
-        ox: offset.x, // preserve the pan the user already had
-        oy: offset.y,
-        midX: (a.x + b.x) / 2,
-        midY: (a.y + b.y) / 2,
-      };
-      swipeStart.current = null;
-      panStart.current = null;
-    }
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!pointers.current.has(e.pointerId)) return;
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if (pointers.current.size === 2 && pinchStart.current) {
-      const [a, b] = [...pointers.current.values()];
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const start = pinchStart.current;
-      const nextScale = clamp((start.scale * dist) / Math.max(start.dist, 1), 1, 5);
-      // Anchor the pinch midpoint exactly at ANY start scale (ratio, not a
-      // linear delta) and preserve the pre-pinch pan offset.
-      setOffset(
-        computeZoomOffset({
-          startScale: start.scale,
-          startOffset: { x: start.ox, y: start.oy },
-          startMid: { x: start.midX, y: start.midY },
-          currentMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-          center: stageCenter(),
-          nextScale,
-        }),
-      );
-      setScale(nextScale);
-    } else if (pointers.current.size === 1 && panStart.current && scale > 1) {
-      const start = panStart.current;
-      setOffset({ x: start.ox + (e.clientX - start.x), y: start.oy + (e.clientY - start.y) });
-    }
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    const hadTwo = pointers.current.size === 2;
-    pointers.current.delete(e.pointerId);
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
-    // A pinch gesture must not leave a stale tap marker: the next single-finger
-    // touch within 300ms of the pinch start would otherwise false-fire the
-    // double-tap reset mid-adjustment.
-    if (hadTwo) lastTap.current = null;
-
-    if (pointers.current.size === 0) {
-      // swipe navigation only at natural zoom
-      const swipe = swipeStart.current;
-      if (swipe && scale <= 1.01 && !hadTwo) {
-        const dx = e.clientX - swipe.x;
-        const dy = e.clientY - swipe.y;
-        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-          go(dx < 0 ? 1 : -1);
-          return;
-        }
-      }
-      // snap back
-      panStart.current = null;
-      swipeStart.current = null;
-      pinchStart.current = null;
-      if (scale <= 1.05) {
-        setScale(1);
-        setOffset({ x: 0, y: 0 });
-        setSmooth(true);
-      } else {
-        setSmooth(true);
-      }
-    } else if (pointers.current.size === 1) {
-      // two → one: re-anchor panning to the remaining finger
-      const [rest] = [...pointers.current.values()];
-      pinchStart.current = null;
-      if (scale > 1) panStart.current = { x: rest.x, y: rest.y, ox: offset.x, oy: offset.y };
-    }
-  };
-
-  // Stage centre = transform-origin of the image box. Measured from the stage
-  // CONTAINER (never the transformed image — its own rect moves with it).
-  function stageCenter(): { x: number; y: number } {
-    const el = stageRef.current;
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    }
-    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  }
-
-  // Desktop zoom: native dblclick (guarded against touch-synthesized dblclick).
-  const onDoubleClick = (e: React.MouseEvent) => {
-    if (lastPointerType.current !== "mouse") return;
-    if (scale > 1) {
-      setScale(1);
-      setOffset({ x: 0, y: 0 });
-    } else {
-      setScale(2.5);
-      setOffset(zoomAtPoint(1, { x: 0, y: 0 }, { x: e.clientX, y: e.clientY }, stageCenter(), 2.5));
-    }
-  };
 
   return (
     <div
@@ -2252,9 +2216,11 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
       aria-modal="true"
       aria-label="Просмотр фото"
     >
-      {/* top bar — glassy counter chip + thumb-sized close */}
-      <div className="flex items-center justify-between px-4 py-3 text-white">
-        <span className="rounded-full bg-white/10 px-3 py-1 text-sm tabular-nums text-white/80 backdrop-blur">
+      {/* top bar — counter слева, ЗАКРЫТИЕ ПО ЦЕНТРУ (boss: углы экрана в
+          Telegram заняты нативными кнопками — «⬎» и «×» WebView перекрывали
+          старую правую кнопку), справа — пустой слот для симметрии */}
+      <div className="relative flex items-center justify-center px-4 py-2 text-white">
+        <span className="absolute left-4 rounded-full bg-white/10 px-3 py-1 text-sm tabular-nums text-white/80 backdrop-blur">
           {index + 1} / {photos.length}
         </span>
         <button
@@ -2265,16 +2231,14 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
         >
           <X className="h-5 w-5" />
         </button>
+        <span aria-hidden className="absolute right-4 h-11 w-11" />
       </div>
 
-      {/* image stage — Task 46: gestures live on a FULL-stage layer
-          (absolute inset-0), not on the image box: fingers landing on the
-          letterbox bars still reach pinch/pan/swipe (pinch used to engage
-          only when BOTH fingers hit the image itself). The transform wrapper
-          is stage-sized, so its transform-origin is exactly the stage centre
-          the zoom math anchors to. max-h-full fits the photo to the REAL
-          stage height — max-h-[78vh] cropped top/bottom on short screens
-          once the top bar + hint/thumbs took their share. */}
+      {/* image stage — gestures live on a FULL-stage layer (absolute inset-0),
+          not on the image box: fingers landing on the letterbox bars still
+          reach pinch/pan/swipe. The transform wrapper is stage-sized, so its
+          transform-origin is exactly the stage centre the zoom math anchors
+          to. max-h-full fits the photo to the REAL stage height. */}
       <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden">
         <div
           className="absolute inset-0 flex items-center justify-center"
@@ -2292,6 +2256,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- public wallpix URLs */}
           <img
+            ref={imgRef}
             src={photo.url}
             alt={`Фото ${index + 1}`}
             draggable={false}
@@ -2299,23 +2264,24 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
           />
         </div>
 
-        {/* desktop arrows */}
-        {photos.length > 1 && index > 0 && (
+        {/* improved arrows: иконки вместо шевронов-«скобок», цель 44px,
+            стеклянная подложка; видны на всех экранах (свайп остаётся) */}
+        {canPrev && (
           <button
             type="button"
             onClick={() => go(-1)}
             aria-label="Предыдущее фото"
-            className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 md:block"
+            className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
         )}
-        {photos.length > 1 && index < photos.length - 1 && (
+        {canNext && (
           <button
             type="button"
             onClick={() => go(1)}
             aria-label="Следующее фото"
-            className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 md:block"
+            className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
@@ -2325,7 +2291,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
       {/* hint + thumbs */}
       <div className="flex flex-col items-center gap-2 px-4 pb-4">
         <p className="hidden text-[11px] text-white/50 md:block">
-          Свайп ← → для навигации · двойной клик — зум · Esc — закрыть
+          Свайп ← → для навигации · двойной клик — зум · Esc — закрыть · тап мимо фото — закрыть
         </p>
         <p className="text-[11px] text-white/50 md:hidden">
           Щипок — зум · двойной тап — зум · свайп — следующее фото
@@ -2355,6 +2321,7 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
     </div>
   );
 }
+
 
 // ── Reaction bar (VK-style) ──────────────────────────────────────────────────
 

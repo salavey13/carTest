@@ -138,9 +138,22 @@ describe("useMeetupCreator photo + id contract", () => {
 describe("MeetupCreateModal", () => {
   const src = read(MODAL);
 
-  it("submits (value, photoFile) — photo is optional", () => {
-    expect(src).toMatch(/onSubmit: \(value: string, photoFile: File \| null\) => void/);
+  it("submits (value, photoFile, wall-flags opts) — photo is optional", () => {
+    // BOSS 2026-09-29: opts carry the meetup → wall interlink flags
+    // (shareToWall suggest + staff autoPublish/notifyAudience).
+    expect(src).toMatch(/onSubmit: \(value: string, photoFile: File \| null, opts: MeetupSubmitOptions\) => void/);
     expect(src).toMatch(/необязательно/);
+  });
+
+  it("wall flags: suggest-режим у всех, autoPublish + рассылка — только staff", () => {
+    expect(src).toContain("shareToWall: boolean");
+    expect(src).toContain("autoPublish: boolean");
+    expect(src).toContain("notifyAudience");
+    expect(src).toContain("showStaffFlags?: boolean");
+    // autoPublish импликитно выключает suggest (пост уже создаётся)
+    expect(src).toContain("shareToWall: autoPublish ? false : shareToWall");
+    // аудитории рассылки — recent/past/all
+    expect(src).toContain('"recent" | "past" | "all"');
   });
 
   it("compresses on the client with the same lib as the wall (1280 / q0.7)", () => {
@@ -243,9 +256,15 @@ describe("map photo lightbox", () => {
   });
 
   it("closes on backdrop tap, ESC and swipe-down (>80px) — Telegram-safe gestures", () => {
+    // BOSS 2026-09-29: жесты переехали в общий движок usePhotoZoomGestures
+    // (DISMISS_DRAG_PX = 80) — свайп вниз закрывает, тап вне фото закрывает,
+    // ESC остался локальным, зум добавился.
     expect(lightbox).toContain('if (event.key === "Escape") onClose();');
-    expect(lightbox).toContain("if (dragY > 80) onClose();");
+    expect(lightbox).toContain("dismissOnDragDown: true");
+    expect(lightbox).toContain("closeOnTapOutside: true");
     expect(lightbox).toContain('className="fixed inset-0 z-[9999]');
+    const engine = read("hooks/usePhotoZoomGestures.ts");
+    expect(engine).toContain("const DISMISS_DRAG_PX = 80;");
   });
 
   it("meetup popup photo opens the lightbox with the point title as caption", () => {

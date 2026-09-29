@@ -114,6 +114,25 @@ export function buildSuggestedWallPost(summary: RideSummary): string {
   return parts.join("\n");
 }
 
+/**
+ * BOSS 2026-09-29 — «kinda precreated base for review respective to just
+ * finished rent»: готовый черновик отзыва для Яндекс.Карт. Только факты из
+ * аренды (байк, срок, км, депозит вернули — только если ВЕРНУЛ), тёплый
+ * тон, готов к копипасте. Pure — тестируется.
+ */
+export function buildSuggestedYandexReview(summary: RideSummary): string {
+  const parts: string[] = [];
+  const duration = formatRideDuration(summary);
+  const kmPart = summary.km && summary.km > 0 ? `, накатал ${summary.km} км` : "";
+  parts.push(`Брал ${summary.bikeTitle} на ${duration}${kmPart} — всё чётко 👌`);
+  parts.push(`Байк исправный и ухоженный, выдали быстро, без бумажной волокиты.`);
+  if (summary.depositReturned === true) {
+    parts.push(`Депозит вернули без проблем.`);
+  }
+  parts.push(`Рекомендую! ⭐⭐⭐⭐⭐`);
+  return parts.join("\n");
+}
+
 // ── TG message builders (pure) ───────────────────────────────────────────────
 
 export function buildRideFinishedRenterHtml(summary: RideSummary, suggestedPost: string): string {

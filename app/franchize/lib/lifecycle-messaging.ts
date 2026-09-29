@@ -4,6 +4,8 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { buildSuggestedYandexReview, formatRideDuration, type RideSummary } from "@/app/franchize/lib/ride-share-notify";
+import { escapeTelegramHtml } from "@/app/franchize/lib/community-wall";
 
 /**
  * Send a post-rental review request to the renter via Telegram.
@@ -42,6 +44,12 @@ interface ReviewNudgeContext {
   rental: ReviewNudgeRental;
   /** The renter's Telegram chat_id (already resolved by the caller) */
   renterChatId: string;
+  /** BOSS 2026-09-29: сводка поездки (байк/срок/км) — caller считает её
+   *  чистым summarizeRide() из ride-share-notify (обе точки вызова имеют
+   *  даты, одометр и депозит под рукой). Небязательно: без неё сообщение
+   *  остаётся прежним. Красит сообщение статистикой + готовым черновиком
+   *  отзыва для Яндекс.Карт (buildSuggestedYandexReview). */
+  rideSummary?: RideSummary | null;
 }
 
 /**
@@ -186,7 +194,7 @@ async function markReviewRequestSent(
  *
  * @returns true if sent, false if skipped or failed (failure is logged + recorded in metadata)
  */
-export async function sendReviewNudge({ rental, renterChatId }: ReviewNudgeContext): Promise<boolean> {
+export async function sendReviewNudge({ rental, renterChatId, rideSummary }: ReviewNudgeContext): Promise<boolean> {
   // ── Kill switch ──
   if (process.env.LIFECYCLE_MESSAGING_ENABLED === "false") {
     logger.info("[review-nudge] Skipped: LIFECYCLE_MESSAGING_ENABLED=false");
@@ -238,13 +246,30 @@ export async function sendReviewNudge({ rental, renterChatId }: ReviewNudgeConte
   // ── Build message ──
   const vehicle = rental.vehicle as { make?: string | null; model?: string | null } | null;
   const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
-  const renterFirstName = renterChatId; // we don't have the name here — TG user_id only
 
-  const messageText =
-    `👋 Спасибо за аренду ${bikeName}!\n\n` +
-    `Если понравилось — оставь отзыв на Яндекс Картах. Это помогает другим райдерам найти нас, а нам — расти:\n\n` +
-    `⭐ Оставить отзыв: ${reviewsLink}\n\n` +
-    `Занимает 30 секунд. Спасибо! 🙏`;
+  // BOSS 2026-09-29: статистика поездки + готовая база отзыва (копипастой).
+  const summary = rideSummary ?? null;
+  const messageLines: string[] = [`👋 Спасибо за аренду ${bikeName}!`];
+  if (summary) {
+    messageLines.push(``, `🛣 ${formatRideDuration(summary)} в седле${summary.km && summary.km > 0 ? ` · ${summary.km} км` : ""}`);
+  }
+  messageLines.push(
+    ``,
+    `Если понравилось — оставь отзыв на Яндекс Картах. Это помогает другим райдерам найти нас, а нам — расти:`,
+    ``,
+    `⭐ Оставить отзыв: ${reviewsLink}`,
+    ``,
+  );
+  if (summary) {
+    messageLines.push(
+      `Чтобы было проще — держи готовый черновик, скопируй и поправь под себя:`,
+      ``,
+      `<i>${escapeTelegramHtml(buildSuggestedYandexReview(summary))}</i>`,
+      ``,
+    );
+  }
+  messageLines.push(`Занимает 30 секунд. Спасибо! 🙏`);
+  const messageText = messageLines.join("\n");
 
   // ── Send via inline keyboard button (better mobile UX) ──
   const inlineKeyboard = [[{ text: "⭐ Оставить отзыв", url: reviewsLink }]];

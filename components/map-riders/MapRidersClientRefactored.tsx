@@ -19,13 +19,15 @@ import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
-import { initialsFromName, meetupDraftFromPost, riderDisplayName, yandexMapsRouteUrl } from "@/lib/map-riders";
+import { initialsFromName, isDarkCssColor, meetupDraftFromPost, riderDisplayName, yandexMapsRouteUrl } from "@/lib/map-riders";
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
+import { createCommunityPostAction, getWallStaffFlagAction } from "@/app/franchize/server-actions/community-wall";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
-import { MeetupCreateModal } from "@/components/map-riders/MeetupCreateModal";
+import { MeetupCreateModal, type MeetupSubmitOptions } from "@/components/map-riders/MeetupCreateModal";
 import { MapPhotoLightbox, type MapPhotoLightboxData } from "@/components/map-riders/MapPhotoLightbox";
 import { CommunityWallClient } from "@/app/franchize/[slug]/community/CommunityWallClient";
 import { getWallGeotagsAction } from "@/app/franchize/server-actions/community-wall";
@@ -137,6 +139,23 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   // (in-page, как sheetRideComposeId). nonce перезапускает префилл при повторном
   // тапе по той же точке; URL-путь (?spot=) остаётся для внешних ссылок.
   const [wallCheckinSpot, setWallCheckinSpot] = useState<{ id: string; nonce: number } | null>(null);
+  // ── Meetup → стена (boss 2026-09-29): staff-флаг для модалки создания
+  // точки («Опубликовать пост автоматически» + «Разослать арендаторам»
+  // видит только экипаж). Лёгкий экшен — один isCrewStaffUser, без ленты.
+  const [viewerIsCrewStaff, setViewerIsCrewStaff] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getWallStaffFlagAction({ slug: crewSlug, initData: getTelegramInitData() })
+      .then((res) => {
+        if (!cancelled && res.ok) setViewerIsCrewStaff(res.isCrewStaff);
+      })
+      .catch(() => {
+        /* молча: флаги останутся скрыты — это безопасный дефолт */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [crewSlug]);
   const lastMeetupActionAtRef = useRef(0);
   // ── Круглые картинки crew-точек: logo_url dummy-экипажей мототочек.
   // Пусто в БД → null → маркер рисует kind-иконку-бейдж (см. RacingMap).
@@ -953,8 +972,39 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     setIsConfirmOpen(true);
   }, [dbUser?.user_id, selectedMeetup]);
 
+  /** Staff kick рассылки «прошлым арендаторам» после публикации поста.
+   *  Awaited — тост показывает фактические счётчики; если вкладку закрыли,
+   *  хвост добивает крон (курсор в notify_job, exactly-once). Никогда не бросает. */
+  const kickRenterFanout = useCallback(async (postId: string, slug: string) => {
+    try {
+      const res = await fetch("/api/franchize/wall-renter-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId, slug, initData: getTelegramInitData() }),
+      });
+      const json = (await res.json().catch(() => null)) as { success?: boolean; sent?: number; remaining?: number; error?: string } | null;
+      if (res.ok && json?.success) {
+        const sent = json.sent ?? 0;
+        const remaining = json.remaining ?? 0;
+        if (sent > 0) {
+          toast.success(
+            remaining > 0
+              ? `Разослано ${sent} арендаторам — ${remaining} добьёт фоновая рассылка`
+              : `Разослано ${sent} арендаторам`,
+          );
+        } else {
+          toast.info("Арендаторы для рассылки не найдены — пост опубликован на стене");
+        }
+      } else {
+        toast.warning(json?.error || "Пост опубликован, рассылка не запустилась — добьётся кроном");
+      }
+    } catch {
+      toast.warning("Пост опубликован, рассылка не запустилась — добьётся кроном");
+    }
+  }, []);
+
   const handleMeetupSubmit = useCallback(
-    async (value: string, photoFile: File | null) => {
+    async (value: string, photoFile: File | null, opts: MeetupSubmitOptions) => {
       if (!dbUser?.user_id) {
         toast.error("Авторизуйся в Telegram/VIP BIKE");
         return;
@@ -968,22 +1018,53 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       // запускает open-effect модалки, который сбрасывает её состояние.
       setIsQuickMeetupSaving(true);
       try {
+        const point = state.selectedMeetupPoint;
         const created = await createMeetup({
           userId: dbUser.user_id,
           title: value,
           comment: "Добавлено с карты",
-          point: state.selectedMeetupPoint,
+          point,
           successMessage: photoFile
             ? "Meetup добавлен — точка на карте носит твоё фото"
             : "Meetup добавлен по выбранной точке",
           photoFile,
         });
-        if (created) setIsPromptOpen(false);
+        if (!created) return; // модалка остаётся открытой (ошибка уже показана)
+
+        // ── Meetup → стена (boss 2026-09-29) ──
+        // autoPublish: пост создаётся сразу (geo-only пост валиден, но даём
+        // короткий текст для ленты); notifyAudience → kick рассылки.
+        // shareToWall (suggest): композер стены шита открывается с черновиком.
+        if (opts.autoPublish) {
+          const res = await createCommunityPostAction({
+            slug: crewSlug,
+            body: `📍 ${value} — собираемся тут. Точка уже на карте экипажа.`,
+            geo: { lat: point[0], lng: point[1], label: value },
+            initData: getTelegramInitData(),
+            notifyRenters: opts.notifyAudience ? { audience: opts.notifyAudience } : undefined,
+          });
+          if (res.ok) {
+            if (opts.notifyAudience) {
+              await kickRenterFanout(res.post.id, crewSlug);
+            } else {
+              toast.success("Пост о точке опубликован на стене");
+            }
+            window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
+          } else {
+            // Точка создана — пост не мешает ей жить: подскажем ручной путь.
+            toast.error(res.error);
+            toast.info("Точка на карте добавлена — опубликуй пост о ней вручную");
+          }
+        } else if (opts.shareToWall) {
+          openWallComposeFromPoint({ lat: point[0], lng: point[1], label: value, text: `📍 ${value} — собираемся тут` });
+          toast.info("Черновик поста о точке открыт на стене");
+        }
+        setIsPromptOpen(false);
       } finally {
         setIsQuickMeetupSaving(false);
       }
     },
-    [createMeetup, dbUser?.user_id, state.selectedMeetupPoint],
+    [createMeetup, dbUser?.user_id, state.selectedMeetupPoint, crewSlug, kickRenterFanout, openWallComposeFromPoint],
   );
 
   const handleConfirmDelete = useCallback(async () => {
@@ -1025,6 +1106,18 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     "--mr-muted": crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
     "--mr-base": crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
   }), [crew.theme.isAuto, crew.theme.palette]);
+
+  // ── Sheet contrast guard (boss 2026-09-29): the sliding sheet is translucent
+  // + backdrop-blur, so a LIGHT tile layer behind a dark sheet bleeds through
+  // and washes the content out. A theme-matched tint layer is painted OVER the
+  // card color (backgroundColor first, backgroundImage on top): a dark card
+  // gets a slate-black tint, a light card a whisper of white (dark text stays
+  // readable over a dark map). Tint follows the CARD theme, not the app theme
+  // (a fixed light crew keeps its light sheet in the rider's dark mode).
+  const sheetCardDark = crew.theme.isAuto
+    ? resolvedTheme === "dark"
+    : isDarkCssColor(crew.theme.palette.bgCard);
+  const sheetTint = sheetCardDark ? "rgba(2, 6, 23, 0.42)" : "rgba(255, 255, 255, 0.16)";
 
   return (
     <div
@@ -1208,7 +1301,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       >
         <Drawer.Portal>
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
-            <div className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/96 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
+            <div
+              className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/92 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}
+              style={{ backgroundImage: `linear-gradient(${sheetTint}, ${sheetTint})` }}
+            ><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
             {/* Snap control buttons — WALL v6: accent hairline under the sheet
                 title ties the sheet to the wall cards below (same accent). */}
             <div className="pointer-events-auto relative mb-3 flex items-center justify-between gap-2 border-b border-[var(--mr-border)] pb-2.5">
@@ -1356,6 +1452,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         placeholder="Точка встречи"
         defaultValue={promptValue}
         saving={isQuickMeetupSaving}
+        showStaffFlags={viewerIsCrewStaff}
       />
       {/* Interlink v3: фуллскрин-фото из попапов (portal → body, вне
           leaflet-pane/шита). Кнопки попапов ставят mapLightbox. */}

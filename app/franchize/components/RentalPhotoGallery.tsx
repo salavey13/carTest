@@ -2,9 +2,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, X, Upload, AlertCircle, Loader2 } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, X, Upload, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { reduceImageResolution } from "@/lib/client-image-compress";
+import { usePhotoZoomGestures } from "@/hooks/usePhotoZoomGestures";
 
 /**
  * I3 — RentalPhotoGallery
@@ -175,22 +176,8 @@ export function RentalPhotoGallery({
     loadPhotos();
   }, [loadPhotos]);
 
-  // Keyboard navigation in lightbox
-  useEffect(() => {
-    if (!lightboxPhoto) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxPhoto(null);
-      else if (e.key === "ArrowLeft" && lightboxIndex > 0) {
-        setLightboxIndex(lightboxIndex - 1);
-        setLightboxPhoto(lightboxList[lightboxIndex - 1]);
-      } else if (e.key === "ArrowRight" && lightboxIndex < lightboxList.length - 1) {
-        setLightboxIndex(lightboxIndex + 1);
-        setLightboxPhoto(lightboxList[lightboxIndex + 1]);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [lightboxPhoto, lightboxIndex, lightboxList]);
+  // Keyboard navigation moved INTO RentalPhotoLightbox (hook-based engine):
+  // the old duplicate parent-level listener would make every ←/→ skip 2 photos.
 
   // I4 enhancement: batch upload state — track progress across multiple files
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; fileName: string } | null>(null);
@@ -415,84 +402,181 @@ export function RentalPhotoGallery({
         </div>
       )}
 
-      {/* Lightbox */}
+      {/* Lightbox — единый жестовый движок (usePhotoZoomGestures):
+          щипок/двойной тап — зум, свайп ← → — навигация, тап мимо фото —
+          закрытие, кнопка закрытия ПО ЦЕНТРУ сверху (углы в Telegram заняты
+          нативными кнопками WebView), иконки-стрелки вместо текстовых «←→».
+          BOSS 2026-09-29: зум теперь есть и у фото ДО/ПОСЛЕ. */}
       {lightboxPhoto && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setLightboxPhoto(null)}
+        <RentalPhotoLightbox
+          photo={lightboxPhoto}
+          list={lightboxList}
+          index={lightboxIndex}
+          onClose={() => setLightboxPhoto(null)}
+          onIndexChange={(next) => {
+            setLightboxIndex(next);
+            setLightboxPhoto(lightboxList[next]);
+          }}
+          onBroken={markPhotoBroken}
+          formatDate={formatDate}
+          formatSize={formatSize}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Fullscreen lightbox (ДО/ПОСЛЕ) — hook-based gestures ──────────────────
+
+interface RentalPhotoLightboxProps {
+  photo: Photo;
+  list: Photo[];
+  index: number;
+  onClose: () => void;
+  onIndexChange: (next: number) => void;
+  /** Signed URL expired while open → one silent re-fetch for that photo id. */
+  onBroken: (photoId: string) => void;
+  formatDate: (iso: string) => string;
+  formatSize: (bytes: number) => string;
+}
+
+function RentalPhotoLightbox({ photo, list, index, onClose, onIndexChange, onBroken, formatDate, formatSize }: RentalPhotoLightboxProps) {
+  const {
+    scale,
+    offset,
+    smooth,
+    stageRef,
+    imgRef,
+    go,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onDoubleClick,
+    canPrev,
+    canNext,
+  } = usePhotoZoomGestures({
+    count: list.length,
+    index,
+    onIndexChange,
+    onClose,
+    closeOnTapOutside: true,
+  });
+
+  // Keyboard navigation (←/→/Esc) — как и раньше, поверх жестового движка.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") go(1);
+    };
+    window.addEventListener("keydown", handler);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose, go]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex flex-col bg-black/95"
+      style={{ touchAction: "none" }}
+    >
+      {/* top bar: счётчик слева + ЗАКРЫТИЕ ПО ЦЕНТРУ (не конфликтует с
+          нативными кнопками Telegram в углах WebView) */}
+      <div className="relative flex items-center justify-center px-4 py-3 text-white">
+        <span className="absolute left-4 rounded-full bg-white/10 px-3 py-1 text-sm tabular-nums text-white/80 backdrop-blur">
+          {index + 1} / {list.length}
+        </span>
+        <button
+          type="button"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          aria-label="Закрыть"
         >
+          <X className="h-5 w-5" />
+        </button>
+        <span aria-hidden className="absolute right-4 h-11 w-11" />
+      </div>
+
+      {/* image stage: жесты — на весь экран (щипок ловится и по полям) */}
+      <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden">
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={onDoubleClick}
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+            transition: smooth ? "transform 200ms ease-out" : "none",
+            willChange: "transform",
+            touchAction: "none",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            ref={imgRef}
+            src={photo.signedUrl}
+            alt={`Фото ${photo.photoType === "start" ? "ДО" : "ПОСЛЕ"}`}
+            draggable={false}
+            className="max-h-[80vh] max-w-[92vw] select-none rounded-lg object-contain"
+            onError={() => {
+              // Signed URL expired while the lightbox was open → one silent re-fetch
+              onBroken(photo.photoId);
+            }}
+          />
+        </div>
+
+        {/* improved arrows: иконки, крупная цель 44px, стеклянная подложка,
+            видны на всех экранах (свайп ← → остаётся) */}
+        {canPrev && (
           <button
             type="button"
-            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
             onClick={(e) => {
               e.stopPropagation();
-              setLightboxPhoto(null);
+              go(-1);
             }}
-            aria-label="Закрыть"
+            aria-label="Предыдущее"
           >
-            <X className="h-5 w-5" />
+            <ChevronLeft className="h-6 w-6" />
           </button>
-
-          {lightboxIndex > 0 && (
-            <button
-              type="button"
-              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                const newIdx = lightboxIndex - 1;
-                setLightboxIndex(newIdx);
-                setLightboxPhoto(lightboxList[newIdx]);
-              }}
-              aria-label="Предыдущее"
-            >
-              ←
-            </button>
-          )}
-
-          {lightboxIndex < lightboxList.length - 1 && (
-            <button
-              type="button"
-              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                const newIdx = lightboxIndex + 1;
-                setLightboxIndex(newIdx);
-                setLightboxPhoto(lightboxList[newIdx]);
-              }}
-              aria-label="Следующее"
-            >
-              →
-            </button>
-          )}
-
-          <div
-            className="flex max-h-[90vh] max-w-[90vw] flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
+        )}
+        {canNext && (
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
+            onClick={(e) => {
+              e.stopPropagation();
+              go(1);
+            }}
+            aria-label="Следующее"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lightboxPhoto.signedUrl}
-              alt={`Фото ${lightboxPhoto.photoType === "start" ? "ДО" : "ПОСЛЕ"}`}
-              className="max-h-[80vh] max-w-[90vw] rounded-lg object-contain"
-              onError={() => {
-                // Signed URL expired while the lightbox was open → one silent re-fetch
-                markPhotoBroken(lightboxPhoto.photoId);
-              }}
-            />
-            <div className="mt-3 rounded-lg bg-black/60 px-4 py-2 text-xs text-white">
-              <span className="font-semibold">
-                {lightboxPhoto.photoType === "start" ? "ДО" : "ПОСЛЕ"}
-              </span>{" "}
-              · {formatDate(lightboxPhoto.takenAt)} · {formatSize(lightboxPhoto.fileSizeBytes)} ·{" "}
-              <span className="opacity-70">
-                {lightboxPhoto.uploaderRole} via {lightboxPhoto.source}
-              </span>
-            </div>
-          </div>
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        )}
+      </div>
+
+      {/* metadata overlay (та же строка, что была) */}
+      <div className="flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="rounded-lg bg-black/60 px-4 py-2 text-xs text-white">
+          <span className="font-semibold">
+            {photo.photoType === "start" ? "ДО" : "ПОСЛЕ"}
+          </span>{" "}
+          · {formatDate(photo.takenAt)} · {formatSize(photo.fileSizeBytes)} ·{" "}
+          <span className="opacity-70">
+            {photo.uploaderRole} via {photo.source}
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }

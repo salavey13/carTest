@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/cleanup-wallpix-staging",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/wall-renter-notify",
+      "schedule": "0 4 * * *"
     }
   ],
   "routes": [

@@ -419,22 +419,34 @@ describe("community wall client (v2)", () => {
   });
 
   it("fullscreen lightbox: pinch-zoom, pan, double-tap, swipe nav, scroll lock", () => {
+    // BOSS 2026-09-29: gesture engine extracted to hooks/usePhotoZoomGestures.ts
+    // (shared with MapPhotoLightbox + rental ДО/ПОСЛЕ lightbox); the wall
+    // client consumes it and adds top-center close + tap-outside-close.
+    const gestures = read("hooks/usePhotoZoomGestures.ts");
+    expect(src).toContain("usePhotoZoomGestures({");
+    expect(src).toContain('closeOnTapOutside: true,');
     expect(src).toContain("function PhotoLightbox");
     expect(src).toContain("onPointerDown");
     expect(src).toContain("onDoubleClick");
-    // wheel is a NATIVE { passive: false } listener (React root wheel is passive)
-    expect(src).toContain('el.addEventListener("wheel", onWheelNative, { passive: false })');
-    expect(src).toContain('lastPointerType.current !== "mouse"');
-    expect(src).toContain("stageRef.current");
-    expect(src).toContain("pointers.current.size === 2");
-    expect(src).toContain("document.body.style.overflow = \"hidden\"");
-    expect(src).toContain("touchAction: \"none\"");
-    expect(src).toContain("Math.abs(dx) > 60");
+    // engine: wheel is a NATIVE { passive: false } listener (React root wheel is passive)
+    expect(gestures).toContain('el.addEventListener("wheel", onWheelNative, { passive: false })');
+    expect(gestures).toContain('lastPointerType.current !== "mouse"');
+    expect(gestures).toContain("stageRef.current");
+    expect(gestures).toContain("pointers.current.size === 2");
+    expect(src).toContain('document.body.style.overflow = "hidden"');
+    // touchAction lives on the CONSUMER stage layers (hook uses pointer capture)
+    expect(src).toContain('touchAction: "none"');
+    expect(gestures).toContain("const SWIPE_PX = 60;");
     // desktop zoom uses dblclick; the double-tap detector ignores mice
-    expect(src).toContain('e.pointerType !== "mouse"');
-    // zoom math goes through the pure, unit-tested helpers
-    expect(src).toContain("computeZoomOffset({");
-    expect(src).toContain("zoomAtPoint(");
+    expect(gestures).toContain('e.pointerType !== "mouse"');
+    // zoom math goes through the pure, unit-tested lib helpers (no duplicate)
+    expect(gestures).toContain('import { computeZoomOffset, zoomAtPoint } from "@/app/franchize/lib/community-wall"');
+    expect(gestures).toContain("computeZoomOffset({");
+    expect(gestures).toContain("zoomAtPoint(");
+    // top-center close (TG WebView owns the screen corners) + improved arrows
+    expect(src).toContain("ЗАКРЫТИЕ ПО ЦЕНТРУ");
+    expect(src).toContain("canPrev");
+    expect(src).toContain("canNext");
   });
 
   it("notification spam budget: chatty authors stop waking all members", () => {

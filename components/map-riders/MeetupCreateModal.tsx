@@ -6,6 +6,13 @@
 // Фото сжимается на клиенте (тот же reduceImageResolution, что у стены) —
 // на сервер уходит уже лёгкий blob; маркер на карте носит фото круглой
 // аватаркой (photo_url в map_rider_meetups, миграция 20260925120000).
+//
+// BOSS 2026-09-29 — meetup → стена:
+//   · «Рассказать на стене» (всем): после создания точки композер стены шита
+//     префиллится геотегом и текстом точки (suggest, in-page interlink);
+//   · crew-staff: «Опубликовать пост автоматически» (пост создаётся сразу)
+//     и «Разослать прошлым арендаторам» с выбором аудитории — флаг виден
+//     только экипажу (сервер перепроверяет isCrewStaffUser отдельно).
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -21,14 +28,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { reduceImageResolution } from "@/lib/client-image-compress";
 
+/** Аудитории рассылки (wall-renter-notify): подписи для чипов. */
+const AUDIENCE_OPTIONS: { value: "recent" | "past" | "all"; label: string; hint: string }[] = [
+  { value: "recent", label: "Недавние", hint: "аренды за последние 30 дней" },
+  { value: "past", label: "Старые", hint: "31–180 дней назад" },
+  { value: "all", label: "Все", hint: "все, кто когда-либо арендовал" },
+];
+
+export interface MeetupSubmitOptions {
+  /** Открыть композер стены с черновиком поста о точке (suggest-режим). */
+  shareToWall: boolean;
+  /** Staff: сразу опубликовать пост о точке (без черновика). */
+  autoPublish: boolean;
+  /** Staff: audience рассылки прошлым арендаторам (только при autoPublish). */
+  notifyAudience: "recent" | "past" | "all" | null;
+}
+
 type MeetupCreateModalProps = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (value: string, photoFile: File | null) => void;
+  onSubmit: (value: string, photoFile: File | null, opts: MeetupSubmitOptions) => void;
   title: string;
   placeholder?: string;
   defaultValue?: string;
   saving?: boolean;
+  /** Crew-staff флаги (auto-post + рассылка) — показываются только со true. */
+  showStaffFlags?: boolean;
 };
 
 const MEETUP_PHOTO_MAX_EDGE = 1280;
@@ -41,11 +66,15 @@ export function MeetupCreateModal({
   placeholder = "Введите значение",
   defaultValue = "",
   saving = false,
+  showStaffFlags = false,
 }: MeetupCreateModalProps) {
   const [value, setValue] = useState(defaultValue);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
+  const [shareToWall, setShareToWall] = useState(true);
+  const [autoPublish, setAutoPublish] = useState(false);
+  const [notifyAudience, setNotifyAudience] = useState<MeetupSubmitOptions["notifyAudience"]>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   // Revoke the previous blob when the preview URL changes or the modal unmounts
   // (a 10–25 MB source must not stay retained in the session).
@@ -54,6 +83,9 @@ export function MeetupCreateModal({
   useEffect(() => {
     if (open) {
       setValue(defaultValue);
+      setShareToWall(true);
+      setAutoPublish(false);
+      setNotifyAudience(null);
     } else {
       // Closed (cancel / X / Escape / успешный сабмит) — состояние модалки
       // сбрасывается ЦЕЛИКОМ здесь: и файл, и превью. Превью без файла —
@@ -112,12 +144,20 @@ export function MeetupCreateModal({
     // Файл/превью СОЗНАТЕЛЬНО не чистятся здесь: родитель решает, закрыть
     // модалку (успех → open-effect всё сбросит) или оставить открытой
     // (ошибка валидации → текст и фото сохраняются для повторной попытки).
-    onSubmit(value, photoFile);
+    onSubmit(value, photoFile, {
+      // autoPublish импликитно закрывает suggest-режим (пост уже будет создан).
+      shareToWall: autoPublish ? false : shareToWall,
+      autoPublish,
+      notifyAudience: autoPublish ? notifyAudience : null,
+    });
   };
+
+  const checkboxClass =
+    "flex min-h-[44px] w-full items-start gap-2.5 rounded-xl border border-[hsl(var(--border))] px-3 py-2.5 text-left transition hover:border-amber-400/60";
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : null)}>
-      <DialogContent className="border-[var(--dialog-border)] bg-[var(--dialog-bg)] text-[var(--dialog-text)] backdrop-blur-md" style={
+      <DialogContent className="max-h-[86dvh] overflow-y-auto border-[var(--dialog-border)] bg-[var(--dialog-bg)] text-[var(--dialog-text)] backdrop-blur-md" style={
         {
           "--dialog-border": "hsl(var(--border))",
           "--dialog-bg": "hsl(var(--background))",
@@ -177,6 +217,80 @@ export function MeetupCreateModal({
           </button>
         </div>
 
+        {/* ── Wall flags (boss 2026-09-29): suggest/auto-post + staff fanout ── */}
+        <div className="flex flex-col gap-2">
+          <label className={checkboxClass}>
+            <input
+              type="checkbox"
+              checked={shareToWall}
+              onChange={(e) => setShareToWall(e.target.checked)}
+              disabled={autoPublish}
+              className="mt-0.5 h-4 w-4 accent-amber-400"
+            />
+            <span className="text-xs leading-snug text-[hsl(var(--foreground))]">
+              <span className="font-semibold">Рассказать на стене экипажа</span>
+              <span className="block text-[11px] text-[hsl(var(--muted-foreground))]">
+                {autoPublish ? "пост создастся автоматически" : "после создания точки откроется готовый черновик поста"}
+              </span>
+            </span>
+          </label>
+
+          {showStaffFlags && (
+            <>
+              <label className={checkboxClass}>
+                <input
+                  type="checkbox"
+                  checked={autoPublish}
+                  onChange={(e) => {
+                    setAutoPublish(e.target.checked);
+                    if (!e.target.checked) setNotifyAudience(null);
+                  }}
+                  className="mt-0.5 h-4 w-4 accent-amber-400"
+                />
+                <span className="text-xs leading-snug text-[hsl(var(--foreground))]">
+                  <span className="font-semibold">Опубликовать пост автоматически</span>
+                  <span className="block text-[11px] text-[hsl(var(--muted-foreground))]">
+                    пост о точке появится на стене сразу, без черновика
+                  </span>
+                </span>
+              </label>
+
+              {autoPublish && (
+                <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 p-2.5">
+                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    Разослать прошлым арендаторам
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {AUDIENCE_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex min-h-[40px] cursor-pointer items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 transition hover:bg-[hsl(var(--muted))]/50"
+                      >
+                        <input
+                          type="radio"
+                          name="meetup-notify-audience"
+                          checked={notifyAudience === option.value}
+                          onChange={() =>
+                            setNotifyAudience((cur) => (cur === option.value ? null : option.value))
+                          }
+                          className="h-4 w-4 accent-amber-400"
+                        />
+                        <span className="text-xs leading-snug text-[hsl(var(--foreground))]">
+                          <span className="font-semibold">{option.label}</span>
+                          <span className="ml-1 text-[11px] text-[hsl(var(--muted-foreground))]">— {option.hint}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[10px] leading-snug text-[hsl(var(--muted-foreground))]">
+                    Уведомление в Telegram: ~20 сообщений/сек, лимиты бота не нарушаем. Члены экипажа и автор получат одну копию.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Отмена
@@ -188,7 +302,7 @@ export function MeetupCreateModal({
             disabled={saving || compressing || titleTooShort}
             title={titleTooShort ? "Название — минимум 2 символа" : undefined}
           >
-            {saving ? "Сохраняем…" : "Подтвердить"}
+            {saving ? "Сохраняем…" : autoPublish ? "Создать точку и пост" : "Подтвердить"}
           </Button>
         </DialogFooter>
       </DialogContent>

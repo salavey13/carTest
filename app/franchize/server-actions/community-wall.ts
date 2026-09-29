@@ -555,6 +555,35 @@ export async function getCommunityWallAction(input: {
   };
 }
 
+// ── VIEWER STAFF FLAG (map-riders meetup modal gating) ──────────────────────
+
+export type GetWallStaffFlagResult =
+  | { ok: true; userId: string | null; isCrewStaff: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Лёгкая проверка «этот зритель — staff экипажа?» для страницы карты
+ * (map-riders): модалка создания meetup-точки показывает «Опубликовать пост
+ * автоматически» + «Разослать прошлым арендаторам» только crew-staff'у.
+ * Полный getCommunityWallAction ради одного флага не нужен (лента тяжёлая).
+ */
+export async function getWallStaffFlagAction(input: {
+  slug: string;
+  initData?: string;
+}): Promise<GetWallStaffFlagResult> {
+  const parsed = z.object({ slug: z.string().trim().min(1), initData: z.string().trim().optional() }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const actor = await resolveWallActor(parsed.data.initData);
+  if (!actor) return { ok: true, userId: null, isCrewStaff: false };
+
+  const isCrewStaff = await isCrewStaffUser(actor.userId, crew);
+  return { ok: true, userId: actor.userId, isCrewStaff };
+}
+
 // ── GEO PINS (wall × map interlink) ─────────────────────────────────────────
 
 export type GetWallGeotagsResult =
@@ -658,6 +687,11 @@ const CreatePostInput = z.object({
       label: z.string().trim().min(1).max(WALL_GEO_LABEL_MAX_LEN).optional(),
     })
     .optional(),
+  // Staff-only: разослать пост прошлым арендаторам (wall-renter-notify).
+  // Server re-verifies isCrewStaffUser — the UI flag is cosmetic gating only.
+  notifyRenters: z
+    .object({ audience: z.enum(["recent", "past", "all"]) })
+    .optional(),
 });
 
 export type CreateCommunityPostResult =
@@ -673,6 +707,7 @@ export async function createCommunityPostAction(input: {
   photos?: unknown;
   bikes?: unknown;
   geo?: { lat: number; lng: number; label?: string };
+  notifyRenters?: { audience: "recent" | "past" | "all" };
 }): Promise<CreateCommunityPostResult> {
   const parsed = CreatePostInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный пост." };
@@ -782,6 +817,19 @@ export async function createCommunityPostAction(input: {
   }
 
   const authorScope = (await isCrewStaffUser(actor.userId, crew)) ? "crew" : "rider";
+
+  // ── notifyRenters: staff-only fanout request (boss: «flag to automatically
+  // send this post through forwarding api to renters … show this flag only to
+  // crew members»). UI flag is cosmetic — authorScope above IS the server
+  // staff check (owner/global admin/active member); a non-staff caller with
+  // this field gets a clean error, not a fanout.
+  let notifyJobAudience: "recent" | "past" | "all" | null = null;
+  if (parsed.data.notifyRenters) {
+    if (authorScope !== "crew") {
+      return { ok: false, error: "Разослать арендаторам могут только owner и члены экипажа." };
+    }
+    notifyJobAudience = parsed.data.notifyRenters.audience;
+  }
 
   // JSON round-trip: RentalStatsSnapshot (interface) → plain Json-assignable shape.
   const statsJson = statsSnapshot
@@ -977,6 +1025,18 @@ export async function createCommunityPostAction(input: {
       await supabaseAdmin.storage.from(WALLPHOTO_BUCKET).remove(photoFinalPaths);
     }
     await supabaseAdmin.from("crew_posts").delete().eq("id", postId); // photo rows cascade
+  }
+
+  // ── notify_job: staff попросил разослать пост прошлым арендаторам ──
+  // Job ставится ТОЛЬКО после ghost-guard (рассылка несуществующему посту
+  // бессмысленна). Сама доставка — отдельный kick (/api/franchize/
+  // wall-renter-notify, staff-gated) + крон-досылка; здесь только постановка.
+  if (notifyJobAudience && stillThere) {
+    const { queueWallRenterNotifyJob } = await import("@/app/franchize/lib/wall-renter-notify");
+    const queued = await queueWallRenterNotifyJob(postId, notifyJobAudience, actor.userId);
+    if (!queued) {
+      logger.error("[community-wall] notify_job queue failed — post is live, fanout skipped");
+    }
   }
 
   const { revalidatePath } = await import("next/cache");

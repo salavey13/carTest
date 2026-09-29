@@ -2318,7 +2318,23 @@ export async function updateRentalStatus(input: {
       .eq("rental_id", rentalId)
       .maybeSingle();
 
-    const currentMeta = (rental?.metadata || {}) as Record<string, unknown>;
+    const nudgeRowMeta = () => ((rentalRow?.metadata ?? {}) as Record<string, unknown>);
+    const rideRowMeta = () => ((rentalRow?.metadata ?? {}) as Record<string, unknown>);
+
+    // Typed alias over the ParserError-typed row (typegen can't parse the
+    // `status as old_status` alias — pre-existing debt). New code reads the
+    // row through rentalRow so it does NOT grow the TS2339 debt list.
+    const rentalRow = rental as unknown as {
+      crew_id: string;
+      user_id: string | null;
+      vehicle: { make?: string | null; model?: string | null } | null;
+      metadata: Record<string, unknown> | null;
+      total_cost: number | null;
+      agreed_start_date: string | null;
+      agreed_end_date: string | null;
+    } | null;
+
+    const currentMeta = (rentalRow?.metadata || {}) as Record<string, unknown>;
     const history = (currentMeta.history || []) as Array<{ status: string; at: string; by?: string; message?: string }>;
     const now = new Date();
 
@@ -2387,9 +2403,9 @@ export async function updateRentalStatus(input: {
     // iter26: `silent` opts out — data-correction cancels from the analytics
     // drawer (e.g. aborting a rental that was completed by mistake) don't
     // need to notify a renter who already got his deposit back.
-    if (rental?.user_id && !silent) {
-      const renterChatId = rental.user_id;
-      const vehicle = rental?.vehicle as { make?: string; model?: string } | null;
+    if (rentalRow?.user_id && !silent) {
+      const renterChatId = rentalRow.user_id;
+      const vehicle = rentalRow.vehicle;
       const bikeName = vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "байк";
 
       // v3 polish: use centralized template builder (with HTML escaping + status-aware emoji + warm defaults)
@@ -2420,21 +2436,100 @@ export async function updateRentalStatus(input: {
       // PRD v0.4 Feature 1 — see docs/PRD_LIFECYCLE_MESSAGING.md
       // The receipt message above says "Аренда завершена" but doesn't include
       // a review link. The nudge is a separate message with a Yandex Maps button.
+      // BOSS 2026-09-29: nudge красится сводкой поездки (срок/км по одометру,
+      // депозит) + готовым черновиком отзыва (buildSuggestedYandexReview).
       if (status === "completed") {
         try {
           const { sendReviewNudge } = await import("@/app/franchize/lib/lifecycle-messaging");
+          const { summarizeRide } = await import("@/app/franchize/lib/ride-share-notify");
+          const nudgeVehicle = rentalRow?.vehicle ?? null;
+          const nudgeBike = nudgeVehicle ? `${nudgeVehicle.make || ""} ${nudgeVehicle.model || ""}`.trim() : "байк";
+          const nudgeMd = nudgeRowMeta();
+          const nudgeOdoBefore = Number.isFinite(Number(nudgeMd.odometer_before ?? nudgeMd.odometerBefore))
+            ? Number(nudgeMd.odometer_before ?? nudgeMd.odometerBefore)
+            : null;
+          const nudgeOdoAfter = Number.isFinite(Number(nudgeMd.odometer_after ?? nudgeMd.odometerAfter))
+            ? Number(nudgeMd.odometer_after ?? nudgeMd.odometerAfter)
+            : odometerAfter ?? null;
+          const nudgeDeposit = typeof nudgeMd.deposit_returned === "boolean" ? nudgeMd.deposit_returned : null;
           await sendReviewNudge({
             rental: {
               rental_id: rentalId,
-              user_id: rental?.user_id ?? null,
-              crew_id: rental?.crew_id ?? null,
-              vehicle: rental?.vehicle as { make?: string; model?: string } | null,
-              metadata: rental?.metadata as Record<string, unknown> | null,
+              user_id: rentalRow?.user_id ?? null,
+              crew_id: rentalRow?.crew_id ?? null,
+              vehicle: nudgeVehicle,
+              metadata: (rentalRow?.metadata ?? null) as Record<string, unknown> | null,
             },
             renterChatId,
+            rideSummary: summarizeRide({
+              bikeTitle: nudgeBike,
+              startIso: rentalRow?.agreed_start_date ?? null,
+              endIso: rentalRow?.agreed_end_date ?? null,
+              totalCost: rentalRow?.total_cost ?? null,
+              odometerBefore: nudgeOdoBefore,
+              odometerAfter: nudgeOdoAfter,
+              depositReturned: nudgeDeposit,
+              crewName: null,
+              crewSlug: null,
+            }),
           });
         } catch (nudgeErr) {
           console.warn("[update-rental-status] Review nudge failed (non-fatal):", nudgeErr);
+        }
+
+        // ── BOSS 2026-09-29: «поездка завершена» + готовый пост на стену ──
+        // ПАРИТЕТ с confirmVehicleReturn (app/rentals/actions.ts): раньше
+        // закрытие из аналитики (этот путь) отправляло только чек + review-
+        // nudge — арендатор НИКОГДА не получал сводку с готовым постом и
+        // кнопкой «Поделиться на стене». Тот же summarizeRide/notify-пайплайн.
+        // Non-fatal: закрытие аренды важнее уведомлений.
+        if (rentalRow?.crew_id) {
+          try {
+            const { notifyRideFinishedAndSuggestPost, summarizeRide } = await import(
+              "@/app/franchize/lib/ride-share-notify"
+            );
+            const crewRowFull = await supabaseAdmin
+              .from("crews")
+              .select("slug, name, metadata")
+              .eq("id", rentalRow.crew_id)
+              .maybeSingle();
+            const crewRow = (crewRowFull.data ?? null) as { slug: string | null; name: string | null; metadata?: unknown } | null;
+            // Бот экипажа извлекается из metadata JSONB (колонки contacts в
+            // crews НЕТ — PGRST204, см. lib/crew-bot.ts).
+            const { botUsernameFromCrewMetadata } = await import("@/app/franchize/lib/crew-bot");
+            const crewBot = botUsernameFromCrewMetadata(crewRow?.metadata);
+            const rideVehicle = rentalRow.vehicle;
+            const rideBikeTitle = rideVehicle ? `${rideVehicle.make || ""} ${rideVehicle.model || ""}`.trim() : "байк";
+            // NB: metadata тут — строка ДО апдейта (fetch был раньше), поэтому
+            // свежий odometer_after берём из параметра экшена.
+            const rideMd = rideRowMeta();
+            const rideOdoBefore = Number.isFinite(Number(rideMd.odometer_before ?? rideMd.odometerBefore))
+              ? Number(rideMd.odometer_before ?? rideMd.odometerBefore)
+              : null;
+            const rideOdoAfter = odometerAfter ?? null;
+            const rideDeposit = typeof rideMd.deposit_returned === "boolean" ? rideMd.deposit_returned : null;
+            const summary = summarizeRide({
+              bikeTitle: rideBikeTitle,
+              startIso: rentalRow.agreed_start_date ?? null,
+              endIso: rentalRow.agreed_end_date ?? null,
+              totalCost: rentalRow.total_cost,
+              odometerBefore: rideOdoBefore,
+              odometerAfter: rideOdoAfter,
+              depositReturned: rideDeposit,
+              crewName: crewRow?.name ?? null,
+              crewSlug: crewRow?.slug ?? null,
+            });
+            await notifyRideFinishedAndSuggestPost({
+              rentalId,
+              crewSlug: crewRow?.slug ?? null,
+              summary,
+              renterChatId: renterChatId,
+              ccCrew: false, // cc owner+админам уходит ниже общим status-change сообщением
+              crewContacts: crewBot ? { telegramBotUsername: crewBot } : undefined,
+            });
+          } catch (rideShareErr) {
+            console.warn("[update-rental-status] Ride-share notify failed (non-fatal):", rideShareErr);
+          }
         }
       }
     }

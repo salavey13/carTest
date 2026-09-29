@@ -114,7 +114,7 @@ describe("iter26: «Отменить» works from the analytics drawer in ANY st
     const src = read("app/franchize/server-actions/rentals-dashboard.ts");
     expect(src).toContain("silent?: boolean");
     // The renter TG notification is gated on !silent.
-    expect(src).toContain("if (rental?.user_id && !silent) {");
+    expect(src).toContain("if (rentalRow?.user_id && !silent) {");
     expect(src).toContain('msgParts.push("без уведомления арендатору")');
   });
 

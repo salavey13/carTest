@@ -7,15 +7,16 @@
 // in-popup overlay can never cover the screen. The portal also escapes the
 // sliding-sheet (Vaul) and drawer layers of the page.
 //
-// Minimal on purpose (vs the wall's gesture-rich PhotoLightbox): popups show
-// ONE photo — open/close + swipe-down-to-dismiss + ESC covers the flow. Swipe
-// uses pointer events on the image only, so backdrop taps stay reserved for
-// close and never fight Leaflet (the portal lives outside the map DOM).
+// BOSS 2026-09-29: жесты переехали в общий движок usePhotoZoomGestures —
+// щипок-зум/двойной тап/пан как у лайтбокса стены, кнопка закрытия ПО ЦЕНТРУ
+// сверху (углы заняты нативными кнопками Telegram), свайп вниз закрывает,
+// тап вне фото закрывает. Одна фотография — стрелок нет.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { usePhotoZoomGestures } from "@/hooks/usePhotoZoomGestures";
 
 export interface MapPhotoLightboxData {
   url: string;
@@ -23,9 +24,26 @@ export interface MapPhotoLightboxData {
 }
 
 export function MapPhotoLightbox({ photo, onClose }: { photo: MapPhotoLightboxData | null; onClose: () => void }) {
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const startYRef = useRef(0);
+  const gestures = usePhotoZoomGestures({
+    count: 1, // одна фотография — свайп-навигация не нужна
+    index: 0,
+    onClose,
+    dismissOnDragDown: true, // свайп вниз закрывает (был и раньше)
+    closeOnTapOutside: true,
+  });
+  const {
+    scale,
+    offset,
+    smooth,
+    dragY,
+    stageRef,
+    imgRef,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onDoubleClick,
+  } = gestures;
+
   // a11y: вернуть фокус открывателю при закрытии — механика в эффекте ниже
   // (сейв ДО императивного фокуса, см. комментарий там).
   const lastFocusedRef = useRef<Element | null>(null);
@@ -57,36 +75,6 @@ export function MapPhotoLightbox({ photo, onClose }: { photo: MapPhotoLightboxDa
     };
   }, [photo]);
 
-  // Reset transient gesture state whenever the viewer opens for another photo.
-  useEffect(() => {
-    setDragY(0);
-    setDragging(false);
-  }, [photo]);
-
-  const onPointerDown = useCallback((event: React.PointerEvent<HTMLImageElement>) => {
-    // Touch gets implicit capture; MOUSE does not — without explicit capture a
-    // drag that leaves the img never sees pointerup, `dragging` freezes true
-    // and the photo starts chasing the cursor (wall lightbox does the same).
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    startYRef.current = event.clientY;
-    setDragging(true);
-  }, []);
-
-  const onPointerMove = useCallback(
-    (event: React.PointerEvent<HTMLImageElement>) => {
-      if (!dragging) return;
-      setDragY(Math.max(0, event.clientY - startYRef.current));
-    },
-    [dragging],
-  );
-
-  const onPointerUp = useCallback(() => {
-    if (!dragging) return;
-    setDragging(false);
-    if (dragY > 80) onClose();
-    else setDragY(0);
-  }, [dragging, dragY, onClose]);
-
   // Static render (SSR / closed): portal target is client-only, and mounting
   // an empty portal would be dead DOM anyway.
   if (!photo || typeof document === "undefined") return null;
@@ -104,6 +92,8 @@ export function MapPhotoLightbox({ photo, onClose }: { photo: MapPhotoLightboxDa
         if (event.key === "Tab") event.preventDefault();
       }}
     >
+      {/* Кнопка закрытия ПО ЦЕНТРУ сверху: в Telegram MiniApp правый верхний
+          угол занимает нативная «×» WebView, левый — «⬎»/назад. */}
       <button
         type="button"
         onClick={(event) => {
@@ -113,27 +103,44 @@ export function MapPhotoLightbox({ photo, onClose }: { photo: MapPhotoLightboxDa
         }}
         aria-label="Закрыть"
         ref={closeRef}
-        className="absolute right-3 top-3 z-10 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+        className="absolute left-1/2 top-3 z-10 flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur transition hover:bg-black/65"
       >
         <X className="h-5 w-5" />
       </button>
-      {/* eslint-disable-next-line @next/next/no-img-element -- wallpix CDN URL, same as the popup renders */}
-      <img
-        src={photo.url}
-        alt={photo.caption || "Фото"}
-        draggable={false}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+      {/* image stage: жестовый слой на весь экран — щипок ловится и по
+          letterbox-полям; картинка следует за drag-down до закрытия. */}
+      <div
+        ref={stageRef}
+        className="absolute inset-0 flex items-center justify-center overflow-hidden"
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[85vh] max-w-[92vw] touch-none select-none rounded-lg object-contain shadow-2xl"
-        style={{
-          transform: `translateY(${dragY}px)`,
-          transition: dragging ? "none" : "transform 180ms ease-out",
-          opacity: dragging ? Math.max(0.4, 1 - dragY / 400) : 1,
-        }}
-      />
+      >
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={onDoubleClick}
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y + dragY}px) scale(${scale})`,
+            transition: smooth ? "transform 200ms ease-out" : "none",
+            willChange: "transform",
+            touchAction: "none",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- wallpix CDN URL, same as the popup renders */}
+          <img
+            ref={imgRef}
+            src={photo.url}
+            alt={photo.caption || "Фото"}
+            draggable={false}
+            className="max-h-[85vh] max-w-[92vw] touch-none select-none rounded-lg object-contain shadow-2xl"
+            style={{
+              opacity: dragY > 0 ? Math.max(0.4, 1 - dragY / 400) : 1,
+            }}
+          />
+        </div>
+      </div>
       {photo.caption ? (
         <div
           className="absolute bottom-5 left-1/2 max-w-[86vw] -translate-x-1/2 truncate rounded-full bg-black/50 px-4 py-1.5 text-xs font-medium text-white/90"

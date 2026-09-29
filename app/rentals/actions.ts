@@ -1795,8 +1795,16 @@ export async function confirmVehicleReturn(
                 // The receipt says "Спасибо за аренду!" but no longer includes the
                 // buried "Будем рады отзыву" nudge — that's now a separate message
                 // with a Yandex Maps review button. See docs/PRD_LIFECYCLE_MESSAGING.md
+                // BOSS 2026-09-29: nudge также красится сводкой поездки + готовым
+                // черновиком отзыва (summarizeRide — тот же pure-билдер, что у
+                // ride-share-notify ниже).
                 try {
                     const { sendReviewNudge } = await import("@/app/franchize/lib/lifecycle-messaging");
+                    const { summarizeRide } = await import("@/app/franchize/lib/ride-share-notify");
+                    const nudgeMd = (rental.metadata as Record<string, unknown> | null) || {};
+                    const nudgeOdoBefore = Number.isFinite(Number(nudgeMd.odometer_before ?? nudgeMd.odometerBefore))
+                        ? Number(nudgeMd.odometer_before ?? nudgeMd.odometerBefore)
+                        : null;
                     await sendReviewNudge({
                         rental: {
                             rental_id: rental.rental_id,
@@ -1807,6 +1815,17 @@ export async function confirmVehicleReturn(
                             metadata: rental.metadata as Record<string, unknown> | null,
                         },
                         renterChatId: receiptChatId,
+                        rideSummary: summarizeRide({
+                            bikeTitle: bikeName,
+                            startIso: rental.agreed_start_date ?? null,
+                            endIso: rental.agreed_end_date ?? null,
+                            totalCost: rental.total_cost,
+                            odometerBefore: nudgeOdoBefore,
+                            odometerAfter: closureData?.odometerAfter ?? null,
+                            depositReturned: closureData?.depositReturned ?? null,
+                            crewName: null,
+                            crewSlug: null,
+                        }),
                     });
                 } catch (nudgeErr) {
                     logger.warn(`[confirmVehicleReturn] Review nudge failed (non-fatal):`, nudgeErr);
