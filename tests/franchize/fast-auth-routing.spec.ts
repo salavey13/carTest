@@ -22,17 +22,21 @@ const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
 describe("startapp router: STATIC fast path", () => {
+  // 2026-09-29: the pure resolver lives in use-start-param-target.ts (no
+  // "use client"), the hook re-exports it — rules are asserted there.
   const src = read("hooks/useStartParamRouter.ts");
+  const pure = read("hooks/use-start-param-target.ts");
 
   it("exports computeStaticFastTarget with self-contained rules", () => {
-    expect(src).toContain("export function computeStaticFastTarget(param: string): string | null");
+    expect(pure).toContain("export function computeStaticFastTarget(param: string): string | null");
+    expect(src).toContain("export { computeStaticFastTarget };");
     // Page-map claim…
-    expect(src).toContain("if (START_PARAM_PAGE_MAP[param]) return START_PARAM_PAGE_MAP[param];");
+    expect(pure).toContain("if (START_PARAM_PAGE_MAP[param]) return START_PARAM_PAGE_MAP[param];");
     // …slug-carried mapriders…
-    expect(src).toContain("param.startsWith(\"mapriders_\")");
+    expect(pure).toContain("param.startsWith(\"mapriders_\")");
     // …self-contained crew_ / viz_ rules.
-    expect(src).toContain("param.startsWith(\"crew_\")");
-    expect(src).toContain("param.startsWith(\"viz_\")");
+    expect(pure).toContain("param.startsWith(\"crew_\")");
+    expect(pure).toContain("param.startsWith(\"viz_\")");
   });
 
   it("static fast path runs BEFORE the auth gate (like the wall fast path)", () => {

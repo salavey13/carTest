@@ -215,9 +215,12 @@ describe("storage wall server actions (identity ladder + move notifications)", (
 
 describe("routing + surfaces wiring", () => {
   it("storage_<slug> routes on the static fast path (no auth roundtrip)", () => {
-    const router = read("hooks/useStartParamRouter.ts");
+    // 2026-09-29: the pure resolver moved to use-start-param-target.ts
+    // (extracted from the client hook so tests import it without the client
+    // graph) — the routing contract follows the code.
+    const router = read("hooks/use-start-param-target.ts");
     expect(router.includes('param.startsWith("storage_")')).toBe(true);
-    expect(router.includes("/franchize/${slug}/storage")).toBe(true);
+    expect(router.includes("/franchize/${rest}/storage")).toBe(true);
   });
 
   it("header «Хранение» link is gated to the crew that sells the service", () => {

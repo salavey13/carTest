@@ -7,6 +7,7 @@ import { FranchizePageShell } from "../../../components/FranchizePageShell";
 import { crewPaletteWithCssVars } from "../../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../../metadata";
 import { StorageOrderForm } from "../StorageOrderForm";
+import { DEFAULT_STORAGE_ADDRESS } from "../../../lib/storage-config";
 
 interface FranchizeStorageOrderPageProps {
   params: Promise<{ slug: string }>;
@@ -47,7 +48,7 @@ export default async function FranchizeStorageOrderPage({ params }: FranchizeSto
             <StorageOrderForm
               slug={resolvedSlug}
               crewName={crew.name}
-              storagePlace={storageConfig?.address || crew.contacts.address || "Стригинский переулок, 13Б"}
+              storagePlace={storageConfig?.address || crew.contacts.address || DEFAULT_STORAGE_ADDRESS}
               defaultMonthlyPriceRub={storageConfig?.defaultMonthlyPriceRub}
               seasonStartMMDD={storageConfig?.seasonStartMMDD}
               seasonEndMMDD={storageConfig?.seasonEndMMDD}

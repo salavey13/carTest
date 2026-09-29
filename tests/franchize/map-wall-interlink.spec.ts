@@ -81,7 +81,8 @@ describe("ride_ deeplink (map-riders session → wall composer)", () => {
   });
 
   it("router fast-path routes ride_ links BEFORE auth (source assert)", () => {
-    const src = read("hooks/useStartParamRouter.ts");
+    // 2026-09-29: computeFastWallTarget moved to the pure resolver module.
+    const src = read("hooks/use-start-param-target.ts");
     expect(src).toContain("/franchize/${link.slug}/community?ride=${link.sessionId}");
     expect(src).toContain("ride_<sessionId>_<slug>");
   });

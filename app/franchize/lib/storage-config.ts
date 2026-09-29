@@ -84,6 +84,18 @@ function sanitizeCareDuties(raw: unknown): string[] {
   return list;
 }
 
+export interface ResolveStorageConfigOptions {
+  /**
+   * The crew's DEFAULT address from metadata (contacts.address chain:
+   * `franchize.contacts.address` → `footer.address` → `hq_location`, or the
+   * private contractDefaults.return_address). It wins over the legacy
+   * Стригинский hardcode when `storage.address` is not configured — vip-bike
+   * moved to пл. Комсомольская 2, so the contract must follow the crew
+   * metadata instead of a frozen literal (boss nuance 1, 2026-09-29).
+   */
+  fallbackAddress?: string;
+}
+
 /**
  * Resolve the per-crew storage config from the hydrated `franchize` record
  * (the SAME record actions-runtime passes to resolveFranchizeTheme — i.e.
@@ -93,8 +105,16 @@ function sanitizeCareDuties(raw: unknown): string[] {
  * hand-edited metadata); when the key is ABSENT the legacy pre-config rule
  * applies — vip-bike only — so a partial block can never silently disable
  * the service.
+ *
+ * Address priority: `storage.address` (special metadata field, config editor)
+ * → `opts.fallbackAddress` (the crew's default address from metadata)
+ * → DEFAULT_STORAGE_ADDRESS (legacy vip-bike literal, last resort only).
  */
-export function resolveStorageConfig(franchize: unknown, slug: string): StorageCrewConfig {
+export function resolveStorageConfig(
+  franchize: unknown,
+  slug: string,
+  opts?: ResolveStorageConfigOptions,
+): StorageCrewConfig {
   const crewSlug = String(slug ?? "").trim();
   const storage = readPath<UnknownRecord2>(franchize, ["storage"], {});
 
@@ -119,7 +139,10 @@ export function resolveStorageConfig(franchize: unknown, slug: string): StorageC
 
   return {
     enabled: Boolean(enabled),
-    address: sanitizeAddress(readPath(storage, ["address"], "")) || DEFAULT_STORAGE_ADDRESS,
+    address:
+      sanitizeAddress(readPath(storage, ["address"], ""))
+      || sanitizeAddress(opts?.fallbackAddress)
+      || DEFAULT_STORAGE_ADDRESS,
     defaultMonthlyPriceRub:
       Number.isFinite(priceRaw) && priceRaw > 0 ? Math.round(priceRaw) : DEFAULT_STORAGE_MONTHLY_PRICE_RUB,
     seasonStartMMDD: seasonStart,

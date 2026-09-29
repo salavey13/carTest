@@ -31,8 +31,9 @@ import {
   resolveDepositRail,
 } from "@/app/franchize/lib/deposit-rail";
 import { formatStorageMonthsLabel as storageSeasonMonthsLabel, storageValidUntilISO } from "@/app/franchize/lib/storage-season";
-import { storageMonthsCount, storageSeasonDateToIso, storageStartParam } from "@/app/franchize/lib/storage";
+import { storageMonthsCount, storageSeasonDateToIso, storageStartParam, storageIsoToRu } from "@/app/franchize/lib/storage";
 import { resolveStorageConfig, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
+import { grantStorageRequestCreated } from "@/app/franchize/server-actions/storage-achievements";
 import { resolveCrewOwnerChatId } from "@/lib/rental-date-utils";
 import type { FranchizeTheme } from "@/lib/franchize-config";
 import { formatRuDate } from "@/app/franchize/lib/date-utils";
@@ -880,6 +881,18 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const metadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
 
+    // The crew's default public address from metadata — the SAME chain the
+    // contacts VM field uses below. Feeds resolveStorageConfig so the storage
+    // place follows the crew's CURRENT address (пл. Комсомольская 2 for
+    // vip-bike) instead of the frozen Стригинский literal (boss nuance 1).
+    const crewDefaultAddress = String(
+      readPath(
+        franchize,
+        ["contacts", "address"],
+        readPath(franchize, ["footer", "address"], crew.hq_location ?? ""),
+      ) ?? "",
+    ).trim();
+
     const resolvedTheme = resolveFranchizeTheme(franchize);
     const menuLinksRaw = readArrayPath<UnknownRecord>(franchize, ["header", "menuLinks"], fallbackMenuLinks(safeSlug)).map((link) => ({
       label: readPath(link, ["label"], "Ссылка"),
@@ -1016,7 +1029,7 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       ui: buildFranchizeCrewUi(readPath<unknown>(franchize, ["ui"], null)),
       // «Зимнее хранение» config — metadata.franchize.storage, legacy vip-bike
       // fallback when the block is absent (resolveStorageConfig).
-      storage: resolveStorageConfig(franchize, crew.slug ?? safeSlug),
+      storage: resolveStorageConfig(franchize, crew.slug ?? safeSlug, { fallbackAddress: crewDefaultAddress }),
     };
 
     const items: CatalogItemVM[] = (cars ?? [])
@@ -2082,19 +2095,47 @@ function assertStorageIdentityDocs(payload: {
  * orders — the editor checkbox promises «онлайн-заявка» off. Runs on BOTH
  * checkout paths (submitFranchizeOrderNotification + createFranchizeOrder-
  * Checkout), BEFORE any writes; throws the human storage_disabled phrase.
+ *
+ * 2026-09-29 (boss nuance 1): also RETURNS the resolved storage config so
+ * the doc builder can stamp the SERVER-RESOLVED storage place (metadata
+ * storage.address → crew default address from metadata → legacy literal)
+ * instead of trusting the client-sent storageDetails.storageAddress.
+ * Returns null only when the crew row itself is missing (unknown crew →
+ * the existing crew-not-found paths handle it).
  */
-async function assertStorageServiceEnabled(slug: string): Promise<void> {
+async function resolveCrewStorageGate(
+  slug: string,
+  opts?: { extraFallbackAddress?: string },
+): Promise<StorageCrewConfig | null> {
   const { data: crewRow } = await supabaseAdmin
     .from("crews")
-    .select("slug, metadata")
+    .select("slug, metadata, hq_location")
     .eq("slug", slug)
     .maybeSingle();
-  if (!crewRow) return; // unknown crew → the existing crew-not-found paths handle it
+  if (!crewRow) return null; // unknown crew → the existing crew-not-found paths handle it
   const metadata = ((crewRow as { metadata?: Record<string, unknown> | null }).metadata ?? {}) as Record<string, unknown>;
   const franchizeMeta = (metadata.franchize ?? metadata) as Record<string, unknown>;
-  if (!resolveStorageConfig(franchizeMeta, String((crewRow as { slug?: string }).slug ?? slug)).enabled) {
+  const crewDefaultAddress = String(
+    readPath(
+      franchizeMeta,
+      ["contacts", "address"],
+      readPath(franchizeMeta, ["footer", "address"], (crewRow as { hq_location?: string | null }).hq_location ?? ""),
+    ) ?? "",
+  ).trim();
+  // R1 (review fix 4): the contacts chain is ALWAYS the first fallback (the
+  // doc path and the page must show the same place); the private
+  // contractDefaults return/legal address is only the tier BELOW it.
+  const config = resolveStorageConfig(franchizeMeta, String((crewRow as { slug?: string }).slug ?? slug), {
+    fallbackAddress: crewDefaultAddress || opts?.extraFallbackAddress,
+  });
+  if (!config.enabled) {
     throw new FranchizeOrderDocValidationError(["storage_disabled"]);
   }
+  return config;
+}
+
+async function assertStorageServiceEnabled(slug: string): Promise<void> {
+  await resolveCrewStorageGate(slug);
 }
 
 type FranchizeOrderNotifyPayload = z.infer<typeof franchizeOrderInvoiceSchema> & {
@@ -2804,6 +2845,17 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     }
 
     // ── STORAGE flow: single consolidated winter-storage contract ──
+    // Server-authoritative storage place (boss nuance 1, 2026-09-29): the
+    // contract and the wall row BOTH stamp the address resolved from the
+    // crew metadata (storage.address → crew default address from metadata
+    // → legacy vip-bike literal). The client-sent storageDetails.storage-
+    // Address is a display echo only — a crafted payload can no longer
+    // write an arbitrary place into the contract.
+    const storageCrewConfig = isStorageFlow
+      ? await resolveCrewStorageGate(payload.slug, {
+          extraFallbackAddress: crewSecrets.returnAddress || crewSecrets.legalAddress,
+        })
+      : null;
     // Like service (2026-09-27): the storage line describes the OWNER's bike,
     // which is NOT a catalog item, so the per-bike loop would skip it (no car
     // row). One contract per storage order is generated here, before the loop,
@@ -2903,7 +2955,11 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         bike_accessories: details.bikeAccessories || "уточняется по Акту приёма-передачи",
         bike_estimated_value_rub: storageEstimatedRub > 0 ? formatMoney(storageEstimatedRub) : "",
         bike_estimated_value_words: storageEstimatedRub > 0 ? numberToWords(storageEstimatedRub) : "",
-        storage_address: details.storageAddress || crewSecrets.returnAddress || crewSecrets.legalAddress,
+        storage_address:
+          storageCrewConfig?.address
+          || details.storageAddress
+          || crewSecrets.returnAddress
+          || crewSecrets.legalAddress,
         storage_start_date: storageStartDateRu,
         storage_end_date: storageEndDateRu,
         storage_months: storageMonthsLabel,
@@ -3437,6 +3493,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // (+ the created event) so /franchize/<slug>/storage can track every
     // move. Guarded end-to-end: a missing table (the migration is manual)
     // logs and continues — the checkout itself has already succeeded by now.
+    // storageBikeId is hoisted so the notifications below can deep-link the
+    // owner straight to the bike's «Карточка хранения» (boss nuance 2).
+    let storageBikeId: string | null = null;
     if (isStorageFlow) {
       try {
         const stDetails = (payload.storageDetails ?? {}) as {
@@ -3453,12 +3512,30 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           noticeAddress?: string;
         };
         const stDoc = bikeDocs.find((d) => d.bikeId === "storage");
-        // Web checkouts from an anonymous browser carry a non-numeric
-        // telegramUserId ("manual-order") — only a real TG chat id claims
-        // the owner link (the wall shows the owner his own bikes).
-        const stOwnerChatId = /^\d+$/.test(String(payload.telegramUserId ?? ""))
-          ? String(payload.telegramUserId)
-          : null;
+        // Creator-at-creation (boss nuance 3, 2026-09-29): the order's owner
+        // is claimed SERVER-SIDE at checkout instead of being assigned
+        // manually later. Identity ladder: HMAC actor cookie → HMAC-verified
+        // initData (the ПЭП signature already proves the same id) → the raw
+        // numeric telegramUserId (in-TG WebApp checkout). Anonymous browser
+        // checkouts stay unclaimed (null) — staff links the owner afterwards
+        // via the story page username/id search.
+        const stOwnerChatId = await (async (): Promise<string | null> => {
+          try {
+            const { resolveServerActorUserId } = await import("@/app/franchize/server-actions/shared/auth-helpers");
+            const rawTgId = String(payload.telegramUserId ?? "").trim();
+            const verified = await resolveServerActorUserId({
+              claimedActorUserId: /^\d+$/.test(rawTgId) ? rawTgId : undefined,
+              initData: typeof payload.pepInitData === "string" ? payload.pepInitData : undefined,
+            });
+            if (verified) return verified;
+          } catch (actorErr) {
+            logger.warn("[franchize] storage owner actor resolution failed (non-fatal)", {
+              orderId: payload.orderId,
+              error: actorErr instanceof Error ? actorErr.message : String(actorErr),
+            });
+          }
+          return /^\d+$/.test(String(payload.telegramUserId ?? "")) ? String(payload.telegramUserId) : null;
+        })();
         const stSeasonStart = storageSeasonDateToIso(payload.rentalStartDate || payload.time);
         const stSeasonEnd = storageSeasonDateToIso(payload.rentalEndDate);
         const stMonths = storageMonthsCount(stSeasonStart, stSeasonEnd);
@@ -3479,7 +3556,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           .eq("order_id", payload.orderId)
           .maybeSingle();
         let stDuplicateId: string | null = null; // boss R2 #4 — a concurrent retry already landed the row
-        if (!stExisting) {
+        if (stExisting?.id) {
+          // Idempotent retry: the season row landed on the previous attempt —
+          // keep its id so the notifications still deep-link the CARD
+          // (R2 review issue #2: the retry used to lose the card button).
+          stDuplicateId = String(stExisting.id);
+        }
+        if (!stDuplicateId) {
           const { data: stRow, error: stErr } = await supabaseAdmin
             .from("storage_bikes")
             .insert({
@@ -3509,7 +3592,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               total_price_rub: stMonthlyRub > 0 && stMonths > 0
                 ? Math.round(stMonthlyRub * stMonths)
                 : Math.round(payload.totalAmount || 0),
-              storage_address: stDetails.storageAddress || "",
+              // Boss nuance 1 (2026-09-29): the wall row shows the SAME
+              // server-resolved place as the contract — crew metadata wins
+              // over the client echo.
+              storage_address: storageCrewConfig?.address || stDetails.storageAddress || "",
               notice_address: stDetails.noticeAddress || payload.registrationAddress || "",
               season_start: stSeasonStart,
               season_end: stSeasonEnd,
@@ -3547,6 +3633,18 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             }
           }
           const stBikeId = stDuplicateId ?? String((stRow as { id: string } | null)?.id ?? "");
+          if (stBikeId) storageBikeId = stBikeId;
+          // Boss nuance 4 (2026-09-29): «Зимовщик» — the creator earns his
+          // first storage badge. Fire-and-forget: gamification must never
+          // break the checkout.
+          if (stOwnerChatId) {
+            void grantStorageRequestCreated({
+              userId: stOwnerChatId,
+              slug: payload.slug,
+              orderId: payload.orderId,
+              bikeId: stBikeId || undefined,
+            });
+          }
           if (stBikeId && !stDuplicateId) {
             await supabaseAdmin.from("storage_bike_events").insert({
               bike_id: stBikeId,
@@ -3692,11 +3790,22 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     else if (isStorageFlow) {
       // 2026-09-27: the «Хранение» wall exists now — the crew lands right on
       // the season board instead of a dead 404 deeplink.
+      // 2026-09-29 (boss nuance 2): when the season row landed, the crew gets
+      // the CARD deeplink too — one tap from the TG message to the bike's
+      // timeline (фотофиксация, status moves, payment).
       const storageHref = crewBotAppLink(crewBotUsername, storageStartParam(payload.slug));
       if (storageHref) {
         notificationParts.push(
           ``,
           `🧊 Стена хранения: <a href="${storageHref}">Открыть «Хранение»</a>`,
+        );
+      }
+      const cardHref = storageBikeId
+        ? crewBotAppLink(crewBotUsername, storageStartParam(payload.slug, storageBikeId))
+        : null;
+      if (cardHref) {
+        notificationParts.push(
+          `🧊 Карточка байка: <a href="${cardHref}">Открыть карточку хранения</a>`,
         );
       }
     }
@@ -3762,6 +3871,41 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             ],
           ];
         }
+      } else if (isStorageFlow) {
+        // 2026-09-29 (boss nuance 4): storage owners used to get the thin
+        // generic copy — now the chat message itself carries the season,
+        // the server-resolved storage place, the tariff and the next step.
+        const stDetails = (payload.storageDetails ?? {}) as { bikeMake?: string; monthlyPriceRub?: number };
+        const stMonthsLabel = formatStorageMonthsLabel(payload.rentalStartDate, payload.rentalEndDate);
+        const stMonthlyRub = Math.round(Number(stDetails.monthlyPriceRub ?? 0));
+        // RU dates in a RU chat (R1 review): the pickers may deliver either
+        // DD.MM.YYYY or ISO — normalise through the season parser + Ru label.
+        const stSeasonStartRu = storageIsoToRu(storageSeasonDateToIso(payload.rentalStartDate)) || payload.rentalStartDate || "";
+        const stSeasonEndRu = storageIsoToRu(storageSeasonDateToIso(payload.rentalEndDate)) || payload.rentalEndDate || "";
+        const esc = (v: unknown): string => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        userNotification = [
+          `❄️ <b>Заявка на зимнее хранение #${payload.orderId}</b>`,
+          `Байк: ${esc(stDetails.bikeMake || bikeLabel)}`,
+          stSeasonStartRu
+            ? `Сезон: ${stSeasonStartRu} → ${stSeasonEndRu || "…"}${stMonthsLabel ? ` (${stMonthsLabel})` : ""}`
+            : "",
+          storageCrewConfig?.address ? `Место хранения: ${esc(storageCrewConfig.address)}` : "",
+          stMonthlyRub > 0
+            ? `Тариф: ${formatMoney(stMonthlyRub)} ₽/мес · Итого: ${formatMoney(payload.totalAmount)} ₽`
+            : `Итого: ${formatMoney(payload.totalAmount)} ₽`,
+          `Статус: оформлено${pepMeta ? ", договор подписан вашей ПЭП" : ""}`,
+          `📄 Договор хранения с актом приёма-передачи отправлен в этот чат.`,
+          `Менеджер свяжется с вами, чтобы принять байк на хранение.`,
+        ].filter(Boolean).join("\n");
+        // Two buttons: the bike card (when the season row landed) + the wall.
+        const storageHref = crewBotAppLink(crewBotUsername, storageStartParam(payload.slug));
+        const cardHref = storageBikeId
+          ? crewBotAppLink(crewBotUsername, storageStartParam(payload.slug, storageBikeId))
+          : null;
+        const ownerButtons: Array<{ text: string; url: string }> = [];
+        if (cardHref) ownerButtons.push({ text: "🧊 Мой байк на хранении", url: cardHref });
+        if (storageHref) ownerButtons.push({ text: "📋 Моё хранение", url: storageHref });
+        if (ownerButtons.length > 0) userButtons = [ownerButtons];
       } else {
         // Other flows — keep existing simple message format
         userNotification = [
@@ -3774,14 +3918,6 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
               ? `Период: ${payload.rentalStartDate} ${rentStartTime} → ${payload.rentalEndDate || "..."} ${rentEndTime}`
               : "",
         ].filter(Boolean).join("\n");
-        // 2026-09-27: storage owners get their own tracking wall button —
-        // every move on the bike now lands in this chat as well.
-        if (isStorageFlow) {
-          const storageHref = crewBotAppLink(crewBotUsername, storageStartParam(payload.slug));
-          if (storageHref) {
-            userButtons = [[{ text: "🧊 Моё хранение", url: storageHref }]];
-          }
-        }
       }
 
       try {

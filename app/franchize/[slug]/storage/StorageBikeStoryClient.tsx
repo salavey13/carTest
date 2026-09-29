@@ -44,6 +44,7 @@ import {
   getStorageBikeStoryAction,
   linkStorageBikeOwnerAction,
   markStorageBikePaidAction,
+  searchUsersForStorageOwnerAction,
   updateStorageBikeStatusAction,
 } from "@/app/franchize/server-actions/storage-bikes";
 import {
@@ -59,7 +60,8 @@ import {
   type StorageBikeStatus,
   type StorageBikeVM,
 } from "@/app/franchize/lib/storage";
-import type { StorageCrewConfig } from "@/app/franchize/lib/storage-config";
+import { findExactSubrenterUserCandidate } from "@/app/franchize/lib/subrenter-user-search";
+import { DEFAULT_STORAGE_ADDRESS, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import type { StorageStatusMeta } from "@/app/franchize/lib/storage";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { StorageEventPhotoGrid, StoragePhotoStrip, useStoragePhotoUpload } from "./StoragePhotos";
@@ -281,7 +283,7 @@ export function StorageBikeStoryClient({ initialSlug, bikeId, crewName, contacts
         <h2 className="text-sm font-extrabold" style={{ color: T.text }}>Мотоцикл</h2>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs" style={{ color: T.textMuted }}>
           <Row label="Сезон" value={`${storageIsoToRu(story.seasonStart)} → ${storageIsoToRu(story.seasonEnd)}${story.monthsLabel ? ` (${story.monthsLabel})` : ""}`} T={T} />
-          <Row label="Место" value={story.storageAddress || storageConfig?.address || "Стригинский переулок, 13Б"} T={T} />
+          <Row label="Место" value={story.storageAddress || storageConfig?.address || DEFAULT_STORAGE_ADDRESS} T={T} />
           <Row label="Гос. номер" value={story.regNumber || "—"} T={T} />
           <Row label="VIN" value={story.vin || "—"} T={T} />
           <Row label="Цвет" value={story.color || "—"} T={T} />
@@ -646,19 +648,114 @@ function PaymentControl({
   );
 }
 
+/**
+ * Owner-reassignment control (story page, staff only).
+ * 2026-09-29 (boss nuance 3): the raw «Telegram chat id» input became a
+ * SEARCH PICKER — type a name, @username or id and tap the right person
+ * (the same 350 ms debounced pattern as SubrenterManagerPanel; the server
+ * action is the storage twin of searchUsersForSubrenterAction). A raw
+ * numeric id still works — numeric input skips the search entirely.
+ */
 function OwnerLinkControl({ slug, bikeId, onDone, T }: { slug: string; bikeId: string; onDone: () => void; T: ReturnType<typeof useCrewTokens> }) {
   const { dbUser } = useAppContext(); // boss R2 #12 — initData fallback needs the claimed id
   const [open, setOpen] = useState(false);
-  const [tgId, setTgId] = useState("");
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<{ userId: string; label: string; username: string | null; fullName: string | null } | null>(null);
+  const [suggestions, setSuggestions] = useState<Array<{ userId: string; label: string; username: string | null; fullName: string | null }>>([]);
+  const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
+  const searchSeq = useRef(0); // stale-response guard (same as subrenter picker)
+  // Latest suggestion list — kept in a ref so save-time exact resolution
+  // (iter20 parity: an unambiguous @username/full-name resolves WITHOUT a
+  // tap) can reuse the freshest candidates it already saw.
+  const lastCandidatesRef = useRef<Array<{ userId: string; username: string | null; fullName: string | null }>>([]);
+
+  // Debounced username/id search — 350 ms, min 2 chars, only for non-numeric
+  // queries (numeric ids pass through to linkStorageBikeOwnerAction as-is).
+  // R1 fix (review P1): once a suggestion is PICKED the effect must stop
+  // searching — otherwise `picked` re-triggering the deps re-opened the
+  // dropdown 350 ms after every tap.
+  useEffect(() => {
+    if (!open || picked) return;
+    const q = query.trim();
+    if (!q || /^\d+$/.test(q)) {
+      setSuggestions([]);
+      setSearching(false);
+      return;
+    }
+    if (q.replace(/^@+/, "").length < 2) {
+      setSuggestions([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await searchUsersForStorageOwnerAction({
+          slug,
+          query: q,
+          initData: getTelegramInitData(),
+          actorUserId: dbUser?.user_id,
+        });
+        if (seq !== searchSeq.current) return; // a newer keystroke already owns the slot
+        if (res.success && Array.isArray(res.data)) {
+          lastCandidatesRef.current = res.data;
+          setSuggestions(res.data.map((u) => ({ userId: u.userId, label: u.label, username: u.username, fullName: u.fullName })));
+        } else {
+          lastCandidatesRef.current = [];
+          setSuggestions([]);
+        }
+      } catch {
+        if (seq === searchSeq.current) setSuggestions([]);
+      } finally {
+        if (seq === searchSeq.current) setSearching(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [query, open, slug, dbUser?.user_id, picked]);
+
+  /**
+   * R1 (review fix 2): an exact @username / full-name / id typed by hand
+   * now RESOLVES on save — one fresh search + findExactSubrenterUserCandidate
+   * (the subrenter iter20 recipe). Ambiguous or unresolvable text is refused
+   * with a clear instruction instead of silently linking nobody.
+   */
+  const resolveOwnerIdOrThrow = async (): Promise<string | null> => {
+    if (picked) return picked.userId;
+    const raw = query.trim();
+    if (!raw) return null;
+    if (/^\d+$/.test(raw)) return raw; // raw numeric id — always accepted
+    try {
+      const res = await searchUsersForStorageOwnerAction({
+        slug,
+        query: raw,
+        initData: getTelegramInitData(),
+        actorUserId: dbUser?.user_id,
+      });
+      const candidates = res.success && Array.isArray(res.data)
+        ? res.data
+        : lastCandidatesRef.current;
+      const exact = findExactSubrenterUserCandidate(candidates, raw);
+      return exact ? exact.userId : null;
+    } catch {
+      const exact = findExactSubrenterUserCandidate(lastCandidatesRef.current, raw);
+      return exact ? exact.userId : null;
+    }
+  };
 
   const submit = async (detach: boolean) => {
     setBusy(true);
     try {
+      const ownerTgUserId = detach ? "" : await resolveOwnerIdOrThrow();
+      if (!detach && !ownerTgUserId) {
+        toast.error("Не удалось однозначно определить владельца — выберите человека из подсказок или введите Telegram id.");
+        return;
+      }
       const result = await linkStorageBikeOwnerAction({
         slug,
         bikeId,
-        ownerTgUserId: detach ? "" : tgId.trim(),
+        ownerTgUserId: ownerTgUserId,
         initData: getTelegramInitData(),
         actorUserId: dbUser?.user_id,
       });
@@ -668,6 +765,9 @@ function OwnerLinkControl({ slug, bikeId, onDone, T }: { slug: string; bikeId: s
       }
       toast.success(detach ? "Привязка снята" : "Владелец привязан к Telegram");
       setOpen(false);
+      setQuery("");
+      setPicked(null);
+      setSuggestions([]);
       onDone();
     } catch {
       toast.error("Нет связи — попробуйте ещё раз.");
@@ -675,6 +775,10 @@ function OwnerLinkControl({ slug, bikeId, onDone, T }: { slug: string; bikeId: s
       setBusy(false);
     }
   };
+
+  // R1: exact text now resolves on save — the button is enabled for ANY
+  // non-empty input (picked / numeric id / name / @username).
+  const canSubmitLink = Boolean(picked || query.trim());
 
   return (
     <div className="mt-3">
@@ -685,40 +789,81 @@ function OwnerLinkControl({ slug, bikeId, onDone, T }: { slug: string; bikeId: s
         style={{ borderColor: T.borderSoft, color: T.textMuted }}
       >
         <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
-        Привязать владельца (TG id)
+        Привязать владельца
       </button>
       {open ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            value={tgId}
-            onChange={(e) => setTgId(e.target.value.replace(/\D/g, "").slice(0, 32))}
-            inputMode="numeric"
-            placeholder="Telegram chat id, напр. 741852963"
-            className="h-11 flex-1 rounded-xl border px-3 text-sm outline-none"
-            style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated, color: T.text }}
-          />
-          <button
-            type="button"
-            disabled={busy || !tgId.trim()}
-            onClick={() => submit(false)}
-            className="inline-flex min-h-11 items-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
-            Привязать
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => submit(true)}
-            className="inline-flex min-h-11 items-center rounded-xl border px-3 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-50"
-            style={{ borderColor: T.borderSoft, color: T.textMuted }}
-          >
-            Снять привязку
-          </button>
+        <div className="mt-2 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={query}
+              onChange={(e) => {
+                setPicked(null);
+                setQuery(e.target.value);
+              }}
+              inputMode="text"
+              autoComplete="off"
+              placeholder="Имя, @username или Telegram id"
+              className="h-11 flex-1 rounded-xl border px-3 text-sm outline-none"
+              style={{ borderColor: picked ? "rgb(14 165 233)" : T.borderSoft, backgroundColor: T.bgElevated, color: T.text }}
+            />
+            <button
+              type="button"
+              disabled={busy || !canSubmitLink}
+              onClick={() => submit(false)}
+              className="inline-flex min-h-11 items-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+              Привязать
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => submit(true)}
+              className="inline-flex min-h-11 items-center rounded-xl border px-3 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-50"
+              style={{ borderColor: T.borderSoft, color: T.textMuted }}
+            >
+              Снять привязку
+            </button>
+          </div>
+          {searching || suggestions.length > 0 ? (
+            <div className="overflow-hidden rounded-xl border" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
+              {searching ? (
+                <p className="flex items-center gap-2 px-3 py-2 text-xs" style={{ color: T.textMuted }}>
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> Ищем пользователей…
+                </p>
+              ) : (
+                suggestions.map((u) => (
+                  <button
+                    key={u.userId}
+                    type="button"
+                    onClick={() => {
+                      setPicked(u);
+                      // R2 (review issue #1): the input keeps the RAW handle
+                      // (@username / name), not the full label — editing the
+                      // pick then never seeds a garbage search.
+                      setQuery(u.username ? `@${u.username.replace(/^@+/, "")}` : (u.fullName || u.userId));
+                      setSuggestions([]);
+                      setSearching(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs transition hover:opacity-80"
+                    style={{ color: T.text, borderTop: `1px solid ${T.borderSoft}` }}
+                  >
+                    <span className="truncate">{u.label}</span>
+                    <span className="shrink-0 font-mono text-[10px]" style={{ color: T.textFaint }}>{u.userId}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
+          {!picked && query.trim().length > 0 && !/^\d+$/.test(query.trim()) && suggestions.length === 0 && !searching ? (
+            <p className="text-[10px]" style={{ color: T.textFaint }}>
+              Имя или @username сохраняются по точному совпадению; если людей несколько — выберите нужного из подсказок.
+            </p>
+          ) : null}
         </div>
       ) : null}
       <p className="mt-1.5 text-[10px]" style={{ color: T.textFaint }}>
-        Веб-заявки приходят без Telegram-привязки — укажите chat id владельца, и он увидит свою карточку и получит уведомления.
+        Веб-заявки приходят без Telegram-привязки — найдите владельца по имени/@username/id, и он увидит свою карточку и получит уведомления.
       </p>
     </div>
   );

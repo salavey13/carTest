@@ -132,10 +132,22 @@ export function storageIsoToRu(iso: string | null | undefined): string {
 
 // ── deeplink + money ─────────────────────────────────────────────────────────
 
-/** storage_<slug> — the startapp param the notifications deep-link into. */
-export function storageStartParam(slug: string): string {
+/**
+ * storage_<slug> — the startapp param the notifications deep-link into.
+ * With bikeId (a storage_bikes uuid): storage_<slug>_<bikeId> — deep-links
+ * straight into that bike's «Карточка хранения» story page (boss nuance 2,
+ * 2026-09-29). The uuid has no underscores, so useStartParamRouter splits at
+ * the LAST underscore and never confuses a bike card with the wall.
+ */
+export function storageStartParam(slug: string, bikeId?: string | null): string {
   const s = String(slug ?? "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
-  return s ? `storage_${s}` : "storage";
+  const base = s ? `storage_${s}` : "storage";
+  const id = String(bikeId ?? "").trim();
+  // Only real uuids qualify — a bare numeric id would be re-parsed as part
+  // of the slug and break the wall route.
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)
+    ? `${base}_${id}`
+    : base;
 }
 // NOTE (boss review R2 #1): the former storageDocPublicUrl() helper is GONE —
 // it built a public-objects URL against the PRIVATE rental-contracts bucket

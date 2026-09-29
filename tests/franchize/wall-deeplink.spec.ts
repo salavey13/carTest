@@ -172,7 +172,8 @@ describe("join_<slug> (crew invite, admin → future owner)", () => {
   });
 
   it("router fast path claims join links before the auth gate (source contract)", () => {
-    const src = read("hooks/useStartParamRouter.ts");
+    // 2026-09-29: the pure fast-path resolver lives in use-start-param-target.ts.
+    const src = read("hooks/use-start-param-target.ts");
     expect(src).toContain('return `/franchize/${link.slug}?join_crew=true`;');
   });
 });
@@ -224,7 +225,9 @@ describe("crew_<slug> (cross-crew catalog links, map popups)", () => {
   });
 
   it("router static fast path routes crew_<slug> to the crew main page (source contract)", () => {
-    const src = read("hooks/useStartParamRouter.ts");
+    // 2026-09-29: the pure resolver lives in use-start-param-target.ts
+    // (extracted from the client hook); the grammar contract follows it.
+    const src = read("hooks/use-start-param-target.ts");
     expect(src).toContain('param.startsWith("crew_")');
     expect(src).toContain("if (content) return `/franchize/${content}`;");
   });

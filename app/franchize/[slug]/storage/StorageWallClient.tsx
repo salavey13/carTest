@@ -47,7 +47,7 @@ import {
   type StorageWallVM,
   type StorageStatusMeta,
 } from "@/app/franchize/lib/storage";
-import type { StorageCrewConfig } from "@/app/franchize/lib/storage-config";
+import { DEFAULT_STORAGE_ADDRESS, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { DEFAULT_FRANCHIZE_THEME, type FranchizeTheme } from "@/lib/franchize-config";
 import { StorageEventPhotoGrid, StoragePhotoStrip, useStoragePhotoUpload } from "./StoragePhotos";
@@ -370,7 +370,7 @@ function GuestOffer({
   T: ReturnType<typeof useCrewTokens>;
 }) {
   const phoneHref = contactsPhone.replace(/\D/g, "").length >= 10 ? `tel:+7${contactsPhone.replace(/\D/g, "").slice(-10)}` : "";
-  const address = config?.address || "Стригинский переулок, 13Б";
+  const address = config?.address || DEFAULT_STORAGE_ADDRESS;
   const price = config?.defaultMonthlyPriceRub ?? 2000;
   const careDuties = config?.careDuties?.length ? config.careDuties : [];
   return (
@@ -609,7 +609,7 @@ function StorageBikeCard({
             {bike.totalPriceRub > 0 ? ` · ${storageFormatRub(bike.totalPriceRub)} ₽` : ""}
           </p>
           <p>Оценка: <b style={{ color: T.text }}>{storageFormatRub(bike.estimatedValueRub)} ₽</b></p>
-          <p>Место: {bike.storageAddress || config?.address || "Стригинский переулок, 13Б"}</p>
+          <p>Место: {bike.storageAddress || config?.address || DEFAULT_STORAGE_ADDRESS}</p>
         </div>
 
         {isStaff ? (

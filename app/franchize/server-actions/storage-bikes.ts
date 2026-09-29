@@ -60,7 +60,19 @@ import {
   type StorageBikeVM,
   type StorageWallVM,
 } from "@/app/franchize/lib/storage";
+// Shared with the subrenter picker (boss nuance 3): pure helpers live in a
+// non-"use server" module so both the admin panel and the storage story
+// page search users the same way (sanitize → or= query → rank → label).
+import {
+  buildSubrenterUserLabel,
+  buildUserSearchOrExpression,
+  normalizeSubrenterUserQuery,
+  rankSubrenterUserCandidate,
+  SUBRENTER_USER_SEARCH_LIMIT,
+  SUBRENTER_USER_SEARCH_MIN_LENGTH,
+} from "@/app/franchize/lib/subrenter-user-search";
 import { buildStorageBikeReport } from "@/app/franchize/lib/storage-bike-report";
+import { grantStorageOwnerPhotos, grantStorageSeasonStarted } from "@/app/franchize/server-actions/storage-achievements";
 
 // ── contract delivery (boss review R2 #1) ────────────────────────────────────
 //
@@ -306,12 +318,18 @@ function escHtml(value: string): string {
 async function notifyStorageMove(params: {
   slug: string;
   text: string;
+  /**
+   * The storage_bikes id — when present, the footer link points to the
+   * bike's «Карточка хранения» (timeline, фотофиксация, payment) instead of
+   * the season board (boss nuance 2, 2026-09-29).
+   */
+  bikeId?: string | null;
   /** Extra recipients beyond the crew (e.g. the bike owner). */
   alsoChatIds?: string[];
   /** Recipients to skip (the actor — he just DID the move). */
   excludeChatIds?: string[];
 }): Promise<void> {
-  const { slug, text, alsoChatIds = [], excludeChatIds = [] } = params;
+  const { slug, text, bikeId, alsoChatIds = [], excludeChatIds = [] } = params;
   try {
     const recipients = new Set<string>();
     // vip-bike style: owner + admins (members get the wall, not the ping).
@@ -329,8 +347,8 @@ async function notifyStorageMove(params: {
     } catch {
       botUsername = null;
     }
-    const deeplink = crewBotAppLink(botUsername, storageStartParam(slug));
-    const html = `${text}${deeplink ? `\n\n🧊 <a href="${deeplink}">Открыть «Хранение»</a>` : ""}`;
+    const deeplink = crewBotAppLink(botUsername, storageStartParam(slug, bikeId));
+    const html = `${text}${deeplink ? `\n\n🧊 <a href="${deeplink}">${bikeId ? "Открыть карточку хранения" : "Открыть «Хранение»"}</a>` : ""}`;
     for (const chatId of recipients) {
       const res = await telegramDeliver("sendMessage", chatId, {
         text: html,
@@ -551,6 +569,7 @@ export async function createStorageBikeAction(input: unknown): Promise<{ success
 
     await notifyStorageMove({
       slug,
+      bikeId,
       text: [
         `❄️ <b>Новый байк на зимнее хранение</b>`,
         `Байк: ${escHtml(form.bikeTitle)}${form.regNumber ? ` (${escHtml(form.regNumber)})` : ""}`,
@@ -656,8 +675,15 @@ export async function updateStorageBikeStatusAction(input: unknown): Promise<{ s
 
   const bike = row as { make: string; reg_number: string; owner_user_id: string | null; owner_name: string };
   const ownerLine = bike.owner_name ? `\nВладелец: ${escHtml(bike.owner_name)}` : "";
+  // Boss nuance 4: the owner earns «На приколе» the moment his bike is
+  // accepted into storage. Fire-and-forget — a gamification hiccup must not
+  // fail the move (the notification below still goes out either way).
+  if (status === "in_storage") {
+    void grantStorageSeasonStarted({ userId: bike.owner_user_id, slug, bikeId });
+  }
   await notifyStorageMove({
     slug,
+    bikeId,
     text: [
       `❄️ <b>Хранение: ${escHtml(bike.make || "мотоцикл")}${bike.reg_number ? ` (${escHtml(bike.reg_number)})` : ""}</b>`,
       `Статус: ${storageStatusLabel(currentStatus)} → <b>${storageStatusLabel(status)}</b>`,
@@ -723,6 +749,7 @@ export async function addStorageBikeNoteAction(input: unknown): Promise<{ succes
 
   await notifyStorageMove({
     slug,
+    bikeId,
     text: [
       `❄️ <b>Заметка по хранению: ${escHtml(bike.make || "мотоцикл")}${bike.reg_number ? ` (${escHtml(bike.reg_number)})` : ""}</b>`,
       `${escHtml(actorName)}: ${escHtml(message)}`,
@@ -798,8 +825,14 @@ export async function addStorageBikePhotosAction(input: unknown): Promise<{ succ
     return { success: false, error: "Не удалось сохранить фото — повторите позже." };
   }
 
+  // Boss nuance 4: the OWNER adding фотофиксация himself earns «Хроника
+  // сезона» — he documents his own bike's condition. Fire-and-forget.
+  if (!isStaff) {
+    void grantStorageOwnerPhotos({ userId: senderId, slug, bikeId });
+  }
   await notifyStorageMove({
     slug,
+    bikeId,
     text: [
       `❄️ 📸 <b>Фотофиксация: ${escHtml(loaded.row.make || "мотоцикл")}${loaded.row.reg_number ? ` (${escHtml(loaded.row.reg_number)})` : ""}</b>`,
       `${photoPaths.length} фото — в карточке хранения`,
@@ -896,6 +929,7 @@ export async function deleteStorageBikePhotoAction(input: unknown): Promise<{ su
 
   await notifyStorageMove({
     slug,
+    bikeId,
     text: [
       `❄️ <b>Фото удалено из истории: ${escHtml(loaded.row.make || "мотоцикл")}${loaded.row.reg_number ? ` (${escHtml(loaded.row.reg_number)})` : ""}</b>`,
       `Удалил: ${escHtml(await actorDisplayName(loaded.actorUserId))}`,
@@ -1060,6 +1094,7 @@ export async function markStorageBikePaidAction(input: unknown): Promise<{ succe
 
   await notifyStorageMove({
     slug,
+    bikeId,
     text: [
       `❄️ <b>Оплата хранения: ${escHtml(row.make || "мотоцикл")}${row.reg_number ? ` (${escHtml(row.reg_number)})` : ""}</b>`,
       `Оплачено до: <b>${storageIsoToRu(target)}</b>`,
@@ -1124,6 +1159,7 @@ export async function linkStorageBikeOwnerAction(input: unknown): Promise<{ succ
 
   await notifyStorageMove({
     slug,
+    bikeId,
     text: [
       `❄️ <b>Хранение: ${escHtml(row.make || "мотоцикл")}${row.reg_number ? ` (${escHtml(row.reg_number)})` : ""}</b>`,
       digits
@@ -1172,4 +1208,65 @@ export async function getStorageBikeReportAction(input: unknown): Promise<{ succ
     docUrl: docUrl || undefined,
   });
   return { success: true, data: report };
+}
+
+/**
+ * Username/id search for the owner-reassignment picker (boss nuance 3,
+ * 2026-09-29) — the storage twin of searchUsersForSubrenterAction
+ * (bike-subrenter.ts). Assigning an owner used to require the raw numeric
+ * Telegram id; now staff types a name, @username or id and taps the right
+ * person. The pure query/rank/label helpers are SHARED with the subrenter
+ * picker (lib/subrenter-user-search.ts) so both surfaces stay in sync.
+ * STAFF ONLY (same staffForActor gate as every storage mutation).
+ */
+export async function searchUsersForStorageOwnerAction(input: unknown): Promise<{
+  success: boolean;
+  data?: Array<{ userId: string; username: string | null; fullName: string | null; label: string }>;
+  error?: string;
+}> {
+  const parsed = z.object({
+    slug: z.string().trim().min(1),
+    query: z.string().max(120),
+    initData: z.string().trim().optional(),
+    actorUserId: z.string().trim().optional(),
+  }).safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+
+  // Same resolveStorageActor ladder as every storage mutation: signed cookie
+  // → HMAC-verified + freshness-capped initData. Guest/staff split below.
+  const gate = await resolveStorageActor(parsed.data);
+  if (!gate) return { success: false, error: "Экипаж не найден." };
+  if (!gate.actor) return { success: false, error: "Не авторизовано." };
+  if (!gate.actor.isStaff) return { success: false, error: "Недостаточно прав." };
+
+  try {
+    const query = normalizeSubrenterUserQuery(parsed.data.query);
+    if (query.length < SUBRENTER_USER_SEARCH_MIN_LENGTH) {
+      return { success: false, error: `Введите минимум ${SUBRENTER_USER_SEARCH_MIN_LENGTH} символа поиска.` };
+    }
+
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name")
+      .or(buildUserSearchOrExpression(query))
+      .order("username", { ascending: true, nullsFirst: false })
+      .limit(SUBRENTER_USER_SEARCH_LIMIT);
+    if (usersError) return { success: false, error: usersError.message };
+
+    const data = (users ?? [])
+      .map((u: { user_id: string | number; username?: string | null; full_name?: string | null }) => {
+        const candidate = {
+          userId: String(u.user_id),
+          username: u.username ? String(u.username) : null,
+          fullName: u.full_name ? String(u.full_name) : null,
+        };
+        return { ...candidate, label: buildSubrenterUserLabel(candidate) };
+      })
+      .sort((a, b) => rankSubrenterUserCandidate(a, query) - rankSubrenterUserCandidate(b, query));
+
+    return { success: true, data };
+  } catch (error) {
+    logger.error("[searchUsersForStorageOwnerAction] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }

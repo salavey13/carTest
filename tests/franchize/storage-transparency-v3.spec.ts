@@ -442,7 +442,7 @@ describe("wall client — money tiles, filters, sort, report pill, paid badges, 
   });
 
   it("guest offer comes from config with legacy fallbacks", () => {
-    expect(src.includes("config?.address || \"Стригинский переулок, 13Б\"")).toBe(true);
+    expect(src.includes("config?.address || DEFAULT_STORAGE_ADDRESS")).toBe(true);
     expect(src.includes("config?.defaultMonthlyPriceRub ?? 2000")).toBe(true);
     expect(src.includes("careDuties.map")).toBe(true);
   });
@@ -477,7 +477,7 @@ describe("story page — KPI band, payment + owner-link controls, data-free gate
     expect(src.includes("<StorageReportButton")).toBe(true);
     expect(src.includes("Итого за сезон")).toBe(true);
     expect(src.includes("Оценка (ответств.)")).toBe(true);
-    expect(src.includes("Привязать владельца (TG id)")).toBe(true);
+    expect(src.includes("Привязать владельца")).toBe(true);
     expect(src.includes("Оплата единовременно за сезон (п. 3 договора)")).toBe(true);
     // gate screen has a retry (Мотопарк parity)
     expect(src.includes("Попробовать снова")).toBe(true);
@@ -514,7 +514,7 @@ describe("admin/crewowner config — editor, pipeline, section links", () => {
     expect(src.includes("enabled: payload.storageEnabled,")).toBe(true);
     expect(src.includes("address: payload.storageAddress,")).toBe(true);
     // VM hydration + empty/fallback crews
-    expect(src.includes("storage: resolveStorageConfig(franchize, crew.slug ?? safeSlug),")).toBe(true);
+    expect(src.includes("resolveStorageConfig(franchize, crew.slug ?? safeSlug, { fallbackAddress: crewDefaultAddress })")).toBe(true);
     expect(src.includes("storage: resolveStorageConfig(null, slug),")).toBe(true);
   });
 
@@ -540,7 +540,7 @@ describe("admin/crewowner config — editor, pipeline, section links", () => {
     const page = read("app/franchize/[slug]/storage/new/page.tsx");
     expect(form.includes("defaultMonthlyPriceRub ?? 2000")).toBe(true);
     expect(form.includes("seasonStartMMDD || \"10-15\"")).toBe(true);
-    expect(page.includes("storageConfig?.address || crew.contacts.address || \"Стригинский переулок, 13Б\"")).toBe(true);
+    expect(page.includes("storageConfig?.address || crew.contacts.address || DEFAULT_STORAGE_ADDRESS")).toBe(true);
     expect(page.includes("defaultMonthlyPriceRub={storageConfig?.defaultMonthlyPriceRub}")).toBe(true);
     // disabled service → off-card instead of the form
     expect(page.includes("const serviceEnabled = storageConfig?.enabled ?? true;")).toBe(true);

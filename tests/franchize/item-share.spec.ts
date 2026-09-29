@@ -18,7 +18,9 @@ import {
 } from "@/app/franchize/lib/item-share";
 
 const MODAL_SRC = readFileSync(join(process.cwd(), "app/franchize/modals/Item.tsx"), "utf8");
-const ROUTER_SRC = readFileSync(join(process.cwd(), "hooks/useStartParamRouter.ts"), "utf8");
+// 2026-09-29: the analytics_sale_ parser moved to the pure resolver module.
+const ROUTER_SRC = readFileSync(join(process.cwd(), "hooks/use-start-param-target.ts"), "utf8")
+  + readFileSync(join(process.cwd(), "hooks/useStartParamRouter.ts"), "utf8");
 
 // ── 1. Deep-link builders ────────────────────────────────────────────────────
 
