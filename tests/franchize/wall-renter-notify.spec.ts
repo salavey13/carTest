@@ -72,6 +72,7 @@ import {
   bikeRentButtonLabel,
 } from "@/app/franchize/lib/community-wall";
 import {
+  batched,
   capWallNotifyCaption,
   deliverWallPostNotify,
 } from "@/app/franchize/lib/wall-notify-deliver";
@@ -195,8 +196,23 @@ describe("renter fanout: staff security wiring", () => {
     // no chat ids ever leak in the response — counters only (the doc comment
     // says so; responses spread WallRenterNotifyRunResult = counters + status)
     expect(src).toContain("только счётчики");
-    expect(src).toContain("processWallRenterNotifyJob(postId)");
+    // code review 2026-10-02: the kick passes the crew id — the processor
+    // re-verifies post.crew_id (staff of crew A cannot kick crew B's job)
+    expect(src).toContain("processWallRenterNotifyJob(postId, RENTER_NOTIFY_TIME_BUDGET_MS, crew.id)");
     expect(src).not.toMatch(/NextResponse\.json\([^)]*chat/);
+  });
+
+  it("code review 2026-10-02: post/crew mismatch guard + honest counters in the fanout lib", () => {
+    const src = read(LIB);
+    // kick passes expectedCrewId; processor rejects a foreign post BEFORE parsing the job
+    expect(src).toContain("expectedCrewId?: string");
+    expect(src).toContain('post.crew_id !== expectedCrewId');
+    // creator copy counts the REAL pending audience (after ledger/exclude/prefs),
+    // not the raw filtered audience — boss compares the counter to actual deliveries
+    expect(src).toContain("recipients: pending.length");
+    expect(src).not.toContain("recipients: filtered.length");
+    // final `sent` is the exactly-once ledger length (retries no longer inflate it)
+    expect(src).toContain("sent: sentLedger.length");
   });
 
   it("createCommunityPostAction: UI flag is cosmetic, server re-checks authorScope", () => {
@@ -619,5 +635,99 @@ describe("post bike chip opens the actual bike rental page (404 fix)", () => {
     expect(src).not.toContain("href={`/franchize/${slug}/catalog`}");
     // the chip now deep-links the bike modal on the crew page
     expect(src).toContain("href={`/franchize/${slug}?vehicle=${encodeURIComponent(bike.bikeId)}&flow=rent`}");
+  });
+});
+
+// ── 13. code review 2026-10-02: link + delivery hardening ────────────────────
+
+describe("hardening: rent button survives hostile bot metadata", () => {
+  it("garbage bot usernames → null (an invalid URL button makes Telegram reject the WHOLE message)", () => {
+    // metadata someone pasted a full URL into
+    expect(buildWallRentButton({ bikes: [{ bikeId: "bmw-f800r" }], botUsername: "https://t.me/oneBikePlsBot" })).toBeNull();
+    // spaces / hostile chars never reach a t.me URL
+    expect(buildWallRentButton({ bikes: [{ bikeId: "bmw-f800r" }], botUsername: "bad bot" })).toBeNull();
+    expect(buildWallRentButton({ bikes: [{ bikeId: "bmw-f800r" }], botUsername: "ab" })).toBeNull();
+    expect(buildWallRentButton({ bikes: [{ bikeId: "bmw-f800r" }], botUsername: "бот" })).toBeNull();
+    // valid handle with @-prefix still works (metadata often stores it)
+    expect(buildWallRentButton({ bikes: [{ bikeId: "bmw-f800r" }], botUsername: "@oneBikePlsBot" })?.url).toBe(
+      "https://t.me/oneBikePlsBot/app?startapp=rent_bmw-f800r",
+    );
+  });
+});
+
+describe("hardening: caption cap never tears an HTML tag (Telegram 400 guard)", () => {
+  it("truncation lands between tags, not inside one", () => {
+    const long = "🟣 <b>Новый пост на стене экипажа</b>\n\n👤 Артур\n💬 «" + "х".repeat(2000) + "»";
+    const capped = capWallNotifyCaption(long);
+    expect(capped.length).toBeLessThanOrEqual(1000);
+    // in the final HTML every "<" is a real tag (literals are escaped), so the
+    // last "<" must be closed — an unclosed one = 400 can't parse entities
+    expect(capped.lastIndexOf("<")).toBeLessThan(capped.lastIndexOf(">"));
+    expect(capped.endsWith("…")).toBe(true);
+  });
+
+  it("a cut landing exactly inside <b>… drops the whole dangling tag", () => {
+    // 40 chars of filler, then an unclosed "<b>" right at the cut point
+    const tricky = `${"a".repeat(985)}<b>bold tail`;
+    const capped = capWallNotifyCaption(tricky, 1000);
+    expect(capped.lastIndexOf("<")).toBeLessThan(capped.lastIndexOf(">"));
+    expect(capped.length).toBeLessThanOrEqual(1000);
+  });
+
+  it("short texts pass through untouched", () => {
+    expect(capWallNotifyCaption("<b>ok</b>")).toBe("<b>ok</b>");
+  });
+});
+
+describe("hardening: shared batch pacing (batched pure)", () => {
+  it("splits into fixed-size chunks with a ragged tail", () => {
+    expect(batched([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(batched(["a"], 20)).toEqual([["a"]]);
+    expect(batched([], 20)).toEqual([]);
+  });
+
+  it("non-positive size degenerates to a single batch (never loops forever)", () => {
+    expect(batched([1, 2], 0)).toEqual([[1, 2]]);
+  });
+});
+
+describe("hardening: 429 flood control gets one respectful retry", () => {
+  it("retry_after ≤ 5s → waits and retries the SAME method once", async () => {
+    const deliver = vi.mocked(telegramDeliver);
+    deliver.mockReset();
+    deliver
+      .mockResolvedValueOnce({ ok: false, error: "Too Many Requests: retry after 3", retryAfter: 3 })
+      .mockResolvedValueOnce({ ok: true, via: "forward", messageId: 77 });
+    vi.useFakeTimers();
+    try {
+      const pending = deliverWallPostNotify("100", "текст", null, null);
+      await vi.advanceTimersByTimeAsync(3250);
+      const res = await pending;
+      expect(res).toEqual({ ok: true, via: "sendMessage", messageId: 77 });
+      expect(deliver).toHaveBeenCalledTimes(2);
+      expect(deliver.mock.calls.every(([method]) => method === "sendMessage")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("long flood control (retry_after > 5s) → give up this run, no sleep", async () => {
+    const deliver = vi.mocked(telegramDeliver);
+    deliver.mockReset();
+    deliver.mockResolvedValueOnce({ ok: false, error: "Too Many Requests: retry after 30", retryAfter: 30 });
+    const res = await deliverWallPostNotify("100", "текст", null, null);
+    expect(res.ok).toBe(false);
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it("plain failures (no retry_after) behave exactly as before — zero extra calls", async () => {
+    const deliver = vi.mocked(telegramDeliver);
+    deliver.mockReset();
+    deliver.mockResolvedValue({ ok: false, error: "failed to get HTTP URL content" });
+    const res = await deliverWallPostNotify("100", "текст", null, "https://dead.example/x.jpg");
+    expect(res.ok).toBe(false);
+    expect(res.via).toBe("sendMessage");
+    // sendPhoto attempt + sendMessage fallback, no flood retries
+    expect(deliver).toHaveBeenCalledTimes(2);
   });
 });

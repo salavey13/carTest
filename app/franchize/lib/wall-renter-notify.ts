@@ -54,7 +54,12 @@ import {
   wallPostStartParam,
 } from "@/lib/wall-deeplink";
 import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
-import { deliverWallPostNotify, WallNotifyKeyboard } from "@/app/franchize/lib/wall-notify-deliver";
+import { deliverWallPostNotify, WallNotifyKeyboard, WALL_NOTIFY_BATCH_SIZE, WALL_NOTIFY_BATCH_PAUSE_MS } from "@/app/franchize/lib/wall-notify-deliver";
+
+// Пакетный темп живёт в wall-notify-deliver.ts (единый дом для ОБЕИХ рассылок);
+// ре-экспорт сохраняет публичный контракт модуля (тесты/роуты импортируют отсюда).
+export const RENTER_NOTIFY_BATCH_SIZE = WALL_NOTIFY_BATCH_SIZE;
+export const RENTER_NOTIFY_BATCH_PAUSE_MS = WALL_NOTIFY_BATCH_PAUSE_MS;
 
 // BOSS 2026-10-01 polish pack:
 //   · уведомление несёт ПЕРВОЕ фото поста (sendPhoto через форвард-API,
@@ -67,10 +72,6 @@ export type WallNotifyAudience = "recent" | "past" | "all";
 
 export const WALL_RENTER_AUDIENCES: WallNotifyAudience[] = ["recent", "past", "all"];
 
-/** Пакет отправки: 20 × 1.1с ≈ 18 сообщений/сек — под потолком Bot API. */
-export const RENTER_NOTIFY_BATCH_SIZE = 20;
-export const RENTER_NOTIFY_BATCH_PAUSE_MS = 1100;
-/** Бюджет одного прогона (route/cron) — запас до maxDuration=60. */
 export const RENTER_NOTIFY_TIME_BUDGET_MS = 50_000;
 /** Hard cap аудитории на пост (хвост добивают повторные прогоны). */
 export const RENTER_NOTIFY_MAX_RECIPIENTS = 500;
@@ -218,10 +219,15 @@ export interface WallRenterNotifyRunResult {
  * Обработать notify_job поста: дослать всем pending в рамках бюджета.
  * Вызывается из kick-роута (staff) и крона; идемпотентен — повторный вызов
  * продолжает с ledger. Никогда не бросает.
+ *
+ * expectedCrewId (code review 2026-10-02): kick-роут проверяет staff только
+ * для ЭКИПАЖА из body.slug — без сверки post.crew_id staff экипажа A мог бы
+ * пнуть job чужого экипажа B, зная id поста. Крон вызывает без параметра.
  */
 export async function processWallRenterNotifyJob(
   postId: string,
   timeBudgetMs: number = RENTER_NOTIFY_TIME_BUDGET_MS,
+  expectedCrewId?: string,
 ): Promise<WallRenterNotifyRunResult> {
   const run: WallRenterNotifyRunResult = { ok: false, status: "absent", sent: 0, failed: 0, remaining: 0 };
   try {
@@ -236,6 +242,10 @@ export async function processWallRenterNotifyJob(
       | { id: string; crew_id: string; author_id: string; body: string; kind: string; metadata: unknown; is_hidden: boolean }
       | null;
     if (!post) return { ...run, error: "post not found" };
+    if (expectedCrewId && post.crew_id !== expectedCrewId) {
+      logger.warn("[wall-renter-notify] post/crew mismatch — kick rejected", { postId, expectedCrewId, postCrewId: post.crew_id });
+      return { ...run, error: "post does not belong to this crew" };
+    }
 
     const job = parseNotifyJob(post.metadata);
     if (!job) return run;
@@ -368,7 +378,9 @@ export async function processWallRenterNotifyJob(
           photoCount,
           bikeTitles,
           hasStats: post.kind === "stats",
-          recipients: filtered.length,
+          // ЧЕСТНОЕ число: pending (после ledger/exclude/prefs), а не сырая
+          // аудитория — boss сверяет счётчик с фактическими доставками.
+          recipients: pending.length,
           failed: 0,
         });
         const creatorRes = await deliverWallPostNotify(post.author_id, creatorText, replyMarkup, coverPhotoUrl);
@@ -437,7 +449,9 @@ export async function processWallRenterNotifyJob(
       ...job,
       status: "done",
       sent_user_ids: sentLedger,
-      sent,
+      // Финальный счётчик — ТОЧНЫЙ (длина exactly-once ledger): failed-получатели
+      // досылаются следующими прогонами, накопленный attempt-counter завышал бы sent.
+      sent: sentLedger.length,
       failed,
       finished_at: new Date().toISOString(),
     });

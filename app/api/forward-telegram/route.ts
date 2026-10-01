@@ -84,6 +84,17 @@ interface ForwardRequest {
   files?: Record<string, { data: string; filename: string; contentType?: string } | string>;
 }
 
+// Code review 2026-10-02: the Origin whitelist is FORGEABLE (any server-to-
+// server caller can present an allowed origin header — the transport itself
+// does exactly that). Without a method allowlist this endpoint exposed the
+// bot token for ARBITRARY Bot API methods: getUpdates (data exfiltration),
+// setWebhook / logOut / close (bot hijack), deleteMessage, etc. Only the four
+// documented delivery methods are legitimate here.
+const ALLOWED_METHODS = new Set<string>(["sendMessage", "sendPhoto", "sendDocument", "sendMediaGroup"]);
+/** Server-side deadline for the Telegram call itself (sendPhoto by URL may
+ *  need a long Telegram-side download — 30s is generous but bounded). */
+const TELEGRAM_CALL_TIMEOUT_MS = Number(process.env.FORWARD_TELEGRAM_CALL_TIMEOUT_MS || 30_000);
+
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   for (const allowed of ALLOWED_ORIGINS) {
@@ -101,6 +112,7 @@ async function forwardToTelegram(method: string, chatId: string | number, payloa
   }
 
   const url = `https://api.telegram.org/bot${token}/${method}`;
+  const deadline = { signal: AbortSignal.timeout(TELEGRAM_CALL_TIMEOUT_MS) };
 
   if (files && Object.keys(files).length > 0) {
     // Multipart form data with files
@@ -139,7 +151,7 @@ async function forwardToTelegram(method: string, chatId: string | number, payloa
       form.append(attachName, blob, filename);
     }
 
-    const response = await fetch(url, { method: "POST", body: form });
+    const response = await fetch(url, { method: "POST", body: form, ...deadline });
     return response.json();
   } else {
     // Simple JSON request
@@ -152,6 +164,7 @@ async function forwardToTelegram(method: string, chatId: string | number, payloa
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      ...deadline,
     });
     return response.json();
   }
@@ -175,6 +188,13 @@ export async function POST(request: NextRequest) {
 
     if (!body.chat_id || !body.method) {
       return NextResponse.json({ error: "Missing required fields: chat_id, method" }, { status: 400 });
+    }
+    if (!ALLOWED_METHODS.has(body.method)) {
+      logger.warn("[forward-telegram] Blocked non-delivery method", { method: body.method });
+      return NextResponse.json({ error: "Method not allowed" }, { status: 400 });
+    }
+    if (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)) {
+      return NextResponse.json({ error: "payload must be an object" }, { status: 400 });
     }
 
     logger.info("[forward-telegram] Forwarding request", {

@@ -9,6 +9,7 @@
 
 import { parseStoredRentalTs, RENTAL_BLOCK_GRACE_MS } from "@/app/franchize/lib/rental-overlap";
 import { bikeRentStartParam, buildTelegramAppLink } from "@/lib/wall-deeplink";
+import { normalizeBotUsername } from "@/app/franchize/lib/crew-bot";
 
 // ── Stats snapshot ───────────────────────────────────────────────────────────
 
@@ -904,15 +905,18 @@ export function bikeRentButtonLabel(title: string | null | undefined): string {
  * straight into the bike page (useStartParamRouter → resolveFranchizeVehicleLink).
  * Null when there is no bot, no bikes, or no round-trippable id — the caller
  * keeps the ordinary post button instead of shipping a broken link.
- * Pure: only string plumbing (wall-deeplink), no Supabase/Telegram imports.
+ * Code review 2026-10-02: bot username is VALIDATED against the Telegram
+ * grammar (normalizeBotUsername) — a garbage metadata value must not become
+ * an invalid URL button, because Telegram rejects the ENTIRE message with the
+ * whole keyboard (400 Bad Request: button URL invalid), losing the
+ * notification for that recipient.
+ * Pure: only string plumbing (wall-deeplink, crew-bot), no Supabase/Telegram imports.
  */
 export function buildWallRentButton(input: {
   bikes?: WallPostNotifyBike[] | null;
   botUsername?: string | null;
 }): WallNotifyUrlButton | null {
-  const bot = String(input.botUsername ?? "")
-    .trim()
-    .replace(/^@+/, "");
+  const bot = normalizeBotUsername(input.botUsername);
   if (!bot) return null;
   for (const bike of input.bikes ?? []) {
     const param = bike?.bikeId ? bikeRentStartParam(bike.bikeId) : null;

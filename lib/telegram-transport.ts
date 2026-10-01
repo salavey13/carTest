@@ -29,6 +29,12 @@ const FORWARD_URL = (process.env.FORWARD_TELEGRAM_URL || "https://v0-car-test.ve
 const FORWARD_ORIGIN = (process.env.FORWARD_TELEGRAM_ORIGIN || "https://v0-car-test.vercel.app").trim();
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const FORWARD_TIMEOUT_MS = Number(process.env.FORWARD_TELEGRAM_TIMEOUT_MS || 20000);
+// Code review 2026-10-02: the direct path previously had NO timeout — one hung
+// fetch inside a fanout batch stalled the whole run until the serverless
+// budget (50s) ran out and Vercel froze the invocation. Every fetch gets a
+// deadline now; photos sent by URL may need a long Telegram-side download, so
+// the budget matches the forward path by default.
+const DIRECT_TIMEOUT_MS = Number(process.env.TELEGRAM_DIRECT_TIMEOUT_MS || 20000);
 
 export type TelegramDeliveryMethod = "sendMessage" | "sendPhoto" | "sendDocument" | "sendMediaGroup";
 
@@ -38,8 +44,31 @@ export interface TelegramTransportResult {
   /** Which path actually delivered the message. */
   via?: "forward" | "direct";
   error?: string;
+  /** Telegram 429 flood-control delay (seconds) when the error is rate
+   *  limiting — callers may retry once after this delay. */
+  retryAfter?: number;
   /** Raw Telegram result payload (message object or media group array). */
   result?: unknown;
+}
+
+/**
+ * Pure: extract `parameters.retry_after` from a Telegram error response.
+ * Handles BOTH shapes seen in the wild:
+ *   · direct Bot API / forward route body: { ok:false, parameters:{ retry_after } }
+ *   · forward route error envelope:       { error:"…", telegram:{ parameters:{ retry_after } } }
+ * Returns null for anything else (never throws — logging paths use it).
+ */
+export function parseTelegramRetryAfter(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const obj = payload as Record<string, unknown>;
+  const sources: unknown[] = [obj.parameters, (obj.telegram as Record<string, unknown> | undefined)?.parameters];
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+    const raw = (source as Record<string, unknown>).retry_after;
+    const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return null;
 }
 
 export interface ForwardFile {
@@ -86,7 +115,7 @@ async function callForward(
     }
     const description = json?.telegram?.description || json?.error || `HTTP ${response.status}`;
     logger.warn("[telegram-transport] forward call failed", { method, chatId: String(chatId), description: String(description).slice(0, 300) });
-    return { ok: false, via: "forward", error: String(description) };
+    return { ok: false, via: "forward", error: String(description), retryAfter: parseTelegramRetryAfter(json) ?? undefined };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn("[telegram-transport] forward call threw", { method, chatId: String(chatId), message });
@@ -120,17 +149,18 @@ async function callDirect(
         const buffer = Buffer.from(file.data, "base64");
         form.append(attachName, new Blob([buffer], { type: file.contentType || "application/octet-stream" }), file.filename);
       }
-      response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, { method: "POST", body: form });
+      response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, { method: "POST", body: form, signal: AbortSignal.timeout(DIRECT_TIMEOUT_MS) });
     } else {
       response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: chatId, ...payload }),
+        signal: AbortSignal.timeout(DIRECT_TIMEOUT_MS),
       });
     }
-    const data = (await response.json()) as { ok: boolean; description?: string; result?: { message_id?: number } };
+    const data = (await response.json()) as { ok: boolean; description?: string; parameters?: { retry_after?: number }; result?: { message_id?: number } };
     if (!data.ok) {
-      return { ok: false, via: "direct", error: data.description || `HTTP ${response.status}` };
+      return { ok: false, via: "direct", error: data.description || `HTTP ${response.status}`, retryAfter: parseTelegramRetryAfter(data) ?? undefined };
     }
     return { ok: true, via: "direct", messageId: data.result?.message_id, result: data.result };
   } catch (error) {

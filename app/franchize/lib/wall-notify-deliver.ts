@@ -20,8 +20,13 @@
 //     ФОТО-сообщении, а не вторым сообщением;
 //   · sendPhoto упал (хост не скачался, URL протух, лимит) → ОДИН откат на
 //     sendMessage — текст с кнопками доходит всегда, фото best-effort;
-//   · caption обрезается до 1024 символов (лимит Telegram) с запасом —
-//     buildWallPostNotifyHtml и так короткий (превью 220), но гвард в коде.
+//   · caption обрезается до лимита Telegram (1024) ТАК, чтобы не разорвать
+//     HTML-тег: в конечном HTML любой «<» — это настоящий тег (литеральные
+//     «<» экранированы escapeTelegramHtml), поэтому хвост, оборванный внутри
+//     тега, отрезается до «<» целиком (code review 2026-10-02);
+//   · Telegram 429 (flood control) с parameters.retry_after ≤
+//     WALL_NOTIFY_RETRY_AFTER_MAX_S → ОДНА повторная попытка после паузы
+//     (code review 2026-10-02: 429 раньше считался окончательным отказом).
 // Никогда не бросает — вызывающие fanout'ы считают ok/failed сами.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -30,6 +35,19 @@ import { logger } from "@/lib/logger";
 
 /** Telegram caption limit — 1024; режем с запасом на HTML-сущности. */
 export const WALL_NOTIFY_CAPTION_LIMIT = 1000;
+
+/**
+ * Максимальный retry_after (сек), при котором делаем одну повторную попытку.
+ * Держим маленьким: fanout живёт в бюджете 50с, долгий flood-control — это
+ * «не сейчас», получателя добьют следующие kick/крон.
+ */
+export const WALL_NOTIFY_RETRY_AFTER_MAX_S = 5;
+
+/** Пакет отправки: 20 × 1.1с ≈ 18 сообщений/сек — под потолком Bot API 30/сек.
+ *  Единый дом для ОБЕИХ рассылок (renter-fanout и crew-fanout): раньше темп
+ *  держал только renter-fanout, crew-fanout стрелял всем списком за раз. */
+export const WALL_NOTIFY_BATCH_SIZE = 20;
+export const WALL_NOTIFY_BATCH_PAUSE_MS = 1100;
 
 /** Shape of the inline keyboard shared by both wall fanouts. */
 export type WallNotifyKeyboard = { inline_keyboard: { text: string; url: string }[][] };
@@ -42,12 +60,58 @@ export interface WallNotifyDeliverResult {
   error?: string;
 }
 
-/** Pure: caption guard — обрезка под лимит Telegram (не ломая HTML-теги
- *  impossible в общем случае, поэтому режем только «хвост» превью: билдеры
- *  стены кладут теги в ШАПКУ (до текста поста), хвост — чистый текст. */
+/** Pure: caption guard — обрезка под лимит Telegram без разрыва HTML-тега. */
 export function capWallNotifyCaption(text: string, limit: number = WALL_NOTIFY_CAPTION_LIMIT): string {
   if (text.length <= limit) return text;
-  return `${text.slice(0, limit - 1).trimEnd()}…`;
+  let cut = `${text.slice(0, limit - 1).trimEnd()}…`;
+  // В финальном HTML каждый «<» — открывающий тег (литеральные экранированы).
+  // Если после последнего «<» нет «>», мы разрезали тег посередине — Telegram
+  // ответил бы 400 «can't parse entities» на ВСЁ сообщение. Отрезаем хвост
+  // вместе с недобранным тегом (плюс возможный «…» сразу за ним).
+  const lastOpen = cut.lastIndexOf("<");
+  if (lastOpen > cut.lastIndexOf(">")) {
+    cut = `${cut.slice(0, lastOpen).trimEnd()}…`;
+  }
+  return cut;
+}
+
+/** Pure: разбить список получателей на пакеты фиксированного размера. */
+export function batched<T>(items: readonly T[], size: number = WALL_NOTIFY_BATCH_SIZE): T[][] {
+  if (size <= 0) return [[...items]];
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Один вызов telegramDeliver с уважением к 429: при flood-control с малым
+ * retry_after (≤ WALL_NOTIFY_RETRY_AFTER_MAX_S) ждём и пробуем ещё РАЗ.
+ * Один ретрай — НЕ цикл: долгий flood-control решает следующий kick/крон.
+ */
+async function deliverWithFloodRetry(
+  method: "sendPhoto" | "sendMessage",
+  chatId: string | number,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; messageId?: number; error?: string; retried?: boolean }> {
+  const first = await telegramDeliver(method, chatId, payload);
+  if (first.ok) return first;
+  const retryAfter = first.retryAfter ?? 0;
+  if (retryAfter > 0 && retryAfter <= WALL_NOTIFY_RETRY_AFTER_MAX_S) {
+    logger.warn("[wall-notify-deliver] 429 flood control — retrying once after retry_after", {
+      method,
+      chatId: String(chatId),
+      retryAfter,
+    });
+    await sleep(retryAfter * 1000 + 250);
+    const second = await telegramDeliver(method, chatId, payload);
+    if (second.ok) return { ...second, retried: true };
+    return second;
+  }
+  return first;
 }
 
 /**
@@ -69,7 +133,7 @@ export async function deliverWallPostNotify(
         parse_mode: "HTML",
       };
       if (replyMarkup) payload.reply_markup = replyMarkup;
-      const res = await telegramDeliver("sendPhoto", chatId, payload);
+      const res = await deliverWithFloodRetry("sendPhoto", chatId, payload);
       if (res.ok) {
         return { ok: true, via: "sendPhoto", messageId: res.messageId };
       }
@@ -89,7 +153,7 @@ export async function deliverWallPostNotify(
   };
   if (replyMarkup) payload.reply_markup = replyMarkup;
   try {
-    const res = await telegramDeliver("sendMessage", chatId, payload);
+    const res = await deliverWithFloodRetry("sendMessage", chatId, payload);
     return {
       ok: Boolean(res.ok),
       via: "sendMessage",

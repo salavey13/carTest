@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getCrewBySlug, isCrewStaffUser, resolveWallActor } from "@/app/franchize/lib/wall-access";
-import { processWallRenterNotifyJob } from "@/app/franchize/lib/wall-renter-notify";
+import { processWallRenterNotifyJob, RENTER_NOTIFY_TIME_BUDGET_MS } from "@/app/franchize/lib/wall-renter-notify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -51,8 +51,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Рассылка доступна только экипажу" }, { status: 403 });
     }
 
-    const result = await processWallRenterNotifyJob(postId);
-    return NextResponse.json({ success: result.ok, ...result }, { status: result.ok ? 200 : 500 });
+    // Code review 2026-10-02: staff-гейт проверяет экипаж из body.slug, поэтому
+    // процессор сверяет post.crew_id — staff экипажа A не может пнуть job чужого поста.
+    const result = await processWallRenterNotifyJob(postId, RENTER_NOTIFY_TIME_BUDGET_MS, crew.id);
+    // absent (job не ставился / пост удалён) — это НЕ серверная ошибка: 500 шумит
+    // в Vercel логах и пугает клиента на гонке с кроном. 200 + success:false.
+    const httpStatus = result.ok || result.status === "absent" ? 200 : 500;
+    return NextResponse.json({ success: result.ok, ...result }, { status: httpStatus });
   } catch (error) {
     logger.warn("[wall-renter-notify] kick crashed", error);
     return NextResponse.json({ success: false, error: "Внутренняя ошибка рассылки" }, { status: 500 });

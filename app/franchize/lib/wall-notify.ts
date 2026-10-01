@@ -38,7 +38,12 @@ import {
 } from "@/app/franchize/lib/new-lead-notify";
 import { filterWallNotifyRecipients } from "@/app/franchize/lib/wall-prefs";
 import { normalizeBotUsername, resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
-import { deliverWallPostNotify, WallNotifyKeyboard } from "@/app/franchize/lib/wall-notify-deliver";
+import {
+  batched,
+  deliverWallPostNotify,
+  WallNotifyKeyboard,
+  WALL_NOTIFY_BATCH_PAUSE_MS,
+} from "@/app/franchize/lib/wall-notify-deliver";
 
 // BOSS 2026-10-01: уведомление о посте несёт ПЕРВОЕ фото поста (sendPhoto
 // через форвард-API, caption = прежний текст, кнопки прежние) — обложка
@@ -174,22 +179,32 @@ export async function notifyNewWallPost(
     keyboard.push([{ text: "🟣 Открыть стену", url: deeplink }]);
     const replyMarkup: WallNotifyKeyboard = { inline_keyboard: keyboard };
 
-    await Promise.allSettled(
-      targets.map(async (chatId) => {
-        try {
-          const res = await deliverWallPostNotify(chatId, text, replyMarkup, input.coverPhotoUrl);
-          if (res.ok) {
-            result.sent += 1;
-          } else {
+    // Code review 2026-10-02: раньше здесь был ОДИН allSettled на весь список —
+    // крупный экипаж (50+ получателей) стрелял 50+ параллельными sendPhoto и
+    // упирался в потолок Bot API 30/сек (429-шторм, у crew-fanout нет крона-
+    // досылки). Темп общий с renter-fanout: пакеты по 20 с паузой 1.1с
+    // (~18/сек); для типового экипажа (≤20) поведение прежнее.
+    for (const [batchIndex, batch] of batched(targets).entries()) {
+      if (batchIndex > 0) {
+        await new Promise((resolve) => setTimeout(resolve, WALL_NOTIFY_BATCH_PAUSE_MS));
+      }
+      await Promise.allSettled(
+        batch.map(async (chatId) => {
+          try {
+            const res = await deliverWallPostNotify(chatId, text, replyMarkup, input.coverPhotoUrl);
+            if (res.ok) {
+              result.sent += 1;
+            } else {
+              result.failed += 1;
+              logger.warn("[wall-notify] delivery failed", { chatId, error: res.error });
+            }
+          } catch (error) {
             result.failed += 1;
-            logger.warn("[wall-notify] delivery failed", { chatId, error: res.error });
+            logger.warn("[wall-notify] delivery exception", { chatId, error });
           }
-        } catch (error) {
-          result.failed += 1;
-          logger.warn("[wall-notify] delivery exception", { chatId, error });
-        }
-      }),
-    );
+        }),
+      );
+    }
   } catch (error) {
     logger.warn("[wall-notify] notify crashed (post unaffected)", error);
   }
