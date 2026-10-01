@@ -1001,6 +1001,9 @@ export async function createCommunityPostAction(input: {
       authorName,
       body: finalBody,
       photoCount: photoViews.length,
+      // Обложка уведомления — первое фото поста (sendPhoto через форвард-API,
+      // boss 2026-10-01: «Notification didn't contain the image from post»).
+      coverPhotoUrl: photoViews[0]?.url ?? null,
       bikeTitles: bikeRefs.map((b) => b.title),
       // Quick-rent button in the crew notification: startapp=rent_<bikeId>
       // (бот экипажа из metadata) — boss: «deep link for quick rent action

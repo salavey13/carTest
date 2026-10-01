@@ -5,7 +5,19 @@
 // computeStaticFastTarget WITHOUT pulling the client hook graph ("use
 // client" + AppContext) into a vitest transform. Behaviour is 1:1 with the
 // previous inline copy — the hook file re-exports the same function.
+//
+// ⚠️ REGRESSION GUARD (boss 2026-10-01, «i didn't get routed»): the original
+// extraction LOST this import — computeFastWallTarget threw
+// «ReferenceError: parseWallDeepLink is not defined» on EVERY call, which
+// silently killed ALL startapp routing that reaches the wall fast path
+// (post_/wall_/wallp_/ride_/rider_/join_ — and rent_, which falls through
+// to the gated branch via this same effect run). The throw happened inside
+// a void'ed async fn, so nothing surfaced it; next.config runs with
+// ignoreBuildErrors, so the build shipped it either way. Tests now EXECUTE
+// computeFastWallTarget (tests/franchize/startapp-routing-regression.spec.ts).
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { parseWallDeepLink } from "@/lib/wall-deeplink";
 
 export const START_PARAM_PAGE_MAP: Record<string, string> = {
   elon: "/elon",

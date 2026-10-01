@@ -468,10 +468,13 @@ describe("community wall client (v2)", () => {
     expect(src).toContain("w-full border-y border-[var(--community-border)]");
   });
 
-  it("post cards render photo grid + bike mention chips linking to the catalogue", () => {
+  it("post cards render photo grid + bike mention chips opening the bike rental page", () => {
     expect(src).toContain("function PostPhotoGrid");
     expect(src).toContain("function PostBikeChips");
-    expect(src).toContain("/franchize/${slug}/catalog");
+    // BOSS 2026-10-01: the old /franchize/<slug>/catalog href was a 404 (no
+    // such route). The chip now opens the same destination the notification
+    // «Арендовать» button resolves to — the crew page with the bike modal.
+    expect(src).toContain("href={`/franchize/${slug}?vehicle=${encodeURIComponent(bike.bikeId)}&flow=rent`}");
   });
 });
 

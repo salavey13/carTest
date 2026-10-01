@@ -2099,8 +2099,14 @@ function PostBikeChips({ bikes, slug }: { bikes: WallBikeRefView[]; slug: string
       {bikes.map((bike) => (
         <Link
           key={bike.bikeId}
-          href={`/franchize/${slug}/catalog`}
-          title={`Открыть каталог — ${bike.title}`}
+          // BOSS 2026-10-01: this used to be /franchize/<slug>/catalog — a route
+          // that does NOT exist (404). The renter-facing bike page is the crew
+          // catalog page with the bike modal pre-opened (?vehicle=<id>&flow=rent)
+          // — the exact destination the notification «Арендовать» button's
+          // startapp=rent_<bikeId> resolves to (useStartParamRouter →
+          // /api/startapp/vehicle), so chip and button agree.
+          href={`/franchize/${slug}?vehicle=${encodeURIComponent(bike.bikeId)}&flow=rent`}
+          title={`Открыть байк — ${bike.title}`}
           className="flex items-center gap-2 rounded-full border border-[var(--community-accent)]/40 bg-[var(--community-accent)]/10 py-1 pl-1 pr-3 text-xs font-semibold text-[var(--community-accent)] transition hover:bg-[var(--community-accent)]/20 cw-press"
         >
           {bike.imageUrl ? (

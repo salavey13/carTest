@@ -66,7 +66,16 @@ import {
   pendingRecipients,
 } from "@/app/franchize/lib/wall-renter-notify";
 import { buildSuggestedYandexReview, summarizeRide } from "@/app/franchize/lib/ride-share-notify";
-import { buildWallRentButton, bikeRentButtonLabel } from "@/app/franchize/lib/community-wall";
+import {
+  buildWallBroadcastCreatorHtml,
+  buildWallRentButton,
+  bikeRentButtonLabel,
+} from "@/app/franchize/lib/community-wall";
+import {
+  capWallNotifyCaption,
+  deliverWallPostNotify,
+} from "@/app/franchize/lib/wall-notify-deliver";
+import { telegramDeliver } from "@/lib/telegram-transport";
 import { isDarkCssColor } from "@/lib/map-riders";
 
 const ROOT = process.cwd();
@@ -481,5 +490,134 @@ describe("quick-rent deeplink: notification wiring (source contracts)", () => {
   it("button builder is pure string plumbing (no transport imports in the grammar path)", () => {
     const src = read("app/franchize/lib/community-wall.ts");
     expect(src).toContain('import { bikeRentStartParam, buildTelegramAppLink } from "@/lib/wall-deeplink";');
+  });
+});
+
+// ── 12. boss polish pack 2026-10-01: photo + creator copy + link fixes ──────
+
+describe("post notification carries the post image (sendPhoto via forward API)", () => {
+  it("renter fanout selects photo rows and passes the cover into the deliver helper", () => {
+    const src = read(LIB);
+    // rows (not head-count) — the first one becomes the sendPhoto cover
+    expect(src).toContain('.select("storage_path")');
+    expect(src).toContain(".order(\"position\", { ascending: true })");
+    expect(src).toContain("wallPhotoPublicUrl(photoRows[0])");
+    // delivery goes through the photo-capable helper for EVERY recipient
+    expect(src).toContain("deliverWallPostNotify(chatId, text, replyMarkup, coverPhotoUrl)");
+    // the old head-count photo probe is gone
+    expect(src).not.toContain('select("id", { count: "exact", head: true })');
+  });
+
+  it("crew fanout (wall-notify) takes coverPhotoUrl and delivers via the same helper", () => {
+    const src = read("app/franchize/lib/wall-notify.ts");
+    expect(src).toContain("coverPhotoUrl?: string | null");
+    expect(src).toContain("deliverWallPostNotify(chatId, text, replyMarkup, input.coverPhotoUrl)");
+    // createCommunityPostAction feeds the first photo view as the cover
+    const action = read(WALL_ACTION);
+    expect(action).toContain("coverPhotoUrl: photoViews[0]?.url ?? null");
+  });
+
+  it("deliver helper: sendPhoto with caption+buttons, sendMessage fallback, never throws", async () => {
+    const deliver = vi.mocked(telegramDeliver);
+    const kb = { inline_keyboard: [[{ text: "🟣 Открыть пост", url: "https://t.me/oneBikePlsBot/app?startapp=wall_vip-bike" }]] };
+
+    // photo present → sendPhoto carries photo, HTML caption and the SAME buttons
+    deliver.mockResolvedValueOnce({ ok: true, via: "forward", messageId: 42 });
+    const withPhoto = await deliverWallPostNotify("100", "<b>пост</b>", kb, "https://supabase/wallpix/posts/p/0.jpg");
+    expect(deliver).toHaveBeenLastCalledWith("sendPhoto", "100", expect.objectContaining({
+      photo: "https://supabase/wallpix/posts/p/0.jpg",
+      caption: "<b>пост</b>",
+      parse_mode: "HTML",
+      reply_markup: kb,
+    }));
+    expect(withPhoto).toEqual({ ok: true, via: "sendPhoto", messageId: 42 });
+
+    // sendPhoto fails (TG can't fetch the URL) → ONE sendMessage fallback with buttons
+    deliver.mockReset();
+    deliver.mockResolvedValueOnce({ ok: false, error: "failed to get HTTP URL content" });
+    deliver.mockResolvedValueOnce({ ok: true, via: "forward", messageId: 43 });
+    const fallback = await deliverWallPostNotify("100", "<b>пост</b>", kb, "https://dead.example/x.jpg");
+    expect(deliver).toHaveBeenCalledTimes(2);
+    expect(deliver).toHaveBeenLastCalledWith("sendMessage", "100", expect.objectContaining({
+      text: "<b>пост</b>",
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      reply_markup: kb,
+    }));
+    expect(fallback).toEqual({ ok: true, via: "sendMessage", messageId: 43 });
+
+    // no photo → straight sendMessage (old behaviour, zero extra cost)
+    deliver.mockReset();
+    deliver.mockResolvedValueOnce({ ok: true, via: "forward", messageId: 44 });
+    const noPhoto = await deliverWallPostNotify("100", "текст", null, null);
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(deliver).toHaveBeenLastCalledWith("sendMessage", "100", expect.objectContaining({ text: "текст" }));
+    expect(noPhoto.via).toBe("sendMessage");
+  });
+
+  it("caption guard keeps the photo caption inside the Telegram 1024 limit", () => {
+    expect(capWallNotifyCaption("x".repeat(2000)).length).toBeLessThanOrEqual(1000);
+    expect(capWallNotifyCaption("короткий")).toBe("короткий");
+  });
+});
+
+describe("creator broadcast copy («be aware what was broadcasted»)", () => {
+  it("creator HTML leads with the broadcast header + audience counter, then the same content", () => {
+    const html = buildWallBroadcastCreatorHtml({
+      body: "Каталог пополнен",
+      photoCount: 3,
+      bikeTitles: ["BMW F 800 R"],
+      hasStats: false,
+      recipients: 28,
+    });
+    expect(html).toContain("📤 <b>Ваш пост разослан прошлым арендаторам экипажа</b>");
+    expect(html).toContain("👥 28 получателей");
+    expect(html).toContain("💬 «Каталог пополнен»");
+    expect(html).toContain("📷 3 фото");
+    expect(html).toContain("🏍 BMW F 800 R");
+    // no author line — the creator knows whose post it is
+    expect(html).not.toContain("👤");
+  });
+
+  it("failed count surfaces when non-zero; singular/plural ru forms", () => {
+    expect(buildWallBroadcastCreatorHtml({ body: "", photoCount: 0, bikeTitles: [], hasStats: false, recipients: 1, failed: 2 }))
+      .toContain("👥 1 получатель · 2 не доставлено");
+    expect(buildWallBroadcastCreatorHtml({ body: "", photoCount: 0, bikeTitles: [], hasStats: false, recipients: 3 }))
+      .toContain("👥 3 получателя");
+  });
+
+  it("renter fanout sends the copy to the AUTHOR once per job (creator_notified ledger flag)", () => {
+    const src = read(LIB);
+    expect(src).toContain("creator_notified?: boolean");
+    expect(src).toContain("if (!job.creator_notified)");
+    expect(src).toContain("buildWallBroadcastCreatorHtml");
+    expect(src).toContain("deliverWallPostNotify(post.author_id, creatorText, replyMarkup, coverPhotoUrl)");
+    // flag persisted right after a successful creator delivery
+    expect(src).toContain("creator_notified: true");
+    // …and the tolerant parser reads the flag without breaking old jobs
+    const legacy = parseNotifyJob({
+      notify_job: {
+        status: "queued",
+        audience: "recent",
+        requested_by: "user-1",
+        created_at: "2026-09-29T10:00:00Z",
+        finished_at: null,
+        sent_user_ids: [],
+        sent: 0,
+        failed: 0,
+        error: null,
+      },
+    });
+    expect(legacy?.creator_notified).toBe(false);
+  });
+});
+
+describe("post bike chip opens the actual bike rental page (404 fix)", () => {
+  it("chip links ?vehicle=<bikeId>&flow=rent — the destination rent_<bikeId> resolves to", () => {
+    const src = read("app/franchize/[slug]/community/CommunityWallClient.tsx");
+    // the dead route is gone
+    expect(src).not.toContain("href={`/franchize/${slug}/catalog`}");
+    // the chip now deep-links the bike modal on the crew page
+    expect(src).toContain("href={`/franchize/${slug}?vehicle=${encodeURIComponent(bike.bikeId)}&flow=rent`}");
   });
 });

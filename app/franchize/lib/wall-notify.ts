@@ -6,7 +6,8 @@
 //   · получатели — resolveLeadNotifyRecipients(slug): owner + админы экипажа
 //     (owner/admin/co_owner, active) + все активные члены + глобальный
 //     ADMIN_CHAT_ID, дедуп через Set;
-//   · доставка — telegramDeliver (форвард через Vercel + прямой фолбэк);
+//   · доставка — deliverWallPostNotify (lib/wall-notify-deliver.ts) поверх
+//     telegramDeliver (форвард через Vercel + прямой фолбэк), с фото-обложкой;
 //   · сообщение строит чистый buildWallPostNotifyHtml из lib/community-wall.ts
 //     (юнит-тестируется отдельно);
 //   · deeplink — startapp=wall_<slug>, useStartParamRouter роутит в
@@ -20,7 +21,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { logger } from "@/lib/logger";
-import { telegramDeliver } from "@/lib/telegram-transport";
 import {
   buildWallPostNotifyHtml,
   buildWallRentButton,
@@ -38,6 +38,13 @@ import {
 } from "@/app/franchize/lib/new-lead-notify";
 import { filterWallNotifyRecipients } from "@/app/franchize/lib/wall-prefs";
 import { normalizeBotUsername, resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import { deliverWallPostNotify, WallNotifyKeyboard } from "@/app/franchize/lib/wall-notify-deliver";
+
+// BOSS 2026-10-01: уведомление о посте несёт ПЕРВОЕ фото поста (sendPhoto
+// через форвард-API, caption = прежний текст, кнопки прежние) — обложка
+// приходит в input.coverPhotoUrl (createCommunityPostAction берёт её из
+// photoViews[0]); без фото — прежний sendMessage. Хелпер:
+// lib/wall-notify-deliver.ts (sendPhoto → sendMessage fallback).
 
 // NOTE: leadDeeplinkUrl сознательно НЕ ре-экспортируется и НЕ используется:
 // тот префиксует startapp как lead_… — кнопки стены на таком deeplink уводили
@@ -62,6 +69,10 @@ export interface WallPostNotifyInput {
    *  startapp=rent_<bikeId> (бот экипажа из metadata). Опционально: без
    *  массива кнопка просто не ставится, раскладка прежняя. */
   bikes?: WallPostNotifyBike[];
+  /** Публичный URL первого фото поста — обложка sendPhoto-уведомления
+   *  (boss 2026-10-01: «Notification didn't contain the image from post»);
+   *  null/absent → обычный текстовый sendMessage. */
+  coverPhotoUrl?: string | null;
   /** Пост делится статистикой поездок (kind='stats'). */
   hasStats: boolean;
   /** Author получает уведомление о своём посте? Нет — исключаем его chat_id. */
@@ -152,24 +163,21 @@ export async function notifyNewWallPost(
       bikeTitles: input.bikeTitles,
       hasStats: input.hasStats,
     });
-    const payload: Record<string, unknown> = {
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    };
+    // Доставка (фото/текст) переехала в deliverWallPostNotify — payload здесь
+    // больше не собирается вручную.
     // Quick-rent row FIRST (паритет с renter-fanout): в посте указан байк —
     // кнопка startapp=rent_<bikeId> ведёт сразу на его страницу (бот экипажа
     // из metadata). Пост/стена — второй ряд; без байка раскладка прежняя.
     const rentButton = buildWallRentButton({ bikes: input.bikes, botUsername: crewBot });
-    const keyboard: { text: string; url: string }[][] = [];
+    const keyboard: WallNotifyKeyboard["inline_keyboard"] = [];
     if (rentButton) keyboard.push([rentButton]);
     keyboard.push([{ text: "🟣 Открыть стену", url: deeplink }]);
-    payload.reply_markup = { inline_keyboard: keyboard };
+    const replyMarkup: WallNotifyKeyboard = { inline_keyboard: keyboard };
 
     await Promise.allSettled(
       targets.map(async (chatId) => {
         try {
-          const res = await telegramDeliver("sendMessage", chatId, payload);
+          const res = await deliverWallPostNotify(chatId, text, replyMarkup, input.coverPhotoUrl);
           if (res.ok) {
             result.sent += 1;
           } else {

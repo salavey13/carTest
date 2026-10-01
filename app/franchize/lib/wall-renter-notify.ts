@@ -40,10 +40,11 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
-import { telegramDeliver } from "@/lib/telegram-transport";
 import {
   buildWallPostNotifyHtml,
+  buildWallBroadcastCreatorHtml,
   buildWallRentButton,
+  wallPhotoPublicUrl,
   WallPostNotifyBike,
 } from "@/app/franchize/lib/community-wall";
 import { filterWallNotifyRecipients } from "@/app/franchize/lib/wall-prefs";
@@ -53,6 +54,14 @@ import {
   wallPostStartParam,
 } from "@/lib/wall-deeplink";
 import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import { deliverWallPostNotify, WallNotifyKeyboard } from "@/app/franchize/lib/wall-notify-deliver";
+
+// BOSS 2026-10-01 polish pack:
+//   · уведомление несёт ПЕРВОЕ фото поста (sendPhoto через форвард-API,
+//     caption = прежний текст, кнопки те же) — deliverWallPostNotify;
+//   · автор поста получает СОБСТВЕННУЮ копию бродкаста («что было разослано»)
+//     с кнопками и счётчиком аудитории — ровно один раз на job
+//     (флаг creator_notified в ledger).
 
 export type WallNotifyAudience = "recent" | "past" | "all";
 
@@ -81,6 +90,8 @@ export interface WallRenterNotifyJob {
   sent: number;
   failed: number;
   error: string | null;
+  /** Копия автору («что было разослано») ушла — не дублируем на кронах. */
+  creator_notified?: boolean;
 }
 
 /** Pure: достать валидный job из metadata (мусор → null). */
@@ -104,6 +115,7 @@ export function parseNotifyJob(metadata: unknown): WallRenterNotifyJob | null {
     sent: typeof j.sent === "number" && Number.isFinite(j.sent) ? j.sent : 0,
     failed: typeof j.failed === "number" && Number.isFinite(j.failed) ? j.failed : 0,
     error: typeof j.error === "string" ? j.error : null,
+    creator_notified: j.creator_notified === true,
   };
 }
 
@@ -265,20 +277,20 @@ export async function processWallRenterNotifyJob(
     const filtered = await filterWallNotifyRecipients(audience, slug).catch(() => audience);
     const pending = pendingRecipients(filtered, job.sent_user_ids, exclude);
     run.remaining = pending.length;
-    if (pending.length === 0) {
-      await writeNotifyJob(postId, { ...job, status: "done", finished_at: new Date().toISOString() });
-      return { ...run, ok: true, sent: job.sent, failed: job.failed, remaining: 0 };
-    }
 
     // ── delivery payload (как wall-notify: превью + кнопка к посту) ──
     // Без PostgREST-embed'ов (та же логика «верифицируем отдельно», что и в
     // createCommunityPostAction) — вложенные select'ы валит PGRST200 при
     // неоднозначных FK.
-    const [photoCountRes, bikeIdRes, botUsername] = await Promise.all([
+    // BOSS 2026-10-01: выбираем СТРОКИ фото (storage_path, position asc) —
+    // первая становится обложкой sendPhoto-уведомления (через форвард-API),
+    // длина — прежним счётчиком «📷 N фото».
+    const [photoRowsRes, bikeIdRes, botUsername] = await Promise.all([
       supabaseAdmin
         .from("crew_post_photos")
-        .select("id", { count: "exact", head: true })
-        .eq("post_id", postId),
+        .select("storage_path")
+        .eq("post_id", postId)
+        .order("position", { ascending: true }),
       supabaseAdmin
         .from("crew_post_bikes")
         .select("bike_id")
@@ -288,7 +300,13 @@ export async function processWallRenterNotifyJob(
         .limit(8),
       resolveCrewBotUsername(slug),
     ]);
-    const photoCount = photoCountRes.count ?? 0;
+    const photoRows = ((photoRowsRes.data ?? []) as { storage_path: string | null }[])
+      .map((p) => (p.storage_path || "").trim())
+      .filter(Boolean);
+    const photoCount = photoRows.length;
+    // Обложка — публичный URL бакета (Telegram сам скачает картинку). Падение
+    // скачивания на стороне TG означает откат на текст внутри deliver helper.
+    const coverPhotoUrl = photoRows[0] ? wallPhotoPublicUrl(photoRows[0]) : null;
     const bikeIds = ((bikeIdRes.data ?? []) as { bike_id: string }[]).map((b) => b.bike_id);
     let bikeTitles: string[] = [];
     let bikes: WallPostNotifyBike[] = [];
@@ -329,21 +347,47 @@ export async function processWallRenterNotifyJob(
       bikeTitles,
       hasStats: post.kind === "stats",
     });
-    const payload: Record<string, unknown> = {
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    };
     // Quick-rent row FIRST: когда в посте указан байк из каталога, кнопка
     // ведёт straight на его страницу (startapp=rent_<bikeId>, бот экипажа из
     // metadata — boss: «deep link for quick rent action»). Обычная кнопка
     // поста остаётся вторым рядом; без байка/бота раскладка прежняя.
     const rentButton = buildWallRentButton({ bikes, botUsername });
-    const keyboard: { text: string; url: string }[][] = [];
+    const keyboard: WallNotifyKeyboard["inline_keyboard"] = [];
     if (rentButton) keyboard.push([rentButton]);
     if (deeplink) keyboard.push([{ text: "🟣 Открыть пост", url: deeplink }]);
-    if (keyboard.length > 0) {
-      payload.reply_markup = { inline_keyboard: keyboard };
+    const replyMarkup: WallNotifyKeyboard | null = keyboard.length > 0 ? { inline_keyboard: keyboard } : null;
+
+    // ── копия АВТОРУ («что было разослано») — ровно один раз на job ──
+    // Boss: «send notification to post creator as well to be aware what was
+    // broadcasted». Уходит ДО fanout (первый же прогон), с теми же кнопками,
+    // счётчиком аудитории и флагом creator_notified против дублей кронов.
+    if (!job.creator_notified) {
+      try {
+        const creatorText = buildWallBroadcastCreatorHtml({
+          body: post.body,
+          photoCount,
+          bikeTitles,
+          hasStats: post.kind === "stats",
+          recipients: filtered.length,
+          failed: 0,
+        });
+        const creatorRes = await deliverWallPostNotify(post.author_id, creatorText, replyMarkup, coverPhotoUrl);
+        if (creatorRes.ok) {
+          job.creator_notified = true;
+          await writeNotifyJob(postId, { ...job, status: job.status, creator_notified: true });
+        } else {
+          logger.warn("[wall-renter-notify] creator copy failed (will not retry this run)", {
+            error: creatorRes.error,
+          });
+        }
+      } catch (creatorError) {
+        logger.warn("[wall-renter-notify] creator copy crashed", creatorError);
+      }
+    }
+
+    if (pending.length === 0) {
+      await writeNotifyJob(postId, { ...job, status: "done", finished_at: new Date().toISOString() });
+      return { ...run, ok: true, sent: job.sent, failed: job.failed, remaining: 0 };
     }
 
     // ── пакетный цикл с бюджетом ──
@@ -361,7 +405,10 @@ export async function processWallRenterNotifyJob(
       }
       const batch = pending.slice(i, i + RENTER_NOTIFY_BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map(async (chatId) => ({ chatId, res: await telegramDeliver("sendMessage", chatId, payload) })),
+        batch.map(async (chatId) => ({
+          chatId,
+          res: await deliverWallPostNotify(chatId, text, replyMarkup, coverPhotoUrl),
+        })),
       );
       const delivered: string[] = [];
       for (const r of results) {

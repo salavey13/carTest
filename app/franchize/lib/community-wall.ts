@@ -827,6 +827,46 @@ export function buildWallPostNotifyHtml(info: WallPostNotifyInfo): string {
   return lines.join("\n");
 }
 
+// ── creator broadcast copy («что было разослано») ────────────────────────────
+
+export interface WallBroadcastCreatorInfo {
+  body: string;
+  photoCount: number;
+  bikeTitles: string[];
+  hasStats: boolean;
+  /** Размер аудитории рассылки (prefs-фильтрованной). */
+  recipients: number;
+  /** Сколько доставить не удалось (в момент отправки копии — обычно 0). */
+  failed?: number;
+}
+
+/**
+ * HTML для копии АВТОРУ поста при fanout'е прошлым арендаторам — boss:
+ * «send notification to post creator as well to be aware what was
+ * broadcasted». Тот же контент, что у получателей, но шапка — счётчик
+ * аудитории вместо имени автора. Pure, unit-tested.
+ */
+export function buildWallBroadcastCreatorHtml(info: WallBroadcastCreatorInfo): string {
+  const lines: string[] = [
+    "📤 <b>Ваш пост разослан прошлым арендаторам экипажа</b>",
+    `👥 ${info.recipients} ${pluralRu(info.recipients, ["получатель", "получателя", "получателей"])}${
+      (info.failed ?? 0) > 0 ? ` · ${info.failed} не доставлено` : ""
+    }`,
+    "",
+  ];
+  const preview = buildWallPostPreview(info.body);
+  if (preview) lines.push(`💬 «${escapeTelegramHtml(preview)}»`);
+  if (info.photoCount > 0) {
+    lines.push(`📷 ${info.photoCount} ${pluralRu(info.photoCount, ["фото", "фото", "фото"])}`);
+  }
+  if (info.bikeTitles.length > 0) {
+    lines.push(`🏍 ${info.bikeTitles.map(escapeTelegramHtml).join(", ")}`);
+  }
+  if (info.hasStats) lines.push(`📊 делится статистикой поездок`);
+  return lines.join("\n");
+}
+
+
 // ── «Быстрая аренда» button on post notifications (pure) ─────────────────────
 
 /** Bike attachment shaped for the quick-rent button (crew_post_bikes + cars.model). */
