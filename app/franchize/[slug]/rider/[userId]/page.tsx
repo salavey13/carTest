@@ -11,6 +11,11 @@ import { getRiderProfileAction, type RiderProfileView } from "@/app/franchize/se
 import { supabaseAdmin } from "@/lib/supabase-server";
 import type { WallPostView } from "@/app/franchize/lib/community-wall";
 import { logger } from "@/lib/logger";
+import {
+  crewAccentFromMetadata,
+  deriveCrewServices,
+  type CrewServicePill,
+} from "../../../lib/crew-network";
 import { RiderProfileClient } from "./RiderProfileClient";
 
 const RIDER_ID_RE = /^[0-9]{1,16}$/;
@@ -24,6 +29,89 @@ export type RiderWallPost = WallPostView & {
   viaCrewName: string | null;
   viaCrewSlug: string | null;
 };
+
+/** Backward link: a crew the rider belongs to, with its derived services. */
+export interface RiderCrewBrief {
+  slug: string;
+  name: string;
+  logoUrl: string | null;
+  accent: string;
+  services: CrewServicePill[];
+  isCurrent: boolean;
+}
+
+const RIDER_CREWS_BRIEF_CAP = 12;
+
+interface RiderCrewRow {
+  id: string;
+  slug: string | null;
+  name: string | null;
+  logo_url: string | null;
+  metadata: unknown;
+}
+
+// «Экипажи райдера» (brainstorm 2026-10-01): the backward link from the rider
+// to their crews + a brief list of each crew's services. Capabilities are
+// DERIVED from existing config only (catalog + metadata.franchize.storage) —
+// no new user inputs. Privacy: each membership is already public on that
+// crew's own wall/map member list, so aggregating them here exposes nothing
+// that wasn't public — same stance as the cross-crew posts fanout above.
+async function loadRiderCrewBriefs(input: {
+  riderId: string;
+  currentCrewId: string;
+}): Promise<RiderCrewBrief[]> {
+  const { riderId, currentCrewId } = input;
+  try {
+    const [memberRes, ownedRes] = await Promise.all([
+      supabaseAdmin
+        .from("crew_members")
+        .select("crew_id")
+        .eq("user_id", riderId)
+        .eq("membership_status", "active"),
+      // one-man crews: the owner is the crew's person even without a
+      // crew_members row (crew = wrapper for a service set)
+      supabaseAdmin
+        .from("crews")
+        .select("id, slug, name, logo_url, metadata")
+        .eq("owner_id", riderId)
+        .not("slug", "is", null),
+    ]);
+
+    const memberCrewIds = ((memberRes.data ?? []) as { crew_id: string }[]).map((r) => r.crew_id);
+    const ownedRows = (ownedRes.data ?? []) as RiderCrewRow[];
+
+    const ownedIds = new Set(ownedRows.map((r) => r.id));
+    const missingMemberIds = [...new Set(memberCrewIds.filter((id) => !ownedIds.has(id)))];
+
+    const memberRows = missingMemberIds.length
+      ? await supabaseAdmin
+          .from("crews")
+          .select("id, slug, name, logo_url, metadata")
+          .in("id", missingMemberIds)
+          .not("slug", "is", null)
+      : { data: [] };
+
+    const crews = [...ownedRows, ...((memberRows.data ?? []) as RiderCrewRow[])].filter(
+      (crew) => (crew.slug ?? "").trim().length > 0,
+    );
+    if (crews.length === 0) return [];
+
+    return crews.slice(0, RIDER_CREWS_BRIEF_CAP).map((crew, index) => {
+      const slug = (crew.slug ?? "").trim();
+      return {
+        slug,
+        name: (crew.name ?? "").trim() || slug,
+        logoUrl: crew.logo_url ?? null,
+        accent: crewAccentFromMetadata(crew.metadata, index),
+        services: deriveCrewServices({ slug, metadata: crew.metadata }),
+        isCurrent: crew.id === currentCrewId,
+      };
+    });
+  } catch (error) {
+    logger.warn("[rider-page] crew briefs load failed (non-fatal):", error);
+    return [];
+  }
+}
 
 // Cross-crew fanout («combine all posts on all crews' walls from user»):
 // the profile aggregates the rider's public posts from EVERY crew they
@@ -128,11 +216,13 @@ export default async function RiderProfilePage({ params }: RiderProfilePageProps
     color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
   } as React.CSSProperties;
 
-  const [profileRes, posts] = await Promise.all([
+  const [profileRes, posts, riderCrews] = await Promise.all([
     getRiderProfileAction({ slug: crewSlug, riderId: userId.trim() }),
     // «This rider's part of the wall» — across ALL crews they posted in,
     // merged newest-first (walls are publicly readable; nothing new leaks).
     loadRiderPostsAcrossCrews({ riderId: userId.trim() }),
+    // «Экипажи райдера» — backward links to their crews + brief services.
+    loadRiderCrewBriefs({ riderId: userId.trim(), currentCrewId: crew.id }),
   ]);
 
   if (!profileRes.ok) notFound();
@@ -142,7 +232,13 @@ export default async function RiderProfilePage({ params }: RiderProfilePageProps
     <main className="min-h-screen" style={{ ...surface.page, ...themeVars }}>
       <CrewHeader crew={crew} activePath={activePath} items={items} />
       <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-20 md:pt-24">
-        <RiderProfileClient profile={profile} crewSlug={crewSlug} crewName={brandName} initialPosts={posts} />
+        <RiderProfileClient
+          profile={profile}
+          crewSlug={crewSlug}
+          crewName={brandName}
+          initialPosts={posts}
+          riderCrews={riderCrews}
+        />
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Link
             href={`/franchize/${crewSlug}/community`}

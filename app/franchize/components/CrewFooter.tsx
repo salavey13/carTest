@@ -187,11 +187,22 @@ export function CrewFooter({ crew }: CrewFooterProps) {
         className="border-t border-[var(--footer-border)] bg-[var(--footer-sub-bg)]"
         style={{ color: subText }}
       >
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-2 text-xs">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-2 text-xs">
           <span>
             {new Date().getFullYear()} © {crew.header.brandName}
           </span>
-          <span>Версия: FR-PEP-02</span>
+          <span className="flex items-center gap-3">
+            {/* the network entry — discovery graph (2026-10-01): every
+                crew's page carries a path to «what can people do for me» */}
+            <Link
+              href="/franchize/discovery"
+              className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold transition hover:opacity-90"
+              style={{ borderColor: footerBorder }}
+            >
+              Сеть экипажей
+            </Link>
+            <span>Версия: FR-PEP-02</span>
+          </span>
         </div>
       </div>
     </footer>

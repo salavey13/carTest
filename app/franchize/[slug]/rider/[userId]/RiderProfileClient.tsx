@@ -20,6 +20,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowRight,
   Bike,
   Camera,
   Check,
@@ -34,6 +35,7 @@ import {
   ThumbsUp,
   Timer,
   Trophy,
+  Users,
   X,
 } from "lucide-react";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
@@ -49,6 +51,7 @@ import {
 import { saveRiderProfileAction, type RiderProfileView } from "@/app/franchize/server-actions/rider-profile";
 import { getWallStandingsAction } from "@/app/franchize/server-actions/community-wall";
 import type { WallPostView } from "@/app/franchize/lib/community-wall";
+import type { RiderCrewBrief } from "./page";
 
 // ── small building blocks ────────────────────────────────────────────────────
 
@@ -133,11 +136,14 @@ export function RiderProfileClient({
   crewSlug,
   crewName,
   initialPosts,
+  riderCrews,
 }: {
   profile: RiderProfileView;
   crewSlug: string;
   crewName: string;
   initialPosts: RiderWallPostClient[];
+  /** «Экипажи райдера» — backward links + derived services (server-provided). */
+  riderCrews?: RiderCrewBrief[];
 }) {
   const { rider, stats, badges, garage, recentRentals, isSelf, isStaff } = profile;
   const displayName = rider.fullName || rider.username || "Райдер";
@@ -481,6 +487,98 @@ export function RiderProfileClient({
           в зачёте экипажа за неделю · {weeklyRank.score}{" "}
           {pluralRuClient(weeklyRank.score, ["очко", "очка", "очков"])}
         </Link>
+      )}
+
+      {/* ── «Экипажи райдера» — backward link to their crews + services ──
+          Capabilities are derived from crew config only (no new inputs);
+          each membership is already public on that crew's member list. */}
+      {riderCrews && riderCrews.length > 0 && (
+        <section className="cw-card cw-rise p-5">
+          <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[var(--community-text)]">
+            <Users className="h-4 w-4 text-[var(--community-accent)]" aria-hidden /> Экипажи райдера
+            <span className="ml-1 text-xs font-semibold normal-case text-[var(--community-muted)]">
+              {riderCrews.length}
+            </span>
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {riderCrews.map((crew) => (
+              <li
+                key={crew.slug}
+                className="rounded-2xl border p-3"
+                style={{
+                  borderColor: crew.isCurrent
+                    ? "color-mix(in srgb, var(--community-accent) 45%, var(--community-border))"
+                    : "var(--community-border)",
+                  backgroundColor: "var(--community-card-faint)",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  {crew.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={crew.logoUrl}
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="h-10 w-10 shrink-0 rounded-full object-cover"
+                      style={{ boxShadow: `0 0 0 2px color-mix(in srgb, ${crew.accent} 55%, transparent)` }}
+                    />
+                  ) : (
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                      style={{ backgroundColor: `color-mix(in srgb, ${crew.accent} 16%, transparent)`, color: crew.accent }}
+                      aria-hidden
+                    >
+                      {(crew.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?")}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[var(--community-text)]">
+                      <Link href={`/franchize/${crew.slug}`} className="truncate transition hover:text-[var(--community-accent)]">
+                        {crew.name}
+                      </Link>
+                      {crew.isCurrent && (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--community-accent) 14%, transparent)",
+                            color: "var(--community-accent)",
+                          }}
+                        >
+                          этот экипаж
+                        </span>
+                      )}
+                    </p>
+                    {crew.services.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {crew.services.map((service) => (
+                          <Link
+                            key={service.key}
+                            href={service.href}
+                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition hover:brightness-110"
+                            style={{
+                              backgroundColor: "color-mix(in srgb, var(--community-accent) 12%, transparent)",
+                              color: "var(--community-accent)",
+                            }}
+                          >
+                            {service.label}
+                            {service.sub && <span className="font-medium opacity-75">· {service.sub}</span>}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <Link
+            href="/franchize/discovery"
+            className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--community-border)] px-4 py-2.5 text-sm font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)]"
+          >
+            Вся сеть экипажей <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </section>
       )}
 
       {/* ── badges ───────────────────────────────────────────────────────── */}
