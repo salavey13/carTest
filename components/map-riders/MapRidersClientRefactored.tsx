@@ -22,6 +22,8 @@ import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
 import { initialsFromName, isDarkCssColor, meetupDraftFromPost, riderDisplayName, yandexMapsRouteUrl } from "@/lib/map-riders";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { createCommunityPostAction, getWallStaffFlagAction } from "@/app/franchize/server-actions/community-wall";
+import { timeoutSignal } from "@/lib/timeout-signal";
+import { makeClientNonce } from "@/lib/client-nonce";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
@@ -980,15 +982,20 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   /** Staff kick рассылки «прошлым арендаторам» после публикации поста.
    *  Awaited — тост показывает фактические счётчики; если вкладку закрыли,
    *  хвост добивает крон (курсор в notify_job, exactly-once). Никогда не бросает. */
-  const kickRenterFanout = useCallback(async (postId: string, slug: string) => {
+  const kickRenterFanout = useCallback(async (postId: string, slug: string, audience?: "recent" | "past" | "all") => {
     try {
       const res = await fetch("/api/franchize/wall-renter-notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, slug, initData: getTelegramInitData() }),
+        body: JSON.stringify({ postId, slug, initData: getTelegramInitData(), audience }),
+        // Robustness 2026-10-02: рассылка может легально идти ~50с — таймаут
+        // чуть выше; хвост в любом случае добьёт крон с ledger.
+        signal: timeoutSignal(65_000),
       });
-      const json = (await res.json().catch(() => null)) as { success?: boolean; sent?: number; remaining?: number; error?: string } | null;
-      if (res.ok && json?.success) {
+      const json = (await res.json().catch(() => null)) as { success?: boolean; sent?: number; remaining?: number; busy?: boolean; error?: string } | null;
+      if (res.ok && json?.busy) {
+        toast.info("Рассылка уже выполняется — хвост добьёт фоновая досылка");
+      } else if (res.ok && json?.success) {
         const sent = json.sent ?? 0;
         const remaining = json.remaining ?? 0;
         if (sent > 0) {
@@ -1041,23 +1048,31 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
         // короткий текст для ленты); notifyAudience → kick рассылки.
         // shareToWall (suggest): композер стены шита открывается с черновиком.
         if (opts.autoPublish) {
-          const res = await createCommunityPostAction({
-            slug: crewSlug,
-            body: `📍 ${value} — собираемся тут. Точка уже на карте экипажа.`,
-            geo: { lat: point[0], lng: point[1], label: value },
-            initData: getTelegramInitData(),
-            notifyRenters: opts.notifyAudience ? { audience: opts.notifyAudience } : undefined,
-          });
-          if (res.ok) {
-            if (opts.notifyAudience) {
-              await kickRenterFanout(res.post.id, crewSlug);
+          // Robustness: сбой сети на посте НЕ должен оставлять модалку в
+          // подвешенном состоянии — точка уже живёт, пост добяжется вручную.
+          try {
+            const res = await createCommunityPostAction({
+              slug: crewSlug,
+              body: `📍 ${value} — собираемся тут. Точка уже на карте экипажа.`,
+              geo: { lat: point[0], lng: point[1], label: value },
+              initData: getTelegramInitData(),
+              notifyRenters: opts.notifyAudience ? { audience: opts.notifyAudience } : undefined,
+              clientNonce: makeClientNonce(),
+            });
+            if (res.ok) {
+              if (opts.notifyAudience) {
+                await kickRenterFanout(res.post.id, crewSlug, opts.notifyAudience);
+              } else {
+                toast.success("Пост о точке опубликован на стене");
+              }
+              window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
             } else {
-              toast.success("Пост о точке опубликован на стене");
+              // Точка создана — пост не мешает ей жить: подскажем ручной путь.
+              toast.error(res.error);
+              toast.info("Точка на карте добавлена — опубликуй пост о ней вручную");
             }
-            window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
-          } else {
-            // Точка создана — пост не мешает ей жить: подскажем ручной путь.
-            toast.error(res.error);
+          } catch {
+            toast.error("Сеть подвела — пост о точке не опубликовался");
             toast.info("Точка на карте добавлена — опубликуй пост о ней вручную");
           }
         } else if (opts.shareToWall) {

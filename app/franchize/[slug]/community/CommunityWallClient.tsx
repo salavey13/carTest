@@ -113,6 +113,8 @@ import {
 import { crewStandingsDisplayName } from "@/app/franchize/lib/crew-standings";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { reduceImageResolution } from "@/lib/client-image-compress";
+import { isTimeoutError, timeoutSignal } from "@/lib/timeout-signal";
+import { makeClientNonce } from "@/lib/client-nonce";
 import { buildSpotCheckinText, findMotoSpotById, findNearestMotoSpot } from "@/lib/map-riders-spots";
 import { buildTelegramAppLink, wallPostStartParam } from "@/lib/wall-deeplink";
 import { usePhotoZoomGestures } from "@/hooks/usePhotoZoomGestures";
@@ -219,6 +221,13 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   const [statsLoading, setStatsLoading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
+  // ── robustness pack 2026-10-02 ──
+  // postingRef: synchronous double-submit guard — React state (posting) is
+  // async, two taps in the same tick BOTH see posting=false. The ref closes it.
+  const postingRef = useRef(false);
+  // composeNonceRef: stable per compose session → createCommunityPostAction
+  // dedupes retries (lost network response no longer duplicates the post).
+  const composeNonceRef = useRef<string>(makeClientNonce());
   const [composerPhotos, setComposerPhotos] = useState<ComposerPhoto[]>([]);
   const [selectedBikes, setSelectedBikes] = useState<WallBikeOption[]>([]);
   const [bikePickerOpen, setBikePickerOpen] = useState(false);
@@ -254,6 +263,36 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
   const withInitData = useCallback(() => getTelegramInitData(), []);
 
+  // ── composer draft autosave (robustness pack): the irreplaceable part of a
+  // lost compose is the TEXT — photos re-pick, bikes re-tap, text re-typing on
+  // a 2000-char ride summary is misery. Debounced sessionStorage, restored on
+  // mount, cleared on success. Private-mode failures are silently ignored.
+  const draftStorageKey = `onlybike:wall:draft:${slug}`;
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { t?: unknown };
+      if (typeof parsed.t === "string" && parsed.t.trim()) {
+        setText(parsed.t.slice(0, WALL_POST_MAX_LEN));
+      }
+    } catch {
+      // corrupted / unavailable — start clean
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftStorageKey]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (text.trim()) sessionStorage.setItem(draftStorageKey, JSON.stringify({ t: text.slice(0, WALL_POST_MAX_LEN) }));
+        else sessionStorage.removeItem(draftStorageKey);
+      } catch {
+        // private mode / quota — autosave is best-effort
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [text, draftStorageKey]);
+
   // discovery state (wall v3 step 3)
   const [activeTag, setActiveTag] = useState<string | null>(null);
   // ?q= (meetup → wall interlink): предзаполняем поиск — лента сразу фильтруется.
@@ -277,21 +316,27 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   const loadFeed = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     setFeedError(null);
-    const res = await getCommunityWallAction({
-      slug,
-      initData: withInitData(),
-      tag: activeTag ?? undefined,
-      q: activeQuery ?? undefined,
-    });
-    if (res.ok) {
-      setPosts(res.posts);
-      setViewer(res.viewer);
-      setHasMore(res.hasMore);
-      setNextBefore(res.nextBefore);
-    } else {
-      setFeedError(res.error);
+    try {
+      const res = await getCommunityWallAction({
+        slug,
+        initData: withInitData(),
+        tag: activeTag ?? undefined,
+        q: activeQuery ?? undefined,
+      });
+      if (res.ok) {
+        setPosts(res.posts);
+        setViewer(res.viewer);
+        setHasMore(res.hasMore);
+        setNextBefore(res.nextBefore);
+      } else {
+        setFeedError(res.error);
+      }
+    } catch {
+      // Server action бросил (сеть/инфра) — раньше спиннер висел навсегда.
+      setFeedError("Лента не загрузилась — проверь сеть и обнови страницу.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [slug, withInitData, activeTag, activeQuery]);
 
   useEffect(() => {
@@ -301,21 +346,26 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   const loadMore = useCallback(async () => {
     if (!nextBefore || loadingMore) return;
     setLoadingMore(true);
-    const res = await getCommunityWallAction({
-      slug,
-      initData: withInitData(),
-      before: nextBefore,
-      tag: activeTag ?? undefined,
-      q: activeQuery ?? undefined,
-    });
-    if (res.ok) {
-      setPosts((prev) => [...prev, ...res.posts]);
-      setHasMore(res.hasMore);
-      setNextBefore(res.nextBefore);
-    } else {
-      setWallNotice(res.error);
+    try {
+      const res = await getCommunityWallAction({
+        slug,
+        initData: withInitData(),
+        before: nextBefore,
+        tag: activeTag ?? undefined,
+        q: activeQuery ?? undefined,
+      });
+      if (res.ok) {
+        setPosts((prev) => [...prev, ...res.posts]);
+        setHasMore(res.hasMore);
+        setNextBefore(res.nextBefore);
+      } else {
+        setWallNotice(res.error);
+      }
+    } catch {
+      setWallNotice("Не удалось подгрузить посты — попробуй ещё раз.");
+    } finally {
+      setLoadingMore(false);
     }
-    setLoadingMore(false);
   }, [slug, nextBefore, loadingMore, withInitData, activeTag, activeQuery]);
 
   // trending strip (top tags of the week) — loaded once per mount
@@ -586,7 +636,14 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
           form.set("slug", slug);
           const initData = withInitData();
           if (initData) form.set("initData", initData);
-          const res = await fetch("/api/franchize/wall-photo-upload", { method: "POST", body: form });
+          // 60с ceiling: compress buffers ~300KB — медленная сеть успеет, а
+          // зависший fetch больше не держит фото в «Загружаем…» навсегда
+          // (блокируя и кнопку «Опубликовать»). Abort → failed-стейт и тост.
+          const res = await fetch("/api/franchize/wall-photo-upload", {
+            method: "POST",
+            body: form,
+            signal: timeoutSignal(60_000),
+          });
           const json = (await res.json().catch(() => null)) as
             | { success?: boolean; path?: string; width?: number; height?: number; bytes?: number; error?: string }
             | null;
@@ -605,7 +662,13 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
           setComposerPhotosSync(
             composerPhotosRef.current.map((p) => (p === placeholder ? { ...placeholder, uploading: false, failed: true } : p)),
           );
-          setComposerError(err instanceof Error ? err.message : "Не удалось загрузить фото.");
+          setComposerError(
+            isTimeoutError(err)
+              ? "Фото не долетело (таймаут) — попробуй ещё раз."
+              : err instanceof Error
+                ? err.message
+                : "Не удалось загрузить фото.",
+          );
         }
       };
 
@@ -704,16 +767,23 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
 
   /** Staff kick рассылки «прошлым арендаторам» после публикации поста
    *  (exactly-once по ledger в crew_posts.metadata.notify_job; хвост добивает
-   *  крон). Никогда не бросает, тост — фактические счётчики доставки. */
-  const kickRenterFanout = useCallback(async (postId: string) => {
+   *  крон). Никогда не бросает, тост — фактические счётчики доставки.
+   *  Robustness pack 2026-10-02: шлём audience (роут умеет самозалечивать
+   *  потерянную постановку job), таймаут 65с — рассылка может ЛЕГАЛЬНО идти
+   *  ~50с, но композер ждать её не обязан (kick вызывается без await). */
+  const kickRenterFanout = useCallback(async (postId: string, audience: "recent" | "past" | "all") => {
     try {
       const res = await fetch("/api/franchize/wall-renter-notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, slug, initData: withInitData() }),
+        body: JSON.stringify({ postId, slug, initData: withInitData(), audience }),
+        signal: timeoutSignal(65_000),
       });
-      const json = (await res.json().catch(() => null)) as { success?: boolean; sent?: number; remaining?: number; error?: string } | null;
-      if (res.ok && json?.success) {
+      const json = (await res.json().catch(() => null)) as
+        | { success?: boolean; sent?: number; remaining?: number; busy?: boolean; error?: string } | null;
+      if (res.ok && json?.busy) {
+        toast.info("Рассылка уже выполняется — хвост добьёт фоновая досылка");
+      } else if (res.ok && json?.success) {
         const sent = json.sent ?? 0;
         const remaining = json.remaining ?? 0;
         if (sent > 0) {
@@ -734,63 +804,108 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
   }, [slug, withInitData]);
 
   const submitPost = useCallback(async () => {
-    if (posting) return;
+    // postingRef — синхронный double-submit guard: React-state (posting)
+    // асинхронный, два тапа в одном тике оба видят posting=false и ОБА уходят
+    // в сеть. Ref закрывает окно; серверный clientNonce — вторая линия обороны.
+    if (postingRef.current) return;
     if (failedUploads > 0) {
       setComposerError("Часть фото не загрузилось — удали их и попробуй ещё раз.");
       return;
     }
+    // Defense in depth: кнопка disabled при pendingUploads, но устаревший
+    // closure / клавиатурный сабмит могли проскочить. Пост без догруженных
+    // фото = молча потерянные фото — лучше явная остановка.
+    if (pendingUploads) {
+      setComposerError("Фото ещё загружаются — секунду…");
+      return;
+    }
+    postingRef.current = true;
     setPosting(true);
     setComposerError(null);
-    const res = await createCommunityPostAction({
-      slug,
-      body: text.trim() || undefined,
-      shareStats,
-      // «Поделиться поездкой»: прикрепляем аренду ТОЛЬКО если это своя аренда
-      // (сервер отдельно проверяет владельца — чужую не даст прицепить).
-      rentalId: composeDraft?.canAttachRental ? composeDraft.rentalId : undefined,
-      initData: withInitData(),
-      photos: composerPhotos
-        .filter((p) => p.path)
-        .map((p) => ({ path: p.path, width: p.width, height: p.height, bytes: p.bytes })),
-      bikes: selectedBikes.map((b) => b.bikeId),
-      geo: geoTag ? { lat: geoTag.lat, lng: geoTag.lng, label: geoTag.label ?? undefined } : undefined,
-      notifyRenters: notifyRenters ? { audience: notifyAudience } : undefined,
-    });
-    if (res.ok) {
-      // Insert after pinned posts (pinned block always stays on top).
-      setPosts((prev) => {
-        const firstRegular = prev.findIndex((p) => !p.isPinned);
-        return firstRegular === -1
-          ? [...prev, res.post]
-          : [...prev.slice(0, firstRegular), res.post, ...prev.slice(firstRegular)];
+    try {
+      const res = await createCommunityPostAction({
+        slug,
+        body: text.trim() || undefined,
+        shareStats,
+        // «Поделиться поездкой»: прикрепляем аренду ТОЛЬКО если это своя аренда
+        // (сервер отдельно проверяет владельца — чужую не даст прицепить).
+        rentalId: composeDraft?.canAttachRental ? composeDraft.rentalId : undefined,
+        initData: withInitData(),
+        photos: composerPhotos
+          .filter((p) => p.path)
+          .map((p) => ({ path: p.path, width: p.width, height: p.height, bytes: p.bytes })),
+        bikes: selectedBikes.map((b) => b.bikeId),
+        geo: geoTag ? { lat: geoTag.lat, lng: geoTag.lng, label: geoTag.label ?? undefined } : undefined,
+        notifyRenters: notifyRenters ? { audience: notifyAudience } : undefined,
+        // Idempotency: сервер вернёт УЖЕ созданный пост, если прошлый запрос
+        // упал после коммита (потерянный ответ больше не создаёт дубль).
+        clientNonce: composeNonceRef.current,
       });
-      setText("");
-      setShareStats(false);
-      setStatsPreview(null); // next stats post gets a FRESH server snapshot
-      for (const p of composerPhotosRef.current) URL.revokeObjectURL(p.previewUrl);
-      setComposerPhotosSync([]);
-      setSelectedBikes([]);
-      setBikePickerOpen(false);
-      setGeoTag(null);
-      setGeoPickerOpen(false);
-      setComposeDraft(null);
-      setComposeDismissed(false);
-      setRideDraft(null);
-      setRideDraftDismissed(false);
-      setNotifyRenters(false);
-      setNotifyPanelOpen(false);
-      // Wall × map: новая метка могла появиться/исчезнуть — карта перечитает пины.
-      window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
-      // Staff fanout: kick после публикации (job уже в metadata, аудитория
-      // проверена сервером на этапе создания).
-      if (notifyRenters) {
-        await kickRenterFanout(res.post.id);
+      if (res.ok) {
+        // Dedupe-safe merge: retry после потерянного ответа возвращает ОРИГИНАЛ
+        // — заменяем по id, а не вставляем второй React-key с тем же постом.
+        setPosts((prev) => {
+          if (prev.some((p) => p.id === res.post.id)) {
+            return prev.map((p) =>
+              p.id === res.post.id
+                ? {
+                    ...p,
+                    ...res.post,
+                    // Viewer-специфику с локального состояния не затираем:
+                    // dedupe-версия приходит без viewer-контекста.
+                    viewerReaction: res.post.viewerReaction ?? p.viewerReaction,
+                    comments: res.post.comments.length > 0 ? res.post.comments : p.comments,
+                  }
+                : p,
+            );
+          }
+          // Insert after pinned posts (pinned block always stays on top).
+          const firstRegular = prev.findIndex((p) => !p.isPinned);
+          return firstRegular === -1
+            ? [...prev, res.post]
+            : [...prev.slice(0, firstRegular), res.post, ...prev.slice(firstRegular)];
+        });
+        setText("");
+        try { sessionStorage.removeItem(draftStorageKey); } catch { /* ignore */ }
+        setShareStats(false);
+        setStatsPreview(null); // next stats post gets a FRESH server snapshot
+        for (const p of composerPhotosRef.current) URL.revokeObjectURL(p.previewUrl);
+        setComposerPhotosSync([]);
+        setSelectedBikes([]);
+        setBikePickerOpen(false);
+        setGeoTag(null);
+        setGeoPickerOpen(false);
+        setComposeDraft(null);
+        setComposeDismissed(false);
+        setRideDraft(null);
+        setRideDraftDismissed(false);
+        setNotifyRenters(false);
+        setNotifyPanelOpen(false);
+        // Nonce ротируется ПОСЛЕ успеха: retry текущего поста должен попадать
+        // в dedupe, следующий пост — уже с новым ключом.
+        composeNonceRef.current = makeClientNonce();
+        // Wall × map: новая метка могла появиться/исчезнуть — карта перечитает пины.
+        window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
+        // Staff fanout: НЕ блокируем композер на 50с рассылки — kick уходит
+        // параллельно (timeout 65с внутри), тост приходит отдельно. Если
+        // вкладку закрыли — хвост добьёт крон.
+        if (notifyRenters) {
+          void kickRenterFanout(res.post.id, notifyAudience);
+        }
+      } else {
+        setComposerError(res.error);
       }
-    } else {
-      setComposerError(res.error);
+    } catch {
+      // Сетевая/инфраструктурная ошибка — server action бросил до ответа.
+      // Раньше setPosting(false) не выполнялся и композер ВИС навсегда.
+      // Теперь: тост, черновик (текст/фото/байки/гео) остаётся, повторный тап
+      // ретраит безопасно (clientNonce защищает от дубля на сервере).
+      setComposerError("Сеть подвела — пост не ушёл. Текст и фото на месте: нажми «Опубликовать» ещё раз.");
+    } finally {
+      postingRef.current = false;
+      setPosting(false);
     }
-    setPosting(false);
-  }, [posting, failedUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, geoTag, setComposerPhotosSync, notifyRenters, notifyAudience, kickRenterFanout]);
+  }, [posting, failedUploads, pendingUploads, slug, text, shareStats, withInitData, composerPhotos, selectedBikes, composeDraft, geoTag, draftStorageKey, setComposerPhotosSync, notifyRenters, notifyAudience, kickRenterFanout]);
 
   // ── likes / comments / moderation ──────────────────────────────────────────
 
@@ -813,16 +928,29 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
           : p,
       ),
     );
-    const res = await togglePostReactionAction({ postId: post.id, emoji, initData: withInitData() });
-    if (res.ok) {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, viewerReaction: res.reaction, likeCount: res.likeCount, reactionCounts: res.reactionCounts }
-            : p,
-        ),
-      );
-    } else {
+    try {
+      const res = await togglePostReactionAction({ postId: post.id, emoji, initData: withInitData() });
+      if (res.ok) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id
+              ? { ...p, viewerReaction: res.reaction, likeCount: res.likeCount, reactionCounts: res.reactionCounts }
+              : p,
+          ),
+        );
+      } else {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id
+              ? { ...p, reactionCounts: prevSnapshot.counts, likeCount: prevSnapshot.total, viewerReaction: prevSnapshot.mine }
+              : p,
+          ),
+        );
+        setWallNotice(res.error);
+      }
+    } catch {
+      // Сетевой сбой: откат оптимистичного стейта (иначе лайк «залипает» до
+      // перезагрузки, а pendingLikes блокирует повторный тап навсегда).
       setPosts((prev) =>
         prev.map((p) =>
           p.id === post.id
@@ -830,13 +958,14 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
             : p,
         ),
       );
-      setWallNotice(res.error);
+      setWallNotice("Сеть подвела — реакция не прошла, попробуй ещё раз.");
+    } finally {
+      setPendingLikes((prev) => {
+        const next = new Set(prev);
+        next.delete(post.id);
+        return next;
+      });
     }
-    setPendingLikes((prev) => {
-      const next = new Set(prev);
-      next.delete(post.id);
-      return next;
-    });
   }, [pendingLikes, viewer, withInitData]);
 
   const toggleComments = useCallback(async (post: WallPostView) => {
@@ -853,13 +982,18 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     // The feed ships only the newest-2 preview — fetch the full history once.
     if (post.comments.length < post.commentCount && !loadingCommentsFor[post.id]) {
       setLoadingCommentsFor((prev) => ({ ...prev, [post.id]: true }));
-      const res = await getPostCommentsAction({ postId: post.id, initData: withInitData() });
-      if (res.ok) {
-        setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, comments: res.comments } : p)));
-      } else {
-        setWallNotice(res.error);
+      try {
+        const res = await getPostCommentsAction({ postId: post.id, initData: withInitData() });
+        if (res.ok) {
+          setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, comments: res.comments } : p)));
+        } else {
+          setWallNotice(res.error);
+        }
+      } catch {
+        setWallNotice("Не удалось подгрузить комментарии — попробуй ещё раз.");
+      } finally {
+        setLoadingCommentsFor((prev) => ({ ...prev, [post.id]: false }));
       }
-      setLoadingCommentsFor((prev) => ({ ...prev, [post.id]: false }));
     }
   }, [expanded, loadingCommentsFor, withInitData]);
 
@@ -872,74 +1006,97 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
     }
     const replyTarget = replyTargets[post.id] ?? null;
     setSendingCommentFor((prev) => ({ ...prev, [post.id]: true }));
-    const res = await addPostCommentAction({
-      postId: post.id,
-      body: draft,
-      replyTo: replyTarget?.commentId,
-      initData: withInitData(),
-    });
-    if (res.ok) {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id ? { ...p, comments: [...p.comments, res.comment], commentCount: res.commentCount } : p,
-        ),
-      );
-      setCommentDrafts((prev) => ({ ...prev, [post.id]: "" }));
-      setReplyTargets((prev) => ({ ...prev, [post.id]: null }));
-      setExpanded((prev) => new Set(prev).add(post.id));
-    } else {
-      setWallNotice(res.error);
+    try {
+      const res = await addPostCommentAction({
+        postId: post.id,
+        body: draft,
+        replyTo: replyTarget?.commentId,
+        initData: withInitData(),
+      });
+      if (res.ok) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id ? { ...p, comments: [...p.comments, res.comment], commentCount: res.commentCount } : p,
+          ),
+        );
+        setCommentDrafts((prev) => ({ ...prev, [post.id]: "" }));
+        setReplyTargets((prev) => ({ ...prev, [post.id]: null }));
+        setExpanded((prev) => new Set(prev).add(post.id));
+      } else {
+        setWallNotice(res.error);
+      }
+    } catch {
+      // Сетевой сбой: черновик комментария СОХРАНЯЕТСЯ (чистится только на
+      // успехе), кнопка разблокируется — ретрай одним тапом.
+      setWallNotice("Сеть подвела — комментарий не ушёл. Текст на месте, попробуй ещё раз.");
+    } finally {
+      setSendingCommentFor((prev) => ({ ...prev, [post.id]: false }));
     }
-    setSendingCommentFor((prev) => ({ ...prev, [post.id]: false }));
   }, [commentDrafts, replyTargets, sendingCommentFor, viewer, withInitData]);
 
   const moderatePost = useCallback(async (post: WallPostView, hide: boolean) => {
-    const res = await hideCommunityPostAction({ postId: post.id, hide, initData: withInitData() });
-    if (res.ok) {
-      setPosts((prev) => prev.filter((p) => p.id !== post.id));
-      setWallNotice(hide ? "Пост скрыт из ленты." : null);
-      // Hidden post's marker must disappear from the map layer too.
-      window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
-    } else {
-      setWallNotice(res.error);
+    try {
+      const res = await hideCommunityPostAction({ postId: post.id, hide, initData: withInitData() });
+      if (res.ok) {
+        setPosts((prev) => prev.filter((p) => p.id !== post.id));
+        setWallNotice(hide ? "Пост скрыт из ленты." : null);
+        // Hidden post's marker must disappear from the map layer too.
+        window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
+      } else {
+        setWallNotice(res.error);
+      }
+    } catch {
+      setWallNotice("Сеть подвела — модерация не прошла, попробуй ещё раз.");
     }
   }, [withInitData]);
 
   const deletePost = useCallback(async (post: WallPostView) => {
     if (!window.confirm("Удалить пост безвозвратно?")) return;
-    const res = await deleteCommunityPostAction({ postId: post.id, initData: withInitData() });
-    if (res.ok) {
-      setPosts((prev) => prev.filter((p) => p.id !== post.id));
-      setLightbox((cur) => (cur && cur.postId === post.id ? null : cur));
-      // Deleted post's marker must disappear from the map layer too.
-      window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
-    } else {
-      setWallNotice(res.error);
+    try {
+      const res = await deleteCommunityPostAction({ postId: post.id, initData: withInitData() });
+      if (res.ok) {
+        setPosts((prev) => prev.filter((p) => p.id !== post.id));
+        setLightbox((cur) => (cur && cur.postId === post.id ? null : cur));
+        // Deleted post's marker must disappear from the map layer too.
+        window.dispatchEvent(new CustomEvent(WALL_POSTS_CHANGED_EVENT));
+      } else {
+        setWallNotice(res.error);
+      }
+    } catch {
+      setWallNotice("Сеть подвела — удаление не прошло, попробуй ещё раз.");
     }
   }, [withInitData]);
 
   const togglePin = useCallback(async (post: WallPostView) => {
-    const res = await setPostPinnedAction({ postId: post.id, pinned: !post.isPinned, initData: withInitData() });
-    if (res.ok) {
-      // Pinned block reorders the feed — silent refetch keeps scroll & state.
-      void loadFeed({ silent: true });
-    } else {
-      setWallNotice(res.error);
+    try {
+      const res = await setPostPinnedAction({ postId: post.id, pinned: !post.isPinned, initData: withInitData() });
+      if (res.ok) {
+        // Pinned block reorders the feed — silent refetch keeps scroll & state.
+        void loadFeed({ silent: true });
+      } else {
+        setWallNotice(res.error);
+      }
+    } catch {
+      setWallNotice("Сеть подвела — закрепление не прошло, попробуй ещё раз.");
     }
   }, [withInitData, loadFeed]);
 
   const hideComment = useCallback(async (post: WallPostView, commentId: string) => {
-    const res = await hideCommunityCommentAction({ commentId, hide: true, initData: withInitData() });
-    if (res.ok) {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === post.id
-            ? { ...p, comments: p.comments.filter((c) => c.id !== commentId), commentCount: Math.max(p.commentCount - 1, 0) }
-            : p,
-        ),
-      );
-    } else {
-      setWallNotice(res.error);
+    try {
+      const res = await hideCommunityCommentAction({ commentId, hide: true, initData: withInitData() });
+      if (res.ok) {
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id
+              ? { ...p, comments: p.comments.filter((c) => c.id !== commentId), commentCount: Math.max(p.commentCount - 1, 0) }
+              : p,
+          ),
+        );
+      } else {
+        setWallNotice(res.error);
+      }
+    } catch {
+      setWallNotice("Сеть подвела — комментарий не скрыт, попробуй ещё раз.");
     }
   }, [withInitData]);
 

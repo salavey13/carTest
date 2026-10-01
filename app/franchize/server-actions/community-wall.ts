@@ -692,7 +692,14 @@ const CreatePostInput = z.object({
   notifyRenters: z
     .object({ audience: z.enum(["recent", "past", "all"]) })
     .optional(),
+  // Idempotency key from the composer (robustness pack 2026-10-02): a lost
+  // network response AFTER the server committed must not duplicate the post
+  // when the user taps «Опубликовать» again. Mirrors rentals' client_request_id
+  // (app/rentals/actions.ts). Invalid shapes degrade to null (old clients).
+  clientNonce: z.string().trim().optional(),
 });
+
+const CLIENT_NONCE_RE = /^[A-Za-z0-9._:-]{8,64}$/;
 
 export type CreateCommunityPostResult =
   | { ok: true; post: WallPostView }
@@ -708,6 +715,7 @@ export async function createCommunityPostAction(input: {
   bikes?: unknown;
   geo?: { lat: number; lng: number; label?: string };
   notifyRenters?: { audience: "recent" | "past" | "all" };
+  clientNonce?: string;
 }): Promise<CreateCommunityPostResult> {
   const parsed = CreatePostInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Некорректный пост." };
@@ -749,6 +757,35 @@ export async function createCommunityPostAction(input: {
     return { ok: false, error: "Пост пустой — напиши пару слов, прикрепи фото или точку." };
   }
   if (body.length > WALL_POST_MAX_LEN) return { ok: false, error: `Максимум ${WALL_POST_MAX_LEN} символов.` };
+
+  // ── Idempotent retry (robustness pack 2026-10-02): the composer sends a
+  // stable clientNonce for the whole compose session. If a post with this
+  // nonce ALREADY exists for this author+crew (created < 24h ago), the previous
+  // attempt actually committed — return it instead of duplicating (and
+  // double-firing the crew notification / renter fanout). Cheap lookup, runs
+  // BEFORE any side effect of a new post.
+  const clientNonce =
+    typeof parsed.data.clientNonce === "string" && CLIENT_NONCE_RE.test(parsed.data.clientNonce)
+      ? parsed.data.clientNonce
+      : null;
+  if (clientNonce) {
+    const { data: dupRow } = await supabaseAdmin
+      .from("crew_posts")
+      .select("*")
+      .eq("metadata->>client_nonce", clientNonce)
+      .eq("author_id", actor.userId)
+      .eq("crew_id", crew.id)
+      .eq("is_hidden", false)
+      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .maybeSingle();
+    const dup = dupRow as DbPostRow | null;
+    if (dup) {
+      logger.info("[community-wall] duplicate submit detected (clientNonce) — returning existing post", {
+        postId: dup.id,
+      });
+      return { ok: true, post: await buildSingleWallPostView(dup) };
+    }
+  }
 
   await ensureUserProfile(actor);
 
@@ -851,6 +888,9 @@ export async function createCommunityPostAction(input: {
     stats: statsJson,
     rental_id: verifiedRentalId,
     ...geoColumns,
+    // Idempotency key lives in metadata (migration 20260929100000, jsonb) —
+    // same column the notify_job bookkeeping uses. Old clients post without it.
+    ...(clientNonce ? { metadata: { client_nonce: clientNonce } } : {}),
   };
   const { data: inserted, error } = await supabaseAdmin
     .from("crew_posts")
@@ -868,11 +908,21 @@ export async function createCommunityPostAction(input: {
   // readers see. Rows are idempotent per (post, tag); cap 8 enforced in lib.
   const tagKeys = extractHashtags(finalBody);
   if (tagKeys.length > 0) {
-    const { error: tagInsertError } = await supabaseAdmin.from("crew_post_tags").insert(
-      tagKeys.map((tag) => ({ post_id: postId, tag, crew_id: crew.id })),
-    );
-    if (tagInsertError) {
-      logger.error("[community-wall] tag rows insert failed:", tagInsertError.message);
+    const tagRows = tagKeys.map((tag) => ({ post_id: postId, tag, crew_id: crew.id }));
+    // One respectful retry: a transient blip here must not cost the post its
+    // tag filter entries (rows are idempotent per (post, tag), so a retry
+    // after a PARTIAL success is safe too).
+    let tagError = "";
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { error } = await supabaseAdmin.from("crew_post_tags").insert(tagRows);
+      if (!error) {
+        tagError = "";
+        break;
+      }
+      tagError = error.message;
+    }
+    if (tagError) {
+      logger.error("[community-wall] tag rows insert failed after retry:", tagError);
     }
   }
 
@@ -1040,7 +1090,13 @@ export async function createCommunityPostAction(input: {
   // wall-renter-notify, staff-gated) + крон-досылка; здесь только постановка.
   if (notifyJobAudience && stillThere) {
     const { queueWallRenterNotifyJob } = await import("@/app/franchize/lib/wall-renter-notify");
-    const queued = await queueWallRenterNotifyJob(postId, notifyJobAudience, actor.userId);
+    // One respectful retry: the kick-route self-heal (2026-10-02) can repair a
+    // missing job afterwards, but a retry here saves a whole round trip.
+    let queued = await queueWallRenterNotifyJob(postId, notifyJobAudience, actor.userId);
+    if (!queued) {
+      logger.warn("[community-wall] notify_job queue failed once — retrying");
+      queued = await queueWallRenterNotifyJob(postId, notifyJobAudience, actor.userId);
+    }
     if (!queued) {
       logger.error("[community-wall] notify_job queue failed — post is live, fanout skipped");
     }
@@ -1966,31 +2022,13 @@ export type GetWallPostResult =
   | { ok: false; error: string };
 
 /**
- * Один пост по id — для deep-link посадки, когда пост старый и не попал в
- * первую страницу ленты (кнопки уведомлений и «Поделиться» должны вести К
- * ПОСТУ, а не к верху стены). Публичное чтение, как и вся лента. Вернёт
- * error для скрытых/чужих экипажей — как если бы поста не было.
+ * Assemble the full WallPostView for ONE crew_posts row (author, comments
+ * preview, photos, bike mentions + live availability, rental ref). Shared by
+ * getWallPostAction (deep-link landing) and the clientNonce dedupe path in
+ * createCommunityPostAction — a duplicated submit must return the EXISTING
+ * post fully-formed, not a half view.
  */
-export async function getWallPostAction(input: {
-  slug: string;
-  postId: string;
-}): Promise<GetWallPostResult> {
-  const parsed = SinglePostInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
-
-  const crew = await getCrewBySlug(parsed.data.slug);
-  if (!crew) return { ok: false, error: "Экипаж не найден." };
-
-  const { data: row } = await supabaseAdmin
-    .from("crew_posts")
-    .select("*")
-    .eq("id", parsed.data.postId)
-    .eq("crew_id", crew.id)
-    .eq("is_hidden", false)
-    .maybeSingle();
-  const postRow = row as DbPostRow | null;
-  if (!postRow) return { ok: false, error: "Пост недоступен." };
-
+async function buildSingleWallPostView(postRow: DbPostRow): Promise<WallPostView> {
   const { data: authorRow } = await supabaseAdmin
     .from("users")
     .select("user_id, username, full_name, avatar_url")
@@ -2105,7 +2143,7 @@ export async function getWallPostAction(input: {
     }
   }
 
-  const post: WallPostView = {
+  return {
     id: postRow.id,
     kind: postRow.kind === "stats" ? "stats" : "post",
     body: postRow.body,
@@ -2116,7 +2154,7 @@ export async function getWallPostAction(input: {
     likeCount: postRow.like_count ?? 0,
     commentCount: postRow.comment_count ?? 0,
     reactionCounts: sanitizeReactionCounts(postRow.reaction_counts),
-    viewerReaction: null, // deep-link посадка — viewer ещё не «себя» показал; подгрузка ленты поправит
+    viewerReaction: null, // deep-link посадка / dedupe — viewer уточнит лента и лайк
     author,
     comments,
     rental,
@@ -2124,7 +2162,35 @@ export async function getWallPostAction(input: {
     bikes,
     geo: sanitizeWallGeo({ lat: postRow.geo_lat, lng: postRow.geo_lng, label: postRow.geo_label }),
   };
-  return { ok: true, post };
+}
+
+/**
+ * Один пост по id — для deep-link посадки, когда пост старый и не попал в
+ * первую страницу ленты (кнопки уведомлений и «Поделиться» должны вести К
+ * ПОСТУ, а не к верху стены). Публичное чтение, как и вся лента. Вернёт
+ * error для скрытых/чужих экипажей — как если бы поста не было.
+ */
+export async function getWallPostAction(input: {
+  slug: string;
+  postId: string;
+}): Promise<GetWallPostResult> {
+  const parsed = SinglePostInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректный запрос." };
+
+  const crew = await getCrewBySlug(parsed.data.slug);
+  if (!crew) return { ok: false, error: "Экипаж не найден." };
+
+  const { data: row } = await supabaseAdmin
+    .from("crew_posts")
+    .select("*")
+    .eq("id", parsed.data.postId)
+    .eq("crew_id", crew.id)
+    .eq("is_hidden", false)
+    .maybeSingle();
+  const postRow = row as DbPostRow | null;
+  if (!postRow) return { ok: false, error: "Пост недоступен." };
+
+  return { ok: true, post: await buildSingleWallPostView(postRow) };
 }
 
 // ── RENTAL COMPOSE DRAFT («поделиться поездкой» из уведомления о закрытии) ──

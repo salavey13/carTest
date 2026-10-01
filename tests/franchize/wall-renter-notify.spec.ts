@@ -276,8 +276,10 @@ describe("meetup → wall: staff flags + auto post", () => {
     const map = read(MAP);
     expect(map).toContain("showStaffFlags={viewerIsCrewStaff}");
     expect(map).toContain("getWallStaffFlagAction");
-    // kick is awaited (lesson d275c52: fire-and-forget freezes on Vercel)
-    expect(map).toContain("await kickRenterFanout(res.post.id, crewSlug)");
+    // kick is awaited (lesson d275c52: fire-and-forget freezes on Vercel) and
+    // passes the audience (robustness pack 2026-10-02: kick-route self-heal
+    // can requeue a lost notify_job from this audience).
+    expect(map).toContain("await kickRenterFanout(res.post.id, crewSlug, opts.notifyAudience);");
     expect(map).toContain("createCommunityPostAction");
   });
 

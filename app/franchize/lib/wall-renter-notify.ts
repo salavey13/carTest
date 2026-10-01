@@ -77,6 +77,14 @@ export const RENTER_NOTIFY_TIME_BUDGET_MS = 50_000;
 export const RENTER_NOTIFY_MAX_RECIPIENTS = 500;
 /** Окно жизни job для крон-досылки. */
 export const RENTER_NOTIFY_JOB_TTL_DAYS = 7;
+/**
+ * Claim «протухает» через столько мс — упавший прогон (воркер убит, сеть
+ * легла) не должен навсегда блокировать рассылку в статусе running.
+ * Здоровый прогон укладывается в 50с бюджет, так что 3 мин — с большим
+ * запасом; живой конкурент при takeover теряет право записи (CAS) и
+ * останавливается, дублей не будет.
+ */
+export const RENTER_NOTIFY_RUN_STALE_MS = 3 * 60_000;
 
 // ── job shape (crew_posts.metadata.notify_job) ───────────────────────────────
 
@@ -93,6 +101,14 @@ export interface WallRenterNotifyJob {
   error: string | null;
   /** Копия автору («что было разослано») ушла — не дублируем на кронах. */
   creator_notified?: boolean;
+  /**
+   * Single-flight claim (robustness pack 2026-10-02): токен активного прогона.
+   * Только владелец токена пишет ledger (CAS по metadata->notify_job->>run_token)
+   * — параллельные kick/крон не дублируют доставку.
+   */
+  run_token?: string | null;
+  /** ISO-время взятия claim; устаревший (> RENTER_NOTIFY_RUN_STALE_MS) — можно перехватить. */
+  run_started_at?: string | null;
 }
 
 /** Pure: достать валидный job из metadata (мусор → null). */
@@ -117,7 +133,18 @@ export function parseNotifyJob(metadata: unknown): WallRenterNotifyJob | null {
     failed: typeof j.failed === "number" && Number.isFinite(j.failed) ? j.failed : 0,
     error: typeof j.error === "string" ? j.error : null,
     creator_notified: j.creator_notified === true,
+    run_token: typeof j.run_token === "string" && j.run_token ? j.run_token : null,
+    run_started_at: typeof j.run_started_at === "string" ? j.run_started_at : null,
   };
+}
+
+/** Pure: claim протух (или его не было)? Свежий чужой claim перехватывать нельзя. */
+export function isNotifyRunStale(job: Pick<WallRenterNotifyJob, "status" | "run_started_at">, nowMs: number): boolean {
+  if (job.status !== "running") return true;
+  if (!job.run_started_at) return true; // running без метки времени — наследие до-claim эпохи
+  const started = Date.parse(job.run_started_at);
+  if (!Number.isFinite(started)) return true;
+  return nowMs - started > RENTER_NOTIFY_RUN_STALE_MS;
 }
 
 /** Pure: pending = аудитория минус ledger, минус исключения. Стабильный порядок. */
@@ -187,20 +214,100 @@ export async function resolveRenterAudience(crewId: string, audience: WallNotify
 
 // ── metadata writer (best-effort, non-throwing) ──────────────────────────────
 
-async function writeNotifyJob(postId: string, job: WallRenterNotifyJob): Promise<void> {
+/**
+ * Записать notify_job в crew_posts.metadata (metadata перечитывается свежей —
+ * никаких stale-merge затираний соседних ключей вроде client_nonce).
+ *
+ * Robustness pack 2026-10-02:
+ *   · вернёт false, если пост исчез (раньше молча «успешно» писали в пустоту);
+ *   · opts.expectRunToken — CAS: апдейт применяется ТОЛЬКО если run_token в
+ *     базе совпадает с нашим (т.е. нас не перехватил другой прогон). Потеря
+ *     claim → false, вызывающий обязан остановить доставку.
+ *
+ * Никогда не бросает.
+ */
+async function writeNotifyJob(
+  postId: string,
+  job: WallRenterNotifyJob,
+  opts?: { expectRunToken?: string },
+): Promise<boolean> {
   try {
     const { data: row } = await supabaseAdmin
       .from("crew_posts")
       .select("metadata")
       .eq("id", postId)
       .maybeSingle();
-    const metadata = (row?.metadata as Record<string, unknown> | null) ?? {};
-    await supabaseAdmin
+    if (!row) {
+      logger.warn("[wall-renter-notify] job write skipped — post gone", { postId });
+      return false;
+    }
+    const metadata = (row.metadata as Record<string, unknown> | null) ?? {};
+    let query = supabaseAdmin
       .from("crew_posts")
       .update({ metadata: { ...metadata, notify_job: job } })
       .eq("id", postId);
+    if (opts?.expectRunToken) {
+      // CAS: только владелец токена пишет. Если другой прогон нас перехватил
+      // (takeover протухшего claim), условие не совпадёт и data будет пустой.
+      query = query.eq("metadata->notify_job->>run_token", opts.expectRunToken);
+    }
+    const { data: updated } = await query.select("id");
+    if (!updated || updated.length === 0) return false;
+    return true;
   } catch (error) {
     logger.warn("[wall-renter-notify] job write failed (non-fatal)", error);
+    return false;
+  }
+}
+
+/**
+ * Single-flight claim: взять рассылку в работу CAS-ом по run_token.
+ * Возвращает токен + СВЕЖИЙ job (перечитанный перед claim — процессор мог
+ * видеть устаревшую копию), или null: рассылку уже ведёт другой прогон /
+ * claim-запись не удалась — лучше пропустить прогон, чем задвоить доставку.
+ * Никогда не бросает.
+ */
+async function claimNotifyJobRun(
+  postId: string,
+): Promise<{ token: string; job: WallRenterNotifyJob } | null> {
+  try {
+    const { data: row } = await supabaseAdmin
+      .from("crew_posts")
+      .select("metadata")
+      .eq("id", postId)
+      .maybeSingle();
+    if (!row) return null;
+    const metadata = (row.metadata as Record<string, unknown> | null) ?? {};
+    // Перечитанный job мог УЖЕ измениться относительно того, что видел
+    // процессор — перехватываем/садимся только на то, что видим сейчас.
+    const fresh = parseNotifyJob(metadata);
+    if (!fresh) return null;
+    if (!isNotifyRunStale(fresh, Date.now())) return null; // свежий чужой claim
+    const token = (globalThis.crypto?.randomUUID?.() || `run-${Date.now()}-${Math.random().toString(36).slice(2)}`) as string;
+    const claimed: WallRenterNotifyJob = {
+      ...fresh,
+      status: "running",
+      run_token: token,
+      run_started_at: new Date().toISOString(),
+    };
+    let query = supabaseAdmin
+      .from("crew_posts")
+      .update({ metadata: { ...metadata, notify_job: claimed } })
+      .eq("id", postId);
+    if (fresh.run_token) {
+      // Takeover протухшего claim: перехватываем КОНКРЕТНЫЙ токен, который
+      // только что прочли. Если конкурент его уже сменил — data пустая → null.
+      query = query.eq("metadata->notify_job->>run_token", fresh.run_token);
+    } else {
+      // Свежий/до-claim job: токена нет ни у кого — садимся на пустое место.
+      query = query.is("metadata->notify_job->>run_token", null);
+    }
+    const { data: updated } = await query.select("id");
+    if (!updated || updated.length === 0) return null;
+    return { token, job: claimed };
+  } catch (error) {
+    logger.warn("[wall-renter-notify] claim failed — treating as busy", error);
+    return null;
   }
 }
 
@@ -213,12 +320,20 @@ export interface WallRenterNotifyRunResult {
   failed: number;
   remaining: number;
   error?: string;
+  /** true — другой прогон уже доставляет (single-flight); повторить позже. */
+  busy?: boolean;
 }
 
 /**
  * Обработать notify_job поста: дослать всем pending в рамках бюджета.
  * Вызывается из kick-роута (staff) и крона; идемпотентен — повторный вызов
  * продолжает с ledger. Никогда не бросает.
+ *
+ * SINGLE-FLIGHT (robustness pack 2026-10-02): только ОДИН прогон может
+ * доставлять — claim по run_token (CAS-запись в metadata). Параллельный
+ * kick/крон получает busy, не читая аудиторию повторно. Упавший прогон
+ * перехватывается через RENTER_NOTIFY_RUN_STALE_MS; живой конкурент при
+ * takeover теряет право записи (CAS на каждом ledger-апдейте) и останавливается.
  *
  * expectedCrewId (code review 2026-10-02): kick-роут проверяет staff только
  * для ЭКИПАЖА из body.slug — без сверки post.crew_id staff экипажа A мог бы
@@ -259,6 +374,19 @@ export async function processWallRenterNotifyJob(
       await writeNotifyJob(postId, { ...job, status: "failed", error: "post hidden before fanout", finished_at: new Date().toISOString() });
       return { ...run, status: "failed", error: "post hidden" };
     }
+
+    // ── single-flight claim: параллельный kick/крон не дублирует доставку ──
+    if (!isNotifyRunStale(job, Date.now())) {
+      return { ...run, ok: true, status: "running", busy: true, sent: job.sent, failed: job.failed, remaining: 0 };
+    }
+    const claim = await claimNotifyJobRun(postId);
+    if (!claim) {
+      // Кто-то успел раньше / claim не взялся — НЕ доставляем (дубли хуже задержки).
+      return { ...run, ok: true, status: "running", busy: true, sent: job.sent, failed: job.failed, remaining: 0 };
+    }
+    const runToken = claim.token;
+    // Base для всех последующих записей: свежий job + НАШ токен (CAS).
+    const myJob: WallRenterNotifyJob = claim.job;
 
     const { data: crewRow } = await supabaseAdmin
       .from("crews")
@@ -385,8 +513,13 @@ export async function processWallRenterNotifyJob(
         });
         const creatorRes = await deliverWallPostNotify(post.author_id, creatorText, replyMarkup, coverPhotoUrl);
         if (creatorRes.ok) {
-          job.creator_notified = true;
-          await writeNotifyJob(postId, { ...job, status: job.status, creator_notified: true });
+          myJob.creator_notified = true;
+          // Claim-guard: перехваченный прогон не пишет (иначе затирал бы токен
+          // нового владельца и статус). Потеря claim → полный стоп доставки.
+          const stored = await writeNotifyJob(postId, { ...myJob, creator_notified: true }, { expectRunToken: runToken });
+          if (!stored) {
+            return { ...run, ok: false, status: "running", error: "lost fanout claim" };
+          }
         } else {
           logger.warn("[wall-renter-notify] creator copy failed (will not retry this run)", {
             error: creatorRes.error,
@@ -398,16 +531,15 @@ export async function processWallRenterNotifyJob(
     }
 
     if (pending.length === 0) {
-      await writeNotifyJob(postId, { ...job, status: "done", finished_at: new Date().toISOString() });
-      return { ...run, ok: true, sent: job.sent, failed: job.failed, remaining: 0 };
+      await writeNotifyJob(postId, { ...myJob, status: "done", finished_at: new Date().toISOString() }, { expectRunToken: runToken });
+      return { ...run, ok: true, sent: myJob.sent, failed: myJob.failed, remaining: 0 };
     }
 
     // ── пакетный цикл с бюджетом ──
     const startedAt = Date.now();
-    const sentLedger = [...job.sent_user_ids];
-    let sent = job.sent;
-    let failed = job.failed;
-    await writeNotifyJob(postId, { ...job, status: "running" });
+    const sentLedger = [...myJob.sent_user_ids];
+    let sent = myJob.sent;
+    let failed = myJob.failed;
     for (let i = 0; i < pending.length; i += RENTER_NOTIFY_BATCH_SIZE) {
       if (Date.now() - startedAt > timeBudgetMs) {
         // Бюджет исчерпан — статус 'running', ledger уже в metadata: следующий
@@ -433,28 +565,51 @@ export async function processWallRenterNotifyJob(
       }
       sentLedger.push(...delivered);
       // Ledger после КАЖДОГО пакета: крэш теряет максимум один пакет.
-      await writeNotifyJob(postId, {
-        ...job,
-        status: "running",
-        sent_user_ids: sentLedger,
-        sent,
-        failed,
-      });
+      // CAS по нашему токену: перехваченный прогон не пишет и останавливается.
+      const stored = await writeNotifyJob(
+        postId,
+        { ...myJob, status: "running", sent_user_ids: sentLedger, sent, failed },
+        { expectRunToken: runToken },
+      );
+      if (!stored) {
+        // Claim потерян — последний записанный ledger у нового владельца:
+        // он продолжит с него (повтор максимум одного пакета, прежняя
+        // crash-семантика; дублей НАМНОГО больше не будет).
+        logger.warn("[wall-renter-notify] lost claim mid-run — stopping delivery", { postId, sent, failed });
+        return {
+          ...run,
+          ok: false,
+          status: "running",
+          sent,
+          failed,
+          remaining: Math.max(0, pending.length - i - batch.length),
+          error: "lost fanout claim",
+        };
+      }
       if (i + RENTER_NOTIFY_BATCH_SIZE < pending.length) {
         await new Promise((resolve) => setTimeout(resolve, RENTER_NOTIFY_BATCH_PAUSE_MS));
       }
     }
 
-    await writeNotifyJob(postId, {
-      ...job,
-      status: "done",
-      sent_user_ids: sentLedger,
-      // Финальный счётчик — ТОЧНЫЙ (длина exactly-once ledger): failed-получатели
-      // досылаются следующими прогонами, накопленный attempt-counter завышал бы sent.
-      sent: sentLedger.length,
-      failed,
-      finished_at: new Date().toISOString(),
-    });
+    const finalStored = await writeNotifyJob(
+      postId,
+      {
+        ...myJob,
+        status: "done",
+        sent_user_ids: sentLedger,
+        // Финальный счётчик — ТОЧНЫЙ (длина exactly-once ledger): failed-получатели
+        // досылаются следующими прогонами, накопленный attempt-counter завышал бы sent.
+        sent: sentLedger.length,
+        failed,
+        finished_at: new Date().toISOString(),
+      },
+      { expectRunToken: runToken },
+    );
+    if (!finalStored) {
+      // Доставили всё, но claim перехватили на финише: новый владелец увидит
+      // почти полный ledger и досылит только failed — дублей не будет.
+      logger.warn("[wall-renter-notify] lost claim on final write — ledger is consistent", { postId });
+    }
     return { ok: true, status: "done", sent, failed, remaining: 0 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -475,7 +630,13 @@ export async function queueWallRenterNotifyJob(
       .select("metadata")
       .eq("id", postId)
       .maybeSingle();
-    const metadata = (row?.metadata as Record<string, unknown> | null) ?? {};
+    if (!row) {
+      // Robustness 2026-10-02: раньше «успешно» писали update в пустоту и
+      // возвращали true — kick-роут честно рапортовал job, которого не было.
+      logger.warn("[wall-renter-notify] queue skipped — post not found", { postId });
+      return false;
+    }
+    const metadata = (row.metadata as Record<string, unknown> | null) ?? {};
     const job: WallRenterNotifyJob = {
       status: "queued",
       audience,
