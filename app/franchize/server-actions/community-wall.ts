@@ -1002,6 +1002,10 @@ export async function createCommunityPostAction(input: {
       body: finalBody,
       photoCount: photoViews.length,
       bikeTitles: bikeRefs.map((b) => b.title),
+      // Quick-rent button in the crew notification: startapp=rent_<bikeId>
+      // (бот экипажа из metadata) — boss: «deep link for quick rent action
+      // in case bike is specified in created post».
+      bikes: bikeRefs.map((b) => ({ bikeId: b.bikeId, title: b.title })),
       hasStats: statsSnapshot !== null,
       excludeUserId: actor.userId,
       recentAuthorPosts: authorPostsLastHour,

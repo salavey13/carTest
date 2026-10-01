@@ -222,7 +222,9 @@ describe("rider profile wiring", () => {
     expect(engage).toContain("notifyWallPostMentions");
     const actions = read("app/franchize/server-actions/community-wall.ts");
     // post mentions fire after the crew fanout, awaited (d275c52 lesson)
-    expect(actions).toMatch(/await notifyNewWallPost\([\s\S]{1,600}?await notifyWallPostMentions\(/);
+    // (window 900: notifyNewWallPost now also passes the bikes payload for
+    // the quick-rent button — the adjacency contract itself is unchanged)
+    expect(actions).toMatch(/await notifyNewWallPost\([\s\S]{1,900}?await notifyWallPostMentions\(/);
   });
 
   it("prefs type + normalize + UI toggle include wallActivity", () => {

@@ -21,7 +21,11 @@
 
 import { logger } from "@/lib/logger";
 import { telegramDeliver } from "@/lib/telegram-transport";
-import { buildWallPostNotifyHtml } from "@/app/franchize/lib/community-wall";
+import {
+  buildWallPostNotifyHtml,
+  buildWallRentButton,
+  WallPostNotifyBike,
+} from "@/app/franchize/lib/community-wall";
 import {
   buildTelegramAppLink,
   isUuidLike,
@@ -54,6 +58,10 @@ export interface WallPostNotifyInput {
   photoCount: number;
   /** Названия упомянутых байков из каталога. */
   bikeTitles: string[];
+  /** Упомянутые байки (id + модель) — из них строится кнопка быстрой аренды
+   *  startapp=rent_<bikeId> (бот экипажа из metadata). Опционально: без
+   *  массива кнопка просто не ставится, раскладка прежняя. */
+  bikes?: WallPostNotifyBike[];
   /** Пост делится статистикой поездок (kind='stats'). */
   hasStats: boolean;
   /** Author получает уведомление о своём посте? Нет — исключаем его chat_id. */
@@ -148,10 +156,15 @@ export async function notifyNewWallPost(
       text,
       parse_mode: "HTML",
       disable_web_page_preview: true,
-      reply_markup: {
-        inline_keyboard: [[{ text: "🟣 Открыть стену", url: deeplink }]],
-      },
     };
+    // Quick-rent row FIRST (паритет с renter-fanout): в посте указан байк —
+    // кнопка startapp=rent_<bikeId> ведёт сразу на его страницу (бот экипажа
+    // из metadata). Пост/стена — второй ряд; без байка раскладка прежняя.
+    const rentButton = buildWallRentButton({ bikes: input.bikes, botUsername: crewBot });
+    const keyboard: { text: string; url: string }[][] = [];
+    if (rentButton) keyboard.push([rentButton]);
+    keyboard.push([{ text: "🟣 Открыть стену", url: deeplink }]);
+    payload.reply_markup = { inline_keyboard: keyboard };
 
     await Promise.allSettled(
       targets.map(async (chatId) => {

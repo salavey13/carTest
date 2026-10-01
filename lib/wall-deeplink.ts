@@ -248,3 +248,31 @@ export function buildTelegramAppLink(botUsername: string, startParam: string): s
   const bot = botUsername.replace(/^@/, "").trim();
   return `https://t.me/${bot}/app?startapp=${startParam}`;
 }
+
+// ── rent_<bikeId> (quick-rent button on wall-post notifications) ─────────────
+// cars.id is a TEXT catalogue slug («bmw-f800r», «kawasaki-ex650k»), NOT a
+// uuid — the same id the QR grammar rent_<bikeId>_<docSha256> already uses.
+// The PARSER lives in hooks/use-start-param-target.ts (parseRentDeepLink) and
+// splits on "_": bike ids are hyphen-slugs, the optional docSha256 hex never
+// contains "_". A bike id containing "_" therefore cannot round-trip (it
+// would parse as a wrong truncated id + phantom doc hash) — the builder
+// returns null for it and the caller simply drops the rent button instead of
+// shipping a link that opens a different bike. Budget: "rent_" (5) + id ≤ 59
+// keeps the whole startapp param inside the 64-char TG budget.
+
+/** Shape of every real catalogue slug: lowercase alnum, hyphens inside. */
+const BIKE_RENT_ID_RE = /^[a-z0-9](?:[a-z0-9-]{0,57}[a-z0-9])?$/;
+
+/**
+ * rent_<bikeId> start param for the «quick rent» button on post notifications
+ * (and any other surface linking a catalogue bike). Lowercases like the whole
+ * rent chain does (parseRentDeepLink / vehicle API both normalize case).
+ * Returns null for ids that would break the round-trip (empty, "_", charset
+ * outside the slug grammar, over-budget) — callers degrade gracefully.
+ */
+export function bikeRentStartParam(bikeId: string): string | null {
+  const id = String(bikeId ?? "")
+    .trim()
+    .toLowerCase();
+  return BIKE_RENT_ID_RE.test(id) ? `rent_${id}` : null;
+}

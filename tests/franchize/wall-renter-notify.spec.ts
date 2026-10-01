@@ -66,6 +66,7 @@ import {
   pendingRecipients,
 } from "@/app/franchize/lib/wall-renter-notify";
 import { buildSuggestedYandexReview, summarizeRide } from "@/app/franchize/lib/ride-share-notify";
+import { buildWallRentButton, bikeRentButtonLabel } from "@/app/franchize/lib/community-wall";
 import { isDarkCssColor } from "@/lib/map-riders";
 
 const ROOT = process.cwd();
@@ -375,7 +376,6 @@ describe("review nudge: ride stats + precreated Yandex review draft", () => {
 // ── 10. fullscreen viewer polish (shared gesture engine) ────────────────────
 
 describe("fullscreen photo viewer: shared engine + top-center close", () => {
-  const HOOK = "hooks/usePhotoZoomGestures.ts";
 
   it("engine consumers: wall lightbox, map lightbox, rental ДО/ПОСЛЕ lightbox", () => {
     for (const file of [
@@ -400,5 +400,86 @@ describe("fullscreen photo viewer: shared engine + top-center close", () => {
     expect(src).toContain("function RentalPhotoLightbox");
     // old duplicate parent-level listener removed
     expect(src).not.toContain("ArrowLeft\" && lightboxIndex > 0");
+  });
+});
+
+// ── 11. quick-rent deeplink on post notifications (boss 2026-10-01) ─────────
+
+describe("quick-rent deeplink: buildWallRentButton (pure)", () => {
+  it("builds the boss example: vip-bike metadata bot + rent_bmw-f800r", () => {
+    const btn = buildWallRentButton({
+      bikes: [{ bikeId: "bmw-f800r", title: "BMW F 800 R" }],
+      botUsername: "oneBikePlsBot", // metadata.franchize.contacts.telegramBotUsername
+    });
+    expect(btn).toEqual({
+      text: "🏍 Арендовать «BMW F 800 R»",
+      url: "https://t.me/oneBikePlsBot/app?startapp=rent_bmw-f800r",
+    });
+  });
+
+  it("strips @ from the bot handle (metadata sometimes stores it)", () => {
+    const btn = buildWallRentButton({
+      bikes: [{ bikeId: "kawasaki-ex650k", title: "Kawasaki EX650K" }],
+      botUsername: "@oneBikePlsBot",
+    });
+    expect(btn?.url).toBe("https://t.me/oneBikePlsBot/app?startapp=rent_kawasaki-ex650k");
+  });
+
+  it("first round-trippable bike wins; ids that would break the rent_ grammar are skipped", () => {
+    const btn = buildWallRentButton({
+      bikes: [
+        { bikeId: "bad_id_with_underscore", title: "Broken" }, // parseRentDeepLink splits on _
+        { bikeId: "bmw-f800r", title: "BMW F 800 R" },
+      ],
+      botUsername: "oneBikePlsBot",
+    });
+    expect(btn?.url).toContain("startapp=rent_bmw-f800r");
+  });
+
+  it("no bot / no bikes / no eligible bike → null (caller keeps the ordinary post button)", () => {
+    expect(buildWallRentButton({ bikes: [{ bikeId: "bmw-f800r" }], botUsername: null })).toBeNull();
+    expect(buildWallRentButton({ bikes: [], botUsername: "oneBikePlsBot" })).toBeNull();
+    expect(buildWallRentButton({ botUsername: "oneBikePlsBot" })).toBeNull();
+    expect(
+      buildWallRentButton({ bikes: [{ bikeId: "still_bad_id" }], botUsername: "oneBikePlsBot" }),
+    ).toBeNull();
+  });
+
+  it("label: long models truncate to keep the row narrow; missing model → neutral call", () => {
+    expect(bikeRentButtonLabel("Ducati 1199 Panigale S Tricolore")).toBe(
+      "🏍 Арендовать «Ducati 1199 Panigale S…»",
+    );
+    expect(bikeRentButtonLabel("  ")).toBe("🏍 Быстрая аренда");
+    expect(bikeRentButtonLabel(null)).toBe("🏍 Быстрая аренда");
+  });
+});
+
+describe("quick-rent deeplink: notification wiring (source contracts)", () => {
+  it("renter fanout: bikes come in the author's attach order + rent row precedes the post row", () => {
+    const src = read(LIB);
+    expect(src).toContain('buildWallRentButton({ bikes, botUsername })');
+    expect(src).toContain('.order("position", { ascending: true })');
+    const rentIdx = src.indexOf("if (rentButton) keyboard.push([rentButton]);");
+    const postIdx = src.indexOf('keyboard.push([{ text: "🟣 Открыть пост", url: deeplink }]);');
+    expect(rentIdx).toBeGreaterThan(-1);
+    expect(postIdx).toBeGreaterThan(rentIdx); // rent first — the headline action
+  });
+
+  it("crew notification (wall-notify): same button from input.bikes + crew bot from metadata", () => {
+    const src = read("app/franchize/lib/wall-notify.ts");
+    expect(src).toContain("buildWallRentButton({ bikes: input.bikes, botUsername: crewBot })");
+    expect(src).toContain("resolveCrewBotUsername(input.slug)");
+    // без байка раскладка прежняя — «Открыть стену» остаётся
+    expect(src).toContain('keyboard.push([{ text: "🟣 Открыть стену", url: deeplink }]);');
+  });
+
+  it("createCommunityPostAction feeds bikeRefs (id + model) into the notify", () => {
+    const src = read(WALL_ACTION);
+    expect(src).toContain("bikes: bikeRefs.map((b) => ({ bikeId: b.bikeId, title: b.title })),");
+  });
+
+  it("button builder is pure string plumbing (no transport imports in the grammar path)", () => {
+    const src = read("app/franchize/lib/community-wall.ts");
+    expect(src).toContain('import { bikeRentStartParam, buildTelegramAppLink } from "@/lib/wall-deeplink";');
   });
 });

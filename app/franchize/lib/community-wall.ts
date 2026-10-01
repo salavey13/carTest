@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { parseStoredRentalTs, RENTAL_BLOCK_GRACE_MS } from "@/app/franchize/lib/rental-overlap";
+import { bikeRentStartParam, buildTelegramAppLink } from "@/lib/wall-deeplink";
 
 // ── Stats snapshot ───────────────────────────────────────────────────────────
 
@@ -824,6 +825,64 @@ export function buildWallPostNotifyHtml(info: WallPostNotifyInfo): string {
   }
   if (info.hasStats) lines.push(`📊 делится статистикой поездок`);
   return lines.join("\n");
+}
+
+// ── «Быстрая аренда» button on post notifications (pure) ─────────────────────
+
+/** Bike attachment shaped for the quick-rent button (crew_post_bikes + cars.model). */
+export interface WallPostNotifyBike {
+  bikeId: string;
+  title?: string | null;
+}
+
+/** A ready Telegram inline-keyboard url-button. */
+export interface WallNotifyUrlButton {
+  text: string;
+  url: string;
+}
+
+const BIKE_BUTTON_TITLE_MAX = 24;
+
+/** Кнопка «Арендовать <модель>»: заголовок обрезается — Telegram рисует кнопку
+ *  по ширине текста, длинные модели ломают вёрстку ряда. Без модели — нейтральный
+ *  призыв, без байка вызывающий вообще не ставит кнопку. */
+export function bikeRentButtonLabel(title: string | null | undefined): string {
+  const flat = String(title ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const short =
+    flat.length > BIKE_BUTTON_TITLE_MAX
+      ? `${flat.slice(0, BIKE_BUTTON_TITLE_MAX - 1).trimEnd()}…`
+      : flat;
+  return short ? `🏍 Арендовать «${short}»` : "🏍 Быстрая аренда";
+}
+
+/**
+ * Quick-rent url-button for post notifications: the FIRST bike whose id
+ * round-trips the rent_<bikeId> grammar gets
+ * t.me/<бот экипажа из metadata>/app?startapp=rent_<bikeId> — deep link
+ * straight into the bike page (useStartParamRouter → resolveFranchizeVehicleLink).
+ * Null when there is no bot, no bikes, or no round-trippable id — the caller
+ * keeps the ordinary post button instead of shipping a broken link.
+ * Pure: only string plumbing (wall-deeplink), no Supabase/Telegram imports.
+ */
+export function buildWallRentButton(input: {
+  bikes?: WallPostNotifyBike[] | null;
+  botUsername?: string | null;
+}): WallNotifyUrlButton | null {
+  const bot = String(input.botUsername ?? "")
+    .trim()
+    .replace(/^@+/, "");
+  if (!bot) return null;
+  for (const bike of input.bikes ?? []) {
+    const param = bike?.bikeId ? bikeRentStartParam(bike.bikeId) : null;
+    if (!param) continue;
+    return {
+      text: bikeRentButtonLabel(bike?.title),
+      url: buildTelegramAppLink(bot, param),
+    };
+  }
+  return null;
 }
 
 // ── map-riders → wall compose draft (pure, unit-tested) ─────────────────────

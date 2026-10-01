@@ -41,7 +41,11 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { telegramDeliver } from "@/lib/telegram-transport";
-import { buildWallPostNotifyHtml } from "@/app/franchize/lib/community-wall";
+import {
+  buildWallPostNotifyHtml,
+  buildWallRentButton,
+  WallPostNotifyBike,
+} from "@/app/franchize/lib/community-wall";
 import { filterWallNotifyRecipients } from "@/app/franchize/lib/wall-prefs";
 import {
   buildTelegramAppLink,
@@ -279,12 +283,15 @@ export async function processWallRenterNotifyJob(
         .from("crew_post_bikes")
         .select("bike_id")
         .eq("post_id", postId)
+        // Author's attach order — the FIRST bike is the post's headline offer.
+        .order("position", { ascending: true })
         .limit(8),
       resolveCrewBotUsername(slug),
     ]);
     const photoCount = photoCountRes.count ?? 0;
     const bikeIds = ((bikeIdRes.data ?? []) as { bike_id: string }[]).map((b) => b.bike_id);
     let bikeTitles: string[] = [];
+    let bikes: WallPostNotifyBike[] = [];
     if (bikeIds.length > 0) {
       const { data: bikeModels } = await supabaseAdmin
         .from("cars")
@@ -293,7 +300,8 @@ export async function processWallRenterNotifyJob(
       const modelById = new Map(
         ((bikeModels ?? []) as { id: string; model: string | null }[]).map((c) => [String(c.id), c.model || ""]),
       );
-      bikeTitles = bikeIds.map((id) => modelById.get(String(id)) || "").filter(Boolean);
+      bikes = bikeIds.map((id) => ({ bikeId: id, title: modelById.get(String(id)) || "" }));
+      bikeTitles = bikes.map((b) => b.title || "").filter(Boolean);
     }
 
     const { data: authorRow } = await supabaseAdmin
@@ -326,8 +334,16 @@ export async function processWallRenterNotifyJob(
       parse_mode: "HTML",
       disable_web_page_preview: true,
     };
-    if (deeplink) {
-      payload.reply_markup = { inline_keyboard: [[{ text: "🟣 Открыть пост", url: deeplink }]] };
+    // Quick-rent row FIRST: когда в посте указан байк из каталога, кнопка
+    // ведёт straight на его страницу (startapp=rent_<bikeId>, бот экипажа из
+    // metadata — boss: «deep link for quick rent action»). Обычная кнопка
+    // поста остаётся вторым рядом; без байка/бота раскладка прежняя.
+    const rentButton = buildWallRentButton({ bikes, botUsername });
+    const keyboard: { text: string; url: string }[][] = [];
+    if (rentButton) keyboard.push([rentButton]);
+    if (deeplink) keyboard.push([{ text: "🟣 Открыть пост", url: deeplink }]);
+    if (keyboard.length > 0) {
+      payload.reply_markup = { inline_keyboard: keyboard };
     }
 
     // ── пакетный цикл с бюджетом ──

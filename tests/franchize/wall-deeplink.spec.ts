@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  bikeRentStartParam,
   buildTelegramAppLink,
   crewCatalogStartParam,
   crewJoinStartParam,
@@ -18,6 +19,7 @@ import {
   wallPostStartParam,
   wallStartParam,
 } from "@/lib/wall-deeplink";
+import { parseRentDeepLink } from "@/hooks/use-start-param-target";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -251,5 +253,44 @@ describe("useStartParamRouter fast path (source contract)", () => {
 
   it("bare wall/post still resolve via userCrewInfo on the gated path", () => {
     expect(src).toContain('link.slug || userCrewInfo?.slug || "vip-bike"');
+  });
+});
+
+describe("bikeRentStartParam (quick-rent deeplink on post notifications)", () => {
+  it("builds the boss example: rent_bmw-f800r", () => {
+    expect(bikeRentStartParam("bmw-f800r")).toBe("rent_bmw-f800r");
+  });
+
+  it("round-trips through parseRentDeepLink (the QR grammar splits on _)", () => {
+    for (const id of ["bmw-f800r", "kawasaki-ex650k", "honda-nps-zoomer", "x9"]) {
+      const parsed = parseRentDeepLink(bikeRentStartParam(id) ?? "");
+      expect(parsed?.bikeId).toBe(id);
+      expect(parsed?.docSha256).toBeNull();
+    }
+  });
+
+  it("normalizes case/whitespace like the rest of the rent chain", () => {
+    expect(bikeRentStartParam("  BMW-F800R ")).toBe("rent_bmw-f800r");
+  });
+
+  it("refuses ids that cannot round-trip (underscore = docSha256 separator)", () => {
+    expect(bikeRentStartParam("bmw_f800")).toBeNull();
+    expect(bikeRentStartParam("")).toBeNull();
+    expect(bikeRentStartParam("   ")).toBeNull();
+  });
+
+  it("refuses charset outside the slug grammar and over-budget ids", () => {
+    expect(bikeRentStartParam("-bmw")).toBeNull(); // leading hyphen
+    expect(bikeRentStartParam("bmw f800")).toBeNull(); // whitespace inside
+    expect(bikeRentStartParam("bmw/f800")).toBeNull(); // path smuggle
+    expect(bikeRentStartParam("bmw?f800")).toBeNull();
+    expect(bikeRentStartParam("b".repeat(60))).toBeNull(); // rent_ + 60 > 64
+    expect(bikeRentStartParam("b".repeat(59))).toBe("rent_" + "b".repeat(59)); // fits exactly
+  });
+
+  it("composes into the t.me/<crew-bot>/app link", () => {
+    expect(buildTelegramAppLink("oneBikePlsBot", bikeRentStartParam("bmw-f800r")!)).toBe(
+      "https://t.me/oneBikePlsBot/app?startapp=rent_bmw-f800r",
+    );
   });
 });
