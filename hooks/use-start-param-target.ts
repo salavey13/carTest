@@ -47,6 +47,10 @@ export const START_PARAM_PAGE_MAP: Record<string, string> = {
   paddock: "/paddock",
   leaderboard: "/leaderboard",
   "rent-bike": "/franchize/vip-bike",
+  // discovery — global crew network page (2026-10-02). Fully public, no auth
+  // data needed → static fast path routes it BEFORE the Telegram roundtrip.
+  // Builder: crewDiscoveryStartParam() in lib/wall-deeplink.ts (single source).
+  discovery: "/franchize/discovery",
 };
 
 export const BIO30_PRODUCT_PATHS: Record<string, string> = {

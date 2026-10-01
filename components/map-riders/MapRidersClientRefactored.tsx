@@ -40,7 +40,7 @@ import {
   type WallGeoPinView,
 } from "@/app/franchize/lib/community-wall";
 import { motoSpotKindLabel, MOTO_SPOT_KINDS, motoSpotKindIcon, NN_MOTO_SPOTS, type MotoSpot, type MotoSpotKind } from "@/lib/map-riders-spots";
-import { buildTelegramAppLink, crewCatalogStartParam, wallStartParam } from "@/lib/wall-deeplink";
+import { buildTelegramAppLink, crewCatalogStartParam, crewDiscoveryStartParam, wallStartParam } from "@/lib/wall-deeplink";
 import { catalogGpsFromSpecs } from "@/lib/catalog-gps";
 import type { CatalogItemVM } from "@/app/franchize/actions";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
@@ -622,6 +622,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 (главная), wall_<slug> → стена чужого экипажа. */}
             {crossCrewControl(() => crewCatalogStartParam(spot.slug), `/franchize/${spot.slug}`, "Каталог экипажа")}
             {crossCrewControl(() => wallStartParam(spot.slug), `/franchize/${spot.slug}/community`, "Стена экипажа")}
+            {/* Глобальная сеть (2026-10-02): все экипажи кругами — откуда
+                угодно, любой точкой карты. Параметр константный, но идём через
+                билдер: единственный источник грамматики. */}
+            {crossCrewControl(crewDiscoveryStartParam, "/franchize/discovery", "Сеть экипажей")}
           </div>
         </div>
       );

@@ -97,8 +97,14 @@ export function CrewDiscoveryGraph({
 
   return (
     <div className="mt-6">
-      {/* ── the graph ─────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)]">
+      {/* ── the graph ─────────────────────────────────────────────── */}
+      {/* Horizontally scrollable with a 640px canvas floor on phones: the
+          1000-unit viewBox squeezed into a ~360px viewport dropped circle
+          labels to ~9px (unreadable). On ≥sm the canvas is 100% again. */}
+      <div
+        className="overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent"
+      >
+        <div className="relative min-w-[640px] sm:min-w-0">
         <svg
           viewBox="0 0 1000 1000"
           className="h-auto w-full select-none"
@@ -245,7 +251,7 @@ export function CrewDiscoveryGraph({
                   <text
                     textAnchor="middle"
                     y={r + 34}
-                    fontSize="26"
+                    fontSize="30"
                     fontWeight="800"
                     fill={labelColor}
                     style={{ pointerEvents: "none", userSelect: "none" }}
@@ -263,7 +269,12 @@ export function CrewDiscoveryGraph({
             Нажми на круг — внутри люди и услуги экипажа
           </p>
         )}
+        </div>
       </div>
+      {/* mobile pan affordance (phones hide overlay scrollbars) */}
+      <p className="mt-2 text-center text-[11px] font-semibold text-white/35 sm:hidden" aria-hidden>
+        Граф можно двигать вбок — потяните пальцем
+      </p>
 
       {/* ── detail panel ──────────────────────────────────────────────────── */}
       <div ref={panelRef}>

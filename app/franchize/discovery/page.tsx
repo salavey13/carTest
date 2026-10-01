@@ -30,6 +30,11 @@ export const metadata: Metadata = {
     "Все экипажи сети на одной карте: круги — экипажи, размер — люди, линии — общие люди. Услуги каждого экипажа: аренда мото, зимнее хранение.",
 };
 
+// Always render per-request: crews/_services change when the boss edits them
+// and the page must show the network AS IT IS NOW (no build-time prerender,
+// no stale ISR snapshot — the empty-state must never get cached either).
+export const dynamic = "force-dynamic";
+
 const CREWS_CAP = 200;
 const CARS_CAP = 2000;
 const STORAGE_CAP = 2000;

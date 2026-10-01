@@ -8,11 +8,14 @@
 // - "Стена" expands the sheet — the community wall IS the sheet content now
 //   (on non-map routes — e.g. /leaderboard — it falls back to a plain Link:
 //   the sheet-controlling actions don't exist there).
+// - "Сеть" (2026-10-02) is a plain Link to the GLOBAL crew discovery page
+//   (/franchize/discovery — every crew as a circle): works on the map page
+//   AND anywhere else, because a Link never depends on the sheet controller.
 // z-30 sits behind the vaul Drawer (z-40), so it's visible
 // when the drawer is collapsed but hidden when expanded.
 
 import Link from "next/link";
-import { Trophy, Users, List } from "lucide-react";
+import { Network, Trophy, Users, List } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface FranchizeMapBottomNavProps {
@@ -69,7 +72,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
         backgroundColor: "color-mix(in srgb, var(--fr-map-nav-bg, #030712) 82%, black)",
       }}
     >
-      <div className="pointer-events-auto mx-auto grid w-full max-w-lg grid-cols-3 gap-2">
+      <div className="pointer-events-auto mx-auto grid w-full max-w-lg grid-cols-4 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
           // Off the map page the sheet/drawer actions don't exist — «Стена»
@@ -104,6 +107,17 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
             </button>
           );
         })}
+        {/* «Сеть» — always a live Link (independent of canControl): the
+            global crew discovery page, crews as circles. Inline template
+            literal keeps it under the franchize-scoped href audit. */}
+        <Link
+          href={`/franchize/discovery`}
+          className="flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition"
+          style={{ color: "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)" }}
+        >
+          <Network className="mb-1 h-4 w-4" />
+          Сеть
+        </Link>
       </div>
     </nav>
   );

@@ -28,6 +28,9 @@
 //                             handles crew_<slug> → /franchize/<slug> before
 //                             auth. This module only BUILDS the param (map
 //                             popups cross-linking to other crews).
+//   discovery               → the GLOBAL crew network page
+//                             (/franchize/discovery). Static fast path, no
+//                             auth; builder crewDiscoveryStartParam().
 //
 // postId / rentalId are Postgres uuids (8-4-4-4-12 hex, hyphen-separated);
 // map-riders session ids are uuids too (gen_random_uuid).
@@ -241,6 +244,15 @@ export function crewCatalogStartParam(slug: string): string {
     throw new Error(`crewCatalogStartParam: slug "${s}" collides with the crew_<slug>_join_crew invite grammar`);
   }
   return param;
+}
+
+/** discovery start param — the GLOBAL crew network page
+ *  (/franchize/discovery: every crew as a circle, shared-people edges).
+ *  The page is fully public → computeStaticFastTarget routes it BEFORE auth
+ *  (START_PARAM_PAGE_MAP.discovery). Constant by design: the destination is
+ *  not crew-scoped, and a constant can never break the round-trip. */
+export function crewDiscoveryStartParam(): string {
+  return "discovery";
 }
 
 /** https://t.me/<bot>/app?startapp=<param> — opens the Mini App on the spot. */
