@@ -1,23 +1,34 @@
 -- 20260929120000_storage_bikes_updated_at.sql
 -- ─────────────────────────────────────────────────────────────────────────────
--- Winter-storage gap analysis vs the subrenter/rentals feature (boss nuance 5,
--- 2026-09-29): the rentals table bumps updated_at on EVERY update via trigger
--- (20260928110000) so compare-and-swap writers and admin timelines see a
--- truthful freshness signal. storage_bikes ships the column
--- (default now() on insert) but no trigger — every status move / note /
--- photo event / payment mark / owner link left it frozen at the insert time.
+-- v2 — FIX for boss-reported apply failure (2026-09-30):
+--   ERROR 2BP01: cannot drop function storage_bikes_touch_updated_at()
+--   because trigger storage_bikes_touch on table storage_bikes depends on it.
 --
--- This trigger stamps updated_at on every row update, same recipe as
--- rentals. SAFE for existing flows: no writer logic depends on updated_at
--- staying untouched (nothing reads it as «insert time»); the wall and story
--- pages already prefer events for ordering.
+-- ROOT CAUSE: the base winter-storage migration (20260927120000) ALREADY
+-- ships function public.storage_bikes_touch_updated_at() + trigger
+-- storage_bikes_touch. The first draft of this file re-created the same
+-- pair under a different trigger name (trg_storage_bikes_touch_updated_at)
+-- and its prelude only dropped THAT new name — so on a crew DB where the
+-- base migration had been applied, DROP FUNCTION hit the live dependency
+-- from the original storage_bikes_touch trigger and the whole script
+-- aborted. The gap this migration targets (updated_at freshness parity
+-- with rentals) was in fact already closed on any DB that ran the base
+-- winter-storage script; this file now only CANONICALIZES the objects.
 --
--- RUNBOOK: manual migration — run in Supabase SQL Editor. Idempotent
--- (drop-if-exists + re-create). MANUAL MIGRATION (Paul).
+-- WHAT IT DOES (safe on every historical state):
+--   1. drops BOTH historical trigger names (if exists — no-ops when absent)
+--   2. drops the function WITH CASCADE (clears any trigger dependency)
+--   3. re-creates the function + one canonical trigger storage_bikes_touch
+--      (same name the base migration uses, so re-running the base
+--      winter-storage script stays consistent)
+--
+-- RUNBOOK: manual migration — run in Supabase SQL Editor. Idempotent.
+-- MANUAL MIGRATION (Paul).
 -- ─────────────────────────────────────────────────────────────────────────────
 
 drop trigger if exists trg_storage_bikes_touch_updated_at on public.storage_bikes;
-drop function if exists public.storage_bikes_touch_updated_at();
+drop trigger if exists storage_bikes_touch on public.storage_bikes;
+drop function if exists public.storage_bikes_touch_updated_at() cascade;
 
 create function public.storage_bikes_touch_updated_at()
 returns trigger
@@ -29,7 +40,7 @@ begin
 end;
 $$;
 
-create trigger trg_storage_bikes_touch_updated_at
+create trigger storage_bikes_touch
   before update on public.storage_bikes
   for each row
   execute function public.storage_bikes_touch_updated_at();

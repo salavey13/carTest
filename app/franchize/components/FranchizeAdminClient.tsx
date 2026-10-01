@@ -1082,6 +1082,13 @@ export function FranchizeAdminClient({
         <FranchizeOperatorLinkButton href="/admin" variant="secondary">
           ← Общий админ
         </FranchizeOperatorLinkButton>
+        {/* Boss (2026-10-01): the «Маршруты» shortcut was removed from the
+            mapriders sheet (legacy /admin surface leaking into a user-facing
+            franchize screen). The staff entry point lives HERE now — next to
+            the other operator tools, where legacy links are explicit. */}
+        <FranchizeOperatorLinkButton href="/admin/map-routes" variant="secondary">
+          Маршруты карты
+        </FranchizeOperatorLinkButton>
         <FranchizeOperatorLinkButton href={`/franchize/${slug}`}>
           Открыть витрину
         </FranchizeOperatorLinkButton>

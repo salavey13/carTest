@@ -23,7 +23,6 @@ import { initialsFromName, isDarkCssColor, meetupDraftFromPost, riderDisplayName
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { createCommunityPostAction, getWallStaffFlagAction } from "@/app/franchize/server-actions/community-wall";
 import { useLiveRiders } from "@/hooks/useLiveRiders";
-import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { getMapRidersWriteHeaders } from "@/lib/map-riders-client-auth";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { FranchizeConfirmModal } from "@/app/franchize/components/FranchizeConfirmModal";
@@ -97,7 +96,13 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   const { dbUser } = useAppContext();
   const { resolvedTheme = "dark" } = useTheme();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
-  const isAdmin = useIsAdmin();
+  // NOTE (boss, 2026-10-01): the admin-only «Маршруты» → /admin/map-routes
+  // shortcut was REMOVED from this sheet. It was the last legacy non-franchize
+  // navigation reachable from the mapriders surface — tapping it ejected the
+  // admin into the legacy shell whose bike-theme bottom nav is all legacy
+  // routes (/leaderboard, /crews, /paddock, /admin). The route editor stays
+  // reachable from the STAFF surface: /franchize/<slug>/admin now carries a
+  // «Маршруты карты» link button (same policy as «← Общий админ»).
   const [isQuickMeetupSaving, setIsQuickMeetupSaving] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(true);
   const [activeSnap, setActiveSnap] = useState<number>(0.48);
@@ -1361,11 +1366,6 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                     >
                       <VibeContentRenderer content="::FaLocationCrosshairs::" className="mr-1" />
                       Обновить гео
-                    </Button>
-                  ) : null}
-                  {isAdmin ? (
-                    <Button asChild variant="outline" size="sm" className="h-7 px-2 text-xs">
-                      <Link href="/admin/map-routes">Маршруты</Link>
                     </Button>
                   ) : null}
                   {endedRideSessionId && !state.shareEnabled ? (

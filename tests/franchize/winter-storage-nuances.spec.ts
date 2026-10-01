@@ -182,7 +182,15 @@ describe("nuance 4 — achievements + owner notification polish", () => {
 describe("nuance 5 — subrenter parity: updated_at trigger migration", () => {
   it("migration stamps updated_at on every storage_bikes update (for Paul)", () => {
     const migration = read("supabase/migrations/20260929120000_storage_bikes_updated_at.sql");
-    expect(migration.includes("create trigger trg_storage_bikes_touch_updated_at")).toBe(true);
+    // v2: the base winter-storage migration already ships the function and a
+    // trigger named storage_bikes_touch — this file must drop BOTH historical
+    // trigger names and CASCADE the function drop, or re-applying on a crew
+    // DB fails with 2BP01 (dependent trigger). Canonical trigger name is
+    // storage_bikes_touch (matches the base migration).
+    expect(migration.includes("drop trigger if exists trg_storage_bikes_touch_updated_at on public.storage_bikes;")).toBe(true);
+    expect(migration.includes("drop trigger if exists storage_bikes_touch on public.storage_bikes;")).toBe(true);
+    expect(migration.includes("drop function if exists public.storage_bikes_touch_updated_at() cascade;")).toBe(true);
+    expect(migration.includes("create trigger storage_bikes_touch")).toBe(true);
     expect(migration.includes("new.updated_at := now();")).toBe(true);
   });
 });
