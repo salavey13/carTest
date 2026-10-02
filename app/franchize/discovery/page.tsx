@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Users } from "lucide-react";
+import { ArrowRight, ChevronDown, Users } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { CrewDiscoveryGraph } from "./CrewDiscoveryGraph";
@@ -205,8 +205,8 @@ export default async function CrewDiscoveryPage() {
           <h1 className="mt-3 text-3xl font-black leading-tight md:text-4xl">Что умеют люди рядом</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-white/70 md:text-base">
             Каждый экипаж — это люди и их услуги. Круг — целый экипаж: размер круга — сколько в нём
-            людей, линия между кругами — общие люди. Заходи в любой круг: аренда, зимнее хранение,
-            стена и live-карта внутри.
+            людей, линия — общие люди. Тапни по кругу — сеть перестроится вокруг него кольцами
+            «рукопожатий»; круги можно таскать — остальные расступаются.
           </p>
         </header>
 
@@ -230,9 +230,13 @@ export default async function CrewDiscoveryPage() {
           <>
             <CrewDiscoveryGraph nodes={nodes} links={links} />
 
-            {/* ── all-crews cards (server-rendered: SEO + no-JS fallback) ── */}
-            <section aria-label="Все экипажи сети" className="mt-10">
-              <h2 className="text-center text-lg font-black text-white/90">Все экипажи сети</h2>
+            {/* ── all-crews cards — collapsible (SEO + no-JS keep the content,
+                the folded summary keeps the page calm) ── */}
+            <details className="group mt-10" aria-label="Все экипажи сети">
+              <summary className="flex cursor-pointer list-none items-center justify-center gap-2 [&::-webkit-details-marker]:hidden">
+                <h2 className="text-lg font-black text-white/90">Все экипажи сети · {nodes.length}</h2>
+                <ChevronDown className="h-5 w-5 text-white/50 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {nodes.map((node) => (
                   <article
@@ -330,7 +334,7 @@ export default async function CrewDiscoveryPage() {
                   </article>
                 ))}
               </div>
-            </section>
+            </details>
           </>
         ) : (
           <section className="mt-10 rounded-3xl border border-white/10 bg-white/[0.05] p-8 text-center backdrop-blur-sm">
@@ -352,8 +356,8 @@ export default async function CrewDiscoveryPage() {
 
         {/* ── bottom note ────────────────────────────────────────────────── */}
         <p className="mt-10 text-center text-xs leading-relaxed text-white/40">
-          Круг — экипаж · размер — люди · линия — общие люди между экипажами. Услуги читаются из
-          настроек экипажей: каталог и «Зимнее хранение».{" "}
+          Круг — экипаж · размер — люди · линия — общие люди · кольца — «рукопожатия» от выбранного
+          круга. Услуги читаются из настроек экипажей: каталог и «Зимнее хранение».{" "}
           <Link
             href="/franchize/create"
             className="underline decoration-white/30 underline-offset-2 hover:text-white/70"
