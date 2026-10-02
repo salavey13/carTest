@@ -329,6 +329,20 @@ describe("global discovery page — static route, memberships-only data", () => 
     // connections slimmed to hairline springs
     expect(graph.includes("Math.min(3.4, 1.05 + link.weight * 0.55)")).toBe(true);
   });
+
+  it("codereview round — static-mode tap, ring-label clearance, hover affordance", () => {
+    // >80 crews: the sim sleeps, but pointer tap must still focus a circle
+    // (gated on !simActive so it can never double-toggle the sim tap path)
+    expect(graph.includes("onClick={simActive ? undefined : () => setSelectedId(isSelected ? null : node.crewId)}")).toBe(true);
+    // guide labels clear the circles anchored at the ring top (fan starts at -90°)
+    expect(graph.includes("ringLabelClearance[i + 1] ?? 30")).toBe(true);
+    expect(graph.includes("maxR[ring] = Math.max(maxR[ring] ?? 0, renderRadii[id] ?? 0)")).toBe(true);
+    // desktop hover / keyboard-focus affordance without React re-renders
+    expect(graph.includes("group-hover:brightness-110")).toBe(true);
+    expect(graph.includes("group-hover:fill-white/95")).toBe(true);
+    // the rAF painter skips redundant label y writes (60fps churn guard)
+    expect(graph.includes("if (pair.lastNameY !== nameY)")).toBe(true);
+  });
 });
 
 describe("rider page — backward links to crews with brief services", () => {

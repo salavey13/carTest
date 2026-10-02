@@ -30,6 +30,11 @@
 //     (name + «N чел.» micro-caption, dark paint-order stroke keeps it
 //     readable over links), connections slimmed to hairline springs —
 //     structure first, paint second.
+//   · codereview round: static mode (>80 crews) regains pointer
+//     tap-to-focus (sim-off onClick fallback), guide-ring labels clear the
+//     circles anchored at the ring top, the rAF painter skips redundant
+//     label writes, and circles answer hover/keyboard-focus without a
+//     single React re-render.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -99,8 +104,11 @@ export function CrewDiscoveryGraph({
   const gRefs = useRef(new Map<string, SVGGElement>());
   const pathRefs = useRef(new Map<string, SVGPathElement>());
   /** Per-circle label pair — the rAF painter flips it above the circle when
-   *  the circle lives near the bottom edge (map-label style). */
-  const labelRefs = useRef(new Map<string, { name: SVGTextElement | null; count: SVGTextElement | null }>());
+   *  the circle lives near the bottom edge (map-label style). The last-y
+   *  caches let the painter skip redundant setAttribute churn at 60fps. */
+  const labelRefs = useRef(
+    new Map<string, { name: SVGTextElement | null; count: SVGTextElement | null; lastNameY?: string; lastCountY?: string }>(),
+  );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     id: string;
@@ -150,6 +158,19 @@ export function CrewDiscoveryGraph({
     );
   }, [links, renderRadii, selectedId]);
 
+  /** Per-ring max rendered circle radius — guide labels must clear the
+   *  circles anchored at the ring's top (the fan starts at -90°, so a
+   *  circle IS anchored exactly where the label would sit). */
+  const ringLabelClearance = useMemo(() => {
+    if (!focus) return [] as number[];
+    const maxR: number[] = [];
+    for (const [id, ring] of focus.ringOf) {
+      if (ring < 1) continue;
+      maxR[ring] = Math.max(maxR[ring] ?? 0, renderRadii[id] ?? 0);
+    }
+    return maxR;
+  }, [focus, renderRadii]);
+
   const initialPositions = useMemo(
     () =>
       layoutCrewGraph(
@@ -186,8 +207,16 @@ export function CrewDiscoveryGraph({
       const pair = labelRefs.current.get(node.id);
       if (pair) {
         const flip = node.y > VIEW - node.r - 62;
-        pair.name?.setAttribute("y", (flip ? -(node.r + 46) : node.r + 26).toFixed(1));
-        pair.count?.setAttribute("y", (flip ? -(node.r + 26) : node.r + 46).toFixed(1));
+        const nameY = (flip ? -(node.r + 46) : node.r + 26).toFixed(1);
+        const countY = (flip ? -(node.r + 26) : node.r + 46).toFixed(1);
+        if (pair.lastNameY !== nameY) {
+          pair.name?.setAttribute("y", nameY);
+          pair.lastNameY = nameY;
+        }
+        if (pair.lastCountY !== countY) {
+          pair.count?.setAttribute("y", countY);
+          pair.lastCountY = countY;
+        }
       }
     }
     for (const link of st.links) {
@@ -451,7 +480,7 @@ export function CrewDiscoveryGraph({
                 />
                 <text
                   x={VIEW / 2}
-                  y={VIEW / 2 - r - 10}
+                  y={VIEW / 2 - r - (ringLabelClearance[i + 1] ?? 30) - 12}
                   textAnchor="middle"
                   fontSize="15"
                   fontWeight="700"
@@ -505,6 +534,10 @@ export function CrewDiscoveryGraph({
                 const ink = inkFor(node.accent);
                 // SSR/static flip decision — physics keeps it live afterwards
                 const flipLabel = point.y > VIEW - r - 62;
+                // static fallback (>SIM_MAX_NODES): the sim sleeps, but a pointer
+                // tap must still focus the circle — the onClick below only fires
+                // when simActive is false, so it can never double-toggle the
+                // pointer-capture tap path
                 return (
                   <g
                     key={node.crewId}
@@ -521,13 +554,14 @@ export function CrewDiscoveryGraph({
                     onPointerMove={simActive ? onNodePointerMove(node.crewId) : undefined}
                     onPointerUp={simActive ? onNodePointerUp(node.crewId) : undefined}
                     onPointerCancel={simActive ? onNodePointerUp(node.crewId) : undefined}
+                    onClick={simActive ? undefined : () => setSelectedId(isSelected ? null : node.crewId)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         setSelectedId(isSelected ? null : node.crewId);
                       }
                     }}
-                    className={simActive ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+                    className={simActive ? "group cursor-grab active:cursor-grabbing" : "group cursor-pointer"}
                     style={{
                       opacity: dim,
                       transition: "opacity 240ms ease",
@@ -545,7 +579,13 @@ export function CrewDiscoveryGraph({
                       <circle r={r + 6} fill="none" stroke="#ffffff" strokeWidth="1.6" strokeDasharray="4 6" opacity="0.85" />
                     )}
                     {/* the circle itself */}
-                    <circle r={r} fill={`url(#cg-${index})`} stroke={node.accent} strokeWidth="1.8" />
+                    <circle
+                      r={r}
+                      fill={`url(#cg-${index})`}
+                      stroke={node.accent}
+                      strokeWidth="1.8"
+                      className="transition group-hover:brightness-110 group-focus-visible:brightness-125"
+                    />
                     {/* logo (falls through to initials when absent/broken) */}
                     {node.logoUrl && (
                       <g clipPath={`url(#cp-${index})`}>
@@ -592,6 +632,7 @@ export function CrewDiscoveryGraph({
                       strokeWidth="5"
                       strokeLinejoin="round"
                       paintOrder="stroke"
+                      className="transition group-hover:fill-white/95 group-focus-visible:fill-white"
                       style={{ pointerEvents: "none", userSelect: "none" }}
                     >
                       {truncate(node.name, isSelected ? 24 : 16)}
