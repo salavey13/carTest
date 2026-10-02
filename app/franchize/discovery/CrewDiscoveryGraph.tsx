@@ -24,6 +24,12 @@
 //     physics takes over after hydration (no mismatch, zero randomness).
 //   · collapsibility: the crew panel folds to its header row, the all-crews
 //     cards live in a <details> on the page — no information overflow.
+//   · typography round (boss 2026-10-03: «miniaturize circles, work on
+//     typography, make it look neat»): circles are miniature color badges,
+//     the text lives in a haloed two-line label block under each circle
+//     (name + «N чел.» micro-caption, dark paint-order stroke keeps it
+//     readable over links), connections slimmed to hairline springs —
+//     structure first, paint second.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -92,6 +98,9 @@ export function CrewDiscoveryGraph({
   const wakeRef = useRef<(() => void) | null>(null);
   const gRefs = useRef(new Map<string, SVGGElement>());
   const pathRefs = useRef(new Map<string, SVGPathElement>());
+  /** Per-circle label pair — the rAF painter flips it above the circle when
+   *  the circle lives near the bottom edge (map-label style). */
+  const labelRefs = useRef(new Map<string, { name: SVGTextElement | null; count: SVGTextElement | null }>());
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     id: string;
@@ -171,6 +180,15 @@ export function CrewDiscoveryGraph({
     for (const node of st.nodes.values()) {
       const gEl = gRefs.current.get(node.id);
       gEl?.setAttribute("transform", `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`);
+      // bottom-edge circles would clip their label block on the viewBox
+      // border — flip it above the circle live (SSR render does the same
+      // flip from the deterministic initial positions)
+      const pair = labelRefs.current.get(node.id);
+      if (pair) {
+        const flip = node.y > VIEW - node.r - 62;
+        pair.name?.setAttribute("y", (flip ? -(node.r + 46) : node.r + 26).toFixed(1));
+        pair.count?.setAttribute("y", (flip ? -(node.r + 26) : node.r + 46).toFixed(1));
+      }
     }
     for (const link of st.links) {
       const pathEl = pathRefs.current.get(`${link.a.id}-${link.b.id}`);
@@ -193,7 +211,7 @@ export function CrewDiscoveryGraph({
       // the spring stretches visibly under tension
       const rest = link.a.r + link.b.r + st.tuning.springGap;
       const tension = Math.max(0, (dist - rest) / rest);
-      pathEl.setAttribute("stroke-width", Math.min(4.5, 1.4 + link.weight * 0.7 + tension * 2).toFixed(2));
+      pathEl.setAttribute("stroke-width", Math.min(3.4, 1.05 + link.weight * 0.55 + tension * 1.6).toFixed(2));
     }
   }, []);
 
@@ -404,9 +422,9 @@ export function CrewDiscoveryGraph({
             <defs>
               {nodes.map((node, index) => (
                 <radialGradient key={node.crewId} id={`cg-${index}`} cx="35%" cy="30%" r="75%">
-                  <stop offset="0%" stopColor={node.accent} stopOpacity="0.92" />
-                  <stop offset="58%" stopColor={node.accent} stopOpacity="0.55" />
-                  <stop offset="100%" stopColor={node.accent} stopOpacity="0.18" />
+                  <stop offset="0%" stopColor={node.accent} stopOpacity="0.95" />
+                  <stop offset="55%" stopColor={node.accent} stopOpacity="0.62" />
+                  <stop offset="100%" stopColor={node.accent} stopOpacity="0.26" />
                 </radialGradient>
               ))}
               {nodes.map((node, index) => (
@@ -429,18 +447,23 @@ export function CrewDiscoveryGraph({
                   fill="none"
                   stroke="#ffffff"
                   strokeOpacity="0.07"
-                  strokeDasharray="3 12"
+                  strokeDasharray="2 10"
                 />
                 <text
                   x={VIEW / 2}
-                  y={VIEW / 2 - r - 8}
+                  y={VIEW / 2 - r - 10}
                   textAnchor="middle"
-                  fontSize="19"
+                  fontSize="15"
                   fontWeight="700"
+                  letterSpacing="2.5"
                   fill="#ffffff"
-                  opacity="0.3"
+                  opacity="0.34"
+                  stroke="rgba(4,9,20,0.85)"
+                  strokeWidth="4"
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
                 >
-                  {pluralRu(i + 1, ["шаг", "шага", "шагов"])}
+                  {pluralRu(i + 1, ["шаг", "шага", "шагов"]).toUpperCase()}
                 </text>
               </g>
             ))}
@@ -462,9 +485,9 @@ export function CrewDiscoveryGraph({
                     }}
                     fill="none"
                     stroke={active ? "#7dd3fc" : "#ffffff"}
-                    strokeWidth={Math.min(4, 1.3 + link.weight * 0.7)}
+                    strokeWidth={Math.min(3.4, 1.05 + link.weight * 0.55)}
                     strokeLinecap="round"
-                    opacity={active ? 0.85 : dimmed ? 0.05 : Math.min(0.4, 0.14 + link.weight * 0.09)}
+                    opacity={active ? 0.9 : dimmed ? 0.04 : Math.min(0.34, 0.1 + link.weight * 0.08)}
                     style={{ transition: "opacity 240ms ease, stroke 240ms ease" }}
                   />
                 );
@@ -480,6 +503,8 @@ export function CrewDiscoveryGraph({
                 const isSelected = node.crewId === selectedId;
                 const dim = dimOf(node.crewId);
                 const ink = inkFor(node.accent);
+                // SSR/static flip decision — physics keeps it live afterwards
+                const flipLabel = point.y > VIEW - r - 62;
                 return (
                   <g
                     key={node.crewId}
@@ -508,19 +533,19 @@ export function CrewDiscoveryGraph({
                       transition: "opacity 240ms ease",
                     }}
                   >
-                    {/* soft glow pad */}
+                    {/* soft glow pad — a whisper, not a halo */}
                     <circle
-                      r={r + (isSelected ? 22 : 12)}
+                      r={r + (isSelected ? 16 : 8)}
                       fill={node.accent}
-                      opacity={isSelected ? 0.28 : 0.14}
+                      opacity={isSelected ? 0.22 : 0.1}
                       style={{ transition: "r 240ms ease, opacity 240ms ease" }}
                     />
                     {/* selection ring */}
                     {isSelected && (
-                      <circle r={r + 9} fill="none" stroke="#ffffff" strokeWidth="2" strokeDasharray="6 7" opacity="0.85" />
+                      <circle r={r + 6} fill="none" stroke="#ffffff" strokeWidth="1.6" strokeDasharray="4 6" opacity="0.85" />
                     )}
                     {/* the circle itself */}
-                    <circle r={r} fill={`url(#cg-${index})`} stroke={node.accent} strokeWidth="2.5" />
+                    <circle r={r} fill={`url(#cg-${index})`} stroke={node.accent} strokeWidth="1.8" />
                     {/* logo (falls through to initials when absent/broken) */}
                     {node.logoUrl && (
                       <g clipPath={`url(#cp-${index})`}>
@@ -538,9 +563,9 @@ export function CrewDiscoveryGraph({
                     {!node.logoUrl && (
                       <text
                         textAnchor="middle"
-                        y={r * 0.12}
-                        fontSize={Math.max(18, r * 0.44)}
-                        fontWeight="900"
+                        y={r * 0.14}
+                        fontSize={Math.max(12, r * 0.42)}
+                        fontWeight="800"
                         fill={ink}
                         opacity="0.95"
                         style={{ pointerEvents: "none", userSelect: "none" }}
@@ -548,30 +573,48 @@ export function CrewDiscoveryGraph({
                         {initialsOf(node.name)}
                       </text>
                     )}
-                    {/* member count inside the circle bottom */}
-                    {r >= 40 && (
-                      <text
-                        textAnchor="middle"
-                        y={r * 0.62}
-                        fontSize={Math.max(12, r * 0.16)}
-                        fontWeight="800"
-                        fill={ink}
-                        opacity="0.85"
-                        style={{ pointerEvents: "none", userSelect: "none" }}
-                      >
-                        {node.memberCount} чел.
-                      </text>
-                    )}
-                    {/* name label under the circle */}
+                    {/* label block under the circle — name + count micro-caption;
+                        the dark paint-order halo keeps both readable over links
+                        and neighbor labels (structure first, paint second) */}
                     <text
+                      ref={(el) => {
+                        const pair = labelRefs.current.get(node.crewId) ?? { name: null, count: null };
+                        pair.name = el;
+                        if (!pair.name && !pair.count) labelRefs.current.delete(node.crewId);
+                        else labelRefs.current.set(node.crewId, pair);
+                      }}
                       textAnchor="middle"
-                      y={r + 30}
-                      fontSize="28"
-                      fontWeight="800"
-                      fill={isSelected ? "#ffffff" : "rgba(255,255,255,0.82)"}
+                      y={flipLabel ? -(r + 46) : r + 26}
+                      fontSize="21"
+                      fontWeight="700"
+                      fill={isSelected ? "#ffffff" : "rgba(255,255,255,0.85)"}
+                      stroke="rgba(4,9,20,0.88)"
+                      strokeWidth="5"
+                      strokeLinejoin="round"
+                      paintOrder="stroke"
                       style={{ pointerEvents: "none", userSelect: "none" }}
                     >
-                      {truncate(node.name)}
+                      {truncate(node.name, isSelected ? 24 : 16)}
+                    </text>
+                    <text
+                      ref={(el) => {
+                        const pair = labelRefs.current.get(node.crewId) ?? { name: null, count: null };
+                        pair.count = el;
+                        if (!pair.name && !pair.count) labelRefs.current.delete(node.crewId);
+                        else labelRefs.current.set(node.crewId, pair);
+                      }}
+                      textAnchor="middle"
+                      y={flipLabel ? -(r + 26) : r + 46}
+                      fontSize="13.5"
+                      fontWeight="600"
+                      fill={isSelected ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.5)"}
+                      stroke="rgba(4,9,20,0.85)"
+                      strokeWidth="4"
+                      strokeLinejoin="round"
+                      paintOrder="stroke"
+                      style={{ pointerEvents: "none", userSelect: "none" }}
+                    >
+                      {node.memberCount} чел.
                     </text>
                   </g>
                 );

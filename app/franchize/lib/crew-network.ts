@@ -226,10 +226,16 @@ export function buildCrewNetworkModel(
   };
 }
 
-/** Circle radius from crew size — sqrt keeps 1-man and 10-man crews comparable. */
+/**
+ * Circle radius from crew size — sqrt keeps 1-man and 10-man crews comparable.
+ * Boss 2026-10-03: «miniaturize circles, work on typography, make it look
+ * neat» — the badge scale (35..72) replaced the billboard scale (59..118):
+ * circles carry color and identity marks, the label block under each circle
+ * carries the text, and the freed canvas keeps the web readable.
+ */
 export function crewCircleRadius(memberCount: number): number {
   const n = Math.max(1, memberCount);
-  return Math.round(Math.min(118, 46 + 13 * Math.sqrt(n)));
+  return Math.round(Math.min(72, 26 + 9 * Math.sqrt(n)));
 }
 
 // ── deterministic force layout (no deps, no randomness) ─────────────────────

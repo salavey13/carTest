@@ -213,7 +213,10 @@ describe("crew-network lib — circle sizing and per-crew paint", () => {
   it("radius grows with membership and never exceeds the cap", () => {
     expect(crewCircleRadius(1)).toBeLessThan(crewCircleRadius(5));
     expect(crewCircleRadius(5)).toBeLessThan(crewCircleRadius(50));
-    expect(crewCircleRadius(500)).toBe(118);
+    // boss 2026-10-03: «miniaturize circles» — the badge scale (26 + 9·√n,
+    // capped 72) replaced the billboard scale (46 + 13·√n, capped 118)
+    expect(crewCircleRadius(500)).toBe(72);
+    expect(crewCircleRadius(1)).toBe(35);
   });
 
   it("uses the crew's configured accent when present (full flat palette)", () => {
@@ -308,6 +311,23 @@ describe("global discovery page — static route, memberships-only data", () => 
     expect(graph.includes("<circle")).toBe(true);
     // selection UX: tap circle → panel, Esc/tap-outside → back
     expect(graph.includes('setSelectedId(null)')).toBe(true);
+  });
+
+  it("typography round 2026-10-03 — miniature badges, haloed two-line labels", () => {
+    // the count moved OUT of the circle into the label block under it
+    expect(graph.includes("{node.memberCount} чел.")).toBe(true);
+    // dark paint-order halo keeps labels readable over links and neighbors
+    expect(graph.includes('paintOrder="stroke"')).toBe(true);
+    // two-line label block: name 21px + count 13.5px micro-caption
+    expect(graph.includes('fontSize="21"')).toBe(true);
+    expect(graph.includes('fontSize="13.5"')).toBe(true);
+    // bottom-edge circles flip their label block above the circle (SSR + rAF)
+    expect(graph.includes("flipLabel ? -(r + 46) : r + 26")).toBe(true);
+    expect(graph.includes("node.y > VIEW - node.r - 62")).toBe(true);
+    // initials re-centered (no in-circle count pushing them up anymore)
+    expect(graph.includes("y={r * 0.14}")).toBe(true);
+    // connections slimmed to hairline springs
+    expect(graph.includes("Math.min(3.4, 1.05 + link.weight * 0.55)")).toBe(true);
   });
 });
 
