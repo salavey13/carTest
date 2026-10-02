@@ -192,7 +192,9 @@ describe("wall reverse interlink: mapPointCompose", () => {
   it("map-riders popup button opens the wall composer with the point's coords + title", () => {
     expect(src).toMatch(/openWallComposeFromPoint\(\{ lat: m\.lat, lng: m\.lon, label: m\.title, text: m\.title \}\)/);
     expect(src).toMatch(/Пост на стене/); // v3: парная кнопка «Маршрут», текст короче
-    expect(src).toMatch(/setActiveSnap\(0\.86\)/);
+    // Task 60: раскрытие идёт через selectSegment("wall") — шит один,
+    // сегмент стены выбирается явно (снап 0.86 внутри селектора).
+    expect(src).toMatch(/selectSegment\("wall"\)/);
     expect(src).toMatch(/setSheetOpen\(true\)/);
   });
 

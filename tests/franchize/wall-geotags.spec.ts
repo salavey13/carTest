@@ -217,14 +217,14 @@ describe("map-riders sheet hosts the community wall (source asserts)", () => {
     expect(page).toContain("wallParams={wallParams}");
   });
 
-  it("RidersDrawer owns the relocated ride controls + leaderboard (ride tab)", () => {
-    const drawer = read("components/map-riders/RidersDrawer.tsx");
-    expect(drawer).toContain('value="ride"');
-    expect(drawer).toContain("RideControlsPanel");
-    expect(drawer).toContain("LeaderboardPanel");
-    expect(drawer).toContain("privacy/toggle-home-blur");
-    expect(drawer).toContain("privacy/set-visibility");
-    // bottom nav: Стена expands the sheet, Топ opens the ride tab
+  it("ride controls + leaderboard live in the merged single sheet (Task 60: no second drawer)", () => {
+    // RidersDrawer is GONE — the ride tab content moved into the deck panels.
+    const panels = read("components/map-riders/MapRidersSheetPanels.tsx");
+    expect(panels).toContain("privacy/toggle-home-blur");
+    expect(panels).toContain("privacy/set-visibility");
+    expect(panels).toContain("RideControlsPanel");
+    expect(panels).toContain("LeaderboardPanel");
+    // bottom nav: Стена expands the wall segment, Топ opens the top segment
     const nav = read("components/layout/FranchizeMapBottomNav.tsx");
     expect(nav).toContain('detail: { tab: "ride" }');
     expect(nav).toContain("mapriders-expand-sheet");
@@ -245,10 +245,10 @@ describe("map-riders sheet hosts the community wall (source asserts)", () => {
     // (2) event focus wins over the stale ?post= URL target
     const wall = read("app/franchize/[slug]/community/CommunityWallClient.tsx");
     expect(wall).toContain("pendingDeepLinkPostId = eventFocus?.id ?? highlightPostId ?? null");
-    // (3) stop from the drawer's Эфир tab keeps the share-ride interlink
-    const drawer = read("components/map-riders/RidersDrawer.tsx");
-    expect(drawer).toContain("onRideStopped?: (endedSessionId: string) => void");
-    expect(drawer).toContain("onRideStopped,");
+    // (3) stop from the deck's «Топ» segment keeps the share-ride interlink
+    const panels = read("components/map-riders/MapRidersSheetPanels.tsx");
+    expect(panels).toContain("onRideStopped?: (endedSessionId: string) => void");
+    expect(panels).toContain("onRideStopped,");
     // (5) in-page share intent beats a stale ?ride= URL param
     expect(read("components/map-riders/MapRidersClientRefactored.tsx")).toContain(
       "composeRideId={sheetRideComposeId ?? wallParams?.composeRideId ?? null}",

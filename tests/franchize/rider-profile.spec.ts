@@ -236,7 +236,7 @@ describe("rider profile wiring", () => {
     expect(ui).toContain('key: "wallActivity"');
   });
 
-  it("map page + drawer carry the wall family: palette bridge, live chip, profile links", () => {
+  it("map page + merged deck carry the wall family: palette bridge, live chip, profile links", () => {
     const mapPage = read("app/franchize/[slug]/map-riders/page.tsx");
     expect(mapPage).toContain('"--community-accent"');
     const mapClient = read("components/map-riders/MapRidersClientRefactored.tsx");
@@ -244,10 +244,12 @@ describe("rider profile wiring", () => {
     // Стена больше не бэнд-ссылка: она и ЕСТЬ контент шита карты.
     expect(mapClient).toContain("Стена экипажа");
     expect(mapClient).toContain("<CommunityWallClient");
-    const drawer = read("components/map-riders/RidersDrawer.tsx");
-    expect(drawer).toContain("openRiderProfile(session.user_id)");
+    // Task 60: RidersDrawer merged into the deck — the rider-profile link
+    // pattern lives in the sheet panels now (same HTML-safety contract).
+    const panels = read("components/map-riders/MapRidersSheetPanels.tsx");
+    expect(panels).toContain("openRiderProfile(session.user_id)");
     // router push (no <a> inside <button> — invalid HTML)
-    expect(drawer).toContain("router.push(`/franchize/${crewSlug}/rider/${userId}`)");
+    expect(panels).toContain("router.push(`/franchize/${crewSlug}/rider/${userId}`)");
   });
 
   it("router fast-paths rider_<id>_<slug> and the gated fallback knows the kind", () => {

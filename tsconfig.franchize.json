@@ -16,7 +16,7 @@
     "components/map-riders/RiderFAB.tsx",
     "components/map-riders/StatusOverlay.tsx",
     "components/map-riders/RiderMarkerLayer.tsx",
-    "components/map-riders/RidersDrawer.tsx",
+    "components/map-riders/MapRidersSheetPanels.tsx",
     "app/franchize/lib/bike-wall.ts",
     "app/franchize/server-actions/bike-wall.ts",
     "app/franchize/lib/superlist-clear.ts",

@@ -2,12 +2,21 @@
 
 // /components/layout/FranchizeMapBottomNav.tsx
 // Franchise-scoped bottom tab navigation for map-riders routes.
-// Refactored to control the sliding sheet instead of navigating away.
-// - "Топ" opens the RidersDrawer on the ride tab (зал славы живёт там)
-// - "Лист" opens the RidersDrawer (riders/meetups/history)
-// - "Стена" expands the sheet — the community wall IS the sheet content now
+// Task 60 (2026-10-02): the map surface used to have TWO stacked sliding
+// bottom sheets — the main sheet (the wall feed) AND a second vaul drawer
+// (RidersDrawer) that slid over it when «Топ»/«Лист» were tapped. Overkill.
+// Now there is ONE command-deck sheet with segments, and EVERY action tab
+// here maps 1:1 to a segment of that single deck:
+// - "Топ"  → segment "top"  (эфир-пульт + недельный зал славы)
+// - "Лист" → segment "list" (райдеры / точки встреч / журнал заездов)
+// - "Стена"→ segment "wall" (the wall feed — the deck's default content)
 //   (on non-map routes — e.g. /leaderboard — it falls back to a plain Link:
 //   the sheet-controlling actions don't exist there).
+// Tapping the tab of the ALREADY-active expanded segment collapses the deck
+// (toggle), and the deck broadcasts mapriders-sheet-state so the active tab
+// highlights. Event names (mapriders-open-riders-drawer / -expand-sheet) are
+// preserved — their semantics changed from "open second drawer" to "select
+// segment" on the client side.
 // - "Сеть" (2026-10-02) is a plain Link to the GLOBAL crew discovery page
 //   (/franchize/discovery — every crew as a circle): works on the map page
 //   AND anywhere else, because a Link never depends on the sheet controller.
@@ -18,6 +27,13 @@ import Link from "next/link";
 import { Network, Trophy, Users, List } from "lucide-react";
 import { useEffect, useState } from "react";
 
+// nav tab key → deck segment broadcast in mapriders-sheet-state.detail
+const SEGMENT_BY_KEY: Record<string, string> = {
+  leaderboard: "top",
+  drawer: "list",
+  crew: "wall",
+};
+
 interface FranchizeMapBottomNavProps {
   pathname: string;
 }
@@ -25,11 +41,28 @@ interface FranchizeMapBottomNavProps {
 export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNavProps) {
   const slug = pathname.match(/^\/franchize\/([^/]+)\//)?.[1] || "vip-bike";
   const [canControl, setCanControl] = useState(false);
+  // Deck state mirror for the active-tab highlight (snap ≤ 0.2 = collapsed
+  // deck → nothing is "open", no highlight).
+  const [deckSegment, setDeckSegment] = useState<string | null>(null);
 
   // Check if we're on map-riders page (where we can control the sheet)
   useEffect(() => {
     setCanControl(pathname.includes("/map-riders"));
   }, [pathname]);
+
+  // The single sheet broadcasts its segment + snap; highlight the matching tab.
+  useEffect(() => {
+    const handleSheetState = (event: Event) => {
+      const detail = (event as CustomEvent<{ segment?: string; snap?: number }>).detail;
+      if (!detail || typeof detail !== "object") {
+        setDeckSegment(null);
+        return;
+      }
+      setDeckSegment((detail.snap ?? 0) > 0.2 ? detail.segment ?? null : null);
+    };
+    window.addEventListener("mapriders-sheet-state", handleSheetState);
+    return () => window.removeEventListener("mapriders-sheet-state", handleSheetState);
+  }, []);
 
   const items = [
     {
@@ -38,7 +71,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
       icon: Trophy,
       isLink: false,
       action: () => {
-        // RidersDrawer on the ride tab — the riding leaderboard lives there now.
+        // Deck segment «Топ» — эфир-пульт + зал славы (зал славы живёт там).
         window.dispatchEvent(new CustomEvent("mapriders-open-riders-drawer", { detail: { tab: "ride" } }));
       },
     },
@@ -48,7 +81,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
       icon: List,
       isLink: false,
       action: () => {
-        // Dispatch custom event for MapRidersClientRefactored to handle
+        // Deck segment «Лист» — райдеры / точки встреч / журнал заездов.
         window.dispatchEvent(new CustomEvent("mapriders-open-riders-drawer"));
       },
     },
@@ -58,7 +91,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
       icon: Users,
       isLink: false,
       action: () => {
-        // Стена = контент шита: просто раскрываем его (без перехода).
+        // Стена = контент шита: повторный тап сворачивает деку.
         window.dispatchEvent(new CustomEvent("mapriders-expand-sheet"));
       },
     },
@@ -75,6 +108,7 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
       <div className="pointer-events-auto mx-auto grid w-full max-w-lg grid-cols-4 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
+          const isActive = canControl && deckSegment !== null && SEGMENT_BY_KEY[item.key] === deckSegment;
           // Off the map page the sheet/drawer actions don't exist — «Стена»
           // degrades to a plain link to the standalone wall (old «Экипаж»
           // behavior), Топ/Лист stay disabled.
@@ -97,13 +131,24 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
               type="button"
               onClick={canControl ? item.action : undefined}
               disabled={!canControl}
-              className="flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition disabled:opacity-40"
+              aria-pressed={isActive}
+              className="relative flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition disabled:opacity-40"
               style={{
-                color: canControl ? "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)" : "color-mix(in srgb, var(--fr-map-nav-text, #fff) 40%, transparent)",
+                color: !canControl
+                  ? "color-mix(in srgb, var(--fr-map-nav-text, #fff) 40%, transparent)"
+                  : isActive
+                    ? "var(--fr-map-nav-accent, #facc15)"
+                    : "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)",
               }}
             >
               <Icon className="mb-1 h-4 w-4" />
               {item.label}
+              {/* active-deck dot: the deck is open on THIS tab's segment */}
+              <span
+                aria-hidden
+                className={`absolute bottom-0.5 h-1 w-1 rounded-full transition-opacity ${isActive ? "opacity-100" : "opacity-0"}`}
+                style={{ backgroundColor: "var(--fr-map-nav-accent, #facc15)" }}
+              />
             </button>
           );
         })}

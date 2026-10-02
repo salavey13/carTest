@@ -45,7 +45,8 @@ import { catalogGpsFromSpecs } from "@/lib/catalog-gps";
 import type { CatalogItemVM } from "@/app/franchize/actions";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
-import { RidersDrawer } from "@/components/map-riders/RidersDrawer";
+import { SheetListPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
+import { List, Trophy, Users } from "lucide-react";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
@@ -78,11 +79,23 @@ const MEETUP_ACTION_DEBOUNCE_MS = 2000;
 // rich spot/meetup popups (leaflet-popup-content-wrapper).
 const SPOT_POPUP_CLASSNAME = "mr-spot-popup";
 
-// Snap labels for the 3-button control (matching vaul snapPoints)
-const SNAP_POINTS = [0.2, 0.48, 0.66, 0.86] as const;
-const DRAWER_SNAP_POINTS: number[] = [...SNAP_POINTS];
-type SnapLabel = "Мини" | "Средне" | "Высоко" | "Макс";
-const SNAP_LABELS: Record<number, SnapLabel> = { 0.2: "Мини", 0.48: "Средне", 0.66: "Высоко", 0.86: "Макс" };
+// Snap points of the single command-deck sheet (0.2 Мини / 0.48 Средне /
+// 0.66 Высоко / 0.86 Макс). The old «Мини/Средне/Высоко/Макс» button row is
+// retired (Task 60): the drag handle + the bottom-nav tabs (select + toggle)
+// cover snapping; wall actions target 0.86, list/top segments 0.66.
+const DRAWER_SNAP_POINTS: number[] = [0.2, 0.48, 0.66, 0.86];
+const SNAP_MINI = 0.2;
+const SNAP_LIST = 0.66;
+const SNAP_WALL = 0.86;
+
+// Segments of the single sheet — mirror the bottom nav 1:1 (Стена/Лист/Топ;
+// «Сеть» stays a Link). Icon family matches the nav's lucide glyphs so the
+// nav tab and the segment it opens read as the same object.
+const SHEET_SEGMENTS: Array<{ key: MapRidersSheetSegment; label: string; icon: typeof Users }> = [
+  { key: "wall", label: "Стена", icon: Users },
+  { key: "list", label: "Лист", icon: List },
+  { key: "top", label: "Топ", icon: Trophy },
+];
 
 /** Deep-link params from /map-riders?post=|ride=|compose=|spot=|q= → wall in the sheet. */
 export interface MapRidersWallParams {
@@ -113,8 +126,12 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   const [isPromptOpen, setIsPromptOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [promptValue, setPromptValue] = useState("Точка встречи");
-  const [ridersDrawerOpen, setRidersDrawerOpen] = useState(false);
-  const [ridersDrawerTab, setRidersDrawerTab] = useState<string>("riders");
+  // Task 60: ONE sheet. The former RidersDrawer (a second vaul drawer that
+  // stacked OVER the wall sheet — two handles, two drag surfaces, two Esc
+  // scopes, a stray handle pill floating over the nav) merged into this deck
+  // as segments. Nav tabs now SELECT a segment (+ toggle-collapse on the
+  // second tap) instead of stacking another drawer on top.
+  const [sheetSegment, setSheetSegment] = useState<MapRidersSheetSegment>("wall");
   // Легенда мототочек — плавающий оверлей на карте (переехала из шита).
   const [spotLegendOpen, setSpotLegendOpen] = useState(false);
   // Interlink карта → стена: id последнего завершённого заезда — даёт кнопку
@@ -203,7 +220,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     ? (resolvedTheme === "light" ? "cartodb-light" : "cartodb-dark")
     : (mapData?.meta.tileLayer || "cartodb-dark");
   const { createMeetup } = useMeetupCreator(crewSlug);
-  // Общий обработчик конца заезда: и FAB/шит, и таб «Эфир» в листе райдеров
+  // Общий обработчик конца заезда: и FAB/шит, и сегмент «Топ» деки
   // должны поднять кнопку «Поделиться заездом» (иначе стоп из листа терял interlink).
   const handleRideStopped = useCallback((endedSessionId: string) => {
     setEndedRideSessionId(endedSessionId);
@@ -215,19 +232,11 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     stopSuccessMessage: "Заезд завершён",
     onRideStopped: handleRideStopped,
   });
-  const drawerEmptyStateCopy = useMemo(
-    () => ({
-      history:
-        state.recentCompleted.length > 0
-          ? `У вас ${state.recentCompleted.length} завершённых заезд(ов) за эту неделю 🏆`
-          : "Пока тут пусто... maybe go ride first?",
-      meetups:
-        state.meetups.length > 0
-          ? `Активных точек встречи: ${state.meetups.length}. Тапни на карту, чтобы добавить свою.`
-          : "Пока тут пусто... maybe go ride first?",
-    }),
-    [state.meetups.length, state.recentCompleted.length],
-  );
+  // Row tap in «Лист» fetches the route (panel does it) — collapse the deck
+  // so the map shows the track (same reveal pattern as wall geotag focus).
+  const handleSelectSessionFromList = useCallback(() => {
+    setActiveSnap(SNAP_MINI);
+  }, []);
 
   // ── Inject crew theme CSS vars for FranchizeMapBottomNav ──
   useEffect(() => {
@@ -308,20 +317,43 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     },
   });
 
-  // ── Event listeners for FranchizeMapBottomNav ──
+  // ── Event listeners for FranchizeMapBottomNav (Task 60: single sheet) ──
+  // Refs mirror the segment/snap for the toggle logic without re-subscribing
+  // the listeners on every deck movement.
+  const sheetSegmentRef = useRef(sheetSegment);
+  const activeSnapRef = useRef(activeSnap);
+  useEffect(() => {
+    sheetSegmentRef.current = sheetSegment;
+  }, [sheetSegment]);
+  useEffect(() => {
+    activeSnapRef.current = activeSnap;
+  }, [activeSnap]);
+
+  // Segment select with toggle semantics: tapping the nav tab of the ALREADY
+  // active expanded segment collapses the deck (Мини) — one sheet, no
+  // stacking, and the second tap is always a useful "get this out of my way".
+  const selectSegment = useCallback((segment: MapRidersSheetSegment, opts?: { toggle?: boolean }) => {
+    if (opts?.toggle && sheetSegmentRef.current === segment && activeSnapRef.current > 0.2) {
+      setActiveSnap(SNAP_MINI);
+      return;
+    }
+    setSheetSegment(segment);
+    setActiveSnap(segment === "wall" ? SNAP_WALL : SNAP_LIST);
+    setSheetOpen(true);
+  }, []);
+
   useEffect(() => {
     const handleOpenRidersDrawer = (event?: Event) => {
-      // «Топ» открывает лист на табе «Эфир» (зал славы переехал туда),
-      // «Лист» — на табе райдеров.
+      // «Топ» → сегмент «Топ» (эфир + зал славы), «Лист» → сегмент «Лист»
+      // (райдеры/точки/журнал). Event names preserved — semantics now select
+      // a segment of the single sheet instead of stacking a second drawer.
       const tab = (event as CustomEvent<{ tab?: string }> | undefined)?.detail?.tab;
-      setRidersDrawerTab(tab === "ride" ? "ride" : "riders");
-      setRidersDrawerOpen(true);
+      selectSegment(tab === "ride" ? "top" : "list", { toggle: true });
     };
 
     const handleExpandSheet = () => {
-      // Стена теперь живёт в шите — «Стена» в нижней навигации просто раскрывает его.
-      setActiveSnap(0.86);
-      setSheetOpen(true);
+      // Стена — сегмент деки: повторный тап сворачивает её.
+      selectSegment("wall", { toggle: true });
     };
 
     window.addEventListener("mapriders-open-riders-drawer", handleOpenRidersDrawer);
@@ -331,7 +363,26 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       window.removeEventListener("mapriders-open-riders-drawer", handleOpenRidersDrawer);
       window.removeEventListener("mapriders-expand-sheet", handleExpandSheet);
     };
-  }, []);
+  }, [selectSegment]);
+
+  // Broadcast deck state → the bottom nav highlights the active segment.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("mapriders-sheet-state", { detail: { segment: sheetSegment, snap: activeSnap } }));
+  }, [sheetSegment, activeSnap]);
+
+  // Esc collapses the deck (Мини) — desktop nicety. Modals own Esc first:
+  // meetup modal, confirm modal and the photo lightbox all listen for it, so
+  // the deck steps aside only when nothing else is up.
+  useEffect(() => {
+    if (!sheetOpen || activeSnap <= 0.2) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (isPromptOpen || isConfirmOpen || mapLightbox) return;
+      setActiveSnap(SNAP_MINI);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [sheetOpen, activeSnap, isPromptOpen, isConfirmOpen, mapLightbox]);
 
   // ── Wall × map: геотег-пины постов экипажа ──────────────────────────────────
   // Лента стены и карта — один экран: пост с геотегом = метка на карте.
@@ -377,7 +428,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   // Гео-чип поста в ленте (onFocusGeotag проп стены) — прямая интеграция:
   // свернуть шит, чтобы карта стала видна, и лететь к метке.
   const handleWallFocusGeotag = useCallback((geo: { lat: number; lng: number }) => {
-    setActiveSnap(0.2);
+    setSheetSegment("wall");
+    setActiveSnap(SNAP_MINI);
     setSheetOpen(true);
     setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
   }, []);
@@ -391,9 +443,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     // не дают одинаковый nonce → повторный префилл гарантирован.
     checkinNonceRef.current += 1;
     setWallCheckinSpot({ id: spotId, nonce: checkinNonceRef.current });
-    setActiveSnap(0.86);
-    setSheetOpen(true);
-  }, []);
+    // Тап по мототочке открывает стену-сегмент деки (не только snap):
+    // раньше чек-ин мог раскрыть шит на чужом сегменте после слияния.
+    selectSegment("wall");
+  }, [selectSegment]);
 
   /** «Точка карты → пост на стене» (обратный interlink): попап meetup-точки
    *  просит стену префиллить композер геотегом этой точки (+ название точки
@@ -408,9 +461,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       text: point.text ?? null,
       nonce: mapPointComposeNonceRef.current,
     });
-    setActiveSnap(0.86);
-    setSheetOpen(true);
-  }, []);
+    selectSegment("wall");
+  }, [selectSegment]);
 
   /** Чужой экипаж = отдельный запуск мини-аппа: t.me/<bot>/app?startapp=… через
    *  openTelegramLink корректно перезапускает WebApp с новым startapp (полный
@@ -430,9 +482,8 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   /** Метка на карте → раскрыть шит и подсветить пост в ленте. */
   const openWallPostFromMap = useCallback((postId: string) => {
     window.dispatchEvent(new CustomEvent(WALL_FOCUS_POST_EVENT, { detail: { postId } }));
-    setActiveSnap(0.86);
-    setSheetOpen(true);
-  }, []);
+    selectSegment("wall");
+  }, [selectSegment]);
 
   /** Внешняя ссылка (Яндекс.Карты и пр.): в Telegram WebApp — openLink,
    *  в браузере — новая вкладка. НЕ openTelegramLink: это не t.me-грамматика. */
@@ -483,7 +534,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
           successMessage: "Точка встречи добавлена на карту",
         });
         if (created) {
-          setActiveSnap(0.2);
+          setActiveSnap(SNAP_MINI);
           setSheetOpen(true);
           setWallFocusPoint({ lat: geo.lat, lng: geo.lng, key: Date.now() });
         }
@@ -1329,24 +1380,31 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
               className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/92 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}
               style={{ backgroundImage: `linear-gradient(${sheetTint}, ${sheetTint})` }}
             ><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
-            {/* Snap control buttons — WALL v6: accent hairline under the sheet
-                title ties the sheet to the wall cards below (same accent). */}
-            <div className="pointer-events-auto relative mb-3 flex items-center justify-between gap-2 border-b border-[var(--mr-border)] pb-2.5">
-              <h3 className="font-orbitron flex items-center gap-2 text-sm text-[var(--mr-text)]">Стена экипажа<span className="cw-live-dot" aria-hidden /></h3>
-              <span aria-hidden className="absolute inset-x-0 -bottom-px h-px" style={{ background: "linear-gradient(90deg, transparent, color-mix(in srgb, var(--mr-accent) 70%, transparent) 45%, transparent)" }} />
-              <div className="pointer-events-auto flex gap-1.5">
-                {SNAP_POINTS.map((snap) => (
-                  <Button
-                    key={snap}
-                    type="button"
-                    size="sm"
-                    variant={activeSnap === snap ? "default" : "outline"}
-                    className="h-7 px-2 text-xs"
-                    onClick={() => setActiveSnap(snap)}
-                  >
-                    {SNAP_LABELS[snap]}
-                  </Button>
-                ))}
+            {/* ── Single-sheet segmented control (Task 60: RidersDrawer merged
+                in) — the two stacked sliding sheets are ONE deck now. The
+                bottom-nav tabs select/toggle these segments (1:1 icons), the
+                drag handle still snaps. No more Мини/Средне/Высоко/Макс
+                button row — that was snap-ui overkill on top of the handle. */}
+            <div className="pointer-events-auto mb-3 border-b border-[var(--mr-border)] pb-2.5">
+              <div role="tablist" aria-label="Панель карты" className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ backgroundColor: "color-mix(in srgb, var(--mr-border) 30%, transparent)" }}>
+                {SHEET_SEGMENTS.map((seg) => {
+                  const SegIcon = seg.icon;
+                  const active = sheetSegment === seg.key;
+                  return (
+                    <button
+                      key={seg.key}
+                      role="tab"
+                      type="button"
+                      aria-selected={active}
+                      onClick={() => selectSegment(seg.key)}
+                      className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition"
+                      style={active ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" } : { color: "var(--mr-muted)" }}
+                    >
+                      <SegIcon className="h-3.5 w-3.5" aria-hidden />
+                      {seg.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             {/* ── Scrollable sheet body. data-vaul-no-drag: vaul 0.9 must NOT
@@ -1359,9 +1417,18 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
               data-vaul-no-drag
               className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto overscroll-contain pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}
             >
+              {/* ── WALL segment (default) — ALWAYS mounted: the feed keeps its
+                  posts/scroll while the user flips to Лист/Топ and back (no
+                  refetch storm per flip). Лист/Топ mount conditionally below. */}
+              <div className={sheetSegment === "wall" ? "space-y-3" : "hidden"} aria-hidden={sheetSegment !== "wall"}>
+              {/* Wall caption: the header became the segmented control, the feed
+                  keeps its identity line (accent hairline + live dot). */}
+              <div className="relative flex items-center gap-2 pb-1">
+                <h3 className="font-orbitron flex items-center gap-2 text-sm text-[var(--mr-text)]">Стена экипажа<span className="cw-live-dot" aria-hidden /></h3>
+                <span aria-hidden className="absolute inset-x-0 -bottom-px h-px" style={{ background: "linear-gradient(90deg, transparent, color-mix(in srgb, var(--mr-accent) 70%, transparent) 45%, transparent)" }} />
+              </div>
               {/* ── Ride strip: компактный статус эфира (start/stop — жёлтый FAB
-                  справа, полный пульт с приватностью — в листе райдеров, таб
-                  «Эфир»). Всё остальное устарело: шит теперь = стена экипажа. ── */}
+                  справа, полный пульт с приватностью — в сегменте «Топ»). ── */}
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2" style={{ backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" }}>
                 <span className="cw-live-dot" aria-hidden />
                 <span className="text-xs font-semibold text-[var(--mr-text)]">
@@ -1397,7 +1464,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                         // Стена теперь в шите: черновик «поделиться заездом»
                         // открывается здесь же, без ухода со страницы карты.
                         setSheetRideComposeId(endedRideSessionId);
-                        setActiveSnap(0.86);
+                        setActiveSnap(SNAP_WALL);
                       }}
                     >
                       <VibeContentRenderer content="::FaShareNodes::" className="mr-1.5" />
@@ -1448,6 +1515,14 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 onFocusGeotag={handleWallFocusGeotag}
                 onMakeMeetupPoint={handleMakeMeetupFromPost}
               />
+              </div>
+              {/* ── Лист segment: riders + meetups + journal (ex-RidersDrawer
+                  tabs, now plain panel bodies of the single deck). */}
+              {sheetSegment === "list" ? (
+                <SheetListPanel crew={crew} onSelectSession={handleSelectSessionFromList} />
+              ) : null}
+              {/* ── Топ segment: ride controls (эфир) + weekly leaderboard. */}
+              {sheetSegment === "top" ? <SheetTopPanel crew={crew} onRideStopped={handleRideStopped} /> : null}
             </div>
           </div>
         </Drawer.Content>
@@ -1455,14 +1530,6 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
       </Drawer.Root>
       <StatusOverlay />
       <RiderFAB />
-      <RidersDrawer
-        crew={crew}
-        initialTab={ridersDrawerTab}
-        emptyStateCopy={drawerEmptyStateCopy}
-        externalOpen={ridersDrawerOpen}
-        onExternalOpenChange={setRidersDrawerOpen}
-        onRideStopped={handleRideStopped}
-      />
       <MeetupCreateModal
         open={isPromptOpen}
         onClose={() => setIsPromptOpen(false)}
