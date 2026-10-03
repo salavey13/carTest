@@ -29,6 +29,11 @@ import {
   type SubrenterMonthSummary,
 } from "@/app/franchize/lib/subrenter-economics";
 import { resolveSubrenterSharePct } from "@/app/franchize/lib/subrenter-notify";
+import {
+  buildSubrenterMonthReport,
+  type SubrenterReportRentalRow,
+} from "@/app/franchize/lib/subrenter-month-report";
+import { resolveReportClientName } from "@/app/franchize/lib/bike-rentals-report";
 
 export interface SubrenterOwnedBike {
   bikeId: string;
@@ -613,6 +618,203 @@ export async function getSubrenterMonthlyEarningsAction(input: {
     };
   } catch (error) {
     logger.warn("[getSubrenterMonthlyEarningsAction] failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Subrenter MONTH REPORT (2026-10-03, boss: «add "total for subrenter
+// excluding equipment" report in subrenter's profile, subrenter's section
+// in admin franchize page and in motopark»). One partner + one MSK month →
+// a .md one-pager (same delivery chain as the Мотопарк bike report) with
+// the headline «Итого партнёру (N% от мото, без экипировки)».
+// Two modes:
+//   • SELF — the partner himself (verified actor = his chat id);
+//   • ADMIN — canManageSubrenters actor passes an explicit chatId.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface SubrenterMonthReportResultData {
+  filename: string;
+  markdown: string;
+  stats: {
+    totalRentals: number;
+    earningRentals: number;
+    revenueRub: number;
+    bikeRub: number;
+    gearRub: number;
+    partnerRub: number;
+  };
+  /** Partner share pct actually applied (contract artifact → 50). */
+  pct: number;
+  /** "YYYY-MM" scope the report was built for. */
+  month: string;
+}
+
+export async function getSubrenterMonthReportAction(input: {
+  slug: string;
+  month?: string;
+  /** ADMIN mode: the partner's Telegram chat id. Caller must manage subrenters. */
+  chatId?: string;
+  /** SELF mode: claimed actor id (verified against cookie/initData). */
+  actorUserId?: string;
+  initData?: string;
+}): Promise<{ success: boolean; data?: SubrenterMonthReportResultData; error?: string }> {
+  const parsed = z
+    .object({
+      slug: z.string().trim().min(1),
+      month: z.string().trim().optional(),
+      chatId: z.string().trim().regex(/^\d{3,}$/).optional(),
+      actorUserId: z.string().trim().optional(),
+      initData: z.string().trim().optional(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { success: false, error: "Некорректный запрос." };
+  const { slug } = parsed.data;
+  const month = normalizeMonthKey(parsed.data.month) || currentMskMonthKey();
+
+  // Identity: verified server-side (SA-002 rule) — either the SELF partner or
+  // an admin acting for an explicit chatId.
+  const verifiedUserId = await resolveServerActorUserId({
+    claimedActorUserId: parsed.data.actorUserId,
+    initData: parsed.data.initData,
+  });
+  if (!verifiedUserId) return { success: false, error: "Не авторизовано." };
+
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id, name")
+      .eq("slug", slug.trim())
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    const adminMode = typeof parsed.data.chatId === "string" && parsed.data.chatId.length > 0;
+    let partnerChatId: string;
+    if (adminMode) {
+      const allowed = await canManageSubrenters(crew.id, crew.owner_id, verifiedUserId);
+      if (!allowed) return { success: false, error: "Недостаточно прав." };
+      partnerChatId = String(parsed.data.chatId);
+    } else {
+      partnerChatId = verifiedUserId;
+    }
+
+    // The partner's bikes in this crew.
+    const { data: bikes } = await supabaseAdmin
+      .from("cars")
+      .select("id, make, model")
+      .eq("crew_id", crew.id)
+      .eq("specs->>subrenter_chat_id", partnerChatId);
+    if (!bikes || bikes.length === 0) {
+      return { success: false, error: "У этого партнёра нет мотоциклов в экипаже." };
+    }
+    const bikeLabelById = new Map(
+      bikes.map((b: { id: string | number; make?: string | null; model?: string | null }) => [
+        String(b.id),
+        `${b.make ?? ""} ${b.model ?? ""}`.trim() || String(b.id),
+      ]),
+    );
+
+    // ALL rentals of his bikes around the month (created_at window + precise
+    // MSK-start scoping below) — any status, like the Мотопарк report: the
+    // partner sees the full picture, only the ОБОРРОТ line filters statuses.
+    const { fromIso, toIso } = monthWindowIso(month);
+    const { data: rentals } = await supabaseAdmin
+      .from("rentals")
+      .select(
+        "rental_id,vehicle_id,status,payment_status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,requested_end_date,created_at,user_id,metadata",
+      )
+      .in("vehicle_id", Array.from(bikeLabelById.keys()))
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .order("created_at", { ascending: true })
+      .limit(1000);
+
+    const scoped = ((rentals ?? []) as Array<{
+      rental_id: string;
+      vehicle_id?: string | null;
+      status?: string | null;
+      payment_status?: string | null;
+      total_cost?: number | string | null;
+      agreed_start_date?: string | null;
+      agreed_end_date?: string | null;
+      requested_start_date?: string | null;
+      requested_end_date?: string | null;
+      created_at?: string | null;
+      user_id?: string | null;
+      metadata?: Record<string, unknown> | null;
+    }>).filter((r) => mskLocalMonth(r.agreed_start_date || r.requested_start_date) === month);
+
+    // Client display names: users.full_name beats metadata.renter_name (the
+    // boss samples convention — same chain as the bike report action).
+    const userIds = Array.from(
+      new Set(scoped.map((r) => r.user_id).filter((v): v is string => typeof v === "string" && v.trim().length > 0)),
+    );
+    const usersByName = new Map<string, { fullName: string | null; username: string | null }>();
+    if (userIds.length > 0) {
+      const { data: users } = await supabaseAdmin
+        .from("users")
+        .select("user_id, full_name, username")
+        .in("user_id", userIds);
+      for (const u of users ?? []) {
+        usersByName.set(String(u.user_id), {
+          fullName: u.full_name ? String(u.full_name) : null,
+          username: u.username ? String(u.username) : null,
+        });
+      }
+    }
+
+    const rows: SubrenterReportRentalRow[] = scoped.map((r) => ({
+      rentalId: String(r.rental_id),
+      bikeId: String(r.vehicle_id ?? ""),
+      bikeLabel: bikeLabelById.get(String(r.vehicle_id ?? "")) ?? "Байк",
+      status: r.status ?? null,
+      paymentStatus: r.payment_status ?? null,
+      totalCost: r.total_cost == null ? null : Number(r.total_cost),
+      agreedStart: r.agreed_start_date ?? null,
+      agreedEnd: r.agreed_end_date ?? null,
+      requestedStart: r.requested_start_date ?? null,
+      requestedEnd: r.requested_end_date ?? null,
+      createdAt: r.created_at ?? null,
+      clientName: resolveReportClientName(
+        r.user_id ? usersByName.get(String(r.user_id)) : undefined,
+        typeof r.metadata?.renter_name === "string" ? r.metadata.renter_name : null,
+      ),
+      metadata: r.metadata ?? null,
+    }));
+
+    // Partner label + share pct — the SAME sources the payout sheet pays with.
+    const { data: partnerUser } = await supabaseAdmin
+      .from("users")
+      .select("full_name, username")
+      .eq("user_id", partnerChatId)
+      .maybeSingle();
+    const partnerLabel = (partnerUser?.full_name ? String(partnerUser.full_name) : "")
+      || (partnerUser?.username ? `@${String(partnerUser.username).replace(/^@+/, "")}` : "")
+      || `id ${partnerChatId}`;
+    const pct = await resolveSubrenterSharePct(crew.id);
+
+    const report = buildSubrenterMonthReport({
+      partnerLabel,
+      partnerChatId,
+      crewName: crew.name ? String(crew.name) : "",
+      month,
+      bikeLabels: Array.from(bikeLabelById.values()),
+      rentals: rows,
+      pct,
+    });
+
+    return {
+      success: true,
+      data: {
+        filename: report.filename,
+        markdown: report.markdown,
+        stats: report.stats,
+        pct,
+        month,
+      },
+    };
+  } catch (error) {
+    logger.warn("[getSubrenterMonthReportAction] failed:", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

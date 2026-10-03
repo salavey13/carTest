@@ -42,6 +42,7 @@ import {
   mskMonthKey,
   normalizeMonthParam,
   availableMonthKeys,
+  EARNING_STATUSES,
   type BikeWallSummary,
   type StatsInputRow,
   type WallFeedItem,
@@ -482,6 +483,13 @@ export async function getBikeStoryAction(params: {
      * story page shows a «партнёрское мото» chip with the contact.
      */
     partner: { name: string | null; username: string | null } | null;
+    /**
+     * 2026-10-03 (boss): the «total for subrenter excluding equipment» KPI —
+     * partner's cut of the BIKE part (gear never splits) for the selected
+     * month (rubScoped) and all time (rubAll), pct from the subrent contract.
+     * null for non-partner bikes.
+     */
+    partnerTotals: { pct: number; rubAll: number; rubScoped: number } | null;
   };
   error?: string;
 }> {
@@ -534,6 +542,42 @@ export async function getBikeStoryAction(params: {
     }
 
     const now = Date.now();
+
+    // ── partner share pct (2026-10-03 parity): the SAME source the weekly
+    // DOCX appendix, the payout sheet and the subrenter month report pay
+    // with (latest contract artifact → 50%). Feeds both the per-row split
+    // and the «Партнёру N%» KPI below — one pct everywhere.
+    const sharePct = bikeSubrenterChatId ? await resolveSubrenterSharePct(crewId) : 50;
+
+    // ── Partner totals for the KPI band (2026-10-03, boss: «total for
+    // subrenter excluding equipment … in motopark»): pct% of the BIKE part
+    // over earning statuses (same set the «Заработал» KPI counts), rows
+    // whose metadata snapshot resolves to ANOTHER partner are skipped (the
+    // bike changed owners mid-history).
+    let partnerRubAll = 0;
+    let partnerRubScoped = 0;
+    if (bikeSubrenterChatId) {
+      const kpiMonth = monthKey ?? mskMonthKey(null, now);
+      for (const r of bikeRentals) {
+        const eff = effStatus(r.status, r.agreed_end_date, now);
+        if (!EARNING_STATUSES.has(eff)) continue;
+        const cost = Math.round(Number(r.total_cost) || 0);
+        if (!(cost > 0)) continue;
+        const md = (r.metadata ?? {}) as Record<string, unknown>;
+        if (resolveRentalSubrenterChatId(md, bikeSubrenterChatId) !== bikeSubrenterChatId) continue;
+        const split = computePartnerSplit({
+          totalCost: r.total_cost,
+          metadata: md,
+          subrenterChatId: bikeSubrenterChatId,
+          ownerPct: sharePct,
+        });
+        if (!(split.partnerRub > 0)) continue;
+        partnerRubAll += split.partnerRub;
+        if (mskMonthKey(r.agreed_start_date || r.created_at, now) === kpiMonth) {
+          partnerRubScoped += split.partnerRub;
+        }
+      }
+    }
 
     // Month scope BEFORE the WALL_EVENTS_CAP slices (fix): the feed used to be
     // built from the newest 80 events of ALL history and only then filtered by
@@ -655,6 +699,7 @@ export async function getBikeStoryAction(params: {
         totalCost: r.total_cost,
         metadata: md,
         subrenterChatId: resolveRentalSubrenterChatId(md, bikeSubrenterChatId),
+        ownerPct: sharePct,
       });
 
       const operatorChatId = r.created_by_operator_chat_id || r.user_id || null;
@@ -766,6 +811,9 @@ export async function getBikeStoryAction(params: {
         month: monthKey ?? null,
         availableMonths: bikeMonths,
         partner,
+        partnerTotals: bikeSubrenterChatId
+          ? { pct: sharePct, rubAll: partnerRubAll, rubScoped: partnerRubScoped }
+          : null,
       },
     };
   } catch (error) {

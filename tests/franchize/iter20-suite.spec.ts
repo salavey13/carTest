@@ -388,9 +388,16 @@ describe("iter20 · source guards", () => {
     expect(panel).toContain('runWeeklyReport("self")');
     expect(panel).toContain("Послать себе в ТГ");
     expect(panel).toContain('sendToSelf: mode === "self"');
-    // the dead blob-download path is gone
+    // the dead blob-download path is gone — the WEEKLY block delivers via the
+    // bot only. 2026-10-03: FileDown legitimately returned for the SEPARATE
+    // monthly subrenter report button («Сформировать»), never in the weekly one.
     expect(panel).not.toContain('mode === "download"');
-    expect(panel).not.toContain("FileDown");
+    const weeklyBody = panel.slice(
+      panel.indexOf("Еженедельный отчёт партнёру"),
+      panel.indexOf("Месячный отчёт партнёру"),
+    );
+    expect(weeklyBody).not.toContain("FileDown");
+    expect(weeklyBody).not.toContain("download");
   });
 
   it("salary attribution: fetch-all + resolve chain, no member-filtered query", () => {

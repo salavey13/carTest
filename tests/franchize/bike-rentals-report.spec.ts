@@ -544,7 +544,7 @@ describe("bike-rentals-report: мот/экип split + partner cut (2026-10-03)"
     // 10 000 bike → 5 000; 15 000 bike → 7 500
     expect(out.markdown).toContain("| 10 000 ₽ | 1 500 ₽ | 11 500 ₽ | 5 000 ₽ |");
     expect(out.markdown).toContain("| 15 000 ₽ | — | 15 000 ₽ | 7 500 ₽ |");
-    expect(out.markdown).toContain("- Доля партнёра (50% от мото, экип не делится): **12 500 ₽**");
+    expect(out.markdown).toContain("- Итого партнёру (50% от мото, без экипировки): **12 500 ₽**");
   });
 
   it("partner rows resolving to a DIFFERENT chat (bike changed owners) show no cut", () => {
@@ -561,7 +561,7 @@ describe("bike-rentals-report: мот/экип split + partner cut (2026-10-03)"
     });
     expect(out.markdown).toContain("| 10 000 ₽ | — | 10 000 ₽ | — |"); // old owner row
     expect(out.markdown).toContain("| 10 000 ₽ | — | 10 000 ₽ | 5 000 ₽ |"); // current owner row
-    expect(out.markdown).toContain("- Доля партнёра (50% от мото, экип не делится): **5 000 ₽**");
+    expect(out.markdown).toContain("- Итого партнёру (50% от мото, без экипировки): **5 000 ₽**");
   });
 
   it("linked gear mirror rows (выдача экипа) carry no money and never inflate revenue", () => {
@@ -582,7 +582,7 @@ describe("bike-rentals-report: мот/экип split + partner cut (2026-10-03)"
     });
     expect(out.markdown).toContain("| выдача экипа |");
     expect(out.markdown).toContain("- Выручка (завершённые + активные): **10 000 ₽**"); // mirror NOT added
-    expect(out.markdown).toContain("- Доля партнёра (50% от мото, экип не делится): **4 500 ₽**");
+    expect(out.markdown).toContain("- Итого партнёру (50% от мото, без экипировки): **4 500 ₽**");
   });
 
   it("standalone gear rows (item_type=equipment): whole total is gear, partner cut 0", () => {
@@ -613,6 +613,9 @@ describe("bike-rentals-report: source guards", () => {
   const wall = read(`${APP}/[slug]/bikes/BikesWallClient.tsx`);
   const story = read(`${APP}/[slug]/bikes/[bikeId]/BikeStoryClient.tsx`);
   const button = read(`${APP}/[slug]/bikes/BikeReportButton.tsx`);
+  // 2026-10-03: delivery helpers were extracted into the shared lib — the
+  // subrenter month report button reuses the SAME forward/download chain.
+  const delivery = read(`${APP}/lib/report-file-delivery.ts`);
 
   it("server action exists and reuses the wall access gate (not a weaker check)", () => {
     expect(action).toContain("export async function getBikeRentalsReportAction");
@@ -677,15 +680,17 @@ describe("bike-rentals-report: source guards", () => {
     expect(reportBody).toContain("normalizeMonthParam(params.month)");
   });
 
-  it("the button: initData, blob download, Telegram-gated clipboard, hit-area, failed state", () => {
+  it("the button: initData, shared delivery chain, hit-area, failed state", () => {
     expect(button).toContain("getBikeRentalsReportAction");
     expect(button).toContain("getTelegramInitData()");
-    expect(button).toContain("createObjectURL");
-    expect(button).toContain('type: "text/markdown;charset=utf-8"');
-    // clipboard fallback gated on the Telegram WebView + size guard
-    expect(button).toContain("isTelegramWebView()");
-    expect(button).toContain("CLIPBOARD_MAX_CHARS");
-    expect(button).toContain("navigator.clipboard.writeText");
+    // delivery helpers live in the shared lib (blob download, clipboard,
+    // Telegram WebView gate) — imported, not re-copied
+    expect(button).toContain("deliverReportFile");
+    expect(delivery).toContain("createObjectURL");
+    expect(delivery).toContain('type: "text/markdown;charset=utf-8"');
+    expect(delivery).toContain("isTelegramWebView()");
+    expect(delivery).toContain("CLIPBOARD_MAX_CHARS");
+    expect(delivery).toContain("navigator.clipboard.writeText");
     // focus ring + failure feedback
     expect(button).toContain("focus-visible:outline-2");
     expect(button).toContain("failed ? (");
@@ -698,15 +703,16 @@ describe("bike-rentals-report: source guards", () => {
     // iOS WebView silently ignores blob downloads — the chat with the bot is
     // the reliable delivery channel. The forward envelope must match
     // /api/forward-telegram: {chat_id, method, payload, files}.
-    expect(button).toContain('"/api/forward-telegram"');
-    expect(button).toContain('method: "sendDocument"');
-    expect(button).toContain("initDataUnsafe");
+    // 2026-10-03: the envelope lives in the shared delivery lib now.
+    expect(delivery).toContain('"/api/forward-telegram"');
+    expect(delivery).toContain('method: "sendDocument"');
+    expect(delivery).toContain("initDataUnsafe");
     // UTF-8-safe base64 (chunked — a report can exceed the spread limit)
-    expect(button).toContain("new TextEncoder().encode");
-    expect(button).toContain("function utf8ToBase64");
+    expect(delivery).toContain("new TextEncoder().encode");
+    expect(delivery).toContain("function utf8ToBase64");
     // download stays as the non-TG path AND the fallback when forwarding fails
-    expect(button).toContain("downloadMarkdown(markdown, filename)");
-    expect(button).toContain("deliveredInTg");
+    expect(delivery).toContain("downloadMarkdown(markdown, filename)");
+    expect(button).toContain("delivered.via");
     // caption is HTML-escaped (parse_mode: HTML)
     expect(button).toContain("escapeHtml(bikeLabel)");
   });

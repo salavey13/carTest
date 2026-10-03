@@ -404,8 +404,11 @@ export function buildBikeRentalsReport(input: BikeReportInput): BikeReportResult
   L.push(`  - в т.ч. экипировка: **${reportMoney(revenueGear)}**`);
   L.push(`- Средний чек: **${revenueCount > 0 ? reportMoney(avgCheck) : "—"}**`);
   if (input.subrent) {
+    // 2026-10-03 (boss): the headline must read as the subrenter's TOTAL
+    // excluding equipment — same wording as the subrenter month report and
+    // the payout surfaces («Итого партнёру (без экипировки)»).
     L.push(
-      `- Доля партнёра (${input.subrent.pct}% от мото, экип не делится): **${reportMoney(partnerPayout)}**`,
+      `- Итого партнёру (${input.subrent.pct}% от мото, без экипировки): **${reportMoney(partnerPayout)}**`,
     );
   }
   L.push("");

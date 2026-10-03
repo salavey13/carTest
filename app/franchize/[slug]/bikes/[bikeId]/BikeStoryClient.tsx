@@ -59,6 +59,9 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
   // iter31: partner owner of this bike (from specs.subrenter_chat_id) — shown
   // as a chip in the hero with a TG contact link when known.
   const [partner, setPartner] = useState<{ name: string | null; username: string | null } | null>(null);
+  // 2026-10-03 (boss): «total for subrenter excluding equipment» KPI — the
+  // partner's cut (pct% of the bike part) for the selected scope/all time.
+  const [partnerTotals, setPartnerTotals] = useState<{ pct: number; rubAll: number; rubScoped: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ photos: WallPhoto[]; index: number } | null>(null);
@@ -113,6 +116,7 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         setFeed(result.data.feed);
         setAvailableMonths(result.data.availableMonths ?? []);
         setPartner(result.data.partner ?? null);
+        setPartnerTotals(result.data.partnerTotals ?? null);
       } else {
         setError(result.error || "Не удалось загрузить историю мото.");
       }
@@ -219,6 +223,18 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
       accent: true,
       sub: mScopes ? `за всё время: ${formatMoney(s.earnedTotal)}` : undefined,
     },
+    // 2026-10-03 (boss): the subrenter's total excluding equipment, right
+    // next to the bike's earnings — pct% of the bike part (gear never splits).
+    ...(partnerTotals
+      ? [
+          {
+            label: mScopes ? `Партнёру ${partnerTotals.pct}% · ${monthLabelRu(month!)}` : `Партнёру ${partnerTotals.pct}%`,
+            value: formatMoney(mScopes ? partnerTotals.rubScoped : partnerTotals.rubAll),
+            accent: true,
+            sub: mScopes ? `за всё время: ${formatMoney(partnerTotals.rubAll)} · без экипировки` : "без экипировки",
+          },
+        ]
+      : []),
     {
       label: mScopes ? "Всё время" : "Этот месяц",
       value: formatMoney(mScopes ? s.earnedTotal : s.earnedThisMonth),

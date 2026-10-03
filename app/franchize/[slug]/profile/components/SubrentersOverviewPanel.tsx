@@ -28,6 +28,7 @@ import {
 import { addOwnerCashEntryAction } from "@/app/franchize/server-actions/owner-cash";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { currentMskMonthKey } from "@/app/franchize/lib/subrenter-economics";
+import { SubrenterReportButton } from "@/app/franchize/components/SubrenterReportButton";
 import { formatCurrency, monthLabel, itemVariants, type CrewTokens, type SpaNavigate } from "./profile-shared";
 
 export function SubrentersOverviewPanel({
@@ -175,6 +176,14 @@ export function SubrentersOverviewPanel({
                   {payouts.totalPaidRub > 0 && ` · уже выплачено ${formatCurrency(payouts.totalPaidRub)}`}
                 </span>
               </div>
+              {/* 2026-10-03 (boss): the «total for subrenter excluding
+                  equipment» — the month's gross partner payout, explicit. */}
+              <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
+                Итого партнёрам за месяц (без экипировки):{" "}
+                <span className="font-semibold tabular-nums" style={{ color: T.text }}>
+                  {formatCurrency(payouts.totalPayoutRub)}
+                </span>
+              </p>
               <div className="mt-3 space-y-1.5">
                 {payouts.rows.map((row) => {
                   const displayName = row.name || (row.username ? `@${row.username.replace(/^@+/, "")}` : `id ${row.chatId}`);
@@ -190,6 +199,7 @@ export function SubrentersOverviewPanel({
                         </span>
                         <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
                           {row.rentalCount} аренд{row.rentalCount > 0 && row.totalRub > 0 ? ` · оборот ${formatCurrency(row.totalRub)}` : ""}
+                          {row.payoutRub > 0 ? ` · итого партнёру ${formatCurrency(row.payoutRub)} (без экипировки)` : ""}
                           {row.rentalCount > 0 && row.totalRub > 0 ? ` · нам ${formatCurrency(Math.max(0, row.totalRub - row.payoutRub))}` : ""}
                         </span>
                       </div>
@@ -297,6 +307,16 @@ export function SubrentersOverviewPanel({
                       <span>· последняя {new Date(s.lastRentalAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</span>
                     )}
                   </div>
+                  {/* 2026-10-03 (boss): month report for THIS partner — the
+                      .md one-pager with «Итого партнёру (без экипировки)». */}
+                  <SubrenterReportButton
+                    slug={slug}
+                    month={payoutsMonth}
+                    chatId={s.chatId}
+                    actorUserId={userId}
+                    label="Отчёт"
+                    style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated, color: T.text }}
+                  />
                 </div>
 
                 {/* iter31: inline month chip — partner's month rentals + payout.

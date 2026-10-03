@@ -24,6 +24,10 @@
 // and the fallback if the forward API fails; the clipboard copy stays as a
 // second fallback inside Telegram (transient-activation aware).
 
+// 2026-10-03 refine: the delivery helpers (TG forward / download / clipboard)
+// moved to lib/report-file-delivery.ts — the subrenter month report button
+// reuses the same chain instead of a diverging copy.
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Check, FileDown, Loader2, X } from "lucide-react";
@@ -31,6 +35,11 @@ import { Check, FileDown, Loader2, X } from "lucide-react";
 import { getBikeRentalsReportAction } from "@/app/franchize/server-actions/bike-wall";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { monthLabelRu } from "@/app/franchize/lib/bike-wall";
+import {
+  deliverReportFile,
+  escapeHtml,
+  hapticLight,
+} from "@/app/franchize/lib/report-file-delivery";
 
 interface BikeReportButtonProps {
   slug: string;
@@ -50,133 +59,6 @@ interface BikeReportButtonProps {
   chipText?: string;
   className?: string;
 }
-
-/** True inside the Telegram Mini App WebView (iOS ignores blob downloads). */
-function isTelegramWebView(): boolean {
-  try {
-    const platform = (window as unknown as { Telegram?: { WebApp?: { platform?: string } } })
-      .Telegram?.WebApp?.platform;
-    return typeof platform === "string" && platform.length > 0 && platform !== "unknown";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * The signed-in user's own Telegram chat id — the delivery target for the
- * report document. initDataUnsafe is not HMAC-verified, but it only chooses
- * WHO receives a report the server action already produced for THIS actor;
- * worst case a spoofed id mails the (already authorized) report to the
- * spoofer's own chat with the bot.
- */
-function getTelegramChatId(): string | null {
-  try {
-    const id = (
-      window as unknown as {
-        Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number | string } } } };
-      }
-    ).Telegram?.WebApp?.initDataUnsafe?.user?.id;
-    return id !== undefined && id !== null && String(id).length > 0 ? String(id) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** UTF-8-safe base64 in ~32k-byte chunks (no call-stack blowups on big md). */
-function utf8ToBase64(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
-
-/**
- * Send the .md report INTO the user's own Telegram chat via the forward
- * API (same envelope as notify/QR flows): {chat_id, method, payload, files}.
- */
-async function forwardReportToTelegram(
-  chatId: string,
-  markdown: string,
-  filename: string,
-  captionHtml: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const response = await fetch("/api/forward-telegram", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        method: "sendDocument",
-        payload: {
-          caption: captionHtml,
-          parse_mode: "HTML",
-        },
-        files: {
-          document: {
-            data: utf8ToBase64(markdown),
-            filename,
-            contentType: "text/markdown;charset=utf-8",
-          },
-        },
-      }),
-    });
-    const json = (await response.json().catch(() => null)) as
-      | { ok?: boolean; error?: string }
-      | null;
-    if (!response.ok || !json?.ok) {
-      return { ok: false, error: json?.error || `HTTP ${response.status}` };
-    }
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "forward failed" };
-  }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function hapticLight(): void {
-  try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred?: (s: string) => void } } } })
-      .Telegram?.WebApp?.HapticFeedback;
-    tg?.impactOccurred?.("light");
-  } catch {
-    /* haptics are cosmetic */
-  }
-}
-
-/** Blob-anchor download, same recipe as SalesAnalyticsClient's CSV export. */
-function downloadMarkdown(markdown: string, filename: string): void {
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Revoke on the next tick — Safari starts an async read of the blob URL.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** A multi-hundred-KB payload can freeze the WebView clipboard — skip it. */
-const CLIPBOARD_MAX_CHARS = 256 * 1024;
 
 type ButtonState = "idle" | "loading" | "done" | "failed";
 
@@ -241,24 +123,19 @@ export function BikeReportButton({
         // the user's own chat, openable/savable on any phone (iOS WebView
         // ignores blob downloads). Download remains the fallback when the
         // forward API is unavailable.
-        const chatId = isTelegramWebView() ? getTelegramChatId() : null;
-        let deliveredInTg = false;
-        if (chatId) {
-          const forward = await forwardReportToTelegram(
-            chatId,
-            markdown,
-            filename,
-            `Отчёт по арендам — <b>${escapeHtml(bikeLabel)}</b> (${escapeHtml(scope)})`,
-          );
-          deliveredInTg = forward.ok;
-        }
+        const delivered = await deliverReportFile(
+          markdown,
+          filename,
+          `Отчёт по арендам — <b>${escapeHtml(bikeLabel)}</b> (${escapeHtml(scope)})`,
+        );
 
-        if (!deliveredInTg) {
-          downloadMarkdown(markdown, filename);
-          const copied =
-            chatId && markdown.length <= CLIPBOARD_MAX_CHARS
-              ? await copyToClipboard(markdown)
-              : false;
+        if (delivered.via === "telegram") {
+          hapticLight();
+          toast.success(`Отчёт готов: ${bikeLabel}`, {
+            description: `${scope} · отправлен файлом в чат с ботом`,
+          });
+        } else {
+          const copied = delivered.via === "download+clipboard";
           if (copied) {
             toast.success(`Отчёт готов: ${bikeLabel}`, {
               description: `${scope} · файл сохранён, копия — в буфере обмена`,
@@ -269,11 +146,6 @@ export function BikeReportButton({
               duration: 6000,
             });
           }
-        } else {
-          hapticLight();
-          toast.success(`Отчёт готов: ${bikeLabel}`, {
-            description: `${scope} · отправлен файлом в чат с ботом`,
-          });
         }
         flashThenReset("done");
       } catch (err) {

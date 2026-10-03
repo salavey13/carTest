@@ -250,8 +250,10 @@ export function equipmentChips(equipment: unknown): Array<{ label: string; count
 
 // ── Wall stats ────────────────────────────────────────────────────────────────
 
-/** Statuses that earn money. Cancelled / expired-limbo rows never do. */
-const EARNING_STATUSES = new Set(["completed", "active", "confirmed", "pending_confirmation"]);
+/** Statuses that earn money. Cancelled / expired-limbo rows never do.
+ *  2026-10-03: exported — the story action's «Партнёру N%» KPI must count
+ *  the SAME earning set as computeBikeStats (one definition, two readers). */
+export const EARNING_STATUSES = new Set(["completed", "active", "confirmed", "pending_confirmation"]);
 
 /** MSK calendar month key ("2026-08") of an ISO date — the app tz convention. */
 export function mskMonthKey(iso: string | null | undefined, nowMs: number = Date.now()): string {

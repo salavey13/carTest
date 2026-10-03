@@ -23,6 +23,7 @@ import {
   type SubrenterOwnedBikesData,
   type SubrenterEarningsData,
 } from "@/app/franchize/server-actions/subrenter-monitoring";
+import { SubrenterReportButton } from "@/app/franchize/components/SubrenterReportButton";
 import {
   formatCurrency,
   isLiveRentalStatus,
@@ -176,11 +177,22 @@ export function SubrenterMyBikesPanel({
                   {formatCurrency(earnings.cutRub)}
                 </span>
                 <span className="text-[11px]" style={{ color: T.textMuted }}>
-                  ваша доля · {earnings.pct ?? 50}% от аренды байков {formatCurrency(earnings.bikePartRub)}
+                  {/* 2026-10-03 (boss): the headline IS the subrenter's total
+                      excluding equipment — labeled explicitly, same math as
+                      the report file and the payout sheet. */}
+                  итого вам за месяц (без экипировки) · {earnings.pct ?? 50}% от аренды байков{" "}
+                  {formatCurrency(earnings.bikePartRub)}
                   {earnings.equipmentRub > 0 && (
-                    <> · экипировка {formatCurrency(earnings.equipmentRub)} (не делится)</>
+                    <> · экипировка {formatCurrency(earnings.equipmentRub)} — экипажу</>
                   )}
                 </span>
+                <SubrenterReportButton
+                  slug={slug}
+                  month={month}
+                  actorUserId={userId}
+                  className="ml-auto"
+                  style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated, color: T.text }}
+                />
               </div>
               <p className="mt-1 text-[11px]" style={{ color: T.textMuted }}>
                 Аренд за месяц: {earnings.rentalCount} · Суммарно оплачено:{" "}

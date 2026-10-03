@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Search, Send, UserRound, History } from "lucide-react";
+import { RefreshCw, Search, Send, UserRound, History, FileDown } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -26,8 +26,14 @@ import {
 } from "@/app/franchize/lib/subrenter-user-search";
 import {
   generateSubrenterWeeklyReportAction,
+  getSubrenterMonthReportAction,
   type SubrentWeeklyReportResult,
 } from "@/app/franchize/server-actions/subrenter-monitoring";
+import { monthKeyToLabelRu } from "@/app/franchize/lib/subrenter-economics";
+import {
+  deliverReportFile,
+  escapeHtml,
+} from "@/app/franchize/lib/report-file-delivery";
 import { FranchizeOperatorPanel } from "./FranchizeOperatorSurface";
 
 interface BikeSubrenterRow {
@@ -86,6 +92,12 @@ export function SubrenterManagerPanel({
   const [reportPct, setReportPct] = useState("");
   const [reportBusy, setReportBusy] = useState<"self" | "send" | null>(null);
 
+  // ── Monthly subrenter report (2026-10-03, boss): «Итого партнёру (без
+  // экипировки)» one-pager for the selected partner + month. ──
+  const [monthReportChatId, setMonthReportChatId] = useState("");
+  const [monthReportMonth, setMonthReportMonth] = useState("");
+  const [monthReportBusy, setMonthReportBusy] = useState(false);
+
   useEffect(() => {
     // MSK current week boundaries (Mon..Sun)
     const nowMsk = new Date(Date.now() + 3 * 3600 * 1000);
@@ -96,6 +108,9 @@ export function SubrenterManagerPanel({
     const iso = (d: Date) => d.toISOString().slice(0, 10);
     setReportFrom(iso(monday));
     setReportTo(iso(sunday));
+    setMonthReportMonth(
+      `${nowMsk.getUTCFullYear()}-${String(nowMsk.getUTCMonth() + 1).padStart(2, "0")}`,
+    );
   }, []);
 
   const partners = useMemo(() => {
@@ -111,7 +126,8 @@ export function SubrenterManagerPanel({
 
   useEffect(() => {
     if (!reportChatId && partners.length > 0) setReportChatId(partners[0].chatId);
-  }, [partners, reportChatId]);
+    if (!monthReportChatId && partners.length > 0) setMonthReportChatId(partners[0].chatId);
+  }, [partners, reportChatId, monthReportChatId]);
 
   const runWeeklyReport = async (mode: "self" | "send") => {
     const userId = dbUser?.user_id;
@@ -166,6 +182,57 @@ export function SubrenterManagerPanel({
       toast.error(`Отчёт не сформирован — ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setReportBusy(null);
+    }
+  };
+
+  /** 2026-10-03: monthly subrenter report — the .md lands in the admin's own
+   *  TG chat (deliverReportFile) with a download fallback outside Telegram. */
+  const runMonthReport = async () => {
+    const userId = dbUser?.user_id;
+    if (!userId) {
+      toast.error("Пользователь ещё авторизуется — попробуйте ещё раз.");
+      return;
+    }
+    if (!monthReportChatId || !monthReportMonth) {
+      toast.error("Выберите партнёра и месяц.");
+      return;
+    }
+    setMonthReportBusy(true);
+    try {
+      const result = await getSubrenterMonthReportAction({
+        slug,
+        month: monthReportMonth,
+        chatId: monthReportChatId,
+        actorUserId: userId,
+        initData: getTelegramInitData(),
+      });
+      if (!result.success || !result.data) {
+        toast.error(`Отчёт не сформирован — ${result.error ?? "неизвестная ошибка"}`);
+        return;
+      }
+      const { markdown, filename, stats } = result.data;
+      const scope = monthKeyToLabelRu(monthReportMonth);
+      const delivered = await deliverReportFile(
+        markdown,
+        filename,
+        `Отчёт партнёру — <b>${escapeHtml(scope)}</b> · итого без экипировки <b>${escapeHtml(
+          `${stats.partnerRub.toLocaleString("ru-RU")} ₽`,
+        )}</b>`,
+      );
+      toast.success(
+        `Отчёт готов: ${scope}`,
+        {
+          duration: 6000,
+          description:
+            `Итого партнёру (без экипировки): ${stats.partnerRub.toLocaleString("ru-RU")} ₽ · ` +
+            `${stats.earningRentals} аренд · оборот ${stats.revenueRub.toLocaleString("ru-RU")} ₽` +
+            (delivered.via === "telegram" ? " · файл отправлен в чат с ботом" : ` · ${filename}`),
+        },
+      );
+    } catch (err) {
+      toast.error(`Отчёт не сформирован — ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setMonthReportBusy(false);
     }
   };
 
@@ -515,6 +582,58 @@ export function SubrenterManagerPanel({
                 >
                   <Send className="mr-1 h-3 w-3" />
                   {reportBusy === "send" ? "Отправляю…" : "Отправить партнёру"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Monthly subrenter report (2026-10-03, boss): the «total for
+              subrenter excluding equipment» one-pager — all his bikes, the
+              month, and «Итого партнёру (N% от мото, без экипировки)». ── */}
+          {partners.length > 0 && (
+            <div className="rounded-xl border p-3" style={{ borderColor: "var(--fr-admin-border)" }}>
+              <p className="text-xs font-semibold text-[var(--fr-admin-text)]">
+                Месячный отчёт партнёру (итого без экипировки)
+              </p>
+              <p className="mt-1 text-xs text-[var(--fr-admin-muted)]">
+                Все аренды байков партнёра за месяц + итоговая строка «Итого партнёру (N% от мото,
+                без экипировки)». Файлом в ваш Telegram, вне Telegram — загрузкой.
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1 text-xs text-[var(--fr-admin-muted)]">
+                  Партнёр
+                  <select
+                    value={monthReportChatId}
+                    onChange={(e) => setMonthReportChatId(e.target.value)}
+                    className="h-9 rounded-lg border bg-transparent px-2 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  >
+                    {partners.map((p) => (
+                      <option key={p.chatId} value={p.chatId} className="bg-zinc-900">
+                        {p.username ? `@${p.username}` : `ID ${p.chatId}`} · {p.bikes.length} мото
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-[var(--fr-admin-muted)]">
+                  Месяц
+                  <input
+                    type="month"
+                    value={monthReportMonth}
+                    onChange={(e) => setMonthReportMonth(e.target.value)}
+                    className="h-9 rounded-lg border bg-transparent px-2 text-xs text-[var(--fr-admin-text)] outline-none focus:border-[var(--fr-admin-accent)]"
+                    style={{ borderColor: "var(--fr-admin-border)" }}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 text-xs"
+                  disabled={monthReportBusy}
+                  onClick={() => void runMonthReport()}
+                >
+                  <FileDown className="mr-1 h-3 w-3" />
+                  {monthReportBusy ? "Готовим…" : "Сформировать"}
                 </Button>
               </div>
             </div>
