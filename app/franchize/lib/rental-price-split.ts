@@ -256,14 +256,20 @@ export interface PartnerSplit extends RentalPriceSplit {
  *   partner gets ownerPct% of the BIKE part only;
  *   the company keeps the gear part + the rest of the bike part.
  * Non-partner rentals: partnerRub = 0, companyRub = total.
+ *
+ * 2026-10-03 (boss polish): optional `window` — legacy rows (no persisted
+ * metadata.equipment_price) get the DURATION-AWARE gear estimate instead of
+ * the flat one, so the gear part is not OVER-excluded and the partner is not
+ * silently underpaid. Stored-split rows are unaffected (exact amounts win).
  */
 export function computePartnerSplit(input: {
   totalCost: number | string | null | undefined;
   metadata?: Metadata;
   subrenterChatId?: string | null;
   ownerPct?: number | null;
+  window?: EquipmentEstimateWindow | null;
 }): PartnerSplit {
-  const split = splitRentalPrice(input.totalCost, input.metadata);
+  const split = splitRentalPrice(input.totalCost, input.metadata, input.window);
   const ownerPct = resolveOwnerPct(input.ownerPct);
   const isPartnerBike = typeof input.subrenterChatId === "string" && input.subrenterChatId.trim().length > 0;
   if (!isPartnerBike) {

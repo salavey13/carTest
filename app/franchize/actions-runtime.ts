@@ -21,6 +21,11 @@ import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context
 import { computeTelegramWebAppHash } from "@/lib/telegram-webapp-auth";
 import { sanitizeTelegramText, oneLine as oneLineValue, escapeHtmlText } from "@/lib/tg-text";
 import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
+// 2026-10-03 (boss): ONE perk-string parser for BOTH the rental row's
+// metadata.equipment AND the return-todo block — the two sites used to
+// re-parse with divergent regexes (todos missed helmets with latin «x» and
+// pants everywhere). Pure module, test-pinned.
+import { parsePerkEquipmentFlags } from "@/app/franchize/lib/equipment-shared";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables, WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB, WEB_ORDER_DEFAULT_EQUIPMENT_DEPOSIT_RUB } from "@/app/lib/rental-contract-vars";
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
 import {
@@ -3210,20 +3215,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
       // The Item modal stores extras in the `perk` field as a human-readable
       // string like "🪖 Шлем ×1, 🧤 Перчатки, 🔌 Зарядка" or "стандарт".
       // We parse this back into the equipment object for the contract builder.
-      const perkStr = String((line as any).options?.perk || "").toLowerCase();
-      const equipment = {
-        helmets: (() => {
-          const m = perkStr.match(/шлем\s*×\s*(\d+)/i);
-          return m ? Number(m[1]) : 0;
-        })(),
-        gloves: /перчатк/.test(perkStr) ? 1 : 0,
-        jacket: /куртк/.test(perkStr),
-        boots: /бот[ыы]|сапог/.test(perkStr),
-        net: /сетк/.test(perkStr),
-        backpack: /рюкзак/.test(perkStr),
-        bag: /сумк|багажн/.test(perkStr),
-        charger: /зарядк/.test(perkStr),
-      };
+      // 2026-10-03: ONE shared parser (equipment-shared.ts) — this site used
+      // the strictest regex of the three (only «×», no helmet fallback, no
+      // pants), so the SIGNED CONTRACT could omit gear the client paid for.
+      const equipment = parsePerkEquipmentFlags((line as any).options?.perk);
 
       // Detect equipment-only rentals: no bike ID in the line or type='equipment'
       const isEquipmentOnlyLine = !car.id || car.type === 'equipment';
@@ -4251,20 +4246,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             : null;
           const depositMethodColumnValue = depositMethodColumnValueFor(resolvedDepositMethod);
           // Equipment parsed from the cart-line perk string (parity with /doc).
-          const rentalEquipment = (() => {
-            const perkStr = String(payload.cartLines[bikeIndex]?.options?.perk || "").toLowerCase();
-            const m = perkStr.match(/шлем\s*[×x]\s*(\d+)/i);
-            return {
-              helmets: m ? Number(m[1]) : (/шлем/.test(perkStr) ? 1 : 0),
-              gloves: /перчатк/.test(perkStr) ? 1 : 0,
-              jacket: /куртк/.test(perkStr),
-              boots: /бот|сапог/.test(perkStr),
-              net: /сетк/.test(perkStr),
-              backpack: /рюкзак/.test(perkStr),
-              bag: /сумк|багажн/.test(perkStr),
-              charger: /зарядк/.test(perkStr),
-            };
-          })();
+          // 2026-10-03: shared parser — same object the todo block below reads.
+          const rentalEquipment = parsePerkEquipmentFlags(
+            payload.cartLines[bikeIndex]?.options?.perk,
+          );
 
           // ── 2026-09-11: persist the ACTUAL charged bike/gear split ──
           // Before today the cash/card checkout path (this insert) never
@@ -4868,18 +4853,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           // before — "will be linked when rental row is confirmed").
           const todoRentalId = createdRentals.find((r) => r.bikeId === doc.bikeId)?.rentalId ?? null;
 
-          // Parse equipment from this bike's cart line perk string
-          const perkStr = String((line as any)?.options?.perk || "").toLowerCase();
-          const equip = {
-            helmets: (() => { const m = perkStr.match(/шлем\s*×\s*(\d+)/i); return m ? Number(m[1]) : 0; })(),
-            gloves: /перчатк/.test(perkStr) ? 1 : 0,
-            jacket: /куртк/.test(perkStr),
-            boots: /бот[ыы]|сапог/.test(perkStr),
-            net: /сетк/.test(perkStr),
-            backpack: /рюкзак/.test(perkStr),
-            bag: /сумк|багажн/.test(perkStr),
-            charger: /зарядк/.test(perkStr),
-          };
+          // Parse equipment from this bike's cart line perk string.
+          // 2026-10-03: SAME shared parser as metadata.equipment above — the
+          // old inline re-parse used divergent regexes (only «×», no helmet
+          // fallback, no pants), so return todos silently diverged from the
+          // rental row's flags.
+          const equip = parsePerkEquipmentFlags((line as any)?.options?.perk);
 
           const bikeLabel = `${bikeMake} ${bikeModel}`;
 
@@ -4983,6 +4962,10 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           if (equip.helmets > 0) todos.push({ title: `🪖 Принять ${equip.helmets} шлем(а/ов) от ${bikeLabel}`, priority: "medium" });
           if (equip.gloves > 0) todos.push({ title: `🧤 Принять ${equip.gloves} перчатки от ${bikeLabel}`, priority: "low" });
           if (equip.jacket) todos.push({ title: `🧥 Принять куртку от ${bikeLabel}`, priority: "low" });
+          // 2026-10-03: pants return todo — pants are chargeable gear
+          // (RENTAL_EXTRAS_PRICES_RUB) and /doc's metadata carries them, but
+          // the web todo list never asked for them back.
+          if (equip.pants) todos.push({ title: `👖 Принять штаны от ${bikeLabel}`, priority: "low" });
           if (equip.boots) todos.push({ title: `👢 Принять боты от ${bikeLabel}`, priority: "low" });
           if (equip.net) todos.push({ title: `🌐 Принять сетку от ${bikeLabel}`, priority: "low" });
           if (equip.backpack) todos.push({ title: `🎒 Принять рюкзак от ${bikeLabel}`, priority: "low" });

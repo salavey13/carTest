@@ -2538,6 +2538,10 @@ ${qrDeepLink}`);
       if ((context.helmets || 0) > 0) todos.push({ title: `🪖 Принять ${context.helmets} шлем(а/ов)`, priority: "medium" });
       if ((context.gloves || 0) > 0) todos.push({ title: `🧤 Принять ${context.gloves} перчатки`, priority: "low" });
       if (context.jacket) todos.push({ title: `🧥 Принять куртку`, priority: "low" });
+      // 2026-10-03: pants return todo — metadata.equipment stores pants and
+      // equipment_price charges them (2026-09-11 canon), but this list never
+      // asked for them back (parity with the web checkout todo fix).
+      if (context.pants) todos.push({ title: `👖 Принять штаны`, priority: "low" });
       if (context.boots) todos.push({ title: `👢 Принять боты`, priority: "low" });
       if (context.net) todos.push({ title: `🌐 Принять сетку`, priority: "low" });
       if (context.backpack) todos.push({ title: `👜 Принять рюкзак`, priority: "low" });

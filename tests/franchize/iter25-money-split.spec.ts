@@ -270,7 +270,9 @@ describe('iter25: CSV finance sheet', () => {
 
   it('equipment column uses the stored-first split and marks estimates with ~', () => {
     const s = src();
-    expect(s).toContain('getEquipmentCostPart(meta)');
+    // 2026-10-03: the call now also passes the rental window — the estimate
+    // fallback is duration-aware (half price <24h); stored split still wins.
+    expect(s).toContain('getEquipmentCostPart(meta, price, {');
     expect(s).toMatch(/equipExact \? "" : "~"/);
     // partner resolution prefers the metadata snapshot
     expect(s).toContain('subrenterIdSnapshot ?? subrenterChatIdFromSpecs');

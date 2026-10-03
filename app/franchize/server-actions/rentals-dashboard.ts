@@ -2396,6 +2396,26 @@ export async function updateRentalStatus(input: {
       }
     }
 
+    // ── 2026-10-03: auto-cancel linked equipment mirrors on CANCELLATION ──
+    // The completion cascade above never fired for cancelled rentals, so gear
+    // mirrors of an aborted trip stayed active forever (the exact phantom the
+    // owner hand-fixed on the cancelled honda CBR, Oct 2). Cancel the
+    // zero-money mirror rows together with the trip (best-effort).
+    const previousStatusForCancel = (rental as any)?.old_status as string | undefined;
+    if (status === "cancelled" && previousStatusForCancel !== "cancelled") {
+      try {
+        const { cancelLinkedEquipmentRentals } = await import("@/app/rentals/rental-cascade");
+        const cascade = await cancelLinkedEquipmentRentals(rentalId, actorUserId, {
+          reason: "primary_rental_cancelled",
+        });
+        if (cascade.closed > 0) {
+          console.log(`[update-rental-status] Auto-cancelled ${cascade.closed} linked equipment rental(s) for ${rentalId}:`, cascade.rentalIds);
+        }
+      } catch (cascadeErr) {
+        console.warn("[update-rental-status] Equipment cancel cascade failed (non-fatal):", cascadeErr);
+      }
+    }
+
     // ── ALWAYS notify renter on status change (v3 polish: was only if operatorMessage) ──
     // CRITICAL FIX: previously, if operator flipped status without typing a message,
     // the renter had NO IDEA their rental was marked completed/cancelled.

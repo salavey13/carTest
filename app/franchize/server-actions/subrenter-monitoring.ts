@@ -573,7 +573,7 @@ export async function getSubrenterMonthlyEarningsAction(input: {
       const winEnd = monthWindowIso(month);
       const { data: trendRentals } = await supabaseAdmin
         .from("rentals")
-        .select("vehicle_id,status,total_cost,agreed_start_date,requested_start_date,metadata")
+        .select("vehicle_id,status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,metadata")
         .in("vehicle_id", Array.from(bikeLabel.keys()))
         .gte("created_at", win.fromIso)
         .lte("created_at", winEnd.toIso)
@@ -588,6 +588,7 @@ export async function getSubrenterMonthlyEarningsAction(input: {
         status?: string | null;
         total_cost?: number | string | null;
         agreed_start_date?: string | null;
+        agreed_end_date?: string | null;
         requested_start_date?: string | null;
         metadata?: Record<string, unknown> | null;
       }>) {
@@ -595,7 +596,12 @@ export async function getSubrenterMonthlyEarningsAction(input: {
         const m = mskLocalMonth(start);
         const bucket = buckets.get(m);
         if (!bucket) continue;
-        const equipmentRub = getEquipmentCostPart(r.metadata, r.total_cost);
+        // 2026-10-03: duration-aware gear estimate for legacy rows — the trend
+        // bars now match the month summary above (same window source).
+        const equipmentRub = getEquipmentCostPart(r.metadata, r.total_cost, {
+          startIso: start,
+          endIso: r.agreed_end_date ?? null,
+        });
         bucket.cutRub += getSubrenterCut(r.total_cost ?? 0, equipmentRub, sharePct);
         bucket.rentalCount += 1;
       }
@@ -858,6 +864,9 @@ export interface SubrenterPayoutRow {
   paidRub: number;
   /** Осталось выплатить (≥0): payoutRub − paidRub. */
   remainingRub: number;
+  /** Доля партнёра, применённая в этой строке (контракт → 50) — 2026-10-03:
+   *  раньше лист всегда считал 50%, а панель партнёра — контрактный pct. */
+  pct: number;
   summary: SubrenterMonthSummary;
 }
 
@@ -870,6 +879,8 @@ export interface SubrentersMonthlyPayoutsData {
   totalRemainingRub: number;
   /** Суммарно уже выплачено в этом месяце. */
   totalPaidRub: number;
+  /** Доля, применённая ко всем строкам листа (контракт → 50). */
+  pct: number;
 }
 
 /**
@@ -929,7 +940,7 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
       chatId: typeof b.specs?.subrenter_chat_id === "string" ? b.specs.subrenter_chat_id : "",
     })).filter((b: { chatId: string }) => b.chatId.length > 0);
     if (partnerBikes.length === 0) {
-      return { success: true, data: { month, rows: [], totalPayoutRub: 0, totalPaidRub: 0, totalRemainingRub: 0 } };
+      return { success: true, data: { month, rows: [], totalPayoutRub: 0, totalPaidRub: 0, totalRemainingRub: 0, pct: 50 } };
     }
 
     const bikeByChat = new Map<string, { bikeId: string; label: string }[]>();
@@ -1071,10 +1082,16 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
     }
 
     const rows: SubrenterPayoutRow[] = [];
+    // 2026-10-03 pct parity: the owner's payout sheet used the DEFAULT 50% —
+    // the partner's own profile panel (getSubrenterMonthlyEarningsAction)
+    // resolves the contract artifact's owner_percentage. For a non-50
+    // contract the two surfaces disagreed about THE SAME money. One source:
+    const sheetPct = await resolveSubrenterSharePct(crew.id);
     for (const [chatId, list] of rentalsByChat) {
       const user = userByChatId.get(chatId);
       const summary = summarizeSubrenterMonth(month, list, {
         docLinkBase: `/franchize/${slug}/rental`,
+        pct: sheetPct,
       });
       const payoutRub = summary.cutRub;
       const paidRub = paidByChat.get(chatId) ?? 0;
@@ -1089,6 +1106,7 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
         payoutRub,
         paidRub,
         remainingRub: Math.max(0, payoutRub - paidRub),
+        pct: sheetPct,
         summary,
       });
     }
@@ -1110,8 +1128,10 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
         payoutRub: 0,
         paidRub,
         remainingRub: 0,
+        pct: sheetPct,
         summary: summarizeSubrenterMonth(month, [], {
           docLinkBase: `/franchize/${slug}/rental`,
+          pct: sheetPct,
         }),
       });
     }
@@ -1125,6 +1145,7 @@ export async function getSubrentersMonthlyPayoutsAction(input: {
         totalPayoutRub: rows.reduce((s, r) => s + r.payoutRub, 0),
         totalPaidRub: rows.reduce((s, r) => s + r.paidRub, 0),
         totalRemainingRub: rows.reduce((s, r) => s + r.remainingRub, 0),
+        pct: sheetPct,
       },
     };
   } catch (error) {

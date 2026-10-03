@@ -130,6 +130,101 @@ export async function closeLinkedEquipmentRentals(
   }
 }
 
+/**
+ * Auto-CANCEL every open equipment rental linked to `primaryRentalId` when the
+ * PRIMARY rental is cancelled (abortRental / updateRentalStatus → cancelled).
+ *
+ * 2026-10-03 (boss polish, same phantom class the owner fixed by hand on
+ * Oct 2 — helmet 5708be39 stayed «Выдан» under the cancelled honda d0a4748a
+ * and floated over the dashboard until a manual relink): the completion
+ * cascade (closeLinkedEquipmentRentals) never fired for cancellations, so
+ * gear mirrors of an aborted trip stayed active forever. The mirrors are
+ * zero-money inventory rows (total_cost = 0), so CANCELLING them (not
+ * completing) is semantically right: the trip never happened, and if the
+ * gear physically went out under another rental the operator re-links it
+ * (the same manual move the owner did). Pending todos bound to the mirror
+ * rows are closed together, mirroring the completion cascade.
+ * Best-effort: never breaks the caller's cancellation flow.
+ */
+export async function cancelLinkedEquipmentRentals(
+  primaryRentalId: string,
+  cancelledBy: string,
+  opts?: { reason?: string },
+): Promise<CascadeCloseResult> {
+  const empty: CascadeCloseResult = { closed: 0, rentalIds: [] };
+  if (!primaryRentalId) return empty;
+
+  try {
+    const { data: linked, error } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, metadata, status")
+      .eq("metadata->>primary_rental_id", primaryRentalId)
+      .eq("metadata->>item_type", "equipment")
+      .in("status", OPEN_RENTAL_STATUSES);
+
+    if (error) {
+      logger.error("[rental-cascade] Failed to fetch linked equipment rentals (cancel):", error);
+      return { ...empty, error: error.message };
+    }
+    if (!linked || linked.length === 0) return empty;
+
+    const nowIso = new Date().toISOString();
+    const cancelledIds: string[] = [];
+
+    for (const row of linked) {
+      const meta = (row.metadata || {}) as Record<string, unknown>;
+      const nextMetadata = {
+        ...meta,
+        auto_closed: {
+          at: nowIso,
+          by: cancelledBy,
+          reason: opts?.reason || "primary_rental_cancelled",
+          primary_rental_id: primaryRentalId,
+        },
+      };
+
+      const { error: updErr } = await supabaseAdmin
+        .from("rentals")
+        .update({
+          status: "cancelled",
+          metadata: nextMetadata,
+          updated_at: nowIso,
+        })
+        .eq("rental_id", row.rental_id);
+
+      if (updErr) {
+        logger.error(`[rental-cascade] Failed to cancel equipment rental ${row.rental_id}:`, updErr);
+        continue;
+      }
+      cancelledIds.push(row.rental_id);
+    }
+
+    // Close pending todos bound to the cancelled mirror rows (same cleanup
+    // shape as the completion cascade — the rows need no further action).
+    if (cancelledIds.length > 0) {
+      try {
+        await supabaseAdmin
+          .from("crew_todos")
+          .update({ status: "done", completed_at: nowIso })
+          .in("rental_id", cancelledIds)
+          .eq("status", "pending");
+      } catch (todoErr) {
+        logger.warn("[rental-cascade] Failed to close todos for cancelled mirrors (non-fatal):", todoErr);
+      }
+    }
+
+    logger.info("[rental-cascade] Auto-cancelled linked equipment rentals", {
+      primaryRentalId,
+      closed: cancelledIds.length,
+      ids: cancelledIds,
+    });
+    return { closed: cancelledIds.length, rentalIds: cancelledIds };
+  } catch (err) {
+    logger.error("[rental-cascade] cancelLinkedEquipmentRentals exception:", err);
+    return { ...empty, error: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
 export interface SupersedeResult {
   ok: boolean;
   closedOriginal: boolean;

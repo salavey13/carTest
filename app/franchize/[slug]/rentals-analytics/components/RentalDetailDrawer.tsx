@@ -198,10 +198,16 @@ export function RentalDetailDrawer({
   const gearConditionColor = equipmentConditionColor(gear.condition);
   // iter25: moto-vs-gear split + company-vs-partner split of this rental.
   // Stored amounts (exact) when the rental carries them; estimate fallback.
+  // 2026-10-03: duration-aware window — legacy rows estimate gear from the
+  // real rental window (half price <24h), same math as the reports/KPIs.
   const moneySplit = computePartnerSplit({
     totalCost: rental.total_cost,
     metadata: md,
     subrenterChatId: rental.subrenterChatId ?? null,
+    window: {
+      startIso: rental.agreed_start_date || rental.requested_start_date || null,
+      endIso: rental.agreed_end_date || rental.requested_end_date || null,
+    },
   });
   // Payment split (bank/cash/card destination)
   const paymentSplit = getPaymentSplit(rental);

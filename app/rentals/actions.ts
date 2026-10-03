@@ -1049,6 +1049,24 @@ export async function abortRental(input: {
             logger.error('[abortRental] Rental updated but failed to create event:', eventError);
         }
 
+        // ── 2026-10-03: auto-cancel linked equipment mirrors on ABORT ─────
+        // Gear issued under this rental (metadata.item_type='equipment',
+        // metadata.primary_rental_id = this rental) used to stay active after
+        // an operator abort — the exact phantom the owner hand-fixed on the
+        // cancelled honda CBR (Oct 2). Cancel the zero-money mirror rows
+        // together with the trip (best-effort, never blocks the abort).
+        try {
+            const { cancelLinkedEquipmentRentals } = await import('@/app/rentals/rental-cascade');
+            const cascade = await cancelLinkedEquipmentRentals(rentalId, actorUserId, {
+                reason: 'primary_rental_cancelled',
+            });
+            if (cascade.closed > 0) {
+                logger.info(`[abortRental] Auto-cancelled ${cascade.closed} linked equipment rental(s) for ${rentalId}:`, cascade.rentalIds);
+            }
+        } catch (cascadeErr) {
+            logger.warn('[abortRental] Equipment cancel cascade failed (non-fatal):', cascadeErr);
+        }
+
         // Notify renter + owner
         await notifyRentalLifecycle(rentalId, 'rental_archived');
 

@@ -570,6 +570,13 @@ export async function getBikeStoryAction(params: {
           metadata: md,
           subrenterChatId: bikeSubrenterChatId,
           ownerPct: sharePct,
+          // 2026-10-03: duration-aware gear estimate for legacy rows — same
+          // window every other money surface uses (agreed → requested →
+          // created fallback, matching the wall's month scoping).
+          window: {
+            startIso: r.agreed_start_date || r.created_at,
+            endIso: r.agreed_end_date || null,
+          },
         });
         if (!(split.partnerRub > 0)) continue;
         partnerRubAll += split.partnerRub;
@@ -700,6 +707,12 @@ export async function getBikeStoryAction(params: {
         metadata: md,
         subrenterChatId: resolveRentalSubrenterChatId(md, bikeSubrenterChatId),
         ownerPct: sharePct,
+        // 2026-10-03: duration-aware gear estimate for legacy rows (parity
+        // with the KPI loop above and the reports).
+        window: {
+          startIso: r.agreed_start_date || r.created_at,
+          endIso: r.agreed_end_date || null,
+        },
       });
 
       const operatorChatId = r.created_by_operator_chat_id || r.user_id || null;

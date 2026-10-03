@@ -329,6 +329,40 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
     activeSnapRef.current = activeSnap;
   }, [activeSnap]);
 
+  // ── Sheet scroll fix (boss 2026-10-03: «in some tabs besides wall scrolling
+  // is fucked») ── two stacked causes:
+  //   1. STALE SCROLL POSITION: the wall segment is ALWAYS mounted and only
+  //      toggled via `hidden` (display:none), so its feed keeps the deck's
+  //      scrollTop. Switching Стена→Лист/Топ swapped the body content under
+  //      the scroller while the scroll position belonged to the (now hidden)
+  //      wall — Лист could open mid-scrolled or glued to the bottom, and a
+  //      same-frame display:none→block flip left the touch scroller in a
+  //      janky state. Fix: remember each segment's scrollTop and restore the
+  //      incoming segment's own (default 0 — a segment opens at its top).
+  //   2. BODY TALLER THAN THE SNAP: the scroller was capped at a fixed 82dvh
+  //      regardless of the active snap, so at Лист/Топ's 0.66 snap the bottom
+  //      of the scroll area lived BELOW the screen edge — content scrolled
+  //      into a zone nobody can see, which reads exactly as «scrolling is
+  //      fucked». Fix: cap the body to the active snap (min(82dvh,
+  //      snap·dvh − chrome)) so every scrollable pixel is on screen.
+  const sheetBodyRef = useRef<HTMLDivElement | null>(null);
+  const segmentScrollTopRef = useRef<Record<MapRidersSheetSegment, number>>({ wall: 0, list: 0, top: 0 });
+  const prevSegmentRef = useRef<MapRidersSheetSegment>(sheetSegment);
+  useEffect(() => {
+    const el = sheetBodyRef.current;
+    const prev = prevSegmentRef.current;
+    if (prev !== sheetSegment) {
+      if (el) {
+        // Save where the outgoing segment was scrolled to, restore the
+        // incoming segment's own position (a segment opens at its top unless
+        // the user left it mid-scroll earlier).
+        segmentScrollTopRef.current[prev] = el.scrollTop;
+        el.scrollTop = segmentScrollTopRef.current[sheetSegment] ?? 0;
+      }
+      prevSegmentRef.current = sheetSegment;
+    }
+  }, [sheetSegment]);
+
   // Segment select with toggle semantics: tapping the nav tab of the ALREADY
   // active expanded segment collapses the deck (Мини) — one sheet, no
   // stacking, and the second tap is always a useful "get this out of my way".
@@ -1412,10 +1446,16 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 it redirected the first downward swipe to "collapse the sheet",
                 so scrolling the wall felt like fighting the sheet (user report).
                 Drag-to-resize stays on the handle/header/buttons OUTSIDE this
-                div. overscroll-contain stops scroll chaining to the map page. */}
+                div. overscroll-contain stops scroll chaining to the map page.
+                2026-10-03 scroll fix: the body is capped to the ACTIVE SNAP
+                (min(82dvh, snap·dvh − ~118px chrome)) so the scroll area never
+                extends below the screen edge, and the element carries
+                sheetBodyRef for the per-segment scroll restore. */}
             <div
+              ref={sheetBodyRef}
               data-vaul-no-drag
-              className={`mx-auto max-h-[82dvh] w-full max-w-6xl overflow-y-auto overscroll-contain pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}
+              className={`mx-auto w-full max-w-6xl overflow-y-auto overscroll-contain pb-[calc(8.5rem+env(safe-area-inset-bottom))] ${activeSnap <= 0.2 ? "pointer-events-none opacity-70" : "pointer-events-auto opacity-100"}`}
+              style={{ maxHeight: `min(82dvh, max(8rem, calc(${Math.round(activeSnap * 100)}dvh - 118px)))` }}
             >
               {/* ── WALL segment (default) — ALWAYS mounted: the feed keeps its
                   posts/scroll while the user flips to Лист/Топ and back (no

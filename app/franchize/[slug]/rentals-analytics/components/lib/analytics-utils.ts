@@ -924,12 +924,19 @@ export function computeAnalyticsKpis(
   // were not charged, so they are not crew money either). iter32: the total
   // is passed so standalone gear rentals (bot /ekip, equipment-only checkout)
   // count as GEAR revenue instead of inflating the bike part.
+  // 2026-10-03: duration-aware estimate window for legacy rows — a today-
+  // rental with gear is HALF price under 24h; the flat estimate over-counted
+  // gear and (for subrented bikes) under-paid the partner tile.
+  const estimateWindow = (r: KpiRentalRow) => ({
+    startIso: r.agreed_start_date || r.requested_start_date || null,
+    endIso: r.agreed_end_date || r.requested_end_date || null,
+  });
   const equipmentPartToday = revenueRows
-    .reduce((sum, r) => sum + getEquipmentCostPart(r.metadata, r.total_cost), 0);
+    .reduce((sum, r) => sum + getEquipmentCostPart(r.metadata, r.total_cost, estimateWindow(r)), 0);
   // Subrenter cut: 50% of the BIKE part (total − equipment) of subrented bikes.
   const owedToSubrentersToday = revenueRows
     .filter((r) => typeof r.subrenterChatId === "string" && r.subrenterChatId)
-    .reduce((sum, r) => sum + getSubrenterCut(r.total_cost, getEquipmentCostPart(r.metadata, r.total_cost)), 0);
+    .reduce((sum, r) => sum + getSubrenterCut(r.total_cost, getEquipmentCostPart(r.metadata, r.total_cost, estimateWindow(r))), 0);
   return {
     totalToday: startedToday.length,
     revenueToday,

@@ -255,12 +255,15 @@ describe("iter18 · computeAnalyticsKpis — money split counters", () => {
       { ...baseRow, status: "cancelled", total_cost: 9999, metadata: { equipment: { helmets: 2 } } },
     ];
     const kpis = computeAnalyticsKpis(rows, DATE);
-    expect(kpis.equipmentPartToday).toBe(1500); // 1000 + 500; gift gloves 0; cancelled excluded
+    // 2026-10-03 canon: the KPI row window is 12:00→18:00 (6h < 24h) → HALF
+    // price (helmet 500 + gloves 250). Gift gloves 0; cancelled excluded.
+    expect(kpis.equipmentPartToday).toBe(750);
   });
 
   it("owed to subrenters: 50% of the BIKE part of subrented bikes only", () => {
     const rows = [
-      // subrented bike, 12000 with 1 helmet (1000): cut = 50% × 11000 = 5500
+      // subrented bike, 12000 with 1 helmet — 6h window → helmet 500 (half):
+      // cut = 50% × 11500 = 5750 (was 5500 under the old flat estimate)
       { ...baseRow, total_cost: 12000, metadata: { equipment: { helmets: 1 } }, subrenterChatId: "687580818" },
       // OWN bike — no split
       { ...baseRow, total_cost: 3500, metadata: null, subrenterChatId: null },
@@ -268,7 +271,7 @@ describe("iter18 · computeAnalyticsKpis — money split counters", () => {
       { ...baseRow, status: "cancelled", total_cost: 8000, metadata: null, subrenterChatId: "687580818" },
     ];
     const kpis = computeAnalyticsKpis(rows, DATE);
-    expect(kpis.owedToSubrentersToday).toBe(5500);
+    expect(kpis.owedToSubrentersToday).toBe(5750);
   });
 
   it("zero-state: no equipment and no subrented bikes → both counters are 0", () => {

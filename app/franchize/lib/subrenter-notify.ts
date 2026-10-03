@@ -143,7 +143,13 @@ export async function notifySubrenterOfRentalActivation(
     // partner renting his own bike) — still returns the chat id.
     // iter32: pass the total — equipment-only rows (if a partner's bike ever
     // produces one) must not shift the split base.
-    const equipmentRub = getEquipmentCostPart(md, totalCost);
+    // 2026-10-03: duration-aware gear estimate for legacy rows (no stored
+    // metadata.equipment_price) — the message's cut now matches the profile
+    // panel and the reports instead of the flat legacy estimate.
+    const equipmentRub = getEquipmentCostPart(md, totalCost, {
+      startIso: startDate,
+      endIso: endDate,
+    });
     const cutRub = getSubrenterCut(totalCost, equipmentRub, pct);
     const bikeTitle = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.id);
 
@@ -241,7 +247,12 @@ export async function notifySubrenterOfRentalCompletion(
           : "";
     if (!subrenterChatId) return "";
 
-    const equipmentRub = getEquipmentCostPart(md, totalCost);
+    // 2026-10-03: same duration-aware window as the activation message —
+    // legacy rows estimate gear from the real rental window, not flat.
+    const equipmentRub = getEquipmentCostPart(md, totalCost, {
+      startIso: startDate,
+      endIso: endDate,
+    });
     const cutRub = getSubrenterCut(totalCost, equipmentRub, pct);
     const bikeTitle = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || String(vehicle.id);
 

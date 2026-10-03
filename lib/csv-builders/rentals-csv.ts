@@ -175,7 +175,12 @@ export async function buildRentalsCsv(
 
     // iter25: moto/gear split of THIS rental — stored amounts (exact) when the
     // row carries them (iter25+ writers), unit-price estimate for legacy rows.
-    const equipmentPartRub = getEquipmentCostPart(meta);
+    // 2026-10-03: duration-aware window — legacy rows pro-rate the gear part
+    // from the real rental window (half price <24h), matching every report.
+    const equipmentPartRub = getEquipmentCostPart(meta, price, {
+      startIso: startDate,
+      endIso: endDate,
+    });
     totalEquipment += equipmentPartRub;
 
     // iter25: partner payout — subrented bikes only. The metadata snapshot

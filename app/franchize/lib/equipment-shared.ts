@@ -291,6 +291,55 @@ export const EQUIPMENT_FLAG_TO_CATEGORY: Record<string, string> = {
 };
 
 /**
+ * Equipment flags parsed from a cart-line perk string (web checkout).
+ * ONE parser for BOTH consumers that used to re-parse the string with
+ * DIVERGENT regexes (2026-10-03 boss: «doublecheck that "todo"s are created
+ * correctly during rental creation»):
+ *   • the rental row's metadata.equipment — tolerated «шлем x 2» (latin x)
+ *     and fell back to 1 helmet on a bare «шлем»;
+ *   • the return-todo block — matched ONLY the «×» glyph and had no helmet
+ *     fallback, so a perk like «Шлем x 2» produced helmets: 2 in metadata
+ *     but NO helmet return todo (the operator forgot to take it back).
+ * Same keys as metadata.equipment / DocFlowContext flags: quantities for
+ * helmets/gloves, booleans for the rest; charger is a freebie (no todo money
+ * impact but still gets a return todo).
+ */
+export interface PerkEquipmentFlags {
+  helmets: number;
+  gloves: number;
+  jacket: boolean;
+  pants: boolean;
+  boots: boolean;
+  net: boolean;
+  backpack: boolean;
+  bag: boolean;
+  charger: boolean;
+}
+
+export function parsePerkEquipmentFlags(perkStrRaw: string | null | undefined): PerkEquipmentFlags {
+  const perkStr = String(perkStrRaw || "").toLowerCase();
+  // Helmet quantity: «Шлем × 2» / «шлем x 2» / «Шлем х 2» (latin x AND cyrillic х),
+  // bare «шлем» → 1. (Old todo-side regex matched only the × glyph.)
+  const helmetMatch = perkStr.match(/шлем\s*[×xх]\s*(\d+)/i);
+  return {
+    helmets: helmetMatch ? Number(helmetMatch[1]) : /шлем/.test(perkStr) ? 1 : 0,
+    gloves: /перчатк/.test(perkStr) ? 1 : 0,
+    jacket: /куртк/.test(perkStr),
+    // «Штаны» — was missing from BOTH web-flow parsers entirely while the
+    // price table (RENTAL_EXTRAS_PRICES_RUB / EQUIPMENT_UNIT_PRICES_RUB) and
+    // the /doc metadata.equipment carry pants: a web order with pants charged
+    // 500₽ nobody tracked and no return todo existed.
+    pants: /штан/.test(perkStr),
+    boots: /бот|сапог/.test(perkStr),
+    net: /сетк/.test(perkStr),
+    backpack: /рюкзак/.test(perkStr),
+    bag: /сумк|багажн/.test(perkStr),
+    charger: /зарядк/.test(perkStr),
+  };
+}
+
+
+/**
  * Resolve a REAL per-crew cars.id for an equipment category.
  *
  * Replaces the phantom `EQUIPMENT_FLAG_TO_CAR_ID` constants (slug-less ids like
