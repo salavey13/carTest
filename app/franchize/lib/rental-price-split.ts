@@ -48,6 +48,34 @@ export const EQUIPMENT_UNIT_PRICE_FALLBACK_RUB = 500;
 /** Default partner share of the bike part (subrent contract §5.5). */
 export const DEFAULT_OWNER_PCT = 50;
 
+/**
+ * Rental window for the DURATION-AWARE gear estimate (2026-10-03, boss:
+ * «more precisely calculate prices … for equipment»). Legacy rows without the
+ * persisted split used to be estimated at the FLAT per-rental price — a 3-hour
+ * rental with a helmet was charged a full 1 000 ₽ in estimates while the
+ * pricing canon (lib/rental-pricing-calculator.ts, owner rule 2026-09-11)
+ * actually charges HALF price for <24h. One formula everywhere:
+ *   • window < 24h          → half of the unit price;
+ *   • window ≥ 24h          → day 1 full + every next day half;
+ *   • no/ broken window     → flat unit price (old behaviour, safe fallback).
+ */
+export interface EquipmentEstimateWindow {
+  startIso?: string | null;
+  endIso?: string | null;
+}
+
+/** Duration-aware unit price (₽) for one gear unit over the rental window. */
+export function durationAwareUnitPrice(baseRub: number, window?: EquipmentEstimateWindow | null): number {
+  if (!(baseRub > 0)) return 0;
+  const start = Date.parse(window?.startIso || "");
+  const end = Date.parse(window?.endIso || "");
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return baseRub;
+  const hours = (end - start) / (60 * 60 * 1000);
+  if (hours < 24) return Math.round(baseRub / 2);
+  const days = Math.max(1, Math.ceil(hours / 24));
+  return baseRub + Math.round(baseRub / 2) * (days - 1);
+}
+
 /** metadata keys — keep in sync with writers in doc-manual.ts / franchize-order.ts */
 export const META_EQUIPMENT_PRICE = "equipment_price";
 export const META_BIKE_PRICE = "bike_price";
@@ -88,7 +116,7 @@ export function getStoredEquipmentPrice(metadata: Metadata): number | null {
  * ZERO revenue — it was not charged, so it is neither crew money nor part of
  * the split.
  */
-export function estimateEquipmentPrice(metadata: Metadata): number {
+export function estimateEquipmentPrice(metadata: Metadata, window?: EquipmentEstimateWindow | null): number {
   const eq = metadata?.["equipment"];
   if (!eq || typeof eq !== "object" || Array.isArray(eq)) return 0;
   let total = 0;
@@ -96,7 +124,8 @@ export function estimateEquipmentPrice(metadata: Metadata): number {
     if (key.endsWith("_gift")) continue;
     const gifted = (eq as Record<string, unknown>)[`${key}_gift`] === true;
     if (gifted) continue;
-    const unitPrice = EQUIPMENT_UNIT_PRICES_RUB[key] ?? EQUIPMENT_UNIT_PRICE_FALLBACK_RUB;
+    const baseUnit = EQUIPMENT_UNIT_PRICES_RUB[key] ?? EQUIPMENT_UNIT_PRICE_FALLBACK_RUB;
+    const unitPrice = durationAwareUnitPrice(baseUnit, window);
     let qty = 0;
     if (typeof value === "number" && value > 0) qty = value;
     else if (value === true) qty = 1;
@@ -110,13 +139,13 @@ export function estimateEquipmentPrice(metadata: Metadata): number {
  * price when present, estimate otherwise. Prefer splitRentalPrice() when the
  * total IS known — it additionally clamps the gear part to the total.
  */
-export function getRentalEquipmentPart(metadata: Metadata): number {
+export function getRentalEquipmentPart(metadata: Metadata, window?: EquipmentEstimateWindow | null): number {
   // iter32: for standalone gear rows (item_type="equipment") the stored/
   // estimate chain has no basis (no flags, no persisted split) and returns 0.
   // Without the total we cannot know the exact gear amount — callers that DO
   // know the total must use getEquipmentCostPart(metadata, total) from
   // subrenter-economics, which returns the full total for equipment-only rows.
-  return getStoredEquipmentPrice(metadata) ?? estimateEquipmentPrice(metadata);
+  return getStoredEquipmentPrice(metadata) ?? estimateEquipmentPrice(metadata, window);
 }
 
 export type PriceSplitSource = "stored" | "estimated" | "equipment_total" | "linked_inventory";
@@ -160,6 +189,7 @@ export function isLinkedEquipmentRow(metadata: Metadata): boolean {
 export function splitRentalPrice(
   totalCost: number | string | null | undefined,
   metadata: Metadata,
+  window?: EquipmentEstimateWindow | null,
 ): RentalPriceSplit {
   // 2026-09-13 double-count fix: a gear row LINKED to its primary bike rental
   // is an inventory mirror — its money lives in the primary rental. Zero in
@@ -182,7 +212,7 @@ export function splitRentalPrice(
     const equipmentPartRub = Math.min(Math.round(stored), totalRub);
     return { totalRub, bikePartRub: totalRub - equipmentPartRub, equipmentPartRub, source: "stored" };
   }
-  const equipmentPartRub = Math.min(estimateEquipmentPrice(metadata), totalRub);
+  const equipmentPartRub = Math.min(estimateEquipmentPrice(metadata, window), totalRub);
   return { totalRub, bikePartRub: totalRub - equipmentPartRub, equipmentPartRub, source: "estimated" };
 }
 

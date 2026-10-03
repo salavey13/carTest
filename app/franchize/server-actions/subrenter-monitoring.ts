@@ -1080,8 +1080,15 @@ export async function generateSubrenterWeeklyReportAction(
       // («стоимость мота и экипа отдельно»). Stored amounts (exact) when the
       // rental carries them, unit-price estimate for legacy rows.
       // iter32: pass the total so standalone gear rows count as gear revenue.
+      // 2026-10-03: legacy estimates are now DURATION-AWARE (owner canon:
+      // <24h → half price, day 1 full + halves after) — the DOCX appendix,
+      // the partner's profile panel and the Мотопарк report agree even on
+      // rows without a persisted split.
       const rub = Math.round(Number(r.total_cost) || 0);
-      const equipmentRub = getEquipmentCostPart(r.metadata, rub);
+      const equipmentRub = getEquipmentCostPart(r.metadata, rub, {
+        startIso: r.agreed_start_date ?? null,
+        endIso: r.agreed_end_date ?? null,
+      });
       const bikeRub = getBikeRevenuePart(rub, equipmentRub);
       return {
         bike: bikeLabel.get(String(r.vehicle_id ?? "")) ?? String(r.vehicle_id ?? ""),

@@ -32,6 +32,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
+import { resolveSubrenterSharePct } from "@/app/franchize/lib/subrenter-notify";
 import {
   computeBikeStats,
   effectiveStatus,
@@ -796,8 +797,8 @@ interface ReportRentalsRow {
   requested_end_date: string | null;
   created_at: string | null;
   user_id: string | null;
-  /** metadata->>renter_name */
-  renter_name: string | null;
+  /** full rentals.metadata — bike/equipment split + renter_name (2026-10-03) */
+  metadata: Record<string, unknown> | null;
 }
 
 export async function getBikeRentalsReportAction(params: {
@@ -824,7 +825,7 @@ export async function getBikeRentalsReportAction(params: {
 
     const { data: car } = await supabaseAdmin
       .from("cars")
-      .select("id, make, model")
+      .select("id, make, model, specs")
       .eq("id", bikeId)
       .eq("crew_id", crewId)
       .eq("type", "bike")
@@ -846,7 +847,7 @@ export async function getBikeRentalsReportAction(params: {
     const { data: rentals, error: rentalsErr } = await supabaseAdmin
       .from("rentals")
       .select(
-        "rental_id,status,payment_status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,requested_end_date,created_at,user_id,metadata->>renter_name",
+        "rental_id,status,payment_status,total_cost,agreed_start_date,agreed_end_date,requested_start_date,requested_end_date,created_at,user_id,metadata",
       )
       .eq("vehicle_id", bikeId)
       .order("created_at", { ascending: true });
@@ -885,9 +886,23 @@ export async function getBikeRentalsReportAction(params: {
       createdAt: r.created_at ?? null,
       clientName: resolveReportClientName(
         r.user_id ? usersByName.get(String(r.user_id)) : undefined,
-        r.renter_name,
+        typeof r.metadata?.renter_name === "string" ? r.metadata.renter_name : null,
       ),
+      metadata: r.metadata ?? null,
     }));
+
+    // 2026-10-03 (boss): partner-bike context for the «Партнёру N%» column.
+    // The share pct is the SAME source the weekly DOCX appendix and the
+    // partner's profile panel pay with (latest contract artifact → 50%).
+    const subrenterChatId =
+      typeof (car.specs as { subrenter_chat_id?: unknown } | null)?.subrenter_chat_id === "string"
+        ? ((car.specs as { subrenter_chat_id: string }).subrenter_chat_id.trim() || null)
+        : null;
+    let subrent: { chatId: string; pct: number } | null = null;
+    if (subrenterChatId) {
+      const pct = await resolveSubrenterSharePct(crewId);
+      subrent = { chatId: subrenterChatId, pct };
+    }
 
     const { markdown, filename } = buildBikeRentalsReport({
       bikeLabel: `${car.make || ""} ${car.model || ""}`.trim() || String(car.id),
@@ -895,6 +910,7 @@ export async function getBikeRentalsReportAction(params: {
       crewName: crew?.name ? String(crew.name) : "",
       rentals: rows,
       month: normalizeMonthParam(params.month),
+      subrent,
       // Deep links must follow the crew-bot chain (metadata → env → platform
       // default) — raw TELEGRAM_BOT_USERNAME is UNSET in prod; two boss bugs
       // (2026-09-21/22) were exactly this class of wrong-bot links.

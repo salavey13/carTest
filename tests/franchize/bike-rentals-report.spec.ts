@@ -101,17 +101,26 @@ describe("bike-rentals-report: golden R6 sample", () => {
     expect(out.markdown).toContain("- Средний чек: **7 000 ₽**");
   });
 
-  it("table rows: MSK dates, duration, client, status emoji, payment, money, created", () => {
+  it("table rows: MSK dates, duration, client, status emoji, payment, мот/экип/итого split, created", () => {
+    // 2026-10-03: one «Стоимость» column became Мот/Экип/Итого (boss: prices
+    // must not hide equipment inside the moto price). Legacy rows without a
+    // persisted split: gear 0 here → Экип «—», Мот = Итого.
     expect(out.markdown).toContain(
-      "| # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Стоимость | Создана |",
+      "| # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Мот | Экип | Итого | Создана |",
     );
     expect(out.markdown).toContain(
-      "| 1 | 29.08.2026 15:00 → 29.08.2026 16:00 | 1 ч | SERG | 🟢 Завершена | оплачен | 3 500 ₽ | 29.08.2026 15:08 |",
+      "| 1 | 29.08.2026 15:00 → 29.08.2026 16:00 | 1 ч | SERG | 🟢 Завершена | оплачен | 3 500 ₽ | — | 3 500 ₽ | 29.08.2026 15:08 |",
     );
     expect(out.markdown).toContain(
-      "| 2 | 11.09.2026 11:00 → 12.09.2026 11:00 | 1 дн | Илья I.O.S. | 🟢 Завершена | оплачен | 11 500 ₽ | 11.09.2026 11:51 |",
+      "| 2 | 11.09.2026 11:00 → 12.09.2026 11:00 | 1 дн | Илья I.O.S. | 🟢 Завершена | оплачен | 11 500 ₽ | — | 11 500 ₽ | 11.09.2026 11:51 |",
     );
     expect(out.markdown).toContain("| 3 | 24.09.2026 10:00 → 24.09.2026 13:00 | 3 ч | Мих |");
+  });
+
+  it("summary shows the мот/экип split behind the revenue (2026-10-03)", () => {
+    expect(out.markdown).toContain("- Выручка (завершённые + активные): **21 000 ₽**");
+    expect(out.markdown).toContain("  - в т.ч. аренда мото: **21 000 ₽**");
+    expect(out.markdown).toContain("  - в т.ч. экипировка: **0 ₽**");
   });
 
   it("deep links section + filename", () => {
@@ -177,7 +186,7 @@ describe("bike-rentals-report: pending rental (Suzuki sample)", () => {
 
   it("pending row: requested dates, предоплата, «—» cost, 🟡 status, excluded from revenue", () => {
     expect(out.markdown).toContain(
-      "| 2 | 27.09.2026 15:00 → 27.09.2026 18:00 | 3 ч | — | 🟡 Ожидает подтверждения | предоплата | — |",
+      "| 2 | 27.09.2026 15:00 → 27.09.2026 18:00 | 3 ч | — | 🟡 Ожидает подтверждения | предоплата | — | — | — |",
     );
     expect(out.markdown).toContain("  - Завершена: 1");
     expect(out.markdown).toContain("  - Ожидает подтверждения: 1");
@@ -220,7 +229,7 @@ describe("bike-rentals-report: status & money discipline", () => {
       ],
       nowMs: NOW,
     });
-    expect(out.markdown).toContain("| 2 | 02.09.2026 13:00 → 03.09.2026 13:00 | 1 дн | B | ⚪️ Отменена | — | 9 000 ₽ |");
+    expect(out.markdown).toContain("| 2 | 02.09.2026 13:00 → 03.09.2026 13:00 | 1 дн | B | ⚪️ Отменена | — | 9 000 ₽ | — | 9 000 ₽ |");
     expect(out.markdown).toContain("- Выручка (завершённые + активные): **5 000 ₽**");
     expect(out.markdown).toContain("  - Завершена: 1");
     expect(out.markdown).toContain("  - Отменена: 1");
@@ -423,7 +432,181 @@ describe("bike-rentals-report: empty history", () => {
   });
 });
 
-// ── 6. source guards ─────────────────────────────────────────────────────────
+// ── 7. money split columns + partner cut (2026-10-03, boss request) ──────────
+//
+// «we need to more precisely calculate prices for subrents and for equipment —
+//  currently prices are shown including equipment and it's difficult to
+//  understand to deduce subrenter's money part»
+//
+// The Kawasaki fixtures are REAL September 2026 vip-bike rows (kawasaki-ex650k,
+// partner @K0r_Al chat 425137783): stored splits (4c01d23b), a legacy row with
+// gear that now estimates by duration (ff6dbfee: helmet + jacket, 3h → 750),
+// and an owner-voice override (d7e91c86 history) — the exact case the boss
+// complained about.
+
+describe("bike-rentals-report: мот/экип split + partner cut (2026-10-03)", () => {
+  const NOW2 = Date.parse("2026-10-03T10:00:00+00:00");
+
+  function row(over: Partial<BikeReportRentalRow>): BikeReportRentalRow {
+    return {
+      rentalId: "r",
+      status: "completed",
+      paymentStatus: "fully_paid",
+      totalCost: 10000,
+      agreedStart: "2026-09-14T09:00:00+00:00",
+      agreedEnd: "2026-09-15T09:00:00+00:00",
+      requestedStart: null,
+      requestedEnd: null,
+      createdAt: "2026-09-14T08:43:34+00:00",
+      clientName: "Тест",
+      metadata: null,
+      ...over,
+    };
+  }
+
+  it("stored split (metadata.bike_price/equipment_price) → exact Мот/Экип", () => {
+    const out = buildBikeRentalsReport({
+      bikeLabel: "Kawasaki EX650K (Ninja 650)",
+      bikeId: "kawasaki-ex650k",
+      crewName: "VIP_BIKE",
+      rentals: [
+        // REAL row 734e63c5: 11 500 = bike 10 000 + gear 1 500 (helmet + gloves)
+        row({
+          rentalId: "734e63c5",
+          totalCost: 11500,
+          clientName: "Салин Роман Анатольевич",
+          metadata: { bike_price: 10000, equipment_price: 1500, equipment: { helmets: 1, gloves: 1 } },
+        }),
+      ],
+      nowMs: NOW2,
+    });
+    expect(out.markdown).toContain(
+      "| 1 | 14.09.2026 12:00 → 15.09.2026 12:00 | 1 дн | Салин Роман Анатольевич | 🟢 Завершена | оплачен | 10 000 ₽ | 1 500 ₽ | 11 500 ₽ |",
+    );
+    expect(out.markdown).toContain("  - в т.ч. аренда мото: **10 000 ₽**");
+    expect(out.markdown).toContain("  - в т.ч. экипировка: **1 500 ₽**");
+    // exact stored numbers carry NO estimate marker (cell-bounded: a bare
+    // «1 500 ₽*» would false-positive inside the bold «**11 500 ₽**»)
+    expect(out.markdown).toContain("| 1 500 ₽ |");
+    expect(out.markdown).not.toContain("| 1 500 ₽* |");
+  });
+
+  it("legacy row with gear estimates BY DURATION: 3h helmet+jacket → 750 ₽* (was flat 1 500 ₽)", () => {
+    const out = buildBikeRentalsReport({
+      bikeLabel: "Kawasaki EX650K (Ninja 650)",
+      bikeId: "kawasaki-ex650k",
+      crewName: "VIP_BIKE",
+      rentals: [
+        // REAL row ff6dbfee: Sep 24 14:00→17:00 (3h), helmets 1 + jacket, no persisted split
+        row({
+          rentalId: "ff6dbfee",
+          totalCost: 6000,
+          agreedStart: "2026-09-24T14:00:00+00:00",
+          agreedEnd: "2026-09-24T17:00:00+00:00",
+          clientName: "Александр Медведев",
+          metadata: { renter_name: "Александр Медведев", equipment: { helmets: 1, jacket: true } },
+        }),
+      ],
+      nowMs: NOW2,
+    });
+    // <24h → half price: helmet 500 + jacket 250 = 750, marked as an estimate
+    expect(out.markdown).toContain("| 750 ₽* | 6 000 ₽ |");
+    expect(out.markdown).toContain("  - в т.ч. аренда мото: **5 250 ₽**");
+    expect(out.markdown).toContain("  - в т.ч. экипировка: **750 ₽**");
+    expect(out.markdown).toContain(
+      "_Экипировка со «*» — оценка по прайсу за срок аренды (в строке нет сохранённой разбивки мот/экип)._",
+    );
+  });
+
+  it("partner bike: «Партнёру 50%» column + «Доля партнёра» summary line (gear never splits)", () => {
+    const out = buildBikeRentalsReport({
+      bikeLabel: "Kawasaki EX650K (Ninja 650)",
+      bikeId: "kawasaki-ex650k",
+      crewName: "VIP_BIKE",
+      subrent: { chatId: "425137783", pct: 50 },
+      rentals: [
+        row({
+          rentalId: "734e63c5",
+          totalCost: 11500,
+          clientName: "Салин Роман Анатольевич",
+          metadata: { bike_price: 10000, equipment_price: 1500, subrenter_chat_id: "425137783" },
+        }),
+        row({
+          rentalId: "910a54c9",
+          totalCost: 15000,
+          clientName: "Скворцов Сергей Аркадьевич.",
+          metadata: { bike_price: 15000, equipment_price: 0, subrenter_chat_id: "425137783" },
+        }),
+      ],
+      nowMs: NOW2,
+    });
+    expect(out.markdown).toContain("| # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Мот | Экип | Итого | Партнёру 50% | Создана |");
+    // 10 000 bike → 5 000; 15 000 bike → 7 500
+    expect(out.markdown).toContain("| 10 000 ₽ | 1 500 ₽ | 11 500 ₽ | 5 000 ₽ |");
+    expect(out.markdown).toContain("| 15 000 ₽ | — | 15 000 ₽ | 7 500 ₽ |");
+    expect(out.markdown).toContain("- Доля партнёра (50% от мото, экип не делится): **12 500 ₽**");
+  });
+
+  it("partner rows resolving to a DIFFERENT chat (bike changed owners) show no cut", () => {
+    const out = buildBikeRentalsReport({
+      bikeLabel: "X",
+      bikeId: "x",
+      crewName: "C",
+      subrent: { chatId: "111", pct: 50 },
+      rentals: [
+        row({ rentalId: "old-owner", totalCost: 10000, metadata: { bike_price: 10000, equipment_price: 0, subrenter_chat_id: "222" } }),
+        row({ rentalId: "new-owner", totalCost: 10000, metadata: { bike_price: 10000, equipment_price: 0, subrenter_chat_id: "111" } }),
+      ],
+      nowMs: NOW2,
+    });
+    expect(out.markdown).toContain("| 10 000 ₽ | — | 10 000 ₽ | — |"); // old owner row
+    expect(out.markdown).toContain("| 10 000 ₽ | — | 10 000 ₽ | 5 000 ₽ |"); // current owner row
+    expect(out.markdown).toContain("- Доля партнёра (50% от мото, экип не делится): **5 000 ₽**");
+  });
+
+  it("linked gear mirror rows (выдача экипа) carry no money and never inflate revenue", () => {
+    const out = buildBikeRentalsReport({
+      bikeLabel: "X",
+      bikeId: "x",
+      crewName: "C",
+      subrent: { chatId: "111", pct: 50 },
+      rentals: [
+        row({ rentalId: "primary", totalCost: 10000, metadata: { bike_price: 9000, equipment_price: 1000 } }),
+        row({
+          rentalId: "mirror",
+          totalCost: 1000,
+          metadata: { item_type: "equipment", primary_rental_id: "primary", equipment: { helmets: 1 } },
+        }),
+      ],
+      nowMs: NOW2,
+    });
+    expect(out.markdown).toContain("| выдача экипа |");
+    expect(out.markdown).toContain("- Выручка (завершённые + активные): **10 000 ₽**"); // mirror NOT added
+    expect(out.markdown).toContain("- Доля партнёра (50% от мото, экип не делится): **4 500 ₽**");
+  });
+
+  it("standalone gear rows (item_type=equipment): whole total is gear, partner cut 0", () => {
+    const out = buildBikeRentalsReport({
+      bikeLabel: "X",
+      bikeId: "x",
+      crewName: "C",
+      subrent: { chatId: "111", pct: 50 },
+      rentals: [
+        row({
+          rentalId: "gear-only",
+          totalCost: 1500,
+          metadata: { item_type: "equipment", equipment: { helmets: 1 } },
+        }),
+      ],
+      nowMs: NOW2,
+    });
+    expect(out.markdown).toContain("| — | 1 500 ₽ | 1 500 ₽ | — |");
+    expect(out.markdown).toContain("  - в т.ч. аренда мото: **0 ₽**");
+    expect(out.markdown).toContain("  - в т.ч. экипировка: **1 500 ₽**");
+  });
+});
+
+// ── 8. source guards ─────────────────────────────────────────────────────────
 
 describe("bike-rentals-report: source guards", () => {
   const action = read(`${APP}/server-actions/bike-wall.ts`);

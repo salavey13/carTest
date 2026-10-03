@@ -287,7 +287,11 @@ describe('iter25: weekly partner report', () => {
     // per-row split + new template vars + summary fields
     // iter32: the call now passes the row total (rub) so standalone gear rows
     // count as gear revenue — see iter32-gear-subrenter.spec.ts.
-    expect(s).toContain('getEquipmentCostPart(r.metadata, rub)');
+    // 2026-10-03: the row window is passed as the 3rd arg — legacy rows get
+    // the DURATION-AWARE gear estimate (same canon as the Мотопарк report and
+    // the partner's profile panel).
+    expect(s).toContain('getEquipmentCostPart(r.metadata, rub, {');
+    expect(s).toContain('startIso: r.agreed_start_date ?? null');
     expect(s).toContain('bike_part_rub');
     expect(s).toContain('equipment_part_rub');
     expect(s).toContain('bikePartRub: totalBikePart');

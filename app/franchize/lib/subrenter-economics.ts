@@ -24,6 +24,7 @@ import {
   getRentalEquipmentPart,
   isEquipmentOnlyRental,
   isLinkedEquipmentRow,
+  type EquipmentEstimateWindow,
 } from "./rental-price-split";
 
 /** Default owner share of the bike part (subrent contract §5.5). */
@@ -62,6 +63,11 @@ function toFiniteNumber(value: unknown): number {
 export function getEquipmentCostPart(
   metadata: Record<string, unknown> | null | undefined,
   totalCost?: number | string | null,
+  // 2026-10-03 precision (boss): legacy rows without the persisted split are
+  // estimated with the DURATION-AWARE canon (half price <24h, day 1 full +
+  // halves after) when the caller knows the rental window. Callers without a
+  // window keep the flat estimate — fully backward compatible.
+  window?: EquipmentEstimateWindow | null,
 ): number {
   // 2026-09-13 double-count fix: a gear row LINKED to its primary bike rental
   // is an inventory mirror — the gear money already lives in the primary
@@ -82,9 +88,9 @@ export function getEquipmentCostPart(
       const total = toFiniteNumber(totalCost);
       if (total > 0) return total;
     }
-    return getRentalEquipmentPart(metadata);
+    return getRentalEquipmentPart(metadata, window);
   }
-  const part = getRentalEquipmentPart(metadata);
+  const part = getRentalEquipmentPart(metadata, window);
   // 2026-09-10 parity fix: when the total IS known, clamp the gear part to
   // it — exactly what splitRentalPrice() does for the drawer/report view.
   // Without the clamp a row whose stored equipment_price exceeded
@@ -287,7 +293,14 @@ export function summarizeSubrenterMonth(
   const out: SubrenterMonthRentalRow[] = rows.map((r) => {
     // iter32: pass the total so a stray standalone gear row in a partner's
     // month is counted as GEAR revenue (not split), not bike revenue.
-    const equipmentRub = getEquipmentCostPart(r.metadata, r.totalCost);
+    // 2026-10-03: legacy rows (no persisted split) now estimate gear with the
+    // duration-aware canon from the rental window — the partner's profile
+    // panel, the weekly DOCX appendix and the Мотопарк report agree even on
+    // rows without metadata.equipment_price.
+    const equipmentRub = getEquipmentCostPart(r.metadata, r.totalCost, {
+      startIso: r.agreedStartDate ?? r.requestedStartDate ?? null,
+      endIso: r.agreedEndDate ?? null,
+    });
     const total = toFiniteNumber(r.totalCost);
     const bikePartRub = getBikeRevenuePart(total, equipmentRub);
     return {

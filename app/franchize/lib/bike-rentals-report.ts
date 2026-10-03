@@ -16,7 +16,8 @@
 //   - Средний чек: **7 000 ₽**
 //
 //   ## Все аренды
-//   | # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Стоимость | Создана |
+//   | # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Мот | Экип | Итого | Создана |
+//   (partner bikes add «Партнёру 50%» between Итого and Создана, 2026-10-03)
 //   ...
 //
 //   ## Ссылки на аренды
@@ -39,6 +40,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { effectiveStatus, mskMonthKey, monthLabelRu } from "@/app/franchize/lib/bike-wall";
+import {
+  isLinkedEquipmentRow,
+  resolveRentalSubrenterChatId,
+  splitRentalPrice,
+  type RentalPriceSplit,
+} from "@/app/franchize/lib/rental-price-split";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +63,13 @@ export interface BikeReportRentalRow {
   createdAt: string | null;
   /** ready-to-print client name or null («—») */
   clientName: string | null;
+  /**
+   * Full rentals.metadata — 2026-10-03 money split (boss: «prices are shown
+   * including equipment and it's difficult to deduce subrenter's money
+   * part»). Persisted bike/equipment split lives here; legacy rows fall back
+   * to the duration-aware estimate inside splitRentalPrice().
+   */
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface BikeReportInput {
@@ -77,6 +91,15 @@ export interface BikeReportInput {
   month?: string | null;
   /** injectable clock (tests); defaults to Date.now() */
   nowMs?: number;
+  /**
+   * Partner-bike context — 2026-10-03. When set (cars.specs.subrenter_chat_id
+   * resolved by the server action), the report gets a per-row «Партнёру N%»
+   * column (pct of the BIKE part — gear is crew money and never splits) and
+   * the summary lines «в т.ч. мото / экипировка» + «Доля партнёра». Rows whose
+   * metadata snapshot resolves to a DIFFERENT partner chat show no cut (the
+   * bike changed owners mid-history).
+   */
+  subrent?: { chatId: string; pct: number } | null;
 }
 
 export interface BikeReportResult {
@@ -229,6 +252,46 @@ const SUMMARY_ORDER = ["completed", "active", "confirmed", "pending_confirmation
 /** Earning statuses for the «Выручка (завершённые + активные)» line. */
 const REVENUE_STATUSES = new Set(["completed", "active"]);
 
+/** One row's money, split once and reused by every section. */
+interface ReportRowMoney {
+  split: RentalPriceSplit;
+  /** resolved partner chat id for this row (metadata snapshot → current) */
+  partnerChatId: string | null;
+  /** partner's cut on this row (0 for non-earning/non-partner/mirror rows) */
+  partnerRub: number;
+  /** true when the gear part is a duration-aware ESTIMATE (footnote marker) */
+  gearEstimated: boolean;
+  /** linked mirror row (gear issued with the primary rental) — no money here */
+  linkedMirror: boolean;
+}
+
+function rowMoney(
+  r: BikeReportRentalRow,
+  win: { start: string | null; end: string | null },
+  eff: string,
+  subrent: { chatId: string; pct: number } | null | undefined,
+): ReportRowMoney {
+  const linkedMirror = isLinkedEquipmentRow(r.metadata);
+  const split = splitRentalPrice(r.totalCost, r.metadata, { startIso: win.start, endIso: win.end });
+  const partnerChatId = subrent
+    ? resolveRentalSubrenterChatId(r.metadata, subrent.chatId)
+    : null;
+  const isCurrentPartnerRow =
+    subrent != null && partnerChatId === subrent.chatId && !linkedMirror;
+  const earns = REVENUE_STATUSES.has(eff) && !linkedMirror;
+  const partnerRub =
+    isCurrentPartnerRow && earns && split.bikePartRub > 0
+      ? Math.round((split.bikePartRub * subrent.pct) / 100)
+      : 0;
+  return {
+    split,
+    partnerChatId,
+    partnerRub,
+    gearEstimated: !linkedMirror && split.source === "estimated" && split.equipmentPartRub > 0,
+    linkedMirror,
+  };
+}
+
 /** Hard cap — a long-lived bike must not produce a multi-MB one-pager. */
 const MAX_REPORT_ROWS = 1000;
 
@@ -263,20 +326,35 @@ export function buildBikeRentalsReport(input: BikeReportInput): BikeReportResult
   const truncated = scoped.length - MAX_REPORT_ROWS;
   const rows = truncated > 0 ? scoped.slice(-MAX_REPORT_ROWS) : scoped;
 
+  // 2026-10-03: money split per row, ONCE (stored bike/gear split wins;
+  // legacy rows get the duration-aware estimate from the effective window).
+  // The summary, the table and the partner column all read the same numbers.
+  const money = rows.map(({ r, win, eff }) => rowMoney(r, win, eff, input.subrent));
+
   // ── Сводка ──
   const byStatus = new Map<string, number>();
   for (const { eff } of rows) byStatus.set(eff, (byStatus.get(eff) || 0) + 1);
 
   let revenue = 0;
   let revenueCount = 0;
-  for (const { r, eff } of rows) {
-    if (!REVENUE_STATUSES.has(eff)) continue;
-    const cost = Math.round(Number(r.totalCost) || 0);
-    if (cost > 0) {
-      revenue += cost;
+  let revenueBike = 0;
+  let revenueGear = 0;
+  let partnerPayout = 0;
+  rows.forEach(({ eff }, i) => {
+    const m = money[i];
+    if (!REVENUE_STATUSES.has(eff)) return;
+    // Linked mirror rows (gear issued WITH a primary rental) carry no money —
+    // their gear lives in the primary row's total; counting them here used to
+    // double the revenue (2026-10-03 fix alongside the money-split columns).
+    if (m.linkedMirror) return;
+    if (m.split.totalRub > 0) {
+      revenue += m.split.totalRub;
       revenueCount++;
+      revenueBike += m.split.bikePartRub;
+      revenueGear += m.split.equipmentPartRub;
+      partnerPayout += m.partnerRub;
     }
-  }
+  });
   const avgCheck = revenueCount > 0 ? Math.floor(revenue / revenueCount) : 0;
 
   // ── Период данных: min start — max end across ALL rows (data coverage) ──
@@ -319,7 +397,17 @@ export function buildBikeRentalsReport(input: BikeReportInput): BikeReportResult
     L.push(`  - ${reportStatusPlain(key, null, now)}: ${n}`);
   }
   L.push(`- Выручка (завершённые + активные): **${reportMoney(revenue)}**`);
+  // 2026-10-03 (boss): the split behind the revenue — «more precisely
+  // calculate prices for subrents and for equipment». Bike part = the
+  // partner's payout base; gear belongs to the crew and never splits.
+  L.push(`  - в т.ч. аренда мото: **${reportMoney(revenueBike)}**`);
+  L.push(`  - в т.ч. экипировка: **${reportMoney(revenueGear)}**`);
   L.push(`- Средний чек: **${revenueCount > 0 ? reportMoney(avgCheck) : "—"}**`);
+  if (input.subrent) {
+    L.push(
+      `- Доля партнёра (${input.subrent.pct}% от мото, экип не делится): **${reportMoney(partnerPayout)}**`,
+    );
+  }
   L.push("");
   L.push("## Все аренды");
   L.push("");
@@ -327,19 +415,39 @@ export function buildBikeRentalsReport(input: BikeReportInput): BikeReportResult
     L.push("Аренд пока не было.");
     L.push("");
   } else {
-    L.push("| # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Стоимость | Создана |");
-    L.push("|---|---|---|---|---|---|---|---|");
+    // 2026-10-03: Мот/Экип/Итого instead of one «Стоимость» (+ «Партнёру N%»
+    // for partner bikes) — the subrenter's money part is readable per row,
+    // not deducible by hand.
+    const partnerCol = input.subrent ? ` Партнёру ${input.subrent.pct}% |` : "";
+    L.push(`| # | Даты (МСК) | Длит. | Клиент | Статус | Оплата | Мот | Экип | Итого |${partnerCol} Создана |`);
+    L.push(`|---|---|---|---|---|---|---|---|---|${input.subrent ? "---|" : ""}---|`);
     rows.forEach(({ r, win }, i) => {
+      const m = money[i];
       const dates = `${mskDateTime(win.start)} → ${win.end ? mskDateTime(win.end) : "—"}`;
       const client = cell(r.clientName || "—");
       const status = cell(reportStatusLabel(r.status, r.agreedEnd || r.requestedEnd, now));
       const payment = cell(paymentLabel(r.paymentStatus));
-      const cost = Math.round(Number(r.totalCost) || 0);
-      const costCell = cost > 0 ? reportMoney(cost) : "—";
+      const motoCell = m.split.bikePartRub > 0 ? reportMoney(m.split.bikePartRub) : "—";
+      const gearCell =
+        m.split.equipmentPartRub > 0
+          ? `${reportMoney(m.split.equipmentPartRub)}${m.gearEstimated ? "*" : ""}`
+          : "—";
+      // Linked mirror rows are inventory echoes of gear issued with the
+      // primary rental — «выдача экипа» instead of a money figure.
+      const totalCell = m.linkedMirror
+        ? "выдача экипа"
+        : m.split.totalRub > 0
+          ? reportMoney(m.split.totalRub)
+          : "—";
+      const partnerCell = m.partnerRub > 0 ? reportMoney(m.partnerRub) : "—";
       L.push(
-        `| ${i + 1} | ${cell(dates)} | ${reportDuration(win.start, win.end)} | ${client} | ${status} | ${payment} | ${costCell} | ${cell(mskDateTime(r.createdAt))} |`,
+        `| ${i + 1} | ${cell(dates)} | ${reportDuration(win.start, win.end)} | ${client} | ${status} | ${payment} | ${motoCell} | ${gearCell} | ${totalCell} |${input.subrent ? ` ${partnerCell} |` : ""} ${cell(mskDateTime(r.createdAt))} |`,
       );
     });
+    if (money.some((m) => m.gearEstimated)) {
+      L.push("");
+      L.push("_Экипировка со «*» — оценка по прайсу за срок аренды (в строке нет сохранённой разбивки мот/экип)._");
+    }
     L.push("");
     L.push("## Ссылки на аренды");
     L.push("");

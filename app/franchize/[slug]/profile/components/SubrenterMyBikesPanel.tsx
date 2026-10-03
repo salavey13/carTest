@@ -315,6 +315,14 @@ export function SubrenterMyBikesPanel({
                             {new Date(r.startedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
                           </span>
                         )}
+                        {/* 2026-10-03: same money split per row as the owner's
+                            report — мот (the partner's payout base) and экип
+                            (crew money, never splits). */}
+                        {r.bikePartRub > 0 && (
+                          <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
+                            · мот {formatCurrency(r.bikePartRub)}
+                          </span>
+                        )}
                         {r.equipmentRub > 0 && (
                           <span className="ml-1.5 font-normal" style={{ color: T.textMuted }}>
                             · экип. {formatCurrency(r.equipmentRub)}
