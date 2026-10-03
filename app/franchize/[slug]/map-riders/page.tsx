@@ -5,8 +5,10 @@ import { getFranchizeRouteCtaPolicy } from "@/app/franchize/lib/route-cta-policy
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import dynamic from "next/dynamic";
+import { logger } from "@/lib/logger";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { AchievementExplorer } from "../../components/AchievementExplorer";
+import { loadNetworkModel, type CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
 
 const MapRidersClient = dynamic(
   () => import("@/app/franchize/components/MapRidersClient").then((mod) => mod.MapRidersClient),
@@ -54,6 +56,17 @@ export default async function MapRidersPage(
   };
   const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
+  // «Сеть» tab of the map deck (2026-10-04): the crew-discovery graph rides
+  // INSIDE the sliding sheet, so the page loads the same network model the
+  // /franchize/discovery route renders. Best-effort: a loader failure must
+  // never take the map page down — the segment shows its empty state.
+  let network: CrewNetworkModelResult | null = null;
+  try {
+    network = await loadNetworkModel();
+  } catch (error) {
+    logger.warn("[map-riders] network model load failed:", error);
+    network = null;
+  }
   const activePath = `/franchize/${crewSlug}/map-riders`;
   const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("map-riders");
@@ -83,7 +96,7 @@ export default async function MapRidersPage(
       <div className="relative z-10">
         <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} showRail={false} />
       </div>
-      <MapRidersClient crew={crew} slug={crewSlug} items={items} wallParams={wallParams} />
+      <MapRidersClient crew={crew} slug={crewSlug} items={items} wallParams={wallParams} network={network} />
     </main>
   );
 }

@@ -17,9 +17,11 @@
 // highlights. Event names (mapriders-open-riders-drawer / -expand-sheet) are
 // preserved — their semantics changed from "open second drawer" to "select
 // segment" on the client side.
-// - "Сеть" (2026-10-02) is a plain Link to the GLOBAL crew discovery page
-//   (/franchize/discovery — every crew as a circle): works on the map page
-//   AND anywhere else, because a Link never depends on the sheet controller.
+// - "Сеть" (2026-10-02) joined the deck (2026-10-04, boss: «polish network
+//   tab in sliding on map-riders»): on the map page it selects the "network"
+//   segment (crew-discovery graph INSIDE the sheet, model loaded by the
+//   page); off the map it stays a plain Link to /franchize/discovery —
+//   a Link never depends on the sheet controller.
 // z-30 sits behind the vaul Drawer (z-40), so it's visible
 // when the drawer is collapsed but hidden when expanded.
 
@@ -32,6 +34,7 @@ const SEGMENT_BY_KEY: Record<string, string> = {
   leaderboard: "top",
   drawer: "list",
   crew: "wall",
+  network: "network",
 };
 
 interface FranchizeMapBottomNavProps {
@@ -152,17 +155,48 @@ export default function FranchizeMapBottomNav({ pathname }: FranchizeMapBottomNa
             </button>
           );
         })}
-        {/* «Сеть» — always a live Link (independent of canControl): the
-            global crew discovery page, crews as circles. Inline template
-            literal keeps it under the franchize-scoped href audit. */}
-        <Link
-          href={`/franchize/discovery`}
-          className="flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition"
-          style={{ color: "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)" }}
-        >
-          <Network className="mb-1 h-4 w-4" />
-          Сеть
-        </Link>
+        {/* «Сеть» — 2026-10-04: on the map page it selects the deck's
+            "network" segment (the crew-discovery graph rides inside the
+            sheet); off the map it degrades to a plain Link to the global
+            discovery page (same fallback contract as «Стена»). Inline
+            template literal keeps it under the franchize-scoped href audit. */}
+        {!canControl ? (
+          <Link
+            href={`/franchize/discovery`}
+            className="flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition"
+            style={{ color: "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)" }}
+          >
+            <Network className="mb-1 h-4 w-4" />
+            Сеть
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              // Сеть = сегмент деки: повторный тап сворачивает её (toggle
+              // живёт в selectSegment, как у Топ/Лист).
+              window.dispatchEvent(new CustomEvent("mapriders-open-riders-drawer", { detail: { tab: "network" } }));
+            }}
+            aria-pressed={deckSegment !== null && SEGMENT_BY_KEY.network === deckSegment}
+            className="relative flex flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition"
+            style={{
+              color:
+                deckSegment !== null && SEGMENT_BY_KEY.network === deckSegment
+                  ? "var(--fr-map-nav-accent, #facc15)"
+                  : "color-mix(in srgb, var(--fr-map-nav-text, #fff) 80%, transparent)",
+            }}
+          >
+            <Network className="mb-1 h-4 w-4" />
+            Сеть
+            <span
+              aria-hidden
+              className={`absolute bottom-0.5 h-1 w-1 rounded-full transition-opacity ${
+                deckSegment !== null && SEGMENT_BY_KEY.network === deckSegment ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ backgroundColor: "var(--fr-map-nav-accent, #facc15)" }}
+            />
+          </button>
+        )}
       </div>
     </nav>
   );

@@ -271,16 +271,20 @@ describe("global discovery page — static route, memberships-only data", () => 
   });
 
   it("the ONLY social signal is crew_members (+ owner as implicit member)", () => {
-    expect(page.includes('.from("crew_members")')).toBe(true);
-    expect(page.includes('.eq("membership_status", "active")')).toBe(true);
-    expect(page.includes("crew.owner_id ? [crew.owner_id]")).toBe(true);
+    // Task 69: the queries live in the EXTRACTED loader (load-network-model.ts)
+    // shared with the map-riders sheet — same guarantees, one file.
+    const model = page + read("app/franchize/discovery/load-network-model.ts");
+    expect(model.includes('.from("crew_members")')).toBe(true);
+    expect(model.includes('.eq("membership_status", "active")')).toBe(true);
+    expect(model.includes("crew.owner_id ? [crew.owner_id]")).toBe(true);
     // no other membership-ish source smuggled in
-    expect(page.includes('.from("users")')).toBe(true); // names/avatars for members
+    expect(model.includes('.from("users")')).toBe(true); // names/avatars for members
   });
 
   it("capabilities come from the derived lib, never from a user input", () => {
-    expect(page.includes("deriveCrewServices(")).toBe(true);
-    expect(page.includes("buildCrewNetworkModel(")).toBe(true);
+    const model = page + read("app/franchize/discovery/load-network-model.ts");
+    expect(model.includes("deriveCrewServices(")).toBe(true);
+    expect(model.includes("buildCrewNetworkModel(")).toBe(true);
     // server page collects NOTHING: no free-text "capabilities" field, no form
     expect(page.toLowerCase().includes("skills")).toBe(false);
     expect(page.includes("<input")).toBe(false);

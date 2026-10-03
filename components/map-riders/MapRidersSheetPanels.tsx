@@ -36,9 +36,17 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import Link from "next/link";
+import { Network as NetworkIcon, ExternalLink } from "lucide-react";
+import { CrewDiscoveryGraph } from "@/app/franchize/discovery/CrewDiscoveryGraph";
+import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
 
-/** Segments of the merged single sheet — mirror the bottom nav 1:1. */
-export type MapRidersSheetSegment = "wall" | "list" | "top";
+/** Segments of the merged single sheet — mirror the bottom nav 1:1.
+ *  2026-10-04: + "network" — «Сеть» was the only nav tab hard-navigating
+ *  AWAY from the map (Link to /franchize/discovery); now it selects a deck
+ *  segment with the same crew-discovery graph, so every tab lives in ONE
+ *  sliding sheet (boss: «polish network tab in sliding on map-riders»). */
+export type MapRidersSheetSegment = "wall" | "list" | "top" | "network";
 
 // Inset surface for nested cards: mixes the border tone into transparency —
 // keeps working for every crew palette without alpha-on-var Tailwind tricks.
@@ -323,6 +331,63 @@ export function SheetTopPanel({ crew, onRideStopped }: { crew: FranchizeCrewVM; 
     <div className="space-y-3">
       <RideControlsPanel accentColor={accentColor} onRideStopped={onRideStopped} />
       <LeaderboardPanel accentColor={accentColor} />
+    </div>
+  );
+}
+
+// ── «Сеть» segment: the global crew graph inside the deck (2026-10-04) ───────
+
+/**
+ * The «Сеть экипажей» discovery graph, embedded in the sheet. The model
+ * arrives as plain props from the map-riders server page (same loader as
+ * the /franchize/discovery page); the graph itself is the SAME component
+ * the full page renders — circles drag, taps refocus the BFS rings, the
+ * selected-crew panel links back into each crew's surfaces.
+ */
+export function SheetNetworkPanel({ network }: { network: CrewNetworkModelResult | null }) {
+  if (!network || network.nodes.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border p-4" style={PANEL_CARD}>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--mr-text)]">
+            <NetworkIcon className="h-4 w-4" aria-hidden />
+            Сеть экипажей
+          </h3>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--mr-muted)]">
+            Пока сеть пуста — как только в экипажах появятся люди, здесь нарисуются круги экипажей и связи между ними.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {/* Caption line — same family as the wall's hairline header */}
+      <div className="relative flex items-center gap-2 pb-1">
+        <h3 className="font-orbitron flex items-center gap-2 text-sm text-[var(--mr-text)]">
+          <NetworkIcon className="h-4 w-4" aria-hidden />
+          Сеть экипажей
+        </h3>
+        <span aria-hidden className="absolute inset-x-0 -bottom-px h-px" style={{ background: "linear-gradient(90deg, transparent, color-mix(in srgb, var(--mr-accent) 70%, transparent) 45%, transparent)" }} />
+        <Link
+          href="/franchize/discovery"
+          className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--mr-muted)] transition hover:text-[var(--mr-text)]"
+        >
+          Вся сеть
+          <ExternalLink className="h-3 w-3" aria-hidden />
+        </Link>
+      </div>
+      {/* Stats chips — parity with the discovery page header */}
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+        <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.nodes.length} экипажей</span>
+        <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.peopleCount} человек</span>
+        <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.connectionCount} связей</span>
+      </div>
+      {/* Hint — one line instead of the page's full paragraph (sheet space) */}
+      <p className="text-xs leading-relaxed text-[var(--mr-muted)]">
+        Круг — экипаж (размер — сколько людей), линия — общие люди. Тап по кругу перестраивает сеть вокруг него, круги можно таскать.
+      </p>
+      <CrewDiscoveryGraph nodes={network.nodes} links={network.links} />
     </div>
   );
 }

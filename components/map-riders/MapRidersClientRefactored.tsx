@@ -45,8 +45,9 @@ import { catalogGpsFromSpecs } from "@/lib/catalog-gps";
 import type { CatalogItemVM } from "@/app/franchize/actions";
 import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
-import { SheetListPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
-import { List, Trophy, Users } from "lucide-react";
+import { SheetListPanel, SheetNetworkPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
+import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
+import { List, Network, Trophy, Users } from "lucide-react";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
@@ -88,13 +89,17 @@ const SNAP_MINI = 0.2;
 const SNAP_LIST = 0.66;
 const SNAP_WALL = 0.86;
 
-// Segments of the single sheet — mirror the bottom nav 1:1 (Стена/Лист/Топ;
-// «Сеть» stays a Link). Icon family matches the nav's lucide glyphs so the
-// nav tab and the segment it opens read as the same object.
+// Segments of the single sheet — mirror the bottom nav 1:1 (Стена/Лист/Топ/
+// Сеть). Icon family matches the nav's lucide glyphs so the nav tab and the
+// segment it opens read as the same object.
 const SHEET_SEGMENTS: Array<{ key: MapRidersSheetSegment; label: string; icon: typeof Users }> = [
   { key: "wall", label: "Стена", icon: Users },
   { key: "list", label: "Лист", icon: List },
   { key: "top", label: "Топ", icon: Trophy },
+  // 2026-10-04: «Сеть» joins the deck — it was the only nav tab hard-linking
+  // away from the map; now it opens the crew-discovery graph as a segment
+  // (model passed from the server page, same loader as /franchize/discovery).
+  { key: "network", label: "Сеть", icon: Network },
 ];
 
 /** Deep-link params from /map-riders?post=|ride=|compose=|spot=|q= → wall in the sheet. */
@@ -107,7 +112,7 @@ export interface MapRidersWallParams {
 }
 
 // ── Inner component (uses context) ──
-function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; items?: unknown[]; wallParams?: MapRidersWallParams }) {
+function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeCrewVM; items?: unknown[]; wallParams?: MapRidersWallParams; network?: CrewNetworkModelResult | null }) {
   const { dbUser } = useAppContext();
   const { resolvedTheme = "dark" } = useTheme();
   const { state, dispatch, crewSlug, fetchSnapshot, fetchSessionDetail } = useMapRiders();
@@ -346,7 +351,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
   //      fucked». Fix: cap the body to the active snap (min(82dvh,
   //      snap·dvh − chrome)) so every scrollable pixel is on screen.
   const sheetBodyRef = useRef<HTMLDivElement | null>(null);
-  const segmentScrollTopRef = useRef<Record<MapRidersSheetSegment, number>>({ wall: 0, list: 0, top: 0 });
+  const segmentScrollTopRef = useRef<Record<MapRidersSheetSegment, number>>({ wall: 0, list: 0, top: 0, network: 0 });
   const prevSegmentRef = useRef<MapRidersSheetSegment>(sheetSegment);
   useEffect(() => {
     const el = sheetBodyRef.current;
@@ -378,11 +383,12 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
 
   useEffect(() => {
     const handleOpenRidersDrawer = (event?: Event) => {
-      // «Топ» → сегмент «Топ» (эфир + зал славы), «Лист» → сегмент «Лист»
+      // «Топ» → сегмент «Топ» (эфир + зал славы), «Сеть» → сегмент «Сеть»
+      // (граф экипажей внутри деки), «Лист» → сегмент «Лист»
       // (райдеры/точки/журнал). Event names preserved — semantics now select
       // a segment of the single sheet instead of stacking a second drawer.
       const tab = (event as CustomEvent<{ tab?: string }> | undefined)?.detail?.tab;
-      selectSegment(tab === "ride" ? "top" : "list", { toggle: true });
+      selectSegment(tab === "ride" ? "top" : tab === "network" ? "network" : "list", { toggle: true });
     };
 
     const handleExpandSheet = () => {
@@ -1420,7 +1426,7 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
                 drag handle still snaps. No more Мини/Средне/Высоко/Макс
                 button row — that was snap-ui overkill on top of the handle. */}
             <div className="pointer-events-auto mb-3 border-b border-[var(--mr-border)] pb-2.5">
-              <div role="tablist" aria-label="Панель карты" className="grid grid-cols-3 gap-1 rounded-xl p-1" style={{ backgroundColor: "color-mix(in srgb, var(--mr-border) 30%, transparent)" }}>
+              <div role="tablist" aria-label="Панель карты" className="grid grid-cols-4 gap-1 rounded-xl p-1" style={{ backgroundColor: "color-mix(in srgb, var(--mr-border) 30%, transparent)" }}>
                 {SHEET_SEGMENTS.map((seg) => {
                   const SegIcon = seg.icon;
                   const active = sheetSegment === seg.key;
@@ -1563,6 +1569,10 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
               ) : null}
               {/* ── Топ segment: ride controls (эфир) + weekly leaderboard. */}
               {sheetSegment === "top" ? <SheetTopPanel crew={crew} onRideStopped={handleRideStopped} /> : null}
+              {/* ── Сеть segment: crew-discovery graph inside the deck — the
+                  model comes from the server page (same loader as the
+                  /franchize/discovery route), graph is the same component. */}
+              {sheetSegment === "network" ? <SheetNetworkPanel network={network ?? null} /> : null}
             </div>
           </div>
         </Drawer.Content>
@@ -1605,11 +1615,11 @@ function MapRidersInner({ crew, items, wallParams }: { crew: FranchizeCrewVM; it
 }
 
 // ── Exported wrapper with provider ──
-export function MapRidersClientRefactored({ crew, slug, items, wallParams }: { crew: FranchizeCrewVM; slug?: string; items?: unknown[]; wallParams?: MapRidersWallParams }) {
+export function MapRidersClientRefactored({ crew, slug, items, wallParams, network }: { crew: FranchizeCrewVM; slug?: string; items?: unknown[]; wallParams?: MapRidersWallParams; network?: CrewNetworkModelResult | null }) {
   const resolvedSlug = crew.slug || slug || "vip-bike";
   return (
     <MapRidersProvider crew={crew} slug={resolvedSlug}>
-      <MapRidersInner crew={crew} items={items} wallParams={wallParams} />
+      <MapRidersInner crew={crew} items={items} wallParams={wallParams} network={network} />
     </MapRidersProvider>
   );
 }

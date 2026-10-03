@@ -64,8 +64,9 @@ describe("map-riders: ONE sheet, not two (Task 60)", () => {
   });
 
   it("nav tabs SELECT deck segments; event names preserved with new semantics", () => {
-    // Топ → top, Лист → list, Стена → wall
-    expect(client).toContain('selectSegment(tab === "ride" ? "top" : "list", { toggle: true })');
+    // Топ → top, Сеть → network, Лист → list, Стена → wall (Task 69: сеть
+    // присоединилась к деке — раньше была жёсткой ссылкой со страницы)
+    expect(client).toContain('selectSegment(tab === "ride" ? "top" : tab === "network" ? "network" : "list", { toggle: true })');
     expect(client).toContain('selectSegment("wall", { toggle: true })');
     expect(nav).toContain('detail: { tab: "ride" }');
     expect(nav).toContain("mapriders-open-riders-drawer");
