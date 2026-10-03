@@ -112,11 +112,15 @@ describe("discovery page guarantees", () => {
     expect(page).toContain('export const dynamic = "force-dynamic"');
   });
 
-  it("the graph canvas keeps the mobile 640px floor + pan", () => {
+  it("the graph canvas is FULLWIDTH on mobile — no 640px floor, no sideways pan (wiki round 2026-10-04)", () => {
     const graph = read("app/franchize/discovery/CrewDiscoveryGraph.tsx");
-    expect(graph).toContain("overflow-x-auto");
-    expect(graph).toContain("min-w-[640px] sm:min-w-0");
-    expect(graph).toContain("Граф можно двигать вбок");
+    // the old pan contract is REVERSED: the circle area fits the screen width
+    expect(graph).not.toContain("overflow-x-auto");
+    expect(graph).not.toContain("min-w-[640px]");
+    expect(graph).not.toContain("Граф можно двигать вбок");
+    // …and the labels scale UP on narrow viewports instead of shrinking
+    expect(graph).toContain("ResizeObserver");
+    expect(graph).toContain("labelScale");
   });
 
   it("has a route-level loading skeleton", () => {

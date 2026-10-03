@@ -35,11 +35,20 @@
 //     circles anchored at the ring top, the rAF painter skips redundant
 //     label writes, and circles answer hover/keyboard-focus without a
 //     single React re-render.
+//   · wiki-dive round (boss 2026-10-04: «fullwidth circle area — more info
+//     inside area, fit screen width on mobile, less scrolling»): the canvas
+//     drops the 640px floor + sideways pan entirely — it is FULLWIDTH at
+//     every viewport, and a ResizeObserver-driven labelScale BLOWS THE
+//     LABELS UP on narrow screens (same viewBox, bigger ink, still crisp);
+//     stats pills + a legend card live INSIDE the canvas overlay (optional
+//     props — the map-riders sheet keeps its own header and passes nothing);
+//     the crew panel learns «Рукопожатия» — tappable neighbor chips that
+//     re-focus the graph crew-to-crew, the wikipedia dive made literal.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, ChevronDown, Snowflake, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronDown, Handshake, Info, Snowflake, Users, X } from "lucide-react";
 import {
   crewCircleRadius,
   layoutCrewGraph,
@@ -90,14 +99,28 @@ const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : use
 export function CrewDiscoveryGraph({
   nodes,
   links,
+  peopleCount,
+  connectionCount,
 }: {
   nodes: CrewNetworkNode[];
   links: CrewNetworkLink[];
+  /** Optional in-canvas stats — the discovery page passes them so the
+   *  chips live INSIDE the circle area; the map-riders sheet renders its
+   *  own header and omits these. */
+  peopleCount?: number;
+  connectionCount?: number;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(false);
+  /** Viewport→viewBox ink multiplier: 1 on ≥640px containers, up to ~2.1
+   *  on a phone. Static attrs re-render with it; the painter reads the
+   *  ref for its per-frame label offsets. */
+  const [labelScale, setLabelScale] = useState(1);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const labelScaleRef = useRef(1);
   const simRef = useRef<SimulationState | null>(null);
   const activeRef = useRef(false);
   const wakeRef = useRef<(() => void) | null>(null);
@@ -110,6 +133,31 @@ export function CrewDiscoveryGraph({
     new Map<string, { name: SVGTextElement | null; count: SVGTextElement | null; lastNameY?: string; lastCountY?: string }>(),
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // fullwidth canvas: measure the CONTAINER, not a fixed floor — labels and
+  // ring captions scale up as the viewport shrinks (wiki round: no sideways
+  // pan, no 640px floor, the circle area fits the screen width).
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = (width: number) => {
+      const scale = Math.min(2.1, Math.max(1, 640 / Math.max(1, width)));
+      labelScaleRef.current = scale;
+      setLabelScale((prev) => (Math.abs(prev - scale) < 0.02 ? prev : scale));
+    };
+    measure(el.clientWidth);
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? el.clientWidth;
+      measure(width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // a scale change may land while the sim is asleep — repaint label offsets
+  useEffect(() => {
+    wakeRef.current?.();
+  }, [labelScale]);
+
   const dragRef = useRef<{
     id: string;
     startX: number;
@@ -184,6 +232,26 @@ export function CrewDiscoveryGraph({
   const selected = nodes.find((n) => n.crewId === selectedId) ?? null;
   const simActive = nodes.length > 0 && nodes.length <= SIM_MAX_NODES;
 
+  /** «Рукопожатия» — crews sharing people with the selection, strongest
+   *  first; tapping a chip re-focuses the graph on it (the wiki dive). */
+  const neighbors = useMemo(() => {
+    if (!selectedId) return [] as { node: CrewNetworkNode; weight: number }[];
+    const byId = new Map(nodes.map((n) => [n.crewId, n]));
+    const list: { node: CrewNetworkNode; weight: number }[] = [];
+    for (const link of links) {
+      const other =
+        link.source === selectedId
+          ? link.target
+          : link.target === selectedId
+            ? link.source
+            : null;
+      if (!other) continue;
+      const node = byId.get(other);
+      if (node) list.push({ node, weight: link.weight });
+    }
+    return list.sort((a, b) => b.weight - a.weight).slice(0, 12);
+  }, [links, nodes, selectedId]);
+
   const selectedSet = useMemo(() => {
     if (!selectedId) return null;
     const incident = new Set<string>([selectedId]);
@@ -206,9 +274,10 @@ export function CrewDiscoveryGraph({
       // flip from the deterministic initial positions)
       const pair = labelRefs.current.get(node.id);
       if (pair) {
-        const flip = node.y > VIEW - node.r - 62;
-        const nameY = (flip ? -(node.r + 46) : node.r + 26).toFixed(1);
-        const countY = (flip ? -(node.r + 26) : node.r + 46).toFixed(1);
+        const s = labelScaleRef.current;
+        const flip = node.y > VIEW - node.r - 62 * s;
+        const nameY = (flip ? -(node.r + 46 * s) : node.r + 26 * s).toFixed(1);
+        const countY = (flip ? -(node.r + 26 * s) : node.r + 46 * s).toFixed(1);
         if (pair.lastNameY !== nameY) {
           pair.name?.setAttribute("y", nameY);
           pair.lastNameY = nameY;
@@ -436,11 +505,14 @@ export function CrewDiscoveryGraph({
   return (
     <div className="mt-6">
       {/* ── the graph ─────────────────────────────────────────────────────── */}
-      {/* Horizontally scrollable with a 640px canvas floor on phones; circles
-          themselves are drag handles (touchmove is claimed only while a
-          circle is actually grabbed). */}
-      <div className="overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-track]:bg-transparent">
-        <div className="relative min-w-[640px] sm:min-w-0">
+      {/* FULLWIDTH at every viewport (wiki round — no 640px floor, no sideways
+          pan); labels scale up on narrow screens; circles themselves remain
+          drag handles (touchmove is claimed only while a circle is grabbed). */}
+      <div
+        ref={wrapRef}
+        className="relative rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)]"
+      >
+        <div className="relative">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${VIEW} ${VIEW}`}
@@ -480,9 +552,9 @@ export function CrewDiscoveryGraph({
                 />
                 <text
                   x={VIEW / 2}
-                  y={VIEW / 2 - r - (ringLabelClearance[i + 1] ?? 30) - 12}
+                  y={VIEW / 2 - r - (ringLabelClearance[i + 1] ?? 30) - 12 * labelScale}
                   textAnchor="middle"
-                  fontSize="15"
+                  fontSize={15 * labelScale}
                   fontWeight="700"
                   letterSpacing="2.5"
                   fill="#ffffff"
@@ -533,7 +605,7 @@ export function CrewDiscoveryGraph({
                 const dim = dimOf(node.crewId);
                 const ink = inkFor(node.accent);
                 // SSR/static flip decision — physics keeps it live afterwards
-                const flipLabel = point.y > VIEW - r - 62;
+                const flipLabel = point.y > VIEW - r - 62 * labelScale;
                 // static fallback (>SIM_MAX_NODES): the sim sleeps, but a pointer
                 // tap must still focus the circle — the onClick below only fires
                 // when simActive is false, so it can never double-toggle the
@@ -624,8 +696,8 @@ export function CrewDiscoveryGraph({
                         else labelRefs.current.set(node.crewId, pair);
                       }}
                       textAnchor="middle"
-                      y={flipLabel ? -(r + 46) : r + 26}
-                      fontSize="21"
+                      y={flipLabel ? -(r + 46 * labelScale) : r + 26 * labelScale}
+                      fontSize={21 * labelScale}
                       fontWeight="700"
                       fill={isSelected ? "#ffffff" : "rgba(255,255,255,0.85)"}
                       stroke="rgba(4,9,20,0.88)"
@@ -645,8 +717,8 @@ export function CrewDiscoveryGraph({
                         else labelRefs.current.set(node.crewId, pair);
                       }}
                       textAnchor="middle"
-                      y={flipLabel ? -(r + 26) : r + 46}
-                      fontSize="13.5"
+                      y={flipLabel ? -(r + 26 * labelScale) : r + 46 * labelScale}
+                      fontSize={13.5 * labelScale}
                       fontWeight="600"
                       fill={isSelected ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.5)"}
                       stroke="rgba(4,9,20,0.85)"
@@ -663,6 +735,75 @@ export function CrewDiscoveryGraph({
             </g>
           </svg>
 
+          {/* ── in-canvas info overlay (wiki round): the circle area carries its
+              own stats and legend — more info INSIDE the area, zero page
+              scroll spent on chrome. pointer-events stay off except the
+              legend button/card, so drag/tap never fights the overlay. ── */}
+          {peopleCount != null && connectionCount != null && (
+            <div
+              className="pointer-events-none absolute left-2.5 top-2.5 z-10 flex max-w-[calc(100%-3.5rem)] flex-wrap gap-1.5"
+              aria-hidden
+            >
+              <span className="rounded-full border border-white/12 bg-[#0b1220]/75 px-2.5 py-1 text-[10px] font-bold text-white/80 backdrop-blur-sm">
+                {nodes.length} {pluralRu(nodes.length, ["экипаж", "экипажа", "экипажей"])}
+              </span>
+              <span className="rounded-full border border-white/12 bg-[#0b1220]/75 px-2.5 py-1 text-[10px] font-bold text-white/80 backdrop-blur-sm">
+                {peopleCount} {pluralRu(peopleCount, ["человек", "человека", "человек"])}
+              </span>
+              <span className="rounded-full border border-white/12 bg-[#0b1220]/75 px-2.5 py-1 text-[10px] font-bold text-white/80 backdrop-blur-sm">
+                {connectionCount} {pluralRu(connectionCount, ["связь", "связи", "связей"])}
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setLegendOpen((v) => !v)}
+            aria-expanded={legendOpen}
+            aria-label={legendOpen ? "Скрыть легенду графа" : "Как читать граф"}
+            className="absolute right-2.5 top-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0b1220]/75 text-white/75 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+          >
+            {legendOpen ? <X className="h-4 w-4" aria-hidden /> : <Info className="h-4 w-4" aria-hidden />}
+          </button>
+          <AnimatePresence initial={false}>
+            {legendOpen && (
+              <motion.div
+                key="legend-card"
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                className="absolute inset-x-2.5 top-12 z-20 rounded-2xl border border-white/12 bg-[#0b1220]/92 p-4 shadow-2xl backdrop-blur-md"
+                role="dialog"
+                aria-label="Легенда графа сети"
+              >
+                <p className="text-xs font-black uppercase tracking-wide text-white/70">Как читать граф</p>
+                <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-white/75">
+                  <li>⬤ Круг — целый экипаж; размер — сколько в нём людей</li>
+                  <li>⌇ Линия — общие люди между двумя экипажами</li>
+                  <li>◎ Кольца — «рукопожатия» от выбранного круга (1 шаг, 2 шага…)</li>
+                  <li>✋ Круги можно таскать — остальные расступаются</li>
+                  <li>☞ Тап по кругу — фокус; тап по фону — вся сеть снова</li>
+                </ul>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href="#howto"
+                    onClick={() => setLegendOpen(false)}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-sky-300/40 bg-sky-400/15 px-3 py-1.5 text-xs font-bold text-sky-200 transition hover:brightness-125"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" aria-hidden /> Как это работает
+                  </a>
+                  <a
+                    href="#all-crews"
+                    onClick={() => setLegendOpen(false)}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-bold text-white/80 transition hover:border-white/40"
+                  >
+                    Все экипажи сети
+                  </a>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {!selected && (
             <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs font-semibold text-white/45">
               Тапни по кругу — сеть перестроится вокруг него · круги можно таскать
@@ -675,10 +816,6 @@ export function CrewDiscoveryGraph({
           )}
         </div>
       </div>
-      {/* mobile pan affordance (phones hide overlay scrollbars) */}
-      <p className="mt-2 text-center text-[11px] font-semibold text-white/35 sm:hidden" aria-hidden>
-        Граф можно двигать вбок — потяните пальцем
-      </p>
 
       {/* ── detail panel (collapsible) ─────────────────────────────────────── */}
       <div ref={panelRef}>
@@ -777,6 +914,35 @@ export function CrewDiscoveryGraph({
                     </div>
                   )}
 
+                  {/* handshake chips — the wikipedia dive: hop crew-to-crew via
+                      shared people without ever leaving the graph */}
+                  {neighbors.length > 0 && (
+                    <div className="mt-4">
+                      <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-white/55">
+                        <Handshake className="h-3.5 w-3.5" aria-hidden /> Рукопожатия · {neighbors.length}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {neighbors.map(({ node: crew, weight }) => (
+                          <button
+                            key={crew.crewId}
+                            type="button"
+                            onClick={() => setSelectedId(crew.crewId)}
+                            aria-label={`Переключить фокус на экипаж ${crew.name}: ${weight} общих людей`}
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.06] py-1 pl-2 pr-3 text-xs font-bold text-white/85 transition hover:border-white/35 hover:bg-white/[0.1]"
+                          >
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: crew.accent }}
+                              aria-hidden
+                            />
+                            {truncate(crew.name, 18)}
+                            <span className="font-semibold text-white/50">· {weight} общ.</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* people */}
                   {selected.members.length > 0 && (
                     <div className="mt-4">
@@ -829,6 +995,12 @@ export function CrewDiscoveryGraph({
                       className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold text-white/85 transition hover:border-white/40"
                     >
                       Стена
+                    </Link>
+                    <Link
+                      href={`/franchize/${selected.slug}/about`}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold text-white/85 transition hover:border-white/40"
+                    >
+                      О экипаже
                     </Link>
                     <Link
                       href={`/franchize/${selected.slug}/map-riders`}

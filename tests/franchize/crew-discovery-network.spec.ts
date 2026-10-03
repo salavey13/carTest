@@ -322,12 +322,13 @@ describe("global discovery page — static route, memberships-only data", () => 
     expect(graph.includes("{node.memberCount} чел.")).toBe(true);
     // dark paint-order halo keeps labels readable over links and neighbors
     expect(graph.includes('paintOrder="stroke"')).toBe(true);
-    // two-line label block: name 21px + count 13.5px micro-caption
-    expect(graph.includes('fontSize="21"')).toBe(true);
-    expect(graph.includes('fontSize="13.5"')).toBe(true);
+    // two-line label block: name + count micro-caption (wiki round: the ink
+    // is multiplied by labelScale — blown UP on narrow viewports)
+    expect(graph.includes("fontSize={21 * labelScale}")).toBe(true);
+    expect(graph.includes("fontSize={13.5 * labelScale}")).toBe(true);
     // bottom-edge circles flip their label block above the circle (SSR + rAF)
-    expect(graph.includes("flipLabel ? -(r + 46) : r + 26")).toBe(true);
-    expect(graph.includes("node.y > VIEW - node.r - 62")).toBe(true);
+    expect(graph.includes("flipLabel ? -(r + 46 * labelScale) : r + 26 * labelScale")).toBe(true);
+    expect(graph.includes("node.y > VIEW - node.r - 62 * s")).toBe(true);
     // initials re-centered (no in-circle count pushing them up anymore)
     expect(graph.includes("y={r * 0.14}")).toBe(true);
     // connections slimmed to hairline springs
