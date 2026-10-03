@@ -78,6 +78,9 @@ export function useSessionManager(options: UseSessionManagerOptions = {}): Sessi
           vehicleLabel: state.vehicleLabel,
           rideMode: state.rideMode,
         },
+        // LIVE-STATS FIX: the seeded ActiveSession row (bar elapsed/speed from
+        // the very first second) needs the owner's user_id.
+        selfUserId: dbUser.user_id,
       });
       if (refreshOnStart) await fetchSnapshot();
       toast.success(startSuccessMessage);

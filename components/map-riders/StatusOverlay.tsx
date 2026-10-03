@@ -37,8 +37,14 @@ export function StatusOverlay() {
   if (!state.shareEnabled) return null;
 
   const session = state.sessions.find((s) => s.id === state.sessionId);
+  // LIVE-STATS FIX (2026-10-03): the reducer now advances the ACTIVE session
+  // row on every accepted GPS packet, so distance/speed are live. The self
+  // liveRiders packet stays as a belt-and-suspenders fallback for the speed
+  // cell (same source the map marker uses) in case a snapshot briefly
+  // overwrites the row with the server's between-flush value.
+  const liveSelfSpeed = session ? Number(state.liveRiders.get(session.user_id)?.speed_kmh || 0) : 0;
   const distanceKm = Number(session?.total_distance_km || 0);
-  const speedKmh = Number(session?.latest_speed_kmh || 0);
+  const speedKmh = Number(session?.latest_speed_kmh || 0) || liveSelfSpeed;
   const hasDistance = distanceKm > 0;
   const hasSpeed = speedKmh > 0;
   const distance = hasDistance ? `${distanceKm.toFixed(1)} км` : "0 км";

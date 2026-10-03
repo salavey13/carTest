@@ -59,6 +59,51 @@ const WATCHDOG_STALE_MS = 45000;
 const WATCHDOG_KICK_COOLDOWN_MS = 30000;
 type GpsSource = "telegram" | "browser";
 
+// GEO-GRANT MEMORY (2026-10-03): `WebApp.requestLocation` shows Telegram's
+// NATIVE popup on EVERY call — closing/reopening the mini app and starting
+// geosharing re-asked the rider every single time. The W3C watch permission,
+// however, is remembered by the OS/WebView across sessions. So: remember a
+// PROVEN browser grant in localStorage (14 days) and skip the Telegram
+// one-shot while it is valid — «ask once, then it just works». A
+// PERMISSION_DENIED watch error forgets the memory (the rider revoked at OS
+// level), and the manual «Обновить гео» one-shot remains the sanctioned
+// escape hatch for dead WebViews.
+const GEO_GRANT_STORAGE_KEY = "mr_geo_grant_v1";
+const GEO_GRANT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+function readRememberedGeoGrant(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(GEO_GRANT_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { expiresAt?: number };
+    return typeof parsed?.expiresAt === "number" && parsed.expiresAt > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function rememberGeoGrant(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      GEO_GRANT_STORAGE_KEY,
+      JSON.stringify({ grantedAt: Date.now(), expiresAt: Date.now() + GEO_GRANT_TTL_MS }),
+    );
+  } catch {
+    /* private mode — the memory is best-effort */
+  }
+}
+
+function forgetGeoGrant(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(GEO_GRANT_STORAGE_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
 /** Why the continuous W3C watch has no fix — surfaced in the ride strip so a
  *  silent GPS stream is never mistaken for a working one. */
 export type LiveRidersGeoError = "denied" | "unavailable" | "timeout" | null;
@@ -236,6 +281,9 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
       if (source === "browser" && !browserFixSeenRef.current) {
         browserFixSeenRef.current = true;
         setHasBrowserFix(true);
+        // GEO-GRANT MEMORY: a real W3C fix proves the OS-level grant — future
+        // app sessions skip the native Telegram re-ask for TTL days.
+        rememberGeoGrant();
       }
       if (now - lastSendTsRef.current < SEND_THROTTLE_MS) return;
       const last = lastAcceptedRef.current;
@@ -436,7 +484,10 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
 
       // ONE-SHOT native Telegram popup for a fast first fix (and to trigger
       // Telegram's own location grant). Must never be polled — see MR geo-fix.
-      const telegramSuccess = await requestTelegramLocation();
+      // GEO-GRANT MEMORY: when a browser fix was already proven recently, skip
+      // the popup entirely — the OS remembers the W3C grant, so reopening the
+      // app no longer re-asks; the continuous watch below just starts.
+      const telegramSuccess = readRememberedGeoGrant() ? false : await requestTelegramLocation();
       if (cancelled || token !== startTokenRef.current) return;
       setIsActive(true);
       setIsUsingTelegram(telegramSuccess);
@@ -464,6 +515,11 @@ export function useLiveRiders(options: UseLiveRidersOptions) {
             // the functional update keeps identical kinds from re-rendering.
             const kind = geoErrorKind(error);
             watchErrorStreakRef.current += 1;
+            if (kind === "denied") {
+              // GEO-GRANT MEMORY: the OS grant is gone (revoked) — forget the
+              // remembered choice so the next session re-asks honestly.
+              forgetGeoGrant();
+            }
             if (kind === "denied" || watchErrorStreakRef.current >= 2) {
               setGeoError((prev) => (prev === kind ? prev : kind));
             }

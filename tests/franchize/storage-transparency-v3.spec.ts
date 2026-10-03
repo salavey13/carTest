@@ -538,7 +538,13 @@ describe("admin/crewowner config — editor, pipeline, section links", () => {
   it("order form + page: config pre-fills price/season/place, staff-confirmed rate still wins", () => {
     const form = read("app/franchize/[slug]/storage/StorageOrderForm.tsx");
     const page = read("app/franchize/[slug]/storage/new/page.tsx");
-    expect(form.includes("defaultMonthlyPriceRub ?? 2000")).toBe(true);
+    // 2026-10-03 owner rule: the rate is now a 3-tier picker (1500/2000/2500 by
+    // bike coolness); the config price still pre-fills — snapped to the closest
+    // tier by nearestStorageTier(defaultMonthlyPriceRub).
+    expect(form.includes("nearestStorageTier(defaultMonthlyPriceRub)")).toBe(true);
+    expect(form.includes("value: 1500")).toBe(true);
+    expect(form.includes("value: 2000")).toBe(true);
+    expect(form.includes("value: 2500")).toBe(true);
     expect(form.includes("seasonStartMMDD || \"10-15\"")).toBe(true);
     expect(page.includes("storageConfig?.address || crew.contacts.address || DEFAULT_STORAGE_ADDRESS")).toBe(true);
     expect(page.includes("defaultMonthlyPriceRub={storageConfig?.defaultMonthlyPriceRub}")).toBe(true);

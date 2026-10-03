@@ -88,6 +88,25 @@ function Field({
 const inputClass =
   "h-11 w-full rounded-xl border px-3 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30";
 
+// 2026-10-03 owner rule: the monthly rate is picked, not typed — three tiers
+// by bike coolness (size/class). The selector drives the same
+// monthlyPriceRub form field, so the checkout payload and the contract keep
+// their exact shape; staff still confirms the final rate at intake.
+const STORAGE_PRICE_TIERS = [
+  { value: 1500, label: "1 500 ₽", hint: "Скутеры и лёгкий класс" },
+  { value: 2000, label: "2 000 ₽", hint: "Средний класс" },
+  { value: 2500, label: "2 500 ₽", hint: "Круизеры, спорт, литровые" },
+] as const;
+
+/** Snap a configured custom rate onto the closest known tier (always one pill selected). */
+function nearestStorageTier(rub?: number): number {
+  const fallback = Number(rub) || 2000;
+  return STORAGE_PRICE_TIERS.reduce(
+    (best, tier) => (Math.abs(tier.value - fallback) < Math.abs(best - fallback) ? tier.value : best),
+    STORAGE_PRICE_TIERS[0].value as number,
+  );
+}
+
 export function StorageOrderForm({
   slug,
   crewName,
@@ -132,11 +151,11 @@ export function StorageOrderForm({
     if (initData && initData.length >= 32) setPepInitData(initData);
   }, [isInTelegramContext, pepInitData, pepUserOptedOut]);
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<StorageOrderFormValues>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<StorageOrderFormValues>({
     resolver: zodResolver(storageOrderSchema),
     mode: "onBlur",
     defaultValues: {
-      monthlyPriceRub: defaultMonthlyPriceRub ?? 2000,
+      monthlyPriceRub: nearestStorageTier(defaultMonthlyPriceRub),
       seasonStart: defaults.start,
       seasonEnd: defaults.end,
       recipient: dbUser?.full_name || "",
@@ -352,8 +371,33 @@ export function StorageOrderForm({
         {!datesValid ? (
           <p className="text-xs font-medium text-red-500">Дата окончания должна быть позже даты начала.</p>
         ) : null}
-        <Field label="Ставка за месяц, ₽" error={errors.monthlyPriceRub?.message} hint="Менеджер подтвердит итоговую ставку при приёме байка">
-          <input type="number" {...register("monthlyPriceRub")} className={inputClass} style={inputStyle} inputMode="numeric" min={0} step={500} />
+        <Field
+          label="Класс байка и ставка за месяц, ₽"
+          error={errors.monthlyPriceRub?.message}
+          hint="Выбери, каким байк был по меркам экипажа — менеджер подтвердит ставку при приёме"
+        >
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Класс байка и ставка за месяц">
+            {STORAGE_PRICE_TIERS.map((tier) => {
+              const selected = Number(values.monthlyPriceRub) === tier.value;
+              return (
+                <button
+                  key={tier.value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setValue("monthlyPriceRub", tier.value, { shouldValidate: true })}
+                  className={`rounded-xl border px-2 py-2.5 text-center transition active:scale-[0.98] ${
+                    selected
+                      ? "border-sky-400 bg-sky-500/10 ring-2 ring-sky-400/30"
+                      : "border-zinc-300 dark:border-zinc-700 hover:border-sky-400/60"
+                  }`}
+                  style={selected ? {} : inputStyle}
+                >
+                  <span className={`block text-sm font-extrabold ${selected ? "text-sky-500 dark:text-sky-400" : ""}`}>{tier.label}</span>
+                  <span className="mt-0.5 block text-[10px] leading-tight text-zinc-400">{tier.hint}</span>
+                </button>
+              );
+            })}
+          </div>
         </Field>
         <div className="rounded-xl p-3" style={{ backgroundColor: "hsl(var(--muted) / 0.4)" }}>
           <p className="text-sm">

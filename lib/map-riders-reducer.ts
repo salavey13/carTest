@@ -196,7 +196,7 @@ export type MapRidersAction =
   | { type: "eviction/tick" }
   | { type: "meetup/created"; payload: MeetupPoint }
   | { type: "session/detail-loaded"; payload: SessionDetail }
-  | { type: "share/started"; payload: { sessionId: string; rideName: string; vehicleLabel: string; rideMode: "rental" | "personal" } }
+  | { type: "share/started"; payload: { sessionId: string; rideName: string; vehicleLabel: string; rideMode: "rental" | "personal" }; selfUserId?: string }
   | { type: "share/stopped" }
   | { type: "privacy/set-visibility"; payload: "crew" | "public" }
   | { type: "privacy/set-auto-expire"; payload: 1 | 5 | 15 | 60 }
@@ -246,8 +246,25 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
         });
       }
 
+      // LIVE-STATS FIX (2026-10-03): the server persists total_distance_km only
+      // at session END, so a mid-ride snapshot would regress the floating bar's
+      // distance back to 0 and wipe the client accumulation. Keep the LARGER of
+      // (server, in-memory) for still-active sessions — the client counter is
+      // never less valid than the server's frozen 0.
+      const prevActiveById = new Map(
+        state.sessions.filter((s) => s.status === "active").map((s) => [s.id, s] as const),
+      );
+      const activeSessions = (payload.activeSessions || []).map((session) => {
+        const prev = prevActiveById.get(session.id);
+        if (!prev) return session;
+        return {
+          ...session,
+          total_distance_km: Math.max(Number(session.total_distance_km) || 0, Number(prev.total_distance_km) || 0),
+        };
+      });
+
       // Also merge from active sessions (as fallback coords) — same timestamp guard
-      for (const session of payload.activeSessions || []) {
+      for (const session of activeSessions) {
         if (typeof session.latest_lat === "number" && typeof session.latest_lon === "number") {
           if (!nextRiders.has(session.user_id)) {
             nextRiders.set(session.user_id, {
@@ -268,7 +285,7 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
       return {
         ...state,
         liveRiders: nextRiders,
-        sessions: payload.activeSessions || [],
+        sessions: activeSessions,
         meetups: payload.meetups || [],
         leaderboard: payload.weeklyLeaderboard || [],
         recentCompleted: payload.latestCompleted || [],
@@ -318,7 +335,34 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
         status: "live",
         isSelf: user_id === action.selfUserId,
       } as LiveRider);
-      return { ...state, liveRiders: nextRiders };
+
+      // LIVE-STATS FIX (2026-10-03): the floating top bar (StatusOverlay) reads
+      // total_distance_km / latest_speed_kmh from state.sessions — the old
+      // handler updated ONLY liveRiders, so the bar showed the snapshot zeroes
+      // for the whole ride while the map marker moved with live speed. Every
+      // ACCEPTED packet now also advances the rider's ACTIVE session row: live
+      // speed, latest coords and a client-side distance delta (the server
+      // persists total_distance_km only at session end). The existing→new pair
+      // here is exactly the one that passed the anti-spoof guards above.
+      const deltaKm = existing ? haversineDistanceKm(existing.lat, existing.lng, lat, lng) : 0;
+      let sessionsTouched = false;
+      const nextSessions = state.sessions.map((session) => {
+        if (session.user_id !== user_id || session.status !== "active") return session;
+        sessionsTouched = true;
+        return {
+          ...session,
+          latest_lat: lat,
+          latest_lon: lng,
+          latest_speed_kmh: speed_kmh,
+          total_distance_km: Number(((Number(session.total_distance_km) || 0) + deltaKm).toFixed(3)),
+        };
+      });
+
+      return {
+        ...state,
+        liveRiders: nextRiders,
+        ...(sessionsTouched ? { sessions: nextSessions } : {}),
+      };
     }
 
     case "eviction/tick": {
@@ -357,6 +401,25 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
     }
 
     case "share/started": {
+      // LIVE-STATS FIX: seed the bar's session row immediately. StatusOverlay
+      // (elapsed/distance/speed) looks the row up in state.sessions — without a
+      // seed it stayed missing until the first snapshot landed after the POST,
+      // so the bar read undefined → zeroes at the start of every ride.
+      const seededSession: ActiveSession = {
+        id: action.payload.sessionId,
+        user_id: action.selfUserId ?? "",
+        crew_slug: "",
+        ride_name: action.payload.rideName,
+        vehicle_label: action.payload.vehicleLabel,
+        ride_mode: action.payload.rideMode,
+        status: "active",
+        sharing_enabled: true,
+        started_at: new Date().toISOString(),
+        latest_lat: null,
+        latest_lon: null,
+        latest_speed_kmh: 0,
+        total_distance_km: 0,
+      };
       return {
         ...state,
         shareEnabled: true,
@@ -366,6 +429,9 @@ export function mapRidersReducer(state: MapRidersState, action: MapRidersAction)
         vehicleLabel: action.payload.vehicleLabel,
         rideMode: action.payload.rideMode,
         shareExpiresAt: new Date(Date.now() + state.autoExpireMinutes * 60_000).toISOString(),
+        sessions: state.sessions.some((s) => s.id === seededSession.id)
+          ? state.sessions
+          : [seededSession, ...state.sessions],
       };
     }
 

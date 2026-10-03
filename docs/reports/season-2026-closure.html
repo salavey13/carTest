@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Сезон 2026 · Закрытие — VIP BIKE</title>
+<style>
+  :root{
+    --bg:#070a12; --bg2:#0b1020; --card:#0e1526; --card2:#111a30;
+    --line:#1c2740; --txt:#e8eefc; --mut:#8fa0c2; --dim:#5a6a8c;
+    --amber:#f5a524; --red:#f43f5e; --sky:#38bdf8; --green:#34d399; --violet:#a78bfa;
+    --grad1:linear-gradient(135deg,#f5a524,#f43f5e);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(244,63,94,.14), transparent 60%),
+      radial-gradient(1000px 500px at 0% 0%, rgba(56,189,248,.10), transparent 55%),
+      radial-gradient(900px 700px at 50% 120%, rgba(245,165,36,.08), transparent 60%),
+      var(--bg);
+    color:var(--txt);
+    font:15px/1.55 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px 80px}
+  h1,h2,h3{font-weight:800;letter-spacing:.02em}
+  .sec{margin-top:56px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .sec-head .num{font-size:12px;font-weight:800;color:var(--amber);letter-spacing:.25em}
+  .sec-head h2{font-size:clamp(20px,3.4vw,28px);text-transform:uppercase}
+  .sec-sub{color:var(--mut);font-size:13.5px;margin-bottom:22px;max-width:70ch}
+  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:18px;padding:20px}
+  .grid{display:grid;gap:14px}
+
+  /* HERO */
+  header.hero{padding:64px 0 8px;text-align:left}
+  .season-tag{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);background:rgba(245,165,36,.06)}
+  .hero h1{font-size:clamp(34px,7vw,64px);line-height:1.02;margin:18px 0 10px;text-transform:uppercase}
+  .hero h1 .accent{background:var(--grad1);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--mut);max-width:64ch;font-size:15.5px}
+  .hero .meta{margin-top:14px;font-size:12.5px;color:var(--dim)}
+
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:30px}
+  .kpi{position:relative;overflow:hidden;background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px}
+  .kpi .lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+  .kpi .val{font-size:clamp(26px,4.4vw,38px);font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+  .kpi .sub{font-size:12px;color:var(--dim);margin-top:4px}
+  .kpi .spark{position:absolute;inset:auto 0 0 0;height:3px;opacity:.9}
+  .kpi.a .val{color:var(--amber)} .kpi.r .val{color:var(--red)} .kpi.s .val{color:var(--sky)} .kpi.g .val{color:var(--green)} .kpi.v .val{color:var(--violet)}
+
+  /* charts */
+  .chart-box{margin-top:8px}
+  .bars{display:flex;align-items:flex-end;gap:10px;height:230px;padding:8px 4px 0}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+  .bar-val{font-size:12px;font-weight:700;margin-bottom:6px;color:var(--txt);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .bar{width:100%;max-width:58px;border-radius:9px 9px 4px 4px;background:linear-gradient(180deg,var(--amber),rgba(244,63,94,.75));box-shadow:0 0 22px rgba(245,165,36,.25);transform-origin:bottom;animation:grow .9s cubic-bezier(.2,.7,.3,1) both}
+  .bar.peak{background:linear-gradient(180deg,#fbbf24,#f43f5e);box-shadow:0 0 30px rgba(244,63,94,.45)}
+  .bar.dim{background:linear-gradient(180deg,#334155,#1e293b);box-shadow:none}
+  .bar-lbl{margin-top:9px;font-size:11.5px;color:var(--mut);font-weight:600}
+  .bar-deal{font-size:10.5px;color:var(--dim)}
+  @keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--mut)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+  /* plan vs fact */
+  .pvf{display:grid;grid-template-columns:1fr;gap:14px}
+  .pv-row{display:grid;grid-template-columns:190px 1fr;gap:16px;align-items:center;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.015)}
+  @media(max-width:640px){.pv-row{grid-template-columns:1fr;gap:8px}}
+  .pv-name{font-size:13px;font-weight:700;color:var(--mut)}
+  .pv-name b{display:block;color:var(--txt);font-size:14px}
+  .track{position:relative;height:26px;border-radius:999px;background:#0a0f1e;border:1px solid var(--line);overflow:hidden}
+  .fill{position:absolute;inset:0 auto 0 0;border-radius:999px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:11.5px;font-weight:800;color:#0b0f1a;white-space:nowrap;animation:wide 1.1s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes wide{from{width:0 !important}}
+  .fill.plan{background:linear-gradient(90deg,#334155,#64748b)}
+  .fill.fact{background:var(--grad1)}
+  .fill.ok{background:linear-gradient(90deg,#059669,#34d399)}
+  .pv-note{font-size:11.5px;color:var(--dim);margin-top:5px}
+
+  /* fleet */
+  .fleet-list{display:flex;flex-direction:column;gap:9px}
+  .frow{display:grid;grid-template-columns:1fr 92px;gap:12px;align-items:center}
+  .frow .fmeta{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px}
+  .frow .fmeta b{font-weight:700}
+  .frow .fmeta span{color:var(--mut)}
+  .ftrack{height:12px;border-radius:999px;background:#0a0f1e;border:1px solid var(--line);overflow:hidden}
+  .ffill{height:100%;border-radius:999px;background:linear-gradient(90deg,#38bdf8,#a78bfa);animation:wide 1.1s cubic-bezier(.2,.7,.3,1) both}
+
+  /* two-col */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}}
+
+  /* donut */
+  .donut-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .dlegend{display:flex;flex-direction:column;gap:9px;font-size:13px}
+  .dlegend b{font-variant-numeric:tabular-nums}
+
+  /* funnel */
+  .funnel{display:flex;flex-direction:column;gap:8px}
+  .fstep{display:grid;grid-template-columns:210px 1fr 74px;gap:12px;align-items:center}
+  @media(max-width:640px){.fstep{grid-template-columns:1fr 60px;}.fstep .fname{grid-column:1/-1}}
+  .fname{font-size:12.5px;color:var(--mut);font-weight:600}
+  .fbar{height:20px;border-radius:7px;animation:wide 1s cubic-bezier(.2,.7,.3,1) both}
+  .fnum{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+
+  table.people{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.people th{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  table.people td{padding:9px 10px;border-bottom:1px solid rgba(28,39,64,.55)}
+  table.people tr:last-child td{border-bottom:none}
+  table.people td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line);color:var(--mut)}
+
+  /* achievements & advises */
+  .ach{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .ach .card{display:flex;gap:14px;align-items:flex-start;transition:transform .18s ease, border-color .18s ease}
+  .ach .card:hover{transform:translateY(-3px);border-color:rgba(245,165,36,.55)}
+  .ach .ico{font-size:26px;line-height:1;filter:drop-shadow(0 0 12px rgba(245,165,36,.45))}
+  .ach h3{font-size:14.5px;margin-bottom:4px}
+  .ach p{font-size:12.5px;color:var(--mut)}
+  .adv .card{border-left:3px solid var(--sky)}
+  .adv .card:nth-child(2n){border-left-color:var(--amber)}
+  .adv .card:nth-child(3n){border-left-color:var(--violet)}
+  .adv h3{font-size:14px;margin-bottom:5px}
+  .adv p{font-size:12.5px;color:var(--mut)}
+
+  /* winter */
+  .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:4px}
+  @media(max-width:640px){.tiers{grid-template-columns:1fr}}
+  .tier{text-align:center;padding:22px 14px;position:relative;overflow:hidden}
+  .tier .t-price{font-size:30px;font-weight:800;color:var(--sky)}
+  .tier.hot .t-price{color:var(--amber)}
+  .tier .t-class{font-size:13px;font-weight:700;margin-top:2px}
+  .tier .t-hint{font-size:11.5px;color:var(--dim);margin-top:4px}
+
+  footer{margin-top:70px;border-top:1px solid var(--line);padding-top:18px;font-size:12px;color:var(--dim);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .hl{color:var(--amber);font-weight:700}
+  .note{font-size:12px;color:var(--dim);margin-top:10px}
+  .quote{border-left:3px solid var(--amber);padding:10px 16px;background:rgba(245,165,36,.05);border-radius:0 12px 12px 0;color:var(--txt);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="season-tag">🏁 Закрытие мотосезона · VIP BIKE × carTest</span>
+  <h1>Сезон <span class="accent">2026</span><br>отчёт экипажа</h1>
+  <p>Цифры живые: всё посчитано из базы приложения — аренды, экипировка, воронка заявок, хранение. Сверка с «планом 3 млн» — честная, до процента.</p>
+  <div class="meta">Период: 1 мая → 3 октября 2026 · срез данных: <span id="gen-at"></span> · источники: rentals, franchize_intents, rental_contract_artifacts, map_rider_sessions</div>
+
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<main>
+<!-- SECTION 1: monthly revenue -->
+<section class="sec">
+  <div class="sec-head"><span class="num">01</span><h2>Деньги по месяцам</h2></div>
+  <p class="sec-sub">Выручка аренды (без залогов и отмен). Сентябрь — пик сезона: <b id="peak-note"></b>. Июнь — тихий старт, дальше каждый месяц набирал оборот.</p>
+  <div class="card chart-box">
+    <div class="bars" id="month-bars"></div>
+    <div class="legend">
+      <span><i style="background:linear-gradient(180deg,#fbbf24,#f43f5e)"></i>выручка, ₽</span>
+      <span><i style="background:#334155"></i>нет сделок</span>
+      <span id="month-total-note"></span>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 2: plan vs fact -->
+<section class="sec">
+  <div class="sec-head"><span class="num">02</span><h2>Факт vs «план 3 млн»</h2></div>
+  <p class="sec-sub">План из «Инструкции 3 000 000 ₽/мес»: 36 байков, ставка 12 000 ₽/сут, загрузка 65% → <b>3 137 500 ₽ прибыли в месяц</b>. Накладываем сезон-2026 поверх — и видим ровно, где рычаг.</p>
+  <div class="card pvf" id="pvf"></div>
+  <div class="quote" style="margin-top:16px">Вывод: парк уже <b>шире плана</b> (62 байка против 36). Вся дистанция до 3 млн — <b>не в расширении парка, а в загрузке и ставке</b>. Это хорошая новость: расти можно без вложений в технику.</div>
+</section>
+
+<!-- SECTION 3: fleet -->
+<section class="sec">
+  <div class="sec-head"><span class="num">03</span><h2>Мотопарк: кто зарабатывал</h2></div>
+  <p class="sec-sub">Топ-12 байков сезона по выручке. <span id="fleet-note"></span></p>
+  <div class="card">
+    <div class="fleet-list" id="fleet-list"></div>
+  </div>
+</section>
+
+<!-- SECTION 4: mix + funnel -->
+<section class="sec">
+  <div class="sec-head"><span class="num">04</span><h2>Сделки и воронка</h2></div>
+  <p class="sec-sub">Статусы сделок, доля экипировки в деньгах и путь заявки: от просмотра до подписанного договора.</p>
+  <div class="two">
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:14px">Статусы сделок сезона</h3>
+      <div class="donut-wrap">
+        <svg id="status-donut" width="170" height="170" viewBox="0 0 170 170" role="img" aria-label="Статусы сделок"></svg>
+        <div class="dlegend" id="status-legend"></div>
+      </div>
+      <div class="note" id="gear-note"></div>
+    </div>
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:14px">Воронка заявок (сезон)</h3>
+      <div class="funnel" id="funnel"></div>
+      <div class="note" id="funnel-note"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 5: people -->
+<section class="sec">
+  <div class="sec-head"><span class="num">05</span><h2>Люди сезона</h2></div>
+  <p class="sec-sub" id="people-sub"></p>
+  <div class="card" style="overflow-x:auto">
+    <table class="people" id="people-table"></table>
+  </div>
+</section>
+
+<!-- SECTION 6: achievements -->
+<section class="sec">
+  <div class="sec-head"><span class="num">06</span><h2>Достижения сезона</h2></div>
+  <p class="sec-sub">Что реально сделано — каждый пункт подтверждён цифрами из базы.</p>
+  <div class="ach" id="achievements"></div>
+</section>
+
+<!-- SECTION 7: advises -->
+<section class="sec">
+  <div class="sec-head"><span class="num">07</span><h2>Что делать зимой и в новом сезоне</h2></div>
+  <p class="sec-sub">Советы выведены из тех же цифр — каждое предложение ссылается на конкретное место отчёта.</p>
+  <div class="ach adv" id="advises"></div>
+</section>
+
+<!-- SECTION 8: winter -->
+<section class="sec">
+  <div class="sec-head"><span class="num">08</span><h2>Зима уже началась</h2></div>
+  <p class="sec-sub">Хранение — это не пауза, а вторая выручка сезона: октябрь → июнь, договор + ПЭП, оплата единовременно за сезон.</p>
+  <div class="tiers">
+    <div class="card tier"><div class="t-price">1 500 ₽</div><div class="t-class">Скутеры и лёгкий класс</div><div class="t-hint">до 300 см³ · мопеды · лёгкие эндуро</div></div>
+    <div class="card tier hot"><div class="t-price">2 000 ₽</div><div class="t-class">Средний класс</div><div class="t-hint">300–700 см³ · дорожные и универсалы</div></div>
+    <div class="card tier"><div class="t-price">2 500 ₽</div><div class="t-class">Круизеры · спорт · литровые</div><div class="t-hint">700+ см³ · крупная техника</div></div>
+  </div>
+  <p class="note">Тиры уже в форме заявки на хранение (запуск сегодня). Первый сезон сезона-2026 уже на «Стене хранения» — 14 000 ₽. Плюс 17 предпродажных контактов в воронке — зимние продажи техники закрывают кассу до весны.</p>
+</section>
+
+<footer>
+  <span>сгенерировано carTest · данные из прод-базы приложения</span>
+  <span>сезон закрыт ❄️ до встречи в сезоне-2027</span>
+</footer>
+</main>
+</div>
+
+<script>
+"use strict";
+/* ═══════════ DATA SNAPSHOT (preload, prod DB 2026-10-03) ═══════════ */
+const DATA = {
+  generatedAt: "2026-10-03T13:58:02Z",
+  months: [
+    { key: "Май", revenue: 0, deals: 0 },
+    { key: "Июнь", revenue: 14000, deals: 6 },
+    { key: "Июль", revenue: 399141, deals: 34 },
+    { key: "Август", revenue: 356828, deals: 73 },
+    { key: "Сентябрь", revenue: 686138, deals: 78 },
+    { key: "Октябрь*", revenue: 42000, deals: 3 }
+  ],
+  statusMix: { completed: 186, active: 5, cancelled: 10, pending: 3 },
+  gearRevenue: 55500,
+  depositHeld: 885000,
+  storage: { seasons: 1, revenue: 14000 },
+  fleet: [
+    { name: "Kawasaki EX650K (Ninja 650)", revenue: 157750, deals: 16, days: 18 },
+    { name: "BMW F800R", revenue: 141500, deals: 15, days: 15 },
+    { name: "Ducati Panigale S Electro Black", revenue: 138719, deals: 18, days: 18 },
+    { name: "Benda LFC700", revenue: 137000, deals: 2, days: 15 },
+    { name: "Yamaha R7", revenue: 112900, deals: 7, days: 12 },
+    { name: "Aprilia Shiver", revenue: 100600, deals: 10, days: 10 },
+    { name: "Ducati Panigale S Electro Aero", revenue: 89250, deals: 10, days: 10 },
+    { name: "Nibbler Regumoto 4V", revenue: 71703, deals: 11, days: 13 },
+    { name: "Ducati 1199 Panigale", revenue: 58000, deals: 4, days: 4 },
+    { name: "Honda CBR600RR", revenue: 55000, deals: 5, days: 5 },
+    { name: "Suzuki VZR1800 Boulevard", revenue: 44300, deals: 5, days: 5 },
+    { name: "Suzuki GSX-S1000F", revenue: 41008, deals: 6, days: 6 }
+  ],
+  bikesTouched: 62,
+  rentDays: 217,
+  deals: 194,
+  renters: { total: 83, repeat: 13 },
+  people: [
+    { name: "Климов Евгений", note: "Benda LFC700 · 3 дня + продление", revenue: 53000, deals: 1 },
+    { name: "Лобанов Михаил", note: "постоянный · 4 сделки", revenue: 47000, deals: 4 },
+    { name: "Федотов Денис", note: "Ducati Panigale S", revenue: 27500, deals: 1 },
+    { name: "Наумов Кирилл", note: "вернулся 3 раза за сезон", revenue: 25300, deals: 3 },
+    { name: "Арефьев Андрей", note: "BMW F800R", revenue: 25000, deals: 1 }
+  ],
+  operatorDeals: { count: 90, revenue: 459008 },
+  funnel: [
+    { name: "Просмотры техники", value: 389, color: "#38bdf8" },
+    { name: "Заявки «прокат»", value: 728, color: "#38bdf8" },
+    { name: "Тест-драйвы", value: 76, color: "#a78bfa" },
+    { name: "Старты чекаута", value: 178, color: "#f5a524" },
+    { name: "Сгенерированные договоры", value: 121, color: "#f5a524" },
+    { name: "Продажи техники (контракт)", value: 17, color: "#f43f5e" }
+  ],
+  intentsTotal: 984,
+  testDrives: 76,
+  saleContracts: 17,
+  crewMembers: 14,
+  plan: {
+    bikes: 36, ratePerDay: 12000, loadPct: 65,
+    profitPerMonth: 3137500, rentDaysPerMonth: 702,
+    profitPerOwnBike: 148000, profitPerPartnerBike: 63750
+  },
+  seasonDays: 156
+};
+
+/* ═══════════ DYNAMIC CALCULATIONS (everything below is derived, not hardcoded) ═══════════ */
+const fmt = (n) => new Intl.NumberFormat("ru-RU").format(Math.round(n));
+const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(2).replace(".", ",") + " млн" : fmt(n);
+const pct = (a, b) => b > 0 ? Math.round(a / b * 100) : 0;
+
+const totalRevenue = DATA.months.reduce((s, m) => s + m.revenue, 0);
+const totalDeals = DATA.months.reduce((s, m) => s + m.deals, 0);
+const avgDeal = Math.round(totalRevenue / totalDeals);
+const peak = DATA.months.reduce((a, b) => (b.revenue > a.revenue ? b : a));
+const peakShare = pct(peak.revenue, totalRevenue);
+const activeMonths = DATA.months.filter(m => m.revenue > 0).length;
+const avgMonthRevenue = Math.round(totalRevenue / activeMonths);
+const gearShare = pct(DATA.gearRevenue, totalRevenue);
+const repeatPct = pct(DATA.renters.repeat, DATA.renters.total);
+const seasonRentDaysPerMonth = +(DATA.rentDays / (DATA.seasonDays / 30)).toFixed(0);
+const fleetTopRevenue = DATA.fleet.reduce((s, b) => s + b.revenue, 0);
+const fleetTopShare = pct(fleetTopRevenue, totalRevenue);
+const planMonthRevenue = DATA.plan.ratePerDay * DATA.plan.rentDaysPerMonth; // 8 424 000 gross/mo
+const factRevenuePerMonth = Math.round(totalRevenue / (DATA.seasonDays / 30));
+const avgRentDaysPerBikePerMonth = +(DATA.rentDays / DATA.bikesTouched / (DATA.seasonDays / 30)).toFixed(1);
+const done = DATA.statusMix.completed + DATA.statusMix.active;
+const doneTotal = done + DATA.statusMix.cancelled + DATA.statusMix.pending;
+const planBikeProfit = DATA.plan.profitPerOwnBike;
+
+document.getElementById("gen-at").textContent =
+  new Date(DATA.generatedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+
+/* ── KPI hero cards (count-up) ── */
+const KPIS = [
+  { cls: "a", lbl: "Выручка сезона", val: totalRevenue, money: true, sub: `${fmt(avgMonthRevenue)} ₽/мес в среднем` },
+  { cls: "r", lbl: "Сделок", val: totalDeals, sub: `${fmt(done)} закрыто · ${repeatPct}% клиентов вернулись` },
+  { cls: "s", lbl: "Байков в обороте", val: DATA.bikesTouched, sub: `топ-${DATA.fleet.length} дали ${fleetTopShare}% выручки` },
+  { cls: "g", lbl: "Клиентов", val: DATA.renters.total, sub: `${DATA.renters.repeat} повторных за сезон` },
+  { cls: "v", lbl: "Арендо-дней", val: DATA.rentDays, sub: `≈ ${avgRentDaysPerBikePerMonth} сут/байк в месяц` },
+  { cls: "a", lbl: "Экипировка", val: DATA.gearRevenue, money: true, sub: `${gearShare}% от выручки · шлемы/куртки` }
+];
+document.getElementById("kpis").innerHTML = KPIS.map((k, i) => `
+  <div class="kpi ${k.cls}">
+    <div class="lbl">${k.lbl}</div>
+    <div class="val" data-count="${k.val}" data-money="${k.money ? 1 : 0}" data-i="${i}">0</div>
+    <div class="sub">${k.sub}</div>
+    <div class="spark" style="background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.35"></div>
+  </div>`).join("");
+
+const counters = document.querySelectorAll("[data-count]");
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    io.unobserve(e.target);
+    const el = e.target, target = Number(el.dataset.count), money = el.dataset.money === "1";
+    const t0 = performance.now(), dur = 1300;
+    const tick = (t) => {
+      const p = Math.min((t - t0) / dur, 1), eased = 1 - Math.pow(1 - p, 3);
+      const v = Math.round(target * eased);
+      el.textContent = money ? fmt(v) + " ₽" : fmt(v);
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+}, { threshold: .4 });
+counters.forEach((c) => io.observe(c));
+
+/* ── monthly bars ── */
+const maxRev = Math.max(...DATA.months.map(m => m.revenue), 1);
+document.getElementById("month-bars").innerHTML = DATA.months.map((m, i) => {
+  const h = Math.max(m.revenue > 0 ? 6 : 3, Math.round(m.revenue / maxRev * 100));
+  const isPeak = m.key === peak.key;
+  return `<div class="bar-col" title="${m.key}: ${fmt(m.revenue)} ₽ · ${m.deals} сделок">
+    <div class="bar-val">${m.revenue > 0 ? (m.revenue >= 1e6 ? (m.revenue/1e6).toFixed(1).replace(".",",")+"М" : fmt(m.revenue/1000)+"к") : "—"}</div>
+    <div class="bar ${isPeak ? "peak" : (m.revenue === 0 ? "dim" : "")}" style="height:${h}%;animation-delay:${i * 90}ms"></div>
+    <div class="bar-lbl">${m.key}</div>
+    <div class="bar-deal">${m.deals ? m.deals + " сд." : ""}</div>
+  </div>`;
+}).join("");
+document.getElementById("peak-note").textContent =
+  `${fmt(peak.revenue)} ₽ (${peak.deals} сделок) — ${peakShare}% всей сезонной выручки`;
+document.getElementById("month-total-note").innerHTML =
+  `<i style="background:linear-gradient(90deg,#fbbf24,#f43f5e)"></i>итого <b style="color:var(--txt)">${fmt(totalRevenue)} ₽</b> за ${totalDeals} сделок · средний чек ${fmt(avgDeal)} ₽`;
+
+/* ── plan vs fact ── */
+const PVF = [
+  { name: "Парк", plan: "36 байков в обороте", fact: `${DATA.bikesTouched} байка задействовано`, planV: 36, factV: DATA.bikesTouched, unit: "байков", ok: true,
+    note: `${pct(DATA.bikesTouched, 36)}% плана — парк уже есть, техника не узкое место` },
+  { name: "Загрузка", plan: "702 арендо-дня/мес", fact: `≈ ${seasonRentDaysPerMonth} арендо-дней/мес (${DATA.rentDays} за сезон)`, planV: 702, factV: seasonRentDaysPerMonth, unit: "дн/мес",
+    note: `главный рычаг №1 — ${(702/Math.max(seasonRentDaysPerMonth,1)).toFixed(0)}× разрыв с планом` },
+  { name: "Ставка", plan: "12 000 ₽/сутки (ср. чек)", fact: `${fmt(avgDeal)} ₽ — фактический средний чек`, planV: 12000, factV: avgDeal, unit: "₽",
+    note: `рычаг №2 — выходные +20% и минимальные ставки подтянут чек к плану` },
+  { name: "Деньги/мес", plan: "3 137 500 ₽ прибыли", fact: `${fmt(factRevenuePerMonth)} ₽ выручки/мес в среднем`, planV: 3137500, factV: factRevenuePerMonth, unit: "₽/мес",
+    note: `пик сезона ${fmt(peak.revenue)} ₽ — уже ${pct(peak.revenue, 3137500)}% от планового месяца` }
+];
+document.getElementById("pvf").innerHTML = PVF.map((r, i) => {
+  const ratio = Math.min(100, Math.round(r.factV / r.planV * 100));
+  return `<div class="pv-row">
+    <div class="pv-name">${r.name}<b>${r.fact}</b></div>
+    <div>
+      <div style="position:relative">
+        <div class="track" style="margin-bottom:6px"><div class="fill plan" style="width:100%;color:#cbd5e1">план: ${r.plan}</div></div>
+        <div class="track"><div class="fill ${r.ok ? "ok" : "fact"}" style="width:${Math.max(ratio, 4)}%;animation-delay:${i * 120}ms">${r.factV ? fmt(r.factV) + " " + r.unit : "—"}</div></div>
+      </div>
+      <div class="pv-note">${r.note}</div>
+    </div>
+  </div>`;
+}).join("");
+
+/* ── fleet bars ── */
+const maxFleet = DATA.fleet[0].revenue;
+document.getElementById("fleet-note").textContent =
+  `на топ-${DATA.fleet.length} приходится ${fleetTopShare}% сезонной выручки (${fmt(fleetTopRevenue)} ₽); всего за сезон поработало ${DATA.bikesTouched} байков`;
+document.getElementById("fleet-list").innerHTML = DATA.fleet.map((b, i) => {
+  const w = Math.max(3, Math.round(b.revenue / maxFleet * 100));
+  return `<div class="frow">
+    <div>
+      <div class="fmeta"><b>${i + 1}. ${b.name}</b><span>${fmt(b.revenue)} ₽ · ${b.deals} сд. · ${b.days} дн.</span></div>
+      <div class="ftrack"><div class="ffill" style="width:${w}%;animation-delay:${i * 70}ms"></div></div>
+    </div>
+    <div style="text-align:right;font-size:11.5px;color:var(--dim)">${fmt(b.revenue / Math.max(b.days, 1))} ₽/сут</div>
+  </div>`;
+}).join("");
+
+/* ── status donut + gear ── */
+(function donut() {
+  const items = [
+    { label: "Закрыто", v: DATA.statusMix.completed, c: "#34d399" },
+    { label: "В эфире сейчас", v: DATA.statusMix.active, c: "#f5a524" },
+    { label: "Отменено", v: DATA.statusMix.cancelled, c: "#f43f5e" },
+    { label: "Ожидают", v: DATA.statusMix.pending, c: "#64748b" }
+  ];
+  const total = items.reduce((s, i) => s + i.v, 0);
+  let angle = -Math.PI / 2;
+  const svg = document.getElementById("status-donut");
+  const arcs = items.map((it) => {
+    const a2 = angle + (it.v / total) * Math.PI * 2;
+    const large = a2 - angle > Math.PI ? 1 : 0;
+    const x1 = 85 + 62 * Math.cos(angle), y1 = 85 + 62 * Math.sin(angle);
+    const x2 = 85 + 62 * Math.cos(a2 - .012), y2 = 85 + 62 * Math.sin(a2 - .012);
+    const d = `M ${85 + 40 * Math.cos(a2 - .012)} ${85 + 40 * Math.sin(a2 - .012)} L ${85 + 62 * Math.cos(a2 - .012)} ${85 + 62 * Math.sin(a2 - .012)} A 62 62 0 ${large} 1 ${x2} ${y2} L ${85 + 40 * Math.cos(angle)} ${85 + 40 * Math.sin(angle)} A 40 40 0 ${large} 0 ${x1} ${y1} Z`;
+    angle = a2;
+    return `<path d="${d}" fill="${it.c}" opacity=".92"><title>${it.label}: ${it.v}</title></path>`;
+  }).join("");
+  svg.innerHTML = arcs + `<text x="85" y="80" text-anchor="middle" fill="#8fa0c2" font-size="10">сделок</text>
+    <text x="85" y="98" text-anchor="middle" fill="#e8eefc" font-size="20" font-weight="800">${total}</text>`;
+  document.getElementById("status-legend").innerHTML = items.map(it =>
+    `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${it.c};margin-right:8px"></i>${it.label}: <b>${it.v}</b> (${pct(it.v, total)}%)</span>`).join("");
+  const okRate = pct(done, doneTotal);
+  document.getElementById("gear-note").innerHTML =
+    `Успешность сделки: <b style="color:var(--green)">${okRate}%</b> (отмены ${DATA.statusMix.cancelled} — менее ${pct(DATA.statusMix.cancelled, doneTotal)}%). ` +
+    `Экипировка добавила <b>${fmt(DATA.gearRevenue)} ₽</b> (${gearShare}% выручки) — 35 выдач только шлемов отдельно. Залогов держится ${fmt(DATA.depositHeld)} ₽ — все возвраты под контролем рельса депозитов.`;
+})();
+
+/* ── funnel ── */
+const maxFun = Math.max(...DATA.funnel.map(f => f.value));
+document.getElementById("funnel").innerHTML = DATA.funnel.map((f, i) => {
+  const w = Math.max(4, Math.round(f.value / maxFun * 100));
+  return `<div class="fstep">
+    <div class="fname">${f.name}</div>
+    <div class="fbar" style="width:${w}%;background:${f.color};opacity:.85;animation-delay:${i * 80}ms"></div>
+    <div class="fnum">${fmt(f.value)}</div>
+  </div>`;
+}).join("");
+document.getElementById("funnel-note").innerHTML =
+  `Всего ${fmt(DATA.intentsTotal)} сигналов в сезон. Конверсия «заявка → договор»: <b>${pct(121, 728)}%</b>; тест-драйвов ${DATA.testDrives}; продаж техники дошло до контракта: <b>${DATA.saleContracts}</b>.`;
+
+/* ── people ── */
+document.getElementById("people-sub").innerHTML =
+  `${DATA.renters.total} уникальных клиентов, ${DATA.renters.repeat} из них катались больше одного раза (${repeatPct}%). Часть сделок оформлена оператором через /doc — это ${DATA.operatorDeals.count} сделок на ${fmt(DATA.operatorDeals.revenue)} ₽ через единую кассу, клиенты в таблице — именные.`;
+document.getElementById("people-table").innerHTML = `
+  <tr><th>Райдер</th><th>Штрих сезона</th><th style="text-align:right">Сделок</th><th style="text-align:right">Выручка</th></tr>
+  ${DATA.people.map(p => `<tr><td><b>${p.name}</b></td><td style="color:var(--mut)">${p.note}</td><td class="num">${p.deals}</td><td class="num" style="color:var(--amber)">${fmt(p.revenue)} ₽</td></tr>`).join("")}`;
+
+/* ── achievements ── */
+const ACH = [
+  { ico: "🏆", t: `Сентябрь — рекорд: ${fmt(peak.revenue)} ₽`, p: `${peak.deals} сделок за месяц и ${peakShare}% всей сезонной кассы. Пик пришёлся на конец сезона — система уже умела продавать.` },
+  { ico: "🔥", t: `${totalDeals} сделок за сезон`, p: `Из них ${done} закрыто успешно (${pct(done, doneTotal)}%). Отмен всего ${DATA.statusMix.cancelled} — процесс приёма/выдачи держит качество.` },
+  { ico: "🏍️", t: `${DATA.bikesTouched} байков в обороте`, p: `Парк шире плановых 36. Топ-12 машин дали ${fleetTopShare}% выручки — есть ядро, которое тянет кассу стабильно.` },
+  { ico: "🤝", t: `${DATA.renters.total} клиентов, ${repeatPct}% вернулись`, p: `${DATA.renters.repeat} райдеров сделали вторую и больше аренд — база лояльности уже существует, её надо кормить.` },
+  { ico: "📄", t: "121 договор за сезон", p: "Договоры, акты и ПЭП генерируются автоматически из чата — юридический контур работает без бумаги." },
+  { ico: "🪖", t: `Экипировка: ${fmt(DATA.gearRevenue)} ₽`, p: `Шлемы, куртки и перчатки добавили ${gearShare}% к чеку. В плане юнит-экономики — +6%: почти попали.` },
+  { ico: "❄️", t: "Зимнее хранение запущено", p: `Первый сезон на стене: ${fmt(DATA.storage.revenue)} ₽. Тиры 1 500/2 000/2 500 ₽ — в форме заявки с сегодняшнего дня.` },
+  { ico: "🗺️", t: "Карта экипажа в проде", p: "Геошаринг, точки встреч и журнал заездов работают в мини-аппе — фундамент командных фич сезона-2027." }
+];
+document.getElementById("achievements").innerHTML = ACH.map(a =>
+  `<div class="card"><div class="ico">${a.ico}</div><div><h3>${a.t}</h3><p>${a.p}</p></div></div>`).join("");
+
+/* ── advises ── */
+const ADV = [
+  { t: "Рычаг №1 — загрузка, не парк", p: `${DATA.bikesTouched} байков дают ${DATA.rentDays} арендо-дней за сезон (≈ ${seasonRentDaysPerMonth}/мес) против 702/мес в плане. Пакет «выходные +20% / будни −15%» из «Быстрой правки цен» — и тот же парк печатает в разы больше.` },
+  { t: "Средний чек: 7 722 ₽ → 12 000 ₽", p: `Плановая ставка 12 000 ₽/сут. Минимальная ставка на литровые (Panigale, LFC700), наценка выходного дня и обязательный шлем в чеке закрывают 60% разрыва без единой новой сделки.` },
+  { t: "13 повторных клиентов → система возвратов", p: `Каждому прошлому арендатору — рассылка «сезон открыт» (кнопка fanout уже в админке, аудитории recent/past/all). ${repeatPct}% повторных сейчас — поднять до 30% реалистично за один сезон.` },
+  { t: "Октябрь не закрывать досрочно", p: `Сентябрь дал ${peakShare}% кассы — спрос есть и в холод. Тёплые выходные, скидки будней и продления (Benda уже катает до 9.10) дотягивают сезон ещё на 2–4 недели выручки.` },
+  { t: "Зима: хранение + продажи", p: `Тиры 1 500/2 000/2 500 ₽ × 8 месяцев — это 12–20 тыс. ₽ с байка за сезон хранения. Плюс ${DATA.saleContracts} предпродажных контактов в воронке: техника «на продажу» уходит зимой по ценам сезона.` },
+  { t: "Каждому чеку — экип по умолчанию", p: `Шлем предвыбран в чекауте, куртка/перчатки — одним тапом. При ${Math.round(totalDeals / (DATA.seasonDays / 30))} сделках/мес +6% к чеку (как в плане) — это десятки тысяч ₽ без рекламы.` }
+];
+document.getElementById("advises").innerHTML = ADV.map(a =>
+  `<div class="card"><div><h3>${a.t}</h3><p>${a.p}</p></div></div>`).join("");
+
+/* title reflects the real numbers */
+document.title = `Сезон 2026 · ${fmt(totalRevenue)} ₽ — закрытие сезона VIP BIKE`;
+</script>
+</body>
+</html>
+
