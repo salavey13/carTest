@@ -3712,7 +3712,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     } else if (isTestdrive && payload.rentalStartDate) {
       // 2026-09-11: testdrives carry a picked slot (no end time) — show it
       // as a testdrive time, not as a rental period with «по согласованию».
-      notificationParts.push(`Тест-драйв: ${payload.rentalStartDate}${rentStartTime && rentStartTime !== "10:00" ? ` ${rentStartTime}` : ""}`);
+      // 2026-10-04 (owner): the line now also carries rentEndTime = start
+      // + 10 minutes — show the full window «14:32–14:42» when present.
+      const tdTimeLabel = rentStartTime !== "10:00" || rentEndTime !== "10:00"
+        ? ` ${rentStartTime}${rentEndTime !== "10:00" ? `–${rentEndTime}` : ""}`
+        : "";
+      notificationParts.push(`Тест-драйв: ${payload.rentalStartDate}${tdTimeLabel}`);
     } else if (payload.rentalStartDate) {
       notificationParts.push(`Период: ${periodStr}`);
     }

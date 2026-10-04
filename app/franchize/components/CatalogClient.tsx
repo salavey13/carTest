@@ -14,6 +14,7 @@ import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
+import { CartAddedFlash } from "./CartAddedFlash";
 import { WinterStorageModal } from "./WinterStorageModal";
 import { useDisplayMode } from "./DisplayModeContext";
 import { SHOW_CART } from "@/lib/feature-flags";
@@ -21,7 +22,7 @@ import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
-import { todayISO } from "../lib/date-utils";
+import { todayISO, addMinutesToHhMm } from "../lib/date-utils";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 import { localImageSrc, handleImageError } from "@/lib/image-fallback";
@@ -547,6 +548,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   const accentColor = palette.accentMain;
   const priceGlowStyle = getContrastingGlowStyle(accentColor);
   const [selectedItem, setSelectedItem] = useState<CatalogItemVM | null>(null);
+  // ── Fullscreen «added to cart» flash (2026-10-04, owner): every add from
+  // the bike card pops a full-screen confirmation — no silent adds.
+  // `at` re-keys the overlay so back-to-back adds retrigger the animation.
+  const [cartFlash, setCartFlash] = useState<{ label: string; kind: "cart" | "testdrive"; at: number } | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
   const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: todayISO(), rentEndDate: todayISO(), rentStartTime: "10:00", rentEndTime: "10:00" });
   const [searchQuery, setSearchQuery] = useState("");
@@ -1831,6 +1836,16 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         monthlyPriceRub={storageConfig?.defaultMonthlyPriceRub}
       />
 
+      {/* Fullscreen «added to cart» confirmation (2026-10-04, owner). */}
+      <CartAddedFlash
+        flash={cartFlash}
+        cartHref={`/franchize/${resolvedSlug}/cart`}
+        accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
+        textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
+        borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
+        onClose={() => setCartFlash(null)}
+      />
+
       <ItemModal
         item={selectedItem}
         items={displayItems}
@@ -1854,6 +1869,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             options: { ...selectedOptions, action: "buy" },
           });
           addItem(selectedItem.id, { action: "buy" }, 1);
+          setCartFlash({ label: selectedItem.title, kind: "cart", at: Date.now() });
           setSelectedItem(null);
         }}
         onClose={() => setSelectedItem(null)}
@@ -1881,7 +1897,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             duration: "10 минут",
             rentStartDate: slot?.date || fallbackDate,
             rentStartTime: slot?.time || fallbackTime,
+            // 2026-10-04 (owner): the ride END = start + 10 minutes — the
+            // slot comes pre-computed from the modal picker (or the same
+            // +10 fallback here if the picker slot somehow lacks it).
+            rentEndTime: slot?.endTime || addMinutesToHhMm(slot?.time || fallbackTime, 10),
           }, 1);
+          setCartFlash({ label: selectedItem.title, kind: "testdrive", at: Date.now() });
           setSelectedItem(null);
         }}
         onAddToCart={(extrasStr) => {
@@ -1898,6 +1919,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             options: cartOptions,
           });
           addItem(selectedItem.id, cartOptions, 1);
+          setCartFlash({ label: selectedItem.title, kind: "cart", at: Date.now() });
           setSelectedItem(null);
         }}
       />

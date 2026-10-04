@@ -48,7 +48,7 @@ import {
 } from "../lib/item-share";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime } from "@/app/franchize/lib/date-utils";
+import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime, addMinutesToHhMm } from "@/app/franchize/lib/date-utils";
 import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
 import {
   reachVipBikeGoal,
@@ -134,8 +134,10 @@ interface ItemModalProps {
   /** Called when "Купить" (buy) CTA is clicked for sale-only flow */
   onBuyItem?: () => void | Promise<void>;
   /** Called when "Тест-драйв" CTA is clicked — adds to cart with testdrive flow.
-   *  2026-09-11: receives the picked testdrive slot (defaults to now). */
-  onTestdrive?: (slot?: { date: string; time: string }) => void | Promise<void>;
+   *  2026-09-11: receives the picked testdrive slot (defaults to now).
+   *  2026-10-04 (owner): slot carries endTime = start + 10 minutes — the ride
+   *  has a real return moment (lands in the cart line as rentEndTime). */
+  onTestdrive?: (slot?: { date: string; time: string; endTime?: string }) => void | Promise<void>;
   /** Shows "С возвращением!" badge for returning users */
   isReturningUser?: boolean;
   /** Display mode from catalog filter — overrides flowType for content visibility */
@@ -1348,6 +1350,20 @@ export function ItemModal({
     setTestdriveDate((prev) => prev || d);
     setTestdriveTime((prev) => prev || t);
   }, [testdriveMode]);
+
+  // ── Auto-scroll to the rental config on card open (2026-10-04, owner):
+  // «при открытии карточки мотоцикла скроллась сразу на выбор дат» —
+  // the date pickers are the primary decision UI; jump straight to them.
+  const rentalConfigRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!item || !isRental) return;
+    // Wait a frame + a beat so the modal mount/entrance animation settles
+    // before smooth-scrolling inside its scroll container.
+    const timer = window.setTimeout(() => {
+      rentalConfigRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 160);
+    return () => window.clearTimeout(timer);
+  }, [item, isRental]);
   // Dynamic calculated price from franchize pricing calculator
   const [calculatedPrice, setCalculatedPrice] = useState<{ label: string; price: string; period: string } | null>(null);
 
@@ -1535,9 +1551,10 @@ export function ItemModal({
       try {
         // Test-drive mode: skip the rental config entirely — the parent adds
         // the line with action "testdrive" / duration "10 минут" (0 ₽).
-        // The picked testdrive slot (default = now) rides along.
+        // The picked testdrive slot (default = now) rides along; the ride
+        // END = start + 10 minutes (2026-10-04, owner).
         if (testdriveMode) {
-          const result = onTestdrive?.({ date: testdriveDate, time: testdriveTime });
+          const result = onTestdrive?.({ date: testdriveDate, time: testdriveTime, endTime: addMinutesToHhMm(testdriveTime, 10) || undefined });
           if (result instanceof Promise) {
             result.finally(() => setIsAdding(false));
           } else {
@@ -2387,7 +2404,7 @@ export function ItemModal({
 
             {/* ── Rental-only options (hidden for order flow) ── */}
             {isRental && (
-              <>
+              <div ref={rentalConfigRef}>
                 {/* ── Test-drive MODE switch (2026-09-11) ──
                     ON: dates / equipment / pricing disappear — the ride is
                     free (10 minutes), mirrors the bot /testdrive flow. The
@@ -2455,6 +2472,13 @@ export function ItemModal({
                         />
                       </label>
                     </div>
+                    {/* 2026-10-04 (owner): the ride END is start + 10 minutes —
+                        shown here and stored in the cart line (rentEndTime). */}
+                    {testdriveTime && (
+                      <p className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--item-accent)" }}>
+                        Начало {testdriveTime} · окончание {addMinutesToHhMm(testdriveTime, 10) || "—"} (10 минут)
+                      </p>
+                    )}
                     <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--item-muted-text)]">
                       <li>• Бесплатное время тест-драйва — 10 минут</li>
                       <li>• Точное время подтверждаем по телефону</li>
@@ -2560,7 +2584,7 @@ export function ItemModal({
                 </> /* end !testdriveMode config block */
                 )}
 
-              </>
+              </div>
             )}
 
             {comparableBikes.length ? (

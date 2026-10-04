@@ -463,7 +463,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   const resolvedStartTime = firstLineWithDates?.options.rentStartTime
     || firstTestdriveLineWithDate?.options.rentStartTime
     || "10:00";
-  const resolvedEndTime = firstLineWithDates?.options.rentEndTime || "10:00";
+  // 2026-10-04 (owner): a testdrive line carries rentEndTime = start + 10
+  // minutes — let it flow into the checkout window instead of «10:00».
+  const resolvedEndTime = firstLineWithDates?.options.rentEndTime
+    || firstTestdriveLineWithDate?.options.rentEndTime
+    || "10:00";
   const rentalPeriodDays = useMemo(
     () => (resolvedStartDate && resolvedEndDate ? durationDaysFromDateTime(resolvedStartDate, resolvedStartTime, resolvedEndDate, resolvedEndTime) : null),
     [resolvedStartDate, resolvedEndDate, resolvedStartTime, resolvedEndTime],

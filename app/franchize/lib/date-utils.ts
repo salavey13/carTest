@@ -195,6 +195,19 @@ export function todayISO(): string {
 }
 
 /**
+ * Add minutes to an «HH:MM» string, wrapping past midnight (23:55 + 10 → 00:05).
+ * Returns "" for invalid input — callers render nothing in that case.
+ * Used by the testdrive flow: ride end = picked start + 10 minutes.
+ */
+export function addMinutesToHhMm(value: string | null | undefined, minutes: number): string {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((value ?? "").trim());
+  if (!match || !Number.isFinite(minutes)) return "";
+  const total = (Number(match[1]) * 60 + Number(match[2]) + minutes) % (24 * 60);
+  const wrapped = total < 0 ? total + 24 * 60 : total;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+}
+
+/**
  * Sanity check: a string is a valid YYYY-MM-DD calendar date.
  */
 export function isISODate(value: string | null | undefined): value is string {

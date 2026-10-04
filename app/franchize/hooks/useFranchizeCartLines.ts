@@ -165,7 +165,11 @@ export function useFranchizeCartLines(
           const [y, m, day] = d.split("-").map(Number);
           if (!y || !m || !day) return "";
           const t = line.options.rentStartTime || "";
-          return `${String(day).padStart(2, "0")}.${String(m).padStart(2, "0")}${t ? ` ${t}` : ""}`;
+          // 2026-10-04 (owner): testdrive carries rentEndTime = start + 10
+          // minutes — show the full window «14:32–14:42» in the badge.
+          const end = line.options.rentEndTime || "";
+          const timeLabel = t ? `${t}${end && end !== t ? `–${end}` : ""}` : "";
+          return `${String(day).padStart(2, "0")}.${String(m).padStart(2, "0")}${timeLabel ? ` ${timeLabel}` : ""}`;
         })();
         return {
           lineId,
