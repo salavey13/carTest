@@ -31,6 +31,18 @@ import { loadNetworkModel } from "./load-network-model";
 //     create-crew), anchored on the flagship crew (most people);
 //   · the dive itself lives in the graph: legend card inside the canvas +
 //     tappable «Рукопожатия» chips in the crew panel (see CrewDiscoveryGraph).
+//
+// REGRESSION ROUND (boss 2026-10-04: «discovery page was kinda nuked… it
+// disappeared — circles back better than ever»): the page paints its own
+// dark world, but bare h1/h2/h3 inherited the GLOBAL --foreground —
+// near-black under html.light, so light-scheme visitors saw INVISIBLE
+// headings (the «disappeared» report). Fixes:
+//   · every heading on this page carries explicit light ink (text-white
+//     family) — the page no longer depends on the app theme at all;
+//   · the <main> root pins a dark-scheme --foreground triplet — any
+//     heading that ever forgets its color class still renders readable.
+// The canvas regression (label pile-up on phones) is fixed in
+// CrewDiscoveryGraph — phones now render a 640-unit viewBox.
 
 export const metadata: Metadata = {
   title: "Сеть экипажей — что умеют люди рядом",
@@ -76,13 +88,16 @@ export default async function CrewDiscoveryPage() {
       style={{
         background:
           "radial-gradient(1100px 700px at 50% -12%, #1c2c50 0%, #0d1526 52%, #070b16 100%)",
+        // dark-scheme foreground triplet — systemic guard: bare headings
+        // inside this page can never inherit the light theme's near-black
+        ["--foreground" as string]: "45 25% 88%",
       }}
     >
       <div className="mx-auto w-full max-w-5xl px-3 pb-16 pt-7 sm:px-4 md:pt-14">
         {/* ── header — one line, the graph owns the first screen ─────────── */}
         <header className="text-center">
           <p className="text-xs font-black uppercase tracking-[0.28em] text-sky-300/80">Сеть экипажей</p>
-          <h1 className="mt-2 text-3xl font-black leading-tight md:text-4xl">Что умеют люди рядом</h1>
+          <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Что умеют люди рядом</h1>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-white/70 md:text-base">
             Круг — экипаж, размер — люди, линия — общие люди. Тапай, тащи, ныряй по рукопожатиям —{" "}
             <a href="#howto" className="underline decoration-sky-300/40 underline-offset-2 hover:text-white">
@@ -215,7 +230,7 @@ export default async function CrewDiscoveryPage() {
                         </span>
                       )}
                       <div className="min-w-0">
-                        <h3 className="truncate text-base font-bold">{node.name}</h3>
+                        <h3 className="truncate text-base font-bold text-white">{node.name}</h3>
                         <p className="flex items-center gap-1 text-xs text-white/60">
                           <Users className="h-3 w-3" aria-hidden /> {node.memberCount}{" "}
                           {pluralPeople(node.memberCount)}
@@ -293,7 +308,7 @@ export default async function CrewDiscoveryPage() {
             <div className="text-4xl" aria-hidden>
               🛰
             </div>
-            <h2 className="mt-3 text-lg font-bold">В сети пока пусто</h2>
+            <h2 className="mt-3 text-lg font-bold text-white">В сети пока пусто</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/65">
               Как только у экипажа появятся люди и услуги — его круг появится здесь. Создай первый.
             </p>
@@ -350,7 +365,7 @@ function HowtoCard({
       >
         {icon}
       </div>
-      <h3 className="mt-2.5 text-sm font-black">{title}</h3>
+      <h3 className="mt-2.5 text-sm font-black text-white/95">{title}</h3>
       <p className="mt-1.5 flex-1 text-[13px] leading-relaxed text-white/65">{body}</p>
       {isAnchor ? (
         <a href={ctaHref} className={ctaClass}>

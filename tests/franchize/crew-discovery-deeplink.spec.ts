@@ -118,9 +118,11 @@ describe("discovery page guarantees", () => {
     expect(graph).not.toContain("overflow-x-auto");
     expect(graph).not.toContain("min-w-[640px]");
     expect(graph).not.toContain("Граф можно двигать вбок");
-    // …and the labels scale UP on narrow viewports instead of shrinking
+    // regression fix 2026-10-04: phones keep readable ink via a 640-unit
+    // viewBox (the old labelScale blowup piled labels over the circles)
     expect(graph).toContain("ResizeObserver");
-    expect(graph).toContain("labelScale");
+    expect(graph).toContain("width >= 640 ? VIEW : 640");
+    expect(graph).not.toContain("labelScale");
   });
 
   it("has a route-level loading skeleton", () => {

@@ -38,12 +38,30 @@
 //   · wiki-dive round (boss 2026-10-04: «fullwidth circle area — more info
 //     inside area, fit screen width on mobile, less scrolling»): the canvas
 //     drops the 640px floor + sideways pan entirely — it is FULLWIDTH at
-//     every viewport, and a ResizeObserver-driven labelScale BLOWS THE
-//     LABELS UP on narrow screens (same viewBox, bigger ink, still crisp);
-//     stats pills + a legend card live INSIDE the canvas overlay (optional
-//     props — the map-riders sheet keeps its own header and passes nothing);
-//     the crew panel learns «Рукопожатия» — tappable neighbor chips that
-//     re-focus the graph crew-to-crew, the wikipedia dive made literal.
+//     every viewport; stats pills + a legend card live INSIDE the canvas
+//     overlay (optional props — the map-riders sheet keeps its own header
+//     and passes nothing); the crew panel learns «Рукопожатия» — tappable
+//     neighbor chips that re-focus the graph crew-to-crew, the wikipedia
+//     dive made literal.
+//
+//   · regression round (boss 2026-10-04: «discovery page was kinda nuked…
+//     circles disappeared, fix regression, circles back better than ever»):
+//     TWO real defects shipped with the wiki round —
+//     (1) the page paints its own dark world but bare h1/h2/h3 inherit the
+//         GLOBAL --foreground, which is near-black under html.light →
+//         headings rendered invisible for light-scheme visitors (the
+//         «disappeared» look). Every heading on this page now carries
+//         explicit light ink, and the page root pins a dark-scheme
+//         --foreground triplet as a systemic guard;
+//     (2) the ink-blowup multiplier (×1.6–2.1 on phones) made labels
+//         outgrow the circles — an unreadable pile over a 1000-unit layout
+//         squeezed into a 364px canvas. REPLACED by a viewBox shrink:
+//         phones render the whole graph in a 640-unit box (the proven old
+//         floor, minus the sideways pan) — circles, labels and links keep
+//         the exact desktop proportions the boss approved, ink readable,
+//         nothing overlaps. The in-canvas bottom hint moved BELOW the card
+//         — the bottom edge is flip-label territory and text-over-text
+//         there was the second pile-up.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -113,14 +131,17 @@ export function CrewDiscoveryGraph({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [legendOpen, setLegendOpen] = useState(false);
-  /** Viewport→viewBox ink multiplier: 1 on ≥640px containers, up to ~2.1
-   *  on a phone. Static attrs re-render with it; the painter reads the
-   *  ref for its per-frame label offsets. */
-  const [labelScale, setLabelScale] = useState(1);
+  /** viewBox edge of the canvas: 1000 on wide containers, 640 on phones.
+   *  The whole graph (layout, sim, rings, labels) renders in the 640-unit
+   *  box on narrow screens — desktop proportions, readable ink, zero
+   *  sideways pan. SSR and the first client render use 1000; the
+   *  ResizeObserver flips phones right after hydration (no mismatch). */
+  const [view, setView] = useState(VIEW);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const labelScaleRef = useRef(1);
+  /** painter reads the live box from the ref (no re-subscribe per frame) */
+  const viewRef = useRef(VIEW);
   const simRef = useRef<SimulationState | null>(null);
   const activeRef = useRef(false);
   const wakeRef = useRef<(() => void) | null>(null);
@@ -134,16 +155,16 @@ export function CrewDiscoveryGraph({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // fullwidth canvas: measure the CONTAINER, not a fixed floor — labels and
-  // ring captions scale up as the viewport shrinks (wiki round: no sideways
-  // pan, no 640px floor, the circle area fits the screen width).
+  // fullwidth canvas: measure the CONTAINER — phones get the 640-unit box
+  // (regression fix: ink proportions stay desktop-true, the sim layout
+  // adapts, nothing needs a sideways pan or blown-up labels).
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const measure = (width: number) => {
-      const scale = Math.min(2.1, Math.max(1, 640 / Math.max(1, width)));
-      labelScaleRef.current = scale;
-      setLabelScale((prev) => (Math.abs(prev - scale) < 0.02 ? prev : scale));
+      const next = width >= 640 ? VIEW : 640;
+      viewRef.current = next;
+      setView((prev) => (prev === next ? prev : next));
     };
     measure(el.clientWidth);
     const ro = new ResizeObserver((entries) => {
@@ -153,10 +174,6 @@ export function CrewDiscoveryGraph({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // a scale change may land while the sim is asleep — repaint label offsets
-  useEffect(() => {
-    wakeRef.current?.();
-  }, [labelScale]);
 
   const dragRef = useRef<{
     id: string;
@@ -202,9 +219,9 @@ export function CrewDiscoveryGraph({
       selectedId,
       links.map((l) => ({ source: l.source, target: l.target, weight: l.weight })),
       new Map(Object.entries(renderRadii)),
-      { width: VIEW, height: VIEW },
+      { width: view, height: view },
     );
-  }, [links, renderRadii, selectedId]);
+  }, [links, renderRadii, selectedId, view]);
 
   /** Per-ring max rendered circle radius — guide labels must clear the
    *  circles anchored at the ring's top (the fan starts at -90°, so a
@@ -224,9 +241,9 @@ export function CrewDiscoveryGraph({
       layoutCrewGraph(
         nodes.map((n) => n.crewId),
         links,
-        { width: VIEW, height: VIEW, radii: baseRadii },
+        { width: view, height: view, radii: baseRadii },
       ),
-    [links, nodes, baseRadii],
+    [links, nodes, baseRadii, view],
   );
 
   const selected = nodes.find((n) => n.crewId === selectedId) ?? null;
@@ -274,10 +291,9 @@ export function CrewDiscoveryGraph({
       // flip from the deterministic initial positions)
       const pair = labelRefs.current.get(node.id);
       if (pair) {
-        const s = labelScaleRef.current;
-        const flip = node.y > VIEW - node.r - 62 * s;
-        const nameY = (flip ? -(node.r + 46 * s) : node.r + 26 * s).toFixed(1);
-        const countY = (flip ? -(node.r + 26 * s) : node.r + 46 * s).toFixed(1);
+        const flip = node.y > viewRef.current - node.r - 62;
+        const nameY = (flip ? -(node.r + 46) : node.r + 26).toFixed(1);
+        const countY = (flip ? -(node.r + 26) : node.r + 46).toFixed(1);
         if (pair.lastNameY !== nameY) {
           pair.name?.setAttribute("y", nameY);
           pair.lastNameY = nameY;
@@ -323,7 +339,7 @@ export function CrewDiscoveryGraph({
     simRef.current = createSimulation(
       nodes.map((n) => {
         const carried = prev?.nodes.get(n.crewId);
-        const init = initialPositions[n.crewId] ?? { x: VIEW / 2, y: VIEW / 2 };
+        const init = initialPositions[n.crewId] ?? { x: view / 2, y: view / 2 };
         return {
           id: n.crewId,
           r: renderRadii[n.crewId] ?? 60,
@@ -332,7 +348,7 @@ export function CrewDiscoveryGraph({
         };
       }),
       links,
-      { width: VIEW, height: VIEW },
+      { width: view, height: view },
     );
     if (focus && selectedId) {
       applyTargets(simRef.current, focus.anchors, selectedId);
@@ -342,7 +358,7 @@ export function CrewDiscoveryGraph({
     drawFrame();
     wakeRef.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, links, selectedId, simActive]);
+  }, [nodes, links, selectedId, simActive, view]);
 
   // ── the rAF loop (mount once): run steps, paint, sleep when settled ────────
   useEffect(() => {
@@ -506,8 +522,10 @@ export function CrewDiscoveryGraph({
     <div className="mt-6">
       {/* ── the graph ─────────────────────────────────────────────────────── */}
       {/* FULLWIDTH at every viewport (wiki round — no 640px floor, no sideways
-          pan); labels scale up on narrow screens; circles themselves remain
-          drag handles (touchmove is claimed only while a circle is grabbed). */}
+          pan); phones render the graph in a 640-unit viewBox so circles and
+          labels keep the approved desktop proportions (regression round);
+          circles themselves remain drag handles (touchmove is claimed only
+          while a circle is grabbed). */}
       <div
         ref={wrapRef}
         className="relative rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)]"
@@ -515,7 +533,7 @@ export function CrewDiscoveryGraph({
         <div className="relative">
           <svg
             ref={svgRef}
-            viewBox={`0 0 ${VIEW} ${VIEW}`}
+            viewBox={`0 0 ${view} ${view}`}
             className="h-auto w-full select-none"
             role="group"
             aria-label="Социальный граф сети: круги — экипажи, линии — общие люди"
@@ -536,14 +554,14 @@ export function CrewDiscoveryGraph({
             </defs>
 
             {/* tap-outside-to-deselect surface */}
-            <rect x="0" y="0" width={VIEW} height={VIEW} fill="transparent" onClick={() => setSelectedId(null)} />
+            <rect x="0" y="0" width={view} height={view} fill="transparent" onClick={() => setSelectedId(null)} />
 
             {/* focus guide rings — the «handshake» depth made visible */}
             {focus?.ringRadii.slice(1).map((r, i) => (
               <g key={`guide-${i}`} style={{ pointerEvents: "none" }}>
                 <circle
-                  cx={VIEW / 2}
-                  cy={VIEW / 2}
+                  cx={view / 2}
+                  cy={view / 2}
                   r={r}
                   fill="none"
                   stroke="#ffffff"
@@ -551,10 +569,10 @@ export function CrewDiscoveryGraph({
                   strokeDasharray="2 10"
                 />
                 <text
-                  x={VIEW / 2}
-                  y={VIEW / 2 - r - (ringLabelClearance[i + 1] ?? 30) - 12 * labelScale}
+                  x={view / 2}
+                  y={view / 2 - r - (ringLabelClearance[i + 1] ?? 30) - 12}
                   textAnchor="middle"
-                  fontSize={15 * labelScale}
+                  fontSize={15}
                   fontWeight="700"
                   letterSpacing="2.5"
                   fill="#ffffff"
@@ -605,7 +623,7 @@ export function CrewDiscoveryGraph({
                 const dim = dimOf(node.crewId);
                 const ink = inkFor(node.accent);
                 // SSR/static flip decision — physics keeps it live afterwards
-                const flipLabel = point.y > VIEW - r - 62 * labelScale;
+                const flipLabel = point.y > view - r - 62;
                 // static fallback (>SIM_MAX_NODES): the sim sleeps, but a pointer
                 // tap must still focus the circle — the onClick below only fires
                 // when simActive is false, so it can never double-toggle the
@@ -696,8 +714,8 @@ export function CrewDiscoveryGraph({
                         else labelRefs.current.set(node.crewId, pair);
                       }}
                       textAnchor="middle"
-                      y={flipLabel ? -(r + 46 * labelScale) : r + 26 * labelScale}
-                      fontSize={21 * labelScale}
+                      y={flipLabel ? -(r + 46) : r + 26}
+                      fontSize={21}
                       fontWeight="700"
                       fill={isSelected ? "#ffffff" : "rgba(255,255,255,0.85)"}
                       stroke="rgba(4,9,20,0.88)"
@@ -717,8 +735,8 @@ export function CrewDiscoveryGraph({
                         else labelRefs.current.set(node.crewId, pair);
                       }}
                       textAnchor="middle"
-                      y={flipLabel ? -(r + 26 * labelScale) : r + 46 * labelScale}
-                      fontSize={13.5 * labelScale}
+                      y={flipLabel ? -(r + 26) : r + 46}
+                      fontSize={13.5}
                       fontWeight="600"
                       fill={isSelected ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.5)"}
                       stroke="rgba(4,9,20,0.85)"
@@ -804,18 +822,17 @@ export function CrewDiscoveryGraph({
             )}
           </AnimatePresence>
 
-          {!selected && (
-            <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs font-semibold text-white/45">
-              Тапни по кругу — сеть перестроится вокруг него · круги можно таскать
-            </p>
-          )}
-          {selected && (
-            <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs font-semibold text-white/45">
-              Тап по фону — вернуться ко всей сети
-            </p>
-          )}
         </div>
       </div>
+
+      {/* hint lives BELOW the canvas — the canvas bottom edge is flip-label
+          territory, an in-canvas hint there collided with crew labels
+          (regression round: the second pile-up) */}
+      <p className="mt-2 text-center text-xs font-semibold text-white/45" aria-hidden>
+        {selected
+          ? "Тап по фону — вернуться ко всей сети"
+          : "Тапни по кругу — сеть перестроится вокруг него · круги можно таскать"}
+      </p>
 
       {/* ── detail panel (collapsible) ─────────────────────────────────────── */}
       <div ref={panelRef}>
@@ -850,7 +867,7 @@ export function CrewDiscoveryGraph({
                   </span>
                 )}
                 <div className="min-w-0">
-                  <h2 className="truncate text-xl font-black">{selected.name}</h2>
+                  <h2 className="truncate text-xl font-black text-white">{selected.name}</h2>
                   <p className="text-xs font-semibold text-white/60">
                     {selected.memberCount}{" "}
                     {pluralRu(selected.memberCount, ["человек", "человека", "человек"])} в экипаже

@@ -7,8 +7,10 @@
 // Pins:
 //   · the canvas is fullwidth with in-canvas stats + legend (info lives
 //     INSIDE the circle area — no page scroll spent on chrome);
-//   · the labels blow UP on narrow viewports (labelScale via ResizeObserver),
-//     including the rAF painter offsets — same viewBox, bigger ink;
+//   · REGRESSION FIX 2026-10-04: phones render the graph in a 640-unit
+//     viewBox (was: labelScale ink-blowup ×1.6–2.1 on a 1000-unit layout —
+//     labels outgrew the circles and piled up); static ink keeps the
+//     desktop-approved proportions, painter offsets are plain constants;
 //   · the crew panel carries «Рукопожатия» chips that re-focus the graph —
 //     crew-to-crew hopping without leaving the page;
 //   · the page carries a six-card «Как это работает» strip (horizontal
@@ -48,19 +50,37 @@ describe("graph canvas — fullwidth + in-canvas info", () => {
     expect(graph).toContain("absolute right-2.5 top-2.5 z-20");
   });
 
-  it("labelScale multiplies static ink AND the painter's per-frame offsets", () => {
-    // static attrs
-    expect(graph).toContain("fontSize={21 * labelScale}");
-    expect(graph).toContain("fontSize={13.5 * labelScale}");
-    expect(graph).toContain("fontSize={15 * labelScale}");
-    // SSR flip decision scales too
-    expect(graph).toContain("point.y > VIEW - r - 62 * labelScale");
+  it("mobile renders the graph in a 640-unit viewBox — desktop proportions, no ink pile-up", () => {
+    // the ResizeObserver picks the box: wide containers 1000, phones 640
+    expect(graph).toContain("width >= 640 ? VIEW : 640");
+    expect(graph).toContain("viewBox={`0 0 ${view} ${view}`}");
+    // static ink back to the typography-round sizes (no labelScale multiplier)
+    expect(graph).toContain("fontSize={21}");
+    expect(graph).toContain("fontSize={13.5}");
+    expect(graph).toContain("fontSize={15}");
+    // SSR flip decision on the live box
+    expect(graph).toContain("point.y > view - r - 62");
     // the painter reads the ref (no re-subscribe per frame)
-    expect(graph).toContain("const s = labelScaleRef.current;");
-    expect(graph).toContain("node.y > VIEW - node.r - 62 * s");
-    expect(graph).toContain("flip ? -(node.r + 46 * s) : node.r + 26 * s");
-    // scale change wakes the sleeping sim so offsets repaint
-    expect(graph).toContain("wakeRef.current?.();");
+    expect(graph).toContain("node.y > viewRef.current - node.r - 62");
+    expect(graph).toContain("flip ? -(node.r + 46) : node.r + 26");
+    // layout + sim + rings all follow the view box
+    expect(graph).toContain("{ width: view, height: view }");
+    // a view change re-seeds the sim (carrying positions)
+    expect(graph).toContain("[nodes, links, selectedId, simActive, view]");
+  });
+
+  it("the bottom hint lives BELOW the canvas — flip-label territory stays clean", () => {
+    expect(graph).not.toContain("absolute inset-x-0 bottom-3");
+    expect(graph).toContain("Тапни по кругу — сеть перестроится вокруг него · круги можно таскать");
+  });
+
+  it("headings on this page are theme-proof — explicit light ink, no bare h1/h2/h3", () => {
+    // the «disappeared» regression: bare headings inherited the global
+    // light-theme --foreground (near-black) on a self-dark page
+    for (const bare of ['className="truncate text-xl font-black"']) {
+      expect(graph).not.toContain(bare);
+    }
+    expect(graph).toContain('className="truncate text-xl font-black text-white"');
   });
 
   it("the crew panel hops between crews — «Рукопожатия» chips re-focus the graph", () => {
@@ -141,5 +161,16 @@ describe("discovery page — howtos + useful links", () => {
     expect(page.includes("<input")).toBe(false);
     expect(page.includes("<textarea")).toBe(false);
     expect(page).toContain('export const dynamic = "force-dynamic"');
+  });
+
+  it("REGRESSION GUARD 2026-10-04 — headings are theme-proof (light scheme must see them)", () => {
+    // the global stylesheet paints bare h1/h2/h3 with --foreground, which is
+    // near-black under html.light — every heading here carries light ink
+    expect(page).toContain('className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl"');
+    expect(page).toContain('className="mt-2.5 text-sm font-black text-white/95"');
+    expect(page).toContain('className="truncate text-base font-bold text-white"');
+    expect(page).toContain('className="mt-3 text-lg font-bold text-white"');
+    // systemic guard: the page root pins a dark --foreground triplet
+    expect(page).toContain('["--foreground" as string]: "45 25% 88%"');
   });
 });
