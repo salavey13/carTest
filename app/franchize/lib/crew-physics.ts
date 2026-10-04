@@ -102,6 +102,14 @@ export interface SimulationState {
   links: { a: PhysicsNode; b: PhysicsNode; weight: number }[];
   width: number;
   height: number;
+  /** INFINITE AREA (2026-10-04, boss: «make kinda infinite area — circles
+   *  not clamped, free real estate»): how far a circle may drift BEYOND the
+   *  [0..W] box. 0 = the historical hard clamp (tests pin that behavior);
+   *  >0 turns the box edges into soft springs — the network breathes into
+   *  the world margin under collision pressure and recovers when it fades,
+   *  with a hard cap at ±overflowPad so the camera can always reach all.
+   *  Units: world units each side. */
+  overflowPad: number;
   /** Global motion budget — decays every step; reset by applyTargets. */
   alpha: number;
   /** Focus anchors (node id → ring point) or null in global mode. */
@@ -125,10 +133,11 @@ export const BOUNDS_MARGIN = 14;
 export function createSimulation(
   inits: PhysicsNodeInit[],
   links: PhysicsLinkInput[],
-  opts?: { width?: number; height?: number; tuning?: Partial<PhysicsTuning> },
+  opts?: { width?: number; height?: number; overflowPad?: number; tuning?: Partial<PhysicsTuning> },
 ): SimulationState {
   const width = opts?.width ?? 1000;
   const height = opts?.height ?? 1000;
+  const overflowPad = Math.max(0, opts?.overflowPad ?? 0);
   const tuning: PhysicsTuning = { ...PHYSICS_DEFAULTS, ...(opts?.tuning ?? {}) };
 
   const nodes = new Map<string, PhysicsNode>();
@@ -156,7 +165,7 @@ export function createSimulation(
     resolved.push({ a, b, weight: Math.max(1, link.weight ?? 1) });
   }
 
-  return { nodes, links: resolved, width, height, alpha: 1, targets: null, focusId: null, tuning, steps: 0 };
+  return { nodes, links: resolved, width, height, overflowPad, alpha: 1, targets: null, focusId: null, tuning, steps: 0 };
 }
 
 /** Point the simulation at focus anchors (or clear them) and re-energize.
@@ -332,22 +341,59 @@ export function stepSimulation(state: SimulationState): { settled: boolean; maxD
     }
   }
 
-  // soft walls — clamp inside the canvas, kill the normal velocity
+  // walls — the proven hard clamp (overflowPad = 0), or the INFINITE AREA
+  // soft boundary (overflowPad > 0): past the box edge a gentle spring pulls
+  // the circle back, so collision pressure can push the network into the
+  // world margin but it recovers once the pressure fades; a hard cap at
+  // ±overflowPad keeps every circle reachable by the camera.
+  const overflow = state.overflowPad;
   for (const node of list) {
     const m = node.r + BOUNDS_MARGIN;
     if (node.x < m) {
-      node.x = m;
-      node.vx = Math.abs(node.vx) * 0.5;
+      if (overflow > 0) {
+        node.vx += Math.min(14, (m - node.x) * 0.045);
+        if (node.x < m - overflow) {
+          node.x = m - overflow;
+          node.vx = Math.abs(node.vx) * 0.5;
+        }
+      } else {
+        node.x = m;
+        node.vx = Math.abs(node.vx) * 0.5;
+      }
     } else if (node.x > state.width - m) {
-      node.x = state.width - m;
-      node.vx = -Math.abs(node.vx) * 0.5;
+      if (overflow > 0) {
+        node.vx -= Math.min(14, (node.x - (state.width - m)) * 0.045);
+        if (node.x > state.width - m + overflow) {
+          node.x = state.width - m + overflow;
+          node.vx = -Math.abs(node.vx) * 0.5;
+        }
+      } else {
+        node.x = state.width - m;
+        node.vx = -Math.abs(node.vx) * 0.5;
+      }
     }
     if (node.y < m) {
-      node.y = m;
-      node.vy = Math.abs(node.vy) * 0.5;
+      if (overflow > 0) {
+        node.vy += Math.min(14, (m - node.y) * 0.045);
+        if (node.y < m - overflow) {
+          node.y = m - overflow;
+          node.vy = Math.abs(node.vy) * 0.5;
+        }
+      } else {
+        node.y = m;
+        node.vy = Math.abs(node.vy) * 0.5;
+      }
     } else if (node.y > state.height - m) {
-      node.y = state.height - m;
-      node.vy = -Math.abs(node.vy) * 0.5;
+      if (overflow > 0) {
+        node.vy -= Math.min(14, (node.y - (state.height - m)) * 0.045);
+        if (node.y > state.height - m + overflow) {
+          node.y = state.height - m + overflow;
+          node.vy = -Math.abs(node.vy) * 0.5;
+        }
+      } else {
+        node.y = state.height - m;
+        node.vy = -Math.abs(node.vy) * 0.5;
+      }
     }
   }
 

@@ -62,11 +62,50 @@
 //         nothing overlaps. The in-canvas bottom hint moved BELOW the card
 //         — the bottom edge is flip-label territory and text-over-text
 //         there was the second pile-up.
+//
+//   · INFINITE AREA + service satellites (boss 2026-10-04: «maybe by tapping
+//     on circle we can spawn respective services as circles as well and kinda
+//     connect to circles that have similar services… try to make kinda
+//     infinite area for these circles, to let circles not clamp and have
+//     some free real estate for additional infographics»):
+//     — the canvas becomes an infinite-canvas WORLD: a camera (pan by
+//       dragging the background, pinch on touch, ⌘/Ctrl+wheel zoom, zoom
+//       buttons) moves a transformed world group over a dot-grid floor; the
+//       physics gets soft walls (crew-physics overflowPad) so circles
+//       breathe past the visible box instead of clamping against it;
+//     — TAP A CREW → its services SPAWN as satellite circles around it
+//       (label + sub + «+N в сети»), and ring-1 crews offering the SAME
+//       service spawn a smaller satellite of their own, connected to the
+//       selection's satellite by a dashed service-colored affinity edge —
+//       the «similar services» constellation made literal (best practice:
+//       progressive disclosure — satellites exist only in focus mode, so
+//       the global network stays calm);
+//     — the freed world margin hosts TWO INFOGRAPHIC STATIONS outside the
+//       visible box («Услуги сети» — every service with its strongest
+//       crews; «Рукопожатия-рекорды» — the top shared-people links), one
+//       camera-chip tap away (Граф · Услуги · Рекорды); tapping a row
+//       focuses that crew — the wikipedia dive now has a map.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, BookOpen, ChevronDown, Handshake, Info, Snowflake, Users, X } from "lucide-react";
+import {
+  ArrowRight,
+  Bike,
+  BookOpen,
+  ChevronDown,
+  Handshake,
+  Info,
+  LocateFixed,
+  Network,
+  Snowflake,
+  Users,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   crewCircleRadius,
   layoutCrewGraph,
@@ -90,6 +129,57 @@ const VIEW = 1000;
 const SIM_MAX_NODES = 80;
 /** Screen-pixel distance before a press counts as a drag, not a tap. */
 const TAP_SLOP_PX = 7;
+
+/** INFINITE AREA — how far the world extends beyond the visible box (share
+ *  of the view edge, each side). Circles breathe into this margin via the
+ *  physics soft walls, and the infographic stations live out here; the
+ *  camera (pan/pinch/wheel/chips) reaches everything. */
+const WORLD_OVERFLOW_RATIO = 0.35;
+const ZOOM_MIN = 0.55;
+const ZOOM_MAX = 2.4;
+/** World infographic stations (right: services, left: handshake records). */
+const STATION_W = 320;
+const STATION_GAP = 96;
+const STATION_TOP = 96;
+
+/** Service satellite paint/icons — keyed by CrewServiceKey. */
+const SERVICE_META: Record<string, { color: string; icon: LucideIcon; short: string }> = {
+  rent: { color: "#7dd3fc", icon: Bike, short: "Аренда" },
+  storage: { color: "#93c5fd", icon: Snowflake, short: "Хранение" },
+};
+
+/** A service satellite spawned around a crew (focus mode). */
+interface SatSpec {
+  key: string;
+  label: string;
+  sub: string | null;
+  href: string;
+  r: number;
+  /** Offset from the crew circle center (world units) — the satellite is
+   *  rendered INSIDE the crew's <g>, so it rides along for free. */
+  ox: number;
+  oy: number;
+  primary: boolean;
+  aria: string;
+}
+
+/** A dashed «similar services» edge: selected crew's satellite ↔ a ring-1
+ *  crew's satellite of the same service. Offsets are crew-local; the painter
+ *  resolves world positions from the live simulation every frame. */
+interface ServiceEdgeSpec {
+  key: string;
+  serviceKey: string;
+  aId: string;
+  bId: string;
+  oax: number;
+  oay: number;
+  obx: number;
+  oby: number;
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+}
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -155,6 +245,23 @@ export function CrewDiscoveryGraph({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
 
+  // ── INFINITE AREA camera + service-edge refs ──────────────────────────
+  const router = useRouter();
+  /** camera: world→screen is translate(x y) scale(k); home = identity. */
+  const camRef = useRef({ x: 0, y: 0, k: 1 });
+  const camTweenRef = useRef<{ x: number; y: number; k: number } | null>(null);
+  const worldRef = useRef<SVGGElement | null>(null);
+  /** background pan / two-finger pinch (svg-level — circles stopPropagation) */
+  const panRef = useRef<{ id: number; startX: number; startY: number; lastX: number; lastY: number; moved: boolean } | null>(null);
+  const pinchRef = useRef<{ lastDist: number; lastMidX: number; lastMidY: number } | null>(null);
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  /** dashed service-affinity edges — the painter keeps them glued to the
+   *  satellites while the network moves; meta is synced per render. */
+  const serviceEdgeRefs = useRef(new Map<string, SVGPathElement>());
+  const serviceEdgeMeta = useRef(
+    new Map<string, { aId: string; bId: string; oax: number; oay: number; obx: number; oby: number }>(),
+  );
+
   // fullwidth canvas: measure the CONTAINER — phones get the 640-unit box
   // (regression fix: ink proportions stay desktop-true, the sim layout
   // adapts, nothing needs a sideways pan or blown-up labels).
@@ -185,6 +292,28 @@ export function CrewDiscoveryGraph({
     throwVX: number;
     throwVY: number;
   } | null>(null);
+
+  // ── camera primitives (declared before the painter — the rAF tick drives
+  //    camera tweens first, then the physics) ────────────────────────────
+  const clampZoom = useCallback((k: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k)), []);
+  const applyCamera = useCallback(() => {
+    const cam = camRef.current;
+    worldRef.current?.setAttribute(
+      "transform",
+      `translate(${cam.x.toFixed(2)} ${cam.y.toFixed(2)}) scale(${cam.k.toFixed(4)})`,
+    );
+  }, []);
+  const tweenCameraTo = useCallback(
+    (x: number, y: number, k: number) => {
+      camTweenRef.current = { x, y, k: clampZoom(k) };
+      wakeRef.current?.();
+    },
+    [clampZoom],
+  );
+  const tweenHome = useCallback(() => {
+    camTweenRef.current = { x: 0, y: 0, k: 1 };
+    wakeRef.current?.();
+  }, []);
 
   // ── derived model (per render — selection switches modes) ─────────────────
   const baseRadii = useMemo(() => {
@@ -248,6 +377,8 @@ export function CrewDiscoveryGraph({
 
   const selected = nodes.find((n) => n.crewId === selectedId) ?? null;
   const simActive = nodes.length > 0 && nodes.length <= SIM_MAX_NODES;
+  /** World margin beyond the visible box (soft walls + station real estate). */
+  const overflowPad = Math.round(view * WORLD_OVERFLOW_RATIO);
 
   /** «Рукопожатия» — crews sharing people with the selection, strongest
    *  first; tapping a chip re-focuses the graph on it (the wiki dive). */
@@ -278,6 +409,154 @@ export function CrewDiscoveryGraph({
     }
     return incident;
   }, [links, selectedId]);
+
+  // ── service satellites (INFINITE ROUND) ────────────────────────────────
+  /** Focus-mode service model: the selection's own services + ring-1 crews
+   *  offering the SAME service («similar services» kin), capped, strongest
+   *  handshake first; plus network-wide per-service totals for «+N в сети». */
+  const focusServices = useMemo(() => {
+    if (!selectedId) return null;
+    const sel = nodes.find((n) => n.crewId === selectedId);
+    if (!sel || sel.services.length === 0) return null;
+    const byId = new Map(nodes.map((n) => [n.crewId, n]));
+    const kinByService = new Map<string, { node: CrewNetworkNode; weight: number }[]>();
+    for (const service of sel.services) {
+      const list: { node: CrewNetworkNode; weight: number }[] = [];
+      for (const link of links) {
+        const other =
+          link.source === selectedId
+            ? link.target
+            : link.target === selectedId
+              ? link.source
+              : null;
+        if (!other) continue;
+        const node = byId.get(other);
+        if (node && node.services.some((s) => s.key === service.key)) {
+          list.push({ node, weight: link.weight });
+        }
+      }
+      list.sort((a, b) => b.weight - a.weight || (a.node.crewId < b.node.crewId ? -1 : 1));
+      kinByService.set(service.key, list.slice(0, 4));
+    }
+    const totalByService = new Map<string, number>();
+    for (const node of nodes) {
+      for (const s of node.services) {
+        totalByService.set(s.key, (totalByService.get(s.key) ?? 0) + 1);
+      }
+    }
+    return { sel, kinByService, totalByService };
+  }, [links, nodes, selectedId]);
+
+  /** Satellite geometry — deterministic (angles derive from the SSR-stable
+   *  initialPositions), so SSR markup and client first render agree. */
+  const satelliteModel = useMemo(() => {
+    const satsByCrew = new Map<string, SatSpec[]>();
+    const edges: ServiceEdgeSpec[] = [];
+    if (!selectedId || !focusServices) return { satsByCrew, edges };
+    const { sel, kinByService, totalByService } = focusServices;
+    const selInit = initialPositions[sel.crewId] ?? { x: view / 2, y: view / 2 };
+
+    // the selection spawns ALL its services, fanned around the top
+    const count = sel.services.length;
+    sel.services.forEach((service, i) => {
+      const meta = SERVICE_META[service.key];
+      const angle = -Math.PI / 2 + ((i - (count - 1) / 2) * 58 * Math.PI) / 180;
+      const satR = 30;
+      const orbit = (renderRadii[sel.crewId] ?? 60) + satR + 34;
+      const ox = orbit * Math.cos(angle);
+      const oy = orbit * Math.sin(angle);
+      const shown = kinByService.get(service.key) ?? [];
+      const plus = Math.max(0, (totalByService.get(service.key) ?? 0) - 1 - shown.length);
+      const sub = [service.sub ?? null, plus > 0 ? `+${plus} в сети` : null].filter(Boolean).join(" · ") || null;
+      const list = satsByCrew.get(sel.crewId) ?? [];
+      list.push({
+        key: service.key,
+        label: meta?.short ?? service.label,
+        sub,
+        href: service.href,
+        r: satR,
+        ox,
+        oy,
+        primary: true,
+        aria: `Услуга «${service.label}» экипажа ${sel.name}${sub ? ` — ${sub}` : ""}`,
+      });
+      satsByCrew.set(sel.crewId, list);
+    });
+
+    // neighbors sharing a service spawn a smaller satellite of THEIR own,
+    // pointed at the selection — the dashed affinity edge connects the pair
+    for (const service of sel.services) {
+      const meta = SERVICE_META[service.key];
+      const selSat = satsByCrew.get(sel.crewId)?.find((s) => s.key === service.key);
+      if (!selSat || !meta) continue;
+      for (const { node } of kinByService.get(service.key) ?? []) {
+        if (satsByCrew.has(node.crewId)) continue; // one satellite per crew
+        const init = initialPositions[node.crewId];
+        if (!init) continue;
+        const angle = Math.atan2(selInit.y - init.y, selInit.x - init.x);
+        const satR = 22;
+        const orbit = (renderRadii[node.crewId] ?? 60) + satR + 26;
+        const ox = orbit * Math.cos(angle);
+        const oy = orbit * Math.sin(angle);
+        satsByCrew.set(node.crewId, [
+          {
+            key: service.key,
+            label: meta.short,
+            sub: null,
+            href: service.key === "storage" ? `/franchize/${node.slug}/storage` : `/franchize/${node.slug}`,
+            r: satR,
+            ox,
+            oy,
+            primary: false,
+            aria: `Похожая услуга «${service.label}» у экипажа ${node.name}`,
+          },
+        ]);
+        edges.push({
+          key: `se-${service.key}-${node.crewId}`,
+          serviceKey: service.key,
+          aId: sel.crewId,
+          bId: node.crewId,
+          oax: selSat.ox,
+          oay: selSat.oy,
+          obx: ox,
+          oby: oy,
+          ax: selInit.x + selSat.ox,
+          ay: selInit.y + selSat.oy,
+          bx: init.x + ox,
+          by: init.y + oy,
+        });
+      }
+    }
+    return { satsByCrew, edges };
+  }, [focusServices, initialPositions, renderRadii, selectedId, view]);
+
+  // ── world stations: the freed margin hosts real infographics ──────────
+  const stationById = useMemo(() => new Map(nodes.map((n) => [n.crewId, n])), [nodes]);
+
+  const stationServices = useMemo(() => {
+    const order = ["rent", "storage"];
+    const byKey = new Map<string, CrewNetworkNode[]>();
+    for (const node of nodes) {
+      for (const service of node.services) {
+        const list = byKey.get(service.key) ?? [];
+        list.push(node);
+        byKey.set(service.key, list);
+      }
+    }
+    return [...byKey.entries()]
+      .sort((a, b) => {
+        const ia = order.indexOf(a[0]);
+        const ib = order.indexOf(b[0]);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      })
+      .map(([key, list]) => ({
+        key,
+        crews: [...list].sort((a, b) => b.memberCount - a.memberCount).slice(0, 4),
+        total: list.length,
+      }));
+  }, [nodes]);
+
+  const stationRecords = useMemo(() => [...links].sort((a, b) => b.weight - a.weight).slice(0, 3), [links]);
 
   // ── the frame painter: sim state → DOM (no React) ──────────────────────────
   const drawFrame = useCallback(() => {
@@ -327,6 +606,18 @@ export function CrewDiscoveryGraph({
       const tension = Math.max(0, (dist - rest) / rest);
       pathEl.setAttribute("stroke-width", Math.min(3.4, 1.05 + link.weight * 0.55 + tension * 1.6).toFixed(2));
     }
+    // service-affinity edges follow their satellites (crew motion included)
+    for (const [key, meta] of serviceEdgeMeta.current) {
+      const edgeEl = serviceEdgeRefs.current.get(key);
+      if (!edgeEl) continue;
+      const a = st.nodes.get(meta.aId);
+      const b = st.nodes.get(meta.bId);
+      if (!a || !b) continue;
+      edgeEl.setAttribute(
+        "d",
+        `M ${(a.x + meta.oax).toFixed(1)} ${(a.y + meta.oay).toFixed(1)} L ${(b.x + meta.obx).toFixed(1)} ${(b.y + meta.oby).toFixed(1)}`,
+      );
+    }
   }, []);
 
   // ── sim lifecycle: rebuild on structure/mode change, carry positions ───────
@@ -348,7 +639,7 @@ export function CrewDiscoveryGraph({
         };
       }),
       links,
-      { width: view, height: view },
+      { width: view, height: view, overflowPad: Math.round(view * WORLD_OVERFLOW_RATIO) },
     );
     if (focus && selectedId) {
       applyTargets(simRef.current, focus.anchors, selectedId);
@@ -360,18 +651,40 @@ export function CrewDiscoveryGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, links, selectedId, simActive, view]);
 
-  // ── the rAF loop (mount once): run steps, paint, sleep when settled ────────
+  // ── the rAF loop (mount once): camera tweens + sim steps + paint, sleeps
+  //    when everything settled ─────────────────────────────────────────────
   useEffect(() => {
     let raf = 0;
     const tick = () => {
+      let busy = false;
+      const tween = camTweenRef.current;
+      if (tween) {
+        const cam = camRef.current;
+        const nx = cam.x + (tween.x - cam.x) * 0.16;
+        const ny = cam.y + (tween.y - cam.y) * 0.16;
+        const nk = cam.k + (tween.k - cam.k) * 0.16;
+        if (Math.abs(tween.x - nx) < 0.4 && Math.abs(tween.y - ny) < 0.4 && Math.abs(tween.k - nk) < 0.002) {
+          cam.x = tween.x;
+          cam.y = tween.y;
+          cam.k = tween.k;
+          camTweenRef.current = null;
+        } else {
+          cam.x = nx;
+          cam.y = ny;
+          cam.k = nk;
+          busy = true;
+        }
+        applyCamera();
+      }
       const st = simRef.current;
       if (st) {
         const { settled } = stepSimulation(st);
         drawFrame();
-        if (!settled) {
-          raf = requestAnimationFrame(tick);
-          return;
-        }
+        if (!settled) busy = true;
+      }
+      if (busy) {
+        raf = requestAnimationFrame(tick);
+        return;
       }
       activeRef.current = false;
     };
@@ -380,19 +693,32 @@ export function CrewDiscoveryGraph({
       activeRef.current = true;
       raf = requestAnimationFrame(tick);
     };
+    applyCamera();
     wakeRef.current();
     return () => {
       cancelAnimationFrame(raf);
       activeRef.current = false;
     };
-  }, [drawFrame]);
+  }, [drawFrame, applyCamera]);
 
-  // drag on touch must not scroll the sheet/container mid-gesture
+  // keep the painter's service-edge meta in sync with the rendered model
+  useIsoLayoutEffect(() => {
+    serviceEdgeMeta.current = new Map(
+      satelliteModel.edges.map((edge) => [
+        edge.key,
+        { aId: edge.aId, bId: edge.bId, oax: edge.oax, oay: edge.oay, obx: edge.obx, oby: edge.oby },
+      ]),
+    );
+  }, [satelliteModel]);
+
+  // drag on touch must not scroll the sheet/container mid-gesture — and the
+  // infinite-area gestures (background pan / pinch) claim the gesture too
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
     const onTouchMove = (event: TouchEvent) => {
       if (dragRef.current) event.preventDefault();
+      else if (panRef.current || pinchRef.current) event.preventDefault();
     };
     svg.addEventListener("touchmove", onTouchMove, { passive: false });
     return () => svg.removeEventListener("touchmove", onTouchMove);
@@ -412,6 +738,11 @@ export function CrewDiscoveryGraph({
     if (selectedId) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [selectedId]);
 
+  // a fresh focus re-centers the world (rings compose around the middle)
+  useEffect(() => {
+    if (selectedId) tweenHome();
+  }, [selectedId, tweenHome]);
+
   // ── drag + tap handlers (per circle) ────────────────────────────────────────────
   const toView = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -420,6 +751,152 @@ export function CrewDiscoveryGraph({
     const pt = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse());
     return { x: pt.x, y: pt.y };
   }, []);
+
+  // ── infinite-area gestures: pan / pinch / wheel-zoom / zoom buttons ──────
+  const zoomAt = useCallback(
+    (px: number, py: number, factor: number) => {
+      const cam = camRef.current;
+      const k = clampZoom(cam.k * factor);
+      const eff = k / cam.k;
+      camTweenRef.current = null;
+      cam.x = px - (px - cam.x) * eff;
+      cam.y = py - (py - cam.y) * eff;
+      cam.k = k;
+      applyCamera();
+    },
+    [applyCamera, clampZoom],
+  );
+
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const cam = camRef.current;
+      const k = clampZoom(cam.k * factor);
+      const wx = (view / 2 - cam.x) / cam.k;
+      const wy = (view / 2 - cam.y) / cam.k;
+      tweenCameraTo(view / 2 - k * wx, view / 2 - k * wy, k);
+    },
+    [clampZoom, tweenCameraTo, view],
+  );
+
+  const focusStation = useCallback(
+    (which: "services" | "records") => {
+      const x = which === "services" ? view + STATION_GAP : -(STATION_GAP + STATION_W);
+      const k = clampZoom(Math.min(1.1, (view * 0.6) / STATION_W));
+      tweenCameraTo(view / 2 - k * (x + STATION_W / 2), view / 2 - k * (STATION_TOP + 170), k);
+    },
+    [clampZoom, tweenCameraTo, view],
+  );
+
+  /** svg-level handlers — circles/panels stopPropagation, so reaching here
+   *  means the BACKGROUND (world floor) is pressed: pan, pinch or tap-out. */
+  const onSurfacePointerDown = useCallback(
+    (event: React.PointerEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      try {
+        svg.setPointerCapture(event.pointerId);
+      } catch {
+        // old WebView without pointer capture — gestures still work inside
+      }
+      if (pointersRef.current.size === 2) {
+        const [p1, p2] = [...pointersRef.current.values()];
+        const v1 = toView(p1.x, p1.y);
+        const v2 = toView(p2.x, p2.y);
+        if (v1 && v2) {
+          pinchRef.current = {
+            lastDist: Math.max(1, Math.hypot(v2.x - v1.x, v2.y - v1.y)),
+            lastMidX: (v1.x + v2.x) / 2,
+            lastMidY: (v1.y + v2.y) / 2,
+          };
+        }
+        panRef.current = null;
+        return;
+      }
+      panRef.current = {
+        id: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        moved: false,
+      };
+    },
+    [toView],
+  );
+
+  const onSurfacePointerMove = useCallback(
+    (event: React.PointerEvent<SVGSVGElement>) => {
+      if (pointersRef.current.has(event.pointerId)) {
+        pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+      const pinch = pinchRef.current;
+      if (pinch && pointersRef.current.size >= 2) {
+        const [p1, p2] = [...pointersRef.current.values()];
+        const v1 = toView(p1.x, p1.y);
+        const v2 = toView(p2.x, p2.y);
+        if (!v1 || !v2) return;
+        const dist = Math.max(1, Math.hypot(v2.x - v1.x, v2.y - v1.y));
+        const midX = (v1.x + v2.x) / 2;
+        const midY = (v1.y + v2.y) / 2;
+        const cam = camRef.current;
+        const k = clampZoom(cam.k * (dist / pinch.lastDist));
+        const eff = k / cam.k;
+        cam.x = midX - (midX - cam.x) * eff;
+        cam.y = midY - (midY - cam.y) * eff;
+        cam.k = k;
+        cam.x += midX - pinch.lastMidX;
+        cam.y += midY - pinch.lastMidY;
+        camTweenRef.current = null;
+        applyCamera();
+        pinch.lastDist = dist;
+        pinch.lastMidX = midX;
+        pinch.lastMidY = midY;
+        return;
+      }
+      const pan = panRef.current;
+      if (!pan || pan.id !== event.pointerId) return;
+      const cur = toView(event.clientX, event.clientY);
+      const last = toView(pan.lastX, pan.lastY);
+      if (!cur || !last) return;
+      if (Math.hypot(event.clientX - pan.startX, event.clientY - pan.startY) > TAP_SLOP_PX) {
+        pan.moved = true;
+      }
+      camTweenRef.current = null;
+      const cam = camRef.current;
+      cam.x += cur.x - last.x;
+      cam.y += cur.y - last.y;
+      applyCamera();
+      pan.lastX = event.clientX;
+      pan.lastY = event.clientY;
+    },
+    [applyCamera, clampZoom, toView],
+  );
+
+  const onSurfacePointerUp = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
+    pointersRef.current.delete(event.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    const pan = panRef.current;
+    if (pan && pan.id === event.pointerId) {
+      panRef.current = null;
+      if (!pan.moved) setSelectedId(null); // tap on the world — the whole network
+    }
+  }, []);
+
+  // ⌘/Ctrl + wheel = zoom at the pointer (plain wheel keeps scrolling the
+  // page — an infinite canvas must not hijack the document scroll)
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+      const pt = toView(event.clientX, event.clientY);
+      if (pt) zoomAt(pt.x, pt.y, Math.exp(-event.deltaY * 0.0022));
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [toView, zoomAt]);
 
   const onNodePointerDown = useCallback(
     (id: string) => (event: React.PointerEvent<SVGGElement>) => {
@@ -537,6 +1014,10 @@ export function CrewDiscoveryGraph({
             className="h-auto w-full select-none"
             role="group"
             aria-label="Социальный граф сети: круги — экипажи, линии — общие люди"
+            onPointerDown={onSurfacePointerDown}
+            onPointerMove={onSurfacePointerMove}
+            onPointerUp={onSurfacePointerUp}
+            onPointerCancel={onSurfacePointerUp}
           >
             <defs>
               {nodes.map((node, index) => (
@@ -551,10 +1032,32 @@ export function CrewDiscoveryGraph({
                   <circle cx="0" cy="0" r={(renderRadii[node.crewId] ?? 60) * 0.66} />
                 </clipPath>
               ))}
+              {Object.entries(SERVICE_META).map(([key, meta]) => (
+                <radialGradient key={`sg-${key}`} id={`sg-${key}`} cx="35%" cy="30%" r="75%">
+                  <stop offset="0%" stopColor={meta.color} stopOpacity="0.95" />
+                  <stop offset="55%" stopColor={meta.color} stopOpacity="0.62" />
+                  <stop offset="100%" stopColor={meta.color} stopOpacity="0.26" />
+                </radialGradient>
+              ))}
+              <pattern id="dotgrid" width="44" height="44" patternUnits="userSpaceOnUse">
+                <circle cx="1.4" cy="1.4" r="1.4" fill="#ffffff" opacity="0.08" />
+              </pattern>
             </defs>
 
-            {/* tap-outside-to-deselect surface */}
-            <rect x="0" y="0" width={view} height={view} fill="transparent" onClick={() => setSelectedId(null)} />
+            {/* ── INFINITE AREA: the world group lives under the camera —
+                pan/pinch/wheel/chips move this transform, the circles stop
+                clamping against the visible box (soft physics walls) and the
+                freed margin hosts the infographic stations below. ── */}
+            <g ref={worldRef} transform="translate(0 0) scale(1)">
+            {/* the world floor — a dot grid across the whole reachable area;
+                it is also the pan/tap surface (svg-level handlers) */}
+            <rect
+              x={-(overflowPad + 600)}
+              y={-(overflowPad + 600)}
+              width={view + 2 * (overflowPad + 600)}
+              height={view + 2 * (overflowPad + 600)}
+              fill="url(#dotgrid)"
+            />
 
             {/* focus guide rings — the «handshake» depth made visible */}
             {focus?.ringRadii.slice(1).map((r, i) => (
@@ -613,6 +1116,28 @@ export function CrewDiscoveryGraph({
               })}
             </g>
 
+            {/* service-affinity edges — dashed, service-colored; the painter
+                keeps them glued to BOTH satellites while the network moves */}
+            <g>
+              {satelliteModel.edges.map((edge) => (
+                <path
+                  key={edge.key}
+                  ref={(el) => {
+                    if (el) serviceEdgeRefs.current.set(edge.key, el);
+                    else serviceEdgeRefs.current.delete(edge.key);
+                  }}
+                  d={`M ${edge.ax.toFixed(1)} ${edge.ay.toFixed(1)} L ${edge.bx.toFixed(1)} ${edge.by.toFixed(1)}`}
+                  fill="none"
+                  stroke={SERVICE_META[edge.serviceKey]?.color ?? "#7dd3fc"}
+                  strokeWidth="1.4"
+                  strokeDasharray="3 7"
+                  strokeLinecap="round"
+                  opacity={0.55}
+                  style={{ pointerEvents: "none" }}
+                />
+              ))}
+            </g>
+
             {/* crew circles */}
             <g>
               {nodes.map((node, index) => {
@@ -640,7 +1165,7 @@ export function CrewDiscoveryGraph({
                     aria-pressed={isSelected}
                     aria-label={`Экипаж ${node.name}: ${node.memberCount} чел., услуги: ${node.services.map((s) => s.label).join(", ") || "каталог"}`}
                     transform={`translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`}
-                    onPointerDown={simActive ? onNodePointerDown(node.crewId) : undefined}
+                    onPointerDown={simActive ? onNodePointerDown(node.crewId) : (event) => event.stopPropagation()}
                     onPointerMove={simActive ? onNodePointerMove(node.crewId) : undefined}
                     onPointerUp={simActive ? onNodePointerUp(node.crewId) : undefined}
                     onPointerCancel={simActive ? onNodePointerUp(node.crewId) : undefined}
@@ -747,9 +1272,175 @@ export function CrewDiscoveryGraph({
                     >
                       {node.memberCount} чел.
                     </text>
+
+                    {/* service satellites (INFINITE ROUND): spawn on focus —
+                        the selection's own services + same-service satellites
+                        on ring-1 crews, all riding the crew's <g> for free */}
+                    {(satelliteModel.satsByCrew.get(node.crewId) ?? []).map((sat) => {
+                      const meta = SERVICE_META[sat.key];
+                      const Icon = meta?.icon;
+                      return (
+                        <g
+                          key={`sat-${sat.key}-${sat.ox.toFixed(0)}`}
+                          role="link"
+                          tabIndex={0}
+                          aria-label={sat.aria}
+                          transform={`translate(${sat.ox.toFixed(1)} ${sat.oy.toFixed(1)})`}
+                          className="cursor-pointer"
+                          style={{ opacity: sat.primary ? 1 : 0.88 }}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onPointerUp={(event) => event.stopPropagation()}
+                          onPointerMove={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(sat.href);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              router.push(sat.href);
+                            }
+                          }}
+                        >
+                          <circle r={sat.r + 5} fill={meta?.color ?? "#7dd3fc"} opacity={0.16} />
+                          <circle
+                            r={sat.r}
+                            fill={`url(#sg-${sat.key})`}
+                            stroke={meta?.color ?? "#7dd3fc"}
+                            strokeWidth="1.6"
+                          />
+                          {Icon && (
+                            <g transform="translate(-11 -11)">
+                              <Icon width={22} height={22} color={meta ? inkFor(meta.color) : "#0b1220"} strokeWidth={2.2} aria-hidden />
+                            </g>
+                          )}
+                          <text
+                            textAnchor="middle"
+                            y={sat.r + 17}
+                            fontSize={14.5}
+                            fontWeight="800"
+                            fill="#ffffff"
+                            stroke="rgba(4,9,20,0.88)"
+                            strokeWidth="4"
+                            strokeLinejoin="round"
+                            paintOrder="stroke"
+                            style={{ pointerEvents: "none", userSelect: "none" }}
+                          >
+                            {sat.label}
+                          </text>
+                          {sat.sub && (
+                            <text
+                              textAnchor="middle"
+                              y={sat.r + 32}
+                              fontSize={11.5}
+                              fontWeight="600"
+                              fill="rgba(255,255,255,0.62)"
+                              stroke="rgba(4,9,20,0.85)"
+                              strokeWidth="3.5"
+                              strokeLinejoin="round"
+                              paintOrder="stroke"
+                              style={{ pointerEvents: "none", userSelect: "none" }}
+                            >
+                              {sat.sub}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    })}
                   </g>
                 );
               })}
+            </g>
+
+            {/* ── world stations: infographic cards OUTSIDE the visible box —
+                the «infinite area» real estate (camera chips below bring them
+                in). pointerdown is stopped so panning never fights taps. ── */}
+            {stationServices.length > 0 && (
+              <foreignObject x={view + STATION_GAP} y={STATION_TOP} width={STATION_W} height={520}>
+                <div
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  className="rounded-2xl border border-white/12 bg-[#0b1220]/95 p-4 shadow-2xl"
+                  style={{ width: STATION_W }}
+                >
+                  <p className="text-xs font-black uppercase tracking-wide text-white/60">Услуги сети</p>
+                  {stationServices.map(({ key, crews, total }) => {
+                    const meta = SERVICE_META[key];
+                    const Icon = meta?.icon;
+                    return (
+                      <div key={key} className="mt-3">
+                        <div className="flex items-center gap-2">
+                          {Icon && (
+                            <span
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                              style={{ backgroundColor: `${meta.color}1f`, color: meta.color }}
+                              aria-hidden
+                            >
+                              <Icon className="h-4 w-4" />
+                            </span>
+                          )}
+                          <p className="text-sm font-bold text-white/90">{meta?.short ?? key}</p>
+                          <span className="ml-auto text-[11px] font-semibold text-white/50">
+                            {total} {pluralRu(total, ["экипаж", "экипажа", "экипажей"])}
+                          </span>
+                        </div>
+                        {crews.map((crew) => (
+                          <button
+                            key={crew.crewId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedId(crew.crewId);
+                              tweenHome();
+                            }}
+                            className="mt-1.5 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-left transition hover:border-white/30 hover:bg-white/[0.09]"
+                          >
+                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: crew.accent }} aria-hidden />
+                            <span className="truncate text-xs font-semibold text-white/85">{truncate(crew.name, 22)}</span>
+                            <span className="ml-auto shrink-0 text-[10px] font-semibold text-white/45">{crew.memberCount} чел.</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <p className="mt-3 text-[10px] leading-relaxed text-white/40">Тап по экипажу — граф перестроится вокруг него</p>
+                </div>
+              </foreignObject>
+            )}
+            {stationRecords.length > 0 && (
+              <foreignObject x={-(STATION_GAP + STATION_W)} y={STATION_TOP} width={STATION_W} height={360}>
+                <div
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  className="rounded-2xl border border-white/12 bg-[#0b1220]/95 p-4 shadow-2xl"
+                  style={{ width: STATION_W }}
+                >
+                  <p className="text-xs font-black uppercase tracking-wide text-white/60">Рукопожатия-рекорды</p>
+                  {stationRecords.map((link) => {
+                    const a = stationById.get(link.source);
+                    const b = stationById.get(link.target);
+                    if (!a || !b) return null;
+                    return (
+                      <button
+                        key={`${link.source}-${link.target}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(link.source);
+                          tweenHome();
+                        }}
+                        className="mt-1.5 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-left transition hover:border-white/30 hover:bg-white/[0.09]"
+                      >
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: a.accent }} aria-hidden />
+                        <span className="truncate text-xs font-semibold text-white/85">
+                          {truncate(a.name, 14)} ⇄ {truncate(b.name, 14)}
+                        </span>
+                        <span className="ml-auto shrink-0 text-[10px] font-semibold text-white/45">{link.weight} общ.</span>
+                      </button>
+                    );
+                  })}
+                  <p className="mt-3 text-[10px] leading-relaxed text-white/40">Самые крепкие связи сети — по общим людям</p>
+                </div>
+              </foreignObject>
+            )}
             </g>
           </svg>
 
@@ -799,8 +1490,10 @@ export function CrewDiscoveryGraph({
                   <li>⬤ Круг — целый экипаж; размер — сколько в нём людей</li>
                   <li>⌇ Линия — общие люди между двумя экипажами</li>
                   <li>◎ Кольца — «рукопожатия» от выбранного круга (1 шаг, 2 шага…)</li>
+                  <li>◈ Тап по кругу — сателлиты услуг; пунктир — похожие услуги соседей</li>
                   <li>✋ Круги можно таскать — остальные расступаются</li>
                   <li>☞ Тап по кругу — фокус; тап по фону — вся сеть снова</li>
+                  <li>⤢ Карта больше экрана: тащи фон, зум — щипок или Ctrl/⌘+колесо, станции — чипы внизу</li>
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a
@@ -822,6 +1515,64 @@ export function CrewDiscoveryGraph({
             )}
           </AnimatePresence>
 
+          {/* ── camera chips: the world is bigger than the screen ── */}
+          <div className="absolute bottom-2.5 left-2.5 z-20 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={tweenHome}
+              aria-label="Показать весь граф"
+              className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/15 bg-[#0b1220]/75 px-3 py-1.5 text-[11px] font-bold text-white/80 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+            >
+              <Network className="h-3.5 w-3.5" aria-hidden /> Граф
+            </button>
+            {stationServices.length > 0 && (
+              <button
+                type="button"
+                onClick={() => focusStation("services")}
+                aria-label="Показать услуги сети"
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/15 bg-[#0b1220]/75 px-3 py-1.5 text-[11px] font-bold text-white/80 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+              >
+                Услуги
+              </button>
+            )}
+            {stationRecords.length > 0 && (
+              <button
+                type="button"
+                onClick={() => focusStation("records")}
+                aria-label="Показать рекорды рукопожатий"
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/15 bg-[#0b1220]/75 px-3 py-1.5 text-[11px] font-bold text-white/80 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+              >
+                Рекорды
+              </button>
+            )}
+          </div>
+          <div className="absolute bottom-2.5 right-2.5 z-20 flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => zoomBy(1.35)}
+              aria-label="Приблизить"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0b1220]/75 text-white/75 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+            >
+              <ZoomIn className="h-4 w-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => zoomBy(1 / 1.35)}
+              aria-label="Отдалить"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0b1220]/75 text-white/75 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+            >
+              <ZoomOut className="h-4 w-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={tweenHome}
+              aria-label="Вернуть камеру к графу"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0b1220]/75 text-white/75 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
+            >
+              <LocateFixed className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
+
         </div>
       </div>
 
@@ -832,6 +1583,7 @@ export function CrewDiscoveryGraph({
         {selected
           ? "Тап по фону — вернуться ко всей сети"
           : "Тапни по кругу — сеть перестроится вокруг него · круги можно таскать"}
+        <span className="block sm:inline"> · карта больше экрана: тащи фон, зум — щипок / Ctrl+колесо, станции — чипы внизу</span>
       </p>
 
       {/* ── detail panel (collapsible) ─────────────────────────────────────── */}

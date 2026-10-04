@@ -289,3 +289,68 @@ describe("crew-physics — interaction mechanics", () => {
     expect(elapsed).toBeLessThan(1000);
   });
 });
+
+describe("crew-physics — INFINITE AREA soft walls (overflowPad)", () => {
+  it("overflowPad = 0 (default) keeps the historical hard clamp exactly", () => {
+    const sim = createSimulation(orbitInit(REALISTIC.ids, REALISTIC.radii), REALISTIC.links, {
+      width: VIEW,
+      height: VIEW,
+    });
+    runSteps(sim);
+    for (const node of sim.nodes.values()) {
+      const m = node.r + 14;
+      expect(node.x).toBeGreaterThanOrEqual(m - 0.6);
+      expect(node.x).toBeLessThanOrEqual(VIEW - m + 0.6);
+      expect(node.y).toBeGreaterThanOrEqual(m - 0.6);
+      expect(node.y).toBeLessThanOrEqual(VIEW - m + 0.6);
+    }
+  });
+
+  it("overflowPad > 0 lets circles breathe past the box but caps at the world edge", () => {
+    const OVER = 350;
+    const sim = createSimulation(orbitInit(REALISTIC.ids, REALISTIC.radii), REALISTIC.links, {
+      width: VIEW,
+      height: VIEW,
+      overflowPad: OVER,
+    });
+    runSteps(sim);
+    for (const node of sim.nodes.values()) {
+      const m = node.r + 14;
+      expect(node.x).toBeGreaterThanOrEqual(m - OVER - 0.6);
+      expect(node.x).toBeLessThanOrEqual(VIEW - m + OVER + 0.6);
+      expect(node.y).toBeGreaterThanOrEqual(m - OVER - 0.6);
+      expect(node.y).toBeLessThanOrEqual(VIEW - m + OVER + 0.6);
+    }
+    // the extra room must not cost the no-overlap guarantee
+    expect(pairOverlaps(sim, 10)).toEqual([]);
+  });
+
+  it("overflow recovery: a circle dragged beyond the box springs back inside", () => {
+    const sim = createSimulation([{ id: "solo", r: 60, x: VIEW / 2, y: VIEW / 2 }], [], {
+      width: VIEW,
+      height: VIEW,
+      overflowPad: 300,
+    });
+    const node = sim.nodes.get("solo")!;
+    node.x = VIEW + 200; // 200 units past the soft edge — the spring must win
+    energize(sim, 1);
+    runSteps(sim, 900);
+    const m = node.r + 14;
+    expect(node.x).toBeLessThanOrEqual(VIEW - m + 1);
+    expect(node.y).toBeGreaterThanOrEqual(m - 1);
+    expect(node.y).toBeLessThanOrEqual(VIEW - m + 1);
+  });
+
+  it("deterministic with overflowPad too (SSR-safe contract, no randomness)", () => {
+    const run = () => {
+      const sim = createSimulation(orbitInit(REALISTIC.ids, REALISTIC.radii), REALISTIC.links, {
+        width: VIEW,
+        height: VIEW,
+        overflowPad: 350,
+      });
+      runSteps(sim);
+      return [...sim.nodes.values()].map((n) => `${n.id}:${n.x.toFixed(2)}:${n.y.toFixed(2)}`).join("|");
+    };
+    expect(run()).toBe(run());
+  });
+});

@@ -500,6 +500,15 @@ export function ConfiguratorClient({ crew, slug }: Props) {
           font-family: var(--font-geist-sans, 'Inter', system-ui, -apple-system, sans-serif);
           background: var(--cfg-bg); color: var(--cfg-text); -webkit-font-smoothing: antialiased;
         }
+        /* REGRESSION GUARD 2026-10-04 (same class as the discovery «disappeared»
+           round): globals.css paints bare h1..h6 with the GLOBAL --foreground,
+           which is near-black under html.light — on this self-dark surface
+           that made headings invisible for light-scheme visitors. Scope the
+           heading ink to the crew's own text color (theme-correct in every
+           mode: auto follows the franchize vars, custom follows the palette). */
+        .cfg-root h1, .cfg-root h2, .cfg-root h3, .cfg-root h4, .cfg-root h5, .cfg-root h6 {
+          color: var(--cfg-text);
+        }
         .cfg-mono {
           font-family: var(--font-geist-mono, 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace);
           font-variant-numeric: tabular-nums;
