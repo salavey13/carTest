@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { addMinutesToHhMm } from "@/app/franchize/lib/date-utils";
+import { addMinutesToHhMm, addMinutesToDateTime } from "@/app/franchize/lib/date-utils";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..");
@@ -36,6 +36,28 @@ describe("addMinutesToHhMm (testdrive end = start + 10 min)", () => {
     expect(addMinutesToHhMm("25:00", 10)).toBe("");
     expect(addMinutesToHhMm("12:60", 10)).toBe("");
     expect(addMinutesToHhMm("abc", 10)).toBe("");
+  });
+});
+
+describe("addMinutesToDateTime (testdrive end = start + 10 min, date rollover)", () => {
+  it("adds minutes inside the same day", () => {
+    expect(addMinutesToDateTime("2026-10-04", "14:32", 10)).toEqual({ date: "2026-10-04", time: "14:42" });
+    expect(addMinutesToDateTime("2026-10-04", "14:55", 10)).toEqual({ date: "2026-10-04", time: "15:05" });
+  });
+
+  it("rolls past midnight, month and year boundaries", () => {
+    expect(addMinutesToDateTime("2026-10-04", "23:55", 10)).toEqual({ date: "2026-10-05", time: "00:05" });
+    expect(addMinutesToDateTime("2026-10-31", "23:55", 10)).toEqual({ date: "2026-11-01", time: "00:05" });
+    expect(addMinutesToDateTime("2026-12-31", "23:55", 10)).toEqual({ date: "2027-01-01", time: "00:05" });
+  });
+
+  it("returns null for invalid input", () => {
+    expect(addMinutesToDateTime("", "14:32", 10)).toBeNull();
+    expect(addMinutesToDateTime(undefined, "14:32", 10)).toBeNull();
+    expect(addMinutesToDateTime("2026-10-04", "", 10)).toBeNull();
+    expect(addMinutesToDateTime("2026-10-04", "25:00", 10)).toBeNull();
+    expect(addMinutesToDateTime("not-a-date", "14:32", 10)).toBeNull();
+    expect(addMinutesToDateTime("2026-13-40", "14:32", 10)).toBeNull();
   });
 });
 
@@ -90,8 +112,22 @@ describe("wiring: bike-card auto-scroll + testdrive end time + flash", () => {
     const src = read("app/franchize/modals/Item.tsx");
     expect(src.includes("onTestdrive?: (slot?: { date: string; time: string; endTime?: string })")).toBe(true);
     expect(src.includes("endTime: addMinutesToHhMm(testdriveTime, 10) || undefined")).toBe(true);
-    // the card shows the computed return moment
-    expect(src.includes("окончание {addMinutesToHhMm(testdriveTime, 10)")).toBe(true);
+    // 2026-10-04 iter2 (owner): the END is a real read-only picker field,
+    // derived from start + 10 minutes WITH the calendar date (rollover-safe)
+    expect(src.includes("Окончание · +10 минут")).toBe(true);
+    expect(src.includes("value={`${formatRuDateFromISO(tdEnd.date)} ${tdEnd.time}`}")).toBe(true);
+    expect(src.includes("readOnly")).toBe(true);
+  });
+
+  it("selecting testdrive stamps start = CURRENT time unconditionally", () => {
+    // 2026-10-04 iter2 (owner): «при выборе тест-драйва дата начала =
+    // текущее время» — the old `prev ||` kept a stale date across toggles.
+    const src = read("app/franchize/modals/Item.tsx");
+    expect(src.includes("setTestdriveDate(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`);")).toBe(true);
+    expect(src.includes("setTestdriveTime(`${pad(now.getHours())}:${pad(now.getMinutes())}`);")).toBe(true);
+    // the stale-guard pattern must be gone
+    expect(src.includes("setTestdriveDate((prev) => prev || ")).toBe(false);
+    expect(src.includes("setTestdriveTime((prev) => prev || ")).toBe(false);
   });
 
   it("CatalogClient stores rentEndTime on the testdrive line and pops the flash on every add", () => {

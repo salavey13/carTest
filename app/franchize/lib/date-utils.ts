@@ -208,6 +208,30 @@ export function addMinutesToHhMm(value: string | null | undefined, minutes: numb
 }
 
 /**
+ * Time-aware variant of `addMinutesToHhMm`: adds `minutes` to a
+ * YYYY-MM-DD + «HH:MM» pair and returns the resulting calendar date AND
+ * time, rolling over past midnight / month / year (23:55 + 10 → next day
+ * 00:05). Returns null for invalid input — callers render nothing then.
+ * Used by the testdrive flow: the «Окончание» field is start + 10 minutes.
+ */
+export function addMinutesToDateTime(
+  dateISO: string | null | undefined,
+  timeHHmm: string | null | undefined,
+  minutes: number,
+): { date: string; time: string } | null {
+  const base = parseISODate(dateISO ?? "");
+  const timeMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((timeHHmm ?? "").trim());
+  if (!base || !timeMatch || !Number.isFinite(minutes)) return null;
+  const total = Number(timeMatch[1]) * 60 + Number(timeMatch[2]) + minutes;
+  // setUTCMinutes normalizes values > 1440 into day rollover automatically.
+  base.setUTCMinutes(total);
+  return {
+    date: formatISODate(base),
+    time: `${String(base.getUTCHours()).padStart(2, "0")}:${String(base.getUTCMinutes()).padStart(2, "0")}`,
+  };
+}
+
+/**
  * Sanity check: a string is a valid YYYY-MM-DD calendar date.
  */
 export function isISODate(value: string | null | undefined): value is string {

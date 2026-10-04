@@ -48,7 +48,7 @@ import {
 } from "../lib/item-share";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime, addMinutesToHhMm } from "@/app/franchize/lib/date-utils";
+import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime, addMinutesToHhMm, addMinutesToDateTime } from "@/app/franchize/lib/date-utils";
 import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
 import {
   reachVipBikeGoal,
@@ -1343,13 +1343,20 @@ export function ItemModal({
   const [testdriveTime, setTestdriveTime] = useState(""); // HH:MM
   useEffect(() => {
     if (!testdriveMode) return;
-    // Default = now (real wall clock, NOT snapped to 10:00)
+    // 2026-10-04 iter2 (owner): «при выборе тест-драйва дата начала =
+    // текущее время» — stamp NOW unconditionally on every mode-ON. The old
+    // `prev ||` kept a stale picked date across toggles and read as «не
+    // работает». Окончание = start + 10 минут is derived in the picker.
     const now = new Date();
-    const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    setTestdriveDate((prev) => prev || d);
-    setTestdriveTime((prev) => prev || t);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setTestdriveDate(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`);
+    setTestdriveTime(`${pad(now.getHours())}:${pad(now.getMinutes())}`);
   }, [testdriveMode]);
+  // Окончание = старт + 10 минут (rolls past midnight — real end date+time).
+  const tdEnd = useMemo(
+    () => addMinutesToDateTime(testdriveDate, testdriveTime, 10),
+    [testdriveDate, testdriveTime],
+  );
 
   // ── Auto-scroll to the rental config on card open (2026-10-04, owner):
   // «при открытии карточки мотоцикла скроллась сразу на выбор дат» —
@@ -2422,7 +2429,7 @@ export function ItemModal({
                       Режим тест-драйва
                     </span>
                     <span className="mt-0.5 block text-[10px] leading-4 text-[var(--item-muted-text)]">
-                      Бесплатно · 10 минут · дата по вашему выбору
+                      Бесплатно · 10 минут · старт — текущее время
                     </span>
                   </span>
                   <input
@@ -2472,12 +2479,21 @@ export function ItemModal({
                         />
                       </label>
                     </div>
-                    {/* 2026-10-04 (owner): the ride END is start + 10 minutes —
-                        shown here and stored in the cart line (rentEndTime). */}
-                    {testdriveTime && (
-                      <p className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--item-accent)" }}>
-                        Начало {testdriveTime} · окончание {addMinutesToHhMm(testdriveTime, 10) || "—"} (10 минут)
-                      </p>
+                    {/* 2026-10-04 iter2 (owner): «дата конца автоматом +
+                        10 минут» — the END is a real read-only field, always
+                        derived from the picked start (+10 minutes) and stored
+                        in the cart line (rentEndTime). */}
+                    {tdEnd && (
+                      <label className="mt-2 flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text)]">
+                        Окончание · +10 минут
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${formatRuDateFromISO(tdEnd.date)} ${tdEnd.time}`}
+                          className="rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]"
+                          aria-label="Время окончания тест-драйва"
+                        />
+                      </label>
                     )}
                     <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--item-muted-text)]">
                       <li>• Бесплатное время тест-драйва — 10 минут</li>
