@@ -95,6 +95,20 @@ export interface PointOfInterest {
   markerSize?: "md" | "lg";
   /** Explicit halo pulse on the marker (anchor points like HQ). */
   markerHalo?: boolean;
+  /**
+   * Declutter layer (2026-10-05): the zoom from which this point stays
+   * INDIVIDUAL when zoom-based grouping is on. 99 = never cluster (HQ);
+   * wall-post pins get 10 (survive longest — post points are the highlight
+   * layer), riders 14. Default 13.
+   */
+  keepZoom?: number;
+  /** Cluster bubble payload — renders as the count badge on the marker. */
+  count?: number;
+  /**
+   * Leaflet zIndexOffset boost (×60 per unit) — post pins ride ABOVE riders
+   * and spots; HQ (9) sits on top of everything.
+   */
+  zPriority?: number;
 }
 
 // === CORE PROJECTION MATH ===

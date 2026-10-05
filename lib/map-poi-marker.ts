@@ -160,6 +160,8 @@ export interface PoiMarkerOptions {
   halo?: boolean;
   /** Extra classes carried over from the old CircleMarker (halo, entrance). */
   markerClassName?: string;
+  /** Cluster-bubble count badge (declutter layer 2026-10-05). */
+  count?: number;
 }
 
 /**
@@ -231,7 +233,18 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   const legacyHalo = extraClasses.includes("mr-spot-popup") ? " mr-poi--halo" : "";
   const optHalo = options.halo ? " mr-poi--halo" : "";
   const sizeClass = isLg ? " mr-poi--lg" : isSm ? " mr-poi--sm" : "";
-  const rootClass = `mr-poi${optHalo}${legacyHalo}${sizeClass}${extraClasses ? ` ${extraClasses}` : ""}`;
+  // Dedupe (a wall pin sets halo explicitly AND inherits it from the legacy
+  // mr-spot-popup carry-over — same class twice in the attribute is sloppy).
+  const rootClass = [...new Set(["mr-poi", optHalo.trim(), legacyHalo.trim(), sizeClass.trim(), ...extraClasses.split(/\s+/).filter(Boolean)])]
+    .filter(Boolean)
+    .join(" ");
+
+  // Cluster-bubble count badge (declutter layer): escaped, capped at 3 chars
+  // (999+ is unreadable at 34px anyway); absent when count < 2.
+  const countBadge =
+    typeof options.count === "number" && options.count >= 2
+      ? `<span class="mr-poi__count" aria-hidden="true">${escAttr(String(Math.min(999, Math.round(options.count))))}</span>`
+      : "";
 
   let inner: string;
   if (wantsImage) {
@@ -249,6 +262,7 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   const html =
     `<div class="${rootClass}" style="background-color:${escAttr(color)}">` +
     inner +
+    countBadge +
     `</div>`;
 
   return L.divIcon({

@@ -47,6 +47,7 @@ import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { SheetListPanel, SheetNetworkPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
 import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
+import { pluralRu } from "@/app/franchize/lib/crew-network";
 import { List, Network, Trophy, Users } from "lucide-react";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
@@ -609,6 +610,11 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
             color: rider.isSelf ? "#facc15" : isStale ? "#6b7280" : "#60a5fa",
             coords: [[rider.lat, rider.lng]] as [number, number][],
             markerClassName: isStale ? "mr-poi--stale" : undefined,
+            // declutter 2026-10-05: riders are the noisiest layer — below z14
+            // they collapse into count bubbles (the old RiderMarkerLayer rule,
+            // now applied to the whole point set)
+            keepZoom: 14,
+            zPriority: 3,
           };
         }),
     [state.liveRiders, state.sessions],
@@ -636,7 +642,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
     return (mapData?.points || []).filter((point) => {
       const normalizedId = String(point.id || "").toLowerCase();
       return !STALE_DEMO_POI_IDS.has(normalizedId);
-    });
+    }).map((point) => ({ ...point, keepZoom: 13, zPriority: 2 }));
     // MR-022: removed mapData?.bounds from deps — the filter body doesn't read it
   }, [mapData?.points]);
 
@@ -743,6 +749,8 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         color: spot.color,
         coords: [spot.coords] as [number, number][],
         markerClassName: SPOT_POPUP_CLASSNAME,
+        keepZoom: 12,
+        zPriority: 4,
         popup: spotPopupFor(spot),
       })),
     [visibleSpots, spotPopupFor, spotLogos],
@@ -753,6 +761,12 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
     for (const spot of NN_MOTO_SPOTS) counts.set(spot.kind, (counts.get(spot.kind) ?? 0) + 1);
     return counts;
   }, []);
+
+  /** userId → blogger card (rarity stars, reach) — feeds the pin popups. */
+  const bloggerByUserId = useMemo(
+    () => new Map((network?.bloggers ?? []).map((b) => [b.userId, b])),
+    [network],
+  );
 
   // ── Wall × map: геотег-метки постов (лента в шите ↔ слой на карте) ──
   // preferCanvas у карты → цвет нужен КОНКРЕТНЫМ hex'ом, CSS-переменные
@@ -770,6 +784,13 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         imageUrl: pin.photoUrl ?? null,
         color: wallPinColor,
         coords: [[pin.lat, pin.lng]] as [number, number][],
+        // 2026-10-05 «highlight post pins more»: big + halo + topmost z,
+        // and they stay individual through the declutter layer down to z10
+        // (riders ungroup only at z14) — the wall literally rides the map.
+        markerSize: "lg",
+        markerHalo: true,
+        keepZoom: 10,
+        zPriority: 9,
         markerClassName: SPOT_POPUP_CLASSNAME,
         popup: (
           <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
@@ -802,6 +823,31 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               </Link>
               <span className="shrink-0">{formatRelativeTimeRu(pin.createdAt)}</span>
             </div>
+            {(() => {
+              const blogger = bloggerByUserId.get(pin.authorId);
+              if (!blogger) return null;
+              // 2026-10-05: the author is a NETWORK BLOGGER — surface the
+              // rarity stars right in the pin (distribution made visible).
+              return (
+                <div
+                  className="flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold"
+                  style={{ borderColor: wallPinColor, color: wallPinColor }}
+                >
+                  <span>
+                    📷 Блогер сети · {"★".repeat(blogger.rarityStars)}
+                  </span>
+                  <span className="font-semibold opacity-75">
+                    {blogger.postCount} {pluralRu(blogger.postCount, ["пост", "поста", "постов"])} ·{" "}
+                    {blogger.crewIds.length} {pluralRu(blogger.crewIds.length, ["экипаж", "экипажа", "экипажей"])}
+                  </span>
+                  {blogger.externalAudience != null && (
+                    <span className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: wallPinColor }}>
+                      +вне платформы
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             {pin.label ? (
               <div className="truncate text-[11px] font-semibold" style={{ color: wallPinColor }}>
                 📍 {pin.label}
@@ -837,7 +883,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
           </div>
         ),
       })),
-    [geoPins, wallPinColor, openWallPostFromMap, handleMakeMeetupFromPost, crew.theme.isAuto, crew.theme.palette.bgBase],
+    [geoPins, wallPinColor, openWallPostFromMap, handleMakeMeetupFromPost, crew.theme.isAuto, crew.theme.palette.bgBase, bloggerByUserId],
   );
 
   // ── Каталог × карта: техника с GPS-координатами в specs ────────────────────
@@ -860,6 +906,8 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         imageUrl: item.imageUrl || null,
         color: catalogItemPinColor,
         coords: [coords] as [number, number][],
+        keepZoom: 13,
+        zPriority: 2,
         markerClassName: SPOT_POPUP_CLASSNAME,
         popup: (
           <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
@@ -904,6 +952,11 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
       coords: [[HOME_BASE[0], HOME_BASE[1]]] as [number, number][],
       markerSize: "lg" as const,
       markerHalo: true,
+      // the anchor of the map — never collapses into a cluster bubble;
+      // z sits UNDER the wall-post pins (posts are the highlight layer,
+      // and geotagged posts at the HQ plaza must not hide beneath it)
+      keepZoom: 99,
+      zPriority: 8,
     };
 
     const demoPoints = showDemo
@@ -918,6 +971,8 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
           color: "#60a5fa",
           coords: [coords],
           markerClassName: "animate-in fade-in duration-300",
+          keepZoom: 14,
+          zPriority: 3,
         }))
       : [];
 
@@ -932,6 +987,8 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
       imageUrl: m.photo_url?.trim() || m.users?.avatar_url?.trim() || null,
       color: "#f97316",
       coords: [[m.lat, m.lon]] as [number, number][],
+      keepZoom: 12,
+      zPriority: 4,
       markerClassName: SPOT_POPUP_CLASSNAME,
       // Meetup → wall interlink: «написать пост о точке» — композер стены шита
       // префиллится геотегом этой точки (обратный interlink, как у чек-инов).
@@ -1254,6 +1311,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
               className="h-full w-full"
               tileLayer={finalTileLayer}
+              clustering
               focusPoint={wallFocusPoint}
               onMapClick={(coords) => {
                 setSelectedMeetupId(null);

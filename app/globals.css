@@ -1314,3 +1314,43 @@ path.mr-spot-popup {
   }
 }
 
+/* ── Declutter layer (2026-10-05): cluster bubbles + the wall-pin highlight ── */
+/* Cluster bubble: the count badge hangs bottom-right like a map-app unread
+   counter; the bubble itself reads as "a group of N things" via a subtle
+   inner ring. Sizes ride the existing md/lg variants. */
+.mr-poi--cluster {
+  /* the inner ring makes the bubble read as a GROUP, not a POI */
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.25),
+    0 0 0 2px rgba(15, 23, 42, 0.55),
+    0 3px 8px rgba(0, 0, 0, 0.5);
+}
+
+.mr-poi--cluster.mr-poi--lg {
+  border-width: 3px;
+}
+
+.mr-poi__count {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0f172a;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  user-select: none;
+}
+
+

@@ -17,9 +17,13 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import {
+  bloggerRarityScore,
+  bloggerRarityStars,
   buildCrewNetworkModel,
   crewAccentFromMetadata,
   deriveCrewServices,
+  isRecord,
+  type CrewNetworkBlogger,
   type CrewNetworkMember,
   type CrewNetworkNodeInput,
 } from "../lib/crew-network";
@@ -27,6 +31,8 @@ import {
 const CREWS_CAP = 200;
 const CARS_CAP = 2000;
 const STORAGE_CAP = 2000;
+/** Wall posts scanned for the blogger layer — the wall itself is the cap. */
+const POSTS_CAP = 1000;
 
 interface CrewRow {
   id: string;
@@ -35,6 +41,24 @@ interface CrewRow {
   description: string | null;
   logo_url: string | null;
   owner_id: string;
+  metadata: unknown;
+}
+
+interface PostRow {
+  id: string;
+  crew_id: string;
+  author_id: string;
+  like_count: number | null;
+  geo_lat: number | null;
+  created_at: string;
+}
+
+interface BloggerUserRow {
+  user_id: string;
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  website: string | null;
   metadata: unknown;
 }
 
@@ -68,12 +92,67 @@ function publicName(row: Pick<UserRow, "username" | "full_name">): string {
   return nick ? `@${nick.replace(/^@/, "")}` : "Райдер";
 }
 
+/** Keys that may carry a cross-platform audience in users.metadata —
+ *  top-level or one bundle deep. Grows as bloggers link more platforms. */
+const SOCIAL_AUDIENCE_KEY_RE =
+  /^(instagram|youtube|telegram|tiktok|vk|dzen|audience|followers|subscribers|external_audience|social_audience)$/i;
+const AUDIENCE_NUMBER_KEY_RE = /(follower|subscriber|audience)/i;
+
+/**
+ * External audience of a blogger — the 2026-10-05 rarity factor: «factor in
+ * the rarity of the blogger in case some additional audience is present on
+ * other platforms». Read ONLY from fields that already exist: users.website
+ * (declared presence → 1) and numeric audience values in users.metadata
+ * (top level or one bundle deep, e.g. instagram: { followers: 1200 }).
+ * Returns: null = presence unknown; ≥1 = audience size / declared presence.
+ */
+export function externalAudienceFromUser(
+  row: Pick<BloggerUserRow, "website" | "metadata"> | undefined,
+): number | null {
+  if (!row) return null;
+  let audience: number | null = (row.website ?? "").trim() ? 1 : null;
+  const meta = isRecord(row.metadata) ? row.metadata : {};
+  const bump = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      audience = Math.max(audience ?? 0, Math.round(value));
+    }
+  };
+  for (const [key, value] of Object.entries(meta)) {
+    if (SOCIAL_AUDIENCE_KEY_RE.test(key)) {
+      bump(value);
+      if (isRecord(value)) {
+        for (const [subKey, subValue] of Object.entries(value)) {
+          if (AUDIENCE_NUMBER_KEY_RE.test(subKey)) bump(subValue);
+        }
+      } else if (typeof value === "string" && value.trim()) {
+        // declared presence without numbers
+        audience = Math.max(audience ?? 0, 1);
+      }
+    } else if (isRecord(value)) {
+      // one bundle deeper (settings/socials objects) — the keys still count
+      for (const [subKey, subValue] of Object.entries(value)) {
+        if (SOCIAL_AUDIENCE_KEY_RE.test(subKey)) {
+          bump(subValue);
+          if (isRecord(subValue)) {
+            for (const [deepKey, deepValue] of Object.entries(subValue)) {
+              if (AUDIENCE_NUMBER_KEY_RE.test(deepKey)) bump(deepValue);
+            }
+          }
+        }
+      }
+    }
+  }
+  return audience;
+}
+
 /** Serializable result — crosses the server→client boundary as props. */
 export interface CrewNetworkModelResult {
   nodes: ReturnType<typeof buildCrewNetworkModel>["nodes"];
   links: ReturnType<typeof buildCrewNetworkModel>["links"];
   peopleCount: number;
   connectionCount: number;
+  bloggers: CrewNetworkBlogger[];
+  bloggerLinks: ReturnType<typeof buildCrewNetworkModel>["bloggerLinks"];
 }
 
 export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
@@ -86,13 +165,13 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
 
   const crews = (crewRows ?? []) as CrewRow[];
   if (crews.length === 0) {
-    return { nodes: [], links: [], peopleCount: 0, connectionCount: 0 };
+    return { nodes: [], links: [], peopleCount: 0, connectionCount: 0, bloggers: [], bloggerLinks: [] };
   }
 
   const crewIds = crews.map((c) => c.id);
   const slugs = crews.map((c) => (c.slug ?? "").trim()).filter(Boolean);
 
-  const [membersRes, carsRes, storageRes] = await Promise.all([
+  const [membersRes, carsRes, storageRes, postsRes] = await Promise.all([
     supabaseAdmin
       .from("crew_members")
       .select("crew_id, user_id, membership_status")
@@ -102,11 +181,21 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
     supabaseAdmin.from("cars").select("crew_id, is_test_result").in("crew_id", crewIds).limit(CARS_CAP),
     // bikes currently on season (storage_bikes is keyed by crew_slug)
     supabaseAdmin.from("storage_bikes").select("crew_slug, status").in("crew_slug", slugs).limit(STORAGE_CAP),
+    // distribution layer (2026-10-05): public crew-wall posts → bloggers.
+    // Same table the wall renders; no new tables, no migrations.
+    supabaseAdmin
+      .from("crew_posts")
+      .select("id, crew_id, author_id, like_count, geo_lat, is_hidden, created_at")
+      .in("crew_id", crewIds)
+      .eq("is_hidden", false)
+      .order("created_at", { ascending: false })
+      .limit(POSTS_CAP),
   ]);
 
   const memberRows = (membersRes.data ?? []) as MemberRow[];
   const carRows = (carsRes.data ?? []) as CarRow[];
   const storageRows = (storageRes.data ?? []) as StorageRow[];
+  const postRows = (postsRes.data ?? []) as PostRow[];
 
   // Membership sets: owner first (the implicit one-man-crew member), then
   // active crew_members. This is the ONLY social signal we use.
@@ -149,6 +238,68 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
     }
   }
 
+  // ── distribution layer (2026-10-05): wall authors → bloggers ─────────────
+  // Boss's blue-product idea: crews MAKE the product, bloggers DISTRIBUTE it.
+  // A user with ≥1 public post on any crew wall IS a blogger — no new user
+  // inputs, the wall itself is the signup sheet. Rarity prices the voice:
+  // output × cross-crew spread × geotags × likes × external audience.
+  const postsByAuthor = new Map<
+    string,
+    { crews: Set<string>; perCrew: Map<string, number>; geos: number; likes: number; lastAt: string | null }
+  >();
+  for (const post of postRows) {
+    if (!post.author_id || !post.crew_id) continue;
+    let agg = postsByAuthor.get(post.author_id);
+    if (!agg) {
+      agg = { crews: new Set(), perCrew: new Map(), geos: 0, likes: 0, lastAt: null };
+      postsByAuthor.set(post.author_id, agg);
+    }
+    agg.crews.add(post.crew_id);
+    agg.perCrew.set(post.crew_id, (agg.perCrew.get(post.crew_id) ?? 0) + 1);
+    if (post.geo_lat != null) agg.geos += 1;
+    agg.likes += post.like_count ?? 0;
+    if (!agg.lastAt || post.created_at > agg.lastAt) agg.lastAt = post.created_at;
+  }
+
+  const bloggerIds = [...postsByAuthor.keys()];
+  const bloggerUsers = new Map<string, BloggerUserRow>();
+  if (bloggerIds.length > 0) {
+    const { data: bloggerRows } = await supabaseAdmin
+      .from("users")
+      .select("user_id, username, full_name, avatar_url, website, metadata")
+      .in("user_id", bloggerIds);
+    for (const row of (bloggerRows ?? []) as BloggerUserRow[]) {
+      bloggerUsers.set(row.user_id, row);
+    }
+  }
+
+  const bloggers: CrewNetworkBlogger[] = [...postsByAuthor.entries()].map(([userId, agg]) => {
+    const user = bloggerUsers.get(userId);
+    const postCount = [...agg.perCrew.values()].reduce((sum, n) => sum + n, 0);
+    const externalAudience = externalAudienceFromUser(user);
+    const rarityScore = bloggerRarityScore({
+      postCount,
+      crewCount: agg.crews.size,
+      geotagCount: agg.geos,
+      likeCount: agg.likes,
+      externalAudience,
+    });
+    return {
+      userId,
+      name: user ? publicName(user) : "Райдер",
+      avatarUrl: user?.avatar_url ?? null,
+      postCount,
+      crewIds: [...agg.crews],
+      postsByCrew: Object.fromEntries(agg.perCrew),
+      geotagCount: agg.geos,
+      likeCount: agg.likes,
+      externalAudience,
+      rarityScore,
+      rarityStars: bloggerRarityStars(rarityScore),
+      lastPostAt: agg.lastAt,
+    };
+  });
+
   const inputs: CrewNetworkNodeInput[] = crews.map((crew, index) => {
     const slug = (crew.slug ?? "").trim();
     return {
@@ -168,5 +319,5 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
     };
   });
 
-  return buildCrewNetworkModel(inputs, people);
+  return buildCrewNetworkModel(inputs, people, bloggers);
 }

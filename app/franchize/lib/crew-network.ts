@@ -141,6 +141,91 @@ export function crewAccentFromMetadata(metadata: unknown, fallbackSeed = 0): str
   return CREW_FALLBACK_ACCENTS[Math.abs(fallbackSeed) % CREW_FALLBACK_ACCENTS.length];
 }
 
+// ── bloggers (2026-10-05): the distribution layer ───────────────────────────
+// Boss (blue-product brainstorm): the crews MAKE the product, but coverage is
+// a DISTRIBUTION problem — and people who already write posts on crew walls
+// are the organic distribution network. A user with ≥1 public crew-wall post
+// is a BLOGGER; the rarity stars price how hard such a voice is to replace.
+
+export interface CrewNetworkBlogger {
+  userId: string;
+  /** full_name || username — the same public name the wall renders. */
+  name: string;
+  avatarUrl: string | null;
+  /** Public crew-wall posts authored (hidden posts excluded). */
+  postCount: number;
+  /** Distinct crews whose wall the blogger posted on. */
+  crewIds: string[];
+  /** crewId → public posts on that crew's wall (subset of crewIds keys). */
+  postsByCrew: Record<string, number>;
+  /** Geotagged posts — the blogger already feeds the riders' map. */
+  geotagCount: number;
+  likeCount: number;
+  /**
+   * Audience the blogger brings from OTHER platforms (website / socials in
+   * users.metadata). Null = unknown — the rarity simply scores on-chain
+   * activity until real follower numbers are ingested.
+   */
+  externalAudience: number | null;
+  /** Deterministic rarity index (same inputs → same stars, SSR-safe). */
+  rarityScore: number;
+  rarityStars: 1 | 2 | 3 | 4 | 5;
+  lastPostAt: string | null;
+}
+
+/** Blogger → crew tie (one row per crew wall the blogger actually posts on). */
+export interface CrewNetworkBloggerLink {
+  userId: string;
+  crewId: string;
+  postCount: number;
+}
+
+/**
+ * Rarity of a blogger voice — deterministic, no randomness, SSR-stable.
+ *   · every post proves output (×1);
+ *   · posting across SEVERAL crews is the distribution jackpot (×2 per extra
+ *     crew) — the Walter-White lesson: one channel is a store, many is a
+ *     franchise;
+ *   · geotags put the blogger on the riders' map (×0.5);
+ *   · likes are audience proof (×0.2);
+ *   · a verified external audience (other platforms) makes the voice RARE —
+ *     flat +3 presence bonus until follower numbers are ingested, scaled a
+ *     bit further for large audiences (log10).
+ */
+export function bloggerRarityScore(input: {
+  postCount: number;
+  crewCount: number;
+  geotagCount: number;
+  likeCount: number;
+  externalAudience: number | null;
+}): number {
+  const posts = Math.max(0, input.postCount);
+  const crews = Math.max(1, input.crewCount);
+  const geos = Math.max(0, input.geotagCount);
+  const likes = Math.max(0, input.likeCount);
+  const external = input.externalAudience;
+  let score = posts + (crews - 1) * 2 + geos * 0.5 + likes * 0.2;
+  if (external != null && external > 0) {
+    score += 3 + Math.min(4, Math.log10(external) + 1);
+  } else if (external === null) {
+    // presence unknown — no bonus, no penalty
+  } else {
+    // explicitly known to be zero: tiny nudge for having any cross-platform
+    // presence declared at all (profiles with a website but 0 followers)
+    score += 0;
+  }
+  return Math.round(score * 10) / 10;
+}
+
+/** Score → 1..5 stars (game-rarity ladder, deterministic thresholds). */
+export function bloggerRarityStars(score: number): 1 | 2 | 3 | 4 | 5 {
+  if (score >= 16) return 5;
+  if (score >= 10) return 4;
+  if (score >= 6) return 3;
+  if (score >= 3) return 2;
+  return 1;
+}
+
 // ── network model (nodes = crews, links = shared people) ────────────────────
 
 export interface CrewNetworkMember {
@@ -182,15 +267,22 @@ export interface CrewNetworkModel {
   peopleCount: number;
   /** Crew-to-crew connections (shared members). */
   connectionCount: number;
+  /** Wall bloggers of the network (may be empty — the layer is additive). */
+  bloggers: CrewNetworkBlogger[];
+  /** Blogger → crew ties (only crews that are IN the graph). */
+  bloggerLinks: CrewNetworkBloggerLink[];
 }
 
 /**
  * Build the social-graph model. Memberships are the ONLY social signal —
  * exactly the «no additional inputs» constraint from the brainstorm.
+ * `bloggers` is optional: when the loader has crew-wall posts, the model
+ * carries the distribution layer (bloggers + their crew ties) alongside.
  */
 export function buildCrewNetworkModel(
   inputs: CrewNetworkNodeInput[],
   people: Map<string, CrewNetworkMember>,
+  bloggers?: CrewNetworkBlogger[],
 ): CrewNetworkModel {
   const nodes: CrewNetworkNode[] = inputs.map((input) => {
     const seen = new Set<string>();
@@ -218,11 +310,36 @@ export function buildCrewNetworkModel(
   const peopleIds = new Set<string>();
   for (const node of nodes) for (const m of node.members) peopleIds.add(m.userId);
 
+  // ── distribution layer: blogger ties are validated against the graph —
+  //    a tie to a crew that is not in the model is dropped (stale wall
+  //    posts must not invent phantom nodes); rows stay deterministic.
+  const crewIdSet = new Set(nodes.map((n) => n.crewId));
+  const knownBloggers = bloggers ?? [];
+  const bloggerLinks: CrewNetworkBloggerLink[] = [];
+  const bloggersOut: CrewNetworkBlogger[] = [];
+  for (const blogger of knownBloggers) {
+    const ties = blogger.crewIds
+      .filter((crewId) => crewIdSet.has(crewId))
+      .map((crewId) => ({
+        userId: blogger.userId,
+        crewId,
+        postCount: blogger.postsByCrew[crewId] ?? 0,
+      }));
+    if (ties.length === 0) continue;
+    for (const tie of ties) bloggerLinks.push(tie);
+    bloggersOut.push({ ...blogger, crewIds: ties.map((t) => t.crewId) });
+  }
+  bloggersOut.sort(
+    (a, b) => b.rarityScore - a.rarityScore || b.postCount - a.postCount || (a.userId < b.userId ? -1 : 1),
+  );
+
   return {
     nodes,
     links,
     peopleCount: peopleIds.size,
     connectionCount: links.length,
+    bloggers: bloggersOut,
+    bloggerLinks,
   };
 }
 

@@ -387,7 +387,12 @@ export function SheetNetworkPanel({ network }: { network: CrewNetworkModelResult
       <p className="text-xs leading-relaxed text-[var(--mr-muted)]">
         Круг — экипаж (размер — сколько людей), линия — общие люди. Тап по кругу перестраивает сеть вокруг него, круги можно таскать.
       </p>
-      <CrewDiscoveryGraph nodes={network.nodes} links={network.links} />
+      <CrewDiscoveryGraph
+        nodes={network.nodes}
+        links={network.links}
+        bloggers={network.bloggers}
+        bloggerLinks={network.bloggerLinks}
+      />
     </div>
   );
 }

@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import React from "react";
-import { CircleMarker, GeoJSON, MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
-import type { DivIcon as LeafletDivIcon } from "leaflet";
+import { CircleMarker, GeoJSON, MapContainer, Marker, Popup, Polyline, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import type { DivIcon as LeafletDivIcon, Map as LeafletMap } from "leaflet";
 import type { GeoJsonObject } from "geojson";
 import { MapInteractionCapture } from "@/components/maps/MapInteractionCapture";
 import type { PointOfInterest } from "@/lib/map-utils";
 import type { TileLayerPreset } from "@/lib/maps/map-types";
 import { buildPoiMarkerIcon, parsePoiIcon, safeCssColor } from "@/lib/map-poi-marker";
+import { CLUSTER_FLY_ZOOM_CAP, clusterPoiPoints } from "@/lib/map-clusters";
 
 const TILE_LAYERS: Record<TileLayerPreset, string> = {
   "cartodb-dark": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
@@ -180,6 +181,29 @@ function MapFocusFlyer({ focus }: { focus: RacingMapFocusPoint | null }) {
   return null;
 }
 
+/**
+ * Declutter plumbing: captures the Leaflet map instance (cluster fly-in) and
+ * the live zoom (group/ungroup threshold). Re-renders are throttled to
+ * zoomend — no churn mid-animation.
+ */
+function MapZoomWatcher({
+  onZoom,
+  onMap,
+}: {
+  onZoom: (zoom: number) => void;
+  onMap: (map: LeafletMap) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    onMap(map);
+    onZoom(map.getZoom());
+  }, [map, onMap, onZoom]);
+  useMapEvents({
+    zoomend: (event) => onZoom(event.target.getZoom()),
+  });
+  return null;
+}
+
 export function RacingMap({
   points,
   bounds,
@@ -190,6 +214,7 @@ export function RacingMap({
   tileLayer = "cartodb-dark",
   focusPoint,
   children,
+  clustering = false,
 }: {
   points: PointOfInterest[];
   bounds: { top: number; bottom: number; left: number; right: number };
@@ -201,8 +226,38 @@ export function RacingMap({
   /** Wall × map: fly to a geotagged post's marker (see MapFocusFlyer). */
   focusPoint?: RacingMapFocusPoint | null;
   children?: ReactNode;
+  /**
+   * Zoom-aware icon declutter (2026-10-05): group nearby point-POIs into
+   * count bubbles at low zoom, ungroup as the rider zooms in. Important
+   * pins survive longer via keepZoom (wall posts 10, HQ never clusters).
+   * Opt-in — admin/vip-geography consumers keep the raw flat layer.
+   */
+  clustering?: boolean;
 }) {
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
+
+  // group/ungroup — recomputed only on zoomend (cheap: ≤ a few hundred POIs)
+  const shownPoints = useMemo(
+    () =>
+      clustering && zoom != null
+        ? clusterPoiPoints(points, zoom, { centerLat: (bounds.top + bounds.bottom) / 2 })
+        : points,
+    [clustering, zoom, points, bounds.top, bounds.bottom],
+  );
+
+  const handlePointClick = (poi: PointOfInterest) => {
+    // cluster bubble: no popup — fly in and let zoomend ungroup the group
+    if (poi.id.startsWith("cl-")) {
+      const center = poi.coords?.[0];
+      if (center && mapRef.current) {
+        mapRef.current.flyTo(center, Math.min((zoom ?? 0) + 2, CLUSTER_FLY_ZOOM_CAP), { duration: 0.55 });
+      }
+      return;
+    }
+    onPointClick?.(poi);
+  };
 
   // Route-start badges: small trailhead marker per path/loop POI (skips the
   // live session route — it follows the rider and needs no badge — and skips
@@ -265,7 +320,7 @@ export function RacingMap({
       >
         <TileLayer url={source} attribution={attribution} />
 
-        {points.map((poi) => {
+        {shownPoints.map((poi) => {
           if (poi.type === "point") {
             const center = poi.coords?.[0];
             if (!center) return null;
@@ -306,6 +361,7 @@ export function RacingMap({
               markerSize: poi.markerSize,
               halo: poi.markerHalo,
               markerClassName: poi.markerClassName,
+              count: poi.count,
             });
 
             if (poiMarkerIcon) {
@@ -314,11 +370,13 @@ export function RacingMap({
                   key={poi.id}
                   position={center}
                   icon={poiMarkerIcon}
+                  zIndexOffset={poi.zPriority ? poi.zPriority * 60 : 0}
                   eventHandlers={{
-                    click: () => onPointClick?.(poi),
+                    click: () => handlePointClick(poi),
                   }}
                 >
-                  {popupNode}
+                  {/* cluster bubbles fly in on tap — no popup underneath */}
+                  {poi.id.startsWith("cl-") ? null : popupNode}
                 </Marker>
               );
             }
@@ -418,6 +476,7 @@ export function RacingMap({
         {children}
         <MapInteractionCapture onMapClick={onMapClick} onMapLongPress={onMapLongPress} />
         <MapFocusFlyer focus={focusPoint ?? null} />
+        <MapZoomWatcher onMap={(map) => (mapRef.current = map)} onZoom={setZoom} />
       </MapContainer>
     </div>
   );

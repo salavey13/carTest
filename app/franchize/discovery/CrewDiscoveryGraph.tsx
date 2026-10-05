@@ -94,6 +94,7 @@ import {
   ArrowRight,
   Bike,
   BookOpen,
+  Camera,
   ChevronDown,
   Handshake,
   Info,
@@ -110,6 +111,8 @@ import {
   crewCircleRadius,
   layoutCrewGraph,
   pluralRu,
+  type CrewNetworkBlogger,
+  type CrewNetworkBloggerLink,
   type CrewNetworkLink,
   type CrewNetworkNode,
 } from "../lib/crew-network";
@@ -148,6 +151,13 @@ const SERVICE_META: Record<string, { color: string; icon: LucideIcon; short: str
   storage: { color: "#93c5fd", icon: Snowflake, short: "Хранение" },
 };
 
+/** Blogger satellite paint — the «blue product» color (boss's metaphor:
+ *  electrobikes carry the BLUE logo; the distribution layer wears it too). */
+const BLOGGER_COLOR = "#60a5fa";
+const BLOGGER_SAT_CAP = 5;
+const BLOGGER_STATION_GAP = 36;
+const BLOGGER_STATION_TOP = STATION_TOP + 520 + BLOGGER_STATION_GAP;
+
 /** A service satellite spawned around a crew (focus mode). */
 interface SatSpec {
   key: string;
@@ -161,6 +171,11 @@ interface SatSpec {
   oy: number;
   primary: boolean;
   aria: string;
+  /** Blogger satellites carry the person — the renderer paints avatar,
+   *  rarity stars and the blue product ring instead of a service glyph. */
+  blogger?: CrewNetworkBlogger;
+  /** Public posts by this author on the FOCUSED crew's wall. */
+  focusPosts?: number;
 }
 
 /** A dashed «similar services» edge: selected crew's satellite ↔ a ring-1
@@ -169,6 +184,8 @@ interface SatSpec {
 interface ServiceEdgeSpec {
   key: string;
   serviceKey: string;
+  /** «blogger» edges ride the same painter but render thin-solid blue. */
+  kind: "service" | "blogger";
   aId: string;
   bId: string;
   oax: number;
@@ -209,6 +226,8 @@ export function CrewDiscoveryGraph({
   links,
   peopleCount,
   connectionCount,
+  bloggers = [],
+  bloggerLinks = [],
 }: {
   nodes: CrewNetworkNode[];
   links: CrewNetworkLink[];
@@ -217,6 +236,10 @@ export function CrewDiscoveryGraph({
    *  own header and omits these. */
   peopleCount?: number;
   connectionCount?: number;
+  /** Distribution layer (2026-10-05): wall bloggers + their crew ties.
+   *  Optional — older consumers (tests, storybook-ish usages) keep working. */
+  bloggers?: CrewNetworkBlogger[];
+  bloggerLinks?: CrewNetworkBloggerLink[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -410,6 +433,48 @@ export function CrewDiscoveryGraph({
     return incident;
   }, [links, selectedId]);
 
+  // ── bloggers (distribution layer): who posts on whose wall ──────────────
+  const bloggersById = useMemo(() => new Map(bloggers.map((b) => [b.userId, b])), [bloggers]);
+
+  /** crewId → its wall bloggers, strongest voice first (deterministic). */
+  const bloggersByCrew = useMemo(() => {
+    const map = new Map<string, { blogger: CrewNetworkBlogger; posts: number }[]>();
+    for (const tie of bloggerLinks) {
+      const blogger = bloggersById.get(tie.userId);
+      if (!blogger) continue;
+      const list = map.get(tie.crewId) ?? [];
+      list.push({ blogger, posts: tie.postCount });
+      map.set(tie.crewId, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => b.blogger.rarityScore - a.blogger.rarityScore || b.posts - a.posts);
+    }
+    return map;
+  }, [bloggersById, bloggerLinks]);
+
+  /** userId → in-graph crews the blogger posts on (the distribution web). */
+  const crewsByBlogger = useMemo(() => {
+    const map = new Map<string, { crewId: string; posts: number }[]>();
+    for (const tie of bloggerLinks) {
+      const list = map.get(tie.userId) ?? [];
+      list.push({ crewId: tie.crewId, posts: tie.postCount });
+      map.set(tie.userId, list);
+    }
+    return map;
+  }, [bloggerLinks]);
+
+  /** The blogger's strongest in-graph crew (most posts, deterministic tie) —
+   *  the «Блогеры» station focuses the graph there on tap. */
+  const topCrewOfBlogger = useCallback(
+    (blogger: CrewNetworkBlogger): string | null => {
+      const ties = (crewsByBlogger.get(blogger.userId) ?? [])
+        .slice()
+        .sort((a, b) => b.posts - a.posts || (a.crewId < b.crewId ? -1 : 1));
+      return ties[0]?.crewId ?? blogger.crewIds[0] ?? null;
+    },
+    [crewsByBlogger],
+  );
+
   // ── service satellites (INFINITE ROUND) ────────────────────────────────
   /** Focus-mode service model: the selection's own services + ring-1 crews
    *  offering the SAME service («similar services» kin), capped, strongest
@@ -514,6 +579,7 @@ export function CrewDiscoveryGraph({
         edges.push({
           key: `se-${service.key}-${node.crewId}`,
           serviceKey: service.key,
+          kind: "service",
           aId: sel.crewId,
           bId: node.crewId,
           oax: selSat.ox,
@@ -527,8 +593,68 @@ export function CrewDiscoveryGraph({
         });
       }
     }
+    // ── bloggers of the selection spawn BELOW (services fan above): every
+    //    wall author becomes a person satellite; a blogger who also posts on
+    //    OTHER crews in-graph gets a dashed blue edge to each of them — the
+    //    distribution web made literal (boss 2026-10-05: «connect bloggers
+    //    with crews», the blue-product coverage push).
+    const selBloggers = (bloggersByCrew.get(sel.crewId) ?? []).slice(0, BLOGGER_SAT_CAP);
+    const selRadius = renderRadii[sel.crewId] ?? 60;
+    selBloggers.forEach(({ blogger, posts }, i) => {
+      const angle = Math.PI / 2 + ((i - (selBloggers.length - 1) / 2) * 34 * Math.PI) / 180;
+      const satR = 26;
+      const orbit = selRadius + satR + 34;
+      const ox = orbit * Math.cos(angle);
+      const oy = orbit * Math.sin(angle);
+      const extraCrews = Math.max(0, blogger.crewIds.length - 1);
+      const sub = [
+        `★${blogger.rarityStars}`,
+        pluralRu(blogger.postCount, ["пост", "поста", "постов"]),
+        extraCrews > 0 ? `+${extraCrews} ${pluralRu(extraCrews, ["экипаж", "экипажа", "экипажей"])}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const spec: SatSpec = {
+        key: `blogger-${blogger.userId}`,
+        label: blogger.name,
+        sub,
+        href: `/franchize/${sel.slug}/rider/${blogger.userId}`,
+        r: satR,
+        ox,
+        oy,
+        primary: true,
+        aria: `Блогер ${blogger.name}: ${pluralRu(posts, ["пост", "поста", "постов"])} на стене этого экипажа, редкость ${blogger.rarityStars} из 5`,
+        blogger,
+        focusPosts: posts,
+      };
+      const list = satsByCrew.get(sel.crewId) ?? [];
+      list.push(spec);
+      satsByCrew.set(sel.crewId, list);
+
+      // distribution edges: blogger → every other in-graph crew they post on
+      const others = (crewsByBlogger.get(blogger.userId) ?? []).filter((tie) => tie.crewId !== sel.crewId);
+      for (const tie of others) {
+        const otherInit = initialPositions[tie.crewId];
+        if (!otherInit) continue; // tie to a crew outside the graph — skip
+        edges.push({
+          key: `bl-${blogger.userId}-${tie.crewId}`,
+          serviceKey: "blogger",
+          kind: "blogger",
+          aId: sel.crewId,
+          bId: tie.crewId,
+          oax: ox,
+          oay: oy,
+          obx: 0,
+          oby: 0,
+          ax: selInit.x + ox,
+          ay: selInit.y + oy,
+          bx: otherInit.x,
+          by: otherInit.y,
+        });
+      }
+    });
     return { satsByCrew, edges };
-  }, [focusServices, initialPositions, renderRadii, selectedId, view]);
+  }, [focusServices, initialPositions, renderRadii, selectedId, view, bloggersByCrew, crewsByBlogger]);
 
   // ── world stations: the freed margin hosts real infographics ──────────
   const stationById = useMemo(() => new Map(nodes.map((n) => [n.crewId, n])), [nodes]);
@@ -779,10 +905,15 @@ export function CrewDiscoveryGraph({
   );
 
   const focusStation = useCallback(
-    (which: "services" | "records") => {
-      const x = which === "services" ? view + STATION_GAP : -(STATION_GAP + STATION_W);
+    (which: "services" | "records" | "bloggers") => {
+      const x = which === "services" || which === "bloggers" ? view + STATION_GAP : -(STATION_GAP + STATION_W);
+      const y = which === "bloggers" ? BLOGGER_STATION_TOP : STATION_TOP;
+      // bloggers card is taller (480) — aim a bit lower so the header row
+      // stays inside the focus window (the services 520-card had the same
+      // cut-off and lived with it; the bloggers station gets the fix)
+      const aimY = y + (which === "bloggers" ? 235 : 170);
       const k = clampZoom(Math.min(1.1, (view * 0.6) / STATION_W));
-      tweenCameraTo(view / 2 - k * (x + STATION_W / 2), view / 2 - k * (STATION_TOP + 170), k);
+      tweenCameraTo(view / 2 - k * (x + STATION_W / 2), view / 2 - k * aimY, k);
     },
     [clampZoom, tweenCameraTo, view],
   );
@@ -1116,8 +1247,8 @@ export function CrewDiscoveryGraph({
               })}
             </g>
 
-            {/* service-affinity edges — dashed, service-colored; the painter
-                keeps them glued to BOTH satellites while the network moves */}
+            {/* service-affinity + blogger-distribution edges — the painter
+                keeps them glued to BOTH endpoints while the network moves */}
             <g>
               {satelliteModel.edges.map((edge) => (
                 <path
@@ -1128,11 +1259,11 @@ export function CrewDiscoveryGraph({
                   }}
                   d={`M ${edge.ax.toFixed(1)} ${edge.ay.toFixed(1)} L ${edge.bx.toFixed(1)} ${edge.by.toFixed(1)}`}
                   fill="none"
-                  stroke={SERVICE_META[edge.serviceKey]?.color ?? "#7dd3fc"}
-                  strokeWidth="1.4"
-                  strokeDasharray="3 7"
+                  stroke={edge.kind === "blogger" ? BLOGGER_COLOR : (SERVICE_META[edge.serviceKey]?.color ?? "#7dd3fc")}
+                  strokeWidth={edge.kind === "blogger" ? 1.7 : 1.4}
+                  strokeDasharray={edge.kind === "blogger" ? "7 5" : "3 7"}
                   strokeLinecap="round"
-                  opacity={0.55}
+                  opacity={edge.kind === "blogger" ? 0.66 : 0.55}
                   style={{ pointerEvents: "none" }}
                 />
               ))}
@@ -1279,6 +1410,106 @@ export function CrewDiscoveryGraph({
                     {(satelliteModel.satsByCrew.get(node.crewId) ?? []).map((sat) => {
                       const meta = SERVICE_META[sat.key];
                       const Icon = meta?.icon;
+                      // ── blogger satellite (distribution layer, 2026-10-05):
+                      //    person circle in the blue-product color, avatar
+                      //    over a local-initials fallback, rarity stars in
+                      //    the sub line; the dashed blue distribution edges
+                      //    to their other crews ride the painter (below).
+                      if (sat.blogger) {
+                        const b = sat.blogger;
+                        const clipId = `blc-${b.userId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16)}`;
+                        const rare = b.rarityStars >= 4;
+                        return (
+                          <g
+                            key={`sat-${sat.key}-${sat.ox.toFixed(0)}`}
+                            role="link"
+                            tabIndex={0}
+                            aria-label={sat.aria}
+                            transform={`translate(${sat.ox.toFixed(1)} ${sat.oy.toFixed(1)})`}
+                            className="cursor-pointer"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onPointerUp={(event) => event.stopPropagation()}
+                            onPointerMove={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              router.push(sat.href);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                router.push(sat.href);
+                              }
+                            }}
+                          >
+                            <defs>
+                              <clipPath id={clipId}>
+                                <circle r={sat.r - 2} />
+                              </clipPath>
+                            </defs>
+                            {/* rarity glow — rare voices breathe brighter */}
+                            <circle r={sat.r + (rare ? 9 : 5)} fill={BLOGGER_COLOR} opacity={rare ? 0.2 : 0.13} />
+                            <circle r={sat.r} fill="#101a33" stroke={BLOGGER_COLOR} strokeWidth="1.6" />
+                            {/* initials painted FIRST — a broken avatar just
+                                reveals them (same contract as map markers) */}
+                            <text
+                              textAnchor="middle"
+                              y={4}
+                              fontSize={12}
+                              fontWeight="800"
+                              fill="#dbeafe"
+                              style={{ pointerEvents: "none", userSelect: "none" }}
+                            >
+                              {initialsOf(b.name)}
+                            </text>
+                            {b.avatarUrl && (
+                              <g clipPath={`url(#${clipId})`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <image
+                                  href={b.avatarUrl}
+                                  x={-(sat.r - 2)}
+                                  y={-(sat.r - 2)}
+                                  width={(sat.r - 2) * 2}
+                                  height={(sat.r - 2) * 2}
+                                  preserveAspectRatio="xMidYMid slice"
+                                />
+                              </g>
+                            )}
+                            {rare && (
+                              <circle r={sat.r + 13} fill="none" stroke={BLOGGER_COLOR} strokeOpacity="0.45" strokeWidth="1" strokeDasharray="2 5" />
+                            )}
+                            <text
+                              textAnchor="middle"
+                              y={sat.r + 16}
+                              fontSize={12}
+                              fontWeight="800"
+                              fill="#ffffff"
+                              stroke="rgba(4,9,20,0.88)"
+                              strokeWidth="3.5"
+                              strokeLinejoin="round"
+                              paintOrder="stroke"
+                              style={{ pointerEvents: "none", userSelect: "none" }}
+                            >
+                              {truncate(b.name, 16)}
+                            </text>
+                            {sat.sub && (
+                              <text
+                                textAnchor="middle"
+                                y={sat.r + 30}
+                                fontSize={10.5}
+                                fontWeight="700"
+                                fill={BLOGGER_COLOR}
+                                stroke="rgba(4,9,20,0.85)"
+                                strokeWidth="3"
+                                strokeLinejoin="round"
+                                paintOrder="stroke"
+                                style={{ pointerEvents: "none", userSelect: "none" }}
+                              >
+                                {sat.sub}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      }
                       return (
                         <g
                           key={`sat-${sat.key}-${sat.ox.toFixed(0)}`}
@@ -1441,6 +1672,74 @@ export function CrewDiscoveryGraph({
                 </div>
               </foreignObject>
             )}
+            {bloggers.length > 0 && (
+              <foreignObject x={view + STATION_GAP} y={BLOGGER_STATION_TOP} width={STATION_W} height={480}>
+                <div
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  className="rounded-2xl border border-sky-400/20 bg-[#0b1220]/95 p-4 shadow-2xl"
+                  style={{ width: STATION_W }}
+                >
+                  <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-sky-200/80">
+                    <Camera className="h-3.5 w-3.5" aria-hidden /> Блогеры сети · {bloggers.length}
+                  </p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-white/40">
+                    Пишут на стенах экипажей — органическое распределение «синего продукта». Звёзды — редкость голоса.
+                  </p>
+                  {bloggers.slice(0, 6).map((blogger) => {
+                    const topCrewId = topCrewOfBlogger(blogger);
+                    const topCrew = topCrewId ? stationById.get(topCrewId) : null;
+                    return (
+                      <button
+                        key={blogger.userId}
+                        type="button"
+                        onClick={() => {
+                          if (topCrewId) {
+                            setSelectedId(topCrewId);
+                            tweenHome();
+                          }
+                        }}
+                        aria-label={topCrew ? `Блогер ${blogger.name} — переключить граф на экипаж ${topCrew.name}` : `Блогер ${blogger.name}`}
+                        className="mt-1.5 flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-left transition hover:border-sky-300/40 hover:bg-white/[0.09]"
+                      >
+                        {blogger.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={blogger.avatarUrl}
+                            alt=""
+                            width={22}
+                            height={22}
+                            className="h-[22px] w-[22px] shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-sky-400/20 text-[9px] font-black text-sky-100" aria-hidden>
+                            {initialsOf(blogger.name)}
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold text-white/85">{truncate(blogger.name, 16)}</span>
+                          <span className="block text-[10px] font-medium text-white/45">
+                            {pluralRu(blogger.postCount, ["пост", "поста", "постов"])} · {pluralRu(blogger.crewIds.length, ["экипаж", "экипажа", "экипажей"])}
+                            {topCrew ? ` · топ: ${truncate(topCrew.name, 12)}` : ""}
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 flex-col items-end gap-0.5">
+                          <span className="text-[10px] font-bold text-sky-300" aria-label={`Редкость ${blogger.rarityStars} из 5`}>
+                            {"★".repeat(blogger.rarityStars)}
+                          </span>
+                          {blogger.externalAudience != null && (
+                            <span className="rounded-full border border-sky-300/40 px-1.5 text-[9px] font-bold leading-tight text-sky-200">
+                              +вне платформы{blogger.externalAudience > 1 ? ` · ${blogger.externalAudience}` : ""}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <p className="mt-3 text-[10px] leading-relaxed text-white/40">Тап — фокус на экипаже с самыми сильными постами блогера</p>
+                </div>
+              </foreignObject>
+            )}
             </g>
           </svg>
 
@@ -1462,6 +1761,11 @@ export function CrewDiscoveryGraph({
               <span className="rounded-full border border-white/12 bg-[#0b1220]/75 px-2.5 py-1 text-[10px] font-bold text-white/80 backdrop-blur-sm">
                 {connectionCount} {pluralRu(connectionCount, ["связь", "связи", "связей"])}
               </span>
+              {bloggers.length > 0 && (
+                <span className="rounded-full border border-sky-300/25 bg-[#0b1220]/75 px-2.5 py-1 text-[10px] font-bold text-sky-200/90 backdrop-blur-sm">
+                  {bloggers.length} {pluralRu(bloggers.length, ["блогер", "блогера", "блогеров"])}
+                </span>
+              )}
             </div>
           )}
           <button
@@ -1491,6 +1795,7 @@ export function CrewDiscoveryGraph({
                   <li>⌇ Линия — общие люди между двумя экипажами</li>
                   <li>◎ Кольца — «рукопожатия» от выбранного круга (1 шаг, 2 шага…)</li>
                   <li>◈ Тап по кругу — сателлиты услуг; пунктир — похожие услуги соседей</li>
+                  <li>📷 Голубой сателлит — блогер стены; пунктир — он же пишет в другие экипажи (распределение)</li>
                   <li>✋ Круги можно таскать — остальные расступаются</li>
                   <li>☞ Тап по кругу — фокус; тап по фону — вся сеть снова</li>
                   <li>⤢ Карта больше экрана: тащи фон, зум — щипок или Ctrl/⌘+колесо, станции — чипы внизу</li>
@@ -1543,6 +1848,16 @@ export function CrewDiscoveryGraph({
                 className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/15 bg-[#0b1220]/75 px-3 py-1.5 text-[11px] font-bold text-white/80 backdrop-blur-sm transition hover:border-white/40 hover:text-white"
               >
                 Рекорды
+              </button>
+            )}
+            {bloggers.length > 0 && (
+              <button
+                type="button"
+                onClick={() => focusStation("bloggers")}
+                aria-label="Показать блогеров сети — распределение продукта"
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-sky-300/30 bg-[#0b1220]/75 px-3 py-1.5 text-[11px] font-bold text-sky-200 backdrop-blur-sm transition hover:border-sky-300/60 hover:text-sky-100"
+              >
+                <Camera className="h-3.5 w-3.5" aria-hidden /> Блогеры {bloggers.length}
               </button>
             )}
           </div>
@@ -1707,6 +2022,54 @@ export function CrewDiscoveryGraph({
                             {truncate(crew.name, 18)}
                             <span className="font-semibold text-white/50">· {weight} общ.</span>
                           </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* wall bloggers — the distribution layer: who feeds this
+                      crew's wall, their rarity and cross-crew reach (tap →
+                      public rider page, the same identity the wall chips
+                      and map pins render) */}
+                  {selected && (bloggersByCrew.get(selected.crewId)?.length ?? 0) > 0 && (
+                    <div className="mt-4">
+                      <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-sky-200/70">
+                        <Camera className="h-3.5 w-3.5" aria-hidden /> Блогеры стены ·{" "}
+                        {bloggersByCrew.get(selected.crewId)!.length}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {bloggersByCrew.get(selected.crewId)!.map(({ blogger, posts }) => (
+                          <Link
+                            key={blogger.userId}
+                            href={`/franchize/${selected.slug}/rider/${blogger.userId}`}
+                            aria-label={`Профиль блогера ${blogger.name}: ${pluralRu(posts, ["пост", "поста", "постов"])}, редкость ${blogger.rarityStars} из 5`}
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-sky-300/25 bg-sky-400/10 py-1 pl-1 pr-3 text-xs font-bold text-white/85 transition hover:border-sky-300/50 hover:bg-sky-400/20"
+                          >
+                            {blogger.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={blogger.avatarUrl}
+                                alt=""
+                                width={22}
+                                height={22}
+                                className="h-[22px] w-[22px] rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-sky-400/25 text-[9px] font-black text-sky-100" aria-hidden>
+                                {initialsOf(blogger.name)}
+                              </span>
+                            )}
+                            {truncate(blogger.name, 16)}
+                            <span className="text-sky-300" aria-hidden>
+                              {"★".repeat(blogger.rarityStars)}
+                            </span>
+                            <span className="font-semibold text-white/50">· {pluralRu(posts, ["пост", "поста", "постов"])}</span>
+                            {blogger.externalAudience != null && (
+                              <span className="rounded-full border border-sky-300/40 px-1.5 py-0.5 text-[9px] font-bold leading-tight text-sky-200">
+                                +вне платформы
+                              </span>
+                            )}
+                          </Link>
                         ))}
                       </div>
                     </div>

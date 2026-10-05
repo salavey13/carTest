@@ -66,10 +66,10 @@ export default async function CrewDiscoveryPage() {
     model = await loadNetworkModel();
   } catch (error) {
     logger.warn("[crew-discovery] network load failed:", error);
-    model = { nodes: [], links: [], peopleCount: 0, connectionCount: 0 };
+    model = { nodes: [], links: [], peopleCount: 0, connectionCount: 0, bloggers: [], bloggerLinks: [] };
   }
 
-  const { nodes, links, peopleCount, connectionCount } = model;
+  const { nodes, links, peopleCount, connectionCount, bloggers, bloggerLinks } = model;
 
   // The flagship crew anchors the howtos/links: most people wins, ties keep
   // the oldest (nodes arrive ordered by created_at from the loader).
@@ -115,6 +115,8 @@ export default async function CrewDiscoveryPage() {
               links={links}
               peopleCount={peopleCount}
               connectionCount={connectionCount}
+              bloggers={bloggers}
+              bloggerLinks={bloggerLinks}
             />
 
             {/* ── howto strip — the wikipedia dive starts here ────────────────
