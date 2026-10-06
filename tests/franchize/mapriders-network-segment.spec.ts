@@ -59,7 +59,13 @@ describe("map-riders: «Сеть» is a deck segment, not an ejector (Task 69)",
 
   it("SheetNetworkPanel renders the SAME graph as the discovery page + «Вся сеть» escape hatch", () => {
     expect(panels).toContain('from "@/app/franchize/discovery/CrewDiscoveryGraph"');
-    expect(panels).toContain("<CrewDiscoveryGraph nodes={network.nodes} links={network.links} />");
+    // Task 74 wired the blogger distribution layer into the sheet's graph —
+    // the same props the discovery page passes (no deprioritized fork).
+    expect(panels).toContain("<CrewDiscoveryGraph");
+    expect(panels).toContain("nodes={network.nodes}");
+    expect(panels).toContain("links={network.links}");
+    expect(panels).toContain("bloggers={network.bloggers}");
+    expect(panels).toContain("bloggerLinks={network.bloggerLinks}");
     expect(panels).toContain("franchize/discovery");
     // empty state instead of a crash when the model fails to load
     expect(panels).toContain("Пока сеть пуста");

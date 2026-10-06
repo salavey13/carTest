@@ -126,8 +126,10 @@ describe("graph canvas — service satellites on tap", () => {
   });
 
   it("dashed service-colored affinity edges connect similar services", () => {
-    expect(graph).toContain('strokeDasharray="3 7"');
-    expect(graph).toContain("stroke={SERVICE_META[edge.serviceKey]?.color ?? \"#7dd3fc\"}");
+    // Task 74: edge paint/dash became ternaries — service edges keep the
+    // SERVICE_META color + "3 7", blogger distribution edges go blue "7 5".
+    expect(graph).toContain('strokeDasharray={edge.kind === "blogger" ? "7 5" : "3 7"}');
+    expect(graph).toContain('stroke={edge.kind === "blogger" ? BLOGGER_COLOR : (SERVICE_META[edge.serviceKey]?.color ?? "#7dd3fc")}');
   });
 
   it("the painter keeps affinity edges glued to BOTH satellites at 60fps", () => {

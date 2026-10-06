@@ -9,6 +9,11 @@
 //     form. hideProfile collapses the view for everyone except owner/staff.
 //   · saveRiderProfileAction — owner-only customization (bio/city/status/
 //     hideProfile), server-side sanitize + cap; zod gates the transport.
+//   · saveBloggerStatsAction — owner-only blogger stats (Task 75):
+//     website + per-platform handle/followers stored in users.metadata.blogger
+//     (canonical bundle, sanitizeBloggerStats collapses any hostile shape).
+//     The discovery/map rarity picks the bundle up via
+//     externalAudienceFromUser — no further wiring needed.
 //   · getPostReactionsAction — «Кому понравилось»: per-emoji reactor lists.
 //     PRIVACY: authenticated viewers only — mirrors the reactions table
 //     stance (no anon SELECT policy; see migration 20260920010000).
@@ -28,6 +33,19 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { getCrewBySlug, resolveWallActor, isCrewStaffUser } from "@/app/franchize/lib/wall-access";
 import { resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
+import {
+  bloggerRarityScore,
+  bloggerRarityStars,
+} from "@/app/franchize/lib/crew-network";
+import {
+  BLOGGER_HANDLE_MAX_LEN,
+  BLOGGER_WEBSITE_MAX_LEN,
+  EMPTY_BLOGGER_STATS,
+  bloggerStatsExternalAudience,
+  isBloggerStatsEmpty,
+  sanitizeBloggerStats,
+  type BloggerStats,
+} from "@/app/franchize/lib/blogger-stats";
 import {
   EMPTY_RIDER_PROFILE_CUSTOM,
   RIDER_BIO_MAX_LEN,
@@ -77,6 +95,63 @@ const ReactionsInput = z.object({
   initData: z.string().trim().optional(),
 });
 
+/** Transport caps only — the lib (sanitizeBloggerStats) decides the final
+ *  shape: whitelist platforms, trim/cap handles, coerce follower numbers. */
+const SaveBloggerStatsInput = z.object({
+  initData: z.string().trim().min(1),
+  stats: z.object({
+    website: z.string().max(BLOGGER_WEBSITE_MAX_LEN * 2).optional(),
+    platforms: z
+      .record(
+        z.string(),
+        z.object({
+          handle: z.string().max(BLOGGER_HANDLE_MAX_LEN * 2).optional(),
+          followers: z.number().nullable().optional(),
+        }),
+      )
+      .optional(),
+  }),
+});
+
+/** On-chain (wall-derived) part of the rarity — fixed at render time; the
+ *  editor adds the live audience part client-side from the same pure fn. */
+export interface RiderBloggerOnChain {
+  postCount: number;
+  crewCount: number;
+  geotagCount: number;
+  likeCount: number;
+}
+
+export interface RiderBloggerView {
+  /** Canonical self-declared stats (public card + editor init). */
+  stats: BloggerStats;
+  onChain: RiderBloggerOnChain;
+  /** bloggerRarityScore over onChain + stats audience (same fn discovery uses). */
+  rarityScore: number;
+  rarityStars: 1 | 2 | 3 | 4 | 5;
+  /** stats empty → the public card hides for non-self viewers. */
+  isEmpty: boolean;
+}
+
+function buildBloggerView(stats: BloggerStats, onChain: RiderBloggerOnChain): RiderBloggerView {
+  const rarityScore = bloggerRarityScore({
+    postCount: onChain.postCount,
+    crewCount: onChain.crewCount,
+    geotagCount: onChain.geotagCount,
+    likeCount: onChain.likeCount,
+    externalAudience: bloggerStatsExternalAudience(stats),
+  });
+  return {
+    stats,
+    onChain,
+    rarityScore,
+    rarityStars: bloggerRarityStars(rarityScore),
+    isEmpty: isBloggerStatsEmpty(stats),
+  };
+}
+
+const ZERO_BLOGGER_ON_CHAIN: RiderBloggerOnChain = { postCount: 0, crewCount: 0, geotagCount: 0, likeCount: 0 };
+
 /** Post scan cap for profile counters/garage (NN-crew scale; badge granularity). */
 const POST_SCAN_CAP = 500;
 
@@ -114,6 +189,8 @@ export interface RiderProfileView {
   sinceLabel: string | null;
   /** Deeplink-friendly bot username for the «Написать в TG» button. */
   botUsername: string | null;
+  /** Task 75: blogger distribution layer (self-declared stats + rarity). */
+  blogger: RiderBloggerView;
 }
 
 export type GetRiderProfileResult =
@@ -122,6 +199,10 @@ export type GetRiderProfileResult =
 
 export type SaveRiderProfileResult =
   | { ok: true; custom: RiderProfileCustom }
+  | { ok: false; error: string };
+
+export type SaveBloggerStatsResult =
+  | { ok: true; stats: BloggerStats }
   | { ok: false; error: string };
 
 export interface ReactionReactorGroup {
@@ -237,6 +318,7 @@ export async function getRiderProfileAction(input: {
         garage: [],
         recentRentals: [],
         sinceLabel: null,
+        blogger: buildBloggerView(EMPTY_BLOGGER_STATS, ZERO_BLOGGER_ON_CHAIN),
       },
     };
   }
@@ -330,6 +412,35 @@ export async function getRiderProfileAction(input: {
   // ── 4. «в экипаже с …»: earliest of first ride / first post ──────────────
   const earliestPostAt = visiblePosts[0]?.created_at ?? null;
 
+  // ── 5. Blogger distribution layer (Task 75) ───────────────────────────────
+  // Cross-crew on-chain aggregates — counted the SAME way the discovery
+  // loader counts them (is_hidden=false, geo_lat != null, like_count ?? 0,
+  // bounded scan) so the profile and the graph never disagree.
+  const bloggerStats = sanitizeBloggerStats(meta.blogger);
+  let bloggerOnChain: RiderBloggerOnChain = ZERO_BLOGGER_ON_CHAIN;
+  try {
+    const { data: bloggerPostRows } = await supabaseAdmin
+      .from("crew_posts")
+      .select("crew_id, like_count, geo_lat")
+      .eq("author_id", riderId)
+      .eq("is_hidden", false)
+      .limit(POST_SCAN_CAP);
+    const rows = (bloggerPostRows ?? []) as {
+      crew_id: string;
+      like_count: number | null;
+      geo_lat: number | null;
+    }[];
+    bloggerOnChain = {
+      postCount: rows.length,
+      crewCount: new Set(rows.map((r) => r.crew_id)).size,
+      geotagCount: rows.filter((r) => r.geo_lat != null).length,
+      likeCount: rows.reduce((sum, r) => sum + Math.max(0, r.like_count ?? 0), 0),
+    };
+  } catch (error) {
+    logger.warn("[rider-profile] blogger on-chain aggregate failed (non-fatal):", error);
+  }
+  const blogger = buildBloggerView(bloggerStats, bloggerOnChain);
+
   return {
     ok: true,
     profile: {
@@ -346,6 +457,7 @@ export async function getRiderProfileAction(input: {
         isStaff,
       }),
       sinceLabel: riderSinceLabel(rental.firstRideAt, earliestPostAt),
+      blogger,
     },
   };
 }
@@ -449,6 +561,68 @@ export async function saveRiderProfileAction(input: {
   } catch (error) {
     logger.warn("[rider-profile] save crashed:", error);
     return { ok: false, error: "Не получилось сохранить профиль." };
+  }
+}
+
+// ── saveBloggerStatsAction (owner-only, Task 75) ─────────────────────────────
+
+/**
+ * Save the caller's OWN blogger stats (users.metadata.blogger).
+ *
+ * Metadata handling contract:
+ *   · INITIALIZATION — the bundle materializes on the first save; before
+ *     that every reader sees sanitizeBloggerStats(undefined) = EMPTY
+ *     (no write-on-read, read paths stay free);
+ *   · UPDATE — read-modify-write on the metadata column: the `blogger` key
+ *     is the ONLY key touched, bot-managed keys (riderProfiles, prefs,
+ *     customLinks, …) pass through untouched;
+ *   · VALIDATION — zod bounds the transport, sanitizeBloggerStats decides
+ *     the final shape (platform whitelist, handle caps, follower coercion),
+ *     and updatedAt is stamped SERVER-side (client claims are ignored);
+ *   · AUTHZ — the actor edits only their own stats: whoever the signed
+ *     cookie/initData resolves to IS the blogger. No slug, no staff override —
+ *     audience numbers are personal marketing data.
+ */
+export async function saveBloggerStatsAction(input: {
+  initData?: string;
+  stats: z.infer<typeof SaveBloggerStatsInput>["stats"];
+}): Promise<SaveBloggerStatsResult> {
+  const parsed = SaveBloggerStatsInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Некорректные данные блогера." };
+
+  const actor = await resolveWallActor(parsed.data.initData);
+  if (!actor) return { ok: false, error: "Настройка статов доступна из Telegram-бота экипажа." };
+
+  // Deep sanitize from the TRANSPORT payload only — updatedAt is re-stamped
+  // server-side, a hostile direct action call cannot fake audit fields.
+  const incoming = sanitizeBloggerStats({
+    website: parsed.data.stats.website ?? "",
+    platforms: parsed.data.stats.platforms ?? {},
+    updatedAt: null,
+  });
+
+  try {
+    const { data: row } = await supabaseAdmin
+      .from("users")
+      .select("metadata")
+      .eq("user_id", actor.userId)
+      .maybeSingle();
+    const meta = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+    const saved: BloggerStats = { ...incoming, updatedAt: new Date().toISOString() };
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ metadata: { ...meta, blogger: saved }, updated_at: new Date().toISOString() })
+      .eq("user_id", actor.userId);
+    if (error) {
+      logger.error("[rider-profile] blogger stats save failed:", error.message);
+      return { ok: false, error: "Не получилось сохранить статы блогера." };
+    }
+    // The client recomputes rarity from its OWN on-chain counts + the saved
+    // stats (same pure fn, same inputs) — no second post scan needed here.
+    return { ok: true, stats: saved };
+  } catch (error) {
+    logger.warn("[rider-profile] blogger stats save crashed:", error);
+    return { ok: false, error: "Не получилось сохранить статы блогера." };
   }
 }
 

@@ -24,10 +24,13 @@ import {
   Bike,
   Camera,
   Check,
+  ExternalLink,
   Eye,
   EyeOff,
+  Globe,
   KeyRound,
   MapPin,
+  Megaphone,
   MessageCircle,
   Pencil,
   Share2,
@@ -48,7 +51,23 @@ import {
   RIDER_STATUS_TEXT_MAX_LEN,
   type RiderProfileCustom,
 } from "@/app/franchize/lib/rider-profile";
-import { saveRiderProfileAction, type RiderProfileView } from "@/app/franchize/server-actions/rider-profile";
+import { bloggerRarityScore, bloggerRarityStars } from "@/app/franchize/lib/crew-network";
+import {
+  BLOGGER_PLATFORMS,
+  BLOGGER_PLATFORM_KEYS,
+  bloggerHandleHref,
+  bloggerStatsExternalAudience,
+  bloggerWebsiteHref,
+  formatBloggerAudience,
+  sanitizeBloggerStats,
+  type BloggerPlatformKey,
+  type BloggerStats,
+} from "@/app/franchize/lib/blogger-stats";
+import {
+  saveRiderProfileAction,
+  saveBloggerStatsAction,
+  type RiderProfileView,
+} from "@/app/franchize/server-actions/rider-profile";
 import { getWallStandingsAction } from "@/app/franchize/server-actions/community-wall";
 import type { WallPostView } from "@/app/franchize/lib/community-wall";
 import type { RiderCrewBrief } from "./page";
@@ -123,6 +142,59 @@ const RENTAL_STATUS_LABEL: Record<string, { label: string; emoji: string }> = {
   disputed: { label: "спор", emoji: "⚠️" },
 };
 
+// ── blogger stats editor (Task 75) ───────────────────────────────────────────
+// The form keeps RAW text drafts (handles + follower counts as typed) and
+// converts them through the SAME pure sanitize the server uses — preview and
+// payload can never disagree with what actually gets stored.
+
+interface BloggerPlatformDraft {
+  handle: string;
+  /** Raw text of the audience input — "" = not stated. */
+  followers: string;
+}
+
+interface BloggerDraft {
+  website: string;
+  platforms: Record<BloggerPlatformKey, BloggerPlatformDraft>;
+}
+
+function bloggerDraftFromStats(s: BloggerStats): BloggerDraft {
+  return {
+    website: s.website,
+    platforms: Object.fromEntries(
+      BLOGGER_PLATFORM_KEYS.map((key) => [
+        key,
+        { handle: s.platforms[key].handle, followers: s.platforms[key].followers == null ? "" : String(s.platforms[key].followers) },
+      ]),
+    ) as BloggerDraft["platforms"],
+  };
+}
+
+/** «12 500», «12,5», «12500» — parse to a non-negative number, else null. */
+function parseFollowersText(text: string): number | null {
+  const cleaned = text.replace(/[\s\u00A0]/g, "").replace(",", ".");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Draft → sanitized stats (client-side; the server re-sanitizes anyway). */
+function sanitizeBloggerDraft(draft: BloggerDraft): BloggerStats {
+  return sanitizeBloggerStats({
+    website: draft.website,
+    platforms: Object.fromEntries(
+      BLOGGER_PLATFORM_KEYS.map((key) => [
+        key,
+        {
+          handle: draft.platforms[key].handle,
+          followers: parseFollowersText(draft.platforms[key].followers),
+        },
+      ]),
+    ),
+    updatedAt: null,
+  });
+}
+
 // ── main component ───────────────────────────────────────────────────────────
 
 /** Wall post annotated with its home crew (cross-crew fanout on the profile). */
@@ -157,6 +229,40 @@ export function RiderProfileClient({
   const [savedFlash, setSavedFlash] = useState(false);
   const bioRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // ── blogger stats (Task 75): local view state survives saves — the page
+  // props go stale after saveBloggerStatsAction, the server payload refreshes
+  // the card without a reload. Rarity is recomputed client-side from the
+  // SAME pure fn the server/discovery use (deterministic, SSR-safe).
+  const [viewBloggerStats, setViewBloggerStats] = useState<BloggerStats>(profile.blogger.stats);
+  const [editingBlogger, setEditingBlogger] = useState(false);
+  const [savingBlogger, setSavingBlogger] = useState(false);
+  const [bloggerDraft, setBloggerDraft] = useState<BloggerDraft>(() => bloggerDraftFromStats(profile.blogger.stats));
+  const sanitizedBloggerDraft = useMemo(() => sanitizeBloggerDraft(bloggerDraft), [bloggerDraft]);
+  const displayBlogger = useMemo(() => {
+    const rarityScore = bloggerRarityScore({
+      postCount: profile.blogger.onChain.postCount,
+      crewCount: profile.blogger.onChain.crewCount,
+      geotagCount: profile.blogger.onChain.geotagCount,
+      likeCount: profile.blogger.onChain.likeCount,
+      externalAudience: bloggerStatsExternalAudience(viewBloggerStats),
+    });
+    return { stats: viewBloggerStats, rarityScore, rarityStars: bloggerRarityStars(rarityScore) };
+  }, [profile.blogger.onChain, viewBloggerStats]);
+  const draftRarity = useMemo(() => {
+    const rarityScore = bloggerRarityScore({
+      postCount: profile.blogger.onChain.postCount,
+      crewCount: profile.blogger.onChain.crewCount,
+      geotagCount: profile.blogger.onChain.geotagCount,
+      likeCount: profile.blogger.onChain.likeCount,
+      externalAudience: bloggerStatsExternalAudience(sanitizedBloggerDraft),
+    });
+    return { rarityScore, rarityStars: bloggerRarityStars(rarityScore) };
+  }, [profile.blogger.onChain, sanitizedBloggerDraft]);
+  const bloggerIsEmpty = useMemo(
+    () => bloggerStatsExternalAudience(viewBloggerStats) === null,
+    [viewBloggerStats],
+  );
+
   // «Зачёт экипажа»: this rider's rank in the crew's weekly standings. The
   // standings are the SAME public payload the wall renders (money-free), so
   // the profile stays consistent with the wall without extra server work.
@@ -177,6 +283,42 @@ export function RiderProfileClient({
     setDraft(custom);
     setEditing(true);
     requestAnimationFrame(() => bioRef.current?.focus());
+  };
+
+  const openBloggerEditor = () => {
+    setBloggerDraft(bloggerDraftFromStats(viewBloggerStats));
+    setEditingBlogger(true);
+  };
+
+  const saveBloggerStats = async () => {
+    setSavingBlogger(true);
+    try {
+      const res = await saveBloggerStatsAction({
+        initData: getTelegramInitData() || undefined,
+        stats: {
+          website: bloggerDraft.website,
+          platforms: Object.fromEntries(
+            BLOGGER_PLATFORM_KEYS.map((key) => [
+              key,
+              {
+                handle: bloggerDraft.platforms[key].handle,
+                followers: parseFollowersText(bloggerDraft.platforms[key].followers),
+              },
+            ]),
+          ),
+        },
+      });
+      if (res.ok) {
+        setViewBloggerStats(res.stats);
+        setEditingBlogger(false);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2500);
+      } else {
+        window.alert(res.error || "Не получилось сохранить статы.");
+      }
+    } finally {
+      setSavingBlogger(false);
+    }
   };
 
   const save = async () => {
@@ -468,6 +610,222 @@ export function RiderProfileClient({
         <StatTile icon={<Camera className="h-4 w-4" />} value={stats.photoPostsCount} label="фото-постов" />
         <StatTile icon={<MapPin className="h-4 w-4" />} value={stats.checkinCount} label="чек-инов" />
       </section>
+
+      {/* ── «Блогер сети» — the distribution layer (Task 75) ────────────────
+          Self-declared cross-platform stats feed the rarity that the
+          discovery graph and the map pin popups already render. The card is
+          public once configured; the owner always sees it (edit entry). */}
+      {(!bloggerIsEmpty || isSelf) && (
+        <section className="cw-card cw-rise p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-[var(--community-text)]">
+              <Megaphone className="h-4 w-4 text-[var(--community-accent)]" aria-hidden /> Блогер сети
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-black normal-case tracking-normal"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--community-accent) 14%, transparent)",
+                  color: "var(--community-accent)",
+                }}
+                title={`Индекс редкости: ${displayBlogger.rarityScore}`}
+              >
+                {"★".repeat(displayBlogger.rarityStars)}
+              </span>
+            </h2>
+            {isSelf && !editingBlogger && (
+              <button
+                type="button"
+                onClick={openBloggerEditor}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--community-border)] px-3.5 py-1.5 text-xs font-bold text-[var(--community-text)] transition hover:border-[var(--community-accent)]"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden /> Настроить статы
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-[var(--community-muted)]">
+            Аудитория с других платформ повышает редкость голоса в{" "}
+            <Link href="/franchize/discovery" className="font-semibold text-[var(--community-accent)] transition hover:underline">
+              сети экипажей
+            </Link>{" "}
+            и на Live-карте. Посты, экипажи и гео-чек-ины считаются автоматически.
+          </p>
+
+          {/* on-chain part — the same counters the discovery graph computes */}
+          <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[var(--community-muted)]">
+            <span>
+              {profile.blogger.onChain.postCount} {pluralRuClient(profile.blogger.onChain.postCount, ["пост", "поста", "постов"])}
+            </span>
+            <span>
+              {profile.blogger.onChain.crewCount} {pluralRuClient(profile.blogger.onChain.crewCount, ["экипаж", "экипажа", "экипажей"])}
+            </span>
+            <span>
+              {profile.blogger.onChain.geotagCount} {pluralRuClient(profile.blogger.onChain.geotagCount, ["гео", "гео", "гео"])}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <ThumbsUp className="h-3 w-3" aria-hidden /> {profile.blogger.onChain.likeCount}
+            </span>
+            <span className="ml-auto rounded-full border border-[var(--community-border)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[var(--community-accent)]">
+              индекс {displayBlogger.rarityScore}
+            </span>
+          </p>
+
+          {editingBlogger ? (
+            <form
+              className="mt-3 space-y-3 rounded-2xl border border-[var(--community-border)] p-4"
+              style={{ backgroundColor: "var(--community-card-faint)" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveBloggerStats();
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-[var(--community-text)]">Статы блогера</p>
+                <button
+                  type="button"
+                  onClick={() => setEditingBlogger(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--community-border)] text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                  aria-label="Закрыть редактор статов"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--community-muted)]">
+                Сайт / блог
+                <input
+                  value={bloggerDraft.website}
+                  maxLength={200}
+                  onChange={(e) => setBloggerDraft({ ...bloggerDraft, website: e.target.value })}
+                  placeholder="https://мой-блог.ru"
+                  className="mt-1 w-full rounded-xl border border-[var(--community-border)] bg-transparent px-3 py-2 text-sm normal-case tracking-normal text-[var(--community-text)] outline-none focus:border-[var(--community-accent)]"
+                />
+              </label>
+
+              <div className="space-y-2">
+                {BLOGGER_PLATFORMS.map((p) => (
+                  <div key={p.key} className="grid grid-cols-[auto_1fr] items-end gap-x-2 gap-y-1 sm:grid-cols-[88px_1fr_1fr]">
+                    <span className="col-span-2 pb-1 text-[11px] font-bold uppercase tracking-wide text-[var(--community-muted)] sm:col-span-1 sm:pb-2.5">
+                      {p.label}
+                    </span>
+                    <input
+                      value={bloggerDraft.platforms[p.key].handle}
+                      maxLength={80}
+                      onChange={(e) =>
+                        setBloggerDraft({
+                          ...bloggerDraft,
+                          platforms: { ...bloggerDraft.platforms, [p.key]: { ...bloggerDraft.platforms[p.key], handle: e.target.value } },
+                        })
+                      }
+                      placeholder="@ник или ссылка"
+                      className="w-full rounded-xl border border-[var(--community-border)] bg-transparent px-3 py-2 text-sm text-[var(--community-text)] outline-none focus:border-[var(--community-accent)]"
+                    />
+                    <input
+                      value={bloggerDraft.platforms[p.key].followers}
+                      inputMode="numeric"
+                      onChange={(e) =>
+                        setBloggerDraft({
+                          ...bloggerDraft,
+                          platforms: { ...bloggerDraft.platforms, [p.key]: { ...bloggerDraft.platforms[p.key], followers: e.target.value } },
+                        })
+                      }
+                      placeholder={`${p.followerNoun[2]} (необязательно)`}
+                      className="col-span-2 w-full rounded-xl border border-[var(--community-border)] bg-transparent px-3 py-2 text-sm text-[var(--community-text)] outline-none focus:border-[var(--community-accent)] sm:col-span-1"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* live rarity preview — the same inputs the discovery graph uses */}
+              <p className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--community-border)] px-3 py-2 text-xs font-semibold text-[var(--community-muted)]">
+                <span>
+                  Индекс редкости: <span className="font-black text-[var(--community-text)]">{draftRarity.rarityScore}</span>
+                </span>
+                <span className="font-black text-[var(--community-accent)]">{"★".repeat(draftRarity.rarityStars)}</span>
+                <span aria-hidden>→</span>
+                <span className="inline-flex items-center gap-1">
+                  <Megaphone className="h-3 w-3" aria-hidden /> как тебя увидит сеть
+                </span>
+              </p>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingBlogger(false)}
+                  className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingBlogger}
+                  className="min-h-11 rounded-full bg-[var(--community-accent)] px-5 py-2 text-sm font-bold text-[var(--community-accent-text)] transition hover:brightness-110 disabled:opacity-60"
+                >
+                  {savingBlogger ? "Сохраняю…" : "Сохранить статы"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              {displayBlogger.rarityStars >= 4 && (
+                <p className="mt-2 text-[11px] font-semibold text-[var(--community-accent)]">
+                  Редкий голос сети — твои метки подсвечены на графе и карте.
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {displayBlogger.stats.website && bloggerWebsiteHref(displayBlogger.stats.website) && (
+                  <a
+                    href={bloggerWebsiteHref(displayBlogger.stats.website) as string}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--community-border)] px-3 py-1.5 text-xs font-bold text-[var(--community-text)] transition hover:border-[var(--community-accent)]"
+                  >
+                    <Globe className="h-3.5 w-3.5" aria-hidden /> {displayBlogger.stats.website.replace(/^https?:\/\//, "").slice(0, 40)}
+                    <ExternalLink className="h-3 w-3 opacity-60" aria-hidden />
+                  </a>
+                )}
+                {BLOGGER_PLATFORMS.map((p) => {
+                  const platform = displayBlogger.stats.platforms[p.key];
+                  if (!platform.handle && platform.followers == null) return null;
+                  const href = bloggerHandleHref(p.key, platform.handle);
+                  const count =
+                    platform.followers != null && platform.followers > 0
+                      ? formatBloggerAudience(platform.followers)
+                      : null;
+                  const chip = (
+                    <>
+                      <span className="font-bold">{p.label}</span>
+                      {platform.handle && <span className="font-medium opacity-75">{platform.handle.replace(/^https?:\/\/(www\.)?/, "").slice(0, 24)}</span>}
+                      {count && <span className="rounded-full bg-[color-mix(in_srgb,var(--community-accent)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-black">{count}</span>}
+                    </>
+                  );
+                  return href ? (
+                    <a
+                      key={p.key}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--community-border)] px-3 py-1.5 text-xs text-[var(--community-text)] transition hover:border-[var(--community-accent)]"
+                    >
+                      {chip}
+                    </a>
+                  ) : (
+                    <span
+                      key={p.key}
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--community-border)] px-3 py-1.5 text-xs text-[var(--community-text)]"
+                    >
+                      {chip}
+                    </span>
+                  );
+                })}
+              </div>
+              {displayBlogger.stats.updatedAt && (
+                <p className="mt-2 text-[10px] text-[var(--community-muted)] opacity-70" suppressHydrationWarning>
+                  обновлено {shortDateClient(displayBlogger.stats.updatedAt)}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {/* weekly standings rank (Зачёт экипажа) — hidden when the rider didn't
           score this week: a silent zero beats a loud «you are not on the list».

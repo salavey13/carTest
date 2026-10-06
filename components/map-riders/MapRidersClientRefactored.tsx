@@ -48,6 +48,7 @@ import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { SheetListPanel, SheetNetworkPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
 import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
 import { pluralRu } from "@/app/franchize/lib/crew-network";
+import { formatBloggerAudience } from "@/app/franchize/lib/blogger-stats";
 import { List, Network, Trophy, Users } from "lucide-react";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
 import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
@@ -842,7 +843,10 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                   </span>
                   {blogger.externalAudience != null && (
                     <span className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: wallPinColor }}>
-                      +вне платформы
+                      {/* Task 75: self-declared stats now carry REAL numbers —
+                          show the reach, not just the fact of presence (1 =
+                          declared, no numbers). */}
+                      +{blogger.externalAudience > 1 ? `${formatBloggerAudience(blogger.externalAudience)} ` : ""}вне платформы
                     </span>
                   )}
                 </div>

@@ -17,16 +17,25 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import {
+  // The metadata reader lives in the PURE lib (vitest cannot import this
+  // server-only module) — re-exported so the loader's public surface is
+  // unchanged for every consumer.
+  externalAudienceFromUser,
+} from "../lib/blogger-stats";
+import {
   bloggerRarityScore,
   bloggerRarityStars,
   buildCrewNetworkModel,
   crewAccentFromMetadata,
   deriveCrewServices,
-  isRecord,
   type CrewNetworkBlogger,
   type CrewNetworkMember,
   type CrewNetworkNodeInput,
 } from "../lib/crew-network";
+
+// Public surface preserved: consumers (and tests) import the reader from the
+// loader exactly as before Task 75.
+export { externalAudienceFromUser };
 
 const CREWS_CAP = 200;
 const CARS_CAP = 2000;
@@ -94,56 +103,7 @@ function publicName(row: Pick<UserRow, "username" | "full_name">): string {
 
 /** Keys that may carry a cross-platform audience in users.metadata —
  *  top-level or one bundle deep. Grows as bloggers link more platforms. */
-const SOCIAL_AUDIENCE_KEY_RE =
-  /^(instagram|youtube|telegram|tiktok|vk|dzen|audience|followers|subscribers|external_audience|social_audience)$/i;
-const AUDIENCE_NUMBER_KEY_RE = /(follower|subscriber|audience)/i;
-
-/**
- * External audience of a blogger — the 2026-10-05 rarity factor: «factor in
- * the rarity of the blogger in case some additional audience is present on
- * other platforms». Read ONLY from fields that already exist: users.website
- * (declared presence → 1) and numeric audience values in users.metadata
- * (top level or one bundle deep, e.g. instagram: { followers: 1200 }).
- * Returns: null = presence unknown; ≥1 = audience size / declared presence.
- */
-export function externalAudienceFromUser(
-  row: Pick<BloggerUserRow, "website" | "metadata"> | undefined,
-): number | null {
-  if (!row) return null;
-  let audience: number | null = (row.website ?? "").trim() ? 1 : null;
-  const meta = isRecord(row.metadata) ? row.metadata : {};
-  const bump = (value: unknown) => {
-    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-      audience = Math.max(audience ?? 0, Math.round(value));
-    }
-  };
-  for (const [key, value] of Object.entries(meta)) {
-    if (SOCIAL_AUDIENCE_KEY_RE.test(key)) {
-      bump(value);
-      if (isRecord(value)) {
-        for (const [subKey, subValue] of Object.entries(value)) {
-          if (AUDIENCE_NUMBER_KEY_RE.test(subKey)) bump(subValue);
-        }
-      } else if (typeof value === "string" && value.trim()) {
-        // declared presence without numbers
-        audience = Math.max(audience ?? 0, 1);
-      }
-    } else if (isRecord(value)) {
-      // one bundle deeper (settings/socials objects) — the keys still count
-      for (const [subKey, subValue] of Object.entries(value)) {
-        if (SOCIAL_AUDIENCE_KEY_RE.test(subKey)) {
-          bump(subValue);
-          if (isRecord(subValue)) {
-            for (const [deepKey, deepValue] of Object.entries(subValue)) {
-              if (AUDIENCE_NUMBER_KEY_RE.test(deepKey)) bump(deepValue);
-            }
-          }
-        }
-      }
-    }
-  }
-  return audience;
-}
+// (moved to ../lib/blogger-stats together with externalAudienceFromUser)
 
 /** Serializable result — crosses the server→client boundary as props. */
 export interface CrewNetworkModelResult {
