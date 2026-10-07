@@ -365,7 +365,8 @@ describe("iter20 · source guards", () => {
     expect(src).toContain("start_photo_count, end_photo_count");
     expect(src).toContain("rentalNotesSummary(meta)");
     expect(src).toContain("rentalPhotoCountsLabel(r.start_photo_count, r.end_photo_count)");
-    expect(src).toContain("subrenterCsvLabel(subrenterUserById.get(subrenterId)");
+    // iter52: users map is shared between subrenter labels and «Выдал»/«Принял»
+    expect(src).toContain("subrenterCsvLabel(userById.get(subrenterId)");
     // rental rows carry the rental id in the hidden column
     expect(src).toMatch(/notesStr, subrenterStr, photosStr, r\.rental_id \|\| ""/);
   });

@@ -22,7 +22,7 @@ This is the project-level skill for the **VIP BIKE ELECTRO / cartest** repo. It 
 
 | Piece | Path | Role |
 |---|---|---|
-| `buildRentalsCsv` | `lib/csv-builders/rentals-csv.ts` | Builds the 17-column finance sheet CSV text for the rentals analytics page. Reads `rentals`, `sale_contract_artifacts`, and `commission_rates`. |
+| `buildRentalsCsv` | `lib/csv-builders/rentals-csv.ts` | Builds the block-structured CSV for the rentals analytics page: separate «АРЕНДЫ» / «ЭКИП» / «СЕРВИС» / «ПРОДАЖИ» blocks + «СВОДКА» (per-block totals; iter52). Reads `rentals`, `sale_contract_artifacts`. |
 | `buildSalesCsv` | `lib/csv-builders/sales-csv.ts` | Builds the 5-column sales-only CSV text. |
 | `resolveRentalCommissionRate` | `lib/csv-builders/rentals-csv.ts` | Resolves the crew's rental commission rate (`rental_daily` preferred, then `rental_hourly`). Drives the `ЗП Аренда` column. |
 | `resolveSaleCommissionRate` | `lib/csv-builders/sales-csv.ts` | Same for `operation_type = 'sale'`. Drives `ЗП Продажа`. |
