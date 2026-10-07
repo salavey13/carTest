@@ -11,12 +11,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, RotateCw, Users, Wallet } from "lucide-react";
+import { Calendar, RotateCw, Send, Users, Wallet } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
 import { getCurrentPayPeriod } from "@/lib/salary-period";
 import { getMyEarnings, getMyPayoutHistory } from "@/app/franchize/server-actions/salary-calculations";
+// Task 77: the salary report as a TG file — the same delivery channel the
+// subrenter weekly reports use (docx → sendTelegramDocument).
+import { sendSalaryReportTelegramAction } from "@/app/franchize/server-actions/salary-report";
 import { formatCurrency, itemVariants, type CrewTokens } from "./profile-shared";
 
 type PeriodEarnings = {
@@ -70,6 +73,35 @@ export function MyEarningsPanel({
   const [periodEarnings, setPeriodEarnings] = useState<PeriodEarnings | null>(null);
   const [periodEarningsLoading, setPeriodEarningsLoading] = useState(false);
   const [periodEarningsError, setPeriodEarningsError] = useState<string | null>(null);
+
+  // Task 77: TG salary report delivery state (self-service — the action
+  // enforces owner-or-self server-side; here it is always self).
+  const [tgReportState, setTgReportState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [tgReportError, setTgReportError] = useState<string | null>(null);
+
+  const handleSendTgReport = async () => {
+    if (!userId || tgReportState === "sending") return;
+    setTgReportState("sending");
+    setTgReportError(null);
+    try {
+      const result = await sendSalaryReportTelegramAction({
+        slug,
+        memberId: userId,
+        from: earningsPeriod.from,
+        to: earningsPeriod.to,
+      });
+      if (result.success && result.sentToMember) {
+        setTgReportState("sent");
+      } else {
+        setTgReportState("error");
+        setTgReportError(result.error || "Telegram не принял файл — попробуй ещё раз");
+      }
+    } catch (err) {
+      console.error("Failed to send salary report to TG:", err);
+      setTgReportState("error");
+      setTgReportError("Не удалось отправить отчёт");
+    }
+  };
 
   // Team earnings modal state (for owners)
   const [showTeamEarningsModal, setShowTeamEarningsModal] = useState(false);
@@ -277,11 +309,46 @@ export function MyEarningsPanel({
                 </>
               )}
             </button>
+            {/* Task 77: salary report as a TG file — same channel as the
+                subrenter reports. Uses the period selected above. */}
+            <button
+              onClick={() => void handleSendTgReport()}
+              disabled={tgReportState === "sending"}
+              className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+              style={{
+                border: `1px solid ${T.borderSoft}`,
+                backgroundColor:
+                  tgReportState === "sent"
+                    ? "color-mix(in srgb, #22c55e 15%, transparent)"
+                    : "color-mix(in srgb, var(--franchize-shell-accent) 12%, transparent)",
+                color: tgReportState === "sent" ? "#22c55e" : T.accent,
+              }}
+            >
+              {tgReportState === "sending" ? (
+                <>
+                  <RotateCw className="h-3 w-3 animate-spin" />
+                  Отправляю...
+                </>
+              ) : tgReportState === "sent" ? (
+                <>✓ В Telegram</>
+              ) : (
+                <>
+                  <Send className="h-3 w-3" />
+                  Отчёт в Telegram
+                </>
+              )}
+            </button>
           </div>
           {/* Inline error for period */}
           {periodEarningsError && (
             <div className="mt-2 rounded px-2 py-1 text-xs" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
               ⚠️ {periodEarningsError}
+            </div>
+          )}
+          {/* Inline error for TG report */}
+          {tgReportState === "error" && tgReportError && (
+            <div className="mt-2 rounded px-2 py-1 text-xs" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
+              ⚠️ {tgReportError}
             </div>
           )}
         </div>

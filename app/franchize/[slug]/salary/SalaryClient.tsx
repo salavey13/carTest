@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Wallet } from "lucide-react";
+import { DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Send, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,6 +31,9 @@ import {
   calculateSalaryForPeriod,
   recordPayoutForPeriod,
 } from "../../server-actions/salary-calculations";
+// Task 77: salary report as a TG file (owner sends any member's report to
+// the member's chat + keeps a copy) — same channel as subrenter reports.
+import { sendSalaryReportTelegramAction } from "../../server-actions/salary-report";
 import { getOwnerSalaryOverview } from "../../server-actions/team-earnings";
 import { fallbackCrew } from "@/app/franchize/lib/fallback-crew";
 
@@ -122,6 +125,41 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
   }>({ open: false, plan: null });
 
   const [processingPayout, setProcessingPayout] = useState<string | null>(null);
+
+  // Task 77: TG report delivery state for the breakdown modal.
+  const [tgSending, setTgSending] = useState(false);
+  const [tgSentMsg, setTgSentMsg] = useState<string | null>(null);
+  const [tgErrorMsg, setTgErrorMsg] = useState<string | null>(null);
+
+  const handleSendTgReport = async (plan: SalaryPlan) => {
+    if (!dbUser?.user_id || tgSending) return;
+    setTgSending(true);
+    setTgSentMsg(null);
+    setTgErrorMsg(null);
+    try {
+      const result = await sendSalaryReportTelegramAction({
+        slug,
+        memberId: plan.memberId,
+        from: periodStart,
+        to: periodEnd,
+        sendCopyToRequester: plan.memberId !== dbUser.user_id,
+      });
+      if (result.success && result.sentToMember) {
+        setTgSentMsg(
+          plan.memberId !== dbUser.user_id
+            ? `Файл отправлен участнику${result.sentToRequester ? " + копия тебе" : ""}`
+            : "Файл отправлен в твой Telegram",
+        );
+      } else {
+        setTgErrorMsg(result.error || "Telegram не принял файл");
+      }
+    } catch (err) {
+      console.error("Failed to send salary report to TG:", err);
+      setTgErrorMsg("Не удалось отправить отчёт");
+    } finally {
+      setTgSending(false);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -766,13 +804,32 @@ export function SalaryClient({ initialCrew, initialSlug }: SalaryClientProps) {
           )}
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setBreakdownModal({ open: false, plan: null })}
-              className="rounded-full"
-            >
-              Закрыть
-            </Button>
+            <div className="flex w-full flex-col gap-2">
+              {tgSentMsg && (
+                <p className="text-center text-xs" style={{ color: "#22c55e" }}>✓ {tgSentMsg}</p>
+              )}
+              {tgErrorMsg && (
+                <p className="text-center text-xs" style={{ color: "#ef4444" }}>⚠️ {tgErrorMsg}</p>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  disabled={tgSending}
+                  onClick={() => breakdownModal.plan && void handleSendTgReport(breakdownModal.plan)}
+                  className="rounded-full"
+                >
+                  <Send className="mr-1 h-3.5 w-3.5" />
+                  {tgSending ? "Отправляю..." : "Отчёт в Telegram"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setBreakdownModal({ open: false, plan: null })}
+                  className="rounded-full"
+                >
+                  Закрыть
+                </Button>
+              </div>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
