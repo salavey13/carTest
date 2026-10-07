@@ -10,6 +10,49 @@ type FranchizePageShellProps = {
   width?: "content" | "wide" | "full";
 };
 
+/**
+ * Convert a palette color to the app-wide shadcn convention.
+ *
+ * The whole app stores shadcn variables (--card, --border, --primary, …) as
+ * raw HSL triplets ("36 92% 68%") — tailwind.config.ts consumes them as
+ * `hsl(var(--card))`. This shell previously assigned HEX strings
+ * ("#1A1A1A"), producing `hsl(#1A1A1A)` → invalid at computed-value time →
+ * `bg-card` collapsed to transparent and `border` fell back to `currentColor`
+ * (bright beige) on every crew page using Card/Badge/Select/Button.
+ * Converting hex → triplet restores proper crew styling. Non-hex input is
+ * returned unchanged (never worse than before).
+ */
+function hslTriplet(color: string): string {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return color;
+
+  const hex = match[1];
+  const full = hex.length === 3
+    ? hex.split("").map((ch) => ch + ch).join("")
+    : hex;
+
+  let r = parseInt(full.slice(0, 2), 16) / 255;
+  let g = parseInt(full.slice(2, 4), 16) / 255;
+  let b = parseInt(full.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+  }
+
+  return `${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
 type FranchizeShellVars = CSSProperties & {
   "--franchize-shell-bg": string;
   "--franchize-shell-card": string;
@@ -63,34 +106,39 @@ export function FranchizePageShell({
       ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
       : readablePaletteTextOnColor(palette.accentMain, palette),
     "--franchize-shell-ring": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-    // Set up shadcn/ui CSS variables for proper Button component styling.
-    // In auto mode, --primary/--accent/--ring/--destructive must follow the
-    // franchize palette (via --franchize-accent-main) rather than the global
-    // shadcn defaults (which are gold/red-orange in light mode and would
-    // produce low-contrast text on light backgrounds).
-    "--background": isAuto ? "hsl(var(--background))" : palette.bgCard,
-    "--foreground": isAuto ? "hsl(var(--foreground))" : palette.textPrimary,
-    "--card": isAuto ? "hsl(var(--card))" : palette.bgCard,
-    "--card-foreground": isAuto ? "hsl(var(--card-foreground))" : palette.textPrimary,
-    "--popover": isAuto ? "hsl(var(--popover))" : palette.bgCard,
-    "--popover-foreground": isAuto ? "hsl(var(--popover-foreground))" : palette.textPrimary,
-    "--primary": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-    "--primary-foreground": isAuto
-      ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
-      : readablePaletteTextOnColor(palette.accentMain, palette),
-    "--secondary": isAuto ? "hsl(var(--secondary))" : palette.bgBase,
-    "--secondary-foreground": isAuto ? "hsl(var(--secondary-foreground))" : palette.textPrimary,
-    "--muted": isAuto ? "hsl(var(--muted))" : palette.bgBase,
-    "--muted-foreground": isAuto ? "hsl(var(--muted-foreground))" : palette.textSecondary,
-    "--accent": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-    "--accent-foreground": isAuto
-      ? readablePaletteTextOnColor(theme.palettes?.dark?.accentMain || theme.palettes?.light?.accentMain || palette.accentMain, theme.palettes?.dark || theme.palettes?.light || palette)
-      : readablePaletteTextOnColor(palette.accentMain, palette),
-    "--destructive": isAuto ? "hsl(var(--destructive))" : palette.accentMain,
-    "--destructive-foreground": isAuto ? "hsl(var(--destructive-foreground))" : readablePaletteTextOnColor(palette.accentMain, palette),
-    "--border": isAuto ? "hsl(var(--border))" : palette.borderSoft,
-    "--input": isAuto ? "hsl(var(--input))" : palette.bgBase,
-    "--ring": isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+    // Set up shadcn/ui CSS variables for proper shadcn component styling
+    // (Card/Badge/Select/Button consume them as hsl(var(--x))).
+    //
+    // AUTO MODE: no shadcn overrides at all — inherit the global :root/.dark
+    // triplets (which ARE the auto crew palette by seed design). The previous
+    // overrides here were broken: `hsl(var(--background))` is a self-cycle and
+    // `var(--franchize-accent-main)` is a hex consumed inside hsl() → invalid
+    // → transparent backgrounds / currentColor borders.
+    //
+    // NON-AUTO: palette hex converted to HSL triplets (hslTriplet).
+    ...(isAuto
+      ? {}
+      : {
+          "--background": hslTriplet(palette.bgCard),
+          "--foreground": hslTriplet(palette.textPrimary),
+          "--card": hslTriplet(palette.bgCard),
+          "--card-foreground": hslTriplet(palette.textPrimary),
+          "--popover": hslTriplet(palette.bgCard),
+          "--popover-foreground": hslTriplet(palette.textPrimary),
+          "--primary": hslTriplet(palette.accentMain),
+          "--primary-foreground": hslTriplet(readablePaletteTextOnColor(palette.accentMain, palette)),
+          "--secondary": hslTriplet(palette.bgBase),
+          "--secondary-foreground": hslTriplet(palette.textPrimary),
+          "--muted": hslTriplet(palette.bgBase),
+          "--muted-foreground": hslTriplet(palette.textSecondary),
+          "--accent": hslTriplet(palette.accentMain),
+          "--accent-foreground": hslTriplet(readablePaletteTextOnColor(palette.accentMain, palette)),
+          "--destructive": "0 84% 60%",
+          "--destructive-foreground": "0 0% 100%",
+          "--border": hslTriplet(palette.borderSoft),
+          "--input": hslTriplet(palette.borderSoft),
+          "--ring": hslTriplet(palette.accentMain),
+        }),
   } as FranchizeShellVars;
   // Full-width: no max-width constraint and minimal padding
   // Wide: max-w-6xl with standard padding

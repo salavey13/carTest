@@ -46,7 +46,7 @@ export default async function FranchizeSlugCrewMembersPage({
         width="wide"
         contentClassName="space-y-4"
       >
-        <FranchizeCrewMembersClient crewSlug={resolvedSlug} />
+        <FranchizeCrewMembersClient crewSlug={resolvedSlug} theme={crew.theme} />
       </FranchizePageShell>
       <CrewFooter crew={crew} />
     </main>

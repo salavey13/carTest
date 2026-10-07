@@ -3,21 +3,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { getCrewLiveDetails } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import { useIsAdmin } from '@/app/franchize/hooks/useIsAdmin';
 import Link from "next/link";
 import { toast } from 'sonner';
 import { Users, Clock, Settings, Calendar, UserPlus, Crown, Copy, Send } from "lucide-react";
+import { useCrewTokens } from '../../lib/use-crew-tokens';
+import { FranchizeOperatorPanel } from '../../components/FranchizeOperatorSurface';
+import { DEFAULT_FRANCHIZE_THEME, type FranchizeTheme } from '@/lib/franchize-config';
 import {
     getCrewInviteInfoAction,
     type CrewInviteInfo,
 } from '../../server-actions/update-crew-member-role';
 
-export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlug: string; initialCrew: any }) {
+export function FranchizeCrewOverviewClient({ crewSlug, initialCrew, theme }: { crewSlug: string; initialCrew: any; theme?: FranchizeTheme }) {
     const { userCrewMemberships, dbUser } = useAppContext();
     const isPlatformAdmin = useIsAdmin();
+    const T = useCrewTokens(theme || DEFAULT_FRANCHIZE_THEME);
     const [crew, setCrew] = useState<any>(initialCrew);
     const [loading, setLoading] = useState(false);
     const [activeShiftsCount, setActiveShiftsCount] = useState(0);
@@ -103,134 +105,157 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
     const memberCount = crew?.members?.length || 0;
     const vehicleCount = crew?.vehicles?.length || 0;
 
+    const stats = [
+        { icon: Users, label: "Участников", value: memberCount },
+        { icon: Calendar, label: "Техники", value: vehicleCount },
+        { icon: Clock, label: "На смене", value: activeShiftsCount },
+        { icon: Settings, label: "Поддержка", value: "24/7" },
+    ];
+
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="min-w-0">
-                    <h1 className="text-2xl font-bold uppercase tracking-tighter md:text-3xl">Управление экипажем</h1>
-                    <p className="text-muted-foreground text-sm mt-1">{crew?.name || crewSlug}</p>
+        <div className="space-y-3 sm:space-y-5">
+            {/* Header — title block always keeps a sane width, provider badge +
+                invite wrap below it on narrow screens (overlap-proof). */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5">
+                <div className="min-w-0 flex-1 basis-52">
+                    <h1
+                        className="text-lg font-bold uppercase tracking-tight sm:text-2xl"
+                        style={{ color: T.text }}
+                    >
+                        Управление экипажем
+                    </h1>
+                    <p className="mt-0.5 truncate text-xs sm:text-sm" style={{ color: T.textMuted }}>
+                        {crew?.name || crewSlug}
+                    </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {isProvider && <Badge className="bg-primary">ПРОВАЙДЕР</Badge>}
-                    {/* Invite button — quick access (deeplink resolved from crew
-                        metadata server-side; works for platform admins and the
-                        senior members of THIS crew) */}
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                    {isProvider && (
+                        <span
+                            className="inline-flex h-8 items-center whitespace-nowrap rounded-full px-2.5 text-[10px] font-semibold uppercase tracking-wider"
+                            style={T.styles.accentPill}
+                        >
+                            Провайдер
+                        </span>
+                    )}
                     {(isCrewAdmin || isPlatformAdmin) && (
                         <button
                             type="button"
                             onClick={handleInviteClick}
                             disabled={!inviteInfo}
-                            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 min-h-[44px] disabled:opacity-50"
+                            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                            style={T.styles.ctaPrimary}
                         >
-                            <UserPlus className="h-4 w-4" />
+                            <UserPlus className="h-3.5 w-3.5" />
                             Пригласить
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <Users className="h-5 w-5 text-primary" />
-                            <div>
-                                <div className="text-2xl font-bold">{memberCount}</div>
-                                <div className="text-xs text-muted-foreground">Участников</div>
+            {/* Quick Stats — compact tiles */}
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                {stats.map(({ icon: Icon, label, value }) => (
+                    <FranchizeOperatorPanel key={label}>
+                        <div className="flex items-center gap-2.5">
+                            <span
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                style={{ backgroundColor: T.accentSoft }}
+                            >
+                                <Icon className="h-4 w-4" style={{ color: T.accent }} />
+                            </span>
+                            <div className="min-w-0">
+                                <p className="text-lg font-bold leading-tight sm:text-xl" style={{ color: T.text }}>
+                                    {value}
+                                </p>
+                                <p className="truncate text-[10px] uppercase tracking-wider" style={{ color: T.textMuted }}>
+                                    {label}
+                                </p>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <Calendar className="h-5 w-5 text-primary" />
-                            <div>
-                                <div className="text-2xl font-bold">{vehicleCount}</div>
-                                <div className="text-xs text-muted-foreground">Техники</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <Clock className="h-5 w-5 text-primary" />
-                            <div>
-                                <div className="text-2xl font-bold">{activeShiftsCount}</div>
-                                <div className="text-xs text-muted-foreground">На смене</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <Settings className="h-5 w-5 text-primary" />
-                            <div>
-                                <div className="text-2xl font-bold">24/7</div>
-                                <div className="text-xs text-muted-foreground">Поддержка</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                    </FranchizeOperatorPanel>
+                ))}
             </div>
 
             {/* Management Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
-                <Card className="hover:border-primary transition-colors">
-                    <Link href={`/franchize/${crewSlug}/crew/members`}>
-                        <CardContent className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Users className="h-6 w-6 text-primary" />
-                                <h2 className="text-lg font-semibold">Участники</h2>
-                            </div>
-                            <p className="text-muted-foreground text-sm mb-4">
-                                Список экипажа, роли и статусы участников.
-                            </p>
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">{memberCount} участников</span>
-                                <Badge variant="outline">Открыть →</Badge>
-                            </div>
-                        </CardContent>
-                    </Link>
-                </Card>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
+                <Link href={`/franchize/${crewSlug}/crew/members`} className="block h-full">
+                    <FranchizeOperatorPanel className="h-full transition-opacity hover:opacity-[0.97]">
+                        <div className="flex items-center gap-2.5">
+                            <span
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                style={{ backgroundColor: T.accentSoft }}
+                            >
+                                <Users className="h-4 w-4" style={{ color: T.accent }} />
+                            </span>
+                            <h2 className="text-sm font-semibold sm:text-base" style={{ color: T.text }}>
+                                Участники
+                            </h2>
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed sm:text-sm" style={{ color: T.textMuted }}>
+                            Список экипажа, роли и статусы участников.
+                        </p>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="truncate text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
+                                {memberCount} участников
+                            </span>
+                            <span className="shrink-0 text-xs font-semibold" style={{ color: T.accent }}>
+                                Открыть →
+                            </span>
+                        </div>
+                    </FranchizeOperatorPanel>
+                </Link>
 
-                <Card className="hover:border-primary transition-colors">
-                    <Link href={`/franchize/${crewSlug}/crew/shifts`}>
-                        <CardContent className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Clock className="h-6 w-6 text-primary" />
-                                <h2 className="text-lg font-semibold">Смены</h2>
-                            </div>
-                            <p className="text-muted-foreground text-sm mb-4">
-                                Активные смены, график работы и отчёты.
-                            </p>
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">Учёт смен</span>
-                                <Badge variant="outline">Открыть →</Badge>
-                            </div>
-                        </CardContent>
-                    </Link>
-                </Card>
+                <Link href={`/franchize/${crewSlug}/crew/shifts`} className="block h-full">
+                    <FranchizeOperatorPanel className="h-full transition-opacity hover:opacity-[0.97]">
+                        <div className="flex items-center gap-2.5">
+                            <span
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                style={{ backgroundColor: T.accentSoft }}
+                            >
+                                <Clock className="h-4 w-4" style={{ color: T.accent }} />
+                            </span>
+                            <h2 className="text-sm font-semibold sm:text-base" style={{ color: T.text }}>
+                                Смены
+                            </h2>
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed sm:text-sm" style={{ color: T.textMuted }}>
+                            Активные смены, график работы и отчёты.
+                        </p>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="truncate text-[10px] uppercase tracking-wider" style={{ color: T.textFaint }}>
+                                Учёт смен
+                            </span>
+                            <span className="shrink-0 text-xs font-semibold" style={{ color: T.accent }}>
+                                Открыть →
+                            </span>
+                        </div>
+                    </FranchizeOperatorPanel>
+                </Link>
 
                 {isCrewAdmin && (
-                    <Card className="md:col-span-2 hover:border-primary transition-colors">
-                        <Link href={`/franchize/${crewSlug}/admin`}>
-                            <CardContent className="p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <Settings className="h-6 w-6 text-primary" />
-                                    <h2 className="text-lg font-semibold">Настройки экипажа</h2>
-                                </div>
-                                <p className="text-muted-foreground text-sm mb-4">
-                                    Управление каталогом, ценами, отзывами и оформлением.
-                                </p>
-                                <Badge variant="outline">Открыть →</Badge>
-                            </CardContent>
-                        </Link>
-                    </Card>
+                    <Link href={`/franchize/${crewSlug}/admin`} className="block h-full md:col-span-2">
+                        <FranchizeOperatorPanel className="h-full transition-opacity hover:opacity-[0.97]">
+                            <div className="flex items-center gap-2.5">
+                                <span
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                    style={{ backgroundColor: T.accentSoft }}
+                                >
+                                    <Settings className="h-4 w-4" style={{ color: T.accent }} />
+                                </span>
+                                <h2 className="text-sm font-semibold sm:text-base" style={{ color: T.text }}>
+                                    Настройки экипажа
+                                </h2>
+                            </div>
+                            <p className="mt-2 text-xs leading-relaxed sm:text-sm" style={{ color: T.textMuted }}>
+                                Управление каталогом, ценами, отзывами и оформлением.
+                            </p>
+                            <div className="mt-3">
+                                <span className="text-xs font-semibold" style={{ color: T.accent }}>
+                                    Открыть →
+                                </span>
+                            </div>
+                        </FranchizeOperatorPanel>
+                    </Link>
                 )}
 
                 {/* Platform admin: owner-onboarding card (dummy crews → real
@@ -239,37 +264,38 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew }: { crewSlu
                     ВСЕГДА t.me/<бот>/app?startapp=join_<slug> (платформенный
                     фолбэк в резолвере), «веб-ссылка» больше не существует. */}
                 {isPlatformAdmin && inviteInfo?.success && (
-                    <Card className="md:col-span-2 border-amber-500/40">
-                        <CardContent className="p-6">
-                            <div className="flex flex-wrap items-center gap-3">
-                                <div className="flex min-w-0 flex-1 items-center gap-3">
-                                    <Crown className="h-6 w-6 shrink-0 text-amber-500" />
-                                    <code
-                                        className="min-w-0 flex-1 truncate rounded-lg border bg-muted px-3 py-2 text-xs"
-                                        title={buildInviteUrl(inviteInfo)}
-                                    >
-                                        {buildInviteUrl(inviteInfo)}
-                                    </code>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleCopyInvite(inviteInfo)}
-                                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition hover:border-primary"
-                                    >
-                                        <Copy className="h-4 w-4" /> Копировать
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleInviteClick}
-                                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition hover:border-primary"
-                                    >
-                                        <Send className="h-4 w-4" /> Поделиться в TG
-                                    </button>
-                                </div>
+                    <FranchizeOperatorPanel className="md:col-span-2">
+                        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <Crown className="h-4 w-4 shrink-0" style={{ color: T.accent }} />
+                                <code
+                                    className="min-w-0 flex-1 truncate rounded-lg border px-2.5 py-1.5 font-mono text-[10px] sm:text-xs"
+                                    style={{ borderColor: T.borderSoft, backgroundColor: T.bg, color: T.textMuted }}
+                                    title={buildInviteUrl(inviteInfo)}
+                                >
+                                    {buildInviteUrl(inviteInfo)}
+                                </code>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleCopyInvite(inviteInfo)}
+                                    className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-opacity hover:opacity-80"
+                                    style={T.styles.ctaSecondary}
+                                >
+                                    <Copy className="h-3.5 w-3.5" /> Копировать
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleInviteClick}
+                                    className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-opacity hover:opacity-80"
+                                    style={T.styles.ctaSecondary}
+                                >
+                                    <Send className="h-3.5 w-3.5" /> Поделиться в TG
+                                </button>
+                            </div>
+                        </div>
+                    </FranchizeOperatorPanel>
                 )}
             </div>
         </div>
