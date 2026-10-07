@@ -132,6 +132,8 @@ export interface BikeWallSummary {
   stats: BikeWallStats;
   /** any non-cancelled rental with status active/confirmed right now */
   onRentNow: boolean;
+  /** Task 76: open items of cars.specs.maintenance_plan (0 = no pill). */
+  maintenanceOpen: number;
 }
 
 // ── Money / number formatting ─────────────────────────────────────────────────

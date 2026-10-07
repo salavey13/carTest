@@ -322,7 +322,12 @@ function BikeCard({
           )}
           {bike.isPartnerBike ? (
             <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={T.styles.accentBadge}>
-              партнёр
+              партнёр{bike.maintenanceOpen > 0 ? ` · план: ${bike.maintenanceOpen}` : ""}
+            </span>
+          ) : bike.maintenanceOpen > 0 ? (
+            <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={T.styles.accentBadge}>
+              <Wrench className="mr-1 inline h-3 w-3" aria-hidden />
+              план: {bike.maintenanceOpen}
             </span>
           ) : null}
         </div>

@@ -36,6 +36,7 @@ import {
 } from "@/app/franchize/lib/bike-wall";
 import { AnalyticsPasswordEntry } from "@/app/franchize/[slug]/rentals-analytics/analytics-components/AnalyticsPasswordEntry";
 import { BikeReportButton } from "@/app/franchize/[slug]/bikes/BikeReportButton";
+import { MaintenanceChecklist } from "./MaintenanceChecklist";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useCrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
@@ -391,6 +392,19 @@ export function BikeStoryClient({ initialSlug, initialBikeId, crew }: BikeStoryC
         textColor={T.text}
         chipBg={T.bgElevated}
         chipText={T.textMuted}
+      />
+
+      {/* ── PLANNED SERVICE CHECKLIST (Task 76, 2026-10-07) ────── */}
+      {/* Boss: «planned service checkbox list in мотопарк for bikes —
+          owner/admin all, subrenter can add but can't delete, members can
+          read and mark checked». Lives on the story page (the wall card
+          stays a compact link); storage = cars.specs.maintenance_plan. */}
+      <MaintenanceChecklist
+        slug={slug}
+        bikeId={bikeId}
+        getActorUserId={getActorUserId}
+        isPasswordAuth={!!passwordAuthOwnerId}
+        T={T}
       />
 
       {/* ── KPI BAND (horizontal scroll on mobile) ────────────── */}

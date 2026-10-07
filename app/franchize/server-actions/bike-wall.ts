@@ -49,6 +49,7 @@ import {
   type WallPhoto,
 } from "@/app/franchize/lib/bike-wall";
 import { computePartnerSplit, resolveRentalSubrenterChatId } from "@/app/franchize/lib/rental-price-split";
+import { openMaintenanceCount } from "@/app/franchize/lib/bike-maintenance";
 import { platformBotUsername, resolveCrewBotUsername } from "@/app/franchize/lib/crew-bot";
 import {
   buildBikeRentalsReport,
@@ -270,6 +271,8 @@ function toSummary(car: CarRow, stats: BikeWallSummary["stats"], onRentNow: bool
     isPartnerBike: typeof specs?.subrenter_chat_id === "string" && (specs.subrenter_chat_id as string).length > 0,
     stats,
     onRentNow,
+    // Task 76: open planned-service items (pure lib — hostile-shape-proof).
+    maintenanceOpen: openMaintenanceCount(specs?.maintenance_plan),
   };
 }
 
