@@ -104,10 +104,15 @@ console.log("СВОДКА Экип row:", eqSvRow.join(" | "));
 console.log("СВОДКА ВСЕГО row:", vsego.join(" | "));
 assert(summary.blocks.equipment.revenue === Number(eqSvRow[2]), `summary.blocks.equipment.revenue == СВОДКА Экип (stored Σ ${eqSvRow[2]})`);
 assert(summary.totalRevenue === Number(vsego[2]), `summary.totalRevenue == СВОДКА ВСЕГО (${vsego[2]})`);
-// iter52 pinned numbers: ВСЕГО revenue 2 863 238 / ЗП 135 675 for this window
-assert(Number(vsego[2]) === 2863238, "ВСЕГО выручка == iter52 pinned 2 863 238 (counters intact)");
-assert(Number(vsego[3]) === 135675, "ВСЕГО ЗП == iter52 pinned 135 675 (counters intact)");
+// iter52 pinned numbers MINUS the fake Молев sale removed in task82 (owner
+// order 2026-10-08): ВСЕГО 2 863 238−500 000 / ЗП 135 675−10 000 (its sale
+// bonus). Equipment block must be bit-identical: 33 docs / 10 000 stored.
+assert(Number(vsego[2]) === 2363238, "ВСЕГО выручка == 2 863 238 − 500 000 (fake Молев sale removed) = 2 363 238");
+assert(Number(vsego[3]) === 125675, "ВСЕГО ЗП == 135 675 − 10 000 (sale bonus) = 125 675");
 assert(Number(eqSvRow[2]) === 10000, "СВОДКА Экип revenue == stored Σ 10 000 (unchanged)");
+// Молев artifact must be gone from ПРОДАЖИ
+const salesBlockIds = (blockOf["ПРОДАЖИ"] || []).map((l) => parseLine(l)[5]).filter(Boolean);
+assert(!salesBlockIds.some((x) => x.startsWith("57258f91")), "fake Молев sale absent from ПРОДАЖИ block");
 
 const baselinePath = "scripts/task81-csv-baseline.json";
 if (!existsSync(baselinePath)) {

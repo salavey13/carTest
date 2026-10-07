@@ -1,0 +1,89 @@
+{
+ "mode": "APPLY",
+ "steps": [
+  {
+   "s": "artifact confirmed",
+   "v": {
+    "id": "57258f91-4d3e-4cdb-9bf4-c7786478d007",
+    "key": "sale-y-volt-surge-v-1790526123753",
+    "buyer": "Молев Георгий Анатольевич",
+    "price": "500000",
+    "created": "2026-09-27T16:22:07.866195+00:00"
+   }
+  },
+  {
+   "s": "cash rows linked to the sale",
+   "v": [
+    {
+     "id": "d996d312-be28-4e4d-934d-6d69248d4042",
+     "transaction_type": "income_sale",
+     "amount": 500000,
+     "description": "Продажа Surge V",
+     "created_at": "2026-09-27T16:22:07.866195+00:00"
+    }
+   ]
+  },
+  {
+   "s": "sale intents for the deal",
+   "v": [
+    {
+     "id": "b51a90f2-61a1-4d82-829a-f02f85450c8b",
+     "intent_type": "sale",
+     "stage": "contract_generated",
+     "created_at": "2026-09-27T16:22:09.128078+00:00",
+     "metadata": {
+      "name": "Молев Георгий Анатольевич",
+      "phone": "+79601949437",
+      "channel": "telegram_bot",
+      "dealType": "sale",
+      "username": null,
+      "bikeTitle": "Y-VOLT Surge V",
+      "hasLicense": false,
+      "lastSeenAt": "2026-09-27T16:22:08.398Z",
+      "operatorId": "413553377",
+      "hasPassport": true,
+      "sourceRoute": "/doc-manual"
+     }
+    }
+   ]
+  },
+  {
+   "s": "storage objects matching contract_key",
+   "v": [
+    "sale-y-volt-surge-v-1790526123753.docx"
+   ]
+  },
+  {
+   "s": "audit block written (in_progress)",
+   "v": "owner_fix_20261008_sale_removal"
+  },
+  {
+   "s": "cash delete d996d312-be28-4e4d-934d-6d69248d4042",
+   "v": "ok"
+  },
+  {
+   "s": "artifact delete",
+   "v": "ok"
+  },
+  {
+   "s": "intent delete b51a90f2-61a1-4d82-829a-f02f85450c8b",
+   "v": "ok"
+  },
+  {
+   "s": "storage remove",
+   "v": "ok"
+  },
+  {
+   "s": "post-verify",
+   "v": {
+    "artifactGone": true,
+    "cashGone": true,
+    "intentsGone": true
+   }
+  },
+  {
+   "s": "audit block finalized",
+   "v": "applied_and_verified"
+  }
+ ]
+}
