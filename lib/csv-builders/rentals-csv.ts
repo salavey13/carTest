@@ -49,6 +49,12 @@ import {
   getSubrenterCut,
 } from "@/app/franchize/lib/subrenter-economics";
 import { CSV_SECTION_TITLES } from "@/lib/csv-builders/rentals-csv-sections";
+// iter53 (2026-10-08, boss): standalone equipment docs written with 0 cost
+// (gear money lives inside the paired bike rental) still show a PROPER
+// reference price in the ЭКИП block — «hourly rental — half price, 2nd+ day
+// half» canon from rental-price-split.ts. Display-only: СВОДКА / ВСЕГО /
+// summary counters stay on STORED revenue (no double accounting).
+import { estimateEquipmentDocPrice } from "@/lib/csv-builders/equipment-doc-price";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -388,11 +394,16 @@ export async function buildRentalsCsv(
   ]));
 
   const blockEquipment: CsvBlockTotals = { count: 0, revenue: 0, salary: 0 };
+  // iter53: Σ of the prices actually SHOWN in this block (stored where it
+  // exists, reference estimate for 0-cost docs) — feeds «Итого экип
+  // (справочно)» only; blockEquipment.revenue stays STORED for СВОДКА.
+  let blockEquipmentDisplayRevenue = 0;
   for (const r of equipmentRows) {
     const meta = r.metadata || {};
     const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
 
     const startDate = r.requested_start_date || r.agreed_start_date || meta.issued_at || r.created_at;
+    const endDate = r.requested_end_date || r.agreed_end_date || meta.returned_at || null;
     const dateStr = startDate
       ? new Date(startDate).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
       : "";
@@ -414,8 +425,23 @@ export async function buildRentalsCsv(
     const qty = Number(meta.quantity) > 0 ? Number(meta.quantity) : 0;
     const nameStr = [title + (size ? ` (${size})` : ""), qty > 1 ? `×${qty}` : ""].filter(Boolean).join(" ");
 
-    const price = r.total_cost || 0;
-    blockEquipment.revenue += price;
+    // iter53: stored cost wins (real money actually charged — pre-12.09 docs
+    // and boundary rows). 0-cost docs (inventory mirrors of gear issued with
+    // the primary rental, 2026-09-13 writer fix) get the duration-aware
+    // reference price so the block stops showing ugly zeros.
+    const storedCost = Number(r.total_cost || 0);
+    const price = storedCost > 0
+      ? storedCost
+      : estimateEquipmentDocPrice({
+          metadata: meta,
+          vehicleDailyPrice: vehicle?.daily_price,
+          startIso: startDate,
+          endIso: endDate,
+        });
+    blockEquipmentDisplayRevenue += price;
+    // Real accounting Σ (СВОДКА / ВСЕГО / summary tiles) — STORED only, so
+    // the reference prices never double-count gear already inside rentals.
+    blockEquipment.revenue += storedCost;
     blockEquipment.count += 1;
 
     const issuedBy = typeof meta.issued_by === "string" ? meta.issued_by : meta.issued_by != null ? String(meta.issued_by) : "";
@@ -433,7 +459,7 @@ export async function buildRentalsCsv(
   }
 
   rows.push(rowOf([
-    "Итого экип", "", blockEquipment.revenue, "", "", "", "",
+    "Итого экип (справочно)", "", blockEquipmentDisplayRevenue, "", "", "", "",
   ]));
   rows.push("");
 
@@ -524,7 +550,7 @@ export async function buildRentalsCsv(
   ]));
   rows.push(rowOf([
     "Экип", blockEquipment.count, blockEquipment.revenue, 0,
-    "ЗП не начисляется — бонус за экип уже учтён в ЗП аренд",
+    "ЗП не начисляется — бонус за экип уже учтён в ЗП аренд; цены строк блока — справочные, в выручку входит фактически записанное",
   ]));
   rows.push(rowOf([
     "Сервис", blockService.count, blockService.revenue, 0,

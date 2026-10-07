@@ -317,13 +317,28 @@ export function ExportCsvModal({
   const sumCell = (section: ParsedCsvSection | undefined, col: number): number =>
     !section || col < 0 ? 0 : section.data.reduce((acc, r) => acc + toNumber(r[col] || ""), 0);
   const secByKey = (key: CsvSectionKey) => visibleSections.find((s) => s.key === key);
+  // iter53: value of a named data row inside the СВОДКА block (e.g. «Экип»
+  // Выручка). Returns null when the block/row/cell is absent — caller falls
+  // back to the legacy row-sum path.
+  const summaryRowValue = (rowLabel: string, col: number): number | null => {
+    const summary = secByKey("summary");
+    if (!summary) return null;
+    const row = summary.data.find((r) => (r[0] || "").trim().toLowerCase() === rowLabel.toLowerCase());
+    if (!row) return null;
+    const cell = (row[col] || "").trim();
+    return cell === "" ? null : toNumber(cell);
+  };
   const rentSec = secByKey("rentals");
   const equipSec = secByKey("equipment");
   const svcSec = secByKey("service");
   const salesSec = secByKey("sales");
   const sumRentPrice = sumCell(rentSec, 3);
   const sumRentSalary = sumCell(rentSec, 1);
-  const sumEquipPrice = sumCell(equipSec, 2);
+  // iter53: ЭКИП rows now carry справочные prices for 0-cost docs (iter53
+  // builder change), so the tile reads the REAL accounting Σ from the СВОДКА
+  // block («Экип» row, Выручка column) and only falls back to the row sum for
+  // legacy files without a СВОДКА block. Keeps the tile double-count-free.
+  const sumEquipPrice = summaryRowValue("Экип", 2) ?? sumCell(equipSec, 2);
   const sumSvcPrice = sumCell(svcSec, 3);
   const sumSalesPrice = sumCell(salesSec, 3);
   const sumSalesSalary = sumCell(salesSec, 1);

@@ -155,10 +155,29 @@ describe('iter52: buildRentalsCsv block structure (source guards)', () => {
   it('per-block «Итого» rows + СВОДКА with ВСЕГО', () => {
     const s = src();
     expect(s).toContain('"Итого аренды"');
-    expect(s).toContain('"Итого экип"');
+    // iter53: the ЭКИП итого is explicitly REFERENCE (справочно) — its rows
+    // carry computed prices for 0-cost docs while real accounting (СВОДКА /
+    // ВСЕГО / summary) stays on stored revenue.
+    expect(s).toContain('"Итого экип (справочно)"');
     expect(s).toContain('"Итого сервис"');
     expect(s).toContain('"Итого продажи"');
     expect(s).toContain('"ВСЕГО", totalCount, totalRevenue, totalSalary');
+  });
+
+  it('iter53: ЭКИП rows show reference prices for 0-cost docs, stored wins, СВОДКА keeps stored Σ', () => {
+    const s = src();
+    // the pure duration-aware helper is imported (one canon with the split math)
+    expect(s).toContain('estimateEquipmentDocPrice');
+    expect(s).toContain('from "@/lib/csv-builders/equipment-doc-price"');
+    // stored cost wins; estimate only for 0-cost rows
+    expect(s).toContain('const price = storedCost > 0');
+    // real accounting Σ (СВОДКА / ВСЕГО / summary) accumulates STORED only —
+    // reference prices never flow into the money totals (no double accounting)
+    expect(s).toContain('blockEquipment.revenue += storedCost;');
+    // and the display Σ is a separate accumulator feeding «Итого экип (справочно)»
+    expect(s).toContain('blockEquipmentDisplayRevenue += price;');
+    // СВОДКА note explains the справочные prices
+    expect(s).toContain('цены строк блока — справочные');
   });
 
   it('summary stays back-compatible + exposes per-block totals', () => {
@@ -202,6 +221,13 @@ describe('iter52: ExportCsvModal block rendering', () => {
     // ЗП tile sums rentals + sales salary columns only
     expect(s).toContain('sumCell(rentSec, 1)');
     expect(s).toContain('sumCell(salesSec, 1)');
+  });
+
+  it('iter53: Σ Экип tile reads the real accounting Σ from СВОДКА (row-sum fallback)', () => {
+    const s = src();
+    // ЭКИП rows carry справочные prices now — the tile must NOT sum them
+    expect(s).toContain('summaryRowValue("Экип", 2) ?? sumCell(equipSec, 2)');
+    expect(s).toContain('const summaryRowValue');
   });
 
   it('search hides block totals (sums would mismatch) and empty blocks', () => {
