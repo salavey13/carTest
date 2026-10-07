@@ -23,10 +23,11 @@
 //   FormPrefillsPanel         — document & form prefills
 //   AchievementsPanel         — gamification grid
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { Bike, FileText, Handshake, Trophy, Wallet, Wrench } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   getFranchizeProfileBySlugAction,
@@ -92,11 +93,22 @@ import {
   type RentalDocsPrefillState,
 } from "./components/ProfileDocumentsPanels";
 import { AchievementsPanel } from "./components/AchievementsPanel";
+import {
+  ProfileTabBar,
+  type ProfileTabDef,
+  type ProfileTabId,
+} from "./components/ProfileTabBar";
 
 type FranchizeProfileClientProps = {
   initialCrew?: FranchizeCrewVM;
   initialSlug?: string;
 };
+
+// Boss-review iter-2 polish: layout effect on the client (applies BEFORE the
+// first paint — no one-frame default-tab flash), plain effect on the server
+// (useLayoutEffect is a no-op there and React would warn).
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export function FranchizeProfileClient({
   initialCrew,
@@ -394,6 +406,112 @@ export function FranchizeProfileClient({
     [catalog, unlockedSet],
   );
 
+  // ── Task 79 (2026-10-07) boss-review refactor: TABS ──────────────────────
+  // Boss-review verdict 4/10: the page stacked up to 10 panels vertically
+  // (~15 phone screens for the owner) mixing four different user intents.
+  // The composition is now tabbed; the panels themselves are UNTOUCHED.
+  //
+  // Keep-mounted rendering: every panel fetches its own data and keeps
+  // draft state (wallet form, payout sheet, docs edits) in local state —
+  // a naive conditional-unmount tab switch (render only the active panel)
+  // would lose it. Instead each tab mounts lazily on first visit and
+  // stays mounted (display:none) afterwards.
+  const [activeTab, setActiveTab] = useState<ProfileTabId>("rentals");
+  const touchedTabRef = useRef(false);
+  const [mountedTabs, setMountedTabs] = useState<Set<ProfileTabId>>(() => new Set<ProfileTabId>());
+
+  const isCrewMember = canOpenCloserDashboard;
+  const isSubrenter = Boolean(subrenterOwned && subrenterOwned.bikes.length > 0);
+  const partnersAvailable = Boolean(
+    (subrentersOverview?.length ?? 0) > 0 || (ownerCash && !ownerCashDenied),
+  );
+
+  const profileTabs: ProfileTabDef[] = useMemo(
+    () => [
+      { id: "rentals", label: "Аренды", icon: Bike, hint: "Мои аренды и покупки" },
+      { id: "earnings", label: "Доходы", icon: Wallet, hint: "Зарплата, смены и партнёрские байки" },
+      { id: "partners", label: "Партнёры", icon: Handshake, hint: "Выплаты партнёрам и кошелёк владельца" },
+      { id: "documents", label: "Документы", icon: FileText, hint: "Документы и шаблоны форм" },
+      { id: "achievements", label: "Достижения", icon: Trophy, hint: "Путь оператора" },
+      { id: "tools", label: "Инструменты", icon: Wrench, hint: "Быстрые ссылки экипажа" },
+    ],
+    [],
+  );
+
+  const visibleTabIds: ProfileTabId[] = useMemo(
+    () => [
+      "rentals",
+      ...(isCrewMember || isSubrenter ? (["earnings"] as const) : []),
+      ...(partnersAvailable ? (["partners"] as const) : []),
+      "documents",
+      ...(isCrewMember ? (["achievements", "tools"] as const) : []),
+    ],
+    [isCrewMember, isSubrenter, partnersAvailable],
+  );
+  const visibleTabs = profileTabs.filter((t) => visibleTabIds.includes(t.id));
+
+  // Role default (boss-review 3.2): owner/admin → «Партнёры» (the only
+  // actions that exist nowhere else), crew / subrenter → «Доходы»,
+  // renter → «Аренды».
+  const defaultTab: ProfileTabId = partnersAvailable
+    ? "partners"
+    : isCrewMember || isSubrenter
+      ? "earnings"
+      : "rentals";
+
+  // Restore the user's last tab for this crew — but only if it is still
+  // visible for the current role/gates; otherwise snap to the role default.
+  // Runs as a layout effect (module-scope helper above) so the role default
+  // is applied BEFORE the first paint.
+  useIsomorphicLayoutEffect(() => {
+    if (isLoading) return;
+    let restored: ProfileTabId | null = null;
+    try {
+      const saved = window.sessionStorage.getItem(`profile-tab:${slug}`);
+      if (saved && (visibleTabIds as string[]).includes(saved)) {
+        restored = saved as ProfileTabId;
+      }
+    } catch {
+      // sessionStorage unavailable — defaults apply
+    }
+    if (restored) {
+      touchedTabRef.current = true;
+      setActiveTab(restored);
+    } else {
+      touchedTabRef.current = false;
+      setActiveTab(defaultTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, slug]);
+
+  // While the user has not picked a tab manually, follow the role default
+  // when gates resolve late (owner cash / probe access after master load).
+  useEffect(() => {
+    if (isLoading || touchedTabRef.current) return;
+    setActiveTab(defaultTab);
+  }, [isLoading, defaultTab]);
+
+  // Lazy keep-mounted bookkeeping: the active tab always renders; visited
+  // tabs keep rendering hidden afterwards (see visibleTabs render below).
+  useEffect(() => {
+    setMountedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
+
+  const selectTab = (id: ProfileTabId) => {
+    touchedTabRef.current = true;
+    setActiveTab(id);
+    try {
+      window.sessionStorage.setItem(`profile-tab:${slug}`, id);
+    } catch {
+      // ignore persistence failures
+    }
+  };
+
   if (isLoading) {
     return <ProfileSkeleton />;
   }
@@ -440,7 +558,7 @@ export function FranchizeProfileClient({
         </div>
       )}
 
-      {/* Header Panel */}
+      {/* Header Panel — the identity card stays ABOVE the tabs for every role */}
       <ProfileHeaderPanel
         crewName={profile?.crewName || crew.header.brandName || slug}
         slug={slug}
@@ -452,118 +570,159 @@ export function FranchizeProfileClient({
         T={T}
       />
 
-      {/* Rentals and Purchases Panel */}
-      <RentalsPurchasesPanel
-        digest={digest}
-        slug={slug}
-        T={T}
-        navigateSpa={navigateSpa}
-      />
+      {/* Task 79: tab rail — composition/visibility per role, panels untouched */}
+      <ProfileTabBar tabs={visibleTabs} activeTab={activeTab} onSelect={selectTab} T={T} />
 
-      {/* Subrenter panel: rentals of MY bikes in the park (partner monitoring).
-          The panel fetches its own monthly earnings when the month changes. */}
-      {subrenterOwned && subrenterOwned.bikes.length > 0 && (
-        <SubrenterMyBikesPanel
-          owned={subrenterOwned}
-          month={subrenterMonth}
-          onMonthChange={setSubrenterMonth}
-          slug={slug}
-          userId={dbUser?.user_id || ""}
-          T={T}
-          navigateSpa={navigateSpa}
-        />
-      )}
+      {/* Tab panels — lazy keep-mounted: first visit mounts the tab (its own
+          fetches fire then, exactly like the old stack), later visits just
+          toggle display:none so draft state and data survive switching. */}
+      {visibleTabs.map((tab) => {
+        const isActive = tab.id === activeTab;
+        if (!mountedTabs.has(tab.id) && !isActive) return null;
+        return (
+          <div
+            key={tab.id}
+            role="tabpanel"
+            id={`profile-tabpanel-${tab.id}`}
+            aria-labelledby={`profile-tab-${tab.id}`}
+            className="space-y-4"
+            style={isActive ? undefined : { display: "none" }}
+          >
+            {tab.id === "rentals" && (
+              /* Rentals and Purchases Panel */
+              <RentalsPurchasesPanel
+                digest={digest}
+                slug={slug}
+                T={T}
+                navigateSpa={navigateSpa}
+              />
+            )}
 
-      {/* Crew owner/admin panel: dedicated subrenters list + payout sheet */}
-      {subrentersOverview && subrentersOverview.length > 0 && (
-        <SubrentersOverviewPanel
-          rows={subrentersOverview}
-          slug={slug}
-          userId={dbUser?.user_id || ""}
-          T={T}
-          navigateSpa={navigateSpa}
-          onPayoutRecorded={reloadOwnerCash}
-        />
-      )}
+            {tab.id === "earnings" && (
+              <>
+                {/* Subrenter panel: rentals of MY bikes in the park (partner
+                    monitoring). The panel fetches its own monthly earnings
+                    when the month changes. */}
+                {subrenterOwned && subrenterOwned.bikes.length > 0 && (
+                  <SubrenterMyBikesPanel
+                    owned={subrenterOwned}
+                    month={subrenterMonth}
+                    onMonthChange={setSubrenterMonth}
+                    slug={slug}
+                    userId={dbUser?.user_id || ""}
+                    T={T}
+                    navigateSpa={navigateSpa}
+                  />
+                )}
 
-      {/* Owner cash wallet («Кошелёк владельца») — owner/admin only.
-          2026-09-02: gate = the wallet data itself (ownerCashDenied only
-          suppresses the panel; data presence implies permission). */}
-      {ownerCash && !ownerCashDenied && (
-        <OwnerCashWalletPanel
-          data={ownerCash}
-          loading={ownerCashLoading}
-          busy={ownerCashBusy}
-          month={ownerCashMonth}
-          onMonthChange={setOwnerCashMonth}
-          onSubmit={submitOwnerCash}
-          onRemove={(id) => void removeOwnerCash(id)}
-          removingId={ownerCashRemovingId}
-          T={T}
-        />
-      )}
+                {/* My Earnings Panel — CREW ONLY (iter14): hidden for ordinary
+                    renters. Self-contained: it loads its own data when mounted. */}
+                {canOpenCloserDashboard && (
+                  <MyEarningsPanel
+                    slug={slug}
+                    userId={dbUser?.user_id || ""}
+                    enabled={canOpenCloserDashboard}
+                    T={T}
+                  />
+                )}
 
-      {/* My Earnings Panel — CREW ONLY (iter14): hidden for ordinary renters.
-          Self-contained: it loads its own data only when rendered. */}
-      {canOpenCloserDashboard && (
-        <MyEarningsPanel
-          slug={slug}
-          userId={dbUser?.user_id || ""}
-          enabled={canOpenCloserDashboard}
-          T={T}
-        />
-      )}
+                {/* My Work Panel — CREW ONLY (iter14): shift/commission work
+                    stats are internal crew info. */}
+                {canOpenCloserDashboard && (
+                  <MyWorkPanel slug={slug} enabled={canOpenCloserDashboard} T={T} />
+                )}
+              </>
+            )}
 
-      {/* My Work Panel — CREW ONLY (iter14): shift/commission work stats are
-          internal crew info, hidden for ordinary renters. */}
-      {canOpenCloserDashboard && (
-        <MyWorkPanel slug={slug} enabled={canOpenCloserDashboard} T={T} />
-      )}
+            {tab.id === "partners" && (
+              <>
+                {/* Crew owner/admin panel: subrenters list + payout sheet.
+                    Kept in the SAME tab as the wallet on purpose: a recorded
+                    payout must refresh the wallet balance instantly. */}
+                {subrentersOverview && subrentersOverview.length > 0 && (
+                  <SubrentersOverviewPanel
+                    rows={subrentersOverview}
+                    slug={slug}
+                    userId={dbUser?.user_id || ""}
+                    T={T}
+                    navigateSpa={navigateSpa}
+                    onPayoutRecorded={reloadOwnerCash}
+                  />
+                )}
 
-      {/* Crew Operations Panel — shown only for crew members */}
-      {canOpenCloserDashboard && <CrewOperationsPanel slug={slug} T={T} />}
+                {/* Owner cash wallet («Кошелёк владельца») — owner/admin only.
+                    2026-09-02: gate = the wallet data itself (ownerCashDenied
+                    only suppresses the panel; data presence implies permission). */}
+                {ownerCash && !ownerCashDenied && (
+                  <OwnerCashWalletPanel
+                    data={ownerCash}
+                    loading={ownerCashLoading}
+                    busy={ownerCashBusy}
+                    month={ownerCashMonth}
+                    onMonthChange={setOwnerCashMonth}
+                    onSubmit={submitOwnerCash}
+                    onRemove={(id) => void removeOwnerCash(id)}
+                    removingId={ownerCashRemovingId}
+                    T={T}
+                  />
+                )}
+              </>
+            )}
 
-      {/* Profile Document Photos Panel */}
-      <DocumentPhotosPanel
-        slug={slug}
-        userId={dbUser?.user_id || null}
-        docsPrefill={docsPrefill}
-        docsStatus={profileDocsStatus}
-        onDocsStatus={setProfileDocsStatus}
-        T={T}
-      />
+            {tab.id === "documents" && (
+              <>
+                {/* Rental Documents Panel — editable via RentalDocsForm */}
+                <RentalDocsPanel
+                  slug={slug}
+                  userId={dbUser?.user_id || null}
+                  docsPrefill={docsPrefill}
+                  rentalSecrets={rentalSecrets}
+                  T={T}
+                />
 
-      {/* Rental Documents Panel — editable via RentalDocsForm */}
-      <RentalDocsPanel
-        slug={slug}
-        userId={dbUser?.user_id || null}
-        docsPrefill={docsPrefill}
-        rentalSecrets={rentalSecrets}
-        T={T}
-      />
+                {/* Form Prefills Panel */}
+                <FormPrefillsPanel
+                  prefill={prefill}
+                  onPrefillChange={setPrefill}
+                  onSave={() => void handlePrefillSave()}
+                  isSaving={isSaving}
+                  saveSuccess={saveSuccess}
+                  T={T}
+                />
 
-      {/* Form Prefills Panel */}
-      <FormPrefillsPanel
-        prefill={prefill}
-        onPrefillChange={setPrefill}
-        onSave={() => void handlePrefillSave()}
-        isSaving={isSaving}
-        saveSuccess={saveSuccess}
-        T={T}
-      />
+                {/* Profile Document Photos Panel (returns null while the
+                    DOC_PHOTO_UPLOAD_ENABLED flag is off) */}
+                <DocumentPhotosPanel
+                  slug={slug}
+                  userId={dbUser?.user_id || null}
+                  docsPrefill={docsPrefill}
+                  docsStatus={profileDocsStatus}
+                  onDocsStatus={setProfileDocsStatus}
+                  T={T}
+                />
+              </>
+            )}
 
-      {/* Achievements Panel — at the very end — CREW ONLY (iter14):
-          crew gamification is not for ordinary renters. slug — ключ
-          лидерского sticky-стора: путь оператора един для профиля и лидов. */}
-      {canOpenCloserDashboard && (
-        <AchievementsPanel
-          catalog={catalog}
-          unlockedSet={unlockedSet}
-          error={error}
-          slug={slug}
-          T={T}
-        />
-      )}
+            {tab.id === "achievements" && canOpenCloserDashboard && (
+              /* Achievements Panel — CREW ONLY (iter14): crew gamification is
+                  not for ordinary renters. slug — ключ лидерского sticky-стора:
+                  путь оператора един для профиля и лидов. */
+              <AchievementsPanel
+                catalog={catalog}
+                unlockedSet={unlockedSet}
+                error={error}
+                slug={slug}
+                T={T}
+              />
+            )}
+
+            {tab.id === "tools" && canOpenCloserDashboard && (
+              /* Crew Operations Panel — shown only for crew members */
+              <CrewOperationsPanel slug={slug} T={T} />
+            )}
+          </div>
+        );
+      })}
     </motion.div>
   );
 }
