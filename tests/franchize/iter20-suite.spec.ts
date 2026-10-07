@@ -402,15 +402,23 @@ describe("iter20 · source guards", () => {
   });
 
   it("salary attribution: fetch-all + resolve chain, no member-filtered query", () => {
-    const src = read("app/franchize/server-actions/salary-calculations.ts");
-    expect(src).toContain("resolveRentalOperator(r, shifts)");
-    expect(src).toContain("resolveSaleOperator(s, memberIds, shifts)");
-    expect(src).toContain('from("crew_member_shifts")');
-    expect(src).toContain("ATTRIBUTION_SOURCE_LABELS");
+    // Task 79 (2026-10-07): computeCategoryBonuses moved to
+    // app/franchize/lib/salary-category-bonuses.ts (a plain server lib — a
+    // "use server" export would become a client-callable action with no
+    // auth guard). The guard now checks BOTH: the lib keeps the full
+    // attribution chain, and calculateSalaryForPeriod still wires it in.
+    const lib = read("app/franchize/lib/salary-category-bonuses.ts");
+    expect(lib).toContain("resolveRentalOperator(r, shifts)");
+    expect(lib).toContain("resolveSaleOperator(s, memberIds, shifts)");
+    expect(lib).toContain('from("crew_member_shifts")');
+    expect(lib).toContain("ATTRIBUTION_SOURCE_LABELS");
     // the old direct member filter must be gone from the rentals query
-    expect(src).not.toContain('.eq("created_by_operator_chat_id", memberId)');
+    expect(lib).not.toContain('.eq("created_by_operator_chat_id", memberId)');
     // breakdown exposes the attribution sources for audit
-    expect(src).toMatch(/\$\{agg\.count\} × бонусы\$\{sourceParts/);
+    expect(lib).toMatch(/\$\{agg\.count\} × бонусы\$\{sourceParts/);
+    const src = read("app/franchize/server-actions/salary-calculations.ts");
+    expect(src).toContain("computeCategoryBonuses");
+    expect(src).toContain("salary-category-bonuses");
   });
 
   it("subrenter panel: free-text input + inline suggestions + exact-match resolution", () => {

@@ -17,6 +17,12 @@ import {
   sumMemberPaidOut,
   computeShiftAccrued,
 } from "@/app/franchize/lib/salary-paid-out";
+import { hasSalaryCoefficients } from "@/lib/salary-coefficients";
+// Task 79 (2026-10-07): the canonical category-bonus computation, shared
+// with calculateSalaryForPeriod — so «Мои доходы», «Зарплаты команды» and
+// the owner overview show the SAME picture as the /salary breakdown for
+// category-model crews (rentals/sales attributed to the operator).
+import { computeCategoryBonuses } from "@/app/franchize/lib/salary-category-bonuses";
 
 /**
  * Get team members' earnings for a period.
@@ -81,6 +87,29 @@ export async function getTeamEarnings(params: {
       return { success: false, error: "Не удалось загрузить сотрудников." };
     }
 
+    // Task 79: category-model crews (crews.metadata.franchize.salaryCoefficients)
+    // pay rental/sale income via fixed category bonuses attributed to the
+    // operator — NOT via recorded expense_commission rows (that would double
+    // count). Mirror calculateSalaryForPeriod exactly so every salary surface
+    // shows the same number. Computed ONCE for the whole team.
+    const useCategoryModel = await hasSalaryCoefficients(crewId);
+    const categoryBonusesByMember = new Map<string, { total: number; details: Array<{ type: string; amount: number; description: string }> }>();
+    if (useCategoryModel) {
+      await Promise.all((members || []).map(async (member: any) => {
+        try {
+          const bonuses = await computeCategoryBonuses({
+            crewId,
+            memberId: member.user_id,
+            periodStart: fromDate,
+            periodEnd: toDateIso,
+          });
+          categoryBonusesByMember.set(member.user_id, bonuses);
+        } catch (bonusErr) {
+          logger.warn("[getTeamEarnings] category bonuses failed for member:", bonusErr);
+        }
+      }));
+    }
+
     // For each member, calculate earnings
     const earnings = await Promise.all(
       (members || []).map(async (member: any) => {
@@ -124,19 +153,27 @@ export async function getTeamEarnings(params: {
 
         // Get commissions for period (expense_commission: money flowing OUT to employees)
         // Crew-scoped so commissions from another crew don't leak in.
-        const { data: commissions } = await supabaseAdmin
-          .from("cash_transactions")
-          .select("amount")
-          .eq("crew_id", crewId)
-          .eq("to_user_id", memberId)
-          .eq("transaction_type", "expense_commission")
-          .gte("transaction_date", fromDate)
-          .lte("transaction_date", toDateIso);
+        // Task 79: under the category model recorded commissions are SKIPPED
+        // (would double count the fixed rental/sale bonuses) — same rule as
+        // calculateSalaryForPeriod.
+        let commissionIncome = 0;
+        if (useCategoryModel) {
+          commissionIncome = categoryBonusesByMember.get(memberId)?.total ?? 0;
+        } else {
+          const { data: commissions } = await supabaseAdmin
+            .from("cash_transactions")
+            .select("amount")
+            .eq("crew_id", crewId)
+            .eq("to_user_id", memberId)
+            .eq("transaction_type", "expense_commission")
+            .gte("transaction_date", fromDate)
+            .lte("transaction_date", toDateIso);
 
-        const commissionIncome = (commissions || []).reduce(
-          (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
-          0,
-        );
+          commissionIncome = (commissions || []).reduce(
+            (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+            0,
+          );
+        }
 
         return {
           memberId,
@@ -246,29 +283,56 @@ export async function getMemberEarnings(params: {
 
     // Get commissions for period (expense_commission: money flowing OUT to employees)
     // Crew-scoped to prevent multi-crew leak.
-    const { data: commissions } = await supabaseAdmin
-      .from("cash_transactions")
-      .select("amount, transaction_date, description")
-      .eq("crew_id", crewId)
-      .eq("to_user_id", targetMemberId)
-      .eq("transaction_type", "expense_commission")
-      .gte("transaction_date", fromDate)
-      .lte("transaction_date", toDateIso)
-      .order("transaction_date", { ascending: false });
+    // Task 79: under the category model recorded commissions are SKIPPED
+    // (would double count the fixed rental/sale bonuses) — same rule as
+    // calculateSalaryForPeriod; the category bonuses land in the breakdown
+    // instead, so the member sees WHICH rentals/sales paid the bonuses.
+    const useCategoryModel = await hasSalaryCoefficients(crewId);
+    let commissionIncome = 0;
+    if (useCategoryModel) {
+      try {
+        const bonuses = await computeCategoryBonuses({
+          crewId,
+          memberId: targetMemberId,
+          periodStart: fromDate,
+          periodEnd: toDateIso,
+        });
+        commissionIncome = bonuses.total;
+        for (const d of bonuses.details) {
+          breakdown.push({
+            date: toDateIso,
+            description: d.description,
+            amount: d.amount,
+          });
+        }
+      } catch (bonusErr) {
+        logger.warn("[getMemberEarnings] category bonuses failed:", bonusErr);
+      }
+    } else {
+      const { data: commissions } = await supabaseAdmin
+        .from("cash_transactions")
+        .select("amount, transaction_date, description")
+        .eq("crew_id", crewId)
+        .eq("to_user_id", targetMemberId)
+        .eq("transaction_type", "expense_commission")
+        .gte("transaction_date", fromDate)
+        .lte("transaction_date", toDateIso)
+        .order("transaction_date", { ascending: false });
 
-    const commissionIncome = (commissions || []).reduce(
-      (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
-      0,
-    );
+      commissionIncome = (commissions || []).reduce(
+        (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+        0,
+      );
 
-    // Add commission breakdown
-    (commissions || []).forEach((c: any) => {
-      breakdown.push({
-        date: c.transaction_date,
-        description: c.description || "Комиссия",
-        amount: Number(c.amount || 0),
+      // Add commission breakdown
+      (commissions || []).forEach((c: any) => {
+        breakdown.push({
+          date: c.transaction_date,
+          description: c.description || "Комиссия",
+          amount: Number(c.amount || 0),
+        });
       });
-    });
+    }
 
     // Sort breakdown by date (newest first)
     breakdown.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -366,6 +430,27 @@ export async function getOwnerSalaryOverview(params: {
     const periodStartIso = fromDate;
     const periodEndIso = toDateIso;
 
+    // Task 79: category-model crews pay rental/sale income via fixed
+    // category bonuses attributed to the operator — mirror
+    // calculateSalaryForPeriod so the owner's payout math includes them.
+    const useCategoryModel = await hasSalaryCoefficients(crewId);
+    const categoryBonusesByMember = new Map<string, number>();
+    if (useCategoryModel) {
+      await Promise.all((members || []).map(async (member: any) => {
+        try {
+          const bonuses = await computeCategoryBonuses({
+            crewId,
+            memberId: member.user_id,
+            periodStart: periodStartIso,
+            periodEnd: periodEndIso,
+          });
+          categoryBonusesByMember.set(member.user_id, bonuses.total);
+        } catch (bonusErr) {
+          logger.warn("[getOwnerSalaryOverview] category bonuses failed for member:", bonusErr);
+        }
+      }));
+    }
+
     // For each member: compute shifts + commissions in parallel, then fetch
     // their already-paid-out amount (cash_transactions.expense_salary) for
     // the same period.
@@ -400,18 +485,26 @@ export async function getOwnerSalaryOverview(params: {
 
         // Commissions for period (expense_commission to this member)
         // Crew-scoped to prevent multi-crew leak.
-        const { data: commissions } = await supabaseAdmin
-          .from("cash_transactions")
-          .select("amount")
-          .eq("crew_id", crewId)
-          .eq("to_user_id", memberId)
-          .eq("transaction_type", "expense_commission")
-          .gte("transaction_date", periodStartIso)
-          .lte("transaction_date", periodEndIso);
-        const commissionIncome = (commissions || []).reduce(
-          (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
-          0,
-        );
+        // Task 79: under the category model recorded commissions are SKIPPED
+        // (would double count the fixed rental/sale bonuses) — same rule as
+        // calculateSalaryForPeriod.
+        let commissionIncome = 0;
+        if (useCategoryModel) {
+          commissionIncome = categoryBonusesByMember.get(memberId) ?? 0;
+        } else {
+          const { data: commissions } = await supabaseAdmin
+            .from("cash_transactions")
+            .select("amount")
+            .eq("crew_id", crewId)
+            .eq("to_user_id", memberId)
+            .eq("transaction_type", "expense_commission")
+            .gte("transaction_date", periodStartIso)
+            .lte("transaction_date", periodEndIso);
+          commissionIncome = (commissions || []).reduce(
+            (sum: number, c: any) => sum + (Number(c.amount) > 0 ? Number(c.amount) : 0),
+            0,
+          );
+        }
 
         // Already-paid-out salary in same period — crew-scoped, BOTH books,
         // deduped. 2026-09-26 salary audit: this used to count ONLY the

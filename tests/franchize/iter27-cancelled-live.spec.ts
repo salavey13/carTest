@@ -132,8 +132,10 @@ describe("iter27: cancelled exclusions across all aggregation surfaces (source g
   });
 
   it("salary engine (ЗП / calculateSalaryForPeriod) filters cancelled", () => {
-    const src = read("app/franchize/server-actions/salary-calculations.ts");
-    expect(src).toContain('.neq("status", "cancelled")');
+    // Task 79 (2026-10-07): the rentals query lives in the extracted
+    // computeCategoryBonuses lib (calculateSalaryForPeriod imports it).
+    const lib = read("app/franchize/lib/salary-category-bonuses.ts");
+    expect(lib).toContain('.neq("status", "cancelled")');
   });
 
   it("profile «Моя работа» day salary filters cancelled", () => {
