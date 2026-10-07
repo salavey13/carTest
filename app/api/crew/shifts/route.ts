@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { DEFAULT_HOURLY_RATE } from "@/app/franchize/lib/salary-constants";
 
 /**
  * API endpoint for managing crew shifts
@@ -251,8 +252,12 @@ export async function GET(request: Request) {
                 .then((r) => r.data),
             ]);
 
-            // Extract hourly_rate from metadata if available
-            const hourlyRate = memberData?.metadata?.hourly_rate || 169; // Default 169 RUB/hour
+            // Extract hourly_rate from metadata if available — fallback is the
+            // ONE canonical constant (DEFAULT_HOURLY_RATE = 500). The literal
+            // 169 that lived here was the documented rate-drift bug
+            // (salary-constants.ts): it under-reported the live timer and
+            // poisoned backfills (djorudjov's stuck shifts, Task 76).
+            const hourlyRate = memberData?.metadata?.hourly_rate || DEFAULT_HOURLY_RATE;
 
             return {
               ...shift,
