@@ -151,3 +151,37 @@ describe("map-riders: ONE sheet, not two (Task 60)", () => {
     expect(deckPanels).not.toMatch(/border-white\/10|bg-white\/5|text-white/);
   });
 });
+
+// 2026-10-07 — boss: «all tabs have issues of fully scrolling to the bottom of
+// what's inside the sheet». Two real roots, both pinned here so they stay dead:
+//
+// 1. VAUL SNAP-POINT GEOMETRY: with snapPoints, vaul 0.9 translates the
+//    bottom-anchored drawer DOWN by (1−snap)·vh and expects Drawer.Content to
+//    be viewport-height tall. Ours was natural-height, so at every snap the
+//    bottom (1−snap)·vh of the sheet (incl. the scroll body's bottom) sat
+//    below the screen edge: at the tab snap 0.66 ≈278px dead zone vs 136px
+//    bottom padding → real content of EVERY tab unreachable.
+// 2. SSR «window is not defined»: RiderMarkerLayer (dead import) and
+//    SpeedGradientRoute statically imported react-leaflet — module-scope
+//    window access inside the SSR graph crashed the route intermittently
+//    (measured 5/6 requests on main before the fix).
+describe("map-riders: sheet scrolls to the bottom (2026-10-07 geometry + SSR)", () => {
+  it("Drawer.Content is viewport-height (vaul snapPoints canonical layout) with the card top-anchored", () => {
+    expect(client).toContain('className="fixed inset-x-0 bottom-0 z-20 h-[100dvh] pointer-events-none"');
+    expect(client).toContain('className="flex h-full flex-col justify-start"');
+  });
+
+  it("the scroll body stays capped to the active snap (no scroll area below the fold)", () => {
+    expect(client).toContain("data-vaul-no-drag");
+    expect(client).toContain("max(8rem, calc(${Math.round(activeSnap * 100)}dvh - 118px))");
+  });
+
+  it("no static react-leaflet import in the deck's SSR graph (window is not defined guard)", () => {
+    // RiderMarkerLayer is dead code (never rendered) — its import alone pulled
+    // leaflet into the SSR bundle; SpeedGradientRoute must stay ssr:false.
+    expect(client).not.toContain('import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer"');
+    expect(client).toContain('import("@/components/map-riders/SpeedGradientRoute")');
+    // the deck itself never imports react-leaflet statically
+    expect(client).not.toMatch(/^import .*from "react-leaflet"/m);
+  });
+});

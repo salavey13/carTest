@@ -43,7 +43,10 @@ import { motoSpotKindLabel, MOTO_SPOT_KINDS, motoSpotKindIcon, NN_MOTO_SPOTS, ty
 import { buildTelegramAppLink, crewCatalogStartParam, crewDiscoveryStartParam, wallStartParam } from "@/lib/wall-deeplink";
 import { catalogGpsFromSpecs } from "@/lib/catalog-gps";
 import type { CatalogItemVM } from "@/app/franchize/actions";
-import { RiderMarkerLayer } from "@/components/map-riders/RiderMarkerLayer";
+// RiderMarkerLayer НЕ импортируем: он мёртв (не рендерится, см. Task 74) и
+// тянет react-leaflet статически — модуль leaflet лезет в SSR-бандл страницы
+// и роняет её intermittent «window is not defined» (prod 500 на старых
+// деплоях). Файл остаётся в репо как исторический референс.
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { SheetListPanel, SheetNetworkPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
 import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
@@ -51,12 +54,19 @@ import { pluralRu } from "@/app/franchize/lib/crew-network";
 import { formatBloggerAudience } from "@/app/franchize/lib/blogger-stats";
 import { List, Network, Trophy, Users } from "lucide-react";
 import { StatusOverlay } from "@/components/map-riders/StatusOverlay";
-import { SpeedGradientRoute } from "@/components/map-riders/SpeedGradientRoute";
 import { MapRidersDebugPanel } from "@/components/map-riders/MapRidersDebugPanel";
 import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 
 // Lazy-load map (SSR disabled)
 const RacingMap = dynamic(() => import("@/components/maps/RacingMap").then((mod) => mod.RacingMap), { ssr: false });
+// SpeedGradientRoute тоже рендерит react-leaflet (Polyline) — статический
+// импорт ронял SSR карты («window is not defined», intermittent). Он живёт
+// ТОЛЬКО внутри <RacingMap> (client-only контекст листлета), поэтому ssr:false
+// безопасен: к моменту монтирования RacingMap уже заряжен на клиенте.
+const SpeedGradientRoute = dynamic(
+  () => import("@/components/map-riders/SpeedGradientRoute").then((mod) => mod.SpeedGradientRoute),
+  { ssr: false },
+);
 
 const DEFAULT_BOUNDS = { top: 56.42, bottom: 56.08, left: 43.66, right: 44.12 };
 // HQ coordinates: 56°17'47.2"N 43°56'47.0"E = [56.296444, 43.946389]
@@ -352,6 +362,21 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
   //      into a zone nobody can see, which reads exactly as «scrolling is
   //      fucked». Fix: cap the body to the active snap (min(82dvh,
   //      snap·dvh − chrome)) so every scrollable pixel is on screen.
+  //   3. VAUL SNAP-POINT GEOMETRY (2026-10-07, boss: «all tabs have issues of
+  //      fully scrolling to the bottom of what's inside the sheet»): with
+  //      snapPoints vaul 0.9 translates the bottom-anchored drawer DOWN by
+  //      (1−snap)·vh (measured live: snap 0.48 → translateY 443px on a 852px
+  //      phone) and expects Drawer.Content to be VIEWPORT-HEIGHT tall — then
+  //      exactly snap·vh of the card shows. Ours was natural-height (~390px),
+  //      so at every snap the bottom (1−snap)·vh of the sheet sank below the
+  //      screen edge: at the default 0.48 the whole scroll body sat at y=991
+  //      (0px visible), at the tab snap 0.66 ≈278px of the scroller's bottom
+  //      was dead zone vs 136px bottom padding → ~142px of REAL content of
+  //      EVERY tab permanently unreachable. Fix: Drawer.Content is now
+  //      h-[100dvh] (vaul's canonical snapPoints layout) with the card
+  //      flex-anchored to its bottom — the invisible spacer above stays
+  //      pointer-events-none, the map stays fully interactive, and the body
+  //      cap from (2) now fits the visible region exactly.
   const sheetBodyRef = useRef<HTMLDivElement | null>(null);
   const segmentScrollTopRef = useRef<Record<MapRidersSheetSegment, number>>({ wall: 0, list: 0, top: 0, network: 0 });
   const prevSegmentRef = useRef<MapRidersSheetSegment>(sheetSegment);
@@ -1477,7 +1502,15 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         modal={false}
       >
         <Drawer.Portal>
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
+          {/* VAUL SNAP-POINT GEOMETRY: with snapPoints, vaul 0.9 translates
+              this drawer down by (1−snap)·vh and expects Content to be
+              viewport-height tall — h-[100dvh] + the card as its top-aligned
+              first child: the visible window [y=(1−snap)·vh … y=vh] then shows
+              exactly the card's top snap·vh pixels and the scroll body never
+              dips below the fold. The spacer below the card inherits
+              pointer-events-none from Content, so the map stays tappable. */}
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 h-[100dvh] pointer-events-none">
+            <div className="flex h-full flex-col justify-start">
             <div
               className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/92 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}
               style={{ backgroundImage: `linear-gradient(${sheetTint}, ${sheetTint})` }}
@@ -1635,6 +1668,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                   model comes from the server page (same loader as the
                   /franchize/discovery route), graph is the same component. */}
               {sheetSegment === "network" ? <SheetNetworkPanel network={network ?? null} /> : null}
+            </div>
             </div>
           </div>
         </Drawer.Content>
