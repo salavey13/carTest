@@ -9,6 +9,7 @@
 // logic. The route is now a thin auth + serialization shim.
 
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyCrewAccess } from "../_auth";
 import { buildSalesCsv } from "@/lib/csv-builders/sales-csv";
 
@@ -30,7 +31,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const auth = await verifyCrewAccess(request);
+    // iter52b FIX (2026-10-07): same 403 bug as rentals-csv-export — the
+    // crew id must be resolved from the slug and passed to verifyCrewAccess,
+    // otherwise only GLOBAL admins pass (crew members got «Нет доступа»).
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (!crew) {
+      return NextResponse.json({ error: "Crew not found" }, { status: 404 });
+    }
+
+    const auth = await verifyCrewAccess(request, crew.id);
     if (auth.ok === false) return auth.response;
 
     const { csv, filename } = await buildSalesCsv(slug, from, to);

@@ -241,3 +241,38 @@ describe('iter52: analytics-csv-send block caption', () => {
     expect(s).toContain('styled(rowIndex, "totals")');
   });
 });
+
+// ─── 5. iter52b: 403 fix — export routes resolve crew id before auth ────────
+
+describe('iter52b: CSV export routes pass crew id to verifyCrewAccess', () => {
+  const rentalsRoute = () => read('app/api/franchize/rentals-csv-export/route.ts');
+  const salesRoute = () => read('app/api/franchize/sales-csv-export/route.ts');
+
+  it('rentals-csv-export resolves slug → crew.id and passes it to auth', () => {
+    const s = rentalsRoute();
+    // crew id resolved from the slug BEFORE the auth call…
+    expect(s).toContain('.from("crews")');
+    expect(s).toContain('.eq("slug", slug)');
+    // …and handed to verifyCrewAccess (member/owner paths need it)
+    expect(s).toContain('verifyCrewAccess(request, crew.id)');
+    // missing crew → explicit 404, not a silent 500
+    expect(s).toContain('"Crew not found"');
+    // supabaseAdmin imported for the lookup
+    expect(s).toContain('import { supabaseAdmin } from "@/lib/supabase-server"');
+  });
+
+  it('sales-csv-export has the same fix (sibling route, same failure mode)', () => {
+    const s = salesRoute();
+    expect(s).toContain('.eq("slug", slug)');
+    expect(s).toContain('verifyCrewAccess(request, crew.id)');
+  });
+
+  it('auth helper only denies with 403 AFTER the crew-scoped checks ran', () => {
+    // Guard the root contract: verifyUserIdAccess must reach the crew_members
+    // check when crewId is provided — the routes above rely on it.
+    const s = read('app/api/franchize/_auth.ts');
+    expect(s).toContain("from(\"crew_members\")");
+    expect(s).toContain('.eq("membership_status", "active")');
+    expect(s).toContain("crew?.owner_id === userId");
+  });
+});

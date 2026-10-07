@@ -9,6 +9,7 @@
 // logic. The route is now a thin auth + serialization shim.
 
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyCrewAccess } from "../_auth";
 import { buildRentalsCsv } from "@/lib/csv-builders/rentals-csv";
 
@@ -28,8 +29,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "slug, from, to are required" }, { status: 400 });
     }
 
-    // Auth: verify crew access
-    const auth = await verifyCrewAccess(request);
+    // Auth: verify crew access.
+    // iter52b FIX (2026-10-07): resolve the crew id from the slug FIRST and
+    // pass it to verifyCrewAccess. Without it the member/owner paths inside
+    // verifyUserIdAccess never run (they need crewId), so every non-GLOBAL
+    // admin — e.g. djorudjov (users.role=attendee, vip-bike crew admin) —
+    // got 403 «Нет доступа» when the table view fetched its data.
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (!crew) {
+      return NextResponse.json({ error: "Crew not found" }, { status: 404 });
+    }
+
+    const auth = await verifyCrewAccess(request, crew.id);
     if (auth.ok === false) return auth.response;
 
     const { csv, filename } = await buildRentalsCsv(slug, from, to);
