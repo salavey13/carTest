@@ -113,7 +113,17 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   // "Аналитика аренд" (and leads/dashboard) items randomly disappeared from
   // the profile dropdown. userCrewMemberships is the deterministic per-crew
   // source — gate on it too.
-  const isCurrentCrewMember = !!(userCrewInfo?.slug && effectiveSlug && userCrewInfo.slug === effectiveSlug);
+  // Task 76 (boss 2026-10-07: «for some reason djorudjov doesn't see it»):
+  // the MEMBER half of the gate still read the flaky userCrewInfo — for a
+  // plain member isCurrentCrewAdmin is false, so the links lived or died on
+  // the arbitrary maybeSingle() row (and died outright for multi-crew members,
+  // where maybeSingle() can't even pick a row). Both halves now read
+  // userCrewMemberships — the deterministic per-crew list — so EVERY active
+  // member of the current crew sees Дашборд / Клиенты / Аналитика аренд.
+  const isCurrentCrewMember = useMemo(() => {
+    if (!effectiveSlug) return false;
+    return userCrewMemberships.some((m) => m.slug === effectiveSlug);
+  }, [userCrewMemberships, effectiveSlug]);
   const canViewCrewLinks = userIsAdmin || isCurrentCrewAdmin || isCurrentCrewMember;
   const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;

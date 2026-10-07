@@ -56,6 +56,20 @@ describe("Task 45/46: ownership gate (slimmed)", () => {
     );
   });
 
+  it("profile dropdown: the MEMBER half of the gate is deterministic too (Task 76 — djorudjov report)", () => {
+    const src = read("app/franchize/components/FranchizeProfileButton.tsx");
+    // isCurrentCrewMember must read userCrewMemberships (per-crew list), not
+    // the flaky primary-crew userCrewInfo — a plain member (no admin role)
+    // otherwise loses Дашборд/Клиенты/Аналитика аренд whenever the arbitrary
+    // maybeSingle() row points at another crew (or dies on multi-membership).
+    expect(src).toMatch(
+      /isCurrentCrewMember = useMemo\(\(\) => \{[\s\S]*?userCrewMemberships\.some\(\(m\) => m\.slug === effectiveSlug\)/,
+    );
+    // and the flaky source must be gone from the gate
+    const gate = src.slice(src.indexOf("const isCurrentCrewAdmin"), src.indexOf("const franchizeAdminHref"));
+    expect(gate).not.toContain("userCrewInfo?.slug");
+  });
+
   it("AppContext: userCrewMembershipsLoaded settles even when the fetch fails", () => {
     const src = read("contexts/AppContext.tsx");
     expect(src).toContain("userCrewMembershipsLoaded: boolean;");
