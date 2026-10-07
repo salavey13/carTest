@@ -841,3 +841,4 @@ Work Log:
 
 Stage Summary:
 - iter52 соответствует ТЗ на живых данных; 403 членов экипажа на веб-таблице починен в обоих экспорт-роутах; монстр Goollil 144 266.85 ₽ → 752.05 ₽, экипаж чист. Push в GitHub временно отбивается «Internal Server Error» (GitHub-side) — коммиты f76c5ed62 + 182f3d9b9 локально, повторить пуш
+- UPDATE: push прошёл со 2-й попытки retry-цикла (ab19bf3d2..b0bff860a → origin/main, Vercel автодеплой) — GitHub 5xx оказался кратковременным
