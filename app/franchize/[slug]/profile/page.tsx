@@ -39,7 +39,15 @@ export default async function FranchizeProfilePage({
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
       />
-      <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
+      {/* overflowMode="clip": the tab dock in ProfileClient is position:sticky
+          — overflow:hidden (default) creates a scroll container that silently
+          disables viewport-sticky for descendants. clip clips identically but
+          keeps sticky working; old engines fall back to the hidden class. */}
+      <FranchizePageShell
+        theme={crew.theme}
+        contentClassName="space-y-4"
+        overflowMode="clip"
+      >
         <FranchizeProfileClient initialCrew={crew} initialSlug={resolvedSlug} />
       </FranchizePageShell>
       <CrewFooter crew={crew} />

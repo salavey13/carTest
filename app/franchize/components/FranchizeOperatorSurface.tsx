@@ -34,6 +34,12 @@ type OperatorStatCardProps = {
   detail?: ReactNode;
   icon?: ReactNode;
   className?: string;
+  /**
+   * Task 83 (2026-10-08): denser type scale for 3-across mobile rows
+   * (profile hero). Default false — every existing consumer renders exactly
+   * as before (text-xs label / text-2xl sm:text-3xl value).
+   */
+  compact?: boolean;
 };
 
 export function FranchizeOperatorStatCard({
@@ -42,19 +48,24 @@ export function FranchizeOperatorStatCard({
   detail,
   icon,
   className = "",
+  compact = false,
 }: OperatorStatCardProps) {
   return (
     <FranchizeOperatorPanel className={`min-w-0 ${className}`}>
       <div className="flex items-center justify-between gap-2">
         <p
-          className="text-xs font-medium tracking-wide"
+          className={`${compact ? "text-[10px]" : "text-xs"} font-medium tracking-wide`}
           style={{ color: "var(--franchize-shell-muted)" }}
         >
           {label}
         </p>
         {icon ? <span className="shrink-0">{icon}</span> : null}
       </div>
-      <p className="mt-2 break-words text-2xl font-semibold sm:text-3xl">
+      <p
+        className={`mt-1.5 break-words font-semibold sm:mt-2 ${
+          compact ? "text-lg sm:text-3xl" : "text-2xl sm:text-3xl"
+        }`}
+      >
         {value}
       </p>
       {detail ? (

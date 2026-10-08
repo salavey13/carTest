@@ -8,6 +8,23 @@ type FranchizePageShellProps = {
   className?: string;
   contentClassName?: string;
   width?: "content" | "wide" | "full";
+  /**
+   * Task 83 (2026-10-08): overflow:hidden creates a scroll container, which
+   * silently DISABLES position:sticky for every descendant (the sticky child
+   * sticks to the hidden-overflow box that never scrolls, not the viewport).
+   * overflow:clip clips identically (border-radius, radial gradient) but does
+   * NOT create a scroll container — sticky descendants pin to the viewport.
+   *
+   * Opt-in per page: flipping this globally would also ACTIVATE other
+   * in-shell sticky elements that were authored but never actually stuck
+   * (e.g. rentals-analytics `sticky top-4` summary card) without reviewing
+   * their offsets against the sticky CrewHeader.
+   *
+   * Delivery: inline style only — browsers that don't parse `clip` drop the
+   * declaration and fall back to the `overflow-hidden` class (sticky stays
+   * disabled there, exactly the old behavior). The profile tab dock uses it.
+   */
+  overflowMode?: "hidden" | "clip";
 };
 
 /**
@@ -90,6 +107,7 @@ export function FranchizePageShell({
   className = "",
   contentClassName = "",
   width = "content",
+  overflowMode = "hidden",
 }: FranchizePageShellProps) {
   const palette = theme.palette;
   const isAuto = theme.isAuto;
@@ -157,6 +175,9 @@ export function FranchizePageShell({
       <div
         className={`relative overflow-hidden ${roundedClass} border ${innerPadding} backdrop-blur ${contentClassName}`}
         style={{
+          // See FranchizePageShellProps.overflowMode — inline-only override,
+          // falls back to the overflow-hidden class on old engines.
+          overflow: overflowMode === "clip" ? "clip" : undefined,
           background:
             "radial-gradient(circle at top right, color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent), transparent 34rem), color-mix(in srgb, var(--franchize-shell-card) 90%, transparent)",
           borderColor: "var(--franchize-shell-border)",
