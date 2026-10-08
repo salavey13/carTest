@@ -212,6 +212,7 @@ export function RacingMap({
   onMapLongPress,
   onPointClick,
   tileLayer = "cartodb-dark",
+  skinMode = null,
   focusPoint,
   children,
   clustering = false,
@@ -223,6 +224,16 @@ export function RacingMap({
   onMapLongPress?: (coords: [number, number]) => void;
   onPointClick?: (poi: PointOfInterest) => void;
   tileLayer?: TileLayerPreset;
+  /**
+   * Task 84 (2026-10-08): game-map skin for map-riders — «map stylized as
+   * Red Dead Redemption, maybe like GTA». Light = RDR2 parchment (warm sepia
+   * tiles + paper vignette), dark = GTA night (punchier contrast on the CARTO
+   * dark basemap). null = classic plain map (admin/VPR consumers unchanged).
+   * The skin is pure CSS on the tile pane + an edge overlay — tile sources,
+   * routes, markers and popups are untouched (routes/markers stay vivid ON
+   * the stylized basemap, exactly like the game references).
+   */
+  skinMode?: "light" | "dark" | null;
   /** Wall × map: fly to a geotagged post's marker (see MapFocusFlyer). */
   focusPoint?: RacingMapFocusPoint | null;
   children?: ReactNode;
@@ -305,8 +316,19 @@ export function RacingMap({
     ? CUSTOM_TILE_ATTRIBUTION || "© OpenStreetMap contributors"
     : "© OpenStreetMap contributors © CARTO";
 
+  // Game skin classes (see skinMode doc) — absent entirely for classic maps.
+  const skinClass =
+    skinMode === "light"
+      ? "mr-map-skin mr-map-skin--light"
+      : skinMode === "dark"
+        ? "mr-map-skin mr-map-skin--dark"
+        : "";
+
   return (
-    <div className={`relative z-0 ${className || ""}`} style={{ touchAction: "pan-x pan-y pinch-zoom" }}>
+    <div
+      className={`relative z-0 ${skinClass} ${className || ""}`}
+      style={{ touchAction: "pan-x pan-y pinch-zoom" }}
+    >
       <MapContainer
         bounds={mapBounds}
         className="z-0 h-full w-full"
@@ -478,6 +500,12 @@ export function RacingMap({
         <MapFocusFlyer focus={focusPoint ?? null} />
         <MapZoomWatcher onMap={(map) => (mapRef.current = map)} onZoom={setZoom} />
       </MapContainer>
+
+      {/* Game-skin edge vignette (paper burn / night falloff). Sits ABOVE the
+          whole map with pointer-events none — panes inside .leaflet-map-pane
+          form their own stacking context, so interleaving is impossible; the
+          vignette is edge-only so route lines and markers stay crisp. */}
+      {skinMode ? <div aria-hidden className="mr-map-skin-vignette" /> : null}
     </div>
   );
 }

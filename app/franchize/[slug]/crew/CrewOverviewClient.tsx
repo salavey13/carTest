@@ -47,10 +47,14 @@ export function FranchizeCrewOverviewClient({ crewSlug, initialCrew, theme }: { 
     useEffect(() => {
         if (!crewSlug) return;
         setLoading(true);
-        getCrewLiveDetails(crewSlug).then(res => {
-            if (res.success) setCrew(res.data);
-            setLoading(false);
-        });
+        // catch: a transport throw used to leave an unhandled rejection and
+        // freeze the loader for crews without initialCrew data.
+        getCrewLiveDetails(crewSlug)
+            .then(res => {
+                if (res.success) setCrew(res.data);
+            })
+            .catch(() => undefined)
+            .finally(() => setLoading(false));
     }, [crewSlug]);
 
     useEffect(() => {

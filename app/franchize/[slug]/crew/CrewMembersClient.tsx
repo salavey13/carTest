@@ -60,7 +60,11 @@ export function FranchizeCrewMembersClient({ crewSlug, theme }: { crewSlug: stri
 
     useEffect(() => {
         if (!crewSlug) return;
-        refreshCrew().finally(() => setLoading(false));
+        // catch: transport error → surface the crew-not-found state instead of
+        // an unhandled rejection killing the render tree below.
+        refreshCrew()
+            .catch(() => undefined)
+            .finally(() => setLoading(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [crewSlug]);
 

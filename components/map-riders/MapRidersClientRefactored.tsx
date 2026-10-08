@@ -1340,6 +1340,13 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
               className="h-full w-full"
               tileLayer={finalTileLayer}
+              /* Game-map skin (task 84): RDR2 parchment on light basemaps,
+                 GTA night on dark ones. Derived from the RESOLVED tile layer
+                 (not the card color) so the filter always matches the tiles
+                 actually rendered — sepia only makes sense on light tiles,
+                 contrast punch only on dark ones. In auto mode this follows
+                 the theme toggle in the profile dropdown 1:1. */
+              skinMode={finalTileLayer === "cartodb-light" || finalTileLayer === "osm" ? "light" : "dark"}
               clustering
               focusPoint={wallFocusPoint}
               onMapClick={(coords) => {
