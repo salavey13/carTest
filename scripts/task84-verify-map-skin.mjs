@@ -1,4 +1,6 @@
-// Task 84 — verify map-riders game skins in dark & light themes.
+// Task 84 (+ vice-tint follow-up, boss 2026-10-09) — verify map-riders game
+// skins in dark & light themes: skin class, tile filter, vignette, and the
+// Vice neon glow layer (dark ONLY — must be absent on the light skin).
 import { chromium } from "playwright";
 
 const URL = "http://localhost:3000/franchize/vip-bike/map-riders";
@@ -21,11 +23,18 @@ for (const theme of ["dark", "light"]) {
     const skin = document.querySelector(".mr-map-skin");
     const tiles = document.querySelector(".mr-map-skin .leaflet-tile-pane");
     const vignette = document.querySelector(".mr-map-skin-vignette");
+    const neon = document.querySelector(".mr-map-skin-neon");
     const tileImg = document.querySelector(".leaflet-tile-loaded");
     return {
       skinClass: skin ? skin.className.slice(0, 80) : null,
-      tileFilter: tiles ? getComputedStyle(tiles).filter.slice(0, 110) : null,
+      tileFilter: tiles ? getComputedStyle(tiles).filter.slice(0, 130) : null,
       vignette: !!vignette,
+      neon: neon
+        ? {
+            blend: getComputedStyle(neon).mixBlendMode,
+            bg: getComputedStyle(neon).backgroundImage.slice(0, 160),
+          }
+        : null,
       tilesLoaded: !!tileImg,
       containerBg: (() => {
         const c = document.querySelector(".mr-map-skin .leaflet-container");
@@ -33,7 +42,7 @@ for (const theme of ["dark", "light"]) {
       })(),
     };
   });
-  console.log(theme.toUpperCase(), JSON.stringify(info), "jsErrors:", errs.length);
+  console.log(theme.toUpperCase(), JSON.stringify(info, null, 1), "jsErrors:", errs.length);
   await page.screenshot({ path: `/home/z/my-project/task84-map-${theme}.png` });
   await ctx.close();
 }

@@ -1,0 +1,11 @@
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true, colorScheme: "dark" });
+await ctx.addInitScript((t) => localStorage.setItem("theme", t), "dark");
+const p = await ctx.newPage();
+const tileReqs = [];
+p.on("response", (r) => { if (r.url().includes("basemaps") || r.url().includes("tile")) tileReqs.push(r.status() + " " + r.url().slice(0, 110)); });
+await p.goto("http://localhost:3000/franchize/vip-bike/map-riders", { waitUntil: "networkidle", timeout: 60000 });
+await p.waitForTimeout(5000);
+console.log(tileReqs.slice(0, 8).join("\n"));
+await b.close();

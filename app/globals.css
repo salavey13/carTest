@@ -1182,13 +1182,16 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 }
 
 /* ── map-riders game-map skins (task 84, boss 2026-10-08: «map stylized as
-   red dead redemption… maybe like gta») ──────────────────────────────────
-   Pure CSS on the raster tile pane + an edge vignette overlay. Applied only
-   when RacingMap gets a skinMode prop (map-riders only — admin/VPR maps stay
+   red dead redemption… maybe like gta»; boss 2026-10-09: «add vice tint in
+   dark mode») ─────────────────────────────────────────────────────────────
+   Pure CSS on the raster tile pane + edge overlay(s). Applied only when
+   RacingMap gets a skinMode prop (map-riders only — admin/VPR maps stay
    classic). The light skin warms the CARTO light basemap into RDR2-style
-   parchment; the dark skin punches up the CARTO dark basemap into a GTA
-   night map. Routes/markers/popups are NOT filtered — they stay vivid on
-   the stylized basemap, exactly like the game references. */
+   parchment; the dark skin pushes the CARTO dark basemap into a GTA Vice
+   City night — violet-shifted tiles, Miami-sunset wash (purple → magenta →
+   cyan) and additive screen-blended neon corner glows. Routes/markers/
+   popups are NOT filtered — they stay vivid on the stylized basemap,
+   exactly like the game references. */
 .mr-map-skin .leaflet-tile-pane {
   transition: filter 0.35s ease;
 }
@@ -1198,7 +1201,10 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 }
 
 .mr-map-skin--dark .leaflet-tile-pane {
-  filter: brightness(1.05) contrast(1.2) saturate(1.08);
+  /* Vice hue-shift: CARTO dark's blue-grey roads drift toward violet,
+     water/parks pick up teal — the neon wash below then reads as Miami
+     night, not as generic dark mode. */
+  filter: brightness(1.03) contrast(1.16) saturate(1.32) hue-rotate(-14deg);
 }
 
 /* Blank-tile / zoom-gap flash color matches the skin, not the default navy. */
@@ -1207,7 +1213,7 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 }
 
 .mr-map-skin--dark .leaflet-container {
-  background: #05070c;
+  background: #0a0714;
 }
 
 .mr-map-skin .mr-map-skin-vignette {
@@ -1225,11 +1231,34 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
   mix-blend-mode: multiply;
 }
 
-/* Dark: night falloff — subtle, edge-only, never over the center action. */
+/* Dark: Vice night — purple-black edge falloff + a full-surface Miami
+   sunset wash (violet sky → magenta horizon band → cyan reflection).
+   Alphas stay ≤0.2 so route lines, labels and markers keep contrast. */
 .mr-map-skin--dark .mr-map-skin-vignette {
   background:
-    radial-gradient(130% 100% at 50% 35%, transparent 52%, rgba(0, 0, 0, 0.42) 100%),
-    linear-gradient(rgba(8, 12, 24, 0.14), rgba(8, 12, 24, 0.14));
+    radial-gradient(130% 100% at 50% 35%, transparent 50%, rgba(20, 4, 36, 0.46) 100%),
+    linear-gradient(
+      180deg,
+      rgba(124, 58, 237, 0.17) 0%,
+      rgba(59, 24, 102, 0.05) 34%,
+      rgba(219, 39, 119, 0.11) 62%,
+      rgba(34, 211, 238, 0.13) 100%
+    );
+}
+
+/* Vice neon corner glows (dark skin only, rendered by RacingMap when
+   skinMode === "dark"). mix-blend-mode: screen is ADDITIVE light — on a
+   night basemap it only lifts dark pixels, so routes/markers keep their
+   own saturated colors while the corners glow hot-pink / cyan. */
+.mr-map-skin .mr-map-skin-neon {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(58% 44% at 88% 4%, rgba(236, 72, 153, 0.17) 0%, transparent 68%),
+    radial-gradient(52% 42% at 6% 98%, rgba(34, 211, 238, 0.16) 0%, transparent 68%);
 }
 
 /* Spot marker: soft breathing halo so discovery dots read as «места», not riders. */

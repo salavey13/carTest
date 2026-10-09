@@ -227,9 +227,10 @@ export function RacingMap({
   /**
    * Task 84 (2026-10-08): game-map skin for map-riders — «map stylized as
    * Red Dead Redemption, maybe like GTA». Light = RDR2 parchment (warm sepia
-   * tiles + paper vignette), dark = GTA night (punchier contrast on the CARTO
-   * dark basemap). null = classic plain map (admin/VPR consumers unchanged).
-   * The skin is pure CSS on the tile pane + an edge overlay — tile sources,
+   * tiles + paper vignette), dark = GTA night (punchier contrast + Vice City
+   * neon tint on the CARTO dark basemap — boss 2026-10-09: «add vice tint in
+   * dark mode»). null = classic plain map (admin/VPR consumers unchanged).
+   * The skin is pure CSS on the tile pane + edge overlays — tile sources,
    * routes, markers and popups are untouched (routes/markers stay vivid ON
    * the stylized basemap, exactly like the game references).
    */
@@ -501,11 +502,16 @@ export function RacingMap({
         <MapZoomWatcher onMap={(map) => (mapRef.current = map)} onZoom={setZoom} />
       </MapContainer>
 
-      {/* Game-skin edge vignette (paper burn / night falloff). Sits ABOVE the
-          whole map with pointer-events none — panes inside .leaflet-map-pane
-          form their own stacking context, so interleaving is impossible; the
-          vignette is edge-only so route lines and markers stay crisp. */}
+      {/* Game-skin edge vignette (paper burn / vice night falloff). Sits ABOVE
+          the whole map with pointer-events none — panes inside
+          .leaflet-map-pane form their own stacking context, so interleaving is
+          impossible; the vignette is edge-only so route lines and markers stay
+          crisp. */}
       {skinMode ? <div aria-hidden className="mr-map-skin-vignette" /> : null}
+      {/* Vice City neon glows (dark skin only): additive screen-blended
+          pink/cyan corner lights — only LIFTS dark pixels, routes/markers
+          keep their own colors. Same stacking rules as the vignette. */}
+      {skinMode === "dark" ? <div aria-hidden className="mr-map-skin-neon" /> : null}
     </div>
   );
 }
