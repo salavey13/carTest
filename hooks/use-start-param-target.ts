@@ -51,6 +51,12 @@ export const START_PARAM_PAGE_MAP: Record<string, string> = {
   // data needed → static fast path routes it BEFORE the Telegram roundtrip.
   // Builder: crewDiscoveryStartParam() in lib/wall-deeplink.ts (single source).
   discovery: "/franchize/discovery",
+  // Колесо фортуны (2026-10-11): промо-колесо с хардкодными промокодами
+  // (WHEEL1000/2000/5000/15%). Bare «wheel» ведёт на главную витрину vip-bike;
+  // per-crew вариант wheel_<slug> обрабатывает computeStaticFastTarget ниже.
+  wheel: "/franchize/vip-bike/wheel",
+  wheel_of_fortune: "/franchize/vip-bike/wheel",
+  fortune: "/franchize/vip-bike/wheel",
 };
 
 export const BIO30_PRODUCT_PATHS: Record<string, string> = {
@@ -321,6 +327,17 @@ export function computeStaticFastTarget(param: string): string | null {
       return null;
     }
     if (content) return `/franchize/${content}`;
+    return null;
+  }
+
+  // wheel_<slug> — колесо фортуны конкретной витрины (2026-10-11).
+  // Self-contained (slug в самом параметре) → static fast path БЕЗ ожидания
+  // auth. Bare «wheel» / «wheel_of_fortune» / «fortune» обрабатывает
+  // START_PARAM_PAGE_MAP выше (главная витрина vip-bike). Слаги franchize —
+  // [a-z0-9-], подчёркиваний не содержат, поэтому split("_") безопасен.
+  if (param.startsWith("wheel_")) {
+    const slug = param.substring(6).trim();
+    if (slug && /^[a-z0-9-]{1,64}$/i.test(slug)) return `/franchize/${slug}/wheel`;
     return null;
   }
 

@@ -31,9 +31,12 @@ interface CartPageClientProps {
   crew: FranchizeCrewVM;
   slug: string;
   items: CatalogItemVM[];
+  /** ?promo=CODE (колесо фортуны → корзина): PromoCodeInput авто-применит
+   *  код тем же серверным валидатором, что и ручной ввод. */
+  initialPromoCode?: string;
 }
 
-export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
+export function CartPageClient({ crew, slug, items, initialPromoCode }: CartPageClientProps) {
   const { cart, itemCount: rawItemCount, changeLineQty, removeLine } = useFranchizeCart(slug);
   const { cartLines, subtotal, itemCount } = useFranchizeCartLines(slug, items, {
     cart,
@@ -343,6 +346,7 @@ export function CartPageClient({ crew, slug, items }: CartPageClientProps) {
                   appliedPromo={appliedPromo}
                   onApply={handlePromoApplied}
                   onClear={handlePromoCleared}
+                  autoApplyCode={initialPromoCode}
                 />
                 <CheckoutButton
                   onClick={handleProceed}

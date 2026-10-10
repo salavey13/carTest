@@ -99,6 +99,36 @@ describe("startapp routing regression: computeFastWallTarget EXECUTES (boss 2026
   });
 });
 
+describe("wheel-of-fortune deeplinks (boss 2026-10-11)", () => {
+  it("wheel_<slug> routes to the crew wheel on the static fast path", () => {
+    expect(computeStaticFastTarget(`wheel_${SLUG}`)).toBe(`/franchize/${SLUG}/wheel`);
+    // Слаг с дефисом (nn-volt, vip-cross…) не ломается подчёркиванием.
+    expect(computeStaticFastTarget("wheel_nn-volt")).toBe("/franchize/nn-volt/wheel");
+  });
+
+  it("bare wheel / wheel_of_fortune / fortune route to the vip-bike wheel", () => {
+    expect(computeStaticFastTarget("wheel")).toBe("/franchize/vip-bike/wheel");
+    expect(computeStaticFastTarget("wheel_of_fortune")).toBe("/franchize/vip-bike/wheel");
+    expect(computeStaticFastTarget("fortune")).toBe("/franchize/vip-bike/wheel");
+  });
+
+  it("wheel_ rejects empty and hostile slugs (falls through to gated path)", () => {
+    expect(computeStaticFastTarget("wheel_")).toBeNull();
+    // Подчёркивание внутри слага не входит в грамматику [a-z0-9-].
+    expect(computeStaticFastTarget("wheel_bad_slug")).toBeNull();
+    expect(computeStaticFastTarget("wheel_привет")).toBeNull();
+  });
+
+  it("the t.me wheel link round-trips into the exact wheel page", () => {
+    const url = buildTelegramAppLink("oneBikePlsBot", `wheel_${SLUG}`);
+    expect(url).toBe(`https://t.me/oneBikePlsBot/app?startapp=wheel_${SLUG}`);
+    const startapp = url.split("startapp=")[1];
+    expect(computeStaticFastTarget(startapp)).toBe(`/franchize/${SLUG}/wheel`);
+    // Грамматика ссылки остаётся в бюджете Telegram.
+    expect(startapp.length).toBeLessThanOrEqual(64);
+  });
+});
+
 describe("startapp routing regression: the missing import is pinned", () => {
   it("use-start-param-target.ts imports parseWallDeepLink from wall-deeplink", () => {
     const src = read("hooks/use-start-param-target.ts");

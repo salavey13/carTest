@@ -5,8 +5,13 @@
 // validated by the same server action the order page uses
 // (validateFranchizePromoCode), so a code applied here carries into checkout
 // with identical discount math — no second source of truth.
+//
+// Колесо фортуны (2026-10-11): autoApplyCode — код из ?promo= (сегмент
+// «В корзину с промокодом» ведёт сюда). Монтируется с кодом и пустой
+// корзиной → валидация НЕ вызывается (сервер отклонил бы baseAmount<=0);
+// код применяется автоматически, как только в корзине появится товар.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { FranchizeCrewVM } from "../../actions";
 import { validateFranchizePromoCode } from "../../server-actions/promotions";
@@ -22,16 +27,22 @@ interface PromoCodeInputProps {
   appliedPromo: CartAppliedPromo | null;
   onApply: (promo: CartAppliedPromo) => void;
   onClear: () => void;
+  /** Код для авто-применения (?promo= из колеса фортуны). */
+  autoApplyCode?: string;
 }
 
-export function PromoCodeInput({ slug, crew, baseAmount, appliedPromo, onApply, onClear }: PromoCodeInputProps) {
+export function PromoCodeInput({ slug, crew, baseAmount, appliedPromo, onApply, onClear, autoApplyCode }: PromoCodeInputProps) {
   const T = useCrewTokens(crew.theme);
   const [code, setCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // autoApplyCode применяется один раз за монтирование: ref не даёт повторно
+  // триггерить эффект при каждом рендере (например, после изменения корзины).
+  const pendingAutoCodeRef = useRef<string | null>(autoApplyCode?.trim() || null);
+  const [autoApplying, setAutoApplying] = useState(Boolean(pendingAutoCodeRef.current));
 
-  const handleApply = async () => {
-    const trimmed = code.trim();
+  const applyCode = async (rawCode: string) => {
+    const trimmed = rawCode.trim();
     if (!trimmed || isValidating) return;
     setIsValidating(true);
     setError(null);
@@ -56,6 +67,53 @@ export function PromoCodeInput({ slug, crew, baseAmount, appliedPromo, onApply, 
       setIsValidating(false);
     }
   };
+
+  const handleApply = () => applyCode(code);
+
+  // ── Автоприменение ?promo= (колесо фортуны) ──
+  // Ждём непустую корзину (baseAmount > 0): сервер отклоняет промокод при
+  // baseAmount <= 0, поэтому пустая корзина держит код в очереди и применяет
+  // его сразу после добавления первого товара. Ошибка валидации — код
+  // отбрасывается (очередь очищается), юзер видит причину в поле промокода.
+  useEffect(() => {
+    const pendingCode = pendingAutoCodeRef.current;
+    if (!pendingCode || appliedPromo || isValidating) return;
+    if (baseAmount <= 0) return;
+
+    pendingAutoCodeRef.current = null;
+    setAutoApplying(false);
+    let cancelled = false;
+    (async () => {
+      setIsValidating(true);
+      setError(null);
+      try {
+        const result = await validateFranchizePromoCode({ slug, code: pendingCode, baseAmount });
+        if (cancelled) return;
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        onApply({
+          slug,
+          code: result.code,
+          title: result.title,
+          description: result.description,
+          discountAmount: result.discountAmount,
+          baseAmountAtApply: baseAmount,
+        });
+      } catch {
+        if (!cancelled) setError("Не удалось проверить промокод. Попробуйте ещё раз.");
+      } finally {
+        if (!cancelled) setIsValidating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedPromo, baseAmount, isValidating, onApply, slug]);
+
+  // Подсказка-заглушка, пока авто-код ждёт товар в корзине.
+  const showAutoApplyPending = autoApplying && !appliedPromo && baseAmount <= 0;
 
   return (
     <div className="rounded-2xl border p-4" style={T.styles.card}>
@@ -127,6 +185,11 @@ export function PromoCodeInput({ slug, crew, baseAmount, appliedPromo, onApply, 
           {error && (
             <p className="break-words text-xs" style={{ color: T.isLight ? "#b91c1c" : "#FF6B6B" }}>
               {error}
+            </p>
+          )}
+          {showAutoApplyPending && (
+            <p className="break-words text-xs" style={{ color: T.textMuted }}>
+              Промокод из колеса фортуны применится автоматически после добавления байка в корзину.
             </p>
           )}
         </form>

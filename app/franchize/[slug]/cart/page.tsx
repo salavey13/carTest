@@ -9,6 +9,8 @@ import { buildFranchizeSectionMetadata } from "../metadata";
 
 interface FranchizeCartPageProps {
   params: Promise<{ slug: string }>;
+  /** ?promo=CODE — колесо фортуны ведёт в корзину сразу с промокодом. */
+  searchParams: Promise<{ promo?: string }>;
 }
 
 
@@ -21,8 +23,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   });
 }
 
-export default async function FranchizeCartPage({ params }: FranchizeCartPageProps) {
+export default async function FranchizeCartPage({ params, searchParams }: FranchizeCartPageProps) {
   const { slug } = await params;
+  const { promo } = await searchParams;
   const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("checkout");
@@ -30,7 +33,12 @@ export default async function FranchizeCartPage({ params }: FranchizeCartPagePro
   return (
     <main className={`min-h-screen ${ctaPolicy.pageBottomSafeAreaClassName}`} style={surface.page}>
       <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cart`} groupLinks={items.map((item) => item.category)} items={items} />
-      <CartPageClient crew={crew} slug={crew.slug || slug} items={items} />
+      <CartPageClient
+        crew={crew}
+        slug={crew.slug || slug}
+        items={items}
+        initialPromoCode={promo?.trim() || undefined}
+      />
       <CrewFooter crew={crew} />
     </main>
   );

@@ -1846,8 +1846,36 @@ function normalizePromoCode(value: string): string {
 // discountAmount = baseAmount makes the checkout total exactly 0 and
 // re-validates symmetrically inside resolveFranchizeCheckoutTotal.
 // Still gated by the per-crew order.allowPromo switch below.
-const BUILT_IN_PROMO_CODES: Record<string, { title: string; description: string }> = {
-  PROMORIDE: { title: "PROMORIDE", description: "100% скидка — заказ 0 ₽" },
+//
+// Колесо фортуны (boss 2026-10-11): помимо full-кода PROMORIDE добавлены
+// ХАРДКОДНЫЕ коды скидок с типом "fixed" (абсолютная ₽-скидка, capped по
+// сумме заказа) и "percent" (процент от суммы). Сегменты колеса ссылаются
+// на эти же коды — единый источник правды с wheel-of-fortune.ts, спека
+// tests/franchize/wheel-promo.spec.ts сверяет обе стороны.
+type BuiltInPromo = {
+  title: string;
+  description: string;
+  /** full = 100% (заказ 0 ₽) · fixed = абсолютная скидка value ₽ · percent = value% */
+  kind: "full" | "fixed" | "percent";
+  /** ₽ для fixed, проценты для percent. Игнорируется для full. */
+  value?: number;
+};
+
+function builtInPromoDiscount(promo: BuiltInPromo, baseAmount: number): number {
+  if (promo.kind === "full") return baseAmount;
+  if (promo.kind === "fixed") return Math.min(Math.round(promo.value ?? 0), baseAmount);
+  // percent — тот же жёсткий кап 90%, что и у extractPromoDiscount.
+  const percent = Math.min(90, Math.max(0, Math.round(promo.value ?? 0)));
+  return Math.min(baseAmount, Math.round((baseAmount * percent) / 100));
+}
+
+const BUILT_IN_PROMO_CODES: Record<string, BuiltInPromo> = {
+  PROMORIDE: { kind: "full", title: "PROMORIDE", description: "100% скидка — заказ 0 ₽" },
+  // ── Колесо фортуны (/franchize/<slug>/wheel) ──
+  WHEEL1000: { kind: "fixed", value: 1000, title: "WHEEL1000", description: "Колесо фортуны — скидка 1 000 ₽" },
+  WHEEL2000: { kind: "fixed", value: 2000, title: "WHEEL2000", description: "Колесо фортуны — скидка 2 000 ₽" },
+  WHEEL5000: { kind: "fixed", value: 5000, title: "WHEEL5000", description: "Колесо фортуны — скидка 5 000 ₽" },
+  WHEEL15: { kind: "percent", value: 15, title: "WHEEL15", description: "Колесо фортуны — скидка 15%" },
 };
 
 function parsePromoDate(value: string, boundary: "start" | "end"): Date | null {
@@ -1940,15 +1968,15 @@ export async function validateFranchizePromoCode(input: unknown): Promise<
     return { success: false, error: "Промокоды отключены для этой витрины." };
   }
 
-  // Built-in codes (e.g. PROMORIDE) bypass the per-crew banner list but
-  // still honor the allowPromo switch above.
+  // Built-in codes (PROMORIDE + wheel-of-fortune codes) bypass the per-crew
+  // banner list but still honor the allowPromo switch above.
   const builtInPromo = BUILT_IN_PROMO_CODES[code];
   if (builtInPromo) {
     return {
       success: true,
       code,
       title: builtInPromo.title,
-      discountAmount: baseAmount,
+      discountAmount: builtInPromoDiscount(builtInPromo, baseAmount),
       description: builtInPromo.description,
     };
   }
