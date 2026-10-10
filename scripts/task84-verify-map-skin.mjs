@@ -1,6 +1,7 @@
-// Task 84 (+ vice-tint follow-up, boss 2026-10-09) — verify map-riders game
-// skins in dark & light themes: skin class, tile filter, vignette, and the
-// Vice neon glow layer (dark ONLY — must be absent on the light skin).
+// Task 84 (2026-10-11 simplified) — verify map-riders game skins in dark &
+// light themes: skin class, tile filter, edge vignette present; and the
+// removed Vice neon glow layer is GONE in both themes (regression guard for
+// the simplification — boss: «it looks odd, please try to improve»).
 import { chromium } from "playwright";
 
 const URL = "http://localhost:3000/franchize/vip-bike/map-riders";
@@ -29,12 +30,9 @@ for (const theme of ["dark", "light"]) {
       skinClass: skin ? skin.className.slice(0, 80) : null,
       tileFilter: tiles ? getComputedStyle(tiles).filter.slice(0, 130) : null,
       vignette: !!vignette,
-      neon: neon
-        ? {
-            blend: getComputedStyle(neon).mixBlendMode,
-            bg: getComputedStyle(neon).backgroundImage.slice(0, 160),
-          }
-        : null,
+      // 2026-10-11: the neon overlay was removed in the simplification pass.
+      // It must stay null — a non-null here means the overlay crept back.
+      neonRemoved: neon === null,
       tilesLoaded: !!tileImg,
       containerBg: (() => {
         const c = document.querySelector(".mr-map-skin .leaflet-container");

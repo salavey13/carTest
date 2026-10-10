@@ -186,33 +186,42 @@ describe("map-riders: sheet scrolls to the bottom (2026-10-07 geometry + SSR)", 
   });
 });
 
-// ── Task 84 (+2026-10-09 vice tint): game-map skins ─────────────────────────
-// Boss: «map stylized as red dead redemption… maybe like gta» → light =
-// RDR2 parchment (sepia tiles + paper vignette), dark = GTA Vice night
-// (violet-shifted tiles + Miami sunset wash + additive neon glows).
-// Pins: the skin stays opt-in via RacingMap's skinMode, map-riders derives it
-// from the RESOLVED tile layer (filter must match the rendered basemap), and
-// the neon glow layer exists ONLY for the dark skin.
-describe("map-riders: game-map skins (task 84 + vice tint)", () => {
+// ── Task 84: game-map skins (2026-10-11 simplified) ───────────────────────
+// Boss 2026-10-08: «map stylized as red dead redemption… maybe like gta» →
+// light = RDR2 parchment (mild sepia + paper edge burn), dark = GTA night
+// (contrast/saturate bump + dark edge falloff).
+// Boss 2026-10-11: «it looks odd, please try to improve or ditch styling».
+// The Vice City follow-up (e07dd1f04) stacked three decoration layers —
+// hue-rotated tiles + a full-surface Miami sunset wash (magenta horizon
+// band across the map) + a screen-blended neon corner-glow overlay — and
+// fought the routes/markers/labels that ARE the content. Stripped back to
+// a single tasteful layer per skin: mild tile filter + edge-only vignette.
+// The neon overlay div and its CSS rule are gone; the skin stays opt-in.
+describe("map-riders: game-map skins (task 84, simplified)", () => {
   it("map-riders passes a skinMode derived from the resolved tile layer", () => {
     expect(client).toContain("skinMode={finalTileLayer");
     expect(client).toContain('"cartodb-light" || finalTileLayer === "osm" ? "light" : "dark"');
   });
 
-  it("RacingMap keeps the skin opt-in (classic maps unchanged) and renders overlays guardedly", () => {
+  it("RacingMap keeps the skin opt-in (classic maps unchanged) and renders only the edge vignette", () => {
     const map = read("components/maps/RacingMap.tsx");
     expect(map).toContain('skinMode = null');
     expect(map).toContain('{skinMode ? <div aria-hidden className="mr-map-skin-vignette" /> : null}');
-    expect(map).toContain('{skinMode === "dark" ? <div aria-hidden className="mr-map-skin-neon" /> : null}');
+    // The standalone neon overlay div was removed in the 2026-10-11 simplification.
+    expect(map).not.toContain('mr-map-skin-neon');
   });
 
-  it("both skins live in globals.css — vice layer is screen-blended and dark-only", () => {
+  it("both skins live in globals.css — single tasteful layer, no neon overlay, no sunset wash", () => {
     const css = read("app/globals.css");
     expect(css).toContain(".mr-map-skin--light .leaflet-tile-pane");
     expect(css).toContain(".mr-map-skin--dark .leaflet-tile-pane");
     expect(css).toContain(".mr-map-skin--dark .mr-map-skin-vignette");
-    expect(css).toContain("mix-blend-mode: screen");
-    // neon glows must be scoped to the skin wrapper (never leaks to classic maps)
-    expect(css).toContain(".mr-map-skin .mr-map-skin-neon");
+    // The dark vignette must NOT carry a full-surface Miami sunset linear
+    // gradient (the magenta horizon band was the main "odd" element).
+    expect(css).not.toContain("rgba(219, 39, 119");
+    expect(css).not.toContain("rgba(34, 211, 238");
+    // The neon overlay CSS rule and its screen blend must be gone.
+    expect(css).not.toContain(".mr-map-skin-neon");
+    expect(css).not.toContain("mix-blend-mode: screen");
   });
 });

@@ -226,13 +226,19 @@ export function RacingMap({
   tileLayer?: TileLayerPreset;
   /**
    * Task 84 (2026-10-08): game-map skin for map-riders — «map stylized as
-   * Red Dead Redemption, maybe like GTA». Light = RDR2 parchment (warm sepia
-   * tiles + paper vignette), dark = GTA night (punchier contrast + Vice City
-   * neon tint on the CARTO dark basemap — boss 2026-10-09: «add vice tint in
-   * dark mode»). null = classic plain map (admin/VPR consumers unchanged).
-   * The skin is pure CSS on the tile pane + edge overlays — tile sources,
-   * routes, markers and popups are untouched (routes/markers stay vivid ON
-   * the stylized basemap, exactly like the game references).
+   * Red Dead Redemption, maybe like GTA». Light = RDR2 parchment (mild sepia
+   * on CARTO light + soft paper edge burn), dark = GTA night (gentle
+   * contrast/saturate bump on CARTO dark + dark edge falloff). null =
+   * classic plain map (admin/VPR consumers unchanged).
+   *
+   * 2026-10-11 codereview (boss: «it looks odd»): the Vice City follow-up
+   * (e07dd1f04) had stacked THREE decoration layers — hue-rotated tiles +
+   * a full-surface Miami sunset linear gradient (magenta horizon band
+   * across the map) + a screen-blended neon corner-glow overlay — which
+   * fought the routes/markers/labels that are the actual content. Stripped
+   * back to a single tasteful layer per skin: a mild tile filter + an
+   * edge-only vignette. No full-surface color wash, no neon overlay, no
+   * hue-shift. The Vice feel now comes from the route/marker colors.
    */
   skinMode?: "light" | "dark" | null;
   /** Wall × map: fly to a geotagged post's marker (see MapFocusFlyer). */
@@ -502,16 +508,14 @@ export function RacingMap({
         <MapZoomWatcher onMap={(map) => (mapRef.current = map)} onZoom={setZoom} />
       </MapContainer>
 
-      {/* Game-skin edge vignette (paper burn / vice night falloff). Sits ABOVE
+      {/* Game-skin edge vignette (paper burn / night falloff). Sits ABOVE
           the whole map with pointer-events none — panes inside
           .leaflet-map-pane form their own stacking context, so interleaving is
           impossible; the vignette is edge-only so route lines and markers stay
-          crisp. */}
+          crisp. 2026-10-11: the standalone neon corner-glow overlay added in
+          e07dd1f04 was removed — it stacked a second full-surface screen-blend
+          layer on top of an already-busy sunset wash and fought the content. */}
       {skinMode ? <div aria-hidden className="mr-map-skin-vignette" /> : null}
-      {/* Vice City neon glows (dark skin only): additive screen-blended
-          pink/cyan corner lights — only LIFTS dark pixels, routes/markers
-          keep their own colors. Same stacking rules as the vignette. */}
-      {skinMode === "dark" ? <div aria-hidden className="mr-map-skin-neon" /> : null}
     </div>
   );
 }
