@@ -1,0 +1,276 @@
+{
+  "per": {
+    "ducati-1199-panigale-2012": {
+      "rentals": 4,
+      "days": 4,
+      "revenue": 58000,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-20"
+    },
+    "bmw-s1000rr-electro-silver": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "falcon-lynx-purple": {
+      "rentals": 2,
+      "days": 2,
+      "revenue": 13500,
+      "riders": 2,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-17"
+    },
+    "kawasaki-ex650k": {
+      "rentals": 18,
+      "days": 21,
+      "revenue": 179000,
+      "riders": 8,
+      "longest_rental_days": 2,
+      "last_end": "2026-10-11"
+    },
+    "falcon-gt-2026": {
+      "rentals": 4,
+      "days": 4,
+      "revenue": 21250,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-24"
+    },
+    "ducati-panigale-s-electro-green": {
+      "rentals": 2,
+      "days": 2,
+      "revenue": 17800,
+      "riders": 2,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-02"
+    },
+    "nibbler-regumoto-4v": {
+      "rentals": 10,
+      "days": 10,
+      "revenue": 56703,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-28"
+    },
+    "suzuki-vzr1800-boulevard-2006": {
+      "rentals": 5,
+      "days": 5,
+      "revenue": 44300,
+      "riders": 4,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-27"
+    },
+    "livewire-one": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "motoland-breakout": {
+      "rentals": 7,
+      "days": 7,
+      "revenue": 34769,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-10-11"
+    },
+    "rerode-r1-plus": {
+      "rentals": 4,
+      "days": 4,
+      "revenue": 35300,
+      "riders": 2,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-24"
+    },
+    "ducati-panigale-s-electro-black-aero": {
+      "rentals": 10,
+      "days": 10,
+      "revenue": 89250,
+      "riders": 6,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-22"
+    },
+    "y-volt-surge-v": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "yamaha-r6-2007": {
+      "rentals": 5,
+      "days": 5,
+      "revenue": 39500,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-10-03"
+    },
+    "yamaha-r7": {
+      "rentals": 8,
+      "days": 13,
+      "revenue": 124150,
+      "riders": 5,
+      "longest_rental_days": 6,
+      "last_end": "2026-10-10"
+    },
+    "sequence-zero": {
+      "rentals": 6,
+      "days": 6,
+      "revenue": 80333,
+      "riders": 1,
+      "longest_rental_days": 1,
+      "last_end": "2026-10-04"
+    },
+    "benda-lfc700-2024": {
+      "rentals": 2,
+      "days": 15,
+      "revenue": 137000,
+      "riders": 1,
+      "longest_rental_days": 12,
+      "last_end": "2026-10-09"
+    },
+    "ducati-panigale-s-electro-black-chain": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "wenbox-u2-pro": {
+      "rentals": 1,
+      "days": 1,
+      "revenue": 6000,
+      "riders": 1,
+      "longest_rental_days": 1,
+      "last_end": "2026-08-02"
+    },
+    "ducati-panigale-s-electro-black": {
+      "rentals": 18,
+      "days": 18,
+      "revenue": 138719,
+      "riders": 7,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-27"
+    },
+    "kayo-tsd110": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "falcon-lite-2026": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "falcon-pro-2026": {
+      "rentals": 1,
+      "days": 1,
+      "revenue": 7000,
+      "riders": 1,
+      "longest_rental_days": 1,
+      "last_end": "2026-07-11"
+    },
+    "leopard-asaka": {
+      "rentals": 4,
+      "days": 4,
+      "revenue": 20000,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-21"
+    },
+    "suzuki-gsx-s1000f": {
+      "rentals": 6,
+      "days": 6,
+      "revenue": 41008,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-07-29"
+    },
+    "honda-cbr600rr-2003": {
+      "rentals": 5,
+      "days": 5,
+      "revenue": 51250,
+      "riders": 2,
+      "longest_rental_days": 1,
+      "last_end": "2026-10-03"
+    },
+    "sotion-em01": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "jilang-max-pro": {
+      "rentals": 3,
+      "days": 4,
+      "revenue": 26700,
+      "riders": 1,
+      "longest_rental_days": 2,
+      "last_end": "2026-08-22"
+    },
+    "hmd-m02": {
+      "rentals": 0,
+      "days": 0,
+      "revenue": 0,
+      "riders": 0,
+      "longest_rental_days": 0,
+      "last_end": null
+    },
+    "ducati-panigale-s-electro-gold": {
+      "rentals": 3,
+      "days": 3,
+      "revenue": 30500,
+      "riders": 3,
+      "longest_rental_days": 1,
+      "last_end": "2026-09-28"
+    },
+    "aprilia-shiver": {
+      "rentals": 11,
+      "days": 11,
+      "revenue": 111600,
+      "riders": 6,
+      "longest_rental_days": 1,
+      "last_end": "2026-10-10"
+    },
+    "bmw-f800r": {
+      "rentals": 17,
+      "days": 17,
+      "revenue": 161000,
+      "riders": 8,
+      "longest_rental_days": 1,
+      "last_end": "2026-10-10"
+    }
+  },
+  "totals": {
+    "bikes": 32,
+    "rentals": 156,
+    "days": 178,
+    "revenue": 1524632,
+    "riders": 49,
+    "window": "17.06.2026 — 10.10.2026",
+    "cancelled": 11,
+    "monthly": {
+      "2026-10": 13,
+      "2026-08": 44,
+      "2026-06": 6,
+      "2026-07": 33,
+      "2026-09": 60
+    }
+  }
+}
