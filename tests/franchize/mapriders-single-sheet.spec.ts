@@ -186,42 +186,67 @@ describe("map-riders: sheet scrolls to the bottom (2026-10-07 geometry + SSR)", 
   });
 });
 
-// ── Task 84: game-map skins (2026-10-11 simplified) ───────────────────────
+// ── Task 84 final: skins DITCHED, basemap made theme-honest (2026-10-11) ──
 // Boss 2026-10-08: «map stylized as red dead redemption… maybe like gta» →
-// light = RDR2 parchment (mild sepia + paper edge burn), dark = GTA night
-// (contrast/saturate bump + dark edge falloff).
-// Boss 2026-10-11: «it looks odd, please try to improve or ditch styling».
-// The Vice City follow-up (e07dd1f04) stacked three decoration layers —
-// hue-rotated tiles + a full-surface Miami sunset wash (magenta horizon
-// band across the map) + a screen-blended neon corner-glow overlay — and
-// fought the routes/markers/labels that ARE the content. Stripped back to
-// a single tasteful layer per skin: mild tile filter + edge-only vignette.
-// The neon overlay div and its CSS rule are gone; the skin stays opt-in.
-describe("map-riders: game-map skins (task 84, simplified)", () => {
-  it("map-riders passes a skinMode derived from the resolved tile layer", () => {
-    expect(client).toContain("skinMode={finalTileLayer");
-    expect(client).toContain('"cartodb-light" || finalTileLayer === "osm" ? "light" : "dark"');
+// skins tried twice (RDR2 parchment / GTA night, then the Vice City tint).
+// Boss 2026-10-11, after testing BOTH: «i tested and it looks odd, please
+// try to improve or ditch styling of the map :)» — and «map is still light
+// in dark theme btw, can it be dark?».
+//
+// Resolution: DITCH the styling entirely (no tile filters, no vignettes, no
+// overlays — the vivid route/marker colors carry the game feel) and fix the
+// real daily pain instead: the premium LIGHT custom tile URL
+// (NEXT_PUBLIC_MAP_TILE_URL = MapTiler streets-v2) hijacked EVERY basemap
+// intent, so dark-theme riders stared at a light map. Now a dark tile intent
+// renders dark tiles (NEXT_PUBLIC_MAP_TILE_URL_DARK or stock CARTO dark).
+// Regression guards below keep the skin stack from creeping back.
+describe("map-riders: skins ditched + theme-honest basemaps (task 84 final)", () => {
+  it("map-riders passes no skinMode — the skin system is gone from the client", () => {
+    expect(client).not.toContain("skinMode");
+    expect(client).toContain("isLightCard={isLightCard}");
   });
 
-  it("RacingMap keeps the skin opt-in (classic maps unchanged) and renders only the edge vignette", () => {
+  it("RacingMap has no skin prop, no vignette overlay, no tile filters", () => {
     const map = read("components/maps/RacingMap.tsx");
-    expect(map).toContain('skinMode = null');
-    expect(map).toContain('{skinMode ? <div aria-hidden className="mr-map-skin-vignette" /> : null}');
-    // The standalone neon overlay div was removed in the 2026-10-11 simplification.
-    expect(map).not.toContain('mr-map-skin-neon');
+    expect(map).not.toContain("skinMode");
+    expect(map).not.toContain("mr-map-skin");
+    expect(map).toContain("wantsDarkBasemap");
   });
 
-  it("both skins live in globals.css — single tasteful layer, no neon overlay, no sunset wash", () => {
+  it("no skin CSS survives in globals.css (no filters, no vignette, no neon)", () => {
     const css = read("app/globals.css");
-    expect(css).toContain(".mr-map-skin--light .leaflet-tile-pane");
-    expect(css).toContain(".mr-map-skin--dark .leaflet-tile-pane");
-    expect(css).toContain(".mr-map-skin--dark .mr-map-skin-vignette");
-    // The dark vignette must NOT carry a full-surface Miami sunset linear
-    // gradient (the magenta horizon band was the main "odd" element).
-    expect(css).not.toContain("rgba(219, 39, 119");
-    expect(css).not.toContain("rgba(34, 211, 238");
-    // The neon overlay CSS rule and its screen blend must be gone.
-    expect(css).not.toContain(".mr-map-skin-neon");
+    expect(css).not.toContain("mr-map-skin");
+    expect(css).not.toContain("sepia(");
     expect(css).not.toContain("mix-blend-mode: screen");
+  });
+
+  it("dark tile intent is theme-honest: custom LIGHT url must not hijack it", () => {
+    const map = read("components/maps/RacingMap.tsx");
+    // the dark branch reads the dedicated dark override first, then the derived
+    // MapTiler dark sibling (same account key, swapped style slug), then CARTO dark
+    expect(map).toContain('CUSTOM_TILE_URL_DARK || deriveMapTilerDarkUrl(CUSTOM_TILE_URL)');
+    expect(map).toContain('? darkCustomUrl || TILE_LAYERS["cartodb-dark"]');
+    // the light branch keeps the premium custom url
+    expect(map).toContain(": CUSTOM_TILE_URL || TILE_LAYERS[tileLayer] || TILE_LAYERS[\"cartodb-dark\"]");
+    expect(map).toContain('const CUSTOM_TILE_URL_DARK = (process.env.NEXT_PUBLIC_MAP_TILE_URL_DARK || "").trim();');
+  });
+
+  it("light-theme contrast pass: --mr tokens are hoisted to :root (portal-safe) + readable ink tokens exist", () => {
+    // ROOT CAUSE of the light-theme contrast bugs: the vaul sheet portals to
+    // document.body, outside the wrapper div that carried style={{...cssVars}}
+    // — every var(--mr-*) inside the sheet resolved to nothing.
+    expect(client).toContain("documentElement");
+    expect(client).toContain('"--mr-on-accent": onAccentInk');
+    expect(client).toContain('"--mr-accent-text": isLightCard');
+    expect(client).toContain('"--mr-ok"');
+    expect(client).toContain('"--mr-warn"');
+    expect(client).toContain('"--mr-err"');
+    // hardcoded bright text on light cards must not come back
+    // (marker FILLS keep the vivid hues — only popup/sheet TEXT was fixed)
+    expect(client).not.toContain('color: wallPinColor }}');
+    expect(panels).not.toContain('color: crew.theme.isAuto ? "#facc15"');
+    expect(panels).not.toContain("text-emerald-300");
+    expect(client).not.toContain('style={{ color: "#f97316" }}');
+    expect(client).not.toContain('style={{ color: spot.color }}');
   });
 });

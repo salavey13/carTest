@@ -149,7 +149,13 @@ describe("RacingMap: keyed tile-provider override", () => {
 
   it("env override wins over presets; empty env keeps CARTO", () => {
     expect(src).toContain("process.env.NEXT_PUBLIC_MAP_TILE_URL");
-    expect(src).toContain("const source = CUSTOM_TILE_URL || TILE_LAYERS[tileLayer]");
+    // 2026-10-11 theme-honest basemaps: the premium LIGHT custom url must NOT
+    // hijack a dark tile intent — the dark branch reads the dedicated dark
+    // override / derived MapTiler dark sibling first, then the stock CARTO
+    // dark basemap (no key needed).
+    expect(src).toContain("CUSTOM_TILE_URL_DARK || deriveMapTilerDarkUrl(CUSTOM_TILE_URL)");
+    expect(src).toContain("? darkCustomUrl || TILE_LAYERS[\"cartodb-dark\"]");
+    expect(src).toContain(": CUSTOM_TILE_URL || TILE_LAYERS[tileLayer] || TILE_LAYERS[\"cartodb-dark\"]");
   });
 
   it("custom provider gets a configurable attribution (license-safe default)", () => {

@@ -203,6 +203,53 @@ export function safeCssColor(raw: string | null | undefined, fallback = "#f97316
 }
 
 /**
+ * Vivid identity hues → their WCAG-readable "-700" siblings for TEXT on a
+ * LIGHT card. As map marker fills the vivid hues are perfect (orange-500 on
+ * white tiles pops), but reused as popup/sheet TEXT on a white card they
+ * collapse to ~1.5–2.8:1 (boss 2026-10-11: «contrast issues on map-riders
+ * staff — modals, text» — amber #facc15 on white is ≈1.5:1, invisible).
+ * Dark cards keep the vivid hue unchanged.
+ * Unknown / non-hex colors fall back to the card's plain ink token.
+ */
+const CARD_TEXT_DARKEN: Record<string, string> = {
+  // green family
+  "#4ade80": "#15803d", "#22c55e": "#15803d", "#86efac": "#15803d", "#10b981": "#047857",
+  // orange family
+  "#f97316": "#c2410c", "#fb923c": "#c2410c", "#fdba74": "#c2410c", "#ff7a45": "#c2410c",
+  // yellow / amber / gold family
+  "#eab308": "#a16207", "#facc15": "#a16207", "#fde047": "#a16207", "#ffd700": "#a16207",
+  // sky / cyan family
+  "#38bdf8": "#0369a1", "#0ea5e9": "#0369a1", "#7dd3fc": "#0369a1",
+  "#06b6d4": "#0e7490", "#22d3ee": "#0e7490", "#67e8f9": "#0e7490", "#00ffff": "#0e7490",
+  // blue family
+  "#3b82f6": "#1d4ed8", "#60a5fa": "#1d4ed8", "#93c5fd": "#1d4ed8",
+  // red family
+  "#ef4444": "#b91c1c", "#f87171": "#b91c1c", "#fca5a5": "#b91c1c",
+  // violet / purple family
+  "#8b5cf6": "#6d28d9", "#a78bfa": "#6d28d9", "#c4b5fd": "#6d28d9",
+  // pink / teal / lime families
+  "#ec4899": "#be185d", "#f472b6": "#be185d", "#14b8a6": "#0f766e", "#2dd4bf": "#0f766e",
+  "#84cc16": "#4d7c0f", "#a3e635": "#4d7c0f",
+};
+
+/**
+ * Pick a readable TEXT color for a vivid identity hue on the crew card.
+ * `isLightCard` = the card surface the text sits on (sheet card / popup
+ * wrapper). On dark cards the vivid hue passes as-is; on light cards a
+ * darkened sibling is returned; anything unrecognized degrades to the card
+ * ink token so DB-authored colors can never render invisible text.
+ */
+export function readableTextOnCard(
+  hexColor: string,
+  isLightCard: boolean,
+  fallbackTextToken = "var(--mr-text, currentColor)",
+): string {
+  const safe = safeCssColor(hexColor);
+  if (!isLightCard) return safe;
+  return CARD_TEXT_DARKEN[safe.toLowerCase()] ?? fallbackTextToken;
+}
+
+/**
  * Builds a Leaflet divIcon for a POI:
  *   · round picture with a colored ring when `imageUrl` is present — the FA
  *     glyph (if any) is layered UNDERNEATH as a pure-CSS fallback, so a broken

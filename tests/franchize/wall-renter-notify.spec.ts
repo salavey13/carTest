@@ -305,8 +305,10 @@ describe("map-riders sheet: dark tint follows the CARD theme", () => {
     const src = read(MAP);
     expect(src).toContain("isDarkCssColor(crew.theme.palette.bgCard)");
     expect(src).toContain("rgba(2, 6, 23, 0.42)"); // dark sheet tint
-    expect(src).toContain("rgba(255, 255, 255, 0.16)"); // light sheet tint
-    expect(src).toContain(`linear-gradient(${sheetTintTemplate()}, ${sheetTintTemplate()})`);
+    // 2026-10-11 contrast pass: the light card no longer paints a white tint
+    // (an opaque white card + a white wash was a no-op that only muted the
+    // blur) — the tint gradient is applied ONLY for dark cards now.
+    expect(src).toContain('sheetCardDark ? `linear-gradient(${sheetTint}, ${sheetTint})` : undefined');
   });
 
   it("isDarkCssColor: parsable colors are decided by luminance; unparsable → dark (safe default)", () => {
@@ -321,9 +323,6 @@ describe("map-riders sheet: dark tint follows the CARD theme", () => {
     expect(isDarkCssColor(null)).toBe(true);
   });
 
-  function sheetTintTemplate(): string {
-    return "${sheetTint}";
-  }
 });
 
 // ── 8. community page portrait fix ──────────────────────────────────────────

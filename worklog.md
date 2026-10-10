@@ -842,3 +842,25 @@ Work Log:
 Stage Summary:
 - iter52 соответствует ТЗ на живых данных; 403 членов экипажа на веб-таблице починен в обоих экспорт-роутах; монстр Goollil 144 266.85 ₽ → 752.05 ₽, экипаж чист. Push в GitHub временно отбивается «Internal Server Error» (GitHub-side) — коммиты f76c5ed62 + 182f3d9b9 локально, повторить пуш
 - UPDATE: push прошёл со 2-й попытки retry-цикла (ab19bf3d2..b0bff860a → origin/main, Vercel автодеплой) — GitHub 5xx оказался кратковременным
+
+---
+Task ID: 84-final
+Agent: Super Z (main)
+Task: boss 2026-10-11: «i tested and it looks odd, please try to improve or ditch styling of the map :)» + «contrast issues on map-riders staff (modals - text, etc) in light theme for vip-bike» + «map is still light in dark theme btw, can it be dark?»
+
+Work Log:
+- DITCHED the game-map skins entirely (boss tested BOTH iterations — RDR2 parchment and the simplified sepia+vignette — and twice said «it looks odd»): removed .mr-map-skin CSS block (63 lines: sepia tile filters, parchment burn, night falloff vignette), skinMode prop, vignette overlay div from RacingMap. The game feel stays with the vivid route/marker colors on a CLEAN basemap
+- ROOT CAUSE of the light-theme contrast bugs found live (headless Chromium probes): the vaul sheet renders via Drawer.Portal → Radix → document.body, OUTSIDE the wrapper div carrying style={{...cssVars}} — every var(--mr-*) inside the sheet resolved to NOTHING (transparent card bg, dead accent chips, currentColor borders). Fix: hoist --mr-* AND --community-* (wall tokens) onto documentElement in a useLayoutEffect (mirrors useFranchizeTheme), cleanup on unmount
+- New computed ink tokens in cssVars: --mr-accent-text (light → darker hover tone, cyan-600 3.7:1 → cyan-700 4.7:1), --mr-on-accent (readablePaletteTextOnColor: dark ink on gold / near-black on cyan — was near-white on cyan 3.5:1 FAIL), --mr-ok/--mr-warn/--mr-err (per-card-theme status inks replace emerald-300/red-200/amber-200 — 1.3–1.5:1 on white), --mr-accent-warm (meetup titles), light --mr-border = ink-derived hairline (#CCFBF1 on white was 1.06:1 invisible)
+- readableTextOnCard() added to lib/map-poi-marker.ts: vivid marker hues reused as popup/sheet TEXT get their -700 sibling on light cards (amber #facc15 on white 1.53:1, sky #38bdf8 2.14:1, orange #f97316 2.8:1, route colors #4ade80/#eab308/#f97316); dark cards keep vivid hues; unknown DB colors degrade to card ink. Applied to wall-pin popups (author link, blogger chip, label, buttons), catalog popups, meetup popups + sheet cards, NN spot popups, route-badge popups (also got mr-spot-popup-wrapper class — stock dark Leaflet wrapper + light-theme ink was dark-on-dark)
+- Sheet chrome: segmented track/active tabs/legend chips/Start button/Badge/rank/🏆 → token inks; light card gets soft slate shadow (was 45% black), no white tint gradient, scrim eased 30%→10% black in light, PANEL_INSET mixes from card ink
+- Bottom nav active tab: --fr-map-nav-accent sinks 62% toward ink in light theme (cyan on light-gray nav was ≈2.4:1)
+- DARK MAP IN DARK THEME: root cause #2 — NEXT_PUBLIC_MAP_TILE_URL (MapTiler streets-v2, LIGHT style) hijacked every tile intent. Now tileLayer prop carries intent: dark branch → NEXT_PUBLIC_MAP_TILE_URL_DARK → derived MapTiler sibling (dataviz-dark, same account key — owner's key verified 200 on raster tiles) → stock CARTO dark_all; light branch → MapTiler streets-v2 (unchanged). Avoids CARTO's «API KEY REQUIRED» watermark band seen on unauthenticated dark_all tiles
+- Verified LIVE (dev server + playwright probes, both themes): dark → api.maptiler.com/dataviz-dark tiles, light → streets-v2, skin classes gone, drawer resolves --mr-card (#1A1A1A / #FFFFFF), 0 JS errors; screenshots reviewed — dark map IS dark with vivid markers, light map clean with readable sheet
+- Tests: task-84 describe rewritten as regression guards (skin gone, tiles theme-honest, tokens hoisted, no hardcoded bright text); dep-array pins updated in map-wall-interlink; sheet-tint pin updated in wall-renter-notify; tile-override pins updated in map-routes-dirt
+- .env.example documents NEXT_PUBLIC_MAP_TILE_URL_DARK
+
+Stage Summary:
+- vitest FULL 2943 ✓ / 8 skipped / 0 fail; eslint 0 on 8 changed files; typecheck:franchize strict slice ✓ (17 pre-existing transitive debt files outside allowlist untouched)
+- Live probe: scripts/task84-verify-map-skin.mjs repurposed — asserts skinRemoved + theme-honest tiles + drawer token resolution per theme, exit 1 on failure
+- Ops: no Vercel env change REQUIRED (dark map derives dataviz-dark from the existing MapTiler key); optional NEXT_PUBLIC_MAP_TILE_URL_DARK for a hand-picked dark style

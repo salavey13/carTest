@@ -436,7 +436,10 @@ describe("popup polish wiring (interlink v3)", () => {
 
   it("useMemo deps stay honest (handleMakeMeetupFromPost / openExternalUrl listed)", () => {
     const client = read("components/map-riders/MapRidersClientRefactored.tsx");
-    expect(client).toContain("openWallPostFromMap, handleMakeMeetupFromPost, crew.theme.isAuto");
-    expect(client).toContain("openWallComposeFromPoint, openExternalUrl]);");
+    // 2026-10-11: crew.theme.isAuto dropped from wallPinPoints deps — the
+    // popup styles moved to --mr-* tokens (portal-safe), so the memo no
+    // longer reads the flag directly (exhaustive-deps honest again).
+    expect(client).toContain("[geoPins, wallPinColor, openWallPostFromMap, handleMakeMeetupFromPost, bloggerByUserId]");
+    expect(client).toContain("openWallComposeFromPoint, openExternalUrl, isLightCard]);");
   });
 });

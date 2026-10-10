@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -16,10 +16,12 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme } from "next-themes";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
+import { readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { useFranchizeTheme } from "@/app/franchize/hooks/useFranchizeTheme";
 import { useMaps } from "@/lib/maps/useMaps";
 import { MapRidersProvider, useMapRiders } from "@/hooks/useMapRidersContext";
 import { initialsFromName, isDarkCssColor, meetupDraftFromPost, riderDisplayName, yandexMapsRouteUrl } from "@/lib/map-riders";
+import { readableTextOnCard } from "@/lib/map-poi-marker";
 import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import { createCommunityPostAction, getWallStaffFlagAction } from "@/app/franchize/server-actions/community-wall";
 import { timeoutSignal } from "@/lib/timeout-signal";
@@ -236,6 +238,22 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
   const finalTileLayer = crew.theme.isAuto
     ? (resolvedTheme === "light" ? "cartodb-light" : "cartodb-dark")
     : (mapData?.meta.tileLayer || "cartodb-dark");
+
+  // ── Card-theme resolution (2026-10-11 light-theme contrast pass) ──
+  // boss: «contrast issues on map-riders staff — modals, text» in light theme.
+  // Resolve the CONCRETE palette for the card theme (auto mode flips with the
+  // app theme, fixed crews use their static palette) so readable ink tokens
+  // can be COMPUTED (readablePaletteTextOnColor), not just var() indirection.
+  // Declared EARLY: the popup/memo builders below consume isLightCard.
+  const resolvedPalette = crew.theme.isAuto
+    ? (resolvedTheme === "light" ? crew.theme.palettes?.light : crew.theme.palettes?.dark) ?? crew.theme.palette
+    : crew.theme.palette;
+  const sheetCardDark = crew.theme.isAuto
+    ? resolvedTheme === "dark"
+    : isDarkCssColor(crew.theme.palette.bgCard);
+  const isLightCard = !sheetCardDark;
+  const accentHex = resolvedPalette?.accentMain || "#facc15";
+  const onAccentInk = readablePaletteTextOnColor(accentHex, resolvedPalette);
   const { createMeetup } = useMeetupCreator(crewSlug);
   // Общий обработчик конца заезда: и FAB/шит, и сегмент «Топ» деки
   // должны поднять кнопку «Поделиться заездом» (иначе стоп из листа терял interlink).
@@ -265,11 +283,24 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
     // When in auto mode, franchize CSS variables are already set by useFranchizeTheme
     // So we use those variables directly
     if (crew.theme.isAuto) {
-      root.style.setProperty("--fr-map-nav-accent", "var(--franchize-accent-main)");
+      root.style.setProperty(
+        "--fr-map-nav-accent",
+        // 2026-10-11 light-theme contrast pass: the raw accent (vip-bike light
+        // = cyan #0891B2) on the light-gray nav bar is ≈2.4:1 for the 11px
+        // active tab label — sink it toward ink so the active tab reads (AA).
+        resolvedTheme === "light"
+          ? "color-mix(in srgb, var(--franchize-accent-main) 62%, #111113)"
+          : "var(--franchize-accent-main)",
+      );
       root.style.setProperty("--fr-map-nav-text", "var(--franchize-text-primary)");
       root.style.setProperty("--fr-map-nav-bg", "var(--franchize-bg-base)");
     } else {
-      root.style.setProperty("--fr-map-nav-accent", crew.theme.palette.accentMain);
+      root.style.setProperty(
+        "--fr-map-nav-accent",
+        isDarkCssColor(crew.theme.palette.bgBase)
+          ? crew.theme.palette.accentMain
+          : `color-mix(in srgb, ${crew.theme.palette.accentMain} 62%, #111113)`,
+      );
       root.style.setProperty("--fr-map-nav-text", crew.theme.palette.textPrimary);
       root.style.setProperty("--fr-map-nav-bg", crew.theme.palette.bgBase);
     }
@@ -279,7 +310,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
       if (prevText) root.style.setProperty("--fr-map-nav-text", prevText); else root.style.removeProperty("--fr-map-nav-text");
       if (prevBg) root.style.setProperty("--fr-map-nav-bg", prevBg); else root.style.removeProperty("--fr-map-nav-bg");
     };
-  }, [crew.theme.isAuto, crew.theme.palette.accentMain, crew.theme.palette.bgBase, crew.theme.palette.textPrimary]);
+  }, [crew.theme.isAuto, crew.theme.palette.accentMain, crew.theme.palette.bgBase, crew.theme.palette.textPrimary, resolvedTheme]);
 
   useEffect(() => {
     const { documentElement, body } = document;
@@ -722,7 +753,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         // Community tokens (--community-*): same family as the wall's cards —
         // the --mr-* fallbacks keep the popup readable on old embeds.
         <div className="min-w-[200px] max-w-[260px] space-y-1.5 p-1 text-[var(--mr-text)]">
-          <div className="text-sm font-semibold" style={{ color: spot.color }}>
+          <div className="text-sm font-semibold" style={{ color: readableTextOnCard(spot.color, isLightCard) }}>
             {spot.name}
           </div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
@@ -753,7 +784,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         </div>
       );
     },
-    [crew.contacts.telegramBotUsername, openCrewDeeplink, openSpotCheckin],
+    [crew.contacts.telegramBotUsername, openCrewDeeplink, openSpotCheckin, isLightCard],
   );
 
   /** Легенда-фильтр: «all» показывает весь слой, иначе только выбранный kind. */
@@ -842,7 +873,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                 href={`/franchize/${crewSlug}/rider/${pin.authorId}`}
                 onClick={(e) => e.stopPropagation()}
                 className="max-w-[130px] truncate font-semibold transition hover:brightness-125"
-                style={{ color: wallPinColor }}
+                style={{ color: "var(--mr-accent-text)" }}
                 title={`Профиль райдера · ${pin.authorName}`}
               >
                 {pin.authorName}
@@ -857,7 +888,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               return (
                 <div
                   className="flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold"
-                  style={{ borderColor: wallPinColor, color: wallPinColor }}
+                  style={{ borderColor: "color-mix(in srgb, var(--mr-accent-text) 45%, transparent)", color: "var(--mr-accent-text)" }}
                 >
                   <span>
                     📷 Блогер сети · {"★".repeat(blogger.rarityStars)}
@@ -867,7 +898,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                     {blogger.crewIds.length} {pluralRu(blogger.crewIds.length, ["экипаж", "экипажа", "экипажей"])}
                   </span>
                   {blogger.externalAudience != null && (
-                    <span className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: wallPinColor }}>
+                    <span className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: "color-mix(in srgb, var(--mr-accent-text) 45%, transparent)" }}>
                       {/* Task 75: self-declared stats now carry REAL numbers —
                           show the reach, not just the fact of presence (1 =
                           declared, no numbers). */}
@@ -878,7 +909,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               );
             })()}
             {pin.label ? (
-              <div className="truncate text-[11px] font-semibold" style={{ color: wallPinColor }}>
+              <div className="truncate text-[11px] font-semibold" style={{ color: "var(--mr-accent-text)" }}>
                 📍 {pin.label}
               </div>
             ) : null}
@@ -890,7 +921,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                 type="button"
                 onClick={() => openWallPostFromMap(pin.postId)}
                 className="rounded-lg px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition hover:brightness-110"
-                style={{ backgroundColor: wallPinColor, color: crew.theme.isAuto ? "#030712" : crew.theme.palette.bgBase }}
+                style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)" }}
               >
                 Показать в ленте
               </button>
@@ -904,7 +935,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                 }
                 title="Добавить точку встречи в координатах этого поста"
                 className="rounded-lg border px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition hover:brightness-125"
-                style={{ borderColor: wallPinColor, color: wallPinColor }}
+                style={{ borderColor: "color-mix(in srgb, var(--mr-accent-text) 45%, transparent)", color: "var(--mr-accent-text)" }}
               >
                 Точкой на карту
               </button>
@@ -912,7 +943,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
           </div>
         ),
       })),
-    [geoPins, wallPinColor, openWallPostFromMap, handleMakeMeetupFromPost, crew.theme.isAuto, crew.theme.palette.bgBase, bloggerByUserId],
+    [geoPins, wallPinColor, openWallPostFromMap, handleMakeMeetupFromPost, bloggerByUserId],
   );
 
   // ── Каталог × карта: техника с GPS-координатами в specs ────────────────────
@@ -944,7 +975,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               // eslint-disable-next-line @next/next/no-img-element -- catalog image URL, same as the site renders
               <img src={item.imageUrl} alt="" className="h-24 w-full rounded-lg object-cover" />
             ) : null}
-            <div className="text-sm font-semibold" style={{ color: catalogItemPinColor }}>
+            <div className="text-sm font-semibold" style={{ color: "var(--mr-accent-text)" }}>
               {item.title}
             </div>
             {item.subtitle ? <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">{item.subtitle}</div> : null}
@@ -955,7 +986,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
             <Link
               href={`/franchize/${crewSlug}`}
               className="block rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
-              style={{ backgroundColor: catalogItemPinColor, color: crew.theme.isAuto ? "#030712" : crew.theme.palette.bgBase }}
+              style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)" }}
             >
               Смотреть в каталоге
             </Link>
@@ -963,7 +994,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         ),
       }];
     });
-  }, [items, catalogItemPinColor, crewSlug, crew.theme.isAuto, crew.theme.palette.bgBase]);
+  }, [items, catalogItemPinColor, crewSlug]);
 
   const mapPoints = useMemo(() => {
     // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
@@ -1037,7 +1068,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               <img src={m.photo_url.trim()} alt={m.title} className="h-24 w-full rounded-lg object-cover" />
             </button>
           ) : null}
-          <div className="text-sm font-semibold" style={{ color: "#f97316" }}>
+          <div className="text-sm font-semibold" style={{ color: readableTextOnCard("#f97316", isLightCard) }}>
             {m.title}
           </div>
           {m.comment ? <div className="text-xs opacity-80">{m.comment}</div> : null}
@@ -1059,7 +1090,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               type="button"
               onClick={() => openWallComposeFromPoint({ lat: m.lat, lng: m.lon, label: m.title, text: m.title })}
               className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
-              style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" }}
+              style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)" }}
             >
               Пост на стене
             </button>
@@ -1068,7 +1099,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               onClick={() => openExternalUrl(yandexMapsRouteUrl(m.lat, m.lon))}
               title="Маршрут до точки в Яндекс.Картах"
               className="rounded-lg border px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-125"
-              style={{ borderColor: "var(--mr-accent)", color: "var(--mr-accent)" }}
+              style={{ borderColor: "color-mix(in srgb, var(--mr-accent-text) 45%, transparent)", color: "var(--mr-accent-text)" }}
             >
               Маршрут
             </button>
@@ -1096,7 +1127,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
     return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
     // crew.logoUrl / crewSlug are read inside (HQ avatar, meetup popup link) —
     // codereview N2: stale HQ avatar after a logo change otherwise lingers.
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug, openWallComposeFromPoint, openExternalUrl]);
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug, openWallComposeFromPoint, openExternalUrl, isLightCard]);
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -1298,16 +1329,6 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
     }
   }, [crewSlug, dbUser, dispatch, fetchSnapshot, selectedMeetup]);
 
-  const cssVars = useMemo(() => ({
-    "--mr-accent": crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
-    "--mr-accent-hover": crew.theme.isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover,
-    "--mr-border": crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
-    "--mr-card": crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
-    "--mr-text": crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
-    "--mr-muted": crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
-    "--mr-base": crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
-  }), [crew.theme.isAuto, crew.theme.palette]);
-
   // ── Sheet contrast guard (boss 2026-09-29): the sliding sheet is translucent
   // + backdrop-blur, so a LIGHT tile layer behind a dark sheet bleeds through
   // and washes the content out. A theme-matched tint layer is painted OVER the
@@ -1315,10 +1336,89 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
   // gets a slate-black tint, a light card a whisper of white (dark text stays
   // readable over a dark map). Tint follows the CARD theme, not the app theme
   // (a fixed light crew keeps its light sheet in the rider's dark mode).
-  const sheetCardDark = crew.theme.isAuto
-    ? resolvedTheme === "dark"
-    : isDarkCssColor(crew.theme.palette.bgCard);
-  const sheetTint = sheetCardDark ? "rgba(2, 6, 23, 0.42)" : "rgba(255, 255, 255, 0.16)";
+  // The card theme itself (resolvedPalette/sheetCardDark/isLightCard) resolves
+  // right after useFranchizeTheme above — memos below depend on it.
+
+  const cssVars = useMemo(() => ({
+    "--mr-accent": crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain,
+    "--mr-accent-hover": crew.theme.isAuto ? "var(--franchize-accent-hover)" : crew.theme.palette.accentMainHover,
+    // Accent used AS TEXT on the card: light palettes flip to the darker hover
+    // tone (vip-bike light cyan #0891B2 on white = 3.7:1 → hover #0E7490 = 4.7:1);
+    // dark palettes keep the vivid accent (gold on #1A1A1A ≈ 10.6:1).
+    "--mr-accent-text": isLightCard ? "var(--mr-accent-hover)" : "var(--mr-accent)",
+    // borderSoft tokens like #CCFBF1 vanish on white cards (1.06:1) — a light
+    // card derives a visible hairline from the card ink instead (≈18% alpha).
+    "--mr-border": isLightCard
+      ? "color-mix(in srgb, var(--mr-text) 18%, transparent)"
+      : crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft,
+    "--mr-card": crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard,
+    "--mr-text": crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
+    "--mr-muted": crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary,
+    "--mr-base": crew.theme.isAuto ? "var(--franchize-bg-base)" : crew.theme.palette.bgBase,
+    // Ink ON an accent-filled control (active chips/tabs, primary buttons):
+    // readablePaletteTextOnColor picks dark ink on gold / near-black ink on
+    // cyan. The old value (--mr-base) was near-WHITE in light theme → 3.5:1
+    // on cyan chips, WCAG FAIL.
+    "--mr-on-accent": onAccentInk,
+    // Semantic status inks per card theme — replace hardcoded tailwind
+    // -200/-300 shades that were designed for dark surfaces (emerald-300 on
+    // white ≈ 1.5:1, red-200 ≈ 1.3:1 — invisible).
+    "--mr-ok": isLightCard ? "#047857" : "#6ee7b7",
+    "--mr-warn": isLightCard ? "#b45309" : "#facc15",
+    "--mr-err": isLightCard ? "#b91c1c" : "#fecaca",
+    // Warm identity ink (meetup titles): orange-300/-500 on white 2.3–2.8:1.
+    "--mr-accent-warm": isLightCard ? "#c2410c" : "#fb923c",
+  }), [crew.theme.isAuto, crew.theme.palette, isLightCard, onAccentInk]);
+
+  // ── Portal-safe tokens (ROOT CAUSE of the light-theme contrast bugs) ──
+  // The sheet renders through Drawer.Portal → Radix portal → document.body,
+  // OUTSIDE this wrapper div. CSS custom properties inherit through the DOM
+  // tree, not the React tree — so inside the sheet every var(--mr-*)
+  // resolved to NOTHING: transparent card background, dead accent chips,
+  // borderColor falling back to currentColor. In dark theme the accident
+  // looked passable (dark tint + inherited light text); in light theme the
+  // sheet turned into a frosted void. Hoist the tokens onto
+  // documentElement (mirroring useFranchizeTheme) so portal content
+  // resolves them 1:1. --community-* (the wall segment's tokens, normally
+  // set by page.tsx on <main>) get the same hoist — the wall lives in the
+  // portal too.
+  const effectImpl = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+  effectImpl(() => {
+    const root = document.documentElement;
+    const hoisted = [
+      ...Object.keys(cssVars),
+      "--community-accent",
+      "--community-border",
+      "--community-card",
+      "--community-base-soft",
+      "--community-card-soft",
+      "--community-card-faint",
+      "--community-text",
+      "--community-muted",
+      "--community-accent-text",
+    ];
+    for (const [prop, value] of Object.entries(cssVars)) {
+      root.style.setProperty(prop, String(value));
+    }
+    // Wall tokens — page.tsx computes the same set on <main>; the portal
+    // cannot see <main>, so the sheet's wall segment carries its own copy.
+    // Soft-card alphas need CONCRETE hexes (withAlpha parses hex → rgba).
+    const pal = resolvedPalette;
+    root.style.setProperty("--community-accent", crew.theme.isAuto ? "var(--franchize-accent-main)" : crew.theme.palette.accentMain);
+    root.style.setProperty("--community-border", isLightCard ? "color-mix(in srgb, var(--community-text, var(--mr-text)) 18%, transparent)" : crew.theme.isAuto ? "var(--franchize-border-soft)" : crew.theme.palette.borderSoft);
+    root.style.setProperty("--community-card", crew.theme.isAuto ? "var(--franchize-bg-card)" : crew.theme.palette.bgCard);
+    root.style.setProperty("--community-base-soft", withAlpha(pal?.bgBase || "#0A0A0A", 0.35));
+    root.style.setProperty("--community-card-soft", withAlpha(pal?.bgCard || "#1A1A1A", 0.86));
+    root.style.setProperty("--community-card-faint", withAlpha(pal?.bgCard || "#1A1A1A", 0.54));
+    root.style.setProperty("--community-text", crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary);
+    root.style.setProperty("--community-muted", crew.theme.isAuto ? "var(--franchize-text-secondary)" : crew.theme.palette.textSecondary);
+    root.style.setProperty("--community-accent-text", onAccentInk);
+    return () => {
+      for (const prop of hoisted) root.style.removeProperty(prop);
+    };
+  }, [cssVars, resolvedPalette, crew.theme.isAuto, crew.theme.palette, onAccentInk]);
+
+  const sheetTint = sheetCardDark ? "rgba(2, 6, 23, 0.42)" : "rgba(255, 255, 255, 0)";
 
   return (
     <div
@@ -1340,13 +1440,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               bounds={mapData?.bounds || mapBounds || DEFAULT_BOUNDS}
               className="h-full w-full"
               tileLayer={finalTileLayer}
-              /* Game-map skin (task 84): RDR2 parchment on light basemaps,
-                 GTA night on dark ones. Derived from the RESOLVED tile layer
-                 (not the card color) so the filter always matches the tiles
-                 actually rendered — sepia only makes sense on light tiles,
-                 contrast punch only on dark ones. In auto mode this follows
-                 the theme toggle in the profile dropdown 1:1. */
-              skinMode={finalTileLayer === "cartodb-light" || finalTileLayer === "osm" ? "light" : "dark"}
+              isLightCard={isLightCard}
               clustering
               focusPoint={wallFocusPoint}
               onMapClick={(coords) => {
@@ -1372,7 +1466,10 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               Режим VibeMap (резерв) — установи NEXT_PUBLIC_MAP_ENGINE=leaflet
             </div>
           )}
-          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/30" />
+          {/* Top/bottom legibility scrim for the floating chrome (pill, legend,
+              FAB). Light map needs only a whisper of it — a 30% black wash on
+              the clean light basemap read as a dirty frame (2026-10-11). */}
+          <div className={`pointer-events-none absolute inset-0 z-10 bg-gradient-to-b via-transparent ${isLightCard ? "from-black/10 to-black/10" : "from-black/30 to-black/30"}`} />
           <MapRidersDebugPanel
             activeRiders={state.liveRiders.size}
             sessionCount={state.sessions.length}
@@ -1445,7 +1542,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                   className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
                   style={
                     spotKindFilter === "all"
-                      ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
+                      ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)", borderColor: "var(--mr-accent)" }
                       : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
                   }
                 >
@@ -1460,7 +1557,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                     className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
                     style={
                       spotKindFilter === kind
-                        ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)", borderColor: "var(--mr-accent)" }
+                        ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)", borderColor: "var(--mr-accent)" }
                         : { color: "var(--mr-text)", borderColor: "var(--mr-border)" }
                     }
                   >
@@ -1519,8 +1616,13 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
           <Drawer.Content className="fixed inset-x-0 bottom-0 z-20 h-[100dvh] pointer-events-none">
             <div className="flex h-full flex-col justify-start">
             <div
-              className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/92 p-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}
-              style={{ backgroundImage: `linear-gradient(${sheetTint}, ${sheetTint})` }}
+              className={`rounded-t-[1.4rem] border border-[var(--mr-border)] bg-[var(--mr-card)]/92 p-3 backdrop-blur-2xl ${activeSnap <= 0.2 ? "pointer-events-none" : "pointer-events-auto"}`}
+              style={{
+                backgroundImage: sheetCardDark ? `linear-gradient(${sheetTint}, ${sheetTint})` : undefined,
+                // Heavy 45% black shadow smeared on the light card — the light
+                // theme gets a soft slate lift instead (2026-10-11 contrast pass).
+                boxShadow: sheetCardDark ? "0 -20px 60px rgba(0, 0, 0, 0.45)" : "0 -20px 60px rgba(15, 23, 42, 0.18)",
+              }}
             ><Drawer.Handle className="pointer-events-auto mx-auto mb-2 h-1.5 w-14 rounded-full bg-[var(--mr-muted)]/35" />
             {/* ── Single-sheet segmented control (Task 60: RidersDrawer merged
                 in) — the two stacked sliding sheets are ONE deck now. The
@@ -1528,7 +1630,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                 drag handle still snaps. No more Мини/Средне/Высоко/Макс
                 button row — that was snap-ui overkill on top of the handle. */}
             <div className="pointer-events-auto mb-3 border-b border-[var(--mr-border)] pb-2.5">
-              <div role="tablist" aria-label="Панель карты" className="grid grid-cols-4 gap-1 rounded-xl p-1" style={{ backgroundColor: "color-mix(in srgb, var(--mr-border) 30%, transparent)" }}>
+              <div role="tablist" aria-label="Панель карты" className="grid grid-cols-4 gap-1 rounded-xl p-1" style={{ backgroundColor: "color-mix(in srgb, var(--mr-text) 8%, transparent)" }}>
                 {SHEET_SEGMENTS.map((seg) => {
                   const SegIcon = seg.icon;
                   const active = sheetSegment === seg.key;
@@ -1540,7 +1642,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                       aria-selected={active}
                       onClick={() => selectSegment(seg.key)}
                       className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition"
-                      style={active ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-base)" } : { color: "var(--mr-muted)" }}
+                      style={active ? { backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)" } : { color: "var(--mr-muted)" }}
                     >
                       <SegIcon className="h-3.5 w-3.5" aria-hidden />
                       {seg.label}
@@ -1629,8 +1731,8 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
                     role="status"
                     className={`basis-full rounded-lg border px-2 py-1 text-[11px] leading-snug ${
                       geoError === "denied"
-                        ? "border-red-400/30 bg-red-500/10 text-red-200"
-                        : "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                        ? "border-red-400/30 bg-red-500/10 text-[var(--mr-err)]"
+                        : "border-amber-400/30 bg-amber-500/10 text-[var(--mr-warn)]"
                     }`}
                   >
                     {geoError === "denied"

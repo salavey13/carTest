@@ -48,9 +48,11 @@ import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-netw
  *  sliding sheet (boss: «polish network tab in sliding on map-riders»). */
 export type MapRidersSheetSegment = "wall" | "list" | "top" | "network";
 
-// Inset surface for nested cards: mixes the border tone into transparency —
+// Inset surface for nested cards: mixes the card INK into transparency —
 // keeps working for every crew palette without alpha-on-var Tailwind tricks.
-const PANEL_INSET = { backgroundColor: "color-mix(in srgb, var(--mr-border) 22%, transparent)", borderColor: "var(--mr-border)" } as const;
+// (was: mixed from --mr-border; the light border is now itself a translucent
+// ink hairline, so mixing from it produced a ~4% wash — invisible.)
+const PANEL_INSET = { backgroundColor: "color-mix(in srgb, var(--mr-text) 6%, transparent)", borderColor: "var(--mr-border)" } as const;
 const PANEL_CARD = { backgroundColor: "var(--mr-card)", borderColor: "var(--mr-border)" } as const;
 
 // ── «Лист» segment: riders + meetups + journal (formerly 3 drawer tabs) ──────
@@ -163,7 +165,7 @@ export function SheetListPanel({
                 </span>
                 <div className="text-[11px] text-[var(--mr-muted)]">{session.ride_name || "Без названия"}</div>
               </div>
-              <div className="text-right text-xs" style={{ color: crew.theme.isAuto ? "#facc15" : crew.theme.palette.accentMain }}>
+              <div className="text-right text-xs" style={{ color: "var(--mr-accent-text)" }}>
                 <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
                 <div>{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
               </div>
@@ -216,7 +218,7 @@ export function SheetListPanel({
           )}
           {state.meetups.map((m) => (
             <div key={m.id} className="rounded-xl border px-3 py-2" style={PANEL_CARD}>
-              <div className="text-sm font-medium" style={{ color: crew.theme.isAuto ? "#fb923c" : crew.theme.palette.accentMain }}>
+              <div className="text-sm font-medium" style={{ color: "var(--mr-accent-warm)" }}>
                 {m.title}
               </div>
               {m.comment && <div className="text-xs text-[var(--mr-muted)]">{m.comment}</div>}
@@ -265,7 +267,7 @@ export function SheetListPanel({
                     </span>
                     <div className="text-xs text-[var(--mr-muted)]">{session.ride_name || "Без названия"} • {formatRideDuration(0)}</div>
                   </div>
-                  <div className="text-right text-sm text-emerald-300">
+                  <div className="text-right text-sm text-[var(--mr-ok)]">
                     <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
                     <div className="text-xs">{Number(session.latest_speed_kmh || 0).toFixed(0)} км/ч</div>
                   </div>
@@ -285,7 +287,7 @@ export function SheetListPanel({
                   <div className="text-sm font-medium text-[var(--mr-text)]">{session.rider_name}</div>
                   <div className="text-xs text-[var(--mr-muted)]">{session.ride_name || "Без названия"} • {formatRideDuration(session.duration_seconds)}</div>
                 </div>
-                <div className="text-right text-sm text-emerald-300">
+                <div className="text-right text-sm text-[var(--mr-ok)]">
                   <div>{Number(session.total_distance_km || 0).toFixed(1)} км</div>
                   <div className="text-xs">avg {Number(session.avg_speed_kmh || 0).toFixed(1)}</div>
                 </div>
@@ -294,7 +296,8 @@ export function SheetListPanel({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="mt-2 h-8 w-full border-emerald-300/40 text-emerald-200"
+                className="mt-2 h-8 w-full"
+                style={{ borderColor: "color-mix(in srgb, var(--mr-ok) 45%, transparent)", color: "var(--mr-ok)" }}
                 onClick={async () => {
                   await fetchSessionDetail(session.id);
                   setIsReplayOpen(true);
@@ -325,12 +328,16 @@ export function SheetListPanel({
 
 // ── «Топ» segment: ride controls + weekly leaderboard (formerly ride tab) ───
 
-export function SheetTopPanel({ crew, onRideStopped }: { crew: FranchizeCrewVM; onRideStopped?: (endedSessionId: string) => void }) {
-  const accentColor = crew.theme.isAuto ? "#facc15" : crew.theme.palette.accentMain || "#facc15";
+export function SheetTopPanel({ onRideStopped }: { crew: FranchizeCrewVM; onRideStopped?: (endedSessionId: string) => void }) {
+  // 2026-10-11 contrast pass: the literal amber (#facc15) was INVISIBLE as
+  // text on light cards (1.5:1). Tokens resolve from :root (portal-safe) and
+  // flip with the card theme: text usages read --mr-accent-text, fills keep
+  // --mr-accent with the computed --mr-on-accent ink.
+  const accentColor = "var(--mr-accent)";
   return (
     <div className="space-y-3">
       <RideControlsPanel accentColor={accentColor} onRideStopped={onRideStopped} />
-      <LeaderboardPanel accentColor={accentColor} />
+      <LeaderboardPanel />
     </div>
   );
 }
@@ -414,7 +421,7 @@ function RideControlsPanel({ accentColor, onRideStopped }: { accentColor: string
     <section className="space-y-3 rounded-2xl border p-3" style={PANEL_CARD}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-[var(--mr-text)]">Эфир и заезд</h3>
-        <Badge className="w-fit border-none" style={{ backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)`, color: accentColor }}>
+        <Badge className="w-fit border-none" style={{ backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)`, color: "var(--mr-accent-text)" }}>
           {state.shareEnabled ? (state.sharePaused ? "пауза" : "в эфире") : "выключен"}
         </Badge>
       </div>
@@ -482,8 +489,8 @@ function RideControlsPanel({ accentColor, onRideStopped }: { accentColor: string
       <Button
         type="button"
         disabled={!canStart}
-        className="w-full text-[var(--mr-base)]"
-        style={{ backgroundColor: accentColor }}
+        className="w-full"
+        style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)" }}
         onClick={startSession}
       >
         <VibeContentRenderer content="::FaLocationArrow::" className="mr-2" />
@@ -517,18 +524,18 @@ function RideControlsPanel({ accentColor, onRideStopped }: { accentColor: string
 
 /** Недельный зал славы (переехал из шита в RidersDrawer, теперь сюда — без
  *  изменений логики; рестайл под --mr-* токены экипажа). */
-function LeaderboardPanel({ accentColor }: { accentColor: string }) {
+function LeaderboardPanel() {
   const { state } = useMapRiders();
 
   return (
     <section className="rounded-2xl border p-3" style={PANEL_CARD}>
       <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--mr-text)]">
-        <span style={{ color: accentColor }}>🏆</span> Недельный зал славы
+        <span style={{ color: "var(--mr-accent-text)" }}>🏆</span> Недельный зал славы
       </h3>
       <div className="mt-3 space-y-2">
         {state.leaderboard.map((row) => (
           <div key={row.userId} className="grid grid-cols-[44px,1fr,72px] items-center gap-2 rounded-xl border px-3 py-2" style={PANEL_INSET}>
-            <div className="text-center font-orbitron text-lg" style={{ color: accentColor }}>#{row.rank}</div>
+            <div className="text-center font-orbitron text-lg" style={{ color: "var(--mr-accent-text)" }}>#{row.rank}</div>
             <div>
               <div className="text-sm font-medium text-[var(--mr-text)]">{row.riderName}</div>
               <div className="text-[11px] text-[var(--mr-muted)]">{row.sessions} заезд(ов) • средняя {row.avgSpeedKmh} км/ч</div>

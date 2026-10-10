@@ -8,7 +8,7 @@ import type { GeoJsonObject } from "geojson";
 import { MapInteractionCapture } from "@/components/maps/MapInteractionCapture";
 import type { PointOfInterest } from "@/lib/map-utils";
 import type { TileLayerPreset } from "@/lib/maps/map-types";
-import { buildPoiMarkerIcon, parsePoiIcon, safeCssColor } from "@/lib/map-poi-marker";
+import { buildPoiMarkerIcon, parsePoiIcon, safeCssColor, readableTextOnCard } from "@/lib/map-poi-marker";
 import { CLUSTER_FLY_ZOOM_CAP, clusterPoiPoints } from "@/lib/map-clusters";
 
 const TILE_LAYERS: Record<TileLayerPreset, string> = {
@@ -27,6 +27,26 @@ const TILE_LAYERS: Record<TileLayerPreset, string> = {
 // redeploy. Invalid/empty values are ignored, the preset stays CARTO.
 const CUSTOM_TILE_URL = (process.env.NEXT_PUBLIC_MAP_TILE_URL || "").trim();
 const CUSTOM_TILE_ATTRIBUTION = (process.env.NEXT_PUBLIC_MAP_TILE_ATTRIBUTION || "").trim();
+/** Optional premium DARK basemap (e.g. a MapTiler dark style). When absent,
+ *  a dark intent falls back to CARTO dark_all — no key needed, always works.
+ *  2026-10-11 fix (boss: «map is still light in dark theme, can it be dark?»):
+ *  the premium LIGHT override (NEXT_PUBLIC_MAP_TILE_URL = MapTiler streets-v2)
+ *  used to hijack EVERY basemap intent, so a dark-theme map-riders map kept
+ *  rendering light streets tiles. Now a light-style custom URL is applied
+ *  ONLY when the resolved tile intent is light; a dark intent gets
+ *  NEXT_PUBLIC_MAP_TILE_URL_DARK, the derived MapTiler dark sibling of the
+ *  same account key, or the stock CARTO dark basemap. */
+const CUSTOM_TILE_URL_DARK = (process.env.NEXT_PUBLIC_MAP_TILE_URL_DARK || "").trim();
+/** MapTiler dark style used when deriving the dark sibling from the light
+ *  custom URL (same account key, swapped style slug — verified the owner's
+ *  key serves dataviz-dark raster tiles). CARTO dark_all remains the fallback
+ *  for non-MapTiler setups; its unauthenticated tiles render an «API KEY
+ *  REQUIRED» watermark band, so the MapTiler sibling is preferred. */
+const MAPTILER_DARK_STYLE = "dataviz-dark";
+const deriveMapTilerDarkUrl = (url: string): string =>
+  url.includes("api.maptiler.com") && url.includes("key=")
+    ? url.replace(/maps\/[^/]+\//, `maps/${MAPTILER_DARK_STYLE}/`)
+    : "";
 
 function collectLatLng(points: PointOfInterest[]): Array<[number, number]> {
   const collected: Array<[number, number]> = [];
@@ -212,10 +232,10 @@ export function RacingMap({
   onMapLongPress,
   onPointClick,
   tileLayer = "cartodb-dark",
-  skinMode = null,
   focusPoint,
   children,
   clustering = false,
+  isLightCard = false,
 }: {
   points: PointOfInterest[];
   bounds: { top: number; bottom: number; left: number; right: number };
@@ -225,22 +245,16 @@ export function RacingMap({
   onPointClick?: (poi: PointOfInterest) => void;
   tileLayer?: TileLayerPreset;
   /**
-   * Task 84 (2026-10-08): game-map skin for map-riders — «map stylized as
-   * Red Dead Redemption, maybe like GTA». Light = RDR2 parchment (mild sepia
-   * on CARTO light + soft paper edge burn), dark = GTA night (gentle
-   * contrast/saturate bump on CARTO dark + dark edge falloff). null =
-   * classic plain map (admin/VPR consumers unchanged).
-   *
-   * 2026-10-11 codereview (boss: «it looks odd»): the Vice City follow-up
-   * (e07dd1f04) had stacked THREE decoration layers — hue-rotated tiles +
-   * a full-surface Miami sunset linear gradient (magenta horizon band
-   * across the map) + a screen-blended neon corner-glow overlay — which
-   * fought the routes/markers/labels that are the actual content. Stripped
-   * back to a single tasteful layer per skin: a mild tile filter + an
-   * edge-only vignette. No full-surface color wash, no neon overlay, no
-   * hue-shift. The Vice feel now comes from the route/marker colors.
+   * Task 84 history (2026-10-08 → 2026-10-11): the game-map skins (RDR2
+   * parchment sepia + GTA night contrast punch, then a Vice City tint) were
+   * tried twice and the boss twice said «it looks odd, please try to improve
+   * or ditch styling of the map». DITCHED — the skin class stack, tile
+   * filters and the edge vignette overlay are gone; the basemap renders
+   * CLEAN in both themes and the game feel is carried by the route/marker
+   * colors themselves. What REPLACED the skin: theme-honest basemaps — a
+   * dark tile intent now actually renders dark tiles (see CUSTOM_TILE_URL_DARK
+   * above), so dark-theme riders get a dark map instead of a light one.
    */
-  skinMode?: "light" | "dark" | null;
   /** Wall × map: fly to a geotagged post's marker (see MapFocusFlyer). */
   focusPoint?: RacingMapFocusPoint | null;
   children?: ReactNode;
@@ -251,6 +265,14 @@ export function RacingMap({
    * Opt-in — admin/vip-geography consumers keep the raw flat layer.
    */
   clustering?: boolean;
+  /**
+   * Contrast hint (2026-10-11): when the consuming surface's card/popup
+   * palette is LIGHT (crew auto mode in the app's light theme), vivid POI
+   * colors reused as popup TEXT get darkened to their readable -700
+   * siblings (orange-500 on white ≈ 2.8:1 → orange-700 4.9:1). Default
+   * false keeps classic consumers (admin/VPR, dark shell) pixel-identical.
+   */
+  isLightCard?: boolean;
 }) {
   const [activeRouteId, setActiveRouteId] = useState<string | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -318,22 +340,25 @@ export function RacingMap({
     ] as [[number, number], [number, number]];
   }, [bounds.bottom, bounds.left, bounds.right, bounds.top, points]);
 
-  const source = CUSTOM_TILE_URL || TILE_LAYERS[tileLayer] || TILE_LAYERS["cartodb-dark"];
-  const attribution = CUSTOM_TILE_URL
-    ? CUSTOM_TILE_ATTRIBUTION || "© OpenStreetMap contributors"
-    : "© OpenStreetMap contributors © CARTO";
-
-  // Game skin classes (see skinMode doc) — absent entirely for classic maps.
-  const skinClass =
-    skinMode === "light"
-      ? "mr-map-skin mr-map-skin--light"
-      : skinMode === "dark"
-        ? "mr-map-skin mr-map-skin--dark"
-        : "";
+  // ── Basemap resolution (2026-10-11 theme-honest tiles) ──
+  // `tileLayer` carries the INTENT: map-riders auto mode passes
+  // "cartodb-dark" when the rider's app theme is dark, "cartodb-light" when
+  // light; fixed crews pass their configured preset. The premium custom URL
+  // (MapTiler streets-v2 — a LIGHT style) must never hijack a dark intent:
+  // that was exactly the «map is still light in dark theme» bug.
+  const wantsDarkBasemap = tileLayer === "cartodb-dark";
+  const darkCustomUrl = CUSTOM_TILE_URL_DARK || deriveMapTilerDarkUrl(CUSTOM_TILE_URL);
+  const source = wantsDarkBasemap
+    ? darkCustomUrl || TILE_LAYERS["cartodb-dark"]
+    : CUSTOM_TILE_URL || TILE_LAYERS[tileLayer] || TILE_LAYERS["cartodb-dark"];
+  const attribution =
+    source === TILE_LAYERS["cartodb-dark"] || source === TILE_LAYERS["cartodb-light"] || source === TILE_LAYERS.osm
+      ? "© OpenStreetMap contributors © CARTO"
+      : CUSTOM_TILE_ATTRIBUTION || "© OpenStreetMap contributors";
 
   return (
     <div
-      className={`relative z-0 ${skinClass} ${className || ""}`}
+      className={`relative z-0 ${className || ""}`}
       style={{ touchAction: "pan-x pan-y pinch-zoom" }}
     >
       <MapContainer
@@ -486,9 +511,13 @@ export function RacingMap({
               icon={icon}
               eventHandlers={{ click: () => setActiveRouteId((prev) => (prev === poi.id ? null : poi.id)) }}
             >
-              <Popup>
+              {/* mr-spot-popup-wrapper: the route-badge popup must follow the
+                  crew --mr-* palette like every other map-riders popup. On the
+                  stock dark Leaflet wrapper the light-theme --mr-text tokens
+                  (#1A1A1A) rendered dark-on-dark — invisible (2026-10-11). */}
+              <Popup className="mr-spot-popup-wrapper">
                 <div className="min-w-[180px] max-w-[240px] space-y-1 p-1 text-[var(--mr-text)]">
-                  <div className="text-sm font-semibold" style={{ color: poi.color }}>
+                  <div className="text-sm font-semibold" style={{ color: readableTextOnCard(poi.color, isLightCard) }}>
                     {poi.name}
                   </div>
                   <div className="text-[10px] uppercase tracking-wider text-[var(--mr-muted)]">
@@ -507,15 +536,6 @@ export function RacingMap({
         <MapFocusFlyer focus={focusPoint ?? null} />
         <MapZoomWatcher onMap={(map) => (mapRef.current = map)} onZoom={setZoom} />
       </MapContainer>
-
-      {/* Game-skin edge vignette (paper burn / night falloff). Sits ABOVE
-          the whole map with pointer-events none — panes inside
-          .leaflet-map-pane form their own stacking context, so interleaving is
-          impossible; the vignette is edge-only so route lines and markers stay
-          crisp. 2026-10-11: the standalone neon corner-glow overlay added in
-          e07dd1f04 was removed — it stacked a second full-surface screen-blend
-          layer on top of an already-busy sunset wash and fought the content. */}
-      {skinMode ? <div aria-hidden className="mr-map-skin-vignette" /> : null}
     </div>
   );
 }
