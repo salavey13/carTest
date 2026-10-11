@@ -4,6 +4,7 @@ import { CalendarCheck2, Clock3, ListChecks, MapPin, Phone, UserRoundCheck } fro
 import { CrewFooter } from "../components/CrewFooter";
 import { CrewHeader } from "../components/CrewHeader";
 import { CatalogClient } from "../components/CatalogClient";
+import { CatalogCardsQuickAdmin } from "../components/CatalogCardsQuickAdmin";
 import { DisplayModeProvider } from "../components/DisplayModeContext";
 import { FranchizeErrorBoundary } from "../components/ErrorBoundary";
 import { ThemeInitializer } from "../components/ThemeInitializer";
@@ -81,6 +82,10 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       >
         <CatalogClient crew={crew} slug={slug} items={items} ctaPolicy={ctaPolicy} />
       </FranchizeErrorBoundary>
+
+      {/* Быстрая админка промо-карточек (owner/co_owner/admin) — boss 2026-10-11:
+          сам компонент проверяет роли и рендерит nothing для остальных. */}
+      <CatalogCardsQuickAdmin slug={crew.slug || slug} />
 
       {slug === "vip-bike" && (
         <section

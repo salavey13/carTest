@@ -28,6 +28,7 @@ import { CURRENT_RENTAL_TEMPLATE_VERSION } from "@/lib/rental-template-version";
 import { parsePerkEquipmentFlags } from "@/app/franchize/lib/equipment-shared";
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets, type RentalContractVariables, WEB_ORDER_DEFAULT_BIKE_DEPOSIT_RUB, WEB_ORDER_DEFAULT_EQUIPMENT_DEPOSIT_RUB } from "@/app/lib/rental-contract-vars";
 import { sanitizeFranchizeOrderMoneyFields } from "@/app/franchize/lib/order-money-sanitize";
+import { safeCardHref } from "@/app/franchize/lib/catalog-cards-shared";
 import {
   buildWebOrderPaymentSplit,
   depositMethodColumnValue as depositMethodColumnValueFor,
@@ -975,7 +976,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
           return {
             id: readPath(tickerItem, ["id"], `ticker-${index + 1}`),
             text,
-            href: readPath(tickerItem, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
+            // Boss round 4 sweep: тот же инъекционный guard, что и у карточек
+            // (легаси-строки тоже не должны пробивать DOM hostile-схемой).
+            href: safeCardHref(readPath(tickerItem, ["href"], `/franchize/${crew.slug ?? safeSlug}`)) || `/franchize/${crew.slug ?? safeSlug}`,
           };
         }),
         promoBanners: readArrayPath<unknown>(franchize, ["catalog", "promoBanners"]).map((item: unknown, index: number) => {
@@ -985,8 +988,11 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             title: readPath(banner, ["title"], ""),
             subtitle: readPath(banner, ["subtitle"], ""),
             code: readPath(banner, ["code"], ""),
-            href: readPath(banner, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
-            imageUrl: readPath(banner, ["imageUrl"], ""),
+            // Boss review round 3 (hardening): href/imageUrl гидратируются через
+            // safeCardHref — javascript:/data://host-схемы не попадают в DOM,
+            // даже если строку записали мимо quick-admin (легаси/конфиг-флоу).
+            href: safeCardHref(readPath(banner, ["href"], ``)),
+            imageUrl: safeCardHref(readPath(banner, ["imageUrl"], "")),
             priority: Number(readPath(banner, ["priority"], 50)),
             activeFrom: readPath(banner, ["activeFrom"], ""),
             activeTo: readPath(banner, ["activeTo"], ""),
@@ -999,8 +1005,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
             id: readPath(ad, ["id"], `ad-${index + 1}`),
             title: readPath(ad, ["title"], ""),
             subtitle: readPath(ad, ["subtitle"], ""),
-            href: readPath(ad, ["href"], `/franchize/${crew.slug ?? safeSlug}`),
-            imageUrl: readPath(ad, ["imageUrl"], ""),
+            href: safeCardHref(readPath(ad, ["href"], ``)),
+            imageUrl: safeCardHref(readPath(ad, ["imageUrl"], "")),
             badge: readPath(ad, ["badge"], ""),
             priority: Number(readPath(ad, ["priority"], 40)),
             activeFrom: readPath(ad, ["activeFrom"], ""),
@@ -1861,6 +1867,35 @@ type BuiltInPromo = {
   value?: number;
 };
 
+/**
+ * Семантика скидки, отдаваемая валидатором КЛИЕНТУ вместе с суммой
+ * (boss codereview 2026-10-11, B1/B2): корзина должна уметь ПЕРЕСЧИТАТЬ
+ * скидку при изменении состава заказа ровно так, как это сделает сервер
+ * на чекауте — иначе показываем «бесплатный заказ», а сервер списывает
+ * фиксированные 5 000 ₽ (B1) либо залипшую скидку от старой суммы (B2).
+ * kind + value + maxDiscount полностью описывают математику сервера:
+ *   full    → скидка = subtotal
+ *   percent → скидка = round(subtotal * value / 100), cap 90% уже в value,
+ *             затем min(subtotal, maxDiscount>0 ? maxDiscount : ∞)
+ *   fixed   → скидка = min(value, subtotal), затем maxDiscount-кап
+ *   bonus   → скидка 0 (описание/бонус без денег)
+ */
+export type FranchizePromoKind = "full" | "fixed" | "percent" | "bonus";
+
+export type FranchizePromoSemantics = {
+  promoKind: FranchizePromoKind;
+  /** ₽ для fixed, проценты для percent, 0 для full/bonus. */
+  promoValue: number;
+  /** Абсолютный кап баннерного промо (0 — без капа). */
+  promoMaxDiscount: number;
+};
+
+function builtInPromoSemantics(promo: BuiltInPromo): FranchizePromoSemantics {
+  if (promo.kind === "full") return { promoKind: "full", promoValue: 0, promoMaxDiscount: 0 };
+  if (promo.kind === "fixed") return { promoKind: "fixed", promoValue: promo.value ?? 0, promoMaxDiscount: 0 };
+  return { promoKind: "percent", promoValue: Math.min(90, Math.max(0, Math.round(promo.value ?? 0))), promoMaxDiscount: 0 };
+}
+
 function builtInPromoDiscount(promo: BuiltInPromo, baseAmount: number): number {
   if (promo.kind === "full") return baseAmount;
   if (promo.kind === "fixed") return Math.min(Math.round(promo.value ?? 0), baseAmount);
@@ -1904,16 +1939,19 @@ function capPromoDiscount(amount: number, baseAmount: number, maxDiscount: numbe
   return maxDiscount > 0 ? Math.min(cappedBySubtotal, Math.round(maxDiscount)) : cappedBySubtotal;
 }
 
-function extractPromoDiscount(banner: PromoValidationBanner, baseAmount: number): { amount: number; description: string } {
+// B1/B2 review (2026-10-11): вместе с суммой возвращаем СЕМАНТИКУ скидки,
+// чтобы корзина пересчитывала её при изменении состава заказа так же, как
+// сервер на чекауте (см. FranchizePromoSemantics).
+function extractPromoDiscount(banner: PromoValidationBanner, baseAmount: number): { amount: number; description: string } & FranchizePromoSemantics {
   if (banner.discountPercent > 0) {
     const percent = Math.min(90, Math.max(1, banner.discountPercent));
     const amount = capPromoDiscount((baseAmount * percent) / 100, baseAmount, banner.maxDiscount);
-    return { amount, description: `${percent}% скидка` };
+    return { amount, description: `${percent}% скидка`, promoKind: "percent", promoValue: percent, promoMaxDiscount: banner.maxDiscount };
   }
 
   if (banner.discountAmount > 0) {
     const amount = capPromoDiscount(banner.discountAmount, baseAmount, banner.maxDiscount);
-    return { amount, description: `${amount.toLocaleString("ru-RU")} ₽ скидка` };
+    return { amount, description: `${amount.toLocaleString("ru-RU")} ₽ скидка`, promoKind: "fixed", promoValue: banner.discountAmount, promoMaxDiscount: banner.maxDiscount };
   }
 
   const promoText = [banner.subtitle, banner.title, banner.ctaLabel, banner.code].filter(Boolean).join(" ");
@@ -1921,7 +1959,7 @@ function extractPromoDiscount(banner: PromoValidationBanner, baseAmount: number)
   if (percentMatch) {
     const percent = Math.min(90, Math.max(1, Number(percentMatch[1])));
     const amount = capPromoDiscount((baseAmount * percent) / 100, baseAmount, banner.maxDiscount);
-    return { amount, description: `${percent}% скидка` };
+    return { amount, description: `${percent}% скидка`, promoKind: "percent", promoValue: percent, promoMaxDiscount: banner.maxDiscount };
   }
 
   const fixedRubMatch = promoText.match(/(?:-|скидка\s*)?(\d[\d\s]{2,})\s*(?:₽|руб\.?)/i);
@@ -1929,15 +1967,21 @@ function extractPromoDiscount(banner: PromoValidationBanner, baseAmount: number)
     const fixedAmount = Number(fixedRubMatch[1].replace(/\s+/g, ""));
     if (Number.isFinite(fixedAmount) && fixedAmount > 0) {
       const amount = capPromoDiscount(fixedAmount, baseAmount, banner.maxDiscount);
-      return { amount, description: `${amount.toLocaleString("ru-RU")} ₽ скидка` };
+      return { amount, description: `${amount.toLocaleString("ru-RU")} ₽ скидка`, promoKind: "fixed", promoValue: fixedAmount, promoMaxDiscount: banner.maxDiscount };
     }
   }
 
-  return { amount: 0, description: banner.subtitle.trim() || banner.title.trim() || "Бонус применён" };
+  return {
+    amount: 0,
+    description: banner.subtitle.trim() || banner.title.trim() || "Бонус применён",
+    promoKind: "bonus",
+    promoValue: 0,
+    promoMaxDiscount: 0,
+  };
 }
 
 export async function validateFranchizePromoCode(input: unknown): Promise<
-  | { success: true; code: string; title: string; discountAmount: number; description: string }
+  | { success: true; code: string; title: string; discountAmount: number; description: string } & FranchizePromoSemantics
   | { success: false; error: string }
 > {
   const parsed = franchizePromoValidationSchema.safeParse(input);
@@ -1978,6 +2022,7 @@ export async function validateFranchizePromoCode(input: unknown): Promise<
       title: builtInPromo.title,
       discountAmount: builtInPromoDiscount(builtInPromo, baseAmount),
       description: builtInPromo.description,
+      ...builtInPromoSemantics(builtInPromo),
     };
   }
 
@@ -2018,6 +2063,9 @@ export async function validateFranchizePromoCode(input: unknown): Promise<
     title: matchedPromo.title || code,
     discountAmount: discount.amount,
     description: discount.description,
+    promoKind: discount.promoKind,
+    promoValue: discount.promoValue,
+    promoMaxDiscount: discount.promoMaxDiscount,
   };
 }
 

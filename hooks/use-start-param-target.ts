@@ -335,9 +335,12 @@ export function computeStaticFastTarget(param: string): string | null {
   // auth. Bare «wheel» / «wheel_of_fortune» / «fortune» обрабатывает
   // START_PARAM_PAGE_MAP выше (главная витрина vip-bike). Слаги franchize —
   // [a-z0-9-], подчёркиваний не содержат, поэтому split("_") безопасен.
+  // Boss review (2026-10-11): без /i — слаги ВСЕГДА в нижнем регистре
+  // (normalizeCrewSlug lowercases); wheel_VIP-Bike не должен резолвиться в
+  // URL, которого не существует.
   if (param.startsWith("wheel_")) {
     const slug = param.substring(6).trim();
-    if (slug && /^[a-z0-9-]{1,64}$/i.test(slug)) return `/franchize/${slug}/wheel`;
+    if (slug && /^[a-z0-9-]{1,64}$/.test(slug)) return `/franchize/${slug}/wheel`;
     return null;
   }
 

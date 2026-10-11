@@ -34,6 +34,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 import { validateFranchizePromoCode } from "@/app/franchize/server-actions/promotions";
+import { computeCartPromoDiscount, type CartAppliedPromo } from "@/app/franchize/lib/cart-promo";
 import {
   WHEEL_SEGMENTS,
   WHEEL_SEGMENT_ANGLE,
@@ -107,6 +108,34 @@ describe("wheel built-in promo codes (server validation)", () => {
     }
   });
 
+  // ── Boss codereview (2026-10-11): сервер отдает КЛИЕНТУ семантику скидки
+  // (promoKind/promoValue/promoMaxDiscount) — корзина пересчитывает скидку
+  // при изменении состава заказа ровно как сервер. Спека пинит контракт.
+  it("validator returns exact discount semantics for every wheel code", async () => {
+    expect(await validateFranchizePromoCode({ slug: "vip-bike", code: "WHEEL1000", baseAmount: 12000 })).toMatchObject({ success: true, promoKind: "fixed", promoValue: 1000, promoMaxDiscount: 0 });
+    expect(await validateFranchizePromoCode({ slug: "vip-bike", code: "WHEEL2000", baseAmount: 12000 })).toMatchObject({ success: true, promoKind: "fixed", promoValue: 2000, promoMaxDiscount: 0 });
+    expect(await validateFranchizePromoCode({ slug: "vip-bike", code: "WHEEL5000", baseAmount: 12000 })).toMatchObject({ success: true, promoKind: "fixed", promoValue: 5000, promoMaxDiscount: 0 });
+    expect(await validateFranchizePromoCode({ slug: "vip-bike", code: "WHEEL15", baseAmount: 12000 })).toMatchObject({ success: true, promoKind: "percent", promoValue: 15, promoMaxDiscount: 0 });
+    expect(await validateFranchizePromoCode({ slug: "vip-bike", code: "PROMORIDE", baseAmount: 12000 })).toMatchObject({ success: true, promoKind: "full", promoValue: 0, promoMaxDiscount: 0 });
+  });
+
+  it("WHEEL_PROMO_CODES amounts match the server BUILT_IN_PROMO_CODES values", async () => {
+    for (const promo of WHEEL_PROMO_CODES) {
+      const result = await validateFranchizePromoCode({ slug: "vip-bike", code: promo.code, baseAmount: 100000 });
+      expect(result.success, `wheel config ${promo.code} must exist server-side`).toBe(true);
+      if (!result.success) continue;
+      if ("percent" in promo && typeof promo.percent === "number") {
+        expect(result.promoKind).toBe("percent");
+        expect(result.promoValue).toBe(promo.percent);
+        expect(result.discountAmount).toBe(Math.round((100000 * promo.percent) / 100));
+      } else if ("amountRub" in promo && typeof promo.amountRub === "number") {
+        expect(result.promoKind).toBe("fixed");
+        expect(result.promoValue).toBe(promo.amountRub);
+        expect(result.discountAmount).toBe(promo.amountRub);
+      }
+    }
+  });
+
   it("codes are case-insensitive like the manual cart input", async () => {
     const result = await validateFranchizePromoCode({ slug: "vip-bike", code: "  wheel5000 ", baseAmount: 12000 });
     expect(result.success).toBe(true);
@@ -164,6 +193,22 @@ describe("wheel-of-fortune lib (pure logic)", () => {
     }
   });
 
+  // Boss review: jitter-экстремумы — случайные значения 0 и 1 дают
+  // максимальный ±0.35·A джиттер; остановка обязана остаться ВНУТРИ
+  // выбранного сектора при любом random на всех 12 сегментах.
+  it("computeTargetRotation keeps EXTREME jitter inside the chosen segment", () => {
+    const ANGLE = WHEEL_SEGMENT_ANGLE;
+    const SEGMENT_HALF = ANGLE / 2;
+    for (const randomValue of [0, 1]) {
+      for (let segmentIndex = 0; segmentIndex < WHEEL_SEGMENTS.length; segmentIndex += 1) {
+        const rotation = computeTargetRotation(segmentIndex, 0, () => randomValue);
+        const centerAfterSpin = ((segmentIndex * ANGLE + rotation) % 360 + 360) % 360;
+        const normalized = centerAfterSpin > 180 ? centerAfterSpin - 360 : centerAfterSpin;
+        expect(Math.abs(normalized), `segment ${segmentIndex}, random ${randomValue}`).toBeLessThanOrEqual(SEGMENT_HALF);
+      }
+    }
+  });
+
   it("computeTargetRotation always spins forward at least fullSpins turns", () => {
     const rotation = computeTargetRotation(3, 720, () => 0.1, 6);
     expect(rotation).toBeGreaterThanOrEqual(720 + 6 * 360 - 360);
@@ -192,5 +237,69 @@ describe("wheel-of-fortune lib (pure logic)", () => {
     expect(formatCooldown(5 * 60 * 60 * 1000 + 12 * 60 * 1000)).toBe("через 5 ч 12 мин");
     expect(formatCooldown(2 * 60 * 60 * 1000)).toBe("через 2 ч");
     expect(formatCooldown(30 * 1000)).toBe("через 1 мин");
+  });
+});
+
+// ── B1/B2 boss codereview: корзина обязана пересчитывать скидку по
+// серверной семантике (kind/value/maxDiscount), а не хранить застывшую сумму.
+describe("cart promo discount mirror (computeCartPromoDiscount)", () => {
+  const makePromo = (patch: Partial<CartAppliedPromo>): CartAppliedPromo => ({
+    slug: "vip-bike",
+    code: "TEST",
+    title: "TEST",
+    description: "",
+    discountAmount: 0,
+    baseAmountAtApply: 0,
+    ...patch,
+  });
+
+  it("B1: a capped WHEEL5000 stays FIXED when the cart grows (no fake free order)", () => {
+    // применён при корзине 4 000 ₽ → скидка capped до 4 000
+    const promo = makePromo({ kind: "fixed", value: 5000, discountAmount: 4000, baseAmountAtApply: 4000 });
+    expect(computeCartPromoDiscount(promo, 4000)).toBe(4000);
+    // корзина выросла до 9 000 — скидка ровно 5 000, а НЕ 9 000
+    expect(computeCartPromoDiscount(promo, 9000)).toBe(5000);
+  });
+
+  it("B1: full-coverage stays exclusive to kind=full (PROMORIDE)", () => {
+    const full = makePromo({ kind: "full", discountAmount: 4000, baseAmountAtApply: 4000 });
+    expect(computeCartPromoDiscount(full, 9000)).toBe(9000);
+  });
+
+  it("B2: percent code recomputes against the LIVE subtotal", () => {
+    // WHEEL15 применён при 12 000 (1 800 ₽), корзина выросла до 24 000
+    const promo = makePromo({ kind: "percent", value: 15, discountAmount: 1800, baseAmountAtApply: 12000 });
+    expect(computeCartPromoDiscount(promo, 24000)).toBe(3600);
+    expect(computeCartPromoDiscount(promo, 8000)).toBe(1200);
+  });
+
+  it("fixed discount never exceeds the live subtotal, maxDiscount caps apply", () => {
+    const promo = makePromo({ kind: "fixed", value: 5000, maxDiscount: 3000 });
+    expect(computeCartPromoDiscount(promo, 9000)).toBe(3000);
+    expect(computeCartPromoDiscount(promo, 2000)).toBe(2000);
+  });
+
+  it("percent honors the banner maxDiscount cap like capPromoDiscount", () => {
+    const promo = makePromo({ kind: "percent", value: 15, maxDiscount: 1000 });
+    expect(computeCartPromoDiscount(promo, 24000)).toBe(1000);
+  });
+
+  it("bonus codes discount nothing", () => {
+    const promo = makePromo({ kind: "bonus", discountAmount: 0, baseAmountAtApply: 5000 });
+    expect(computeCartPromoDiscount(promo, 9000)).toBe(0);
+  });
+
+  it("legacy rows (no kind) degrade conservatively to min(stored, subtotal)", () => {
+    // строка из старой сессии: WHEEL5000 capped при базе 4 000
+    const legacy = makePromo({ discountAmount: 4000, baseAmountAtApply: 4000 });
+    // консервативно 4 000 (НЕ «вся корзина бесплатно»), чекаут ревалидирует сервером
+    expect(computeCartPromoDiscount(legacy, 9000)).toBe(4000);
+    expect(computeCartPromoDiscount(legacy, 2000)).toBe(2000);
+  });
+
+  it("zero/negative subtotal always yields zero discount", () => {
+    const promo = makePromo({ kind: "full" });
+    expect(computeCartPromoDiscount(promo, 0)).toBe(0);
+    expect(computeCartPromoDiscount(null, 5000)).toBe(0);
   });
 });

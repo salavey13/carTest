@@ -1104,10 +1104,14 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       return;
     }
     if (appliedPromo.baseAmount !== baseOrderAmount) {
-      setAppliedPromo(null);
-      setPromoMessage({ tone: "info", text: "Сумма заказа изменилась — примените промокод ещё раз." });
+      // B1/B2 review (2026-10-11): состав заказа изменился — НЕ выбрасываем
+      // промокод, а автоматически ревалидируем его против новой суммы (тот
+      // же серверный валидатор, БЕЗ тостов — см. silent).
+      // Так скидка в checkout всегда совпадает с resolveFranchizeCheckoutTotal;
+      // при неуспехе юзер видит причину в поле промокода.
+      void applyPromoByCode(appliedPromo.code, { silent: true });
     }
-  }, [appliedPromo, baseOrderAmount, promo]);
+  }, [appliedPromo, baseOrderAmount, promo, applyPromoByCode]);
 
   useEffect(() => {
     if (recoveryDebounceRef.current) {
@@ -1333,7 +1337,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   };
 
   const applyPromoByCode = useCallback(
-    async (rawCode: string) => {
+    // silent = авто-ревалидация при изменении состава заказа (B1/B2 review,
+    // boss round 2): обновляем сумму без тостов — юзер видит свежую скидку
+    // в итогах; ошибки по-прежнему показываем. Явный ввод — с тостами.
+    async (rawCode: string, opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
       const requestedCode = normalizePromoCode(rawCode);
       setIsPromoValidating(true);
 
@@ -1342,7 +1350,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         if (!result.success) {
           setAppliedPromo(null);
           setPromoMessage({ tone: "error", text: result.error });
-          toast.error(result.error);
+          if (!silent) toast.error(result.error);
           return;
         }
 
@@ -1359,6 +1367,11 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
           baseAmount: baseOrderAmount,
         };
         setAppliedPromo(promoResult);
+        if (silent) {
+          // тихий ре-апплай: только строка-статус, без тостов (анти-спам)
+          setPromoMessage({ tone: "success", text: `${result.code} пересчитан под новый состав заказа.` });
+          return;
+        }
         setPromoMessage({
           tone: "success",
           text: result.discountAmount > 0
@@ -1370,7 +1383,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
         const error = "Не удалось проверить промокод. Попробуйте ещё раз.";
         setAppliedPromo(null);
         setPromoMessage({ tone: "error", text: error });
-        toast.error(error);
+        if (!silent) toast.error(error);
       } finally {
         setIsPromoValidating(false);
       }

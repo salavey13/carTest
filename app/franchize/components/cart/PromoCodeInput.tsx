@@ -59,6 +59,11 @@ export function PromoCodeInput({ slug, crew, baseAmount, appliedPromo, onApply, 
         description: result.description,
         discountAmount: result.discountAmount,
         baseAmountAtApply: baseAmount,
+        // B1/B2 review: сохраняем серверную семантику скидки — корзина
+        // пересчитывает её при изменении состава заказа как сервер.
+        kind: result.promoKind,
+        value: result.promoValue,
+        maxDiscount: result.promoMaxDiscount,
       });
       setCode("");
     } catch {
@@ -100,6 +105,10 @@ export function PromoCodeInput({ slug, crew, baseAmount, appliedPromo, onApply, 
           description: result.description,
           discountAmount: result.discountAmount,
           baseAmountAtApply: baseAmount,
+          // B1/B2 review: семантика скидки (см. FranchizePromoSemantics).
+          kind: result.promoKind,
+          value: result.promoValue,
+          maxDiscount: result.promoMaxDiscount,
         });
       } catch {
         if (!cancelled) setError("Не удалось проверить промокод. Попробуйте ещё раз.");

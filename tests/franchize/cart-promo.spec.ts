@@ -144,6 +144,9 @@ describe('cart-applied promo storage (lib/cart-promo)', () => {
 });
 
 describe('computeCartPromoDiscount (live re-cap of the stored promo)', () => {
+  // 2026-10-11 boss review B1/B2: свежие строки несут серверную семантику
+  // (kind/value/maxDiscount) — full-покрытие ТОЛЬКО у kind:"full"; legacy-строки
+  // (без kind, старые сессии) деградируют консервативно в min(stored, subtotal).
   const fullCover: CartAppliedPromo = {
     slug: 'vip-bike',
     code: 'PROMORIDE',
@@ -151,15 +154,24 @@ describe('computeCartPromoDiscount (live re-cap of the stored promo)', () => {
     description: '',
     discountAmount: 12000,
     baseAmountAtApply: 12000,
+    kind: 'full',
+    value: 0,
+    maxDiscount: 0,
   };
 
-  it('a 100% code keeps covering the whole order after it grows', () => {
+  it('a 100% code (kind=full) keeps covering the whole order after it grows', () => {
     expect(computeCartPromoDiscount(fullCover, 24000)).toBe(24000);
     expect(computeCartPromoDiscount(fullCover, 3000)).toBe(3000);
   });
 
+  it('a legacy row without kind degrades conservatively (no fake free order)', () => {
+    const legacy: CartAppliedPromo = { ...fullCover, kind: undefined, value: undefined, maxDiscount: undefined };
+    expect(computeCartPromoDiscount(legacy, 24000)).toBe(12000);
+    expect(computeCartPromoDiscount(legacy, 3000)).toBe(3000);
+  });
+
   it('a fixed-amount code stays capped by its validated amount', () => {
-    const fixed: CartAppliedPromo = { ...fullCover, code: 'FIX500', discountAmount: 500, baseAmountAtApply: 12000 };
+    const fixed: CartAppliedPromo = { ...fullCover, kind: 'fixed', value: 500, code: 'FIX500', discountAmount: 500, baseAmountAtApply: 12000 };
     expect(computeCartPromoDiscount(fixed, 12000)).toBe(500);
     expect(computeCartPromoDiscount(fixed, 300)).toBe(300);
   });

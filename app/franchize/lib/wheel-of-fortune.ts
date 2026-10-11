@@ -92,6 +92,26 @@ export function wheelPromoCodes(): string[] {
 }
 
 /**
+ * Серверная правда о призе по коду: label («1 000 ₽») и человеческое
+ * описание для TG-уведомлений о выигрыше (B3). null — код не колесный.
+ */
+export function wheelPrizeForCode(
+  code: string,
+): { code: string; label: string; description: string } | null {
+  const normalized = code.trim().replace(/\s+/g, "").toUpperCase();
+  const promo = WHEEL_PROMO_CODES.find((item) => item.code === normalized);
+  if (!promo) return null;
+  const kind = "percent" in promo && typeof promo.percent === "number"
+    ? `скидка ${promo.percent}%`
+    : `скидка ${(promo as { amountRub?: number }).amountRub ?? 0} ₽`;
+  return {
+    code: promo.code,
+    label: promo.label,
+    description: `Промокод ${promo.code} — ${kind} на аренду или покупку`,
+  };
+}
+
+/**
  * Взвешенный выбор индекса сегмента. Вызывается ДО запуска анимации:
  * колесо докручивается ровно до выбранного сектора.
  */

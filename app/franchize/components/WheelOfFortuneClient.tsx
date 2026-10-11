@@ -14,8 +14,13 @@
 //    точно до него — визуал всегда совпадает с фактическим призом (в старом
 //    варианте сегмент вычислялся из остатка поворота и мог разойтись с UI);
 //  · лимит 1 крутка / 24 ч на экипаж в localStorage (?demo=1 снимает);
+//    кулдаун пишется на СТАРТЕ крутки (кроме «Ещё раз») — закрытие таба
+//    посреди анимации честно съедает крутку;
 //  · результат ведёт в корзину с ?promo=CODE — корзина валидирует код
-//    сервером и применяет скидку (та же математика, что и ручной ввод).
+//    сервером и применяет скидку (та же математика, что и ручной ввод);
+//  · ВЫИГРЫШ уведомляет экипаж (B3, boss review 2026-10-11): победителю —
+//    DM с промокодом, owner/админам — сводка (server-actions/wheel.ts,
+//    анонимные веб-крутки молча пропускаются).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,12 +28,15 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Copy, Check, RotateCw, Ticket, ShoppingCart, Sparkles } from "lucide-react";
 
+import { getTelegramInitData } from "@/lib/telegram-webapp-init-data";
 import type { FranchizeCrewVM } from "../actions";
 import { useCrewTokens } from "../lib/use-crew-tokens";
+import { notifyFranchizeWheelWinnerAction } from "../server-actions/wheel";
 import {
   WHEEL_SEGMENTS,
   WHEEL_SEGMENT_ANGLE,
   WHEEL_PROMO_CODES,
+  WHEEL_SPIN_COOLDOWN_MS,
   computeTargetRotation,
   pickWeightedSegmentIndex,
   readLastSpinAt,
@@ -58,6 +66,14 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
   const [copied, setCopied] = useState(false);
   const [cooldownMs, setCooldownMs] = useState(0);
   const isDemoModeRef = useRef(false);
+  // B3 review: таймер анимации должен переживать unmount-гигиену —
+  // навигация посреди крутки не должна тостить/писать кулдаун из ниоткуда.
+  const spinTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (spinTimerRef.current !== null) window.clearTimeout(spinTimerRef.current);
+    };
+  }, []);
 
   // ?demo=1 — босс-тест: снимает суточный лимит круток.
   useEffect(() => {
@@ -87,6 +103,22 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
     });
   }, []);
 
+  const dispatchWinnerNotify = useCallback(
+    (promoCode: string) => {
+      // B3 (boss review): победитель получает DM с промокодом, owner/админы —
+      // сводку. Сервер сам верифицирует initData, перепроверит код по
+      // WHEEL_PROMO_CODES и задедуплирует (1 раз/сутки) — клиент fire-and-forget:
+      // уведомление не должно задерживать показ результата.
+      const initData = getTelegramInitData();
+      if (!initData) return; // анонимный веб-визит — сервер всё равно no-op
+      const targetSlug = crew.slug || slug;
+      void notifyFranchizeWheelWinnerAction({ slug: targetSlug, promoCode, initData }).catch(() => {
+        // никогда не роняем UI из-за уведомления
+      });
+    },
+    [crew.slug, slug],
+  );
+
   const handleSpinComplete = useCallback(
     (segmentIndex: number) => {
       const segment = WHEEL_SEGMENTS[segmentIndex];
@@ -94,8 +126,10 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
 
       if (segment.kind === "promo" && segment.promoCode) {
         setResult({ kind: "promo", segment, promoCode: segment.promoCode });
-        writeLastSpinAt(window.localStorage, slug, Date.now());
+        // Кулдаун уже записан на СТАРТЕ крутки (см. spin) — таб-закрытие
+        // посреди анимации честно съедает крутку.
         toast.success(`Выигрыш: ${segment.label}! Промокод ${segment.promoCode}`);
+        dispatchWinnerNotify(segment.promoCode);
         return;
       }
 
@@ -107,10 +141,9 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
       }
 
       setResult({ kind: "miss", segment });
-      writeLastSpinAt(window.localStorage, slug, Date.now());
       toast.info("Мимо! Возвращайся завтра или следи за акциями.");
     },
-    [slug],
+    [dispatchWinnerNotify],
   );
 
   const spin = useCallback(() => {
@@ -125,10 +158,18 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
     setIsSpinning(true);
 
     const segmentIndex = pickWeightedSegmentIndex();
+    // Кулдаун пишем на СТАРТЕ (промо/мимо съедают крутку сразу): таб-закрытие
+    // или свайп посреди анимации не дают «бесплатную» повторную крутку.
+    // «Ещё раз» (respin) кулдаун НЕ consumes; ?demo=1 — витрина без следов.
+    if (!isDemoModeRef.current && WHEEL_SEGMENTS[segmentIndex].kind !== "respin") {
+      writeLastSpinAt(window.localStorage, slug, Date.now());
+      setCooldownMs(WHEEL_SPIN_COOLDOWN_MS);
+    }
     setRotation((previous) => computeTargetRotation(segmentIndex, previous));
     // Анимация фиксирует ровно выбранный сегмент (см. computeTargetRotation).
-    window.setTimeout(() => handleSpinComplete(segmentIndex), SPIN_DURATION_S * 1000 + 120);
-  }, [cooldownMs, handleSpinComplete, isSpinning]);
+    if (spinTimerRef.current !== null) window.clearTimeout(spinTimerRef.current);
+    spinTimerRef.current = window.setTimeout(() => handleSpinComplete(segmentIndex), SPIN_DURATION_S * 1000 + 120);
+  }, [cooldownMs, handleSpinComplete, isSpinning, slug]);
 
   const copyCode = useCallback(async () => {
     if (!result || result.kind !== "promo") return;
@@ -170,8 +211,8 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-8 lg:flex-row lg:items-start lg:justify-center">
-          {/* Колесо */}
-          <div className="relative mx-auto aspect-square w-full max-w-[340px] shrink-0">
+          {/* Колесо — декоративное, результат озвучиваем в панели справа */}
+          <div className="relative mx-auto aspect-square w-full max-w-[340px] shrink-0" aria-hidden="true">
             {/* Указатель сверху */}
             <div
               className="absolute left-1/2 top-[-6px] z-20 h-0 w-0 -translate-x-1/2"
@@ -241,8 +282,8 @@ export function WheelOfFortuneClient({ crew, slug }: WheelOfFortuneClientProps) 
             </div>
           </div>
 
-          {/* Панель результата / призы */}
-          <div className="w-full max-w-sm space-y-4">
+          {/* Панель результата / призы — aria-live: скринридер слышит выигрыш */}
+          <div className="w-full max-w-sm space-y-4" role="status" aria-live="polite">
             <button
               type="button"
               onClick={spin}
