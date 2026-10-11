@@ -885,3 +885,22 @@ Stage Summary:
 - Коммит 2a130ceaa (ребейз на 84c6e686a, push в origin/main OK, Vercel автодеплой подхватит)
 - Контракт колеса↔сервера спинится тестами: сегмент ссылается на код строкой, wheel-promo.spec сверяет обе стороны — новая награда = +1 строка в WHEEL_SEGMENTS + WHEEL_PROMO_CODES + BUILT_IN_PROMO_CODES
 - Ссылки для экипажа: web rental.vip-bike.ru/franchize/vip-bike/wheel · бот t.me/oneBikePlsBot/app?startapp=wheel_vip-bike · демо без лимита ?demo=1
+
+---
+Task ID: 93-posts-pop
+Agent: Super Z (main)
+Task: boss 2026-10-11: «nice, please make posts related icons on map POP ;)» — the wall's geotag pins must really stand out on the map-riders map.
+
+Work Log:
+- POSTS POP ENGINE: buildPoiMarkerIcon() получил опцию pop (lib/map-poi-marker.ts) — pop подразумевает НОВЫЙ размер xl (46px, на ступень ВЫШЕ HQ lg 40px) и заменяет еле заметное белое дыхание halo на 4 эффекта на ОДНОМ 2.8s такте: (1) два сонар-кольца цвета пина (инлайн border-color, второе кольцо с delay 1.4s — постоянный радарный пинг), (2) акцентное свечение диска (--mr-poi-glow через color-mix 60%), (3) heartbeat-пульс диска scale 1→1.08, (4) XL-размер. Кольца — СОСЕДИ диска в html divIcon (у диска overflow:hidden — кольца обязаны жить на элементе Leaflet, чтобы расширяться ЗА его пределы); рендерятся ДО диска, чтобы диск красился поверх «схлопнутого» кольца (scale .55 < диска — кольцо выходит из-под него, радаром)
+- PointOfInterest: markerSize расширен до "md"|"lg"|"xl" + опция pop (lib/map-utils.ts); RacingMap пробрасывает pop в билдер; MapRidersClientRefactored wallPinPoints: markerSize:"xl" + pop:true (markerHalo снят — pop владеет вниманием, halo-класс для pop не эмитится даже через legacy mr-spot-popup carry-over)
+- CSS (app/globals.css): .mr-poi--xl (46px, glyph 20px, initials 17px), .mr-poi--pop (heartbeat-анимация + статичное свечение; объявлен ПОСЛЕ .mr-poi--cluster — кластеризованный pop-пин сохраняет свечение), .mr-poi__pulse (+--late), keyframes mr-poi-sonar (scale .55→1.85, fade .9→0) и mr-poi-heartbeat; центровка колец отрицательными margin (ключевые кадры монопольно владеют transform). prefers-reduced-motion: кольца display:none, анимации off — статичное свечение и xl-размер остаются
+- Внимание — на МАРКЕРЕ, не на базовой карте (скины уже ditched как «odd»): поп-пины читаются на ОБОИХ basemap (тёмный ring rgba(15,23,42,.55) + белая обводка диска отделены от любого фона)
+- Визуальная проверка LIVE: NEW scripts/task93-pop-pin-probe.mjs (playwright, CHROME_PATH override) — реальный Leaflet + globals.css, dark и light CARTO basemap: 2 поп-пина (amber камера-бейдж + sky фото-аватар) vs спокойный HQ lg; asserts: кольца анимируются (computed transform меняется между кадрами), центровка кольца под диском Δ=0.00px, диск 46±heartbeat px, свечение color(srgb …)/0.6 в computed boxShadow; скриншоты docs/probes/task93-pop-pin-{dark,light}.png — amber/blue пины явно доминируют, HQ спокоен
+- Тесты: map-poi-markers.spec.ts +11 (xl-размер с якорями [46,46]/[23,23]/[0,-25]; ДВА кольца с инлайн-тингом ×2; кольца ДО диска; glow-var color-mix; pop глотает halo даже через mr-spot-popup; pop⇒xl без явного size; НЕ-pop маркеры пиксель-в-пиксель (без колец/глоу, halo на месте); hostile color не инжектится через тинг/глоу (safeCssColor fallback ×2); map-riders opt-in + CSS-движок на месте + reduced-motion)
+- Проверки: vitest FULL 2955 ✓ / 23 skipped / 0 fail; eslint 0 на 5 изменённых файлах; typecheck:franchize strict slice ✓ (те же 17 pre-existing transitive debt файлов вне allowlist)
+
+Stage Summary:
+- Поп-пины постов: xl 46px + сонар цвета экипажа + свечение + heartbeat; авто-тема — фирменный amber VIP BIKE (#facc15), фиксированные экипажи — их accentMain (инлайн тинг каждого пина)
+- Кластеризация не тронута: ниже z10 посты группируются в бабблы (pop-классы заменяются mr-poi--cluster, как и раньше с halo) — низкий зум спокоен, сонар появляется при расхождении
+- Скрипт-пробник переносим (CHROME_PATH), артефакты в docs/probes/ регенерируемые

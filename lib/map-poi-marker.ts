@@ -154,8 +154,18 @@ export interface PoiMarkerOptions {
    * the disc color.
    */
   initials?: string | null;
-  /** "lg" = 40px anchor marker (crew HQ); "sm" = 26px route-start badge; default "md" = 34px. */
-  markerSize?: "sm" | "md" | "lg";
+  /** "lg" = 40px anchor marker (crew HQ); "sm" = 26px route-start badge;
+   *  "xl" = 46px wall-post POP pin; default "md" = 34px. */
+  markerSize?: "sm" | "md" | "lg" | "xl";
+  /**
+   * Wall-post POP (2026-10-11, boss: «make posts related icons on map POP ;)»):
+   * implies the xl size and swaps the white breathing halo for two
+   * accent-colored sonar rings + an accent glow + a heartbeat swell. Rings are
+   * emitted as SIBLING spans of the disc — the disc clips its own overflow,
+   * so the rings must live one level up (on the Leaflet icon element) to
+   * expand past it.
+   */
+  pop?: boolean;
   /** Explicit halo pulse (the legacy mr-spot-popup carry-over still works). */
   halo?: boolean;
   /** Extra classes carried over from the old CircleMarker (halo, entrance). */
@@ -265,6 +275,9 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   // inject extra CSS declarations; see safeCssColor).
   const color = safeCssColor(options.color);
   const extraClasses = (options.markerClassName || "").trim();
+  const isPop = options.pop === true;
+  // POP implies xl — the post pin must be one step ABOVE the HQ anchor.
+  const isXl = isPop || options.markerSize === "xl";
   const isLg = options.markerSize === "lg";
   const isSm = options.markerSize === "sm";
 
@@ -276,13 +289,16 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   if (!wantsImage && !faHtml && !initialsText) return null;
 
   // Legacy carry-over: discovery-layer popups breathe (mr-spot-popup), plus
-  // the explicit opt-in for anchor markers like HQ.
-  const legacyHalo = extraClasses.includes("mr-spot-popup") ? " mr-poi--halo" : "";
-  const optHalo = options.halo ? " mr-poi--halo" : "";
-  const sizeClass = isLg ? " mr-poi--lg" : isSm ? " mr-poi--sm" : "";
+  // the explicit opt-in for anchor markers like HQ. POP pins skip it — the
+  // sonar rings replace the white breathing (two box-shadow/animation
+  // sources would fight over the same properties).
+  const legacyHalo = !isPop && extraClasses.includes("mr-spot-popup") ? " mr-poi--halo" : "";
+  const optHalo = !isPop && options.halo ? " mr-poi--halo" : "";
+  const sizeClass = isXl ? " mr-poi--xl" : isLg ? " mr-poi--lg" : isSm ? " mr-poi--sm" : "";
+  const popClass = isPop ? " mr-poi--pop" : "";
   // Dedupe (a wall pin sets halo explicitly AND inherits it from the legacy
   // mr-spot-popup carry-over — same class twice in the attribute is sloppy).
-  const rootClass = [...new Set(["mr-poi", optHalo.trim(), legacyHalo.trim(), sizeClass.trim(), ...extraClasses.split(/\s+/).filter(Boolean)])]
+  const rootClass = [...new Set(["mr-poi", popClass.trim(), optHalo.trim(), legacyHalo.trim(), sizeClass.trim(), ...extraClasses.split(/\s+/).filter(Boolean)])]
     .filter(Boolean)
     .join(" ");
 
@@ -306,8 +322,22 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
     inner = `<span class="mr-poi__initials" style="color:${readableTextColorOn(color)}">${escAttr(initials)}</span>`;
   }
 
+  // Sonar rings (POP only): two staggered expanding circles in the pin's OWN
+  // accent color. Emitted BEFORE the disc div so the disc paints on top — a
+  // ring at scale .55 is smaller than the disc and emerges from behind it,
+  // radar-style. border-color is inline per pin (color already whitelisted by
+  // safeCssColor + attribute-escaped, so a DB-authored color cannot inject).
+  const pulseHtml = isPop
+    ? `<span class="mr-poi__pulse" aria-hidden="true" style="border-color:${escAttr(color)}"></span>` +
+      `<span class="mr-poi__pulse mr-poi__pulse--late" aria-hidden="true" style="border-color:${escAttr(color)}"></span>`
+    : "";
+  // Accent glow tint for .mr-poi--pop's box-shadow (color-mix keeps it
+  // translucent; declared on the disc so the CSS var sits next to its use).
+  const glowVar = isPop ? `;--mr-poi-glow:color-mix(in srgb, ${escAttr(color)} 60%, transparent)` : "";
+
   const html =
-    `<div class="${rootClass}" style="background-color:${escAttr(color)}">` +
+    pulseHtml +
+    `<div class="${rootClass}" style="background-color:${escAttr(color)}${glowVar}">` +
     inner +
     countBadge +
     `</div>`;
@@ -315,8 +345,8 @@ export function buildPoiMarkerIcon(options: PoiMarkerOptions): L.DivIcon | null 
   return L.divIcon({
     html,
     className: "mr-poi-div-icon",
-    iconSize: isLg ? [40, 40] : isSm ? [26, 26] : [34, 34],
-    iconAnchor: isLg ? [20, 20] : isSm ? [13, 13] : [17, 17],
-    popupAnchor: [0, isLg ? -22 : isSm ? -15 : -19],
+    iconSize: isXl ? [46, 46] : isLg ? [40, 40] : isSm ? [26, 26] : [34, 34],
+    iconAnchor: isXl ? [23, 23] : isLg ? [20, 20] : isSm ? [13, 13] : [17, 17],
+    popupAnchor: [0, isXl ? -25 : isLg ? -22 : isSm ? -15 : -19],
   });
 }

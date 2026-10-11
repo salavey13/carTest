@@ -203,6 +203,17 @@ describe("buildPoiMarkerIcon", () => {
     expect(options.html).not.toContain("mr-poi--lg");
   });
 
+  it("supports the xl POP pin size (wall posts 2026-10-11 «make posts POP ;)»)", () => {
+    const xl = buildPoiMarkerIcon({ color: "#facc15", faName: "FaCameraRetro", markerSize: "xl", pop: true });
+    const options = (xl as unknown as { options: { html: string; iconSize: number[]; iconAnchor: number[]; popupAnchor: number[] } }).options;
+    expect(options.iconSize).toEqual([46, 46]);
+    expect(options.iconAnchor).toEqual([23, 23]);
+    expect(options.popupAnchor).toEqual([0, -25]);
+    expect(options.html).toContain("mr-poi--xl");
+    expect(options.html).toContain("mr-poi--pop");
+    expect(options.html).not.toContain("mr-poi--lg");
+  });
+
   it("whitelists the disc color — a hostile 'red;…' cannot inject CSS declarations", () => {
     expect(safeCssColor("red;background:url(https://evil.test)")).toBe("#f97316");
     expect(safeCssColor("#facc15")).toBe("#facc15");
@@ -231,6 +242,84 @@ describe("buildPoiMarkerIcon", () => {
     const nl = cssSafeUrlForMarker("data:image/png;x\n;background:url(https://evil.test)");
     expect(nl).toContain("%0A");
     expect(nl).not.toContain("\n");
+  });
+});
+
+// ── wall-post pins POP (2026-10-11 «make posts related icons on map POP ;)») ─
+// The wall's geotag pins swap the barely-visible white breathing halo for an
+// XL disc + two accent sonar rings + accent glow + heartbeat. Guards pin the
+// structure (rings BEFORE the disc — the disc paints on top), the tinting
+// (pin's own color, escaped) and the halo hand-off.
+
+describe("wall-post pins POP", () => {
+  const opts = (icon: ReturnType<typeof buildPoiMarkerIcon>) =>
+    (icon as unknown as { options: { html: string; iconSize: number[]; iconAnchor: number[]; popupAnchor: number[] } }).options;
+
+  it("emits TWO staggered sonar rings tinted with the pin's own color", () => {
+    const options = opts(buildPoiMarkerIcon({ color: "#facc15", faName: "FaCameraRetro", markerSize: "xl", pop: true }));
+    // two ring spans (count via the class ATTRIBUTE — the bare substring would
+    // also match inside "mr-poi__pulse--late")
+    expect((options.html.match(/class="mr-poi__pulse[\s"]/g) ?? []).length).toBe(2);
+    expect(options.html).toContain("mr-poi__pulse--late");
+    // inline per-pin tint, twice (both rings)
+    expect((options.html.match(/border-color:#facc15/g) ?? []).length).toBe(2);
+  });
+
+  it("rings render BEFORE the disc — the disc paints on top of the collapsed ring", () => {
+    const options = opts(buildPoiMarkerIcon({ color: "#38bdf8", faName: "FaCameraRetro", markerSize: "xl", pop: true }));
+    expect(options.html.indexOf("mr-poi__pulse")).toBeLessThan(options.html.indexOf('class="mr-poi '));
+  });
+
+  it("disc carries the accent glow var derived from the pin color", () => {
+    const options = opts(buildPoiMarkerIcon({ color: "#facc15", faName: "FaCameraRetro", markerSize: "xl", pop: true }));
+    expect(options.html).toContain("--mr-poi-glow:color-mix(in srgb, #facc15 60%, transparent)");
+  });
+
+  it("pop owns the attention effects — the white breathing halo is dropped", () => {
+    // even via the legacy mr-spot-popup carry-over (wall pins pass it)
+    const options = opts(
+      buildPoiMarkerIcon({ color: "#facc15", faName: "FaCameraRetro", markerSize: "xl", pop: true, markerClassName: "mr-spot-popup" }),
+    );
+    expect(options.html).toContain("mr-poi--pop");
+    expect(options.html).not.toContain("mr-poi--halo");
+  });
+
+  it("pop implies xl even without an explicit markerSize", () => {
+    const options = opts(buildPoiMarkerIcon({ color: "#38bdf8", faName: "FaCameraRetro", pop: true }));
+    expect(options.iconSize).toEqual([46, 46]);
+    expect(options.iconAnchor).toEqual([23, 23]);
+    expect(options.html).toContain("mr-poi--xl");
+  });
+
+  it("non-pop markers stay pixel-identical: no rings, no glow var, halo intact", () => {
+    const options = opts(buildPoiMarkerIcon({ color: "#f97316", faName: "FaLocationDot", markerSize: "lg", halo: true }));
+    expect(options.html).not.toContain("mr-poi__pulse");
+    expect(options.html).not.toContain("--mr-poi-glow");
+    expect(options.html).toContain("mr-poi--halo");
+    expect(options.iconSize).toEqual([40, 40]);
+  });
+
+  it("a hostile DB-authored color cannot inject CSS through the ring tint or glow", () => {
+    const options = opts(buildPoiMarkerIcon({ color: "red;background:url(https://evil.test)", faName: "FaCameraRetro", markerSize: "xl", pop: true }));
+    expect(options.html).not.toContain("evil.test");
+    expect(options.html).toContain("#f97316"); // safeCssColor fallback everywhere
+    expect((options.html.match(/border-color:#f97316/g) ?? []).length).toBe(2);
+  });
+
+  it("map-riders wall pins opt in + the CSS ships the sonar/heartbeat engine", () => {
+    const client = read("components/map-riders/MapRidersClientRefactored.tsx");
+    expect(client).toContain('markerSize: "xl" as const');
+    expect(client).toContain("pop: true");
+
+    const css = read("app/globals.css");
+    expect(css).toContain(".mr-poi--xl");
+    expect(css).toContain(".mr-poi__pulse");
+    expect(css).toContain("@keyframes mr-poi-sonar");
+    expect(css).toContain("@keyframes mr-poi-heartbeat");
+    // rings + heartbeat honor prefers-reduced-motion (static glow + xl remain)
+    const rm = css.slice(css.indexOf("prefers-reduced-motion", css.indexOf(".mr-poi__pulse")));
+    expect(rm).toContain(".mr-poi__pulse");
+    expect(rm).toContain("display: none");
   });
 });
 

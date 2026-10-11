@@ -1,0 +1,2 @@
+dark: pins=2 rings=4 animating=true disc=48.94554138183594px centerΔ=0.00px
+light: pins=2 rings=4 animating=true disc=49.250152587890625px centerΔ=0.00px

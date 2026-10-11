@@ -841,11 +841,15 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
         imageUrl: pin.photoUrl ?? null,
         color: wallPinColor,
         coords: [[pin.lat, pin.lng]] as [number, number][],
-        // 2026-10-05 «highlight post pins more»: big + halo + topmost z,
-        // and they stay individual through the declutter layer down to z10
-        // (riders ungroup only at z14) — the wall literally rides the map.
-        markerSize: "lg",
-        markerHalo: true,
+        // 2026-10-05 «highlight post pins more» → 2026-10-11 «make posts
+        // related icons on map POP ;)»: XL sonar pins — 46px disc, two
+        // staggered accent-colored sonar rings, accent glow, heartbeat swell
+        // (all on the marker, never on the basemap — skins were ditched as
+        // «odd»). Topmost z, and they stay individual through the declutter
+        // layer down to z10 (riders ungroup only at z14) — the wall literally
+        // rides the map.
+        markerSize: "xl" as const,
+        pop: true,
         keepZoom: 10,
         zPriority: 9,
         markerClassName: SPOT_POPUP_CLASSNAME,

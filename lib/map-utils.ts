@@ -91,8 +91,18 @@ export interface PointOfInterest {
    * `initials:АК` icon grammar. Escaped + auto-contrasted by the builder.
    */
   initials?: string | null;
-  /** "lg" = 40px anchor marker with a wider popup offset (crew HQ). */
-  markerSize?: "md" | "lg";
+  /**
+   * "lg" = 40px anchor marker with a wider popup offset (crew HQ);
+   * "xl" = 46px wall-post POP pin (see `pop`).
+   */
+  markerSize?: "md" | "lg" | "xl";
+  /**
+   * Wall-post POP upgrade (2026-10-11, «make posts related icons on map
+   * POP ;)»): XL disc + two accent sonar rings + accent glow + heartbeat
+   * swell. Rendering engine lives in buildPoiMarkerIcon (lib/map-poi-marker.ts)
+   * + the .mr-poi--pop / .mr-poi__pulse CSS blocks.
+   */
+  pop?: boolean;
   /** Explicit halo pulse on the marker (anchor points like HQ). */
   markerHalo?: boolean;
   /**

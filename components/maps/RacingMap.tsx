@@ -414,6 +414,7 @@ export function RacingMap({
               initials: poi.initials ?? initials,
               markerSize: poi.markerSize,
               halo: poi.markerHalo,
+              pop: poi.pop,
               markerClassName: poi.markerClassName,
               count: poi.count,
             });
