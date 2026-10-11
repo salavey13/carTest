@@ -368,7 +368,7 @@ export function SheetNetworkPanel({ network }: { network: CrewNetworkModelResult
     );
   }
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {/* Caption line — same family as the wall's hairline header */}
       <div className="relative flex items-center gap-2 pb-1">
         <h3 className="font-orbitron flex items-center gap-2 text-sm text-[var(--mr-text)]">
@@ -384,21 +384,21 @@ export function SheetNetworkPanel({ network }: { network: CrewNetworkModelResult
           <ExternalLink className="h-3 w-3" aria-hidden />
         </Link>
       </div>
-      {/* Stats chips — parity with the discovery page header */}
+      {/* Stats chips — parity with the discovery page header; the zoom chip
+          names the two mobile gestures (ZOOM-LOD round) right where the
+          fingers land. Full manual = the ℹ️ button inside the canvas. */}
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.nodes.length} экипажей</span>
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.peopleCount} человек</span>
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.connectionCount} связей</span>
+        <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>щипок · двойной тап — зум</span>
       </div>
-      {/* Hint — one line instead of the page's full paragraph (sheet space) */}
-      <p className="text-xs leading-relaxed text-[var(--mr-muted)]">
-        Круг — экипаж (размер — сколько людей), линия — общие люди. Тап по кругу перестраивает сеть вокруг него, круги можно таскать.
-      </p>
       <CrewDiscoveryGraph
         nodes={network.nodes}
         links={network.links}
         bloggers={network.bloggers}
         bloggerLinks={network.bloggerLinks}
+        variant="sheet"
       />
     </div>
   );

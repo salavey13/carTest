@@ -32,15 +32,15 @@ describe("graph canvas — infinite area camera", () => {
   const graph = read("app/franchize/discovery/CrewDiscoveryGraph.tsx");
 
   it("world group under the camera transform (home = identity, no hydration risk)", () => {
-    expect(graph).toContain('<g ref={worldRef} transform="translate(0 0) scale(1)">');
+    expect(graph).toContain('<g ref={worldRef} className="cg-lod" data-lod="mid" transform="translate(0 0) scale(1)">');
     expect(graph).toContain("translate(${cam.x.toFixed(2)} ${cam.y.toFixed(2)}) scale(${cam.k.toFixed(4)})");
     // the camera applies on mount too (before any tween)
     expect(graph).toContain("applyCamera();\n    wakeRef.current();");
   });
 
-  it("zoom bounds are clamped — [0.55 .. 2.4]", () => {
-    expect(graph).toContain("const ZOOM_MIN = 0.55;");
-    expect(graph).toContain("const ZOOM_MAX = 2.4;");
+  it("zoom bounds are clamped — [0.42 .. 3.2] (ZOOM-LOD round widened the range)", () => {
+    expect(graph).toContain("const ZOOM_MIN = 0.42;");
+    expect(graph).toContain("const ZOOM_MAX = 3.2;");
     expect(graph).toContain("Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k))");
   });
 
@@ -50,8 +50,10 @@ describe("graph canvas — infinite area camera", () => {
     expect(graph).toContain("const onSurfacePointerUp = useCallback(");
     // the old click-to-deselect rect is gone — pan must not deselect
     expect(graph).not.toContain('onClick={() => setSelectedId(null)} />');
-    // tap (below slop) on the world floor still returns to the whole network
-    expect(graph).toContain("if (!pan.moved) setSelectedId(null);");
+    // tap (below slop) on the world floor still returns to the whole network —
+    // and a quick SECOND tap is the double-tap zoom (ZOOM-LOD round)
+    expect(graph).toContain("setSelectedId(null); // tap on the world — the whole network");
+    expect(graph).toContain("zoomAt(pt.x, pt.y, DOUBLE_TAP_ZOOM)");
     // pan converts client deltas via the viewBox transform (zoom-agnostic)
     expect(graph).toContain("const cur = toView(event.clientX, event.clientY);");
   });

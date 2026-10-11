@@ -85,6 +85,30 @@
 //       crews; «Рукопожатия-рекорды» — the top shared-people links), one
 //       camera-chip tap away (Граф · Услуги · Рекорды); tapping a row
 //       focuses that crew — the wikipedia dive now has a map.
+//
+//   · ZOOM-LOD round (boss 2026-10-11: «overhaul ui/ux of network tab of
+//     sliding sheet on map-riders — full zoom/pinch support on mobile, make
+//     circle even more miniature but interesting, play with zoom — make
+//     visual details depend on zoom level and handle it dynamically on the
+//     fly»):
+//     — MINIATURE circles: every radius × MINIATURE_SCALE (0.72) — the graph
+//       breathes, and each tiny circle stays interesting via a deterministic
+//       ACCENT ARC on the rim (the crew's share of the network's largest
+//       crew — a capacity gauge, SSR-stable, readable even far out);
+//     — FULL PINCH: a capture-phase pointer registry sees pointers that land
+//       on circles/satellites too (their stopPropagation used to blind the
+//       camera) — two fingers ANYWHERE engage the pinch, an in-flight circle
+//       drag hands the gesture over to the camera, and a quick double-tap
+//       zooms at the finger (or homes the camera when already zoomed in);
+//     — ZOOM LOD: applyCamera stamps data-lod="far|mid|near|macro" on the
+//       world group and a scoped stylesheet cross-fades the detail layers on
+//       the fly — far: labels off, sparse floor, stations dimmed (the
+//       constellation read); mid: the approved reading look; near: service
+//       rim ticks wake up; macro: «N общ.» link badges ride the springs and
+//       the dense floor sharpens. Zero React re-renders — the camera painter
+//       writes it every frame, CSS eases the swaps;
+//     — blogger crews breathe: a slow sky halo marks the distribution layer
+//       without adding a single pixel of chrome.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -133,13 +157,24 @@ const SIM_MAX_NODES = 80;
 /** Screen-pixel distance before a press counts as a drag, not a tap. */
 const TAP_SLOP_PX = 7;
 
+/** ZOOM-LOD round: every crew circle shrinks by this factor — the freed
+ *  canvas is re-invested in zoom-dependent detail (accent arcs, rim ticks,
+ *  link badges). crewCircleRadius keeps its contract; the graph just paints
+ *  a miniature world on top of it. */
+const MINIATURE_SCALE = 0.72;
+/** Double-tap zoom (mobile): a quick second tap on the background is the
+ *  camera gesture, not a missed tap. */
+const DOUBLE_TAP_MS = 340;
+const DOUBLE_TAP_SLOP_PX = 26;
+const DOUBLE_TAP_ZOOM = 1.8;
+
 /** INFINITE AREA — how far the world extends beyond the visible box (share
  *  of the view edge, each side). Circles breathe into this margin via the
  *  physics soft walls, and the infographic stations live out here; the
  *  camera (pan/pinch/wheel/chips) reaches everything. */
 const WORLD_OVERFLOW_RATIO = 0.35;
-const ZOOM_MIN = 0.55;
-const ZOOM_MAX = 2.4;
+const ZOOM_MIN = 0.42;
+const ZOOM_MAX = 3.2;
 /** World infographic stations (right: services, left: handshake records). */
 const STATION_W = 320;
 const STATION_GAP = 96;
@@ -198,6 +233,53 @@ interface ServiceEdgeSpec {
   by: number;
 }
 
+/** Zoom LOD bands — the visual detail level follows the camera on the fly:
+ *  far = the constellation (initials + springs only), mid = the approved
+ *  reading look, near = service rim ticks wake up, macro = link badges +
+ *  sharp floor. applyCamera stamps the band on the world group. */
+type LodBand = "far" | "mid" | "near" | "macro";
+function lodOf(k: number): LodBand {
+  return k < 0.72 ? "far" : k < 1.3 ? "mid" : k < 2 ? "near" : "macro";
+}
+
+/** Deterministic accent arc — the «capacity gauge» on the circle rim: the
+ *  sweep follows the crew's share of the largest crew in the network, so a
+ *  miniature circle still tells you something at a glance (SSR-stable). */
+function accentArcPath(r: number, sweepDeg: number): string {
+  const clamped = Math.max(12, Math.min(338, sweepDeg));
+  const a0 = -Math.PI / 2;
+  const a1 = a0 + (clamped * Math.PI) / 180;
+  const large = clamped > 180 ? 1 : 0;
+  const x0 = Math.cos(a0) * r;
+  const y0 = Math.sin(a0) * r;
+  const x1 = Math.cos(a1) * r;
+  const y1 = Math.sin(a1) * r;
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r.toFixed(2)} ${r.toFixed(2)} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+
+/** Scoped stylesheet for the ZOOM LOD layers — everything is cg-prefixed and
+ *  lives under the world group's data-lod stamp, so nothing leaks globally. */
+const CG_LOD_CSS = `
+.cg-lod .cg-label, .cg-lod .cg-tick, .cg-lod .cg-badge, .cg-lod .cg-halo,
+.cg-lod .cg-floor, .cg-lod .cg-floor-far, .cg-station { transition: opacity 260ms ease; }
+.cg-floor-far { opacity: 0; }
+.cg-lod[data-lod="far"] .cg-label { opacity: 0; }
+.cg-lod[data-lod="far"] .cg-floor { opacity: 0.3; }
+.cg-lod[data-lod="far"] .cg-floor-far { opacity: 1; }
+.cg-lod[data-lod="far"] .cg-station { opacity: 0.22; pointer-events: none; }
+.cg-tick { opacity: 0; }
+.cg-lod[data-lod="near"] .cg-tick, .cg-lod[data-lod="macro"] .cg-tick { opacity: 1; }
+.cg-badge { opacity: 0; }
+.cg-lod[data-lod="macro"] .cg-badge { opacity: 1; }
+/* macro reads by NAME + handshake badges — the count caption would only
+   pile up over the badges at that scale (arcs already encode the size) */
+.cg-lod[data-lod="macro"] .cg-count { opacity: 0; }
+.cg-halo { animation: cg-breathe 3.4s ease-in-out infinite; }
+@keyframes cg-breathe { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.42; } }
+.cg-lod[data-lod="far"] .cg-halo { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .cg-halo { animation: none; } }
+`;
+
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).slice(0, 2);
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
@@ -228,6 +310,7 @@ export function CrewDiscoveryGraph({
   connectionCount,
   bloggers = [],
   bloggerLinks = [],
+  variant = "page",
 }: {
   nodes: CrewNetworkNode[];
   links: CrewNetworkLink[];
@@ -240,6 +323,10 @@ export function CrewDiscoveryGraph({
    *  Optional — older consumers (tests, storybook-ish usages) keep working. */
   bloggers?: CrewNetworkBlogger[];
   bloggerLinks?: CrewNetworkBloggerLink[];
+  /** ZOOM-LOD round: "page" keeps the discovery-page chrome (top margin,
+   *  below-canvas hint); "sheet" strips it — the map-riders deck provides
+   *  its own spacing and the in-canvas legend already covers the manual. */
+  variant?: "page" | "sheet";
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -267,6 +354,15 @@ export function CrewDiscoveryGraph({
     new Map<string, { name: SVGTextElement | null; count: SVGTextElement | null; lastNameY?: string; lastCountY?: string }>(),
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // ── ZOOM-LOD round refs ─────────────────────────────────────────────────
+  /** last LOD band stamped on the world group (write-on-change, no churn) */
+  const lodRef = useRef<LodBand>("mid");
+  /** double-tap detector state — background taps only (bubbles from circles
+   *  never reach the surface handler) */
+  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null);
+  /** macro-zoom link badges — the painter glues them to the springs */
+  const badgeRefs = useRef(new Map<string, SVGGElement>());
 
   // ── INFINITE AREA camera + service-edge refs ──────────────────────────
   const router = useRouter();
@@ -325,6 +421,14 @@ export function CrewDiscoveryGraph({
       "transform",
       `translate(${cam.x.toFixed(2)} ${cam.y.toFixed(2)}) scale(${cam.k.toFixed(4)})`,
     );
+    // ZOOM LOD — visual detail follows the camera on the fly: the band is
+    // stamped on the world group and the scoped stylesheet cross-fades the
+    // layers. Write-on-change: no per-frame attribute churn, no re-render.
+    const band = lodOf(cam.k);
+    if (band !== lodRef.current) {
+      lodRef.current = band;
+      worldRef.current?.setAttribute("data-lod", band);
+    }
   }, []);
   const tweenCameraTo = useCallback(
     (x: number, y: number, k: number) => {
@@ -339,11 +443,18 @@ export function CrewDiscoveryGraph({
   }, []);
 
   // ── derived model (per render — selection switches modes) ─────────────────
+  // MINIATURE round: the whole world (layout, physics, paint) runs on the
+  // scaled radii — spacing stays coherent, the graph just breathes.
   const baseRadii = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const node of nodes) map[node.crewId] = crewCircleRadius(node.memberCount);
+    for (const node of nodes) {
+      map[node.crewId] = Math.round(crewCircleRadius(node.memberCount) * MINIATURE_SCALE);
+    }
     return map;
   }, [nodes]);
+
+  /** Accent-arc denominator — the largest crew in the network (share gauge). */
+  const maxMemberCount = useMemo(() => nodes.reduce((m, n) => Math.max(m, n.memberCount), 1), [nodes]);
 
   const hops = useMemo(() => {
     if (!selectedId) return null;
@@ -731,6 +842,15 @@ export function CrewDiscoveryGraph({
       const rest = link.a.r + link.b.r + st.tuning.springGap;
       const tension = Math.max(0, (dist - rest) / rest);
       pathEl.setAttribute("stroke-width", Math.min(3.4, 1.05 + link.weight * 0.55 + tension * 1.6).toFixed(2));
+      // macro-zoom link badges ride the springs (CSS hides them below macro —
+      // positions only update while the macro band is on the world group)
+      if (lodRef.current === "macro") {
+        const badgeEl = badgeRefs.current.get(`${link.a.id}-${link.b.id}`);
+        badgeEl?.setAttribute(
+          "transform",
+          `translate(${((x1 + x2) / 2).toFixed(1)} ${((y1 + y2) / 2).toFixed(1)})`,
+        );
+      }
     }
     // service-affinity edges follow their satellites (crew motion included)
     for (const [key, meta] of serviceEdgeMeta.current) {
@@ -878,6 +998,46 @@ export function CrewDiscoveryGraph({
     return { x: pt.x, y: pt.y };
   }, []);
 
+  // ── FULL PINCH (capture phase, ZOOM-LOD round) ───────────────────────────
+  // Bubbles from circles/satellites stopPropagation, which used to blind the
+  // camera: a pinch STARTING on a circle was invisible to the surface
+  // handlers. This capture-phase listener sees EVERY pointer before the
+  // stops happen — two fingers anywhere (circle, satellite, station, floor)
+  // engage the pinch, and an in-flight single-pointer circle drag hands the
+  // gesture over to the camera. The bubble-level handlers stay the source of
+  // truth for moves/ups; this layer only guarantees the REGISTRATION.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onCapturePointerDown = (event: PointerEvent) => {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointersRef.current.size !== 2) return;
+      // a circle drag is a one-pointer gesture — pinch outranks it
+      const drag = dragRef.current;
+      if (drag && simRef.current) {
+        const node = simRef.current.nodes.get(drag.id);
+        if (node) {
+          node.fx = null;
+          node.fy = null;
+        }
+        dragRef.current = null;
+      }
+      panRef.current = null;
+      const [p1, p2] = [...pointersRef.current.values()];
+      const v1 = toView(p1.x, p1.y);
+      const v2 = toView(p2.x, p2.y);
+      if (v1 && v2) {
+        pinchRef.current = {
+          lastDist: Math.max(1, Math.hypot(v2.x - v1.x, v2.y - v1.y)),
+          lastMidX: (v1.x + v2.x) / 2,
+          lastMidY: (v1.y + v2.y) / 2,
+        };
+      }
+    };
+    svg.addEventListener("pointerdown", onCapturePointerDown, { capture: true });
+    return () => svg.removeEventListener("pointerdown", onCapturePointerDown, { capture: true });
+  }, [toView]);
+
   // ── infinite-area gestures: pan / pinch / wheel-zoom / zoom buttons ──────
   const zoomAt = useCallback(
     (px: number, py: number, factor: number) => {
@@ -922,6 +1082,14 @@ export function CrewDiscoveryGraph({
    *  means the BACKGROUND (world floor) is pressed: pan, pinch or tap-out. */
   const onSurfacePointerDown = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
+      // The graph is a CAMERA surface, not a sheet-drag surface: stop the
+      // event here so the host drawer (vaul) never even starts tracking a
+      // press that began on the graph floor. vaul 0.9 has a crash class in
+      // its pointerout path (onRelease reads event.target of a stale/null
+      // lastKnown ref when a multi-touch gesture outlives the press) —
+      // starving it of the pointerdown makes that path unreachable. The
+      // sheet keeps its drag handle/header; nothing else changes.
+      event.stopPropagation();
       const svg = svgRef.current;
       if (!svg) return;
       pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1004,15 +1172,39 @@ export function CrewDiscoveryGraph({
     [applyCamera, clampZoom, toView],
   );
 
-  const onSurfacePointerUp = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
-    pointersRef.current.delete(event.pointerId);
-    if (pointersRef.current.size < 2) pinchRef.current = null;
-    const pan = panRef.current;
-    if (pan && pan.id === event.pointerId) {
-      panRef.current = null;
-      if (!pan.moved) setSelectedId(null); // tap on the world — the whole network
-    }
-  }, []);
+  const onSurfacePointerUp = useCallback(
+    (event: React.PointerEvent<SVGSVGElement>) => {
+      pointersRef.current.delete(event.pointerId);
+      if (pointersRef.current.size < 2) pinchRef.current = null;
+      const pan = panRef.current;
+      if (pan && pan.id === event.pointerId) {
+        panRef.current = null;
+        if (!pan.moved) {
+          // background tap — a quick SECOND tap is the mobile zoom gesture:
+          // double-tap zooms at the finger, or homes the camera when already
+          // zoomed in (a two-way toggle). A lone tap clears the focus.
+          const now = performance.now();
+          const last = lastTapRef.current;
+          const isDoubleTap =
+            last != null &&
+            now - last.t < DOUBLE_TAP_MS &&
+            Math.hypot(event.clientX - last.x, event.clientY - last.y) < DOUBLE_TAP_SLOP_PX;
+          lastTapRef.current = isDoubleTap ? null : { t: now, x: event.clientX, y: event.clientY };
+          if (isDoubleTap) {
+            if (camRef.current.k > 1.15) {
+              tweenHome();
+            } else {
+              const pt = toView(event.clientX, event.clientY);
+              if (pt) zoomAt(pt.x, pt.y, DOUBLE_TAP_ZOOM);
+            }
+          } else {
+            setSelectedId(null); // tap on the world — the whole network
+          }
+        }
+      }
+    },
+    [toView, tweenHome, zoomAt],
+  );
 
   // ⌘/Ctrl + wheel = zoom at the pointer (plain wheel keeps scrolling the
   // page — an infinite canvas must not hijack the document scroll)
@@ -1127,7 +1319,7 @@ export function CrewDiscoveryGraph({
   };
 
   return (
-    <div className="mt-6">
+      <div className={variant === "sheet" ? "mt-0" : "mt-6"}>
       {/* ── the graph ─────────────────────────────────────────────────────── */}
       {/* FULLWIDTH at every viewport (wiki round — no 640px floor, no sideways
           pan); phones render the graph in a 640-unit viewBox so circles and
@@ -1136,8 +1328,16 @@ export function CrewDiscoveryGraph({
           while a circle is grabbed). */}
       <div
         ref={wrapRef}
-        className="relative rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)]"
+        data-vaul-no-drag
+        className={`relative rounded-3xl border border-white/10 shadow-[0_30px_80px_-40px_rgba(2,8,23,0.9)] ${
+          // sheet variant: SOLID dark canvas — the deck can be light-themed,
+          // and the graph's white links / white floor / dark label halos are
+          // built for the dark world (on the light deck they used to wash out)
+          variant === "sheet" ? "bg-[#0b1220]" : "bg-white/[0.04]"
+        }`}
       >
+        {/* ZOOM LOD stylesheet — scoped by the cg-* class family, see CG_LOD_CSS */}
+        <style>{CG_LOD_CSS}</style>
         <div className="relative">
           <svg
             ref={svgRef}
@@ -1173,21 +1373,37 @@ export function CrewDiscoveryGraph({
               <pattern id="dotgrid" width="44" height="44" patternUnits="userSpaceOnUse">
                 <circle cx="1.4" cy="1.4" r="1.4" fill="#ffffff" opacity="0.08" />
               </pattern>
+              {/* sparse floor — the far-zoom LOD layer (cross-fades with the
+                  dense grid so the constellation never turns into noise) */}
+              <pattern id="dotgrid-sparse" width="116" height="116" patternUnits="userSpaceOnUse">
+                <circle cx="2" cy="2" r="2" fill="#ffffff" opacity="0.11" />
+              </pattern>
             </defs>
 
             {/* ── INFINITE AREA: the world group lives under the camera —
                 pan/pinch/wheel/chips move this transform, the circles stop
                 clamping against the visible box (soft physics walls) and the
                 freed margin hosts the infographic stations below. ── */}
-            <g ref={worldRef} transform="translate(0 0) scale(1)">
+            <g ref={worldRef} className="cg-lod" data-lod="mid" transform="translate(0 0) scale(1)">
             {/* the world floor — a dot grid across the whole reachable area;
-                it is also the pan/tap surface (svg-level handlers) */}
+                it is also the pan/tap surface (svg-level handlers). Two
+                densities ride the ZOOM LOD: far zoom reads the sparse one,
+                macro sharpens the dense one. */}
             <rect
+              className="cg-floor"
               x={-(overflowPad + 600)}
               y={-(overflowPad + 600)}
               width={view + 2 * (overflowPad + 600)}
               height={view + 2 * (overflowPad + 600)}
               fill="url(#dotgrid)"
+            />
+            <rect
+              className="cg-floor-far"
+              x={-(overflowPad + 600)}
+              y={-(overflowPad + 600)}
+              width={view + 2 * (overflowPad + 600)}
+              height={view + 2 * (overflowPad + 600)}
+              fill="url(#dotgrid-sparse)"
             />
 
             {/* focus guide rings — the «handshake» depth made visible */}
@@ -1269,6 +1485,43 @@ export function CrewDiscoveryGraph({
               ))}
             </g>
 
+            {/* macro-zoom link badges — «N общ.» rides each spring; only real
+                handshakes (weight ≥ 2) get one — painting «1 общ.» on every
+                weak tie turned macro into badge noise. The painter glues them
+                to the live midpoint, CSS shows the layer only at macro. */}
+            <g className="cg-linkbadges" style={{ pointerEvents: "none" }}>
+              {links.filter((link) => link.weight >= 2).map((link) => {
+                const a = initialPositions[link.source];
+                const b = initialPositions[link.target];
+                if (!a || !b) return null;
+                return (
+                  <g
+                    key={`badge-${link.source}-${link.target}`}
+                    ref={(el) => {
+                      if (el) badgeRefs.current.set(`${link.source}-${link.target}`, el);
+                      else badgeRefs.current.delete(`${link.source}-${link.target}`);
+                    }}
+                    className="cg-badge"
+                    transform={`translate(${((a.x + b.x) / 2).toFixed(1)} ${((a.y + b.y) / 2).toFixed(1)})`}
+                  >
+                    <text
+                      textAnchor="middle"
+                      y={-7}
+                      fontSize={10.5}
+                      fontWeight="800"
+                      fill="#bae6fd"
+                      stroke="rgba(4,9,20,0.9)"
+                      strokeWidth="3"
+                      strokeLinejoin="round"
+                      paintOrder="stroke"
+                    >
+                      {link.weight} общ.
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+
             {/* crew circles */}
             <g>
               {nodes.map((node, index) => {
@@ -1324,6 +1577,33 @@ export function CrewDiscoveryGraph({
                     {isSelected && (
                       <circle r={r + 6} fill="none" stroke="#ffffff" strokeWidth="1.6" strokeDasharray="4 6" opacity="0.85" />
                     )}
+                    {/* MINIATURE round: the accent arc — a deterministic
+                        «capacity gauge» showing this crew's share of the
+                        largest crew in the network; even a tiny circle tells
+                        you something at a glance */}
+                    <path
+                      d={accentArcPath(r + 3.2, 40 + 290 * (node.memberCount / maxMemberCount))}
+                      fill="none"
+                      stroke={node.accent}
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      opacity="0.9"
+                      aria-hidden
+                      style={{ pointerEvents: "none" }}
+                    />
+                    {/* ZOOM-LOD round: blogger crews breathe — a slow sky halo
+                        marks the distribution layer without chrome */}
+                    {bloggersByCrew.has(node.crewId) && (
+                      <circle
+                        className="cg-halo"
+                        r={r + 9}
+                        fill="none"
+                        stroke={BLOGGER_COLOR}
+                        strokeWidth="1.4"
+                        aria-hidden
+                        style={{ pointerEvents: "none" }}
+                      />
+                    )}
                     {/* the circle itself */}
                     <circle
                       r={r}
@@ -1359,9 +1639,35 @@ export function CrewDiscoveryGraph({
                         {initialsOf(node.name)}
                       </text>
                     )}
+                    {/* service rim ticks (ZOOM LOD): invisible until the near
+                        band — zoom in and each crew shows WHAT it offers as
+                        tiny colored studs on its rim */}
+                    {node.services.length > 0 && (
+                      <g aria-hidden>
+                        {node.services.slice(0, 2).map((service, tickIndex) => {
+                          const meta = SERVICE_META[service.key];
+                          const angle = (-90 + tickIndex * 52) * (Math.PI / 180);
+                          return (
+                            <circle
+                              key={service.key}
+                              className="cg-tick"
+                              cx={Math.cos(angle) * (r + 8)}
+                              cy={Math.sin(angle) * (r + 8)}
+                              r={4.6}
+                              fill={meta?.color ?? "#7dd3fc"}
+                              stroke="rgba(4,9,20,0.92)"
+                              strokeWidth="1.6"
+                              style={{ pointerEvents: "none" }}
+                            />
+                          );
+                        })}
+                      </g>
+                    )}
                     {/* label block under the circle — name + count micro-caption;
                         the dark paint-order halo keeps both readable over links
-                        and neighbor labels (structure first, paint second) */}
+                        and neighbor labels (structure first, paint second).
+                        The cg-label class rides the ZOOM LOD: far out the labels
+                        fold away and the graph reads as a constellation. */}
                     <text
                       ref={(el) => {
                         const pair = labelRefs.current.get(node.crewId) ?? { name: null, count: null };
@@ -1378,12 +1684,13 @@ export function CrewDiscoveryGraph({
                       strokeWidth="5"
                       strokeLinejoin="round"
                       paintOrder="stroke"
-                      className="transition group-hover:fill-white/95 group-focus-visible:fill-white"
+                      className="cg-label transition group-hover:fill-white/95 group-focus-visible:fill-white"
                       style={{ pointerEvents: "none", userSelect: "none" }}
                     >
                       {truncate(node.name, isSelected ? 24 : 16)}
                     </text>
                     <text
+                      className="cg-label cg-count"
                       ref={(el) => {
                         const pair = labelRefs.current.get(node.crewId) ?? { name: null, count: null };
                         pair.count = el;
@@ -1591,7 +1898,7 @@ export function CrewDiscoveryGraph({
                 <div
                   onPointerDown={(event) => event.stopPropagation()}
                   onPointerUp={(event) => event.stopPropagation()}
-                  className="rounded-2xl border border-white/12 bg-[#0b1220]/95 p-4 shadow-2xl"
+                  className="cg-station rounded-2xl border border-white/12 bg-[#0b1220]/95 p-4 shadow-2xl"
                   style={{ width: STATION_W }}
                 >
                   <p className="text-xs font-black uppercase tracking-wide text-white/60">Услуги сети</p>
@@ -1642,7 +1949,7 @@ export function CrewDiscoveryGraph({
                 <div
                   onPointerDown={(event) => event.stopPropagation()}
                   onPointerUp={(event) => event.stopPropagation()}
-                  className="rounded-2xl border border-white/12 bg-[#0b1220]/95 p-4 shadow-2xl"
+                  className="cg-station rounded-2xl border border-white/12 bg-[#0b1220]/95 p-4 shadow-2xl"
                   style={{ width: STATION_W }}
                 >
                   <p className="text-xs font-black uppercase tracking-wide text-white/60">Рукопожатия-рекорды</p>
@@ -1677,7 +1984,7 @@ export function CrewDiscoveryGraph({
                 <div
                   onPointerDown={(event) => event.stopPropagation()}
                   onPointerUp={(event) => event.stopPropagation()}
-                  className="rounded-2xl border border-sky-400/20 bg-[#0b1220]/95 p-4 shadow-2xl"
+                  className="cg-station rounded-2xl border border-sky-400/20 bg-[#0b1220]/95 p-4 shadow-2xl"
                   style={{ width: STATION_W }}
                 >
                   <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-sky-200/80">
@@ -1798,7 +2105,7 @@ export function CrewDiscoveryGraph({
                   <li>📷 Голубой сателлит — блогер стены; пунктир — он же пишет в другие экипажи (распределение)</li>
                   <li>✋ Круги можно таскать — остальные расступаются</li>
                   <li>☞ Тап по кругу — фокус; тап по фону — вся сеть снова</li>
-                  <li>⤢ Карта больше экрана: тащи фон, зум — щипок или Ctrl/⌘+колесо, станции — чипы внизу</li>
+                  <li>⤢ Карта больше экрана: тащи фон, зум — щипок или двойной тап, Ctrl/⌘+колесо, станции — чипы внизу; детали графа меняются с зумом</li>
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a
@@ -1893,13 +2200,17 @@ export function CrewDiscoveryGraph({
 
       {/* hint lives BELOW the canvas — the canvas bottom edge is flip-label
           territory, an in-canvas hint there collided with crew labels
-          (regression round: the second pile-up) */}
-      <p className="mt-2 text-center text-xs font-semibold text-white/45" aria-hidden>
-        {selected
-          ? "Тап по фону — вернуться ко всей сети"
-          : "Тапни по кругу — сеть перестроится вокруг него · круги можно таскать"}
-        <span className="block sm:inline"> · карта больше экрана: тащи фон, зум — щипок / Ctrl+колесо, станции — чипы внизу</span>
-      </p>
+          (regression round: the second pile-up). Sheet variant strips it —
+          the deck has no room for a second manual, the in-canvas legend
+          button covers it. */}
+      {variant !== "sheet" && (
+        <p className="mt-2 text-center text-xs font-semibold text-white/45" aria-hidden>
+          {selected
+            ? "Тап по фону — вернуться ко всей сети"
+            : "Тапни по кругу — сеть перестроится вокруг него · круги можно таскать"}
+          <span className="block sm:inline"> · карта больше экрана: тащи фон, зум — щипок / двойной тап / Ctrl+колесо, детали графа меняются с зумом</span>
+        </p>
+      )}
 
       {/* ── detail panel (collapsible) ─────────────────────────────────────── */}
       <div ref={panelRef}>
