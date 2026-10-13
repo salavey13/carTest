@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>КЛОНИРУЕМ ПРОЕКТ — GitHub → Vercel → Supabase → Telegram (инструкция для бородатых)</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --paper:#ffffff; --warm:#f6f4ef; --line:#d8d3c8;
+    --gold:#8a6d1d; --gold-bg:#f5efdd; --ok:#0b7a4b; --ok-bg:#e9f4ee;
+    --warn:#8a3b16; --warn-bg:#f9ece3; --code-bg:#f2f0ea; --accent:#1d4ed8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--warm);color:var(--ink);
+    font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:24px 20px 80px}
+  h1{font-size:34px;line-height:1.2;margin:10px 0 6px}
+  h2{font-size:25px;margin:44px 0 12px;padding-top:14px;border-top:3px solid var(--ink)}
+  h3{font-size:19px;margin:26px 0 8px}
+  p{margin:10px 0}
+  .cover{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:34px 30px;margin-top:14px;
+    box-shadow:0 2px 0 var(--line)}
+  .cover .tag{display:inline-block;background:var(--gold-bg);color:var(--gold);font-weight:700;
+    padding:3px 12px;border-radius:999px;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+  .lead{font-size:18px;color:#444}
+  .toc{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:22px 0}
+  .toc ol{margin:6px 0 0;padding-left:22px}
+  .toc a{color:var(--accent);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .stepnum{display:inline-flex;align-items:center;gap:10px}
+  .stepnum .n{background:var(--ink);color:#fff;font-weight:800;width:34px;height:34px;border-radius:8px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+  .box{border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0;background:var(--paper)}
+  .box.ok{background:var(--ok-bg);border-color:var(--ok)}
+  .box.warn{background:var(--warn-bg);border-color:var(--warn)}
+  .box.gold{background:var(--gold-bg);border-color:var(--gold)}
+  .box b.lbl{display:block;font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+  .box.ok b.lbl{color:var(--ok)} .box.warn b.lbl{color:var(--warn)} .box.gold b.lbl{color:var(--gold)}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  code{background:var(--code-bg);padding:1px 6px;border-radius:5px;font-size:.92em;word-break:break-all}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+    overflow-x:auto;font-size:13.5px;line-height:1.5}
+  pre b{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:12px 0;background:var(--paper);font-size:14.5px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--ink);color:#fff;font-weight:600;font-size:13.5px}
+  tr:nth-child(even) td{background:#faf9f6}
+  .req{color:var(--warn);font-weight:700}
+  /* ── pseudo-screenshots ── */
+  .mock{background:#e9e7e1;border:1px solid #c9c4b8;border-radius:12px;padding:0;margin:18px 0;
+    box-shadow:0 3px 10px rgba(0,0,0,.09);overflow:hidden;max-width:640px}
+  .mock .bar{background:#d3cfc6;border-bottom:1px solid #b9b4a8;padding:8px 12px;display:flex;gap:6px;align-items:center}
+  .mock .bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .mock .bar i.r{background:#e2634f}.mock .bar i.y{background:#e8b93f}.mock .bar i.g{background:#77bf72}
+  .mock .bar span{margin-left:8px;color:#6b665c;font-size:12.5px;font-weight:600}
+  .mock .body{background:#fff;padding:18px 20px;font-size:14px}
+  .mock .btn{display:inline-block;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13.5px;
+    border:1px solid transparent}
+  .mock .btn.green{background:#24a148;color:#fff}
+  .mock .btn.dark{background:var(--ink);color:#fff}
+  .mock .btn.ghost{background:#fff;color:var(--ink);border-color:#bbb}
+  .mock .input{border:1.5px solid #b9b4a8;border-radius:8px;padding:8px 12px;color:#777;background:#fff;margin:4px 0}
+  .mock .row{margin:10px 0}
+  .mock .nav{display:flex;gap:14px;font-size:13px;color:#555;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px;flex-wrap:wrap}
+  .mock .nav b{color:var(--ink)}
+  .mock .side{float:left;width:150px;margin-right:16px;font-size:13px;color:#444;line-height:2}
+  .mock .side b{color:var(--ink)}
+  .mock:after{content:"";display:block;clear:both}
+  .arrow{color:var(--warn);font-weight:800}
+  .tap{display:inline-block;background:#ffe9a8;border:2px dashed var(--warn);color:var(--warn);
+    font-weight:800;padding:2px 10px;border-radius:8px;font-size:13px;transform:rotate(-1.5deg)}
+  .check li{margin:6px 0}
+  .small{font-size:13.5px;color:#666}
+  .footer{margin-top:60px;padding-top:16px;border-top:1px solid var(--line);color:#777;font-size:13px}
+  .schema{background:#111;color:#d7ffd7;border-radius:10px;padding:16px 18px;font-size:13px;overflow-x:auto;
+    font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.55}
+  .schema .c{color:#8fd3ff}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="cover">
+  <span class="tag">Инструкция · версия от 2026-10-13</span>
+  <h1>Клонируем весь проект:<br>GitHub → Vercel → Supabase → Telegram</h1>
+  <p class="lead">Ты становишься полным админом своей копии rental-платформы: свой форк на GitHub,
+  свой деплой на Vercel, своя копия базы Supabase (со всеми данными) и свой телеграм-бот.
+  Веб-апп, карточки байков, аренды, договоры, стена, карта — всё работает так же, только <b>у тебя</b>.</p>
+  <p class="small">Сделано на основе живого бэкапа от 13.10.2026 (117 таблиц, 11 716 строк, 19 бакетов storage).
+  Писано для нормальных людей: каждое нажатие показано, каждая кнопка нарисована. Никакой магии.</p>
+</div>
+
+<div class="toc">
+  <b>Маршрут целиком (≈ 60–90 минут, всё бесплатно):</b>
+  <ol>
+    <li><a href="#s0">Подготовка: что должно быть под рукой</a> — 5 мин</li>
+    <li><a href="#s1">GitHub: проверить форк и синкнуть его</a> — 2 мин</li>
+    <li><a href="#s2">Supabase: создать новый проект</a> — 5 мин</li>
+    <li><a href="#s3">Supabase: залить схему (создать все таблицы)</a> — 10 мин</li>
+    <li><a href="#s4">Vercel: подключить форк и задеплоить</a> — 10 мин</li>
+    <li><a href="#s5">Переменные окружения: вписать все ключи</a> — 10 мин</li>
+    <li><a href="#s6">Накатить бэкап (данные + картинки) в Supabase</a> — 15 мин</li>
+    <li><a href="#s7">Телеграм-бот: BotFather, вебапп, вебхук</a> — 10 мин</li>
+    <li><a href="#s8">Стать админом</a> — 3 мин</li>
+    <li><a href="#s9">Финальная проверка</a> — 5 мин</li>
+    <li><a href="#s10">Если что-то пошло не так (болезни и лекарства)</a></li>
+    <li><a href="#s11">Что внутри бэкапа (для любопытных)</a></li>
+  </ol>
+</div>
+
+<div class="schema">
+GitHub (форк репо) ──push в main──▶ <span class="c">Vercel</span> (собирает и хостит сайт)
+                                        │
+                                        │ читает данные по ключам
+                                        ▼
+                                   <span class="c">Supabase</span> (база + хранилище файлов)
+                                        ▲
+                                        │ токен / вебхук
+                                   <span class="c">Telegram-бот</span> (кнопка «Открыть приложение» → Vercel-ссылка)
+</div>
+
+<h2 id="s0"><span class="stepnum"><span class="n">0</span> Подготовка</span></h2>
+<p>Проверь, что у тебя есть всё из списка. Если чего-то нет — зарегистрируйся, это бесплатно.</p>
+<div class="box gold"><b class="lbl">Чек-лист</b>
+<ul class="check">
+  <li><b>Аккаунт GitHub</b> (github.com) — и на нём уже сделан <b>форк</b> репозитория <code>salavey13/cartest</code>.</li>
+  <li><b>Аккаунт Vercel</b> (vercel.com) — можно просто войти через кнопку <i>Continue with GitHub</i>.</li>
+  <li><b>Аккаунт Supabase</b> (supabase.com) — ты уже залогинен, отлично.</li>
+  <li><b>Аккаунт Telegram</b> — будешь создавать своего бота.</li>
+  <li><b>Node.js версии 20+</b> на компе (nodejs.org → LTS). Нужен для одного шага с рестором.</li>
+  <li>Ссылки на бэкап (они ниже, в шаге 6) и 400 МБ свободного места на диске.</li>
+</ul>
+</div>
+<div class="box"><b class="lbl">Сколько это стоит</b>
+Все три сервиса на бесплатных тарифах: GitHub — бесплатно, Vercel Hobby — бесплатно,
+Supabase Free — бесплатно (500 МБ под базу, 1 ГБ под файлы). Наш проект влезает: база ≈ 30 МБ, файлы ≈ 240 МБ.</div>
+
+<h2 id="s1"><span class="stepnum"><span class="n">1</span> GitHub: форк и синк</span></h2>
+<p>Форк — это твоя личная копия чужого репозитория. Он у тебя уже есть. Теперь убедись, что в нём
+<b>свежий код</b>: владелец оригинала иногда что-то чинит, и твой форк надо подтянуть.</p>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>github.com — твой форк</span></div>
+  <div class="body">
+    <div style="font-size:15px"><b>твой-ник / cartest</b> <span class="small">forked from salavey13/cartest</span></div>
+    <div style="margin:8px 0 4px;color:#777;font-size:13px">Code&nbsp;&nbsp;Issues&nbsp;&nbsp;Pull requests&nbsp;&nbsp;Actions&nbsp;&nbsp;Settings</div>
+    <div style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-size:13.5px;font-weight:600">This branch is <span style="color:#8a3b16">N commits behind</span> salavey13:main</div></div>
+      <div class="btn green">Sync fork ▾</div>
+    </div>
+    <div style="margin-top:8px;font-size:12.5px;color:#666">↑ Если видишь такую жёлтую полоску — жми зелёную кнопку <b>Sync fork</b>, затем <b>Update branch</b>.</div>
+  </div>
+</div>
+<p><span class="tap">ЖМИ СЮДА</span> <b>Sync fork → Update branch</b>. После этого в твоём форке на ветке <code>main</code> лежит ровно тот же код, что в оригинале. Готово, больше GitHub не трогаем.</p>
+
+<h2 id="s2"><span class="stepnum"><span class="n">2</span> Supabase: новый проект</span></h2>
+<p>Supabase — это база данных (Postgres) плюс склад файлов. Делаешь <b>свой</b> проект — он будет
+полностью независим от оригинала.</p>
+<p>Слева вверху жми выпадашку с названием организации → <span class="tap">New project</span>.</p>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>supabase.com — dashboard</span></div>
+  <div class="body">
+    <div class="nav"><b>Project</b> ▾ &nbsp;&nbsp;|&nbsp;&nbsp; Docs &nbsp; SQL Editor &nbsp; Table Editor</div>
+    <div class="side">
+      <b>Организация ▾</b><br>
+      ○ мой-старый-проект<br>
+      <span style="background:#ffe9a8;padding:2px 6px;border-radius:6px;font-weight:700">＋ New project</span>
+    </div>
+    <div>
+      <p class="small">Создай новый проект внутри организации:</p>
+      <div class="btn dark">New project</div>
+    </div>
+  </div>
+</div>
+
+<h3>Форма создания</h3>
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>New project</span></div>
+  <div class="body">
+    <div class="row"><div class="small">Name</div>
+      <div class="input" style="color:#1a1a1a">cartest-clone</div></div>
+    <div class="row"><div class="small">Database Password <span class="small">(нажми Generate)</span></div>
+      <div class="input" style="color:#1a1a1a">•••••••••••••••••••• <span class="small">[Generate a password]</span></div></div>
+    <div class="row"><div class="small">Region</div>
+      <div class="input">Frankfurt (eu-central-1) — ближе всех к России</div></div>
+    <div class="row"><div class="small">Plan</div>
+      <div class="input">Free — $0.00/month</div></div>
+    <div class="btn green">Create new project</div>
+  </div>
+</div>
+
+<div class="box gold"><b class="lbl">Важно</b>
+<p style="margin:4px 0">1) <b>Скопируй и сохрани Database Password</b> (тот, что сгенерировался) в блокнот — он больше никогда не покажется,
+а понадобится, если будешь пользоваться командной строкой Supabase.<br>
+2) Регион — <b>Frankfurt</b> (или любой европейский): пинг ниже.<br>
+3) Проект будет «вариться» минуты 2–3 — крутится колёсико «Setting up project». Жди, это нормально.</p>
+</div>
+
+<h2 id="s3"><span class="stepnum"><span class="n">3</span> Supabase: создаём все таблицы (схема)</span></h2>
+<p>В новом проекте база пустая — ни одной таблицы. Схема — это «чертёж» всех таблиц.
+Он у нас готов одним файлом. Просто вставь его целиком и запусти.</p>
+<p>Скачай файл схемы: <a href="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/backup-clone-2026-10/full-schema-2026-10-13.sql">full-schema-2026-10-13.sql</a>
+(правая кнопка → «Сохранить ссылку», это текстовый файл ~700 КБ).</p>
+<p>В меню слева: <b>SQL Editor</b> → <span class="tap">New query</span> → открой скачанный файл блокнотом,
+<b>выдели всё (Ctrl+A)</b>, <b>скопируй (Ctrl+C)</b>, <b>вставь в окно SQL Editor (Ctrl+V)</b> → <b>Run</b> (или Ctrl+Enter).</p>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>supabase — SQL Editor</span></div>
+  <div class="body">
+    <div class="nav">Table Editor &nbsp; SQL Editor &nbsp; Database &nbsp; Storage</div>
+    <div style="border:1.5px dashed #8a6d1d;border-radius:8px;padding:10px 14px;background:#fdfaf2;color:#555;min-height:120px;font-size:13px">
+      -- CARTEST FULL SCHEMA — generated 2026-10-13 …<br>
+      -- ===== 20240101000000_init.sql =====<br>
+      create table users ( … );<br>
+      create table crews ( … );<br>
+      <span style="color:#999">…вставлено 700 КБ SQL…</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <div class="btn green">Run</div><div class="small">Ctrl+Enter</div>
+      <div class="small" style="margin-left:12px;color:#0b7a4b;font-weight:700">Success. No rows returned ✓</div>
+    </div>
+  </div>
+</div>
+
+<div class="box ok"><b class="lbl">Проверка</b>
+<p style="margin:4px 0">Открой слева <b>Table Editor</b>. В списке таблиц должны появиться (среди прочих):
+<code>users</code>, <code>crews</code>, <code>cars</code>, <code>crew_members</code>, <code>rentals</code>, <code>specs</code>, <code>posts</code>,
+<code>rental_contract_artifacts</code> (в схеме <code>private</code>). Сотни штук — не пугайся, это нормально.
+Отдельные надписи «already exists» в логе — тоже норм, это повторные создания.</p>
+</div>
+
+<div class="box"><b class="lbl">Альтернатива для гиков</b>
+<p style="margin:4px 0">Можно залить схему через CLI: <code>npm i -g supabase</code> → <code>supabase login</code> →
+<code>supabase link --project-ref &lt;REF&gt;</code> → <code>supabase db push</code> из папки репо (попросят Database Password из шага 2).
+Но способ с SQL Editor проще и не требует ничего ставить.</p>
+</div>
+
+<h2 id="s4"><span class="stepnum"><span class="n">4</span> Vercel: подключаем форк</span></h2>
+<p>Vercel — хостинг. Он собирает код и держит сайт включённым. Каждый раз, когда в твой форк
+прилетает обновление в ветку <code>main</code>, Vercel <b>сам</b> пересоберёт сайт. Красота.</p>
+
+<h3>4.1. Импорт проекта</h3>
+<p>На vercel.com жми <b>Add New… → Project</b>. Если Vercel просит доступ к GitHub — соглашайся
+(кнопка Install, выбрать «All repositories» или только свой форк).</p>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>vercel.com — Let's build something new</span></div>
+  <div class="body">
+    <div class="small">Import Git Repository</div>
+    <div style="border:1px solid #d0d7de;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:8px 0">
+      <div><b>твой-ник/cartest</b><div class="small">main branch</div></div>
+      <div class="btn dark">Import</div>
+    </div>
+    <div class="small">Не видишь свой форк? → «Adjust GitHub App Permissions» → включи cartest.</div>
+  </div>
+</div>
+
+<h3>4.2. Перед первым деплоем: убрать лишний cron</h3>
+<div class="box warn"><b class="lbl">Подводный камень — обязательно прочти</b>
+<p style="margin:4px 0">В файле <code>vercel.json</code> проекта прописано <b>3</b> расписания (cron). На бесплатном плане Vercel
+Hobby разрешено максимум <b>2</b> cron-задачи, лишние Vercel может встретить ошибкой деплоя.
+Лечится за минуту: в своём форке на GitHub открой <code>vercel.json</code> (кнопка-карандаш «Edit this file»),
+удали блок с <code>"cleanup-wallpix-staging"</code> целиком (это косметическая чистка, без неё всё работает),
+нажми <b>Commit changes</b>.</p>
+<pre>"crons": [
+  { "path": "/api/fetch-crypto-prices",     "schedule": "0 0 * * *" },
+  { "path": "/api/cron/wall-renter-notify", "schedule": "0 4 * * *" }
+]</pre>
+</div>
+
+<h3>4.3. Настройки импорта</h3>
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>vercel.com — Configure Project</span></div>
+  <div class="body">
+    <div class="row"><div class="small">Project Name</div><div class="input" style="color:#1a1a1a">cartest-clone</div></div>
+    <div class="row"><div class="small">Framework Preset</div><div class="input">Next.js (определится сам)</div></div>
+    <div class="row"><div class="small">Root Directory</div><div class="input">./ <span class="small">(не трогай)</span></div></div>
+    <div class="row"><div class="small">Build Command / Output</div><div class="input">Next.js default <span class="small">(не трогай)</span></div></div>
+    <div class="row"><div class="small">Environment Variables</div>
+      <div class="small">→ добавим сейчас, см. шаг 5 (можно и после деплоя)</div></div>
+    <div class="btn blue" style="background:#1d4ed8;color:#fff;border-radius:8px;padding:8px 16px;font-weight:700;display:inline-block">Deploy</div>
+  </div>
+</div>
+<p>Первый деплой займёт 3–5 минут. Пока он крутится — переходи к шагу 5 и готовь ключи.
+Если нажал Deploy без переменных — не страшно: сайт задеплоится, но будет серый/ошибки;
+впишешь ключи и сделаешь Redeploy (шаг 5.3).</p>
+
+<h2 id="s5"><span class="stepnum"><span class="n">5</span> Переменные окружения</span></h2>
+<p>Это «ключи от квартиры»: сайт при сборке и работе читает их, чтобы знать, куда ходить за базой,
+каким ботом слать сообщения и кто админ. Вписываются в Vercel: твой проект →
+<b>Settings → Environment Variables</b> → в каждую строчку Name и Value → <b>Save</b>.</p>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>vercel.com — Settings → Environment Variables</span></div>
+  <div class="body">
+    <div class="row"><div class="small">Key</div>
+      <div class="input" style="color:#1a1a1a">NEXT_PUBLIC_SUPABASE_URL</div>
+      <div class="small">Value</div>
+      <div class="input" style="color:#1a1a1a">https://xxxxxxxxxxxx.supabase.co</div></div>
+    <div class="small">Environments: <b>Production</b> ✓ &nbsp; Preview ✓ &nbsp; Development ✓</div>
+    <div class="btn green">Save</div>
+    <div class="small" style="margin-top:8px">…повторить для каждой строки из таблицы ниже…</div>
+  </div>
+</div>
+
+<h3>5.1. Обязательные — без них не заведётся</h3>
+<table>
+<tr><th>Имя переменной</th><th>Что вписать</th><th>Где взять</th></tr>
+<tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td><span class="req">обязательно</span><br>https://<b>REF</b>.supabase.co</td><td>Supabase → Settings → API → «Project URL». REF — тот же, что в адресе дашборда.</td></tr>
+<tr><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td><span class="req">обязательно</span><br>eyJhbGciOi…(длинная)</td><td>Supabase → Settings → API → «anon public». Это ПУБЛИЧНЫЙ ключ, так задумано.</td></tr>
+<tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td><span class="req">обязательно · секрет</span><br>eyJhbGciOi…</td><td>Там же → «service_role». НИКОМУ не показывай, в чат не кидай.</td></tr>
+<tr><td><code>TELEGRAM_BOT_TOKEN</code></td><td><span class="req">обязательно · секрет</span><br>1234567890:AA…</td><td>@BotFather (получишь в шаге 7; можно вписать сразу после создания бота).</td></tr>
+<tr><td><code>TELEGRAM_BOT_USERNAME</code></td><td>myclone_bot <span class="small">(без @)</span></td><td>Юзернейм твоего бота (шаг 7).</td></tr>
+<tr><td><code>NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code></td><td>myclone_bot <span class="small">(без @)</span></td><td>То же самое, для клиентской части (ссылки-диплинки).</td></tr>
+<tr><td><code>NEXT_PUBLIC_TELEGRAM_BOT_LINK</code></td><td>https://t.me/myclone_bot</td><td>Ссылка на бота целиком.</td></tr>
+<tr><td><code>NEXT_PUBLIC_SITE_URL</code></td><td>https://cartest-clone.vercel.app</td><td>Адрес твоего деплоя (даст Vercel после первого деплоя). Если появится свой домен — поменяй на него и сделай Redeploy.</td></tr>
+<tr><td><code>ADMIN_CHAT_ID</code></td><td>число вида 123456789</td><td>Твой Telegram ID (узнать: написать боту @userinfobot — он ответит числом). Сюда падают уведомления.</td></tr>
+<tr><td><code>CRON_SECRET</code></td><td>длинная случайная строка</td><td>Придумай сам, например <code>openssl rand -hex 24</code>. «Пароль» для крон-задач.</td></tr>
+</table>
+
+<h3>5.2. Настоятельно рекомендуемые</h3>
+<table>
+<tr><th>Имя переменной</th><th>Что вписать</th><th>Зачем</th></tr>
+<tr><td><code>TELEGRAM_SEND_MODE</code></td><td><code>direct</code></td><td><b>Критично.</b> По умолчанию отправка сообщений идёт через «прокладку» — API-роут оригинального проекта. С ней твой бот будет слать через ЧУЖОЙ сайт. <code>direct</code> = слать напрямую со своим токеном.</td></tr>
+<tr><td><code>ALLOWED_FORWARD_ORIGINS</code></td><td>https://cartest-clone.vercel.app</td><td>Белый список сайтов, которым разрешено звать API /api/forward-telegram (если будешь пользоваться форвардингом).</td></tr>
+<tr><td><code>FORWARD_TELEGRAM_URL</code></td><td>https://cartest-clone.vercel.app/api/forward-telegram</td><td>Если оставил форвард-режим — свой же роут, а не чужой.</td></tr>
+<tr><td><code>TELEGRAM_WEBAPP_ALLOWED_ORIGINS</code></td><td>https://cartest-clone.vercel.app</td><td>Доп. разрешённые домены вебаппа (защита карты map-riders).</td></tr>
+</table>
+
+<h3>5.3. Как применить переменные</h3>
+<div class="box warn"><b class="lbl">Магия слов: NEXT_PUBLIC_*</b>
+<p style="margin:4px 0">Все переменные, начинающиеся с <code>NEXT_PUBLIC_</code>, «впекаются» в сайт <b>в момент сборки</b>.
+Поменял их → недостаточно нажать Save, нужно пересобрать: вкладка <b>Deployments</b> → напротив
+последнего деплоя «⋯» → <b>Redeploy</b> → confirm. Остальные (без префикса) подхватятся и просто так,
+но Redeploy лишним не бывает.</p>
+</div>
+
+<h2 id="s6"><span class="stepnum"><span class="n">6</span> Накатываем бэкап: данные и файлы</span></h2>
+<p>Схема есть, сайт вот-вот будет. Теперь заливаем <b>содержимое</b>: все аренды, байки, юзеров,
+экипажи, посты, настройки — и картинки/документы из хранилища.</p>
+
+<h3>6.1. Скачать бэкап (4 части + манифест)</h3>
+<p>Части по 40 МБ (лимит загрузки одного файла на бесплатном Supabase — 50 МБ, поэтому порезано):</p>
+<pre><b>MANIFEST.json</b>  — паспорт архива (сверка целостности)
+https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/backup-clone-2026-10/MANIFEST.json
+
+<b>Части архива</b> (скачать ВСЕ 4 штуки в одну папку):
+…/carpix/backup-clone-2026-10/cartest-super-backup-20261013.zip.part0.bin
+…/carpix/backup-clone-2026-10/cartest-super-backup-20261013.zip.part1.bin
+…/carpix/backup-clone-2026-10/cartest-super-backup-20261013.zip.part2.bin
+…/carpix/backup-clone-2026-10/cartest-super-backup-20261013.zip.part3.bin
+(префикс: https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public)</pre>
+
+<h3>6.2. Склеить части обратно в zip</h3>
+<p>Открой терминал/командную строку <b>в той папке, куда всё скачал</b>:</p>
+<pre># Windows (командная строка, cmd):
+<b>copy /b</b> cartest-super-backup-20261013.zip.part0.bin+cartest-super-backup-20261013.zip.part1.bin+cartest-super-backup-20261013.zip.part2.bin+cartest-super-backup-20261013.zip.part3.bin cartest-super-backup-20261013.zip
+
+# Mac / Linux (терминал):
+<b>cat</b> cartest-super-backup-20261013.zip.part*.bin > cartest-super-backup-20261013.zip</pre>
+<p>Получится файл 132 649 008 байт. Контрольная сумма (если хочется проверить, что всё доехало):</p>
+<pre>Windows PowerShell: <b>Get-FileHash</b> cartest-super-backup-20261013.zip -Algorithm SHA256
+Mac/Linux: <b>sha256sum</b> cartest-super-backup-20261013.zip
+
+Должно сойтись: ef26b9ddedf80528155531648d6d7cc4e0ce0067bc51d90d1636d6a2849ca87d</pre>
+<p>Распакуй архив (двойной клик / «Extract All» / <code>unzip cartest-super-backup-20261013.zip</code>).
+Внутри — папка <code>cartest-backup-202610131850</code>.</p>
+
+<h3>6.3. Запуск рестора</h3>
+<p>Скачай код репо (зелёная кнопка <b>Code → Download ZIP</b> на твоём форке и распакуй,
+или <code>git clone https://github.com/твой-ник/cartest</code>). В папке репо:</p>
+<pre># 1) поставить зависимости (нужен Node 20+; если есть bun — bun install)
+<b>npm install</b>
+
+# 2) запустить рестор (одна длинная команда):
+<b>node</b> scripts/restore.mjs ^
+  --url https://<b>ТВОЙ-REF</b>.supabase.co ^
+  --key <b>ТВОЙ-SERVICE_ROLE-KEY</b> ^
+  --dir C:\загрузки\cartest-backup-202610131850
+
+# на Mac/Linux вместо ^ — \ в конце строк, или просто напиши в одну строку</pre>
+<div class="box"><b class="lbl">Что скрипт делает</b>
+<p style="margin:4px 0">Создаёт storage-бакеты с теми же настройками → льёт все файлы → вставляет строки таблиц
+(сперва «родителей», потом зависимые; секретные таблицы <code>private.*</code> в конце).
+Скрипт <b>можно перезапускать</b>: что уже залилось, он пропустит. Если какая-то таблица упала
+по внешнему ключу — запусти ещё раз, а хвосты долей так: <code>node scripts/restore.mjs --only имя_таблицы …</code></p>
+</div>
+
+<div class="box ok"><b class="lbl">Проверка после рестора</b>
+<p style="margin:4px 0">Supabase → Table Editor: в <code>cars</code> — сотни байков, в <code>rentals</code> — аренды,
+в <code>users</code> — сотни юзеров. Storage: в бакете <code>carpix</code> — папки с картинками и PDF.
+Числа должны быть похожи на паспорт архива: 117 таблиц / 11 716 строк.</p>
+</div>
+
+<div class="box warn"><b class="lbl">Чего в бэкапе НЕТ (и это нормально)</b>
+<p style="margin:4px 0"><b>Пользователи авторизации (auth.users)</b> — пароли/сессии Supabase не экспортируются в принципе.
+Все будут логиниться заново через Telegram-бота — это штатный путь этого проекта, ничего не теряется.
+<b>Секреты Vercel/бота</b> — ты их и так вписываешь руками (шаги 5 и 7).
+<b>Договоры-DOCX в storage</b> — оригинальные байты удалены из склада ещё до бэкапа (см. приложение);
+но данные всех договоров целы в таблице <code>private.rental_contract_artifacts</code> — приложение
+перегенерирует DOCX по шаблону одной кнопкой «Мой договор».</p>
+</div>
+
+<h2 id="s7"><span class="stepnum"><span class="n">7</span> Телеграм-бот: BotFather</span></h2>
+<p>Бот — «дверь» в вебапп: по кнопке «Открыть приложение» Telegram открывает сайт, и человек
+логинится автоматически. Делаешь СВОЕГО бота — оригинальный остаётся у владельца.</p>
+
+<h3>7.1. Создание бота</h3>
+<ol>
+  <li>Открой в Telegram <b>@BotFather</b> → кнопка Start / команда <span class="kbd">/newbot</span>.</li>
+  <li>BotFather спросит <b>имя</b> — это человеческое название, любое: <i>«Cartest Clone»</i>.</li>
+  <li>Потом спросит <b>юзернейм</b> — должен кончаться на <code>bot</code>: например <code>salavey_clone_bot</code>.</li>
+  <li>BotFather пришлёт <b>токен</b> вида <code>7712345678:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>.
+  <span class="tap">СКОПИРУЙ</span> его — это и есть <code>TELEGRAM_BOT_TOKEN</code> из шага 5.
+  Если потерял — в BotFather команда <span class="kbd">/mybots</span> → бот → API Token.</li>
+</ol>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>Telegram — BotFather</span></div>
+  <div class="body">
+    <div style="color:#999;font-size:12.5px">BotFather, сегодня</div>
+    <div style="background:#effdde;border-radius:10px;padding:8px 12px;margin:6px 0;max-width:80%">/newbot</div>
+    <div style="background:#fff;border-radius:10px;padding:8px 12px;margin:6px 0;max-width:85%">Alright, a new bot. How are we going to call it? Please choose a name for your bot.</div>
+    <div style="background:#effdde;border-radius:10px;padding:8px 12px;margin:6px 0;max-width:80%">Cartest Clone</div>
+    <div style="background:#fff;border-radius:10px;padding:8px 12px;margin:6px 0;max-width:85%">Good. Now let's choose a username… It must end in `bot`.</div>
+    <div style="background:#effdde;border-radius:10px;padding:8px 12px;margin:6px 0;max-width:80%">salavey_clone_bot</div>
+    <div style="background:#e8f0fe;border:1px solid #9ec2ff;border-radius:10px;padding:8px 12px;margin:6px 0;max-width:90%">
+      Done! … Use this token to access the HTTP API:<br><b>7712345678:AAExxxx…</b><br>
+      <span class="small">↑ эта строка = TELEGRAM_BOT_TOKEN</span></div>
+  </div>
+</div>
+
+<h3>7.2. Вебхук (бот узнаёт о сообщениях)</h3>
+<p>Вебхук — это адрес, куда Telegram стучится, когда боту пишут. Открой в браузере ссылку
+(подставь свой токен и свой домен Vercel):</p>
+<pre>https://api.telegram.org/bot<b>ТВОЙ_ТОКЕН</b>/setWebhook?url=https://<b>cartest-clone.vercel.app</b>/api/telegramWebhook</pre>
+<p>Ответ должен быть <code>{"ok":true,"result":true,"description":"Webhook was set"}</code>. Всё.</p>
+
+<h3>7.3. Кнопка меню = вебапп</h3>
+<p>Теперь вешаем кнопку, которой бот открывает сайт:</p>
+<ol>
+  <li>В BotFather: <span class="kbd">/mybots</span> → выбери своего бота → <b>Bot Settings</b>.</li>
+  <li><b>Menu Button</b> → <b>Configure menu button</b> → отправь ссылку вебаппа:
+  <code>https://cartest-clone.vercel.app</code></li>
+  <li>На просьбу «send a text for the button» — например: <i>«Открыть приложение»</i>.</li>
+</ol>
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>BotFather — Bot Settings</span></div>
+  <div class="body">
+    <div class="small">salavey_clone_bot · Edit Bot</div>
+    <div style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin:6px 0">
+      Edit Name · Edit About · Edit Description Pics · Edit Botpic · <b>Bot Settings</b> · Payments
+    </div>
+    <div style="border:1px solid #ddd;border-radius:8px;padding:8px 12px;margin:6px 0">
+      Inline Mode · Allow Groups · <b>Menu Button</b> · Commands · Webhook URL…
+    </div>
+    <div class="small">Menu Button → Configure menu button → https://cartest-clone.vercel.app → «Открыть приложение»</div>
+  </div>
+</div>
+
+<div class="box ok"><b class="lbl">Проверка бота</b>
+<p style="margin:4px 0">Открой своего бота в Telegram → слева внизу появилась кнопка меню → жми → открывается твой сайт
+(адрес Vercel) → Telegram спросит разрешение → после согласия сайт показывает твой профиль.
+Диплинки вида <code>https://t.me/твой_бот?startapp=rent_киловариант</code> работают с новым юзернеймом бота.</p>
+</div>
+
+<h2 id="s8"><span class="stepnum"><span class="n">8</span> Стать админом</span></h2>
+<p>После первого входа через бота ты появился в базе как обычный пользователь.
+Поднимаешь себя до глобального админа двумя строчками SQL.</p>
+<ol>
+  <li>Зайди на сайт через кнопку меню бота (шаг 7) — так твоя строка появится в таблице <code>users</code>.</li>
+  <li>Узнай свой Telegram ID (бот <b>@userinfobot</b>).</li>
+  <li>Supabase → <b>SQL Editor</b> → New query → вставь и Run:</li>
+</ol>
+<pre><b>UPDATE</b> users <b>SET</b> role = 'admin' <b>WHERE</b> user_id = <b>ТВОЙ_TELEGRAM_ID</b>;</pre>
+<p>Обнови страницу сайта — откроются админские разделы. Если нужно быть админом ещё и конкретного
+экипажа (роли owner / co_owner / admin дают доступ к франшизному кабинету):</p>
+<pre><b>UPDATE</b> crew_members <b>SET</b> role = 'owner' <b>WHERE</b> user_id = <b>ТВОЙ_TELEGRAM_ID</b> <b>AND</b> crew_id = (
+  <b>SELECT</b> id <b>FROM</b> crews <b>WHERE</b> slug = 'vip-bike');</pre>
+
+<h2 id="s9"><span class="stepnum"><span class="n">9</span> Финальная проверка</span></h2>
+<div class="box"><b class="lbl">Прогони по списку</b>
+<ul class="check">
+  <li>Сайт открывается по адресу Vercel, шапка и картинки на месте (картинки = значит storage залился).</li>
+  <li><b>Каталог байков</b> открывается, цены и фото показываются.</li>
+  <li>Вход через бота: кнопка меню → твой профиль, имя/аватар из Telegram.</li>
+  <li><b>Создай тестовую аренду</b>: байк → даты → корзина → оформление → договор DOCX сгенерился и скачался.</li>
+  <li><b>Стена</b> (community wall): посты прошлого сезона видны.</li>
+  <li><b>Карта</b> (map-riders): райдеры/маршруты рисуются, тёмная/светлая тема переключает скин.</li>
+  <li>Уведомления: создай аренду — в твой чат прилетает сообщение от бота (значит TELEGRAM_SEND_MODE=direct работает).</li>
+  <li>Админка: раздел франшизы открывается (значит шаг 8 сработал).</li>
+</ul>
+</div>
+
+<h2 id="s10">Если что-то пошло не так</h2>
+<table>
+<tr><th>Симптом</th><th>Лечение</th></tr>
+<tr><td>Деплой падает с ошибкой про <i>Too many cron jobs</i></td><td>Ты не вырезал третий cron из <code>vercel.json</code> (шаг 4.2). Вырежи и закоммить.</td></tr>
+<tr><td>Сайт отдаёт 500/серый экран</td><td>99% — не все env-переменные или не сделан Redeploy после их вписывания. Смотри Deployments → Runtime Logs, там написано, ЧЕГО не хватает.</td></tr>
+<tr><td>Картинки не грузятся, тексты есть</td><td>Не выполнен шаг 6 (рестор) или ключ service_role неверный. Проверь в Supabase → Storage, есть ли файлы в <code>carpix</code>.</td></tr>
+<tr><td>Бот молчит</td><td>1) Не поставлен вебхук (шаг 7.2). 2) Забыл <code>TELEGRAM_SEND_MODE=direct</code>. 3) Не сделан Redeploy после вписывания токена.</td></tr>
+<tr><td>Supabase «проект спит» / кнопка Restore</td><td>Бесплатные проекты засыпают после недели неактивности — жми Restore в дашборде, проснётся через пару минут.</td></tr>
+<tr><td>Ошибка при запуске restore.mjs про FK</td><td>Норма: перезапусти скрипт ещё раз (он доуливает недостающее), хвосты — через <code>--only таблица</code>.</td></tr>
+<tr><td>Поменял NEXT_PUBLIC_*, а ничего не изменилось</td><td>NEXT_PUBLIC_* впекается при сборке → Deployments → Redeploy.</td></tr>
+<tr><td>Загрузка файла в Storage ругается</td><td>На бесплатном плане лимит 50 МБ на файл и 1 ГБ всего — следи за местом.</td></tr>
+<tr><td>Пишет «JWT expired» в логах</td><td>Ты скопировал ключ не полностью или взял ключ чужого проекта. Скопируй заново из Settings → API своего проекта.</td></tr>
+</table>
+
+<h2 id="s11">Что внутри бэкапа (для любопытных)</h2>
+<p>Снимок снят 13.10.2026 скриптом <code>scripts/task84-backup.mjs</code> (в репо), работающим только
+через официальные API Supabase с service-role ключом.</p>
+<table>
+<tr><th>Папка в архиве</th><th>Что там</th></tr>
+<tr><td><code>data/*.json</code></td><td>Все 117 таблиц (109 public + 8 private), 11 716 строк, полные данные: байки, экипажи, юзеры, аренды, посты, артефакты договоров, секреты арендаторов (private.user_rental_secrets).</td></tr>
+<tr><td><code>data/*.sql</code>, <code>data.sql</code></td><td>Те же данные в виде INSERT-ов — можно лить через SQL Editor вместо restore.mjs.</td></tr>
+<tr><td><code>storage/&lt;бакет&gt;/…</code></td><td>Файлы из 19 бакетов: carpix (маркетинг/каталоги ~123 МБ), about, tutorial-*, rental-contracts, doc-verifier и др. Итого 240 МБ.</td></tr>
+<tr><td><code>schema/</code></td><td>Точный чертёж таблиц на момент снятия (openapi), настройки бакетов, список «осиротевших» объектов.</td></tr>
+<tr><td><code>MANIFEST.json</code></td><td>Паспорт: количество строк/файлов, коммит, контрольные суммы.</td></tr>
+</table>
+<div class="box warn"><b class="lbl">Про пропавшие договоры (orphaned)</b>
+<p style="margin:4px 0">В storage оригинального проекта числятся метаданные 266 договоров аренды и 287 документов из
+doc-verifier, у которых <b>сами файлы уже удалены из склада</b> (бэкап подтверждает: сервер отвечает
+«NoSuchKey»). Это мусорные строки, а не потеря данных: содержимое каждого договора целиком хранится
+в таблице <code>private.rental_contract_artifacts</code>, и приложение в любой момент перегенерирует
+DOCX по шаблону. В паспорте архива эти объекты честно перечислены как unrecoverable.</p>
+</div>
+<div class="box warn"><b class="lbl">Секретность</b>
+<p style="margin:4px 0">В архиве паспорта, водительские удостоверения, телефоны и секреты экипажей. Держи его на своём
+диске, не выкладывай в публичные облака и не пересылай непонятно кому. Скачал, восстановил — архив
+можно удалить или скинуть на зашифрованную флешку.</p>
+</div>
+
+<div class="footer">
+  Инструкция собрана 2026-10-13 · проект salavey13/cartest · бэкап: carpix/backup-clone-2026-10/
+  · скрипты: task84-backup.mjs (снятие), restore.mjs (восстановление) · вопросы — Полу.
+</div>
+
+</div>
+</body>
+</html>
