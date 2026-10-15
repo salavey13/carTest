@@ -282,6 +282,7 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
       description: (crew.description ?? "").trim(),
       logoUrl: crew.logo_url ?? null,
       accent: crewAccentFromMetadata(crew.metadata, index),
+      ownerId: crew.owner_id || null,
       memberUserIds: membersByCrew.get(crew.id) ?? [],
       services: deriveCrewServices({
         slug,

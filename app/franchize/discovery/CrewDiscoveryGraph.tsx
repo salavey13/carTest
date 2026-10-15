@@ -277,7 +277,20 @@ const CG_LOD_CSS = `
 .cg-halo { animation: cg-breathe 3.4s ease-in-out infinite; }
 @keyframes cg-breathe { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.42; } }
 .cg-lod[data-lod="far"] .cg-halo { animation: none; opacity: 0; }
-@media (prefers-reduced-motion: reduce) { .cg-halo { animation: none; } }
+/* SELECTION PULSE (production-polish round): a one-shot sonar ripple that
+   expands from the tapped circle — same "ping" language as the map's sonar
+   markers, so a focus reads as an event, not a state change. Two ripples,
+   then it rests (no battery drain); scaled around the circle's local origin
+   (cx=cy=0), disabled for reduced-motion users. */
+.cg-sonar { animation: cg-sonar 1.9s ease-out 2; transform-origin: 0px 0px; }
+@keyframes cg-sonar {
+  0% { opacity: 0.85; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cg-halo { animation: none; }
+  .cg-sonar { animation: none; opacity: 0.3; }
+}
 `;
 
 function initialsOf(name: string): string {
@@ -510,6 +523,9 @@ export function CrewDiscoveryGraph({
   );
 
   const selected = nodes.find((n) => n.crewId === selectedId) ?? null;
+  /** Active springs paint in the SELECTED crew's accent (production round):
+   *  the constellation literally takes the crew's color while focused. */
+  const activeLinkColor = selected?.accent ?? "#7dd3fc";
   const simActive = nodes.length > 0 && nodes.length <= SIM_MAX_NODES;
   /** World margin beyond the visible box (soft walls + station real estate). */
   const overflowPad = Math.round(view * WORLD_OVERFLOW_RATIO);
@@ -980,8 +996,26 @@ export function CrewDiscoveryGraph({
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId]);
 
+  // AUTO-CENTER (production-polish round, mobile-first): the detail card is
+  // the modal of this surface — after the focus spring starts expanding it,
+  // scroll it to the MIDDLE of the viewport so the circle that was tapped
+  // stays visible ABOVE it and the actions stay thumb-reachable BELOW it.
+  // Deselecting scrolls the canvas back just enough to be visible (no-op
+  // when it already is) — "nearest" never yanks the page.
+  const lastSelectedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedId) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const wasSelected = lastSelectedRef.current;
+    lastSelectedRef.current = selectedId;
+    if (selectedId && selectedId !== wasSelected) {
+      // wait for the panel's mount + spring to lay out real height
+      const timer = setTimeout(() => {
+        panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 340);
+      return () => clearTimeout(timer);
+    }
+    if (!selectedId && wasSelected) {
+      wrapRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }, [selectedId]);
 
   // a fresh focus re-centers the world (rings compose around the middle)
@@ -1313,9 +1347,9 @@ export function CrewDiscoveryGraph({
     if (!selectedSet) return 1;
     if (selectedSet.has(id)) return 1;
     const hop = selectedHops?.get(id);
-    if (hop === undefined) return 0.22; // unreachable island — fades out
-    if (hop === 2) return 0.72;
-    return 0.45;
+    if (hop === undefined) return 0.26; // unreachable island — fades out
+    if (hop === 2) return 0.74;
+    return 0.47;
   };
 
   return (
@@ -1453,7 +1487,7 @@ export function CrewDiscoveryGraph({
                       else pathRefs.current.delete(`${link.source}-${link.target}`);
                     }}
                     fill="none"
-                    stroke={active ? "#7dd3fc" : "#ffffff"}
+                    stroke={active ? activeLinkColor : "#ffffff"}
                     strokeWidth={Math.min(3.4, 1.05 + link.weight * 0.55)}
                     strokeLinecap="round"
                     opacity={active ? 0.9 : dimmed ? 0.04 : Math.min(0.34, 0.1 + link.weight * 0.08)}
@@ -1573,9 +1607,22 @@ export function CrewDiscoveryGraph({
                       opacity={isSelected ? 0.22 : 0.1}
                       style={{ transition: "r 240ms ease, opacity 240ms ease" }}
                     />
-                    {/* selection ring */}
+                    {/* selection ring + one-shot sonar pulse (production round):
+                        the white dash marks the state, the accent ripple marks
+                        the MOMENT of the tap — two quiet pings, then rest. */}
                     {isSelected && (
-                      <circle r={r + 6} fill="none" stroke="#ffffff" strokeWidth="1.6" strokeDasharray="4 6" opacity="0.85" />
+                      <>
+                        <circle r={r + 6} fill="none" stroke="#ffffff" strokeWidth="1.6" strokeDasharray="4 6" opacity="0.85" />
+                        <circle
+                          className="cg-sonar"
+                          r={r + 6}
+                          fill="none"
+                          stroke={node.accent}
+                          strokeWidth="2.6"
+                          aria-hidden
+                          style={{ pointerEvents: "none" }}
+                        />
+                      </>
                     )}
                     {/* MINIATURE round: the accent arc — a deterministic
                         «capacity gauge» showing this crew's share of the
@@ -1678,7 +1725,8 @@ export function CrewDiscoveryGraph({
                       textAnchor="middle"
                       y={flipLabel ? -(r + 46) : r + 26}
                       fontSize={21}
-                      fontWeight="700"
+                      fontWeight="800"
+                      letterSpacing="0.2"
                       fill={isSelected ? "#ffffff" : "rgba(255,255,255,0.85)"}
                       stroke="rgba(4,9,20,0.88)"
                       strokeWidth="5"
@@ -1699,9 +1747,10 @@ export function CrewDiscoveryGraph({
                       }}
                       textAnchor="middle"
                       y={flipLabel ? -(r + 26) : r + 46}
-                      fontSize={13.5}
-                      fontWeight="600"
-                      fill={isSelected ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.5)"}
+                      fontSize={12.5}
+                      fontWeight="700"
+                      letterSpacing="1.4"
+                      fill={isSelected ? node.accent : "rgba(255,255,255,0.55)"}
                       stroke="rgba(4,9,20,0.85)"
                       strokeWidth="4"
                       strokeLinejoin="round"
@@ -2215,8 +2264,12 @@ export function CrewDiscoveryGraph({
       {/* ── detail panel (collapsible) ─────────────────────────────────────── */}
       <div ref={panelRef}>
         {selected ? (
-          <section
+          <motion.section
+            key={selected.crewId}
             aria-label={`Экипаж ${selected.name}`}
+            initial={{ opacity: 0, y: 18, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
             className="mt-4 rounded-3xl border border-white/12 bg-white/[0.07] p-5 backdrop-blur-md md:p-6"
           >
             <div className="flex items-start justify-between gap-3">
@@ -2245,8 +2298,8 @@ export function CrewDiscoveryGraph({
                   </span>
                 )}
                 <div className="min-w-0">
-                  <h2 className="truncate text-xl font-black text-white">{selected.name}</h2>
-                  <p className="text-xs font-semibold text-white/60">
+                  <h2 className="truncate text-2xl font-black tracking-tight text-white">{selected.name}</h2>
+                  <p className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white/60">
                     {selected.memberCount}{" "}
                     {pluralRu(selected.memberCount, ["человек", "человека", "человек"])} в экипаже
                     {focus && focus.maxHop >= 1 && (
@@ -2267,9 +2320,9 @@ export function CrewDiscoveryGraph({
                 type="button"
                 onClick={() => setSelectedId(null)}
                 aria-label="Закрыть карточку экипажа"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-white/70 transition hover:border-white/40 hover:text-white"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-white/70 transition hover:rotate-90 hover:border-white/40 hover:text-white"
               >
-                <X className="h-4 w-4" aria-hidden />
+                <X className="h-4 w-4 transition-transform" aria-hidden />
               </button>
             </div>
 
@@ -2455,7 +2508,7 @@ export function CrewDiscoveryGraph({
                 </motion.div>
               )}
             </AnimatePresence>
-          </section>
+          </motion.section>
         ) : (
           <p className="mt-3 text-center text-xs text-white/40" aria-hidden>
             Круг — экипаж · размер — люди · линия — общие люди · тап — фокус на рукопожатиях

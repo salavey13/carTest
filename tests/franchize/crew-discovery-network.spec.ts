@@ -96,6 +96,7 @@ describe("crew-network lib — social graph from memberships ONLY", () => {
           description: "",
           logoUrl: null,
           accent: "#f00",
+          ownerId: null,
           memberUserIds: ["u1", "u2"],
           services: [],
         },
@@ -144,6 +145,7 @@ describe("crew-network lib — social graph from memberships ONLY", () => {
           description: "",
           logoUrl: null,
           accent: "#f00",
+          ownerId: null,
           memberUserIds: ["u1", "u1", "u2"],
           services: [],
         },
@@ -163,6 +165,7 @@ describe("crew-network lib — social graph from memberships ONLY", () => {
           description: "",
           logoUrl: null,
           accent: "#f00",
+          ownerId: null,
           memberUserIds: ["ghost"],
           services: [],
         },
@@ -329,9 +332,10 @@ describe("global discovery page — static route, memberships-only data", () => 
     expect(graph.includes('paintOrder="stroke"')).toBe(true);
     // two-line label block: name + count micro-caption (regression fix
     // 2026-10-04: static typography-round ink — phones shrink the viewBox
-    // instead of blowing the labels up)
+    // instead of blowing the labels up; 2026-10-15 production round retunes
+    // the caption to 12.5/700 + letterspaced tracking)
     expect(graph.includes("fontSize={21}")).toBe(true);
-    expect(graph.includes("fontSize={13.5}")).toBe(true);
+    expect(graph.includes("fontSize={12.5}")).toBe(true);
     // bottom-edge circles flip their label block above the circle (SSR + rAF)
     expect(graph.includes("flipLabel ? -(r + 46) : r + 26")).toBe(true);
     expect(graph.includes("node.y > viewRef.current - node.r - 62")).toBe(true);
@@ -353,6 +357,23 @@ describe("global discovery page — static route, memberships-only data", () => 
     expect(graph.includes("group-hover:fill-white/95")).toBe(true);
     // the rAF painter skips redundant label y writes (60fps churn guard)
     expect(graph.includes("if (pair.lastNameY !== nameY)")).toBe(true);
+  });
+
+  it("production-polish round 2026-10-15 — sonar, auto-center, accent springs, owner UX", () => {
+    // one-shot sonar ripple on the selected circle (reduced-motion safe)
+    expect(graph.includes('className="cg-sonar"')).toBe(true);
+    expect(graph.includes("@keyframes cg-sonar")).toBe(true);
+    expect(graph.includes("prefers-reduced-motion: reduce")).toBe(true);
+    // active springs paint in the SELECTED crew's accent (not hardcoded sky)
+    expect(graph.includes("stroke={active ? activeLinkColor : \"#ffffff\"}")).toBe(true);
+    expect(graph.includes('selected?.accent ?? "#7dd3fc"')).toBe(true);
+    // the detail card auto-centers in the viewport after the focus spring
+    expect(graph.includes('scrollIntoView({ behavior: "smooth", block: "center" })')).toBe(true);
+    // panel remounts per crew with a spring entrance (fresh focus = fresh card)
+    expect(graph.includes("motion.section")).toBe(true);
+    expect(graph.includes("key={selected.crewId}")).toBe(true);
+    // the model carries crews.owner_id for the role manager's selector
+    expect(graph.includes("n.ownerId != null")).toBe(false); // graph itself never branches on it — the manager does
   });
 });
 

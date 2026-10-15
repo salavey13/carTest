@@ -1600,7 +1600,14 @@ async function createRentalFromDocContract(
     const rentalInsert = {
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
-      created_by_operator_chat_id: crewOwnerChatId,
+      // 2026-10-15 salary audit: created_by_* must be the OPERATOR who ran
+      // /doc (the sender), NOT the crew owner. ekip-manual.ts already does
+      // `operatorChatId || crewOwnerChatId`; the sale artifact insert below
+      // stores String(userId) "preserved forever". The old crewOwnerChatId
+      // value silently credited every /doc rental to the crew owner in the
+      // salary attribution chain (lib/operator-attribution.ts doc_command
+      // step), so multiple operators could never be paid separately.
+      created_by_operator_chat_id: String(userId),
       crew_id: effectiveCrewId,  // 2026-08-19 review: was MISSING — rental insert failed silently because crew_id is required
       vehicle_id: bike.id,
       requested_start_date: startDateIso,

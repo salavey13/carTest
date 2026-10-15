@@ -56,7 +56,7 @@ describe("graph canvas — fullwidth + in-canvas info", () => {
     expect(graph).toContain("viewBox={`0 0 ${view} ${view}`}");
     // static ink back to the typography-round sizes (no labelScale multiplier)
     expect(graph).toContain("fontSize={21}");
-    expect(graph).toContain("fontSize={13.5}");
+    expect(graph).toContain("fontSize={12.5}");
     expect(graph).toContain("fontSize={15}");
     // SSR flip decision on the live box
     expect(graph).toContain("point.y > view - r - 62");
@@ -80,7 +80,7 @@ describe("graph canvas — fullwidth + in-canvas info", () => {
     for (const bare of ['className="truncate text-xl font-black"']) {
       expect(graph).not.toContain(bare);
     }
-    expect(graph).toContain('className="truncate text-xl font-black text-white"');
+    expect(graph).toContain('className="truncate text-2xl font-black tracking-tight text-white"');
   });
 
   it("the crew panel hops between crews — «Рукопожатия» chips re-focus the graph", () => {

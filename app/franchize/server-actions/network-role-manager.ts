@@ -190,6 +190,12 @@ export async function assignNetworkCrewRoleAction(input: {
     if (target.user_id === crewRow.owner_id && input.newRole === "owner") {
       return { success: false, error: "Он уже владелец этого экипажа" };
     }
+    // Demote guard: ownership lives in crews.owner_id — stripping the ROLE of
+    // the effective owner would leave a silent owner + a "member" label.
+    // Transfer ownership first (👑), then demote if needed.
+    if (target.user_id === crewRow.owner_id && input.newRole === "member") {
+      return { success: false, error: "Это владелец экипажа — сначала передай владение другому" };
+    }
 
     // Existing membership?
     const { data: existing } = await supabase
@@ -240,7 +246,7 @@ export async function assignNetworkCrewRoleAction(input: {
           .eq("crew_id", crewRow.id);
       }
     } else {
-      // co_owner / admin: upsert the membership row.
+      // co_owner / admin / member (demote): upsert the membership row.
       if (existingRow) {
         const { error: updateError } = await supabase
           .from("crew_members")
@@ -263,29 +269,34 @@ export async function assignNetworkCrewRoleAction(input: {
       }
     }
 
-    // Best-effort Telegram heads-up (never blocks the operation).
-    try {
-      const what = input.newRole === "owner" ? "владельцем" : input.newRole === "co_owner" ? "совладельцем" : "админом";
-      let openUrl = "";
+    // Best-effort Telegram heads-up (never blocks the operation; a demote to
+    // plain member stays silent — nobody needs a push about losing a crown).
+    if (input.newRole !== "member") {
       try {
-        const { resolveCrewBotUsername, crewBotAppLink } = await import("@/app/franchize/lib/crew-bot");
-        const botUsername = await resolveCrewBotUsername(slug);
-        openUrl = crewBotAppLink(botUsername, `crew_${slug}`) ?? "";
-      } catch {
-        openUrl = "";
+        const what = input.newRole === "owner" ? "владельцем" : input.newRole === "co_owner" ? "совладельцем" : "админом";
+        let openUrl = "";
+        try {
+          const { resolveCrewBotUsername, crewBotAppLink } = await import("@/app/franchize/lib/crew-bot");
+          const botUsername = await resolveCrewBotUsername(slug);
+          openUrl = crewBotAppLink(botUsername, `crew_${slug}`) ?? "";
+        } catch {
+          openUrl = "";
+        }
+        await sendTelegramMessage(
+          target.user_id,
+          `👑 Ты назначен ${what} экипажа «${crewRow.name}».${openUrl ? ` Открыть: ${openUrl}` : ""}`,
+        );
+      } catch (notifyError) {
+        logger.warn("[networkRoles] notification failed", notifyError);
       }
-      await sendTelegramMessage(
-        target.user_id,
-        `👑 Ты назначен ${what} экипажа «${crewRow.name}».${openUrl ? ` Открыть: ${openUrl}` : ""}`,
-      );
-    } catch (notifyError) {
-      logger.warn("[networkRoles] notification failed", notifyError);
     }
 
     const message =
       input.newRole === "owner"
-        ? `${target.name} — владелец «${crewRow.name}»${createdMembership ? " (участие создано)" : ""}`
-        : `${target.name} — ${networkRoleLabel(input.newRole)} «${crewRow.name}»${createdMembership ? " (участие создано)" : ""}`;
+        ? `${target.name} — владелец «${crewRow.name}»${createdMembership ? " (участие создано)" : ""}${transferredOwnership ? " · прошлый владелец остался совладельцем" : ""}`
+        : input.newRole === "member"
+          ? `${target.name} — теперь просто участник «${crewRow.name}»`
+          : `${target.name} — ${networkRoleLabel(input.newRole).toLowerCase()} «${crewRow.name}»${createdMembership ? " (участие создано)" : ""}`;
     logger.info(`[networkRoles] ${message} by ${input.actorTelegramUserId}`);
     return { success: true, message, createdMembership, transferredOwnership };
   } catch (error) {

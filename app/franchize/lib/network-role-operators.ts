@@ -16,14 +16,15 @@ export const NETWORK_ROLE_OPERATOR_IDS: ReadonlySet<string> = new Set([
   "413553377", // salavey13 — platform owner
 ]);
 
-/** Roles the network manager can assign. */
-export const NETWORK_ASSIGNABLE_ROLES = ["owner", "co_owner", "admin"] as const;
+/** Roles the network manager can assign ("member" = demote to plain rider). */
+export const NETWORK_ASSIGNABLE_ROLES = ["owner", "co_owner", "admin", "member"] as const;
 export type NetworkAssignableRole = (typeof NETWORK_ASSIGNABLE_ROLES)[number];
 
 const NETWORK_ROLE_LABEL: Record<NetworkAssignableRole, string> = {
   owner: "Владелец",
   co_owner: "Совладелец",
   admin: "Админ",
+  member: "Участник",
 };
 
 export function networkRoleLabel(role: string): string {

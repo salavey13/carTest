@@ -81,14 +81,27 @@
 <div class="wrap">
 
 <div class="cover">
-  <span class="tag">Инструкция · версия от 2026-10-13</span>
+  <span class="tag">Инструкция · версия от 2026-10-15</span>
   <h1>Клонируем весь проект:<br>GitHub → Vercel → Supabase → Telegram</h1>
   <p class="lead">Ты становишься полным админом своей копии rental-платформы: свой форк на GitHub,
   свой деплой на Vercel, своя копия базы Supabase (со всеми данными) и свой телеграм-бот.
   Веб-апп, карточки байков, аренды, договоры, стена, карта — всё работает так же, только <b>у тебя</b>.</p>
-  <p class="small">Сделано на основе живого бэкапа от 13.10.2026 (117 таблиц, 11 716 строк, 19 бакетов storage).
+  <p class="small">Сделано на основе живого бэкапа от 13.10.2026 (117 таблиц, 11 716 строк, 19 бакетов storage;
+  15.10.2026 добавлен свежий дамп данных одним SQL-файлом — см. §6.4).
   Писано для нормальных людей: каждое нажатие показано, каждая кнопка нарисована. Никакой магии.</p>
 </div>
+
+<div class="box ok"><b class="lbl">Сначала главное — не бойся :) Ничего сломать нельзя</b>
+<p style="margin:4px 0">Ты работаешь в СВОИХ аккаунтах (форк, свой Supabase, свой Vercel) — оригинальный проект
+при этом недоступен для твоих ошибок физически: там другие ключи. Любой шаг можно переделать:
+таблицы пересоздаются, ключи перевставляются, деплой перезапускается. Денег сплатить негде —
+везде бесплатные тарифы, карты не просят. Если застрял на любом шаге — сделай скриншот и отправь Полу,
+ответим с картинкой «жми сюда».</p></div>
+
+<div class="box warn"><b class="lbl">Если браузер переводит страницы — выключи автоперевод для панелей</b>
+<p style="margin:4px 0">Chrome/Edge любят предлагать перевод панели Supabase/Vercel на русский. Переведённые кнопки
+могут выглядеть иначе, чем на скриншотах ниже (и ломать кнопки интерфейса). Один раз нажми
+«переводчик → Не переводить этот сайт» — и дальше всё будет выглядеть ровно как в картинках.</p></div>
 
 <div class="toc">
   <b>Маршрут целиком (≈ 60–90 минут, всё бесплатно):</b>
@@ -133,11 +146,36 @@ GitHub (форк репо) ──push в main──▶ <span class="c">Vercel</s
 </div>
 <div class="box"><b class="lbl">Сколько это стоит</b>
 Все три сервиса на бесплатных тарифах: GitHub — бесплатно, Vercel Hobby — бесплатно,
-Supabase Free — бесплатно (500 МБ под базу, 1 ГБ под файлы). Наш проект влезает: база ≈ 30 МБ, файлы ≈ 240 МБ.</div>
+Supabase Free — бесплатно (500 МБ под базу, 1 ГБ под файлы). Наш проект влезает: база ≈ 30 МБ, файлы ≈ 240 МБ.
+Банковскую карту нигде не просят — ни на одном из трёх шагов регистрации.</div>
+<div class="box"><b class="lbl">Пара слов о страшных словах</b>
+«Репозиторий» = папка с кодом на GitHub. «Форк» = твоя копия этой папки. «Деплой» = сборка и запуск сайта.
+«Переменная окружения» = строчка вида ИМЯ = значение, где сайт читает свои настройки. Всё, больше терминов нет.</div>
 
 <h2 id="s1"><span class="stepnum"><span class="n">1</span> GitHub: форк и синк</span></h2>
-<p>Форк — это твоя личная копия чужого репозитория. Он у тебя уже есть. Теперь убедись, что в нём
-<b>свежий код</b>: владелец оригинала иногда что-то чинит, и твой форк надо подтянуть.</p>
+<p>Форк — это твоя личная копия чужого репозитория. <b>Если форка ещё нет</b> — сделай его сейчас:
+открой <code>github.com/salavey13/cartest</code> и нажми кнопку <b>Fork</b> в правом верхнем углу,
+на следующем экране — зелёную <b>Create fork</b>. Десять секунд, больше ничего менять не надо.</p>
+
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>github.com/salavey13/cartest — кнопка Fork</span></div>
+  <div class="body">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:15px"><b>salavey13 / cartest</b> <span class="small">Public</span></div>
+      <div>
+        <span class="btn ghost">Watch</span>
+        <span class="btn ghost">Fork <span class="small">▾</span></span>
+        <span class="btn ghost">Star</span>
+      </div>
+    </div>
+    <div style="margin-top:10px;border:2px dashed var(--warn);border-radius:8px;padding:8px 12px;display:inline-block;color:var(--warn);font-weight:700;font-size:13px">
+      ↑ эта кнопка создаёт твою копию репозитория (бесплатно, мгновенно)
+    </div>
+  </div>
+</div>
+
+<p>Форк есть. Теперь убедись, что в нём <b>свежий код</b>: владелец оригинала иногда что-то чинит,
+и твой форк надо подтянуть.</p>
 
 <div class="mock">
   <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>github.com — твой форк</span></div>
@@ -227,7 +265,8 @@ Supabase Free — бесплатно (500 МБ под базу, 1 ГБ под ф
 <p style="margin:4px 0">Открой слева <b>Table Editor</b>. В списке таблиц должны появиться (среди прочих):
 <code>users</code>, <code>crews</code>, <code>cars</code>, <code>crew_members</code>, <code>rentals</code>, <code>specs</code>, <code>posts</code>,
 <code>rental_contract_artifacts</code> (в схеме <code>private</code>). Сотни штук — не пугайся, это нормально.
-Отдельные надписи «already exists» в логе — тоже норм, это повторные создания.</p>
+Отдельные надписи «already exists» в логе — тоже норм, это повторные создания.
+Сам запрос может крутиться 1–3 минуты — SQL Editor иногда кажется зависшим, просто жди зелёного «Success».</p>
 </div>
 
 <div class="box"><b class="lbl">Альтернатива для гиков</b>
@@ -267,6 +306,28 @@ Hobby разрешено максимум <b>2</b> cron-задачи, лишни
   { "path": "/api/fetch-crypto-prices",     "schedule": "0 0 * * *" },
   { "path": "/api/cron/wall-renter-notify", "schedule": "0 4 * * *" }
 ]</pre>
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>github.com — правка vercel.json</span></div>
+  <div class="body">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b>твой-ник / cartest / vercel.json</b>
+      <div><span class="btn ghost">✎ Edit this file</span> <span class="btn ghost">⋯</span></div>
+    </div>
+    <div style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:8px;padding:10px 14px;margin-top:8px;font-family:ui-monospace,monospace;font-size:12.5px">
+      "crons": [<br>
+      &nbsp;&nbsp;{ "path": "/api/fetch-crypto-prices", … },<br>
+      &nbsp;&nbsp;{ "path": "/api/cron/wall-renter-notify", … }<br>
+      <span style="color:#8a3b16;text-decoration:line-through">&nbsp;&nbsp;{ "path": "/api/cron/cleanup-wallpix-staging", … } ← ЭТУ СТРОКУ УДАЛИЛИ</span><br>
+      ]
+    </div>
+    <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+      <span class="small">внизу страницы — зелёная кнопка</span>
+      <span class="btn green">Commit changes</span>
+    </div>
+  </div>
+</div>
+<p class="small">Кстати: после этого коммита Vercel (если проект уже подключён) запустит пересборку сам — это нормально,
+если ещё не подключён — просто игнорируй.</p>
 </div>
 
 <h3>4.3. Настройки импорта</h3>
@@ -304,7 +365,21 @@ Hobby разрешено максимум <b>2</b> cron-задачи, лишни
   </div>
 </div>
 
-<h3>5.1. Обязательные — без них не заведётся</h3>
+<h3>5.1. Где взять ключи Supabase (картинка-шпаргалка)</h3>
+<div class="mock">
+  <div class="bar"><i class="r"></i><i class="y"></i><i class="g"></i><span>supabase — Project Settings → API Keys</span></div>
+  <div class="body">
+    <div class="nav"><b>Project Settings</b> ▾ &nbsp; (шестерёнка слева внизу) → <b>API Keys</b></div>
+    <div style="border:1px solid #d0d7de;border-radius:8px;overflow:hidden">
+      <div style="padding:8px 12px;border-bottom:1px solid #d0d7de"><b>Project URL</b><div class="input" style="color:#1a1a1a">https://<b>xxxxxxxxxxxx</b>.supabase.co</div><span class="small">↑ это NEXT_PUBLIC_SUPABASE_URL</span></div>
+      <div style="padding:8px 12px;border-bottom:1px solid #d0d7de"><b>anon public</b> <span class="small">(публичный, так задумано)</span><div class="input" style="color:#1a1a1a">eyJhbGciOiJIUzI1NiIsInR5cCI6…</div><span class="small">↑ NEXT_PUBLIC_SUPABASE_ANON_KEY</span></div>
+      <div style="padding:8px 12px"><b>service_role</b> <span class="small" style="color:var(--warn);font-weight:700">(секрет! никому не показывай)</span><div class="input" style="color:#1a1a1a">eyJhbGciOiJIUzI1NiIsInR5cCI6…</div><span class="small">↑ SUPABASE_SERVICE_ROLE_KEY</span></div>
+    </div>
+    <div class="small" style="margin-top:8px">У каждого ключа есть кнопка копирования — пользуйся ей, а не выделяй мышкой (легко захватить лишний пробел).</div>
+  </div>
+</div>
+
+<h3>5.2. Обязательные — без них не заведётся</h3>
 <table>
 <tr><th>Имя переменной</th><th>Что вписать</th><th>Где взять</th></tr>
 <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td><span class="req">обязательно</span><br>https://<b>REF</b>.supabase.co</td><td>Supabase → Settings → API → «Project URL». REF — тот же, что в адресе дашборда.</td></tr>
@@ -319,7 +394,7 @@ Hobby разрешено максимум <b>2</b> cron-задачи, лишни
 <tr><td><code>CRON_SECRET</code></td><td>длинная случайная строка</td><td>Придумай сам, например <code>openssl rand -hex 24</code>. «Пароль» для крон-задач.</td></tr>
 </table>
 
-<h3>5.2. Настоятельно рекомендуемые</h3>
+<h3>5.3. Настоятельно рекомендуемые</h3>
 <table>
 <tr><th>Имя переменной</th><th>Что вписать</th><th>Зачем</th></tr>
 <tr><td><code>TELEGRAM_SEND_MODE</code></td><td><code>direct</code></td><td><b>Критично.</b> По умолчанию отправка сообщений идёт через «прокладку» — API-роут оригинального проекта. С ней твой бот будет слать через ЧУЖОЙ сайт. <code>direct</code> = слать напрямую со своим токеном.</td></tr>
@@ -328,7 +403,7 @@ Hobby разрешено максимум <b>2</b> cron-задачи, лишни
 <tr><td><code>TELEGRAM_WEBAPP_ALLOWED_ORIGINS</code></td><td>https://cartest-clone.vercel.app</td><td>Доп. разрешённые домены вебаппа (защита карты map-riders).</td></tr>
 </table>
 
-<h3>5.3. Как применить переменные</h3>
+<h3>5.4. Как применить переменные</h3>
 <div class="box warn"><b class="lbl">Магия слов: NEXT_PUBLIC_*</b>
 <p style="margin:4px 0">Все переменные, начинающиеся с <code>NEXT_PUBLIC_</code>, «впекаются» в сайт <b>в момент сборки</b>.
 Поменял их → недостаточно нажать Save, нужно пересобрать: вкладка <b>Deployments</b> → напротив
@@ -353,7 +428,9 @@ https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/backup-
 (префикс: https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public)</pre>
 
 <h3>6.2. Склеить части обратно в zip</h3>
-<p>Открой терминал/командную строку <b>в той папке, куда всё скачал</b>:</p>
+<p>Открой терминал/командную строку <b>в той папке, куда всё скачал</b>.
+Если «терминал» — что-то новое: в Windows нажми <b>Пуск</b>, набери <code>cmd</code>, Enter (откроется чёрное окно);
+потом набери <code>cd Загрузки</code> (или <code>cd Downloads</code>) и Enter. На Mac — приложение «Терминал» из Launchpad.</p>
 <pre># Windows (командная строка, cmd):
 <b>copy /b</b> cartest-super-backup-20261013.zip.part0.bin+cartest-super-backup-20261013.zip.part1.bin+cartest-super-backup-20261013.zip.part2.bin+cartest-super-backup-20261013.zip.part3.bin cartest-super-backup-20261013.zip
 
@@ -392,6 +469,13 @@ Mac/Linux: <b>sha256sum</b> cartest-super-backup-20261013.zip
 в <code>users</code> — сотни юзеров. Storage: в бакете <code>carpix</code> — папки с картинками и PDF.
 Числа должны быть похожи на паспорт архива: 117 таблиц / 11 716 строк.</p>
 </div>
+
+<h3>6.4. Альтернатива данных одним SQL-файлом (без zip и без скрипта)</h3>
+<p>Если хочется обойтись вообще без терминала: свежий дамп <b>данных</b> одним SQL-файлом (данные на
+15.10.2026, все таблицы, INSERT-ы): <a href="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/backup-clone-2026-10/full-data-2026-10-15.sql">full-data-2026-10-15.sql</a> (~10 МБ).
+Схему (шаг 3) это НЕ заменяет — сначала схема, потом эти данные. Файл можно открывать блокнотом и
+вставить в SQL Editor кусками, либо пролить через psql/CLI. Способ из §6.1–6.3 остаётся основным:
+он же заливает файлы storage (картинки), которых в SQL-дампе нет.</p>
 
 <div class="box warn"><b class="lbl">Чего в бэкапе НЕТ (и это нормально)</b>
 <p style="margin:4px 0"><b>Пользователи авторизации (auth.users)</b> — пароли/сессии Supabase не экспортируются в принципе.
@@ -479,14 +563,15 @@ Mac/Linux: <b>sha256sum</b> cartest-super-backup-20261013.zip
 <pre><b>UPDATE</b> crew_members <b>SET</b> role = 'owner' <b>WHERE</b> user_id = <b>ТВОЙ_TELEGRAM_ID</b> <b>AND</b> crew_id = (
   <b>SELECT</b> id <b>FROM</b> crews <b>WHERE</b> slug = 'vip-bike');</pre>
 
-<div class="box ok"><b class="lbl">Лёгкий путь: вкладка «Сеть» на карте (2026-10-14+)</b>
+<div class="box ok"><b class="lbl">Лёгкий путь: вкладка «Сеть» на карте (2026-10-14+, улучшено 15.10)</b>
 <p style="margin:4px 0">В код вшиты <b>два оператора ролей</b> — <code>356282674</code> (I_O_S_NN) и <code>413553377</code>
 (salavey13). Они видят на вкладке <b>«Сеть»</b> (карта map-riders → нижний лист) карточку
-<b>«⚙️ Роли экипажей»</b>: выбери экипаж → назначь <b>Владельца / Совладельца / Админа</b>
-по тапу на 👑 / 🤝 / 🛡, или добавь человека по <b>@username / Telegram ID</b> — участие создастся
-автоматически, даже если человека ещё нет в экипаже. Передача владения старого владельца
-не выкидывает, а оставляет его совладельцем. Это основной способ «прописать админов»
-пресозданным экипажам (у них по умолчанию владелец — только I_O_S_NN). SQL выше — запасной путь.</p>
+<b>«⚙️ Роли экипажей»</b>: экипажи без живого владельца помечены <b>«⚠️ нужен владелец»</b> и стоят первыми;
+выбери экипаж → назначь <b>Владельца / Совладельца / Админа</b> тапом на 👑 / 🤝 / 🛡
+(передача короны — с двухтаповым подтверждением «Точно?»), или добавь человека по
+<b>@username / Telegram ID</b> (Enter = поиск) — участие создастся автоматически, даже если человека ещё нет
+в экипаже. Передача владения старого владельца не выкидывает, а оставляет его совладельцем.
+Кнопка <b>➖</b> снимает роль обратно до простого участника. SQL выше — запасной путь.</p>
 </div>
 
 <h2 id="s9"><span class="stepnum"><span class="n">9</span> Финальная проверка</span></h2>
@@ -513,6 +598,9 @@ Mac/Linux: <b>sha256sum</b> cartest-super-backup-20261013.zip
 <tr><td>Supabase «проект спит» / кнопка Restore</td><td>Бесплатные проекты засыпают после недели неактивности — жми Restore в дашборде, проснётся через пару минут.</td></tr>
 <tr><td>Ошибка при запуске restore.mjs про FK</td><td>Норма: перезапусти скрипт ещё раз (он доуливает недостающее), хвосты — через <code>--only таблица</code>.</td></tr>
 <tr><td>Поменял NEXT_PUBLIC_*, а ничего не изменилось</td><td>NEXT_PUBLIC_* впекается при сборке → Deployments → Redeploy.</td></tr>
+<tr><td>Кнопки в панели выглядят не как на скриншотах</td><td>Браузер перевёл страницу. Выключи автоперевод для supabase.com и vercel.com (иконка переводчика в адресной строке).</td></tr>
+<tr><td>Restore/скрипт пишет «Failed to fetch» / 503</td><td>Временная сетевая занятость Supabase. Подожди минуту и запусти скрипт ещё раз — он продолжит с того же места.</td></tr>
+<tr><td>Supabase просит подтвердить почту / не пускает</td><td>Проверь почту (включая папку «Спам») — письмо подтверждения от Supabase приходит при регистрации.</td></tr>
 <tr><td>Загрузка файла в Storage ругается</td><td>На бесплатном плане лимит 50 МБ на файл и 1 ГБ всего — следи за местом.</td></tr>
 <tr><td>Пишет «JWT expired» в логах</td><td>Ты скопировал ключ не полностью или взял ключ чужого проекта. Скопируй заново из Settings → API своего проекта.</td></tr>
 </table>
@@ -542,7 +630,7 @@ DOCX по шаблону. В паспорте архива эти объекты
 </div>
 
 <div class="footer">
-  Инструкция собрана 2026-10-13 · проект salavey13/cartest · бэкап: carpix/backup-clone-2026-10/
+  Инструкция собрана 2026-10-13, обновлена 2026-10-15 · проект salavey13/cartest · бэкап: carpix/backup-clone-2026-10/
   · скрипты: task84-backup.mjs (снятие), restore.mjs (восстановление) · вопросы — Полу.
 </div>
 

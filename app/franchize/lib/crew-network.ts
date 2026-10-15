@@ -242,6 +242,9 @@ export interface CrewNetworkNodeInput {
   description: string;
   logoUrl: string | null;
   accent: string;
+  /** crews.owner_id — effective ownership (the role manager's selector uses
+   *  it to mark prefab crews that still carry the default operator owner). */
+  ownerId: string | null;
   /** Active member user ids + owner (the implicit first member). */
   memberUserIds: string[];
   services: CrewServicePill[];
