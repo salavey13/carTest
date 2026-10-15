@@ -48,6 +48,7 @@ import {
 } from "@/app/franchize/lib/blogger-stats";
 import {
   EMPTY_RIDER_PROFILE_CUSTOM,
+  RIDER_BASE_COORDS_MAX_LEN,
   RIDER_BIO_MAX_LEN,
   RIDER_CITY_MAX_LEN,
   RIDER_STATUS_EMOJIS,
@@ -86,6 +87,9 @@ const SaveProfileInput = z.object({
     statusEmoji: z.string().max(8).optional(),
     statusText: z.string().max(RIDER_STATUS_TEXT_MAX_LEN * 2).optional(),
     hideProfile: z.boolean().optional(),
+    // "lat,lng" transport cap only — parseRiderBaseCoords (lib) decides the
+    // final normalized shape, garbage degrades to null server-side.
+    baseCoords: z.string().max(RIDER_BASE_COORDS_MAX_LEN * 2).nullable().optional(),
   }),
 });
 
@@ -533,6 +537,7 @@ export async function saveRiderProfileAction(input: {
     statusEmoji: parsed.data.custom.statusEmoji ?? "",
     statusText: parsed.data.custom.statusText ?? "",
     hideProfile: parsed.data.custom.hideProfile ?? false,
+    baseCoords: parsed.data.custom.baseCoords ?? null,
   });
   // The emoji must come from the picker; a hostile direct action call cannot
   // smuggle arbitrary glyphs onto the public page.

@@ -12,6 +12,8 @@ import {
   EMPTY_RIDER_PROFILE_CUSTOM,
   RIDER_BIO_MAX_LEN,
   RIDER_STATUS_EMOJIS,
+  parseRiderBaseCoords,
+  riderBaseLatLng,
   riderSinceLabel,
   sanitizeRiderProfileCustom,
   type RiderPublicStats,
@@ -47,6 +49,46 @@ describe("sanitizeRiderProfileCustom", () => {
   it("hideProfile is true only for a literal boolean true", () => {
     expect(sanitizeRiderProfileCustom({ hideProfile: true }).hideProfile).toBe(true);
     expect(sanitizeRiderProfileCustom({ hideProfile: "yes" }).hideProfile).toBe(false);
+  });
+
+  it("baseCoords passes through the parser — garbage degrades to null", () => {
+    expect(sanitizeRiderProfileCustom({ baseCoords: "56.29644, 43.94639" }).baseCoords).toBe("56.29644,43.94639");
+    expect(sanitizeRiderProfileCustom({ baseCoords: "<script>alert(1)</script>" }).baseCoords).toBeNull();
+    expect(sanitizeRiderProfileCustom({}).baseCoords).toBeNull();
+  });
+});
+
+// ── pure lib: «Моя база» coords parser (map opt-in, 2026-10-16) ─────────────
+
+describe("parseRiderBaseCoords / riderBaseLatLng", () => {
+  it("accepts lat,lng with spaces, comma decimals and ; separator, normalizes to 5 decimals", () => {
+    expect(parseRiderBaseCoords("56.29644, 43.94639")).toBe("56.29644,43.94639");
+    expect(parseRiderBaseCoords("56,29644;43,94639")).toBe("56.29644,43.94639");
+    expect(parseRiderBaseCoords("  -33.8688 , 151.2093 ")).toBe("-33.86880,151.20930");
+    expect(parseRiderBaseCoords("56.1234567,43.1")).toBeNull(); // >6 decimals → suspicious precision
+  });
+
+  it("rejects non-coordinates, out-of-range values and Null Island", () => {
+    expect(parseRiderBaseCoords("")).toBeNull();
+    expect(parseRiderBaseCoords("hello")).toBeNull();
+    expect(parseRiderBaseCoords("<script>")).toBeNull();
+    expect(parseRiderBaseCoords("999,43")).toBeNull();
+    expect(parseRiderBaseCoords("56,999")).toBeNull();
+    expect(parseRiderBaseCoords("0,0")).toBeNull();
+    expect(parseRiderBaseCoords(null)).toBeNull();
+    expect(parseRiderBaseCoords({ lat: 56 })).toBeNull();
+  });
+
+  it("riderBaseLatLng returns the numeric pair for markers", () => {
+    expect(riderBaseLatLng("56.29644,43.94639")).toEqual({ lat: 56.29644, lng: 43.94639 });
+    expect(riderBaseLatLng(null)).toBeNull();
+    expect(riderBaseLatLng("garbage")).toBeNull();
+  });
+
+  it("isRiderProfileCustomEmpty treats a base as content (profile is no longer empty)", async () => {
+    const { isRiderProfileCustomEmpty } = await import("@/app/franchize/lib/rider-profile");
+    expect(isRiderProfileCustomEmpty({ ...EMPTY_RIDER_PROFILE_CUSTOM, baseCoords: "56.29644,43.94639" })).toBe(false);
+    expect(isRiderProfileCustomEmpty(EMPTY_RIDER_PROFILE_CUSTOM)).toBe(true);
   });
 });
 

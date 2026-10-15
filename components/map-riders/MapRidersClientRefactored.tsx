@@ -52,6 +52,7 @@ import type { CatalogItemVM } from "@/app/franchize/actions";
 import { RiderFAB } from "@/components/map-riders/RiderFAB";
 import { SheetListPanel, SheetNetworkPanel, SheetTopPanel, type MapRidersSheetSegment } from "@/components/map-riders/MapRidersSheetPanels";
 import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
+import { riderBaseLatLng, type CrewNetworkRiderBase } from "@/app/franchize/lib/rider-profile";
 import { pluralRu } from "@/app/franchize/lib/crew-network";
 import { formatBloggerAudience } from "@/app/franchize/lib/blogger-stats";
 import { List, Network, Trophy, Users } from "lucide-react";
@@ -1003,9 +1004,15 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
   const mapPoints = useMemo(() => {
     // MR-018: Always add the HQ point so it's visible even if the migration hasn't been
     // re-run or the DB POI is missing. Uses HOME_BASE constant (single source of truth).
+    // 2026-10-16 (boss: «allow to save own coordinates for base … similarly to HQ
+    // location of crew»): the HQ marker finally HONORS the crew's own stored
+    // coordinates — crews.hq_location ("lat,lng", the field the create/config
+    // forms write) wins, the hardcoded Комсомольская-2 constant stays as the
+    // fallback so existing crews never lose their pin.
+    const crewHqLatLng = riderBaseLatLng(crew.hqLocation || null);
     const hqPoint = {
       id: "vip-base-point",
-      name: "VIP BIKE HQ • пл. Комсомольская 2",
+      name: crewHqLatLng ? `${crew.name || "Экипаж"} • штаб` : "VIP BIKE HQ • пл. Комсомольская 2",
       type: "point" as const,
       icon: "::FaLocationDot::",
       color: "#f97316",
@@ -1013,7 +1020,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
       // аватарка); без логотипа RacingMap нарисует иконку-бейдж. HQ — якорь
       // карты: крупнее обычных точек (lg) + halo-пульс для привлечения взгляда.
       imageUrl: crew.logoUrl || null,
-      coords: [[HOME_BASE[0], HOME_BASE[1]]] as [number, number][],
+      coords: [[crewHqLatLng?.lat ?? HOME_BASE[0], crewHqLatLng?.lng ?? HOME_BASE[1]]] as [number, number][],
       markerSize: "lg" as const,
       markerHalo: true,
       // the anchor of the map — never collapses into a cluster bubble;
@@ -1022,6 +1029,55 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
       keepZoom: 99,
       zPriority: 8,
     };
+
+    // ── Rider bases layer («Моя база» opt-in, 2026-10-16) ──
+    // Chain-pattern: the map is the people screen too. Only riders who
+    // explicitly saved a base in their profile appear (the loader already
+    // strips hideProfile=true and unset/invalid coords server-side) —
+    // home locations stay invisible unless the rider publishes a base point.
+    const crewRiderBases = (network?.riderBases ?? []).filter((base) => base.slug === crewSlug);
+    const riderBasePoints = crewRiderBases.map((base) => ({
+      id: `riderbase-${base.userId}`,
+      name: `${base.name} — база`,
+      type: "point" as const,
+      // avatar wins (round-picture promise), local initials badge as the
+      // offline fallback — same family as the live-rider markers.
+      icon: `initials:${initialsFromName(base.name).slice(0, 2).toUpperCase()}`,
+      imageUrl: base.avatarUrl || null,
+      color: "#38bdf8",
+      coords: [[base.lat, base.lng]] as [number, number][],
+      markerSize: "md" as const,
+      markerHalo: true,
+      keepZoom: 12,
+      zPriority: 5,
+      popup: (
+        <div className="min-w-[190px] max-w-[250px] space-y-1.5 p-1 text-[var(--mr-text)]">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--mr-muted)]">База райдера</div>
+          <div className="text-sm font-semibold" style={{ color: readableTextOnCard("#38bdf8", isLightCard) }}>
+            {base.name}
+          </div>
+          {base.username ? <div className="text-xs opacity-80">@{base.username}</div> : null}
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+            <Link
+              href={`/franchize/${crewSlug}/rider/${base.userId}`}
+              className="rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-110"
+              style={{ backgroundColor: "var(--mr-accent)", color: "var(--mr-on-accent)" }}
+            >
+              Профиль
+            </Link>
+            <button
+              type="button"
+              onClick={() => openExternalUrl(yandexMapsRouteUrl(base.lat, base.lng))}
+              title="Маршрут до базы в Яндекс.Картах"
+              className="rounded-lg border px-2 py-1.5 text-center text-xs font-semibold transition hover:brightness-125"
+              style={{ borderColor: "color-mix(in srgb, var(--mr-accent-text) 45%, transparent)", color: "var(--mr-accent-text)" }}
+            >
+              Маршрут
+            </button>
+          </div>
+        </div>
+      ),
+    }));
 
     const demoPoints = showDemo
       ? DEMO_RIDER_OFFSETS.map((coords, index) => ({
@@ -1128,10 +1184,25 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
 
     // Routes come exclusively from the DB now (dirt-* entries from migration
     // 20260923000000) — the old hardcoded DEFAULT_ROUTES injection is gone.
-    return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
+    return [hqPoint, ...staticMapPoints, ...routePoints, ...riderPoints, ...riderBasePoints, ...demoPoints, ...meetupPoints, ...spotPoints, ...wallPinPoints, ...(showCatalogItems ? itemPoints : [])];
     // crew.logoUrl / crewSlug are read inside (HQ avatar, meetup popup link) —
     // codereview N2: stale HQ avatar after a logo change otherwise lingers.
-  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crewSlug, openWallComposeFromPoint, openExternalUrl, isLightCard]);
+    // riderBasePoints deps: crew.hqLocation (HQ coords) + network.riderBases.
+  }, [staticMapPoints, riderPoints, showDemo, state.meetups, state.sessionDetail, spotPoints, wallPinPoints, itemPoints, showCatalogItems, crew.logoUrl, crew.name, crew.hqLocation, crewSlug, network, openWallComposeFromPoint, openExternalUrl, isLightCard]);
+
+  /** Network sheet → map: collapse the deck to Мини and fly to the base pin
+   *  (the same reveal pattern the «meetup from wall post» interlink uses —
+   *  the rider SEES the map move, so the pin registers). */
+  const handleFocusRiderBase = useCallback((base: CrewNetworkRiderBase) => {
+    setActiveSnap(SNAP_MINI);
+    setSheetOpen(true);
+    setWallFocusPoint({ lat: base.lat, lng: base.lng, key: Date.now() });
+  }, []);
+
+  const crewRiderBases = useMemo(
+    () => (network?.riderBases ?? []).filter((base) => base.slug === crewSlug),
+    [network, crewSlug],
+  );
 
   const riderStatusCounts = useMemo(() => {
     const riders = Array.from(state.liveRiders.values());
@@ -1780,7 +1851,7 @@ function MapRidersInner({ crew, items, wallParams, network }: { crew: FranchizeC
               {/* ── Сеть segment: crew-discovery graph inside the deck — the
                   model comes from the server page (same loader as the
                   /franchize/discovery route), graph is the same component. */}
-              {sheetSegment === "network" ? <SheetNetworkPanel network={network ?? null} /> : null}
+              {sheetSegment === "network" ? <SheetNetworkPanel network={network ?? null} riderBases={crewRiderBases} onFocusBase={handleFocusRiderBase} /> : null}
             </div>
             </div>
           </div>

@@ -52,9 +52,30 @@ describe("map-riders: «Сеть» is a deck segment, not an ejector (Task 69)",
 
   it("deck maps tab:\"network\" to the network segment and mounts the panel", () => {
     expect(client).toContain('tab === "network" ? "network"');
-    expect(client).toContain('{sheetSegment === "network" ? <SheetNetworkPanel network={network ?? null} /> : null}');
+    // 2026-10-16: the panel also carries the rider-base layer (list↔map sync)
+    expect(client).toContain('{sheetSegment === "network" ? <SheetNetworkPanel network={network ?? null} riderBases={crewRiderBases} onFocusBase={handleFocusRiderBase} /> : null}');
     // per-segment scroll restore covers the new segment (Task 68 fix family)
     expect(client).toContain("{ wall: 0, list: 0, top: 0, network: 0 }");
+  });
+
+  it("rider bases: opt-in map layer + HQ honors the crew's own coordinates (2026-10-16)", () => {
+    // the client renders base pins ONLY from the server-sanitized loader payload
+    expect(client).toContain("network?.riderBases ?? []");
+    // per-scope filter: a crew's map shows ITS crew's bases
+    expect(client).toContain("base.slug === crewSlug");
+    // focus plumbing: network sheet tap → deck collapses → map flies (MapFocusFlyer)
+    expect(client).toContain("const handleFocusRiderBase");
+    expect(client).toContain("setWallFocusPoint({ lat: base.lat, lng: base.lng, key: Date.now() })");
+    // the HQ marker reads crews.hq_location instead of only the hardcoded constant
+    expect(client).toContain("riderBaseLatLng(crew.hqLocation || null)");
+    expect(client).toContain("crewHqLatLng?.lat ?? HOME_BASE[0]");
+    // the sheet offers the sync card (or the education hint when empty)
+    expect(panels).toContain("Базы райдеров");
+    expect(panels).toContain("Моя база» в профиле райдера");
+    // loader extracts bases from riderProfiles with the privacy guards
+    expect(loader).toContain("riderBases");
+    expect(loader).toContain("custom.hideProfile || !custom.baseCoords");
+    expect(loader).toContain("sanitizeRiderProfileCustom");
   });
 
   it("SheetNetworkPanel renders the SAME graph as the discovery page + «Вся сеть» escape hatch", () => {

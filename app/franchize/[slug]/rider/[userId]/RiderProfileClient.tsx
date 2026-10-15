@@ -49,6 +49,7 @@ import {
   RIDER_BIO_MAX_LEN,
   RIDER_CITY_MAX_LEN,
   RIDER_STATUS_TEXT_MAX_LEN,
+  parseRiderBaseCoords,
   type RiderProfileCustom,
 } from "@/app/franchize/lib/rider-profile";
 import { bloggerRarityScore, bloggerRarityStars } from "@/app/franchize/lib/crew-network";
@@ -322,6 +323,13 @@ export function RiderProfileClient({
   };
 
   const save = async () => {
+    // Base validation gate: a non-empty value that the parser rejects would be
+    // silently dropped server-side — better to stop the save and explain.
+    const rawBase = (draft.baseCoords ?? "").trim();
+    if (rawBase && !parseRiderBaseCoords(rawBase)) {
+      window.alert("Координаты базы не распознаны. Формат: широта, долгота — например 56.29644, 43.94639");
+      return;
+    }
     setSaving(true);
     try {
       const res = await saveRiderProfileAction({ slug: crewSlug, initData: getTelegramInitData() || undefined, custom: draft });
@@ -337,6 +345,27 @@ export function RiderProfileClient({
       setSaving(false);
     }
   };
+
+  /** «Я на месте» — one tap fills the base with the device's current fix.
+   *  Falls back to the manual input when the browser denies geolocation. */
+  const grabBaseFromGeolocation = () => {
+    if (!navigator.geolocation) {
+      window.alert("Геолокация недоступна в этом браузере — впиши координаты руками.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const value = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+        setDraft((d) => ({ ...d, baseCoords: value }));
+      },
+      () => window.alert("Не удалось получить геолокацию — разреши доступ или впиши координаты руками."),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+    );
+  };
+
+  /** Live editor hint: non-empty but unparseable base → warn before saving. */
+  const baseDraftRaw = (draft.baseCoords ?? "").trim();
+  const baseDraftInvalid = Boolean(baseDraftRaw) && !parseRiderBaseCoords(baseDraftRaw);
 
   const shareProfile = () => {
     const webUrl = `${window.location.origin}/franchize/${crewSlug}/rider/${rider.userId}`;
@@ -484,6 +513,14 @@ export function RiderProfileClient({
                   <MapPin className="h-3.5 w-3.5" aria-hidden /> {custom.city}
                 </span>
               )}
+              {custom.baseCoords && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--community-border)] px-2 py-0.5 font-semibold text-[var(--community-accent)]"
+                  title="База на карте экипажа"
+                >
+                  <MapPin className="h-3 w-3" aria-hidden /> база на карте
+                </span>
+              )}
               <span>{crewName}</span>
             </p>
           </div>
@@ -542,6 +579,46 @@ export function RiderProfileClient({
                   className="mt-1 w-full rounded-xl border border-[var(--community-border)] bg-transparent px-3 py-2 text-sm normal-case tracking-normal text-[var(--community-text)] outline-none focus:border-[var(--community-accent)]"
                 />
               </label>
+            </div>
+            {/* «Моя база» — deliberate public point (crew-HQ analogue). Setting
+                it is the opt-in that makes the rider visible on the crew map. */}
+            <div className="rounded-xl border border-[var(--community-border)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--community-muted)]">
+                  <MapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden /> Моя база на карте
+                </p>
+                <button
+                  type="button"
+                  onClick={grabBaseFromGeolocation}
+                  className="min-h-9 rounded-full border border-[var(--community-border)] px-3 py-1.5 text-xs font-semibold text-[var(--community-text)] transition hover:border-[var(--community-accent)]"
+                >
+                  📍 Я на месте
+                </button>
+              </div>
+              <input
+                value={draft.baseCoords ?? ""}
+                onChange={(e) => setDraft({ ...draft, baseCoords: e.target.value || null })}
+                inputMode="decimal"
+                placeholder="56.29644, 43.94639"
+                aria-invalid={baseDraftInvalid}
+                className={`mt-2 w-full rounded-xl border bg-transparent px-3 py-2 text-sm normal-case tracking-normal text-[var(--community-text)] outline-none focus:border-[var(--community-accent)] ${
+                  baseDraftInvalid ? "border-red-500/70" : "border-[var(--community-border)]"
+                }`}
+              />
+              <p className="mt-1.5 text-[11px] leading-snug text-[var(--community-muted)]">
+                {baseDraftInvalid
+                  ? "Не похоже на координаты — формат: широта, долгота (например 56.29644, 43.94639)."
+                  : "Точка появится на карте экипажа — её увидят райдеры. Дом по умолчанию скрыт: на карте ты появляешься, только когда ставишь базу сам."}
+              </p>
+              {draft.baseCoords ? (
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, baseCoords: null })}
+                  className="mt-2 min-h-9 rounded-full px-3 py-1.5 text-xs font-semibold text-[var(--community-muted)] transition hover:text-[var(--community-text)]"
+                >
+                  Убрать базу с карты
+                </button>
+              ) : null}
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--community-muted)]">Эмодзи статуса</p>

@@ -37,9 +37,10 @@ import { useMeetupCreator } from "@/hooks/useMeetupCreator";
 import { useSessionManager } from "@/app/franchize/hooks/useSessionManager";
 import type { FranchizeCrewVM } from "@/app/franchize/actions";
 import Link from "next/link";
-import { Network as NetworkIcon, ExternalLink } from "lucide-react";
+import { Network as NetworkIcon, ExternalLink, MapPin } from "lucide-react";
 import { CrewDiscoveryGraph } from "@/app/franchize/discovery/CrewDiscoveryGraph";
 import type { CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
+import type { CrewNetworkRiderBase } from "@/app/franchize/lib/rider-profile";
 import {
   isNetworkRoleOperator,
   NETWORK_ROLE_OPERATOR_IDS,
@@ -641,7 +642,15 @@ function NetworkRoleManager({ nodes }: { nodes: CrewNetworkModelResult["nodes"] 
  * the full page renders — circles drag, taps refocus the BFS rings, the
  * selected-crew panel links back into each crew's surfaces.
  */
-export function SheetNetworkPanel({ network }: { network: CrewNetworkModelResult | null }) {
+export function SheetNetworkPanel({ network, riderBases, onFocusBase }: {
+  network: CrewNetworkModelResult | null;
+  /** «Моя база» opt-ins for THIS crew — the map already renders them; the
+   *  card is the list↔map sync (Chain-pattern side rail): tap a face →
+   *  the deck collapses and the map flies to that base pin. */
+  riderBases?: CrewNetworkRiderBase[];
+  onFocusBase?: (base: CrewNetworkRiderBase) => void;
+}) {
+  const bases = riderBases ?? [];
   if (!network || network.nodes.length === 0) {
     return (
       <div className="space-y-3">
@@ -681,8 +690,54 @@ export function SheetNetworkPanel({ network }: { network: CrewNetworkModelResult
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.nodes.length} экипажей</span>
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.peopleCount} человек</span>
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>{network.connectionCount} связей</span>
+        {bases.length > 0 ? (
+          <span className="rounded-full border px-2.5 py-1 text-[var(--mr-accent-text)]" style={PANEL_INSET}>{bases.length} баз на карте</span>
+        ) : null}
         <span className="rounded-full border px-2.5 py-1" style={PANEL_INSET}>щипок · двойной тап — зум</span>
       </div>
+      {/* ── Базы райдеров (2026-10-16): list↔map sync card ── */}
+      {bases.length > 0 ? (
+        <div className="rounded-2xl border p-3" style={PANEL_CARD}>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="flex items-center gap-1.5 text-sm font-semibold text-[var(--mr-text)]">
+              <MapPin className="h-3.5 w-3.5 text-[var(--mr-accent-text)]" aria-hidden />
+              Базы райдеров
+            </h4>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--mr-muted)]">тап — карта полетит к базе</span>
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {bases.map((base) => (
+              <button
+                key={base.userId}
+                type="button"
+                onClick={() => onFocusBase?.(base)}
+                title={`Показать базу ${base.name} на карте`}
+                className="flex w-[64px] flex-col items-center gap-1 rounded-xl border border-transparent px-1 py-1.5 transition hover:border-[var(--mr-border)]"
+              >
+                {base.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- avatar CDN URL, same as live-rider markers render
+                  <img src={base.avatarUrl} alt="" className="h-11 w-11 rounded-full border object-cover" style={{ borderColor: "var(--mr-border)" }} />
+                ) : (
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-full border text-xs font-bold"
+                    style={{ borderColor: "var(--mr-border)", backgroundColor: "color-mix(in srgb, #38bdf8 16%, transparent)", color: "var(--mr-text)" }}
+                  >
+                    {base.name.replace(/^@/, "").slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <span className="w-full truncate text-center text-[10px] font-semibold text-[var(--mr-muted)]">{base.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 rounded-2xl border px-3 py-2.5" style={PANEL_CARD}>
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--mr-muted)]" aria-hidden />
+          <p className="text-[11px] leading-snug text-[var(--mr-muted)]">
+            Хочешь на карту экипажа? Поставь «Моя база» в профиле райдера — точка появится здесь и на карте. Дом по умолчанию скрыт.
+          </p>
+        </div>
+      )}
       <CrewDiscoveryGraph
         nodes={network.nodes}
         links={network.links}

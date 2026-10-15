@@ -32,6 +32,12 @@ import {
   type CrewNetworkMember,
   type CrewNetworkNodeInput,
 } from "../lib/crew-network";
+import {
+  sanitizeRiderProfileCustom,
+  riderProfileMetadataField,
+  riderBaseLatLng,
+  type CrewNetworkRiderBase,
+} from "../lib/rider-profile";
 
 // Public surface preserved: consumers (and tests) import the reader from the
 // loader exactly as before Task 75.
@@ -113,6 +119,10 @@ export interface CrewNetworkModelResult {
   connectionCount: number;
   bloggers: CrewNetworkBlogger[];
   bloggerLinks: ReturnType<typeof buildCrewNetworkModel>["bloggerLinks"];
+  /** Riders who OPTED IN by saving «Моя база» in their profile (per-slug).
+   *  Privacy: hideProfile=true riders and profiles without baseCoords never
+   *  land here — the map layer renders ONLY deliberate public points. */
+  riderBases: CrewNetworkRiderBase[];
 }
 
 export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
@@ -125,7 +135,7 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
 
   const crews = (crewRows ?? []) as CrewRow[];
   if (crews.length === 0) {
-    return { nodes: [], links: [], peopleCount: 0, connectionCount: 0, bloggers: [], bloggerLinks: [] };
+    return { nodes: [], links: [], peopleCount: 0, connectionCount: 0, bloggers: [], bloggerLinks: [], riderBases: [] };
   }
 
   const crewIds = crews.map((c) => c.id);
@@ -197,17 +207,46 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
 
   const allUserIds = [...new Set([...membersByCrew.values()].flat())];
   const people = new Map<string, CrewNetworkMember>();
+  // Rider bases («Моя база» opt-in, 2026-10-16): the SAME users query now
+  // also carries metadata, so the base layer costs zero extra round-trips.
+  // Scope note: bases are read for crew MEMBERS (the people the network
+  // already knows); a visitor who saved a base but joined nothing will
+  // appear once they are a member of any crew — acceptable v1 scoping.
+  const riderBases: CrewNetworkRiderBase[] = [];
+  const profileField = riderProfileMetadataField();
   if (allUserIds.length > 0) {
     const { data: userRows } = await supabaseAdmin
       .from("users")
-      .select("user_id, username, full_name, avatar_url")
+      .select("user_id, username, full_name, avatar_url, metadata")
       .in("user_id", allUserIds);
-    for (const row of (userRows ?? []) as UserRow[]) {
+    for (const row of (userRows ?? []) as (UserRow & { metadata?: unknown })[]) {
       people.set(row.user_id, {
         userId: row.user_id,
         name: publicName(row),
         avatarUrl: row.avatar_url ?? null,
       });
+      // ── base extraction (opt-in public point, per-crew slug) ──
+      const meta = (row.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+      const profilesRaw = meta[profileField];
+      if (!profilesRaw || typeof profilesRaw !== "object") continue;
+      for (const crew of crews) {
+        const slug = (crew.slug ?? "").trim();
+        if (!slug) continue;
+        const custom = sanitizeRiderProfileCustom((profilesRaw as Record<string, unknown>)[slug]);
+        // hideProfile=true → the rider asked to stay invisible; no base → nothing to show.
+        if (custom.hideProfile || !custom.baseCoords) continue;
+        const latLng = riderBaseLatLng(custom.baseCoords);
+        if (!latLng) continue;
+        riderBases.push({
+          userId: row.user_id,
+          slug,
+          name: publicName(row),
+          username: (row.username ?? "").trim() ? row.username!.replace(/^@/, "") : null,
+          avatarUrl: row.avatar_url ?? null,
+          lat: latLng.lat,
+          lng: latLng.lng,
+        });
+      }
     }
   }
 
@@ -293,5 +332,5 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
     };
   });
 
-  return buildCrewNetworkModel(inputs, people, bloggers);
+  return { ...buildCrewNetworkModel(inputs, people, bloggers), riderBases };
 }

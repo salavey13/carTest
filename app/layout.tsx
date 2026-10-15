@@ -81,7 +81,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="icon" href="/favicon.png" />
         <link rel="shortcut icon" href="/favicon.png" type="image/png" />
         <link rel="manifest" href={isVipBikeRentalHost ? "/manifest.webmanifest" : "/manifest.json"} />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
+        {/* apple-touch-icon: was /icons/icon-192x192.png — the whole /icons
+            dir never existed in public/, so EVERY page fired a 404 for it
+            (task96 404-doublecheck). /favicon.png is the same file the
+            manifests already serve, so iOS gets a real icon and the 404 dies. */}
+        <link rel="apple-touch-icon" href="/favicon.png"></link>
         {/* Updated msapplication-TileColor to match light theme background by default */}
         <meta name="msapplication-TileColor" content="hsl(220 25% 98%)"></meta>
         <Script

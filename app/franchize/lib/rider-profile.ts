@@ -30,6 +30,8 @@ import {
 export const RIDER_BIO_MAX_LEN = 280;
 export const RIDER_CITY_MAX_LEN = 40;
 export const RIDER_STATUS_TEXT_MAX_LEN = 60;
+/** Transport cap for the "lat,lng" string — the parser below decides the shape. */
+export const RIDER_BASE_COORDS_MAX_LEN = 32;
 
 /** Whitelist — the status emoji must be picked, not typed (no arbitrary
  *  user-supplied glyphs on the public page). */
@@ -50,6 +52,14 @@ export interface RiderProfileCustom {
   /** «Скрыть профиль»: other viewers see a minimal card (name + hint),
    *  the owner and crew staff still see everything. */
   hideProfile: boolean;
+  /** «Моя база» — a deliberate public "lat,lng" point (crew HQ analogue for
+   *  a single rider). Normalized "<lat>,<lng>" (5 decimals) or null.
+   *  PRIVACY MODEL (boss 2026-10-16): the map never shows anyone's home by
+   *  default (home-blur + hidden profile cover the live layer); a rider who
+   *  explicitly saves a base OPTS IN — the base pin appears on the crew map
+   *  and the profile chip appears on the public card. No base saved →
+   *  nothing to show, the rider stays invisible to the base layer. */
+  baseCoords: string | null;
 }
 
 export const EMPTY_RIDER_PROFILE_CUSTOM: RiderProfileCustom = {
@@ -58,7 +68,50 @@ export const EMPTY_RIDER_PROFILE_CUSTOM: RiderProfileCustom = {
   statusEmoji: "",
   statusText: "",
   hideProfile: false,
+  baseCoords: null,
 };
+
+/**
+ * «Моя база» parser — the single source of truth for what a valid base is.
+ * Accepts "lat,lng" (also ";" separator, comma decimals, optional spaces),
+ * validates the geographic ranges and normalizes to "<lat>,<lng>" with
+ * 5 decimals (~1 m precision — enough for a base pin, never a street address).
+ * Returns null for anything else (garbage in → no base, never a throw).
+ */
+export function parseRiderBaseCoords(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const m = raw.trim().match(/^(-?\d{1,2}(?:[.,]\d{1,6})?)\s*[,;]\s*(-?\d{1,3}(?:[.,]\d{1,6})?)$/);
+  if (!m) return null;
+  const lat = Number(m[1].replace(",", "."));
+  const lng = Number(m[2].replace(",", "."));
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  // 0,0 is Null Island — a placeholder, not a base.
+  if (lat === 0 && lng === 0) return null;
+  return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+}
+
+/** Normalized "lat,lng" → numeric pair for map markers; null when unset/broken. */
+export function riderBaseLatLng(value: string | null | undefined): { lat: number; lng: number } | null {
+  const normalized = parseRiderBaseCoords(value);
+  if (!normalized) return null;
+  const [lat, lng] = normalized.split(",").map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+/** A rider base crossing the server→client boundary (map layer + network
+ *  sheet). Built ONLY by the server loader from sanitized profiles —
+ *  hideProfile=true riders never land here. */
+export interface CrewNetworkRiderBase {
+  userId: string;
+  /** The crew slug the base was saved for (riderProfiles is per-crew). */
+  slug: string;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+  lat: number;
+  lng: number;
+}
 
 function cleanText(value: unknown, max: number): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
@@ -75,11 +128,12 @@ export function sanitizeRiderProfileCustom(raw: unknown): RiderProfileCustom {
     statusEmoji: (RIDER_STATUS_EMOJIS as readonly string[]).includes(emoji) ? emoji : "",
     statusText: cleanText(src.statusText, RIDER_STATUS_TEXT_MAX_LEN),
     hideProfile: src.hideProfile === true,
+    baseCoords: parseRiderBaseCoords(src.baseCoords),
   };
 }
 
 export function isRiderProfileCustomEmpty(c: RiderProfileCustom): boolean {
-  return !c.bio && !c.city && !c.statusEmoji && !c.statusText && !c.hideProfile;
+  return !c.bio && !c.city && !c.statusEmoji && !c.statusText && !c.hideProfile && !c.baseCoords;
 }
 
 /** Where the custom payload lives inside users.metadata (per-crew scope). */

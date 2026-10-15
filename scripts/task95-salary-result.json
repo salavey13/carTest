@@ -1,0 +1,765 @@
+{
+  "generatedAt": "2026-10-15T17:55:24.412Z",
+  "period": {
+    "fromMsk": "2026-10-01",
+    "toMsk": "2026-10-31",
+    "fromUtc": "2026-09-30T21:00:00.000Z",
+    "toUtc": "2026-10-31T20:59:59.999Z"
+  },
+  "crew": {
+    "id": "2d5fde70-1dd3-4f0d-8d72-66ccf6908746",
+    "name": "VIP_BIKE",
+    "slug": "vip-bike",
+    "ownerId": "356282674"
+  },
+  "member": {
+    "id": "7813830016",
+    "username": "DJORUDJOV",
+    "fullName": "ORUDJOV",
+    "membership": {
+      "user_id": "7813830016",
+      "role": "admin",
+      "membership_status": "active"
+    }
+  },
+  "config": {
+    "rental": {
+      "budget": 750,
+      "regular": 1000,
+      "partner_regular": 500,
+      "premium": 1500,
+      "partner_premium": 750
+    },
+    "equipmentRentalUnit": 200,
+    "sale": {
+      "enduro_moped": 5000,
+      "regular": 10000,
+      "premium": 15000
+    },
+    "equipmentSale": {
+      "helmet": 500,
+      "balaclava": 100,
+      "jacket": 500,
+      "pants": 500,
+      "gloves": 200
+    },
+    "overpricePercent": 10,
+    "fromMetadata": true,
+    "tiers": {
+      "premiumThreshold": 14000,
+      "regularThreshold": 7000
+    }
+  },
+  "ownerMembershipRows": [
+    {
+      "user_id": "356282674",
+      "role": "owner"
+    }
+  ],
+  "shifts": {
+    "count": 6,
+    "income": 36000,
+    "breakdown": [
+      {
+        "clockIn": "2026-10-03T07:00:00+00:00",
+        "clockOut": "2026-10-03T19:00:00+00:00",
+        "hours": 12,
+        "rate": 500,
+        "salaryAmount": 6000,
+        "amount": 6000
+      },
+      {
+        "clockIn": "2026-10-01T07:00:00+00:00",
+        "clockOut": "2026-10-01T19:00:00+00:00",
+        "hours": 12,
+        "rate": 500,
+        "salaryAmount": 6000,
+        "amount": 6000
+      },
+      {
+        "clockIn": "2026-10-02T07:00:00+00:00",
+        "clockOut": "2026-10-02T19:00:00+00:00",
+        "hours": 12,
+        "rate": 500,
+        "salaryAmount": 6000,
+        "amount": 6000
+      },
+      {
+        "clockIn": "2026-10-04T07:00:00+00:00",
+        "clockOut": "2026-10-04T19:00:00+00:00",
+        "hours": 12,
+        "rate": 500,
+        "salaryAmount": 6000,
+        "amount": 6000
+      },
+      {
+        "clockIn": "2026-10-05T07:00:00+00:00",
+        "clockOut": "2026-10-05T19:00:00+00:00",
+        "hours": 12,
+        "rate": 500,
+        "salaryAmount": 6000,
+        "amount": 6000
+      },
+      {
+        "clockIn": "2026-10-06T07:00:00+00:00",
+        "clockOut": "2026-10-06T19:00:00+00:00",
+        "hours": 12,
+        "rate": 500,
+        "salaryAmount": 6000,
+        "amount": 6000
+      }
+    ]
+  },
+  "rentals": {
+    "total": 22,
+    "attributedToMember": 14,
+    "bonusTotalMember": 16880,
+    "bonusAllRentals": 24506,
+    "byCategory": {
+      "Обычные": {
+        "count": 5,
+        "amount": 8430,
+        "sources": {
+          "doc_command": 5
+        }
+      },
+      "Бюджетные": {
+        "count": 7,
+        "amount": 5850,
+        "sources": {
+          "doc_command": 7
+        }
+      },
+      "Партнерские обычные": {
+        "count": 1,
+        "amount": 900,
+        "sources": {
+          "doc_command": 1
+        }
+      },
+      "Премиум": {
+        "count": 1,
+        "amount": 1700,
+        "sources": {
+          "doc_command": 1
+        }
+      }
+    },
+    "rows": [
+      {
+        "rentalId": "2bfceacc-cc28-4628-b432-2ff37bf89c98",
+        "createdAt": "2026-09-29T12:47:18.202781+00:00",
+        "bikeId": "kawasaki-ex650k",
+        "bike": "Kawasaki EX650K (Ninja 650)",
+        "start": "2026-10-02T11:00:00+00:00",
+        "end": "2026-10-03T11:00:00+00:00",
+        "totalCost": 10000,
+        "standardPrice": 10000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "handout",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 1000,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 1000
+        },
+        "createdByOperatorChatId": null,
+        "handoutBy": "413553377",
+        "returnBy": "7813830016"
+      },
+      {
+        "rentalId": "d0a4748a-0908-4e8c-aee7-dd8878921e84",
+        "createdAt": "2026-10-02T11:41:06.791373+00:00",
+        "bikeId": "honda-cbr600rr-2003",
+        "bike": "Honda CBR600RR",
+        "start": "2026-10-02T12:00:00+00:00",
+        "end": "2026-10-03T12:00:00+00:00",
+        "totalCost": 5750,
+        "standardPrice": 11500,
+        "markup": 0,
+        "equipmentUnits": 2,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 1000,
+          "equipment": 400,
+          "overprice": 0,
+          "total": 1400
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "5708be39-9463-4df2-9385-a94823297b05",
+        "createdAt": "2026-10-02T11:41:07.377396+00:00",
+        "bikeId": "the-meta-helmet",
+        "bike": "Meta Universal Helmet (All Sizes)",
+        "start": "2026-10-02T12:00:00+00:00",
+        "end": "2026-10-03T00:00:00+00:00",
+        "totalCost": 0,
+        "standardPrice": 1000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 750
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "645e5f9d-74dd-4dfc-a920-c3279cb00fe8",
+        "createdAt": "2026-10-02T11:51:58.298561+00:00",
+        "bikeId": "yamaha-r6-2007",
+        "bike": "Yamaha R6",
+        "start": "2026-10-02T12:00:00+00:00",
+        "end": "2026-10-03T12:00:00+00:00",
+        "totalCost": 12500,
+        "standardPrice": 12500,
+        "markup": 0,
+        "equipmentUnits": 1,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 1000,
+          "equipment": 200,
+          "overprice": 0,
+          "total": 1200
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "7813830016"
+      },
+      {
+        "rentalId": "add63811-8067-4c13-9e5a-292308c089c9",
+        "createdAt": "2026-10-02T16:30:56.172248+00:00",
+        "bikeId": "yamaha-r7",
+        "bike": "Yamaha R7",
+        "start": "2026-10-02T12:00:00+00:00",
+        "end": "2026-10-03T12:00:00+00:00",
+        "totalCost": 7750,
+        "standardPrice": 13500,
+        "markup": 0,
+        "equipmentUnits": 2,
+        "rentalCategory": "partner_regular",
+        "categoryLabel": "Партнерские обычные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 500,
+          "equipment": 400,
+          "overprice": 0,
+          "total": 900
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "86234acc-a2bb-46ec-a123-e90b3df565da",
+        "createdAt": "2026-10-02T16:30:57.573343+00:00",
+        "bikeId": "the-meta-helmet",
+        "bike": "Meta Universal Helmet (All Sizes)",
+        "start": "2026-10-02T12:00:00+00:00",
+        "end": "2026-10-03T00:00:00+00:00",
+        "totalCost": 0,
+        "standardPrice": 1000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 750
+        },
+        "createdByOperatorChatId": "413553377",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "de2de03c-e071-4796-89bd-e0effcc614f8",
+        "createdAt": "2026-10-03T09:17:57.410152+00:00",
+        "bikeId": "sequence-zero",
+        "bike": "Sequence Zero",
+        "start": "2026-10-03T10:00:00+00:00",
+        "end": "2026-10-04T10:00:00+00:00",
+        "totalCost": 21000,
+        "standardPrice": 26000,
+        "markup": 0,
+        "equipmentUnits": 1,
+        "rentalCategory": "premium",
+        "categoryLabel": "Премиум",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 1500,
+          "equipment": 200,
+          "overprice": 0,
+          "total": 1700
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "5219192922"
+      },
+      {
+        "rentalId": "c6ff865b-1e77-4e17-8c63-6114a0217b36",
+        "createdAt": "2026-10-03T09:17:58.032316+00:00",
+        "bikeId": "the-meta-helmet",
+        "bike": "Meta Universal Helmet (All Sizes)",
+        "start": "2026-10-03T10:00:00+00:00",
+        "end": "2026-10-04T10:00:00+00:00",
+        "totalCost": 0,
+        "standardPrice": 1000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 750
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "f335428d-ada2-4564-9fba-c52e07397536",
+        "createdAt": "2026-10-04T12:39:25.690318+00:00",
+        "bikeId": "bmw-f800r",
+        "bike": "BMW F800R",
+        "start": "2026-10-04T13:00:00+00:00",
+        "end": "2026-10-04T19:00:00+00:00",
+        "totalCost": 8500,
+        "standardPrice": 9000,
+        "markup": 0,
+        "equipmentUnits": 1,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "handout",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 1000,
+          "equipment": 200,
+          "overprice": 0,
+          "total": 1200
+        },
+        "createdByOperatorChatId": null,
+        "handoutBy": "413553377",
+        "returnBy": "5219192922"
+      },
+      {
+        "rentalId": "50c71a29-93e6-4bae-8743-1f45b10efae9",
+        "createdAt": "2026-10-06T16:45:58.637846+00:00",
+        "bikeId": "bmw-f800r",
+        "bike": "BMW F800R",
+        "start": "2026-10-09T12:00:00+00:00",
+        "end": "2026-10-10T12:00:00+00:00",
+        "totalCost": 11000,
+        "standardPrice": 11000,
+        "markup": 0,
+        "equipmentUnits": 1,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "handout",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 1000,
+          "equipment": 200,
+          "overprice": 0,
+          "total": 1200
+        },
+        "createdByOperatorChatId": null,
+        "handoutBy": "413553377",
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "33ec1f38-65de-4b1e-9bec-a587e44cd451",
+        "createdAt": "2026-10-06T16:49:40.751099+00:00",
+        "bikeId": "yamaha-r7",
+        "bike": "Yamaha R7",
+        "start": "2026-10-09T12:00:00+00:00",
+        "end": "2026-10-10T12:00:00+00:00",
+        "totalCost": 12000,
+        "standardPrice": 12000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "partner_regular",
+        "categoryLabel": "Партнерские обычные",
+        "attributionSource": "handout",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 500,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 500
+        },
+        "createdByOperatorChatId": null,
+        "handoutBy": "413553377",
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "9d7582e5-dfa6-469d-bfad-5c47d3f51129",
+        "createdAt": "2026-10-09T08:25:31.314258+00:00",
+        "bikeId": "motoland-breakout",
+        "bike": "Motoland Breakout 300",
+        "start": "2026-10-09T09:00:00+00:00",
+        "end": "2026-10-09T12:00:00+00:00",
+        "totalCost": 3500,
+        "standardPrice": 4700,
+        "markup": 0,
+        "equipmentUnits": 1,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 200,
+          "overprice": 0,
+          "total": 950
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "15db0028-ece6-4e62-9c50-a891bcd32fe7",
+        "createdAt": "2026-10-09T11:32:23.972758+00:00",
+        "bikeId": "kawasaki-ex650k",
+        "bike": "Kawasaki EX650K (Ninja 650)",
+        "start": "2026-10-09T12:00:00+00:00",
+        "end": "2026-10-09T15:00:00+00:00",
+        "totalCost": 7500,
+        "standardPrice": 8500,
+        "markup": 0,
+        "equipmentUnits": 2,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 1000,
+          "equipment": 400,
+          "overprice": 0,
+          "total": 1400
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "b29c508f-fdc6-46ad-b810-f75da32579ff",
+        "createdAt": "2026-10-09T11:32:24.586736+00:00",
+        "bikeId": "the-meta-helmet",
+        "bike": "Meta Universal Helmet (All Sizes)",
+        "start": "2026-10-09T12:00:00+00:00",
+        "end": "2026-10-09T15:00:00+00:00",
+        "totalCost": 0,
+        "standardPrice": 3000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 750
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "685a9152-a0f4-4026-985a-793c816e4e55",
+        "createdAt": "2026-10-09T15:26:45.282248+00:00",
+        "bikeId": "kawasaki-ex650k",
+        "bike": "Kawasaki EX650K (Ninja 650)",
+        "start": "2026-10-09T15:00:00+00:00",
+        "end": "2026-10-11T15:00:00+00:00",
+        "totalCost": 18750,
+        "standardPrice": 18500,
+        "markup": 250,
+        "equipmentUnits": 1,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "handout",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 1000,
+          "equipment": 200,
+          "overprice": 25,
+          "total": 1225
+        },
+        "createdByOperatorChatId": null,
+        "handoutBy": "413553377",
+        "returnBy": "5219192922"
+      },
+      {
+        "rentalId": "03e18650-74a8-439a-b2ba-efddbea0af96",
+        "createdAt": "2026-10-10T10:30:31.03215+00:00",
+        "bikeId": "motoland-breakout",
+        "bike": "Motoland Breakout 300",
+        "start": "2026-10-10T11:00:00+00:00",
+        "end": "2026-10-11T11:00:00+00:00",
+        "totalCost": 7500,
+        "standardPrice": 9500,
+        "markup": 0,
+        "equipmentUnits": 2,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 400,
+          "overprice": 0,
+          "total": 1150
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "5219192922"
+      },
+      {
+        "rentalId": "443d7f9d-fae4-4003-9ae3-c5a27987167f",
+        "createdAt": "2026-10-10T10:30:31.458876+00:00",
+        "bikeId": "the-meta-helmet",
+        "bike": "Meta Universal Helmet (All Sizes)",
+        "start": "2026-10-10T11:00:00+00:00",
+        "end": "2026-10-11T11:00:00+00:00",
+        "totalCost": 0,
+        "standardPrice": 1000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 750
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "41ab8468-1110-4b02-a452-8accd159a1fc",
+        "createdAt": "2026-10-10T15:32:48.096606+00:00",
+        "bikeId": "aprilia-shiver",
+        "bike": "Aprilia Shiver 750",
+        "start": "2026-10-09T12:00:00+00:00",
+        "end": "2026-10-10T12:00:00+00:00",
+        "totalCost": 11000,
+        "standardPrice": 12000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "return",
+        "attributionOperator": "413553377",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 1000,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 1000
+        },
+        "createdByOperatorChatId": null,
+        "handoutBy": null,
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "9f6c55fb-6c9a-4cf4-945b-544330f4aea6",
+        "createdAt": "2026-10-12T12:05:04.982092+00:00",
+        "bikeId": "yamaha-r6-2007",
+        "bike": "Yamaha R6",
+        "start": "2026-10-12T12:30:00+00:00",
+        "end": "2026-10-15T12:30:00+00:00",
+        "totalCost": 48000,
+        "standardPrice": 30000,
+        "markup": 18000,
+        "equipmentUnits": 0,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 1000,
+          "equipment": 0,
+          "overprice": 1800,
+          "total": 2800
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "24277629-cf4f-4953-9e21-ac24234d56e1",
+        "createdAt": "2026-10-13T16:41:21.360534+00:00",
+        "bikeId": "vip-bike-svc-048",
+        "bike": "— VIP_BIKE Уборка шланга (за метр)",
+        "start": "2026-10-13T10:00:00+00:00",
+        "end": "2026-10-13T11:00:00+00:00",
+        "totalCost": 10.35,
+        "standardPrice": 1,
+        "markup": 9,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "356282674",
+        "isDjorudjov": false,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 1,
+          "total": 751
+        },
+        "createdByOperatorChatId": "356282674",
+        "handoutBy": null,
+        "returnBy": null
+      },
+      {
+        "rentalId": "28702ae4-21a2-45bb-9dd2-e770223ff933",
+        "createdAt": "2026-10-14T08:34:03.671864+00:00",
+        "bikeId": "bmw-f800r",
+        "bike": "BMW F800R",
+        "start": "2026-10-14T09:00:00+00:00",
+        "end": "2026-10-15T09:00:00+00:00",
+        "totalCost": 13800,
+        "standardPrice": 11500,
+        "markup": 2300,
+        "equipmentUnits": 2,
+        "rentalCategory": "regular",
+        "categoryLabel": "Обычные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 1000,
+          "equipment": 400,
+          "overprice": 230,
+          "total": 1630
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": "413553377"
+      },
+      {
+        "rentalId": "c5d19f4f-07ea-4a0a-9b9e-31710f05e05d",
+        "createdAt": "2026-10-14T08:34:04.514808+00:00",
+        "bikeId": "the-meta-helmet",
+        "bike": "Meta Universal Helmet (All Sizes)",
+        "start": "2026-10-14T09:00:00+00:00",
+        "end": "2026-10-15T09:00:00+00:00",
+        "totalCost": 0,
+        "standardPrice": 1000,
+        "markup": 0,
+        "equipmentUnits": 0,
+        "rentalCategory": "budget",
+        "categoryLabel": "Бюджетные",
+        "attributionSource": "doc_command",
+        "attributionOperator": "7813830016",
+        "isDjorudjov": true,
+        "salary": {
+          "base": 750,
+          "equipment": 0,
+          "overprice": 0,
+          "total": 750
+        },
+        "createdByOperatorChatId": "7813830016",
+        "handoutBy": null,
+        "returnBy": null
+      }
+    ]
+  },
+  "sales": {
+    "total": 1,
+    "attributedToMember": 1,
+    "bonusTotalMember": 10000,
+    "bonusAll": 10000,
+    "rows": [
+      {
+        "id": "93e5013a-c2a6-4a95-8cba-cd8d81ccb786",
+        "bike": "79BIKE Falcon Pro",
+        "createdAt": "2026-10-10T14:12:59.54544+00:00",
+        "salePrice": 310000,
+        "category": "regular",
+        "salary": {
+          "base": 10000,
+          "overprice": 0,
+          "total": 10000
+        },
+        "source": "doc_command"
+      }
+    ]
+  },
+  "totals": {
+    "shiftIncome": 36000,
+    "commissionIncome": 26880,
+    "totalAccrued": 62880
+  },
+  "paidOut": {
+    "formalTotal": 0,
+    "walletTotal": 0,
+    "total": 0,
+    "walletRows": [],
+    "formalRows": []
+  },
+  "balanceDue": 62880,
+  "attributionTally": {
+    "356282674|doc_command": 1,
+    "7813830016|doc_command": 14,
+    "413553377|handout": 5,
+    "413553377|return": 1,
+    "413553377|doc_command": 1
+  },
+  "legacyCommissionsCount": 0
+}
