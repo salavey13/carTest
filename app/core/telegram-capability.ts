@@ -442,9 +442,9 @@ export const telegram = {
   editMessage,
 };
 
-// Re-export individual functions for convenience
-export { sendMessage, sendDocument, sendPhoto, sendInvoice, notifyAdmin, deleteMessage, editMessage };
-
+// (task94 codereview: the "re-export for convenience" block below was removed —
+// every listed function is already `export`ed at its definition, so the block
+// was a duplicate-export build error)
 // ============================================================================
 // LEGACY COMPATIBILITY
 // ============================================================================

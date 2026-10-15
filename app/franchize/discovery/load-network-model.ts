@@ -157,14 +157,27 @@ export async function loadNetworkModel(): Promise<CrewNetworkModelResult> {
   const storageRows = (storageRes.data ?? []) as StorageRow[];
   const postRows = (postsRes.data ?? []) as PostRow[];
 
+  // ── display-level exclusion (boss 2026-10-14) ─────────────────────────────
+  // Ilya (I_O_S_NN) currently sits as owner in EVERY prefabricated/demo crew,
+  // so the crew graph collapses into a star: every circle links to one person
+  // and the «паутина» reads as fake density. Until each crew gets its final
+  // owner/admin (see the network-tab role manager), the network VIEW hides
+  // his memberships: no satellite node, no edges, no shared-person weight.
+  // DISPLAY ONLY — memberships, rights, walls, rentals are untouched. Drop
+  // the id from the set once real admins land and the filter becomes moot.
+  const NETWORK_DISPLAY_EXCLUDED_USER_IDS: ReadonlySet<string> = new Set([
+    "356282674", // I_O_S_NN
+  ]);
+
   // Membership sets: owner first (the implicit one-man-crew member), then
   // active crew_members. This is the ONLY social signal we use.
   const membersByCrew = new Map<string, string[]>();
   for (const crew of crews) {
-    membersByCrew.set(crew.id, crew.owner_id ? [crew.owner_id] : []);
+    const ownerVisible = crew.owner_id && !NETWORK_DISPLAY_EXCLUDED_USER_IDS.has(crew.owner_id);
+    membersByCrew.set(crew.id, ownerVisible ? [crew.owner_id] : []);
   }
   for (const row of memberRows) {
-    if (!row.user_id) continue;
+    if (!row.user_id || NETWORK_DISPLAY_EXCLUDED_USER_IDS.has(row.user_id)) continue;
     const list = membersByCrew.get(row.crew_id);
     if (!list) continue;
     if (!list.includes(row.user_id)) list.push(row.user_id);

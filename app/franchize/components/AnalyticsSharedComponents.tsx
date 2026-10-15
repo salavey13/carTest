@@ -92,7 +92,7 @@ interface SummaryCardProps {
 }
 
 function SummaryCard({ label, value, icon: Icon, iconColor, fullWidth }: SummaryCardProps) {
-  const Icon = Icon;
+  // (task94: `const Icon = Icon;` removed — TDZ self-shadow crash + duplicate symbol)
   return (
     <div className={`rounded-2xl border p-5 ${fullWidth ? "col-span-full md:col-span-4" : ""}`} style={{ borderColor: "#e5e7eb", backgroundColor: "#fff" }}>
       <div className="flex items-center justify-between">

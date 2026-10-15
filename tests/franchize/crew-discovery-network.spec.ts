@@ -273,10 +273,15 @@ describe("global discovery page — static route, memberships-only data", () => 
   it("the ONLY social signal is crew_members (+ owner as implicit member)", () => {
     // Task 69: the queries live in the EXTRACTED loader (load-network-model.ts)
     // shared with the map-riders sheet — same guarantees, one file.
+    // Task 94: owner seeding gained the DISPLAY-only exclusion filter
+    // (NETWORK_DISPLAY_EXCLUDED_USER_IDS hides I_O_S_NN's memberships in the
+    // graph until prefab crews get real admins) — the signal set is unchanged:
+    // still crew_members + owner, just visually masked for excluded ids.
     const model = page + read("app/franchize/discovery/load-network-model.ts");
     expect(model.includes('.from("crew_members")')).toBe(true);
     expect(model.includes('.eq("membership_status", "active")')).toBe(true);
-    expect(model.includes("crew.owner_id ? [crew.owner_id]")).toBe(true);
+    expect(model.includes("ownerVisible ? [crew.owner_id]")).toBe(true);
+    expect(model.includes("NETWORK_DISPLAY_EXCLUDED_USER_IDS")).toBe(true);
     // no other membership-ish source smuggled in
     expect(model.includes('.from("users")')).toBe(true); // names/avatars for members
   });

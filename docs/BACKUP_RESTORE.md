@@ -125,12 +125,31 @@ GITHUB_TOKEN / UNSPLASH_ACCESS_KEY
 - [ ] `/franchize/vip-bike` renders, prices/images present
 - [ ] Profile page: tabs switch, earnings visible for crew roles
 - [ ] map-riders: riders/маршруты render, game-map skin follows the theme toggle
+- [ ] map-riders «Сеть»: graph renders WITHOUT the I_O_S_NN spider-web
+      (display filter) and operators see the «⚙️ Роли экипажей» manager
 - [ ] Rentals: create → contract docx generated → stored → visible in аренды table
 - [ ] Sales: artifact created, cash transaction row appears
 - [ ] Crew management: roles editable, invite deeplink opens the bot
 - [ ] Salary report TG file delivery to ADMIN_CHAT_ID works
 - [ ] cron routes answer with `CRON_SECRET`
 - [ ] Global admin: `UPDATE users SET role='admin' WHERE user_id=<tg id>;` after first login
+
+## 6b. Owners/admins for prefabricated crews (2026-10-14+)
+
+Prefab crews ship with **I_O_S_NN as the default owner** and zero admins. Two ways to fix:
+
+1. **UI (recommended)** — hardcoded network role operators (`356282674` I_O_S_NN,
+   `413553377` salavey13, see `app/franchize/lib/network-role-operators.ts`) get the
+   **«⚙️ Роли экипажей»** card on the map-riders **«Сеть»** tab: pick a crew → assign
+   Владелец/Совладелец/Админ (👑/🤝/🛡) or add a person by **@username / Telegram ID**
+   — the membership row is created on the fly; owner transfer demotes the previous
+   owner to co_owner. Server actions: `app/franchize/server-actions/network-role-manager.ts`.
+2. **SQL fallback** — `UPDATE crew_members SET role=…` / `crews.owner_id` via SQL Editor
+   (see `docs/CLONE_PROJECT_GUIDE.html`, step 8).
+
+Note: the network VIEW also hides I_O_S_NN's memberships until crews get real admins
+(`NETWORK_DISPLAY_EXCLUDED_USER_IDS` in `app/franchize/discovery/load-network-model.ts`)
+— otherwise every prefab crew links through one person and the graph reads as a star.
 
 ## 7. Making a NEW backup
 

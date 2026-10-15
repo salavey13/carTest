@@ -465,7 +465,7 @@ Mac/Linux: <b>sha256sum</b> cartest-super-backup-20261013.zip
 Диплинки вида <code>https://t.me/твой_бот?startapp=rent_киловариант</code> работают с новым юзернеймом бота.</p>
 </div>
 
-<h2 id="s8"><span class="stepnum"><span class="n">8</span> Стать админом</span></h2>
+<h2 id="s8"><span class="stepnum"><span class="n">8</span> Стать админом и раздать роли экипажам</span></h2>
 <p>После первого входа через бота ты появился в базе как обычный пользователь.
 Поднимаешь себя до глобального админа двумя строчками SQL.</p>
 <ol>
@@ -478,6 +478,16 @@ Mac/Linux: <b>sha256sum</b> cartest-super-backup-20261013.zip
 экипажа (роли owner / co_owner / admin дают доступ к франшизному кабинету):</p>
 <pre><b>UPDATE</b> crew_members <b>SET</b> role = 'owner' <b>WHERE</b> user_id = <b>ТВОЙ_TELEGRAM_ID</b> <b>AND</b> crew_id = (
   <b>SELECT</b> id <b>FROM</b> crews <b>WHERE</b> slug = 'vip-bike');</pre>
+
+<div class="box ok"><b class="lbl">Лёгкий путь: вкладка «Сеть» на карте (2026-10-14+)</b>
+<p style="margin:4px 0">В код вшиты <b>два оператора ролей</b> — <code>356282674</code> (I_O_S_NN) и <code>413553377</code>
+(salavey13). Они видят на вкладке <b>«Сеть»</b> (карта map-riders → нижний лист) карточку
+<b>«⚙️ Роли экипажей»</b>: выбери экипаж → назначь <b>Владельца / Совладельца / Админа</b>
+по тапу на 👑 / 🤝 / 🛡, или добавь человека по <b>@username / Telegram ID</b> — участие создастся
+автоматически, даже если человека ещё нет в экипаже. Передача владения старого владельца
+не выкидывает, а оставляет его совладельцем. Это основной способ «прописать админов»
+пресозданным экипажам (у них по умолчанию владелец — только I_O_S_NN). SQL выше — запасной путь.</p>
+</div>
 
 <h2 id="s9"><span class="stepnum"><span class="n">9</span> Финальная проверка</span></h2>
 <div class="box"><b class="lbl">Прогони по списку</b>
