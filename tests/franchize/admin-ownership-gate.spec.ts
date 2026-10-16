@@ -48,8 +48,11 @@ describe("Task 45/46: ownership gate (slimmed)", () => {
     expect(src).toContain(
       "const canViewCrewLinks = userIsAdmin || isCurrentCrewAdmin || isCurrentCrewMember;",
     );
+    // Task 97: the admin half went through lib/crew-slug.hasCrewRole — same
+    // membership-based source, but now normalized (trim/lowercase) and
+    // case-insensitive on roles. The full role set is unchanged.
     expect(src).toMatch(
-      /isCurrentCrewAdmin = useMemo\(\(\) => \{[\s\S]*?userCrewMemberships\.some\([\s\S]*?\["owner", "admin", "co_owner"\]\.includes\(m\.role\)/,
+      /isCurrentCrewAdmin = useMemo\(\(\) => \{[\s\S]*?hasCrewRole\(userCrewMemberships, effectiveSlug, \["owner", "admin", "co_owner"\]\)/,
     );
     expect(src).toMatch(
       /\{canViewCrewLinks && effectiveSlug && \(\s*<DropdownMenuItem asChild>\s*<Link href=\{`\/franchize\/\$\{effectiveSlug\}\/rentals-analytics`\}/,
@@ -58,16 +61,28 @@ describe("Task 45/46: ownership gate (slimmed)", () => {
 
   it("profile dropdown: the MEMBER half of the gate is deterministic too (Task 76 — djorudjov report)", () => {
     const src = read("app/franchize/components/FranchizeProfileButton.tsx");
-    // isCurrentCrewMember must read userCrewMemberships (per-crew list), not
+    // isCurrentCrewMember must read userCrewMemberships (per-crew list) via
+    // lib/crew-slug.hasCrewMembership (Task 97: normalized comparison), not
     // the flaky primary-crew userCrewInfo — a plain member (no admin role)
     // otherwise loses Дашборд/Клиенты/Аналитика аренд whenever the arbitrary
     // maybeSingle() row points at another crew (or dies on multi-membership).
     expect(src).toMatch(
-      /isCurrentCrewMember = useMemo\(\(\) => \{[\s\S]*?userCrewMemberships\.some\(\(m\) => m\.slug === effectiveSlug\)/,
+      /isCurrentCrewMember = useMemo\(\(\) => \{[\s\S]*?hasCrewMembership\(userCrewMemberships, effectiveSlug\)/,
     );
-    // and the flaky source must be gone from the gate
+    // userCrewInfo may appear ONLY as an additional OR-fallback AFTER the
+    // deterministic source (never instead of it) — and only as a strict
+    // normalized slug equality, which is true-positive-only: a matching
+    // userCrewInfo.slug means an owned crew or an active membership row.
     const gate = src.slice(src.indexOf("const isCurrentCrewAdmin"), src.indexOf("const franchizeAdminHref"));
-    expect(gate).not.toContain("userCrewInfo?.slug");
+    const fallbackPos = gate.indexOf("crewSlugKey(userCrewInfo?.slug)");
+    const primaryPos = gate.indexOf("hasCrewMembership(userCrewMemberships, effectiveSlug)");
+    expect(primaryPos).toBeGreaterThan(-1);
+    if (fallbackPos > -1) {
+      expect(fallbackPos).toBeGreaterThan(primaryPos);
+      expect(gate).toContain("if (hasCrewMembership(userCrewMemberships, effectiveSlug)) return true;");
+    }
+    // flaky raw comparison is gone
+    expect(gate).not.toContain("userCrewMemberships.some((m) => m.slug === effectiveSlug)");
   });
 
   it("AppContext: userCrewMembershipsLoaded settles even when the fetch fails", () => {

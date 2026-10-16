@@ -52,6 +52,13 @@ interface AppRuntimeContextData {
   userCrewInfo: UserCrewInfo | null;
   userCrewMemberships: CrewMembership[];
   /**
+   * Task 97: on-demand revalidation of userCrewMemberships. The profile
+   * dropdown fires this when it OPENS while the cached list is empty —
+   * so a transient boot-fetch failure can no longer keep «Аналитика аренд»
+   * hidden for the whole session. No-op while a fetch is already running.
+   */
+  refreshUserCrewMemberships: () => Promise<void>;
+  /**
    * Task 45: true once the runtime snapshot fetch for the current user has
    * SETTLED (successfully or not). Consumers that gate admin-only UI on
    * userCrewMemberships must distinguish "no admin memberships" from
@@ -128,6 +135,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const processedStartParam = useRef(false);
 
+  // ── Task 97: resilient crew-memberships loading ──
+  // Boot path used to run snapshot + memberships in ONE Promise.all: a
+  // snapshot failure discarded the memberships result, and ANY failure left
+  // an empty list that was never retried → crew-gated links (Дашборд /
+  // Клиенты / Аналитика аренд) disappeared until a full reload. Now:
+  //   • memberships fetch is independent (allSettled semantics) and RETRIES
+  //     with a short backoff — quick on the happy path (first attempt is
+  //     immediate), self-healing on transient Supabase/REST errors;
+  //   • an in-flight ref guards against duplicate concurrent fetches;
+  //   • refreshUserCrewMemberships() is exposed for point-of-use revalidation.
+  const membershipsInFlightRef = useRef<Promise<void> | null>(null);
+
+  const loadUserCrewMemberships = useCallback(async (userId: string): Promise<void> => {
+    if (membershipsInFlightRef.current) return membershipsInFlightRef.current;
+    const run = (async () => {
+      // Up to 3 attempts: immediate → +400ms → +1200ms. A flat loop, NOT
+      // recursion: a recursive re-entry would hit this function's own
+      // in-flight guard (ref still set mid-run) and deadlock the promise.
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) {
+            const delayMs = attempt === 1 ? 400 : 1200;
+            debugLogger.warn(
+              `[AppContext] memberships fetch failed, retrying in ${delayMs}ms (attempt ${attempt + 1}/3)`,
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+          }
+          try {
+            const memberships = await fetchUserCrewMembershipsAction(userId);
+            setUserCrewMemberships(memberships);
+            break;
+          } catch (err) {
+            if (attempt === 2) {
+              debugLogger.error("[AppContext] memberships fetch failed after retries", err);
+            }
+          }
+        }
+      } finally {
+        // Task 45: settled flag — even when every attempt fails we must not
+        // leave consumers waiting forever (they would render a loading state
+        // instead of the correct access-denied / allowed panel).
+        setUserCrewMembershipsLoaded(true);
+      }
+    })();
+    membershipsInFlightRef.current = run.finally(() => {
+      membershipsInFlightRef.current = null;
+    });
+    return membershipsInFlightRef.current;
+  }, []);
+
+  const refreshUserCrewMemberships = useCallback(async () => {
+    const userId = dbUser?.user_id;
+    if (!userId) return;
+    await loadUserCrewMemberships(userId);
+  }, [dbUser?.user_id, loadUserCrewMemberships]);
+
   useEffect(() => {
     const fetchRuntimeSnapshot = async () => {
       if (!dbUser?.user_id) {
@@ -137,23 +200,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserCrewMembershipsLoaded(true); // check settled — user has no id
         return;
       }
-      try {
-        const [snapshot, memberships] = await Promise.all([
-          fetchUserRuntimeSnapshotAction(dbUser.user_id),
-          fetchUserCrewMembershipsAction(dbUser.user_id),
-        ]);
-        setUserCrewInfo(snapshot.crewInfo);
-        setUserCrewMemberships(memberships);
-        setUserMetadataSlices(snapshot.metadataSlices);
-      } finally {
-        // Task 45: settled flag — even on fetch error we must not leave
-        // consumers waiting forever (they would render a loading state
-        // instead of the correct access-denied / allowed panel).
-        setUserCrewMembershipsLoaded(true);
-      }
+      // Task 97: memberships no longer share a Promise.all with the runtime
+      // snapshot — a snapshot failure must not discard a healthy memberships
+      // response (and vice versa). Each settles on its own.
+      const snapshotTask = fetchUserRuntimeSnapshotAction(dbUser.user_id)
+        .then((snapshot) => {
+          setUserCrewInfo(snapshot.crewInfo);
+          setUserMetadataSlices(snapshot.metadataSlices);
+        })
+        .catch((err) => {
+          debugLogger.error("[AppContext] runtime snapshot fetch failed", err);
+        });
+      const membershipsTask = loadUserCrewMemberships(dbUser.user_id);
+      await Promise.allSettled([snapshotTask, membershipsTask]);
     };
-    fetchRuntimeSnapshot();
-  }, [dbUser?.user_id]);
+    void fetchRuntimeSnapshot();
+  }, [dbUser?.user_id, loadUserCrewMemberships]);
 
   const clearStartParam = useCallback(() => {
     setStartParamPayload(null);
@@ -294,8 +356,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     userCrewInfo,
     userCrewMemberships,
     userCrewMembershipsLoaded,
+    refreshUserCrewMemberships,
     userMetadataSlices,
-  }), [startParamPayload, clearStartParam, userCrewInfo, userCrewMemberships, userCrewMembershipsLoaded, userMetadataSlices]);
+  }), [startParamPayload, clearStartParam, userCrewInfo, userCrewMemberships, userCrewMembershipsLoaded, refreshUserCrewMemberships, userMetadataSlices]);
 
   const cartValue = useMemo<AppCartContextData>(() => ({
     cartScopeVersion: 1,
@@ -330,6 +393,7 @@ export const useAppContext = (): AppContextData => {
 
   const defaultRefreshDbUser = useCallback(async () => {}, []);
   const defaultClearStartParam = useCallback(() => {}, []);
+  const defaultRefreshCrewMemberships = useCallback(async () => {}, []);
   const defaultIsAdmin = useCallback(() => false, []);
 
   if (!auth) {
@@ -362,6 +426,7 @@ export const useAppContext = (): AppContextData => {
       userCrewInfo: null,
       userCrewMemberships: [],
       userCrewMembershipsLoaded: false,
+      refreshUserCrewMemberships: defaultRefreshCrewMemberships,
       userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
       activeLobby: null,
       cartScopeVersion: 1,
@@ -382,6 +447,7 @@ export const useAppContext = (): AppContextData => {
       userCrewInfo: null,
       userCrewMemberships: [],
       userCrewMembershipsLoaded: false,
+      refreshUserCrewMemberships: defaultRefreshCrewMemberships,
       userMetadataSlices: { cyberFitness: null, strikeball: null, franchizeProfiles: null },
     }),
     ...(strikeball ?? { activeLobby: null }),

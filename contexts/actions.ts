@@ -100,30 +100,39 @@ export async function fetchUserCrewMembershipsAction(userId: string): Promise<Ar
 }>> {
   if (!userId) return [];
 
+  // Task 97 (boss 2026-10-16): this action used to destructure only `data`
+  // and ignore `error`. A transient Supabase REST failure (cold start, 5xx,
+  // network blip) then silently returned [] — the profile dropdown treated
+  // that as ground truth and «Аналитика аренд» stayed hidden for the whole
+  // session (reported by djorudjov / vip-bike). Now: errors THROW so the
+  // caller's retry/backoff in AppContext engages; slugs are normalized the
+  // same way as the UI compares them (lib/crew-slug.ts).
   try {
-    const { data: ownedCrews } = await supabaseAdmin
+    const { data: ownedCrews, error: ownedErr } = await supabaseAdmin
       .from('crews')
       .select('id, slug, name')
       .eq('owner_id', userId);
+    if (ownedErr) throw ownedErr;
 
     const owned = (ownedCrews || []).map((c) => ({
       crewId: c.id,
-      slug: c.slug,
+      slug: String(c.slug || '').trim().toLowerCase(),
       name: c.name,
       role: 'owner' as const,
     }));
 
-    const { data: memberships } = await supabaseAdmin
+    const { data: memberships, error: memberErr } = await supabaseAdmin
       .from('crew_members')
       .select('crew_id, role, crews!inner(slug, name)')
       .eq('user_id', userId)
       .eq('membership_status', 'active');
+    if (memberErr) throw memberErr;
 
     const member = (memberships || []).map((m) => {
       const crewData = Array.isArray(m.crews) ? m.crews[0] : m.crews;
       return {
         crewId: m.crew_id,
-        slug: crewData?.slug || '',
+        slug: String(crewData?.slug || '').trim().toLowerCase(),
         name: crewData?.name || '',
         role: m.role || 'member',
       };
@@ -132,13 +141,16 @@ export async function fetchUserCrewMembershipsAction(userId: string): Promise<Ar
     // Merge: owned crews override membership entries
     const seen = new Set<string>();
     return [...owned, ...member].filter((m) => {
-      if (seen.has(m.crewId)) return false;
+      if (!m.slug || seen.has(m.crewId)) return false;
       seen.add(m.crewId);
       return true;
     });
   } catch (error) {
     logger.error(`[fetchUserCrewMembershipsAction] Failed for user ${userId}:`, error);
-    return [];
+    // Re-throw: an empty list is a MEANINGFUL answer ("user has no crews"),
+    // a failed fetch is not. Callers retry; swallowing here would freeze
+    // crew-gated UI in the "no access" state until a full page reload.
+    throw error;
   }
 }
 

@@ -9,6 +9,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useTheme } from "next-themes";
 import { useIsAdmin } from "@/app/franchize/hooks/useIsAdmin";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
+import { crewSlugKey, hasCrewMembership, hasCrewRole } from "@/lib/crew-slug";
 import { normalizeBotUsername, platformBotUsername } from "@/app/franchize/lib/crew-bot";
 import {
   DropdownMenu,
@@ -87,7 +88,7 @@ interface FranchizeProfileButtonProps {
 }
 
 export function FranchizeProfileButton({ bgColor, textColor, borderColor, currentSlug, telegramBotUsername, crewUi }: FranchizeProfileButtonProps) {
-  const { dbUser, user, userCrewInfo, isInTelegramContext, tg } = useAppContext();
+  const { dbUser, user, userCrewInfo, isInTelegramContext, tg, userCrewMembershipsLoaded, refreshUserCrewMemberships } = useAppContext();
   const { theme, setTheme } = useTheme();
 
   const hasUser = Boolean(dbUser || user);
@@ -99,9 +100,12 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   // If currentSlug was explicitly provided (from CrewHeader), prefer it.
   const effectiveSlug = currentSlug?.trim() ? currentSlug.trim().toLowerCase() : scopeSlug;
   // Check if user has admin-level role for the current crew
+  // Task 97: slug comparison goes through crewSlugKey (trim + lowercase) on
+  // BOTH sides — a "VIP-Bike" slug in DB must not permanently hide the
+  // links, and role checks are case-insensitive too.
   const isCurrentCrewAdmin = useMemo(() => {
     if (!effectiveSlug) return false;
-    return userCrewMemberships.some((m) => m.slug === effectiveSlug && ["owner", "admin", "co_owner"].includes(m.role));
+    return hasCrewRole(userCrewMemberships, effectiveSlug, ["owner", "admin", "co_owner"]);
   }, [userCrewMemberships, effectiveSlug]);
   // Only show crew operator links (leads, rentals, analytics) if user is admin
   // OR belongs to the crew whose page they're currently viewing.
@@ -120,10 +124,21 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
   // where maybeSingle() can't even pick a row). Both halves now read
   // userCrewMemberships — the deterministic per-crew list — so EVERY active
   // member of the current crew sees Дашборд / Клиенты / Аналитика аренд.
+  // Task 97 (djorudjov: «sometimes hidden FOREVER»): DB row was verified
+  // correct — the freeze was a transient fetch failure treated as truth.
+  // Two extra layers here:
+  //   1. userCrewInfo (fetched independently) acts as a redundant OR-source.
+  //   2. opening the dropdown revalidates an empty/unloaded list (below) —
+  //      self-healing at the exact moment of use.
   const isCurrentCrewMember = useMemo(() => {
     if (!effectiveSlug) return false;
-    return userCrewMemberships.some((m) => m.slug === effectiveSlug);
-  }, [userCrewMemberships, effectiveSlug]);
+    if (hasCrewMembership(userCrewMemberships, effectiveSlug)) return true;
+    // Redundant fallback: userCrewInfo slug matches → user belongs to the
+    // crew even if the memberships list is (still/failed) empty. For a
+    // plain member userCrewInfo IS a membership row (fetchUserCrewInfoAction
+    // falls back to the first active membership), so this is safe to OR in.
+    return crewSlugKey(userCrewInfo?.slug) === crewSlugKey(effectiveSlug) && Boolean(userCrewInfo?.slug);
+  }, [userCrewMemberships, userCrewInfo, effectiveSlug]);
   const canViewCrewLinks = userIsAdmin || isCurrentCrewAdmin || isCurrentCrewMember;
   const franchizeAdminHref = `/franchize/${effectiveSlug}/admin`;
   const franchizeDashboardHref = `/franchize/${effectiveSlug}/dashboard`;
@@ -318,7 +333,20 @@ export function FranchizeProfileButton({ bgColor, textColor, borderColor, curren
 
   return (
     <div style={{ isolation: "isolate" }}>
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={(open) => {
+          // Task 97 (self-healing at the point of use): if the cached
+          // membership list is empty or never settled, revalidate the very
+          // moment the user opens the menu. Healthy users pay ZERO extra
+          // requests (list non-empty + loaded → no-op); a user hit by a
+          // transient boot-fetch failure gets the crew links back within
+          // one round-trip instead of "hidden forever".
+          if (!open) return;
+          if (!hasUser) return;
+          if (userCrewMembershipsLoaded && userCrewMemberships.length > 0) return;
+          void refreshUserCrewMemberships();
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
             type="button"
