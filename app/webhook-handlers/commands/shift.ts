@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
+import { DEFAULT_HOURLY_RATE } from "@/app/franchize/lib/salary-constants";
 import {
     buildShiftReplyButtons,
     escapeHtmlTg,
@@ -120,7 +121,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                         clock_in_time: clockInIso,
                         // hourly_rate намеренно не передаём: триггер
                         // sync_hourly_rate_on_shift_start проставит ставку
-                        // из users.metadata.hourly_rate (дефолт 500).
+                        // из users.metadata.hourly_rate (дефолт 100, task98).
                     });
                     // iter24: clock-in achievements — first shift (classic) +
                     // early bird (<10:00 МСК), dawn patrol (<07:00 МСК),
@@ -163,7 +164,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                             const clockOut = Date.now();
                             const clockOutIso = new Date(clockOut).toISOString();
                             const durationMinutes = Math.round((clockOut - clockIn) / 60000);
-                            const rate = shiftData.hourly_rate || 500;
+                            const rate = shiftData.hourly_rate || DEFAULT_HOURLY_RATE;
                             const salaryAmount = (durationMinutes / 60) * rate;
                             // 2026-08-19 review: stash the earned amount + duration
                             // so we can include it in the user-facing message.

@@ -414,8 +414,11 @@ describe("iter20 · source guards", () => {
     expect(lib).toContain("ATTRIBUTION_SOURCE_LABELS");
     // the old direct member filter must be gone from the rentals query
     expect(lib).not.toContain('.eq("created_by_operator_chat_id", memberId)');
-    // breakdown exposes the attribution sources for audit
-    expect(lib).toMatch(/\$\{agg\.count\} × бонусы\$\{sourceParts/);
+    // breakdown exposes the attribution sources for audit — since task98 the
+    // line rendering lives in the pure lib/salary-bucket.ts aggregator
+    // («N × бонусы · M /doc, K выдача»), driven by ATTRIBUTION_SOURCE_LABELS.
+    expect(lib).toContain("salaryBucketsToDetails(byRentalCategory");
+    expect(read("lib/salary-bucket.ts")).toMatch(/\$\{agg\.count\} × бонусы\$\{sourceParts/);
     const src = read("app/franchize/server-actions/salary-calculations.ts");
     expect(src).toContain("computeCategoryBonuses");
     expect(src).toContain("salary-category-bonuses");

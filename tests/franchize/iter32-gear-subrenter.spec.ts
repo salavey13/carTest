@@ -337,10 +337,14 @@ describe('iter32: buildSubrenterCompletionMessage', () => {
 // ─── 5. Salary leveling: one rate default, no drifted literals ───────────────
 
 describe('iter32: salary leveling', () => {
-  it('DEFAULT_HOURLY_RATE matches the DB default (500)', () => {
-    expect(DEFAULT_HOURLY_RATE).toBe(500);
-    const migration = read('supabase/migrations/20260726000001_deposit_and_shift_tracking.sql');
-    expect(migration).toContain('hourly_rate numeric DEFAULT 500');
+  it('DEFAULT_HOURLY_RATE matches the DB default (task98 2026-10-16: 100 ₽/h)', () => {
+    // Task 98 (boss): «default 100 rub/hour instead of 500 — 10h shift = 1k
+    // rub, closer to reality». The DB side (column DEFAULT + trigger
+    // COALESCE) moves to 100 via Paul's SQL
+    // docs/crewDocs/salary-hourly-default-100-dj-october-shifts-2026-10-16.sql;
+    // the 20260726 migration file stays historical (it documented the OLD
+    // default at its point in time).
+    expect(DEFAULT_HOURLY_RATE).toBe(100);
   });
 
   it('the 169 literals are gone from the web shift math (drift fix)', () => {

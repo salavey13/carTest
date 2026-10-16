@@ -49,6 +49,18 @@ import {
   getSubrenterCut,
 } from "@/app/franchize/lib/subrenter-economics";
 import { CSV_SECTION_TITLES } from "@/lib/csv-builders/rentals-csv-sections";
+// Task 98 (boss 2026-10-16, djorudjov): generated columns for manual auditing —
+// the ₽ split of «ЗП Аренда» (техника / экип / наценка), equipment-set flags
+// and commission attribution (who created / handed out / returned + who gets
+// the bonus). Filtering the sheet by «Оператор (ЗП)» and summing «ЗП Аренда»
+// now reproduces the member's profile «Комиссии» EXACTLY — same attribution
+// chain (lib/operator-attribution.ts) and the same shift cross-reference.
+import {
+  resolveRentalOperator,
+  resolveSaleOperator,
+  ATTRIBUTION_SOURCE_LABELS,
+  type ShiftLike,
+} from "@/app/franchize/lib/operator-attribution";
 // iter53 (2026-10-08, boss): standalone equipment docs written with 0 cost
 // (gear money lives inside the paired bike rental) still show a PROPER
 // reference price in the ЭКИП block — «hourly rental — half price, 2nd+ day
@@ -136,12 +148,14 @@ export async function buildRentalsCsv(
 
   // iter52: `type` is selected so rows can be routed to the АРЕНДЫ / ЭКИП /
   // СЕРВИС blocks (service works and equipment items are cars too).
+  // Task 98: created_by_operator_chat_id feeds the attribution columns.
   const { data: rentals, error } = await supabaseAdmin
     .from("rentals")
     .select(`
       rental_id, status, total_cost, payment_status,
       requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
       metadata, created_at, start_photo_count, end_photo_count,
+      created_by_operator_chat_id,
       vehicle:cars!inner(id, make, model, crew_id, specs, daily_price, type)
     `)
     .eq("vehicle.crew_id", crew.id)
@@ -151,6 +165,29 @@ export async function buildRentalsCsv(
     .order("requested_start_date", { ascending: true });
 
   if (error) throw new Error(error.message);
+
+  // Task 98: attribution context — crew member ids + shifts (±1 day margin,
+  // the same window computeCategoryBonuses uses) so the shift cross-reference
+  // fallback resolves to the SAME operator as the profile salary math.
+  const [{ data: crewMembers }, { data: shiftRows }] = await Promise.all([
+    supabaseAdmin.from("crew_members").select("user_id").eq("crew_id", crew.id),
+    supabaseAdmin
+      .from("crew_member_shifts")
+      .select("member_id, clock_in_time, clock_out_time")
+      .eq("crew_id", crew.id)
+      .gte("clock_in_time", new Date(Date.parse(fromIso) - 24 * 3600 * 1000).toISOString())
+      .lte("clock_in_time", new Date(Date.parse(toIso) + 24 * 3600 * 1000).toISOString()),
+  ]);
+  const crewMemberIds = new Set<string>((crewMembers || []).map((m: { user_id: string }) => m.user_id));
+  const shiftsForAttribution: ShiftLike[] = (shiftRows || []).map((s: {
+    member_id: string;
+    clock_in_time: string;
+    clock_out_time: string | null;
+  }) => ({
+    member_id: s.member_id,
+    clock_in_time: s.clock_in_time,
+    clock_out_time: s.clock_out_time ?? null,
+  }));
 
   // Fetch sales artifacts for the same period
   const { data: crewBikes } = await supabaseAdmin
@@ -164,7 +201,7 @@ export async function buildRentalsCsv(
 
   const { data: sales } = await privateSchema()
     .from("sale_contract_artifacts")
-    .select("id, buyer_full_name, sale_price, created_at, resolved_bike_id")
+    .select("id, buyer_full_name, sale_price, created_at, resolved_bike_id, telegram_chat_id")
     .in("resolved_bike_id", crewBikeIds.length ? crewBikeIds : ["__none__"])
     .gte("created_at", fromIso)
     .lte("created_at", toIso)
@@ -194,6 +231,16 @@ export async function buildRentalsCsv(
       ? meta.subrenter_chat_id.trim()
       : typeof meta.subrenter_chat_id === "number" ? String(meta.subrenter_chat_id) : null;
     if (snapshot) userIds.add(snapshot);
+    // Task 98: operator role ids for the attribution columns
+    const createdBy = r.created_by_operator_chat_id;
+    if (createdBy) userIds.add(String(createdBy));
+    const freeze = (meta as Record<string, unknown>).pickup_freeze as Record<string, unknown> | undefined;
+    const frozenBy = freeze && typeof freeze.frozen_by === "string" ? freeze.frozen_by.trim() : "";
+    if (frozenBy) userIds.add(frozenBy);
+    const returnedBy = typeof (meta as Record<string, unknown>).return_confirmed_by === "string"
+      ? String((meta as Record<string, unknown>).return_confirmed_by).trim()
+      : "";
+    if (returnedBy) userIds.add(returnedBy);
   }
   for (const r of equipmentRows) {
     const meta = r.metadata || {};
@@ -204,6 +251,13 @@ export async function buildRentalsCsv(
     }
   }
   const userById = new Map<string, { user_id: string; full_name: string | null; username: string | null }>();
+  // Task 98: sale operator ids join the batched users lookup (labels for
+  // the attribution columns in the ПРОДАЖИ block).
+  for (const s of (sales || []) as any[]) {
+    if (typeof s.telegram_chat_id === "string" && s.telegram_chat_id.trim()) {
+      userIds.add(s.telegram_chat_id.trim());
+    }
+  }
   if (userIds.size > 0) {
     const { data: users } = await supabaseAdmin
       .from("users")
@@ -236,11 +290,20 @@ export async function buildRentalsCsv(
     "Дата", "ЗП Аренда", "Партнеру", "Цена", "Экип", "Залог",
     "Марка", "Пробег до", "Пробег после", "Время", "Комментарий",
     "Заметки", "Субарендатор", "Фото", "ID",
+    // Task 98: generated audit columns — the ₽ split of «ЗП Аренда»,
+    // machine-friendly equipment flags and the commission attribution
+    // (filter by «Оператор (ЗП)» to reproduce a member's profile total).
+    "ЗП техника", "ЗП экип", "ЗП наценка", "Экип флаги",
+    "Оператор создал", "Оператор выдал", "Оператор принял", "Оператор (ЗП)", "Атрибуция ЗП",
   ]));
 
   const blockRentals: CsvBlockTotals = { count: 0, revenue: 0, salary: 0 };
   let totalPartnerPayouts = 0;
   let totalEquipment = 0;
+  // Task 98: «ЗП Аренда» split accumulators (техника / экип / наценка)
+  let rentalsSalaryBase = 0;
+  let rentalsSalaryEquipment = 0;
+  let rentalsSalaryOverprice = 0;
 
   for (const r of rentalRows) {
     const meta = r.metadata || {};
@@ -301,6 +364,9 @@ export async function buildRentalsCsv(
     const salaryStr = String(salary.total);
     blockRentals.salary += salary.total;
     blockRentals.count += 1;
+    rentalsSalaryBase += salary.base;
+    rentalsSalaryEquipment += salary.equipment;
+    rentalsSalaryOverprice += salary.overprice;
 
     // Equipment (FIX F2-iter2): charger is free. iter25: the charged amount
     // (stored split) is the source of truth; the estimate (~) only for legacy
@@ -317,6 +383,30 @@ export async function buildRentalsCsv(
     if (eq.backpack) equipParts.push("рюк");
     if (eq.charger) equipParts.push("заряд↔");
     const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost}${equipExact ? "" : "~"})` : "";
+
+    // Task 98: attribution — same chain + same shift set as the profile
+    // salary math, so filtering this sheet reproduces the profile numbers.
+    const attribution = resolveRentalOperator(
+      {
+        created_by_operator_chat_id: r.created_by_operator_chat_id ?? null,
+        created_at: r.created_at ?? null,
+        metadata: meta,
+      },
+      shiftsForAttribution,
+    );
+    const createdByLabel = r.created_by_operator_chat_id ? compactUserLabel(String(r.created_by_operator_chat_id)) : "";
+    const freezeMeta = (meta as Record<string, unknown>).pickup_freeze as Record<string, unknown> | undefined;
+    const handedById = freezeMeta && typeof freezeMeta.frozen_by === "string" && freezeMeta.frozen_by.trim()
+      ? freezeMeta.frozen_by.trim()
+      : "";
+    const handedByLabel = handedById ? compactUserLabel(handedById) : "";
+    const returnedById = typeof (meta as Record<string, unknown>).return_confirmed_by === "string"
+      && String((meta as Record<string, unknown>).return_confirmed_by).trim()
+      ? String((meta as Record<string, unknown>).return_confirmed_by).trim()
+      : "";
+    const returnedByLabel = returnedById ? compactUserLabel(returnedById) : "";
+    const attributedToLabel = attribution.operatorId ? compactUserLabel(attribution.operatorId) : "";
+    const attributionLabel = ATTRIBUTION_SOURCE_LABELS[attribution.source] || attribution.source;
 
     const depositAmount = Number(meta.deposit_amount || 0);
     // iter20: deposit method — direct metadata, else derived from the payment
@@ -370,6 +460,11 @@ export async function buildRentalsCsv(
       dateStr, salaryStr, partnerPayout > 0 ? String(partnerPayout) : "", price, equipStr, depositStr,
       bikeName, odoBefore, odoAfter, timeStr, comment,
       notesStr, subrenterStr, photosStr, r.rental_id || "",
+      // Task 98: generated audit columns
+      String(salary.base), String(salary.equipment), String(salary.overprice),
+      equipParts.join("+"),
+      createdByLabel, handedByLabel, returnedByLabel,
+      attributedToLabel, attributionLabel,
     ]));
   }
 
@@ -381,6 +476,9 @@ export async function buildRentalsCsv(
     totalEquipment,
     (rentalRows as any[]).reduce((sum, r) => sum + Number(r.metadata?.deposit_amount || 0), 0),
     "", "", "", "", "", "", "", "", "",
+    // Task 98: «ЗП Аренда» split — техника + экип + наценка = ЗП Аренда
+    rentalsSalaryBase, rentalsSalaryEquipment, rentalsSalaryOverprice,
+    "", "", "", "", "", "",
   ]));
   rows.push("");
 
@@ -504,6 +602,8 @@ export async function buildRentalsCsv(
   rows.push(CSV_SECTION_TITLES.sales);
   rows.push(rowOf([
     "Дата", "ЗП Продажа", "Наименование", "Цена", "Комментарий", "ID",
+    // Task 98: commission attribution columns (same idiom as АРЕНДЫ)
+    "Оператор (ЗП)", "Атрибуция ЗП",
   ]));
 
   const blockSales: CsvBlockTotals = { count: 0, revenue: 0, salary: 0 };
@@ -524,14 +624,25 @@ export async function buildRentalsCsv(
     blockSales.revenue += price;
     blockSales.count += 1;
 
+    // Task 98: who gets the sale bonus — telegram_chat_id when it belongs to
+    // a crew member, else the shift cross-reference (same as the profile).
+    const saleAttribution = resolveSaleOperator(
+      { telegram_chat_id: s.telegram_chat_id ?? null, created_at: s.created_at ?? null },
+      crewMemberIds,
+      shiftsForAttribution,
+    );
+    const saleAttributedToLabel = saleAttribution.operatorId ? compactUserLabel(saleAttribution.operatorId) : "";
+    const saleAttributionLabel = ATTRIBUTION_SOURCE_LABELS[saleAttribution.source] || saleAttribution.source;
+
     rows.push(rowOf([
       dateStr, String(saleSalary.total), bikeName, price, comment,
       s.id || "",
+      saleAttributedToLabel, saleAttributionLabel,
     ]));
   }
 
   rows.push(rowOf([
-    "Итого продажи", blockSales.salary, "", blockSales.revenue, "", "",
+    "Итого продажи", blockSales.salary, "", blockSales.revenue, "", "", "", "",
   ]));
   rows.push("");
 
@@ -546,7 +657,7 @@ export async function buildRentalsCsv(
 
   rows.push(rowOf([
     "Аренды", blockRentals.count, blockRentals.revenue, blockRentals.salary,
-    "категория техники + экип при аренде + оверпрайс",
+    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор (ЗП)/Атрибуция ЗП: фильтр по оператору и сумма «ЗП Аренда» = его комиссии в профиле`,
   ]));
   rows.push(rowOf([
     "Экип", blockEquipment.count, blockEquipment.revenue, 0,

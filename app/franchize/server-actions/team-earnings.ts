@@ -22,7 +22,7 @@ import { hasSalaryCoefficients } from "@/lib/salary-coefficients";
 // with calculateSalaryForPeriod — so «Мои доходы», «Зарплаты команды» and
 // the owner overview show the SAME picture as the /salary breakdown for
 // category-model crews (rentals/sales attributed to the operator).
-import { computeCategoryBonuses } from "@/app/franchize/lib/salary-category-bonuses";
+import { computeCategoryBonuses, type CategoryBonusRentalItem, type CategoryBonusSaleItem } from "@/app/franchize/lib/salary-category-bonuses";
 
 /**
  * Get team members' earnings for a period.
@@ -194,6 +194,20 @@ export async function getTeamEarnings(params: {
 }
 
 /**
+ * Task 98: TL;DR rows for the profile «Мои доходы» panel — per-rental /
+ * per-sale bonus lines with equipment flags, the ₽ split and operator roles
+ * (names resolved from ids in ONE batched users lookup).
+ */
+export type EarningsRentalItem = Omit<CategoryBonusRentalItem, "createdByChatId" | "handedByChatId" | "returnedByChatId"> & {
+  createdByLabel: string;
+  handedByLabel: string;
+  returnedByLabel: string;
+};
+export type EarningsSaleItem = Omit<CategoryBonusSaleItem, "createdByChatId"> & {
+  createdByLabel: string;
+};
+
+/**
  * Get member's own earnings for a period.
  * Used by profile page to show earnings with date range.
  */
@@ -209,6 +223,7 @@ export async function getMemberEarnings(params: {
   commissionIncome: number;
   total: number;
   breakdown: Array<{ date: string; description: string; amount: number }>;
+  commissionItems?: { rentals: EarningsRentalItem[]; sales: EarningsSaleItem[] };
 }>> {
   const { slug, from, to, memberId } = params;
 
@@ -289,6 +304,7 @@ export async function getMemberEarnings(params: {
     // instead, so the member sees WHICH rentals/sales paid the bonuses.
     const useCategoryModel = await hasSalaryCoefficients(crewId);
     let commissionIncome = 0;
+    let commissionItems: { rentals: EarningsRentalItem[]; sales: EarningsSaleItem[] } | undefined;
     if (useCategoryModel) {
       try {
         const bonuses = await computeCategoryBonuses({
@@ -305,6 +321,45 @@ export async function getMemberEarnings(params: {
             amount: d.amount,
           });
         }
+
+        // Task 98: resolve operator ids → readable labels (@username first)
+        // in ONE batched users query — the TL;DR lists show who created /
+        // handed out / returned each rental (multi-operator transparency).
+        const operatorIds = new Set<string>();
+        for (const it of bonuses.rentalItems) {
+          for (const id of [it.createdByChatId, it.handedByChatId, it.returnedByChatId]) {
+            if (id) operatorIds.add(id);
+          }
+        }
+        for (const it of bonuses.saleItems) {
+          if (it.createdByChatId) operatorIds.add(it.createdByChatId);
+        }
+        const operatorLabel = new Map<string, string>();
+        if (operatorIds.size > 0) {
+          const { data: opUsers } = await supabaseAdmin
+            .from("users")
+            .select("user_id, username, full_name")
+            .in("user_id", Array.from(operatorIds));
+          for (const u of (opUsers || []) as Array<{ user_id: string; username: string | null; full_name: string | null }>) {
+            operatorLabel.set(
+              String(u.user_id),
+              u.username ? `@${u.username}` : u.full_name?.trim() || String(u.user_id),
+            );
+          }
+        }
+        const labelOf = (id: string | null): string => (id ? operatorLabel.get(id) || id : "");
+        commissionItems = {
+          rentals: bonuses.rentalItems.map((it) => ({
+            ...it,
+            createdByLabel: labelOf(it.createdByChatId),
+            handedByLabel: labelOf(it.handedByChatId),
+            returnedByLabel: labelOf(it.returnedByChatId),
+          })),
+          sales: bonuses.saleItems.map((it) => ({
+            ...it,
+            createdByLabel: labelOf(it.createdByChatId),
+          })),
+        };
       } catch (bonusErr) {
         logger.warn("[getMemberEarnings] category bonuses failed:", bonusErr);
       }
@@ -346,6 +401,7 @@ export async function getMemberEarnings(params: {
         ...b,
         amount: Math.round(b.amount),
       })),
+      commissionItems,
     });
   } catch (err) {
     logger.error("[getMemberEarnings] Exception:", err);

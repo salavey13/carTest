@@ -30,7 +30,52 @@ export interface SalaryReportDetailRow {
   amount: number;
 }
 
+/** Task 98: one TL;DR row of the «Аренды — детально» table in the docx. */
+export interface SalaryReportRentalRow {
+  /** Human date, e.g. «02.10.2026». */
+  dateLabel: string;
+  bikeName: string;
+  /** Compact equipment flags, e.g. «1шл+1перч» ("—" when none). */
+  equipmentFlags: string;
+  /** How the rental was credited: /doc · выдача · возврат · смена. */
+  sourceLabel: string;
+  /** Operator roles, e.g. «создал @DJORUDJOV» (multi-operator aware). */
+  operatorsLabel: string;
+  /** Client-paid price. */
+  priceRub: number;
+  amountRub: number;
+  /** ₽ split of the bonus (so «итого» is never a mystery). */
+  baseRub: number;
+  equipmentRub: number;
+  overpriceRub: number;
+}
+
+/** Task 98: one TL;DR row of the «Продажи — детально» table. */
+export interface SalaryReportSaleRow {
+  dateLabel: string;
+  sourceLabel: string;
+  operatorsLabel: string;
+  amountRub: number;
+  baseRub: number;
+  overpriceRub: number;
+}
+
 const fmtRub = (n: number): string => Math.round(n).toLocaleString("ru-RU");
+
+/**
+ * Task 98 review: escape user-controlled strings (bike make/model metadata,
+ * users.full_name/@username, cash-transaction descriptions) before they enter
+ * the HTML the docx converter parses with cheerio. A literal `<` in a name
+ * would otherwise be parsed as a tag and swallow the rest of the document
+ * text; `&` would start an entity. Numbers/dates built above are safe.
+ */
+const escapeHtml = (s: unknown): string =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 /** One <tr> per shift for the shifts table (mirrors the subrenter rows idiom). */
 export function renderSalaryShiftRowsHtml(rows: SalaryReportShiftRow[]): string {
@@ -56,8 +101,59 @@ export function renderSalaryBreakdownRowsHtml(details: SalaryReportDetailRow[]):
     .map(
       (d) =>
         `<tr>` +
-        `<td style="border: 1px solid #000; padding: 4pt 6pt;">${d.description}</td>` +
+        // description can embed freeform cash-transaction text («Комиссия: …»)
+        `<td style="border: 1px solid #000; padding: 4pt 6pt;">${escapeHtml(d.description)}</td>` +
         `<td style="border: 1px solid #000; padding: 4pt 6pt; text-align: right;">${fmtRub(d.amount)}</td>` +
+        `</tr>`,
+    )
+    .join("\n");
+}
+
+const TD_C = `style="border: 1px solid #000; padding: 4pt 6pt;"`;
+const TD_R = `style="border: 1px solid #000; padding: 4pt 6pt; text-align: right;"`;
+const TD_C_CENTER = `style="border: 1px solid #000; padding: 4pt 6pt; text-align: center;"`;
+
+/**
+ * Task 98: per-rental TL;DR rows — the rentals twin of the shifts table.
+ * Columns: Дата | Байк | Экип | Как учтён | Операторы | Цена | Начислено.
+ */
+export function renderSalaryRentalRowsHtml(rows: SalaryReportRentalRow[]): string {
+  if (rows.length === 0) {
+    return `<tr><td colspan="7" ${TD_C_CENTER}>Аренд с начисленными бонусами за период не было</td></tr>`;
+  }
+  return rows
+    .map(
+      (r) =>
+        `<tr>` +
+        `<td ${TD_C_CENTER}>${escapeHtml(r.dateLabel)}</td>` +
+        // bikeName = cars.make/model metadata (operator-entered) — escaped
+        `<td ${TD_C}>${escapeHtml(r.bikeName)}</td>` +
+        `<td ${TD_C_CENTER}>${escapeHtml(r.equipmentFlags) || "—"}</td>` +
+        `<td ${TD_C_CENTER}>${escapeHtml(r.sourceLabel)}</td>` +
+        // operatorsLabel embeds @usernames / full names (user-controlled)
+        `<td ${TD_C}>${escapeHtml(r.operatorsLabel) || "—"}</td>` +
+        `<td ${TD_R}>${fmtRub(r.priceRub)}</td>` +
+        `<td ${TD_R}><b>${fmtRub(r.amountRub)}</b>` +
+        ` <span style="font-size:9pt;">(техника ${fmtRub(r.baseRub)} · экип ${fmtRub(r.equipmentRub)} · наценка ${fmtRub(r.overpriceRub)})</span></td>` +
+        `</tr>`,
+    )
+    .join("\n");
+}
+
+/** Task 98: per-sale TL;DR rows. */
+export function renderSalarySaleRowsHtml(rows: SalaryReportSaleRow[]): string {
+  if (rows.length === 0) {
+    return `<tr><td colspan="4" ${TD_C_CENTER}>Продаж с начисленными бонусами за период не было</td></tr>`;
+  }
+  return rows
+    .map(
+      (r) =>
+        `<tr>` +
+        `<td ${TD_C_CENTER}>${escapeHtml(r.dateLabel)}</td>` +
+        `<td ${TD_C_CENTER}>${escapeHtml(r.sourceLabel)}</td>` +
+        `<td ${TD_C}>${escapeHtml(r.operatorsLabel) || "—"}</td>` +
+        `<td ${TD_R}><b>${fmtRub(r.amountRub)}</b>` +
+        ` <span style="font-size:9pt;">(база ${fmtRub(r.baseRub)} · наценка ${fmtRub(r.overpriceRub)})</span></td>` +
         `</tr>`,
     )
     .join("\n");
@@ -127,7 +223,33 @@ export const SALARY_REPORT_TEMPLATE = `<!DOCTYPE html>
 </tr>
 </table>
 
-<p style="font-weight: bold; margin-top: 12pt;">3. Детализация начислений (смены, комиссии с аренд и продаж)</p>
+<p style="font-weight: bold; margin-top: 12pt;">3. Аренды — детально (бонусы за аренды, где участник оператор)</p>
+<table style="border: 1px solid #000; margin-top: 6pt; width: 100%;">
+<tr>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 9%;">Дата</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 18%;">Байк</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 10%;">Экип</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 10%;">Как учтён</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 17%;">Операторы</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 10%;">Цена, руб.</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 26%;">Начислено, руб.</th>
+</tr>
+{{rentals_table_rows}}
+</table>
+<p style="font-size: 9pt; margin-top: 2pt;">Начислено за аренды всего: {{rentals_total_rub}} руб., в том числе бонус за экипировку {{rentals_equipment_total_rub}} руб. (уже входит в суммы аренд, отдельно не приплюсовывается) и наценка {{rentals_overprice_total_rub}} руб.</p>
+
+<p style="font-weight: bold; margin-top: 12pt;">4. Продажи — детально</p>
+<table style="border: 1px solid #000; margin-top: 6pt; width: 100%;">
+<tr>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 14%;">Дата</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 16%;">Как учтён</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 40%;">Операторы</th>
+  <th style="border: 1px solid #000; padding: 4pt 4pt; width: 30%;">Начислено, руб.</th>
+</tr>
+{{sales_table_rows}}
+</table>
+
+<p style="font-weight: bold; margin-top: 12pt;">5. Детализация начислений (смены, комиссии с аренд и продаж)</p>
 <table style="border: 1px solid #000; margin-top: 6pt; width: 100%;">
 <tr>
   <th style="border: 1px solid #000; padding: 4pt 6pt; width: 70%;">Статья</th>
@@ -138,7 +260,7 @@ export const SALARY_REPORT_TEMPLATE = `<!DOCTYPE html>
 
 <p style="font-weight: bold; margin-top: 12pt;">Итого начислено за период: {{total_rub}} руб.</p>
 
-<p style="margin-top: 14pt; font-size: 10pt;">Начисление за смену = длительность × часовая ставка. Комиссии с аренд и продаж — категориальные бонусы по правилам экипажа. Ставки и формулы: страница экипажа → «Как считаются деньги».</p>
+<p style="margin-top: 14pt; font-size: 10pt;">Начисление за смену = длительность × часовая ставка. Комиссии с аренд и продаж — категориальные бонусы по правилам экипажа: бонус за экипировку и наценку платится вместе с бонусом за аренду (состав — в колонке «Начислено» раздела 3); отдельные документы экипировки и сервисные работы бонуса не дают. Ставки и формулы: страница экипажа → «Как считаются деньги».</p>
 
 </body>
 </html>`;

@@ -28,6 +28,35 @@ type PeriodEarnings = {
   commissionIncome: number;
   total: number;
   breakdown: Array<{ date: string; description: string; amount: number }>;
+  // Task 98: per-rental / per-sale TL;DR rows (category-model crews) —
+  // the rentals twin of the shifts list, with equipment flags and the ₽ split.
+  commissionItems?: {
+    rentals: Array<{
+      rentalId: string;
+      dateIso: string | null;
+      bikeName: string;
+      totalCost: number;
+      amount: number;
+      base: number;
+      equipment: number;
+      overprice: number;
+      equipmentUnits: number;
+      equipmentFlags: string;
+      source: string;
+      createdByLabel: string;
+      handedByLabel: string;
+      returnedByLabel: string;
+    }>;
+    sales: Array<{
+      saleId: string;
+      dateIso: string | null;
+      amount: number;
+      base: number;
+      overprice: number;
+      source: string;
+      createdByLabel: string;
+    }>;
+  };
 };
 
 type LegacyEarnings = {
@@ -403,6 +432,132 @@ export function MyEarningsPanel({
                       <span className="font-mono font-semibold" style={{ color: T.accent }}>
                         {formatCurrency(item.amount)}
                       </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Task 98: TL;DR rentals list — the same picture the shifts list
+                gives, but for rental bonuses: every credited rental with its
+                equipment flags, attribution source, operator roles and the
+                ₽ split (техника · экип · наценка), so «итого» is auditable. */}
+            {(periodEarnings.commissionItems?.rentals?.length ?? 0) > 0 && (
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
+                    🛵 Аренды с моими бонусами — {periodEarnings.commissionItems!.rentals.length}
+                  </p>
+                  <span className="font-mono text-xs font-semibold" style={{ color: T.accent }}>
+                    +{formatCurrency(periodEarnings.commissionItems!.rentals.reduce((s, r) => s + r.amount, 0))}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {periodEarnings.commissionItems!.rentals.map((r) => (
+                    <div
+                      key={r.rentalId}
+                      className="rounded px-2 py-1.5 text-xs"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium" style={{ color: T.text }}>
+                            {r.dateIso
+                              ? new Date(r.dateIso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
+                              : "—"}{" "}
+                            · {r.bikeName || "аренда"}
+                          </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                            {r.equipmentFlags && (
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{ backgroundColor: "color-mix(in srgb, #0ea5e9 15%, transparent)", color: "#0ea5e9" }}
+                              >
+                                🪖 {r.equipmentFlags} +{formatCurrency(r.equipment)}
+                              </span>
+                            )}
+                            {r.overprice > 0 && (
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{ backgroundColor: "color-mix(in srgb, #f59e0b 15%, transparent)", color: "#f59e0b" }}
+                              >
+                                ⬆ наценка +{formatCurrency(r.overprice)}
+                              </span>
+                            )}
+                            <span
+                              className="rounded px-1.5 py-0.5 text-[10px]"
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 12%, transparent)",
+                                color: T.textMuted,
+                              }}
+                            >
+                              {r.source === "doc_command" ? "/doc" : r.source === "handout" ? "выдача" : r.source === "return" ? "возврат" : r.source === "shift" ? "смена" : "—"}
+                            </span>
+                          </div>
+                          {(r.createdByLabel || r.handedByLabel || r.returnedByLabel) && (
+                            <p className="mt-0.5 truncate text-[10px]" style={{ color: T.textMuted }}>
+                              {[r.createdByLabel ? `создал ${r.createdByLabel}` : "", r.handedByLabel ? `выдал ${r.handedByLabel}` : "", r.returnedByLabel ? `принял ${r.returnedByLabel}` : ""]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className="font-mono font-semibold" style={{ color: T.accent }}>
+                            +{formatCurrency(r.amount)}
+                          </span>
+                          <p className="text-[10px]" style={{ color: T.textMuted }}>
+                            техника {formatCurrency(r.base)}
+                            {r.equipment > 0 ? ` · экип ${formatCurrency(r.equipment)}` : ""}
+                            {r.overprice > 0 ? ` · нац. ${formatCurrency(r.overprice)}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Task 98: TL;DR sales list — same treatment for sale bonuses. */}
+            {(periodEarnings.commissionItems?.sales?.length ?? 0) > 0 && (
+              <div className="mt-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
+                    💰 Продажи с моими бонусами — {periodEarnings.commissionItems!.sales.length}
+                  </p>
+                  <span className="font-mono text-xs font-semibold" style={{ color: T.accent }}>
+                    +{formatCurrency(periodEarnings.commissionItems!.sales.reduce((s, r) => s + r.amount, 0))}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {periodEarnings.commissionItems!.sales.map((s) => (
+                    <div
+                      key={s.saleId}
+                      className="flex items-start justify-between gap-2 rounded px-2 py-1.5 text-xs"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium" style={{ color: T.text }}>
+                          {s.dateIso
+                            ? new Date(s.dateIso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone: "Europe/Moscow" })
+                            : "—"}{" "}
+                          · продажа
+                        </p>
+                        <p className="mt-0.5 truncate text-[10px]" style={{ color: T.textMuted }}>
+                          {s.source === "doc_command" ? "/doc" : s.source === "shift" ? "смена" : "—"}
+                          {s.createdByLabel ? ` · создал ${s.createdByLabel}` : ""}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="font-mono font-semibold" style={{ color: T.accent }}>
+                          +{formatCurrency(s.amount)}
+                        </span>
+                        <p className="text-[10px]" style={{ color: T.textMuted }}>
+                          база {formatCurrency(s.base)}
+                          {s.overprice > 0 ? ` · нац. ${formatCurrency(s.overprice)}` : ""}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>

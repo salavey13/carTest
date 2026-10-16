@@ -16,6 +16,21 @@
 // Logic is MOVED verbatim (2026-10-07) — same queries, same attribution
 // chain, same calculators. calculateSalaryForPeriod imports this instead of
 // its local copy; behavior unchanged.
+//
+// Task 98 (2026-10-16, djorudjov report):
+//   • BUGFIX: the rental bucket was never .set() back into the Map — rental
+//     bonus lines vanished from every breakdown while the total included
+//     them (boss: «за аренды не вижу такого красивого списочка»). Buckets
+//     now go through the pure lib/salary-bucket.ts aggregator.
+//   • Standalone gear docs (cars.type=equipment / metadata.item_type) and
+//     service works (type=service) are EXCLUDED from the rental bonus pool —
+//     the CSV СВОДКА pays them 0 («бонус за экип уже учтён в ЗП аренд»), so
+//     counting them here made the profile disagree with the analytics export.
+//   • New rentalItems / saleItems — the per-rental/per-sale TL;DR lists the
+//     profile «Мои доходы» panel and the docx salary report render, with
+//     equipment flags, the ₽ split (техника/экип/наценка) and the full
+//     operator roles (created / handed out / returned) for multi-operator
+//     authoring/assisting transparency.
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
@@ -32,12 +47,70 @@ import {
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
 import {
+  accumulateSalaryBucket,
+  salaryBucketsToDetails,
+  type SalaryBucketMap,
+} from "@/lib/salary-bucket";
+import {
   resolveRentalOperator,
   resolveSaleOperator,
   ATTRIBUTION_SOURCE_LABELS,
   type ShiftLike,
   type AttributionSource,
 } from "@/app/franchize/lib/operator-attribution";
+
+/** One credited rental in the member's TL;DR list (profile + docx report). */
+export interface CategoryBonusRentalItem {
+  rentalId: string;
+  /** Rental start as stored (requested_start_date, MSK-local). */
+  dateIso: string | null;
+  bikeName: string;
+  /** Client-paid price (moto + gear), ₽. */
+  totalCost: number;
+  /** Operator bonus credited for this rental (= base + equipment + overprice). */
+  amount: number;
+  base: number;
+  equipment: number;
+  overprice: number;
+  equipmentUnits: number;
+  /** Compact ru flags, e.g. «1шл+1перч» (matches the CSV «Экип» column style). */
+  equipmentFlags: string;
+  /** How this rental was credited to the member (operator-attribution chain). */
+  source: AttributionSource;
+  /** Operator who created the rental (/doc) — null for self-service web orders. */
+  createdByChatId: string | null;
+  /** Operator who handed the bike out / activated the web order («Фиксация выдачи»). */
+  handedByChatId: string | null;
+  /** Operator who confirmed the return. */
+  returnedByChatId: string | null;
+}
+
+/** One credited sale in the member's TL;DR list. */
+export interface CategoryBonusSaleItem {
+  saleId: string;
+  dateIso: string | null;
+  amount: number;
+  base: number;
+  overprice: number;
+  source: AttributionSource;
+  /** Bot-session chat id that created the sale artifact (when known). */
+  createdByChatId: string | null;
+}
+
+/** Compact ru equipment flags — same idiom as the CSV «Экип» column. */
+export function equipmentFlagsLabel(eq: RentalEquipment | null | undefined): string {
+  if (!eq) return "";
+  const parts: string[] = [];
+  if (Number(eq.helmets) > 0) parts.push(`${eq.helmets}шл`);
+  if (Number(eq.gloves) > 0) parts.push(`${eq.gloves}перч`);
+  if (eq.jacket) parts.push("курт");
+  if (eq.pants) parts.push("шт");
+  if (eq.boots) parts.push("бот");
+  if (eq.net) parts.push("сет");
+  if (eq.backpack) parts.push("рюк");
+  if (eq.charger) parts.push("заряд↔");
+  return parts.join("+");
+}
 
 /**
  * Category-bonus method (official scheme, docs/PRD_SALARY_COEFFICIENTS.md):
@@ -61,9 +134,13 @@ export async function computeCategoryBonuses(params: {
 }): Promise<{
   total: number;
   details: Array<{ type: string; amount: number; description: string }>;
+  rentalItems: CategoryBonusRentalItem[];
+  saleItems: CategoryBonusSaleItem[];
 }> {
   const { crewId, memberId, periodStart, periodEnd } = params;
   const details: Array<{ type: string; amount: number; description: string }> = [];
+  const rentalItems: CategoryBonusRentalItem[] = [];
+  const saleItems: CategoryBonusSaleItem[] = [];
 
   const [config, bikeOverrides] = await Promise.all([
     getSalaryConfig(crewId),
@@ -103,7 +180,7 @@ export async function computeCategoryBonuses(params: {
       rental_id, total_cost, metadata, created_at,
       created_by_operator_chat_id,
       requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
-      vehicle:cars!inner(id, make, model, crew_id, specs, daily_price)
+      vehicle:cars!inner(id, make, model, crew_id, specs, daily_price, type)
     `)
     .eq("vehicle.crew_id", crewId)
     .neq("status", "cancelled")
@@ -116,15 +193,23 @@ export async function computeCategoryBonuses(params: {
 
   // Keep only rentals attributed to THIS member; remember WHY so the
   // breakdown can show the operator exactly how each rental was credited.
+  // Task 98: standalone gear docs (item_type=equipment / cars.type=equipment)
+  // and service works (type=service) are NOT bonus-bearing — the CSV pays
+  // them 0 (СВОДКА: «бонус за экип уже учтён в ЗП аренд») — so they must not
+  // enter the rental pool here either (alignment with the analytics export).
   const attributedRentals: Array<{ rental: any; source: AttributionSource }> = [];
   for (const r of (rentals || []) as any[]) {
+    const meta = (r.metadata || {}) as Record<string, unknown>;
+    const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
+    if (meta.item_type === "equipment" || vehicle?.type === "equipment") continue;
+    if (vehicle?.type === "service") continue;
     const attribution = resolveRentalOperator(r, shifts);
     if (attribution.operatorId === memberId) {
       attributedRentals.push({ rental: r, source: attribution.source });
     }
   }
 
-  const byRentalCategory = new Map<string, { count: number; amount: number; sources: Map<AttributionSource, number> }>();
+  const byRentalCategory: SalaryBucketMap = new Map();
   let rentalTotal = 0;
   for (const { rental: r, source } of attributedRentals) {
     const meta = r.metadata || {};
@@ -149,25 +234,44 @@ export async function computeCategoryBonuses(params: {
     });
     rentalTotal += salary.total;
     const label = RENTAL_CATEGORY_LABELS[categories.rental];
-    const bucket = byRentalCategory.get(label) || { count: 0, amount: 0, sources: new Map<AttributionSource, number>() };
-    bucket.count += 1;
-    bucket.amount += salary.total;
-    bucket.sources.set(source, (bucket.sources.get(source) ?? 0) + 1);
+    // Task 98: accumulateSalaryBucket performs the missing .set() — this is
+    // the bugfix that makes rental lines visible again.
+    accumulateSalaryBucket(byRentalCategory, label, salary.total, source);
+    const md = meta as Record<string, unknown>;
+    const freeze = md.pickup_freeze as Record<string, unknown> | undefined;
+    rentalItems.push({
+      rentalId: String(r.rental_id || ""),
+      dateIso: r.requested_start_date || r.agreed_start_date || null,
+      bikeName: `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim(),
+      totalCost: price,
+      amount: salary.total,
+      base: salary.base,
+      equipment: salary.equipment,
+      overprice: salary.overprice,
+      equipmentUnits: countEquipmentUnits(eq),
+      equipmentFlags: equipmentFlagsLabel(eq),
+      source,
+      createdByChatId:
+        typeof r.created_by_operator_chat_id === "string" && r.created_by_operator_chat_id.trim()
+          ? r.created_by_operator_chat_id.trim()
+          : null,
+      handedByChatId:
+        freeze && typeof freeze.frozen_by === "string" && freeze.frozen_by.trim()
+          ? freeze.frozen_by.trim()
+          : null,
+      returnedByChatId:
+        typeof md.return_confirmed_by === "string" && md.return_confirmed_by.trim()
+          ? md.return_confirmed_by.trim()
+          : null,
+    });
   }
 
   if (rentalTotal > 0 || byRentalCategory.size > 0) {
-    for (const [label, agg] of byRentalCategory) {
-      // iter20: attribution transparency — how each rental was credited
-      // ("4 /doc, 2 выдача, 1 смена") so the owner can audit the counts.
-      const sourceParts = Array.from(agg.sources.entries())
-        .map(([src, n]) => `${n} ${ATTRIBUTION_SOURCE_LABELS[src]}`)
-        .join(", ");
-      details.push({
-        type: "rental_category_bonus",
-        amount: agg.amount,
-        description: `Аренда (${label}): ${agg.count} × бонусы${sourceParts ? ` · ${sourceParts}` : ""}`,
-      });
-    }
+    details.push(...salaryBucketsToDetails(byRentalCategory, {
+      type: "rental_category_bonus",
+      noun: "Аренда",
+      sourceLabels: ATTRIBUTION_SOURCE_LABELS as unknown as Record<string, string>,
+    }));
   }
 
   // ── Sale bonuses: sale contracts created in the member's chat ──
@@ -194,13 +298,10 @@ export async function computeCategoryBonuses(params: {
       logger.warn("[computeCategoryBonuses] category sales query failed:", salesError);
     }
 
-    const attributedSales = ((sales || []) as any[]).filter((s) => {
+    const bySaleCategory: SalaryBucketMap = new Map();
+    for (const s of ((sales || []) as any[])) {
       const attribution = resolveSaleOperator(s, memberIds, shifts);
-      return attribution.operatorId === memberId;
-    });
-
-    const bySaleCategory = new Map<string, { count: number; amount: number }>();
-    for (const s of attributedSales) {
+      if (attribution.operatorId !== memberId) continue;
       const categories = resolveBikeCategories(s.resolved_bike_id || "", bikeOverrides);
       const salary = computeSaleSalary({
         config,
@@ -209,20 +310,27 @@ export async function computeCategoryBonuses(params: {
       });
       saleTotal += salary.total;
       const label = categories.sale === "enduro_moped" ? "эндуро/мопеды" : categories.sale === "premium" ? "премиум" : "обычные";
-      const bucket = bySaleCategory.get(label) || { count: 0, amount: 0 };
-      bucket.count += 1;
-      bucket.amount += salary.total;
-      bySaleCategory.set(label, bucket);
-    }
-
-    for (const [label, agg] of bySaleCategory) {
-      details.push({
-        type: "sale_category_bonus",
-        amount: agg.amount,
-        description: `Продажа (${label}): ${agg.count} × бонусы`,
+      accumulateSalaryBucket(bySaleCategory, label, salary.total, attribution.source);
+      saleItems.push({
+        saleId: String(s.id || ""),
+        dateIso: s.created_at || null,
+        amount: salary.total,
+        base: salary.base,
+        overprice: salary.overprice,
+        source: attribution.source,
+        createdByChatId:
+          typeof s.telegram_chat_id === "string" && s.telegram_chat_id.trim()
+            ? s.telegram_chat_id.trim()
+            : null,
       });
     }
+
+    details.push(...salaryBucketsToDetails(bySaleCategory, {
+      type: "sale_category_bonus",
+      noun: "Продажа",
+      sourceLabels: ATTRIBUTION_SOURCE_LABELS as unknown as Record<string, string>,
+    }));
   }
 
-  return { total: rentalTotal + saleTotal, details };
+  return { total: rentalTotal + saleTotal, details, rentalItems, saleItems };
 }

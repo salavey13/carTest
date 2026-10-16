@@ -29,8 +29,14 @@ import {
   SALARY_REPORT_TEMPLATE,
   renderSalaryShiftRowsHtml,
   renderSalaryBreakdownRowsHtml,
+  renderSalaryRentalRowsHtml,
+  renderSalarySaleRowsHtml,
   type SalaryReportShiftRow,
+  type SalaryReportRentalRow,
+  type SalaryReportSaleRow,
 } from "@/app/franchize/lib/salary-report-template";
+import { ATTRIBUTION_SOURCE_LABELS } from "@/app/franchize/lib/operator-attribution";
+import type { CategoryBonusRentalItem, CategoryBonusSaleItem } from "@/app/franchize/lib/salary-category-bonuses";
 
 export interface SalaryReportResult {
   success: boolean;
@@ -164,6 +170,77 @@ export async function sendSalaryReportTelegramAction(input: {
       };
     });
 
+    // Task 98: per-rental / per-sale TL;DR rows for report sections 3–4.
+    // commissionItems comes from calculateSalaryForPeriod (the same canonical
+    // numbers the profile panel shows); operator ids resolve to @username
+    // labels in ONE batched users query.
+    const rawItems = (calc.data as { commissionItems?: { rentals?: CategoryBonusRentalItem[]; sales?: CategoryBonusSaleItem[] } }).commissionItems;
+    const rentalItems = rawItems?.rentals ?? [];
+    const saleItems = rawItems?.sales ?? [];
+    const operatorIds = new Set<string>();
+    for (const it of rentalItems) {
+      for (const id of [it.createdByChatId, it.handedByChatId, it.returnedByChatId]) {
+        if (id) operatorIds.add(id);
+      }
+    }
+    for (const it of saleItems) {
+      if (it.createdByChatId) operatorIds.add(it.createdByChatId);
+    }
+    const operatorLabel = new Map<string, string>();
+    if (operatorIds.size > 0) {
+      const { data: opUsers } = await supabaseAdmin
+        .from("users")
+        .select("user_id, username, full_name")
+        .in("user_id", Array.from(operatorIds));
+      for (const u of (opUsers || []) as Array<{ user_id: string; username: string | null; full_name: string | null }>) {
+        operatorLabel.set(
+          String(u.user_id),
+          u.username ? `@${u.username}` : u.full_name?.trim() || String(u.user_id),
+        );
+      }
+    }
+    const labelOf = (id: string | null | undefined): string =>
+      id ? operatorLabel.get(String(id)) || String(id) : "";
+
+    const mskDateLabel = (iso: string | null | undefined): string => {
+      if (!iso) return "—";
+      const t = Date.parse(iso);
+      if (!Number.isFinite(t)) return "—";
+      const msk = new Date(t + 3 * 3600 * 1000);
+      return `${String(msk.getUTCDate()).padStart(2, "0")}.${String(msk.getUTCMonth() + 1).padStart(2, "0")}.${msk.getUTCFullYear()}`;
+    };
+    const operatorsFor = (it: CategoryBonusRentalItem | CategoryBonusSaleItem): string => {
+      const parts: string[] = [];
+      if ("createdByChatId" in it && it.createdByChatId) parts.push(`создал ${labelOf(it.createdByChatId)}`);
+      if ("handedByChatId" in it && it.handedByChatId) parts.push(`выдал ${labelOf(it.handedByChatId)}`);
+      if ("returnedByChatId" in it && it.returnedByChatId) parts.push(`принял ${labelOf(it.returnedByChatId)}`);
+      return parts.join(", ");
+    };
+
+    const rentalReportRows: SalaryReportRentalRow[] = rentalItems.map((it) => ({
+      dateLabel: mskDateLabel(it.dateIso),
+      bikeName: it.bikeName || "—",
+      equipmentFlags: it.equipmentFlags,
+      sourceLabel: ATTRIBUTION_SOURCE_LABELS[it.source] || it.source,
+      operatorsLabel: operatorsFor(it),
+      priceRub: it.totalCost,
+      amountRub: it.amount,
+      baseRub: it.base,
+      equipmentRub: it.equipment,
+      overpriceRub: it.overprice,
+    }));
+    const saleReportRows: SalaryReportSaleRow[] = saleItems.map((it) => ({
+      dateLabel: mskDateLabel(it.dateIso),
+      sourceLabel: ATTRIBUTION_SOURCE_LABELS[it.source] || it.source,
+      operatorsLabel: operatorsFor(it),
+      amountRub: it.amount,
+      baseRub: it.base,
+      overpriceRub: it.overprice,
+    }));
+    const rentalsTotalRub = rentalReportRows.reduce((acc, r) => acc + r.amountRub, 0);
+    const rentalsEquipmentTotalRub = rentalReportRows.reduce((acc, r) => acc + r.equipmentRub, 0);
+    const rentalsOverpriceTotalRub = rentalReportRows.reduce((acc, r) => acc + r.overpriceRub, 0);
+
     // Names: user full name / username; crew display name.
     const [{ data: memberUser }, { data: crewRow }] = await Promise.all([
       supabaseAdmin
@@ -204,6 +281,11 @@ export async function sendSalaryReportTelegramAction(input: {
       shifts_hours: fmtDuration(totalMinutes),
       shifts_total_rub: fmtRub(shiftsTotal),
       breakdown_table_rows: renderSalaryBreakdownRowsHtml(calc.data.breakdown),
+      rentals_table_rows: renderSalaryRentalRowsHtml(rentalReportRows),
+      rentals_total_rub: fmtRub(rentalsTotalRub),
+      rentals_equipment_total_rub: fmtRub(rentalsEquipmentTotalRub),
+      rentals_overprice_total_rub: fmtRub(rentalsOverpriceTotalRub),
+      sales_table_rows: renderSalarySaleRowsHtml(saleReportRows),
       commissions_total_rub: fmtRub(commissionRub),
       total_rub: fmtRub(totalRub),
     };
