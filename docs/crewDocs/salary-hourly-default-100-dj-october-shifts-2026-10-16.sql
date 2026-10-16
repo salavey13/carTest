@@ -63,8 +63,13 @@ END;
 $$;
 
 -- ── 2. Backfill djorudjov's missing October shifts (rate 100) ──────────────
--- Same shape as the existing rows: 07:00→19:00 UTC, 720 min, shift_type
--- 'online'. The BEFORE trigger recomputes salary_amount = 720/60 × 100.
+-- Same shape as the existing rows: 07:00→19:00 UTC, shift_type 'online'.
+-- ⚠ duration_minutes is a GENERATED ALWAYS column (20240727000000 migration;
+--   Paul hit error 428C9 inserting it explicitly on the first run) — it is
+--   NOT in the column list: Postgres computes 720 from 07:00→19:00 itself.
+-- salary_amount (1200 = 720/60 × 100) is explicit AND matches what the
+--   calc_shift_salary BEFORE-trigger derives — both paths agree. This is the
+--   same minimal shape the production bot and the task76 fix script use.
 DO $$
 DECLARE
   d date;
@@ -74,11 +79,11 @@ BEGIN
   -- 07–14 Oct
   FOR d IN SELECT generate_series('2026-10-07'::date, '2026-10-14'::date, '1 day') LOOP
     INSERT INTO public.crew_member_shifts
-      (member_id, crew_id, clock_in_time, clock_out_time, duration_minutes, shift_type, hourly_rate, salary_amount, notes)
+      (member_id, crew_id, clock_in_time, clock_out_time, shift_type, hourly_rate, salary_amount, notes)
     SELECT member, crew,
            (d::text || ' 07:00:00+00:00')::timestamptz,
            (d::text || ' 19:00:00+00:00')::timestamptz,
-           720, 'online', 100, 1200,
+           'online', 100, 1200,
            'восстановлено автоматически (task98 2026-10-16): смена не была отмечена в боте'
     WHERE NOT EXISTS (
       SELECT 1 FROM public.crew_member_shifts s
@@ -91,11 +96,11 @@ BEGIN
   -- 16–25 Oct (15th = day off, сознательно пропущен)
   FOR d IN SELECT generate_series('2026-10-16'::date, '2026-10-25'::date, '1 day') LOOP
     INSERT INTO public.crew_member_shifts
-      (member_id, crew_id, clock_in_time, clock_out_time, duration_minutes, shift_type, hourly_rate, salary_amount, notes)
+      (member_id, crew_id, clock_in_time, clock_out_time, shift_type, hourly_rate, salary_amount, notes)
     SELECT member, crew,
            (d::text || ' 07:00:00+00:00')::timestamptz,
            (d::text || ' 19:00:00+00:00')::timestamptz,
-           720, 'online', 100, 1200,
+           'online', 100, 1200,
            'восстановлено автоматически (task98 2026-10-16): смена не была отмечена в боте'
     WHERE NOT EXISTS (
       SELECT 1 FROM public.crew_member_shifts s

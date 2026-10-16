@@ -154,6 +154,11 @@ export function FranchizeProfileClient({
     comment: "",
   });
   const [canOpenCloserDashboard, setCanOpenCloserDashboard] = useState(false);
+  // task99 polish: the probe already returns the actor's crew role ("owner" /
+  // "admin" / "co_owner" / "member"…) — keep it so owner-tier-only surfaces
+  // (e.g. «Зарплаты команды») can hide themselves from ordinary members
+  // instead of erroring on click (server stays the source of truth).
+  const [operatorRole, setOperatorRole] = useState<string | null>(null);
 
   // Subrent partner monitoring (iter12): the user's OWN partner bikes
   // (specs.subrenter_chat_id = his chat id) and, for crew owner/admins,
@@ -239,6 +244,7 @@ export function FranchizeProfileClient({
         setCanOpenCloserDashboard(
           Boolean(operatorAccessRes.canOpen),
         );
+        setOperatorRole(operatorAccessRes.role ?? null);
         // 2026-09-02 fix: the achievement write used to be awaited BEFORE the
         // first paint — it is a non-critical counter bump, so fire-and-forget.
         void grantFranchizeAchievementAction({
@@ -622,6 +628,14 @@ export function FranchizeProfileClient({
                     slug={slug}
                     userId={dbUser?.user_id || ""}
                     enabled={canOpenCloserDashboard}
+                    teamSalariesVisible={
+                      // task99: hide «Зарплаты команды» from ordinary members —
+                      // the server action rejects them with a toast, so don't
+                      // show the entry point at all. Unknown role (probe blip)
+                      // keeps the button: server remains the source of truth.
+                      operatorRole === null ||
+                      ["owner", "co_owner", "admin"].includes(operatorRole)
+                    }
                     T={T}
                   />
                 )}

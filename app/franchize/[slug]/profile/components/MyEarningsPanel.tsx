@@ -83,12 +83,20 @@ export function MyEarningsPanel({
   slug,
   userId,
   enabled,
+  teamSalariesVisible = true,
   T,
 }: {
   slug: string;
   userId: string;
   /** false → the panel is not rendered by the parent anyway (crew gate). */
   enabled: boolean;
+  /**
+   * task99: «Зарплаты команды» is an owner-tier surface (owner/co_owner/admin).
+   * Parent passes the probe role verdict; when false the button is not
+   * rendered so ordinary members never hit the server-side rejection toast.
+   * Server action stays the source of truth either way.
+   */
+  teamSalariesVisible?: boolean;
   T: CrewTokens;
 }) {
   // 2026-08-19 review: default to the CURRENT PAY PERIOD (10th → 25th, or
@@ -254,28 +262,30 @@ export function MyEarningsPanel({
             <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
               📅 Период расчёта
             </p>
-            <button
-              onClick={() => void fetchTeamEarnings()}
-              disabled={teamEarningsLoading}
-              className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
-              style={{
-                backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
-                color: T.accent,
-                border: `1px solid ${T.borderSoft}`,
-              }}
-            >
-              {teamEarningsLoading ? (
-                <>
-                  <RotateCw className="h-3 w-3 animate-spin" />
-                  Загрузка...
-                </>
-              ) : (
-                <>
-                  <Users className="h-3 w-3" />
-                  Зарплаты команды
-                </>
-              )}
-            </button>
+            {teamSalariesVisible ? (
+              <button
+                onClick={() => void fetchTeamEarnings()}
+                disabled={teamEarningsLoading}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                  color: T.accent,
+                  border: `1px solid ${T.borderSoft}`,
+                }}
+              >
+                {teamEarningsLoading ? (
+                  <>
+                    <RotateCw className="h-3 w-3 animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <Users className="h-3 w-3" />
+                    Зарплаты команды
+                  </>
+                )}
+              </button>
+            ) : null}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
