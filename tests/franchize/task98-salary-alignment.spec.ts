@@ -183,3 +183,104 @@ describe("Task 98 structural guarantees (source-grep)", () => {
     expect(sql).toContain("owner_fix_20261016_salary_defaults");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Task 100 — final code review / alignment / adaptability polish (boss 2026-10-17).
+// Boss feedback: (1) «are you sure there is table for rentals in salary part of
+// profile?» — the TL;DR lists vanished for members with 0 attributed rentals;
+// (2) «why djorudjov is called strangrly in зарплаты команды» — full_name
+// "Dmitry User" beat the recognizable @username; (3) team table not scrollable
+// horizontally on mobile — w-full compressed 6 columns instead of scrolling;
+// (4) «shifts are counted as 500/h still» — stored legacy rates need Paul's
+// normalize SQL; (5) rentals must be visible personally for ALL members.
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Task 100 — salary UI polish, naming, mobile scroll, rate normalize", () => {
+  it("rentals/sales TL;DR sections ALWAYS render for category-model crews (empty state)", () => {
+    const src = read("app/franchize/[slug]/profile/components/MyEarningsPanel.tsx");
+    // the section guard is now «commissionItems present», NOT «items exist»
+    expect(src).toContain("{periodEarnings.commissionItems && (");
+    // old vanish-guard must be gone for the section wrappers
+    expect(src).not.toContain("commissionItems?.rentals?.length ?? 0) > 0 && (");
+    expect(src).not.toContain("commissionItems?.sales?.length ?? 0) > 0 && (");
+    // empty states explain WHY the list can be empty (attribution rule)
+    expect(src).toContain("В выбранном периоде аренд с моими бонусами нет");
+    expect(src).toContain("В выбранном периоде продаж с моими бонусами нет");
+  });
+
+  it("team leaderboard names: @username first (crew handle), full_name as secondary", () => {
+    const src = read("app/franchize/server-actions/team-earnings.ts");
+    // both resolvers (getTeamEarnings + getOwnerSalaryOverview) — username-first
+    expect(src.match(/username && `@\$\{member\.users\.username\}`/g)?.length).toBe(2);
+    expect(src.match(/const memberFullName = member\.users\?\.full_name \|\| null;/g)?.length).toBe(2);
+    // rows carry the full name through to the UI
+    expect(src.match(/memberFullName,/g)?.length).toBe(2);
+    // panel type + secondary line rendering
+    const panel = read("app/franchize/[slug]/profile/components/MyEarningsPanel.tsx");
+    expect(panel).toContain("memberFullName?: string | null");
+    expect(panel).toContain("member.memberName.replace(/^@/, \"\")");
+  });
+
+  it("team table keeps a usable width on phones (horizontal scroll, no squeeze)", () => {
+    const src = read("app/franchize/[slug]/profile/components/MyEarningsPanel.tsx");
+    expect(src).toContain("overflow-x-auto");
+    expect(src).toContain("min-w-[560px]");
+    // the column shows HOURS, not a shift count
+    expect(src).toContain(">Часы</th>");
+    // bonus legend wraps instead of overflowing a 360px row
+    expect(src).toContain("flex flex-wrap items-center gap-x-3 gap-y-1");
+  });
+
+  it("KPI label no longer claims «Смены» for a money number", () => {
+    const src = read("app/franchize/[slug]/profile/components/MyEarningsPanel.tsx");
+    expect(src).toContain(">За смены</p>");
+    // KPI grid itself shows shiftIncome under the new label (not the old one)
+    expect(src).not.toContain(">Смены</p>");
+  });
+
+  it("Paul's normalize SQL: 500→100 with EXPLICIT salary_amount (trigger won't fire) + audit", () => {
+    const sql = read("docs/crewDocs/salary-october-shifts-normalize-100-2026-10-17.sql");
+    // salary_amount recomputed from the generated duration — never written
+    expect(sql).toContain("salary_amount = ROUND((duration_minutes / 60.0) * 100, 2)");
+    expect(sql).not.toMatch(/SET[^;]*duration_minutes\s*=/);
+    // guard makes it idempotent + scoped + completed shifts only
+    expect(sql).toContain("AND hourly_rate = 500");
+    expect(sql).toContain("clock_out_time IS NOT NULL");
+    expect(sql).toContain("owner_fix_20261017_salary_normalize_100");
+    // preview before write (Paul's runbook convention)
+    expect(sql).toContain("-- ── 1. Preview (no writes)");
+  });
+
+  it("salary cache bumped v100 — warm 24h caches must not serve pre-normalize numbers", () => {
+    const src = read("app/franchize/server-actions/salary-calculations.ts");
+    expect(src).toContain("-v100`");
+    expect(src).not.toContain("-v98`");
+  });
+
+  it("team dialog is pinned to the phone screen (no fixed-position clipping)", () => {
+    const src = read("app/franchize/[slug]/profile/components/MyEarningsPanel.tsx");
+    // tailwind gotcha: calc() needs underscores, or the declaration is invalid CSS
+    expect(src).toContain("w-[calc(100vw_-_2rem)]");
+    expect(src).toContain("max-h-[90dvh]");
+    expect(src).toContain("overflow-y-auto");
+    // grid item must be shrinkable, or the table's min-width escapes to the dialog
+    expect(src).toContain("min-w-0 space-y-4");
+  });
+
+  it("INCIDENT GUARD: mock identity can never be upserted into the shared users table", () => {
+    // server choke point: refuse writes when mock mode is on and the target IS the mock id
+    const srv = read("lib/supabase-server.ts");
+    expect(srv).toContain("Mock-identity upsert REFUSED");
+    expect(srv).toContain('process.env.NEXT_PUBLIC_USE_MOCK_USER === "true"');
+    expect(srv).toContain('process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377"');
+    // client hook: mock sessions skip the upsert chain AND lead tracking entirely
+    const hook = read("hooks/telegram/useTelegramAuth.ts");
+    expect(hook).toContain("if (MOCK_USER && userId === String(MOCK_USER.id))");
+    expect(hook).toContain("!isMockIdentity");
+    // repair SQL for the 2026-10-17 clobber (djorudjov → «Mock User»), Paul runs
+    const sql = read("docs/crewDocs/fix-djorudjov-identity-mockupsert-2026-10-17.sql");
+    expect(sql).toContain("owner_fix_20261017_identity_restore");
+    expect(sql).toContain("'djorudjov'");
+    expect(sql).toContain("'Dmitry User'");
+    expect(sql).toContain("IS DISTINCT FROM");
+  });
+});

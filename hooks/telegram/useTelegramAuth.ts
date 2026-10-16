@@ -90,6 +90,15 @@ export function useTelegramAuth() {
       avatarUrl: userToAuth.photo_url || null,
       languageCode: userToAuth.language_code || null,
     };
+    // Task 100 incident fix: the MOCK identity is a UI-reading device and
+    // must never be upserted into the shared users table — a mock session
+    // re-labelled djorudjov's production row as «Mock User» through this
+    // exact chain (see createOrUpdateUser guard + docs/crewDocs/
+    // fix-djorudjov-identity-mockupsert-2026-10-17.sql). Read-only here:
+    // return the existing row (mock ids are always real users in practice).
+    if (MOCK_USER && userId === String(MOCK_USER.id)) {
+      return await fetchDbUserAction(userId);
+    }
     let userFromDb = await fetchDbUserAction(userId);
     if (!userFromDb) userFromDb = await upsertTelegramUserAction(payload);
     else {
@@ -199,11 +208,14 @@ export function useTelegramAuth() {
         }
 
         // Track every Telegram app open as a franchize lead (only on franchize pages).
+        // Task 100: NOT for the mock identity — audits must not plant
+        // «Mock User» junk rows into franchize_leads.
         try {
           if (typeof window !== "undefined") {
             const pathMatch = window.location.pathname.match(/^\/franchize\/([^\/]+)/);
             const slug = pathMatch?.[1];
-            if (slug && candidate.id) {
+            const isMockIdentity = Boolean(MOCK_USER && candidate && String(candidate.id) === String(MOCK_USER.id));
+            if (slug && candidate.id && !isMockIdentity) {
               void upsertFranchizeLead({
                 slug,
                 userId: String(candidate.id),

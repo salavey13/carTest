@@ -73,6 +73,8 @@ type PayoutHistory = {
 type TeamEarningsRow = {
   memberId: string;
   memberName: string;
+  // Task 100: Telegram full name for the muted secondary line (may be null).
+  memberFullName?: string | null;
   shifts: number;
   shiftIncome: number;
   commissionIncome: number;
@@ -403,7 +405,9 @@ export function MyEarningsPanel({
                 </p>
               </div>
               <div>
-                <p className="text-xs" style={{ color: T.textMuted }}>Смены</p>
+                {/* Task 100: this KPI shows MONEY for shifts, not a count —
+                    the old label «Смены» read as a number of shifts. */}
+                <p className="text-xs" style={{ color: T.textMuted }}>За смены</p>
                 <p className="mt-1 text-lg font-semibold" style={{ color: T.text }}>
                   {formatCurrency(periodEarnings.shiftIncome)}
                 </p>
@@ -452,18 +456,32 @@ export function MyEarningsPanel({
                 gives, but for rental bonuses: every credited rental with its
                 equipment flags, attribution source, operator roles and the
                 ₽ split (техника · экип · наценка), so «итого» is auditable. */}
-            {(periodEarnings.commissionItems?.rentals?.length ?? 0) > 0 && (
+            {/* Task 100: the section is ALWAYS rendered for category-model
+                crews (commissionItems present) — with a clear empty state when
+                the period has no credited rentals. Previously it vanished for
+                members with 0 rentals, so the feature looked missing (boss:
+                «are you sure there is table for rentals in salary part?»). */}
+            {periodEarnings.commissionItems && (
               <div className="mt-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
-                    🛵 Аренды с моими бонусами — {periodEarnings.commissionItems!.rentals.length}
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="min-w-0 text-xs font-semibold" style={{ color: T.textMuted }}>
+                    🛵 Аренды с моими бонусами — {periodEarnings.commissionItems.rentals.length}
                   </p>
-                  <span className="font-mono text-xs font-semibold" style={{ color: T.accent }}>
-                    +{formatCurrency(periodEarnings.commissionItems!.rentals.reduce((s, r) => s + r.amount, 0))}
+                  <span className="shrink-0 font-mono text-xs font-semibold" style={{ color: T.accent }}>
+                    +{formatCurrency(periodEarnings.commissionItems.rentals.reduce((s, r) => s + r.amount, 0))}
                   </span>
                 </div>
+                {periodEarnings.commissionItems.rentals.length === 0 ? (
+                  <p
+                    className="rounded px-2 py-2 text-xs"
+                    style={{ color: T.textMuted, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                  >
+                    В выбранном периоде аренд с моими бонусами нет — бонусы за аренды
+                    начисляются оператору (/doc, выдача или возврат).
+                  </p>
+                ) : (
                 <div className="space-y-1.5">
-                  {periodEarnings.commissionItems!.rentals.map((r) => (
+                  {periodEarnings.commissionItems.rentals.map((r) => (
                     <div
                       key={r.rentalId}
                       className="rounded px-2 py-1.5 text-xs"
@@ -526,22 +544,33 @@ export function MyEarningsPanel({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
-            {/* Task 98: TL;DR sales list — same treatment for sale bonuses. */}
-            {(periodEarnings.commissionItems?.sales?.length ?? 0) > 0 && (
+            {/* Task 98: TL;DR sales list — same treatment for sale bonuses.
+                Task 100: always visible (empty state) for the same reason. */}
+            {periodEarnings.commissionItems && (
               <div className="mt-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
-                    💰 Продажи с моими бонусами — {periodEarnings.commissionItems!.sales.length}
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="min-w-0 text-xs font-semibold" style={{ color: T.textMuted }}>
+                    💰 Продажи с моими бонусами — {periodEarnings.commissionItems.sales.length}
                   </p>
-                  <span className="font-mono text-xs font-semibold" style={{ color: T.accent }}>
-                    +{formatCurrency(periodEarnings.commissionItems!.sales.reduce((s, r) => s + r.amount, 0))}
+                  <span className="shrink-0 font-mono text-xs font-semibold" style={{ color: T.accent }}>
+                    +{formatCurrency(periodEarnings.commissionItems.sales.reduce((s, r) => s + r.amount, 0))}
                   </span>
                 </div>
+                {periodEarnings.commissionItems.sales.length === 0 ? (
+                  <p
+                    className="rounded px-2 py-2 text-xs"
+                    style={{ color: T.textMuted, backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                  >
+                    В выбранном периоде продаж с моими бонусами нет — бонусы за продажи
+                    начисляются оператору (/doc).
+                  </p>
+                ) : (
                 <div className="space-y-1.5">
-                  {periodEarnings.commissionItems!.sales.map((s) => (
+                  {periodEarnings.commissionItems.sales.map((s) => (
                     <div
                       key={s.saleId}
                       className="flex items-start justify-between gap-2 rounded px-2 py-1.5 text-xs"
@@ -571,6 +600,7 @@ export function MyEarningsPanel({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
           </div>
@@ -728,14 +758,26 @@ function TeamEarningsModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" style={{ backgroundColor: T.bgCard, borderColor: T.borderSoft }}>
+      {/* Task 100: w-[calc(100vw-2rem)] pins the dialog to the PHONE screen —
+          the old w-full-only dialog was position:fixed and the 6-column
+          table (min-w) blew it past the viewport, so it was CLIPPED with no
+          scrollbar anywhere (the real «not scrollable on mobile» bug).
+          max-h + overflow-y keeps the 10-row leaderboard inside the screen. */}
+      <DialogContent
+        className="max-h-[90dvh] max-w-2xl w-[calc(100vw_-_2rem)] overflow-y-auto p-4 sm:p-6"
+        style={{ backgroundColor: T.bgCard, borderColor: T.borderSoft }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2" style={{ color: T.text }}>
             <Users className="h-5 w-5" style={{ color: T.accent }} />
             💰 Зарплаты команды
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        {/* Task 100: min-w-0 — this div is a GRID ITEM of DialogContent;
+            grid items default to min-width:auto, so without it the item kept
+            the table's 560px+ min-content width and the horizontal scroll
+            escaped to the dialog instead of the table wrapper. */}
+        <div className="min-w-0 space-y-4">
           {/* Period display */}
           <div className="flex items-center gap-2 text-sm" style={{ color: T.textMuted }}>
             <Calendar className="h-4 w-4" />
@@ -767,7 +809,7 @@ function TeamEarningsModal({
               <p className="text-xs font-semibold mb-2" style={{ color: T.text }}>
                 🏆 Бонусы топ-3 лидеров
               </p>
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span style={{ color: T.textMuted }}>🥇 1-е место: +10%</span>
                 <span style={{ color: T.textMuted }}>🥈 2-е место: +5%</span>
                 <span style={{ color: T.textMuted }}>🥉 3-е место: +3%</span>
@@ -778,14 +820,18 @@ function TeamEarningsModal({
           {/* Team earnings table */}
           {!loading && rows.length > 0 ? (
             <div className="rounded-lg border overflow-hidden" style={{ borderColor: T.borderSoft }}>
-              {/* Responsive table with horizontal scroll on mobile */}
+              {/* Responsive table with horizontal scroll on mobile.
+                  Task 100: min-w forces the table to keep a usable width on
+                  phones — the old w-full-only table compressed 6 columns into
+                  a 360px viewport and had nothing left to scroll. */}
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[560px] text-sm">
                   <thead>
                     <tr className="border-b" style={{ borderColor: T.borderSoft, color: T.textMuted }}>
                       <th className="px-3 py-2 text-left text-xs font-semibold w-10">#</th>
                       <th className="px-3 py-2 text-left text-xs font-semibold">Сотрудник</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold">Смены</th>
+                      {/* Task 100: the column shows HOURS (288ч), not a shift count. */}
+                      <th className="px-3 py-2 text-right text-xs font-semibold">Часы</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold">Комиссии</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold">Итого</th>
                       <th className="px-3 py-2 text-right text-xs font-semibold w-16">Бонус</th>
@@ -816,7 +862,18 @@ function TeamEarningsModal({
                               {medal || rank + 1}
                             </td>
                             <td className="px-3 py-2 font-medium" style={{ color: T.text }}>
-                              {member.memberName}
+                              {/* Task 100: primary = @username (the identity the
+                                  crew actually uses, same label the CSV
+                                  attribution columns use), muted secondary =
+                                  the Telegram full name («Dmitry User» wart). */}
+                              <div className="min-w-0">
+                                <p className="truncate">{member.memberName}</p>
+                                {member.memberFullName && member.memberFullName !== member.memberName.replace(/^@/, "") && (
+                                  <p className="truncate text-[10px] font-normal" style={{ color: T.textMuted }}>
+                                    {member.memberFullName}
+                                  </p>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-2 text-right font-mono" style={{ color: T.text }}>
                               {member.shifts}ч

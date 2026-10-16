@@ -36,6 +36,9 @@ export async function getTeamEarnings(params: {
 }): Promise<ActionResponse<Array<{
   memberId: string;
   memberName: string;
+  // Task 100: the Telegram full name (when it differs from memberName) —
+  // the UI shows it as a muted secondary line under the @username.
+  memberFullName?: string | null;
   shifts: number;
   shiftIncome: number;
   commissionIncome: number;
@@ -121,12 +124,18 @@ export async function getTeamEarnings(params: {
         // fallback checked, but production users have those undefined —
         // so the salary page was showing "Member <id-slice>" placeholders
         // instead of actual nicknames.
+        // Task 100: @username FIRST — the crew identifies people by their
+        // Telegram handles (same labels the CSV attribution columns use).
+        // full_name alone produced warts like "Dmitry User" for @djorudjov
+        // (his Telegram last_name is literally "User"). full_name is still
+        // returned as memberFullName for the muted secondary line.
         const memberName =
+          (member.users?.username && `@${member.users.username}`) ||
           member.users?.full_name ||
-          member.users?.username ||
           metadata?.name ||
           metadata?.username ||
           `Member ${memberId.slice(0, 6)}`;
+        const memberFullName = member.users?.full_name || null;
 
         // Get shifts for period — filter by crew_id too, otherwise shifts
         // from another crew the member belongs to would leak in.
@@ -178,6 +187,7 @@ export async function getTeamEarnings(params: {
         return {
           memberId,
           memberName,
+          memberFullName,
           shifts: Math.round(shiftHours * 10) / 10,
           shiftIncome: Math.round(shiftIncome),
           commissionIncome: Math.round(commissionIncome),
@@ -431,6 +441,8 @@ export async function getOwnerSalaryOverview(params: {
 }): Promise<ActionResponse<Array<{
   memberId: string;
   memberName: string;
+  // Task 100: Telegram full name for the muted secondary line (may be null).
+  memberFullName?: string | null;
   role: string;
   periodStart: string;
   periodEnd: string;
@@ -520,12 +532,15 @@ export async function getOwnerSalaryOverview(params: {
         // fallback checked, but production users have those undefined —
         // so the salary page was showing "Member <id-slice>" placeholders
         // instead of actual nicknames.
+        // Task 100: @username first — same rule as getTeamEarnings, so the
+        // /salary overview and the profile leaderboard show the same handle.
         const memberName =
+          (member.users?.username && `@${member.users.username}`) ||
           member.users?.full_name ||
-          member.users?.username ||
           metadata?.name ||
           metadata?.username ||
           `Member ${memberId.slice(0, 6)}`;
+        const memberFullName = member.users?.full_name || null;
         const role = member.role || "member";
 
         // Shifts for period — crew-scoped to prevent multi-crew leak.
@@ -589,6 +604,7 @@ export async function getOwnerSalaryOverview(params: {
         return {
           memberId,
           memberName,
+          memberFullName,
           role,
           periodStart: periodStartIso,
           periodEnd: periodEndIso,

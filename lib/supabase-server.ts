@@ -158,6 +158,27 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
         logger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
         return null;
     }
+
+    // ── Task 100 INCIDENT GUARD: mock identity must never reach the DB ──────
+    // A mock-mode UI session (local `next dev` with NEXT_PUBLIC_USE_MOCK_USER
+    // = true, e.g. a Playwright audit) used to UPSERT the mock identity —
+    // «Mock User / @mockuser» (or whatever NEXT_PUBLIC_MOCK_USER_ID points
+    // at, default 413553377 = the owner's real row!) — into the SHARED
+    // production users table via handleAuthentication →
+    // upsertTelegramUserAction → here. Real-world effect 2026-10-17:
+    // djorudjov's row was re-labelled by an audit run, the team leaderboard
+    // showed the mock name until his next real Telegram interaction healed
+    // it (ping-pong across sessions). Mock mode is a UI-READING device:
+    // refuse the write and return the existing row untouched. Production
+    // (Vercel) never sets NEXT_PUBLIC_USE_MOCK_USER, so real users are
+    // unaffected. Repair SQL: docs/crewDocs/fix-djorudjov-identity-
+    // mockupsert-2026-10-17.sql.
+    const mockModeOn = process.env.NEXT_PUBLIC_USE_MOCK_USER === "true";
+    const mockUserId = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
+    if (mockModeOn && String(userId) === String(mockUserId)) {
+        logger.warn("[SupabaseHook] Mock-identity upsert REFUSED (mock mode on, target = mock userId) — users row untouched:", { userId });
+        return await fetchUserData(userId);
+    }
 /*
      // Guard against Client-Side usage
      if (typeof window !== "undefined") {

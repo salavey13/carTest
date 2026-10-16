@@ -383,7 +383,10 @@ export async function calculateSalaryForPeriod(params: {
     // Temporal Dead Zone ReferenceError.
     // Task 98: v98 suffix — the bucket-fix changed breakdown/totals; the old
     // 24h cache entries must not serve pre-fix numbers to warm instances.
-    const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}-${useRateCalculation}-${useCategoryModel}-v98`;
+    // Task 100: v100 — Paul's October normalize SQL (500 ₽/h → 100 ₽/h with
+    // explicit salary_amount recompute) changes stored shift pay; warm 24h
+    // caches must not keep serving the pre-normalize numbers.
+    const cacheKey = `${access.crewId}-${memberId}-${periodStart}-${periodEnd}-${useRateCalculation}-${useCategoryModel}-v100`;
     const cached = salaryCalcCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) {
       logger.debug("[calculateSalaryForPeriod] Cache hit", { cacheKey, useRateCalculation });
