@@ -504,8 +504,45 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     },
   ];
 
-  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...storageAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements, ...vipBikeOnly];
-  return [...shared, ...workAchievements, ...rentalAchievements, ...storageAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements];
+  // Task 101 (2026-10-17): salary-verification badges — the on-the-fly
+  // reconciliation between operator and owner. Granted from
+  // lib/rental-verify.ts when a rental reaches status «verified» (BOTH parties
+  // pressed ✅ on the frozen commission snapshot). rentalsVerified counter is
+  // SET from the DB truth, never incremented from stale totals (the 731-shift
+  // lesson).
+  const verificationAchievements: FranchizeAchievementDefinition[] = [
+    {
+      id: "verify_first",
+      title: "Рукопожатие 🤝",
+      description: "Первая аренда, расчёт по которой подтверждён и оператором, и владельцем. Деньги сверены на лету!",
+      category: "operations",
+      triggerSources: ["rental:verified"],
+    },
+    {
+      id: "verify_speedy",
+      title: "Быстрая сверка ⚡️",
+      description: "Обе стороны подтвердили расчёт в течение часа после закрытия аренды. Никаких очередей на конец месяца!",
+      category: "operations",
+      triggerSources: ["rental:verified"],
+    },
+    {
+      id: "verify_10",
+      title: "Безупречная десятка 🧾",
+      description: "10 аренд закрыты со статусом «проверено»: расчёты подтверждены без споров.",
+      category: "operations",
+      triggerSources: ["rental:verified"],
+    },
+    {
+      id: "verify_50",
+      title: "Полсотни рукопожатий 💯",
+      description: "50 верифицированных аренд — закрытие месяца превращается из аврала в формальность.",
+      category: "operations",
+      triggerSources: ["rental:verified"],
+    },
+  ];
+
+  if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...storageAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements, ...verificationAchievements, ...vipBikeOnly];
+  return [...shared, ...workAchievements, ...rentalAchievements, ...storageAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements, ...verificationAchievements];
 }
 
 export async function getFranchizeAchievementCatalogAction(slug: string): Promise<FranchizeAchievementDefinition[]> {
@@ -854,6 +891,84 @@ async function grantAchievementOnce(
   }
 
   return { success: false, error: "concurrent profile update conflict (retries exhausted)" };
+}
+
+// ── TASK 101: ABSOLUTE counter sync («731 смены» bug) ────────────────────────
+// HISTORY: grantShiftAchievements passed shift TOTALS (all completed shifts)
+// as incrementCounters — deltas — once per eligible achievement per clock-out.
+// Counters therefore grew like (totalShifts × eligibleBadges) every clock-out:
+// salavey13 ended at 731 «смен» / 8512 «часов» while the DB truth was 31/290.
+//
+// Fix philosophy: profile counters are DERIVED values — they must be SET from
+// the source of truth (the shifts table), never incremented from stale
+// totals. Callers (shift.ts clock-out, rental-verify) compute the truth and
+// sync it once per event. SET semantics also SELF-HEAL: the next event
+// overwrites any historical corruption, no migration required.
+//
+// Same CAS read-modify-write as grantAchievementOnce (only the profile's own
+// counters keys are touched; achievements/notification preferences stay put),
+// same in-process queue to stay serialized with achievement grants.
+export async function syncFranchizeCountersAction(params: {
+  slug: string;
+  userId: string;
+  /** Absolute counter values — keys absent here are left untouched. */
+  counters: Record<string, number>;
+  source?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const slug = normalizeSlug(params.slug);
+  if (!params.userId || !slug) {
+    return { success: false, error: "userId and slug are required" };
+  }
+  const wanted: Record<string, number> = {};
+  for (const [key, value] of Object.entries(params.counters || {})) {
+    const n = Number(value);
+    if (key && Number.isFinite(n)) wanted[key] = n;
+  }
+  if (Object.keys(wanted).length === 0) return { success: true };
+
+  return enqueueProfileWrite(`${params.userId}:${slug}`, () =>
+    (async () => {
+      for (let attempt = 0; attempt <= PROFILE_WRITE_RETRIES; attempt += 1) {
+        const { data: user, error } = await supabaseAdmin
+          .from("users")
+          .select("metadata, updated_at")
+          .eq("user_id", params.userId)
+          .maybeSingle();
+        if (error) return { success: false, error: error.message };
+        if (!user) return { success: false, error: "user row not found" };
+
+        const metadata = ((user.metadata || {}) as Record<string, any>) || {};
+        const profiles = ((metadata.franchizeProfiles || {}) as Record<string, any>) || {};
+        const currentState = (profiles[slug] || DEFAULT_PROFILE(slug)) as FranchizeProfileState;
+        const nextCounters = { ...(currentState.counters || {}) };
+        for (const [key, value] of Object.entries(wanted)) nextCounters[key] = value;
+
+        const nextState: FranchizeProfileState = {
+          ...currentState,
+          slug,
+          counters: nextCounters,
+          lastActivityAt: new Date().toISOString(),
+        };
+        const nextMetadata = {
+          ...metadata,
+          franchizeProfiles: { ...profiles, [slug]: nextState },
+        };
+
+        const seenUpdatedAt = (user as { updated_at?: string | null }).updated_at ?? null;
+        const baseUpdate = supabaseAdmin
+          .from("users")
+          .update({ metadata: nextMetadata, updated_at: new Date().toISOString() }, { count: "exact" })
+          .eq("user_id", params.userId);
+        const { error: updateError, count } =
+          seenUpdatedAt == null
+            ? await baseUpdate.is("updated_at", null)
+            : await baseUpdate.eq("updated_at", seenUpdatedAt);
+        if (updateError) return { success: false, error: updateError.message };
+        if ((count ?? 1) > 0) return { success: true };
+      }
+      return { success: false, error: "concurrent profile update conflict (retries exhausted)" };
+    })(),
+  );
 }
 
 /**

@@ -333,6 +333,26 @@ export function countEquipmentUnits(eq: RentalEquipment | null | undefined): num
   return units;
 }
 
+/**
+ * Compact ru equipment flags — same idiom as the CSV «Экип» column
+ * («1шл+1перч+курт»). Task 101: moved HERE from salary-category-bonuses.ts
+ * (pure, zero deps) so the rental-verify lib can share it without a circular
+ * import — salary-category-bonuses imports the verification helpers back.
+ */
+export function equipmentFlagsLabel(eq: RentalEquipment | null | undefined): string {
+  if (!eq) return "";
+  const parts: string[] = [];
+  if (Number(eq.helmets) > 0) parts.push(`${eq.helmets}шл`);
+  if (Number(eq.gloves) > 0) parts.push(`${eq.gloves}перч`);
+  if (eq.jacket) parts.push("курт");
+  if (eq.pants) parts.push("шт");
+  if (eq.boots) parts.push("бот");
+  if (eq.net) parts.push("сет");
+  if (eq.backpack) parts.push("рюк");
+  if (eq.charger) parts.push("заряд↔");
+  return parts.join("+");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Salary calculators
 // ─────────────────────────────────────────────────────────────────────────────

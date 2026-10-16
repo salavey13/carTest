@@ -3,7 +3,7 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
-import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
+import { grantFranchizeAchievementAction, syncFranchizeCountersAction } from "@/app/franchize/profile-actions";
 import { DEFAULT_HOURLY_RATE } from "@/app/franchize/lib/salary-constants";
 import {
     buildShiftReplyButtons,
@@ -469,7 +469,24 @@ async function grantShiftAchievements(
         }
 
         // Grant each achievement (non-blocking, don't await each)
-        // Also update profile counters with current totals
+        // TASK 101 FIX («731 смены за 3 месяца»): profile counters used to be
+        // passed as incrementCounters HERE — absolute totals, once per eligible
+        // achievement — so every clock-out multiplied the totals by the badge
+        // count and the profile drifted into fantasy numbers (salavey13: 731
+        // «смен» / 8512 «часов» при реальных 31/290). Counters are DERIVED
+        // values: they are now SET once per clock-out from this exact query
+        // (the source of truth) via syncFranchizeCountersAction; achievement
+        // grants below carry NO counter increments.
+        syncFranchizeCountersAction({
+            slug: crewSlug,
+            userId,
+            counters: {
+                shiftsCompleted: totalShifts,
+                totalHoursWorked: Math.round(totalHours * 100) / 100,
+            },
+            source: "telegram:/shift clock-out",
+        }).catch((err) => logger.warn(`[Shift Achievements] Counter sync failed for ${userId}:`, err));
+
         for (const achievement of achievementsToGrant) {
             grantFranchizeAchievementAction({
                 slug: crewSlug,
@@ -477,10 +494,6 @@ async function grantShiftAchievements(
                 achievementId: achievement.id,
                 source: "telegram:/shift",
                 context: achievement.context,
-                incrementCounters: {
-                    shiftsCompleted: totalShifts,
-                    totalHoursWorked: totalHours,
-                },
             }).catch((err) => logger.warn(`[Shift Achievement] Failed to grant ${achievement.id} to ${userId}:`, err));
         }
 

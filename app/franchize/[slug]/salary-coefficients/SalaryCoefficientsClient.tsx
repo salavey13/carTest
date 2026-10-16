@@ -29,6 +29,7 @@ import {
   Sparkles,
   AlertCircle,
   Wand2,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,8 @@ import {
   getSalaryCoefficientsConfig,
   saveSalaryCoefficientsConfig,
   resetSalaryCoefficientsToOfficial,
+  getCrewHourlyRatesAction,
+  type CrewHourlyRatesVM,
 } from "../../server-actions/salary-coefficients";
 import type { SalaryBikeRow } from "../../server-actions/salary-coefficients";
 import type { SalaryConfig } from "@/lib/salary-coefficients-shared";
@@ -114,6 +117,9 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
   const [savedConfig, setSavedConfig] = useState<SalaryConfig>(OFFICIAL_SALARY_CONFIG);
   const [savedBikes, setSavedBikes] = useState<SalaryBikeRow[]>([]);
 
+  // Task 101: hourly shift-rate block (100 ₽/h) — see «⏱️ Почасовая ставка смен».
+  const [hourlyRates, setHourlyRates] = useState<CrewHourlyRatesVM | null>(null);
+
   // Preview calculator state
   const [previewBikeId, setPreviewBikeId] = useState<string>("");
   const [previewEquipUnits, setPreviewEquipUnits] = useState(1);
@@ -148,6 +154,20 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
   useEffect(() => {
     load();
   }, [load]);
+
+  // Task 101: hourly rates load in parallel with the coefficients (non-fatal —
+  // the block renders nothing until data arrives).
+  useEffect(() => {
+    let alive = true;
+    getCrewHourlyRatesAction({ slug })
+      .then((res) => {
+        if (alive && res.success && res.data) setHourlyRates(res.data);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
 
   const dirty = useMemo(
     () =>
@@ -410,6 +430,77 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
           )}
         </FranchizeOperatorPanel>
       </motion.div>
+
+      {/* ── Task 101: Почасовая ставка смен (100 ₽/h) ──
+          The shift coefficient was invisible in the UI: it lived in
+          DEFAULT_HOURLY_RATE + the DB column default, and the boss asked
+          «where to find the 100 ₽/h coefficient». Now it's on the
+          coefficients page: the crew default, the history and every member's
+          personal override (users.metadata.hourly_rate). Editing stays on
+          the crew page (Смены → «Изменить часовую ставку»). */}
+      {hourlyRates && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+          <FranchizeOperatorPanel>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
+                <Clock className="h-4 w-4" style={{ color: T.accent }} /> Почасовая ставка смен
+              </h2>
+              <span
+                className="rounded-full px-3 py-1 text-sm font-bold"
+                style={{
+                  backgroundColor: `color-mix(in srgb, ${T.accent} 12%, transparent)`,
+                  color: T.accent,
+                }}
+              >
+                {hourlyRates.crewDefault} ₽/час
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-relaxed" style={{ color: T.textMuted }}>
+              Дефолт экипажа для смен: при отметке начала смены ставка пишется в смену
+              (часы × ставка = ЗП смены) и используется в живом счётчике заработка.
+              История: 169 → 500 → <b style={{ color: T.text }}>100 ₽/ч</b> (октябрь 2026).
+              Индивидуальная ставка участника сильнее дефолта.
+            </p>
+            {hourlyRates.members.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {hourlyRates.members.map((m) => (
+                  <div
+                    key={m.userId}
+                    className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs"
+                    style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                  >
+                    <span className="min-w-0 flex-1 truncate" style={{ color: T.text }}>
+                      {m.label}
+                      {m.fullName && m.fullName !== m.label && (
+                        <span className="ml-1" style={{ color: T.textMuted }}>{m.fullName}</span>
+                      )}
+                      {m.role && m.role !== "member" && (
+                        <span
+                          className="ml-1.5 rounded px-1 py-0.5 text-[10px]"
+                          style={{ backgroundColor: `color-mix(in srgb, ${T.accent} 12%, transparent)`, color: T.accent }}
+                        >
+                          {m.role}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className="shrink-0 font-mono font-semibold"
+                      style={{ color: m.hourlyRate != null ? T.accent : T.textMuted }}
+                    >
+                      {m.hourlyRate != null ? `${m.hourlyRate} ₽/ч` : `дефолт ${hourlyRates.crewDefault} ₽/ч`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-[10px]" style={{ color: T.textMuted }}>
+              Изменить индивидуальную ставку: страница экипажа → блок «Смены» → «Изменить
+              часовую ставку». Ставка фиксируется в смену при её начале — ранее открытые
+              смены не пересчитываются.
+            </p>
+          </FranchizeOperatorPanel>
+        </motion.div>
+      )}
 
       {/* ── Аренда ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>

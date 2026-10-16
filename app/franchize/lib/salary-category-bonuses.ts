@@ -44,6 +44,7 @@ import {
   equipmentStandardCost,
   standardRentalPrice,
   RENTAL_CATEGORY_LABELS,
+  equipmentFlagsLabel,
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
 import {
@@ -58,6 +59,7 @@ import {
   type ShiftLike,
   type AttributionSource,
 } from "@/app/franchize/lib/operator-attribution";
+import { getVerificationStatusMap, type RentalVerificationStatus } from "@/app/franchize/lib/rental-verify";
 
 /** One credited rental in the member's TL;DR list (profile + docx report). */
 export interface CategoryBonusRentalItem {
@@ -83,6 +85,8 @@ export interface CategoryBonusRentalItem {
   handedByChatId: string | null;
   /** Operator who confirmed the return. */
   returnedByChatId: string | null;
+  /** Task 101: operator+owner commission confirmation state (null = no data yet). */
+  verificationStatus: RentalVerificationStatus | null;
 }
 
 /** One credited sale in the member's TL;DR list. */
@@ -97,20 +101,12 @@ export interface CategoryBonusSaleItem {
   createdByChatId: string | null;
 }
 
-/** Compact ru equipment flags — same idiom as the CSV «Экип» column. */
-export function equipmentFlagsLabel(eq: RentalEquipment | null | undefined): string {
-  if (!eq) return "";
-  const parts: string[] = [];
-  if (Number(eq.helmets) > 0) parts.push(`${eq.helmets}шл`);
-  if (Number(eq.gloves) > 0) parts.push(`${eq.gloves}перч`);
-  if (eq.jacket) parts.push("курт");
-  if (eq.pants) parts.push("шт");
-  if (eq.boots) parts.push("бот");
-  if (eq.net) parts.push("сет");
-  if (eq.backpack) parts.push("рюк");
-  if (eq.charger) parts.push("заряд↔");
-  return parts.join("+");
-}
+/**
+ * Compact ru equipment flags — pure helper now LIVES in
+ * lib/salary-coefficients-shared.ts (task101: shared with rental-verify
+ * without a circular import). Re-exported here for back-compat.
+ */
+export { equipmentFlagsLabel };
 
 /**
  * Category-bonus method (official scheme, docs/PRD_SALARY_COEFFICIENTS.md):
@@ -263,6 +259,8 @@ export async function computeCategoryBonuses(params: {
         typeof md.return_confirmed_by === "string" && md.return_confirmed_by.trim()
           ? md.return_confirmed_by.trim()
           : null,
+      // Task 101: batch-filled right below from rental_verifications.
+      verificationStatus: null,
     });
   }
 
@@ -272,6 +270,14 @@ export async function computeCategoryBonuses(params: {
       noun: "Аренда",
       sourceLabels: ATTRIBUTION_SOURCE_LABELS as unknown as Record<string, string>,
     }));
+  }
+
+  // Task 101: batch-fetch the operator+owner verification state for the
+  // credited rentals (one chunked query; empty map when the table is not
+  // applied yet — badges then simply do not render).
+  const verificationMap = await getVerificationStatusMap(rentalItems.map((i) => i.rentalId));
+  for (const item of rentalItems) {
+    item.verificationStatus = verificationMap.get(item.rentalId)?.status ?? null;
   }
 
   // ── Sale bonuses: sale contracts created in the member's chat ──

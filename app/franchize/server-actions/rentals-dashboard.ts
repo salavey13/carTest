@@ -2714,6 +2714,24 @@ export async function updateRentalStatus(input: {
       }
     }
 
+    // ── Task 101: rental VERIFICATION request (second closure path) ──
+    // updateRentalStatus closes rentals from the analytics dashboard — mirror
+    // the confirmVehicleReturn hook so BOTH closure paths start the operator+
+    // owner commission confirmation. Fire-and-forget, non-fatal; no-ops
+    // gracefully when the rental_verifications table is not applied yet.
+    if (status === "completed" && (rental as { old_status?: string | null } | null)?.old_status !== "completed") {
+      try {
+        const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
+        void requestRentalVerification({
+          rentalId,
+          actorChatId: actorUserId,
+          source: "dashboard",
+        });
+      } catch (verifyErr) {
+        console.warn("[update-rental-status] Verification request failed to start (non-fatal):", verifyErr);
+      }
+    }
+
     const msgParts: string[] = [];
     msgParts.push(`Статус изменён на «${status}»`);
     if (operatorMessage && !silent) msgParts.push("уведомление отправлено арендатору");

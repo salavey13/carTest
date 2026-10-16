@@ -26,6 +26,7 @@ import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 import { ekipCommand, handleEkipText, handleEkipCallback } from "./ekip-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
+import { handleRentalVerifyCallbackCommand } from "./rental-verify";
 import { analyticsPassCommand } from "./analytics_pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
 import { sampleCommand } from "./sample";
@@ -100,6 +101,22 @@ export async function handleCommand(update: any) {
         )) {
             await handleSubrentManualCommand({ userId: userIdStr, userName: username, text: undefined, callbackData: text, messageId: update.callback_query?.message?.message_id, callbackQueryId: update.callback_query?.id, crewId: undefined });
             return;
+        }
+
+        // Handle callback queries for the rental-verification flow (task101:
+        // «verified» salary state). Unique `vrf_` prefix — routed BEFORE the
+        // doc/ekip/subrent routers so no shared-prefix state logic can eat it.
+        // Both parties (attributed operator + crew owner) confirm the frozen
+        // commission snapshot right after the rental closes.
+        if (update.callback_query && (text.startsWith("vrf_ok_") || text.startsWith("vrf_dis_"))) {
+            const handled = await handleRentalVerifyCallbackCommand({
+                userIdStr,
+                chatId,
+                text,
+                callbackQueryId: update.callback_query.id,
+                messageId: update.callback_query?.message?.message_id,
+            });
+            if (handled) return;
         }
 
         // Handle callback queries for /ekip flow (equipment rental)

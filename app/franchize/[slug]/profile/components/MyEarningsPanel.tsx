@@ -20,6 +20,8 @@ import { getMyEarnings, getMyPayoutHistory } from "@/app/franchize/server-action
 // Task 77: the salary report as a TG file — the same delivery channel the
 // subrenter weekly reports use (docx → sendTelegramDocument).
 import { sendSalaryReportTelegramAction } from "@/app/franchize/server-actions/salary-report";
+// Task 101: manual «verified» stamp for the owner (backfill of closed rentals).
+import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";
 import { formatCurrency, itemVariants, type CrewTokens } from "./profile-shared";
 
 type PeriodEarnings = {
@@ -46,6 +48,8 @@ type PeriodEarnings = {
       createdByLabel: string;
       handedByLabel: string;
       returnedByLabel: string;
+      // Task 101: operator+owner verification state (null = no data yet).
+      verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
     }>;
     sales: Array<{
       saleId: string;
@@ -112,11 +116,40 @@ export function MyEarningsPanel({
   const [periodEarnings, setPeriodEarnings] = useState<PeriodEarnings | null>(null);
   const [periodEarningsLoading, setPeriodEarningsLoading] = useState(false);
   const [periodEarningsError, setPeriodEarningsError] = useState<string | null>(null);
+  // Task 101: optimistic per-rental verify stamps (admin tap-to-verify).
+  const [verifyingIds, setVerifyingIds] = useState<Set<string>>(new Set());
+  const [verifiedOverrides, setVerifiedOverrides] = useState<Record<string, true>>({});
 
   // Task 77: TG salary report delivery state (self-service — the action
   // enforces owner-or-self server-side; here it is always self).
   const [tgReportState, setTgReportState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [tgReportError, setTgReportError] = useState<string | null>(null);
+
+  // Task 101: owner stamps «verified» on a closed rental after an offline
+  // double-check (mainly the backfill of rentals closed BEFORE the Telegram
+  // verification flow shipped). Optimistic UI — the server action stays the
+  // source of truth and is gated owner/co_owner/admin server-side.
+  const handleManualVerify = useCallback(
+    async (rentalId: string) => {
+      if (verifyingIds.has(rentalId)) return;
+      setVerifyingIds((prev) => new Set(prev).add(rentalId));
+      try {
+        const res = await adminVerifyRentalAction({ slug, rentalId });
+        if (res.success) {
+          setVerifiedOverrides((prev) => ({ ...prev, [rentalId]: true }));
+        }
+      } catch {
+        /* the button just stays un-verified; no toast spam on the money surface */
+      } finally {
+        setVerifyingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(rentalId);
+          return next;
+        });
+      }
+    },
+    [slug, verifyingIds],
+  );
 
   const handleSendTgReport = async () => {
     if (!userId || tgReportState === "sending") return;
@@ -471,6 +504,33 @@ export function MyEarningsPanel({
                     +{formatCurrency(periodEarnings.commissionItems.rentals.reduce((s, r) => s + r.amount, 0))}
                   </span>
                 </div>
+                {/* Task 101: verification tally — how much of the period is
+                    already confirmed by operator+owner (Telegram ✅ / manual
+                    owner stamp). null statuses (feature off / old rentals
+                    without a row) are shown as «нет данных», not «ждёт». */}
+                {periodEarnings.commissionItems.rentals.length > 0 && (() => {
+                  const withStatus = periodEarnings.commissionItems.rentals.filter(
+                    (r) => r.verificationStatus != null || verifiedOverrides[r.rentalId],
+                  );
+                  const verified = withStatus.filter(
+                    (r) => r.verificationStatus === "verified" || verifiedOverrides[r.rentalId],
+                  ).length;
+                  const waiting = withStatus.filter(
+                    (r) =>
+                      r.verificationStatus !== "verified" &&
+                      r.verificationStatus !== "disputed" &&
+                      !verifiedOverrides[r.rentalId],
+                  ).length;
+                  const disputed = withStatus.filter((r) => r.verificationStatus === "disputed").length;
+                  if (withStatus.length === 0) return null;
+                  return (
+                    <p className="mb-2 text-[10px]" style={{ color: T.textMuted }}>
+                      🤝 Сверка: <span style={{ color: "#22c55e" }}>{verified} подтверждено</span>
+                      {waiting > 0 ? <span> · {waiting} ожидает</span> : null}
+                      {disputed > 0 ? <span style={{ color: "#ef4444" }}> · {disputed} спор</span> : null}
+                    </p>
+                  );
+                })()}
                 {periodEarnings.commissionItems.rentals.length === 0 ? (
                   <p
                     className="rounded px-2 py-2 text-xs"
@@ -521,6 +581,45 @@ export function MyEarningsPanel({
                             >
                               {r.source === "doc_command" ? "/doc" : r.source === "handout" ? "выдача" : r.source === "return" ? "возврат" : r.source === "shift" ? "смена" : "—"}
                             </span>
+                            {/* Task 101: verification badge — money sensitive, so
+                                the wording stays soft and exact. For the owner
+                                tier an inline tap verifies on the spot (old
+                                rentals / offline reconciliation backfill). */}
+                            {(r.verificationStatus || verifiedOverrides[r.rentalId]) &&
+                              (r.verificationStatus === "verified" || verifiedOverrides[r.rentalId] ? (
+                                <span
+                                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{ backgroundColor: "color-mix(in srgb, #22c55e 15%, transparent)", color: "#22c55e" }}
+                                >
+                                  ✅ подтверждено
+                                </span>
+                              ) : r.verificationStatus === "disputed" ? (
+                                <span
+                                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{ backgroundColor: "color-mix(in srgb, #ef4444 15%, transparent)", color: "#ef4444" }}
+                                >
+                                  ⚠️ спор
+                                </span>
+                              ) : (
+                                <span
+                                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style={{ backgroundColor: "color-mix(in srgb, #f59e0b 15%, transparent)", color: "#f59e0b" }}
+                                >
+                                  ⏳ {r.verificationStatus === "operator_confirmed" ? "ждёт владельца" : r.verificationStatus === "owner_confirmed" ? "ждёт оператора" : "ожидает"}
+                                </span>
+                              ))}
+                            {!r.verificationStatus && !verifiedOverrides[r.rentalId] && teamSalariesVisible && (
+                              <button
+                                type="button"
+                                onClick={() => handleManualVerify(r.rentalId)}
+                                disabled={verifyingIds.has(r.rentalId)}
+                                className="rounded px-1.5 py-0.5 text-[10px] font-semibold transition disabled:opacity-50"
+                                style={{ backgroundColor: "color-mix(in srgb, #22c55e 12%, transparent)", color: "#22c55e" }}
+                                title="Подтвердить расчёт вручную (после личной сверки)"
+                              >
+                                {verifyingIds.has(r.rentalId) ? "…" : "✓ подтвердить"}
+                              </button>
+                            )}
                           </div>
                           {(r.createdByLabel || r.handedByLabel || r.returnedByLabel) && (
                             <p className="mt-0.5 truncate text-[10px]" style={{ color: T.textMuted }}>

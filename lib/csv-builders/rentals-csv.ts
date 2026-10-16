@@ -67,6 +67,12 @@ import {
 // half» canon from rental-price-split.ts. Display-only: СВОДКА / ВСЕГО /
 // summary counters stay on STORED revenue (no double accounting).
 import { estimateEquipmentDocPrice } from "@/lib/csv-builders/equipment-doc-price";
+// Task 101: operator+owner verification state per rental («Верификация»
+// column) — graceful empty when the table is not applied yet.
+import {
+  getVerificationStatusMap,
+  VERIFICATION_STATUS_LABELS,
+} from "@/app/franchize/lib/rental-verify";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -220,6 +226,15 @@ export async function buildRentalsCsv(
     else rentalRows.push(r);
   }
 
+  // Task 101: operator+owner verification state per rental (empty map until
+  // Paul applies rental-verifications-table-2026-10-17.sql — the column then
+  // just stays empty, the sheet keeps its shape).
+  const verificationMap = await getVerificationStatusMap(rentalRows.map((r: any) => String(r.rental_id)));
+  const verificationLabel = (rentalId: unknown): string => {
+    const brief = verificationMap.get(String(rentalId || ""));
+    return brief ? VERIFICATION_STATUS_LABELS[brief.status] : "";
+  };
+
   // ── Batched users lookup — subrenter labels (АРЕНДЫ) + «Выдал»/«Принял»
   //    (ЭКИП) resolve in ONE query. ─────────────────────────────────────────
   const userIds = new Set<string>();
@@ -295,6 +310,8 @@ export async function buildRentalsCsv(
     // (filter by «Оператор (ЗП)» to reproduce a member's profile total).
     "ЗП техника", "ЗП экип", "ЗП наценка", "Экип флаги",
     "Оператор создал", "Оператор выдал", "Оператор принял", "Оператор (ЗП)", "Атрибуция ЗП",
+    // Task 101: operator+owner dual-confirmation state (пусто = сверки нет).
+    "Верификация",
   ]));
 
   const blockRentals: CsvBlockTotals = { count: 0, revenue: 0, salary: 0 };
@@ -465,6 +482,8 @@ export async function buildRentalsCsv(
       equipParts.join("+"),
       createdByLabel, handedByLabel, returnedByLabel,
       attributedToLabel, attributionLabel,
+      // Task 101: verification state
+      verificationLabel(r.rental_id),
     ]));
   }
 
@@ -657,7 +676,7 @@ export async function buildRentalsCsv(
 
   rows.push(rowOf([
     "Аренды", blockRentals.count, blockRentals.revenue, blockRentals.salary,
-    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор (ЗП)/Атрибуция ЗП: фильтр по оператору и сумма «ЗП Аренда» = его комиссии в профиле`,
+    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор (ЗП)/Атрибуция ЗП: фильтр по оператору и сумма «ЗП Аренда» = его комиссии в профиле; верификация — колонка «Верификация»: подтверждено = расчёт сверен оператором и владельцем, пусто = сверки ещё нет`,
   ]));
   rows.push(rowOf([
     "Экип", blockEquipment.count, blockEquipment.revenue, 0,

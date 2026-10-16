@@ -1939,6 +1939,25 @@ export async function confirmVehicleReturn(
             logger.warn(`[confirmVehicleReturn] Achievement grant failed (non-fatal):`, achErr);
         }
 
+        // ── Task 101: rental VERIFICATION request («verified» salary state) ──
+        // The rental is closed and all money fields (odometer, damage notes,
+        // penalty, deposit) are persisted — the perfect moment to ask BOTH the
+        // attributed operator and the crew owner to confirm the calculated
+        // commission (inline keyboard in DM). Verified rentals stop costing
+        // month-end review time. Non-fatal, fire-and-forget: closure must
+        // never wait on notifications. Graceful when the SQL (Paul) is not
+        // applied yet — requestRentalVerification no-ops with a warn.
+        try {
+            const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
+            void requestRentalVerification({
+                rentalId,
+                actorChatId: userId,
+                source: "return_page",
+            });
+        } catch (verifyErr) {
+            logger.warn(`[confirmVehicleReturn] Verification request failed to start (non-fatal):`, verifyErr);
+        }
+
         return {
             success: true,
             data: 'OK',

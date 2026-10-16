@@ -254,3 +254,75 @@ export async function resetSalaryCoefficientsToOfficial(params: {
 
 /** Type re-exports for the client VM. */
 export type { SalaryConfig, BikeSalaryCategories, RentalCategory, SaleCategory };
+
+// ── TASK 101: hourly shift rate — VISIBLE on 🎯 Ставки ЗП ───────────────────
+// The 100 ₽/h default (task98: 169 → 500 → 100) lived only in code constants
+// and the DB column default — nowhere in the UI, so the crew could not see
+// which coefficient pays the shift part of the salary. This action powers the
+// «⏱️ Почасовая ставка смен» block on the coefficients page:
+//   • crew default = DEFAULT_HOURLY_RATE (the code constant, mirrors the DB
+//     DEFAULT on crew_member_shifts.hourly_rate set by Paul's SQL);
+//   • per-member override = users.metadata.hourly_rate (source of truth the
+//     sync_hourly_rate_on_shift_start() trigger copies into each shift).
+// Read: ANY crew member (transparent ЗП, same policy as the coefficients).
+// Edit: stays where it already works — crew page → «Смены» → «Изменить
+// часовую ставку» (app/api/crew/shifts/rate/route.ts); no new write path.
+export interface CrewHourlyRateRow {
+  userId: string;
+  /** @username-first label (task100 lesson: full_name can be literally «Dmitry User»). */
+  label: string;
+  fullName: string | null;
+  role: string | null;
+  /** users.metadata.hourly_rate override; null → crew default applies. */
+  hourlyRate: number | null;
+}
+
+export interface CrewHourlyRatesVM {
+  crewDefault: number;
+  members: CrewHourlyRateRow[];
+}
+
+export async function getCrewHourlyRatesAction(params: {
+  slug: string;
+}): Promise<ActionResponse<CrewHourlyRatesVM>> {
+  try {
+    const access = await verifyCrewAccess(params.slug);
+    if (!access.allowed) {
+      return { success: false, error: access.error };
+    }
+    const crewId = access.crewId!;
+    const { supabaseAdmin } = await import("@/lib/supabase-server");
+    const { DEFAULT_HOURLY_RATE } = await import("@/app/franchize/lib/salary-constants");
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id, role, users(username, full_name, metadata)")
+      .eq("crew_id", crewId);
+
+    if (error) {
+      logger.error("[salary-coefficients] getCrewHourlyRatesAction query failed:", error.message);
+      return { success: false, error: "Не удалось получить ставки участников." };
+    }
+
+    const members: CrewHourlyRateRow[] = (rows || [])
+      .map((row: any) => {
+        const u = (row.users || {}) as { username?: string | null; full_name?: string | null; metadata?: Record<string, unknown> | null };
+        const rateMeta = u.metadata && typeof u.metadata.hourly_rate === "number" ? u.metadata.hourly_rate : null;
+        const username = (u.username || "").trim();
+        const fullName = (u.full_name || "").trim() || null;
+        return {
+          userId: String(row.user_id),
+          label: username ? `@${username}` : fullName || String(row.user_id),
+          fullName: username && fullName ? fullName : null,
+          role: (row.role as string) || null,
+          hourlyRate: rateMeta,
+        };
+      })
+      .sort((a: CrewHourlyRateRow, b: CrewHourlyRateRow) => a.label.localeCompare(b.label));
+
+    return successResponse({ crewDefault: DEFAULT_HOURLY_RATE, members });
+  } catch (err) {
+    logger.error("[salary-coefficients] getCrewHourlyRatesAction exception:", err);
+    return errorResponse(handleError(err, "getCrewHourlyRatesAction"));
+  }
+}
