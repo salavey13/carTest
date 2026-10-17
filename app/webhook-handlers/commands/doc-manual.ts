@@ -431,6 +431,13 @@ function formatDepositDestination(context: DocFlowContext): string {
 
 /**
  * Insert deposit_entries rows for the collected deposit.
+ * TASK 102 FIX: the comment terminator was lost when this file was assembled
+ * (task 83) — the unterminated JSDoc swallowed the WHOLE function body up
+ * to the next comment, so this function never existed at runtime.
+ * Every /doc rental then threw a silent ReferenceError (caught by the
+ * rental-creation try/catch) and deposit_entries rows were never written —
+ * confirmed against prod: 0 rows for every doc_command rental since October.
+ */
 async function insertDepositEntries(rentalId: string, userId: string, context: DocFlowContext): Promise<void> {
   const depositAmount = Number(context.depositOverride || "20000");
   if (depositAmount <= 0 || context.stsPledgeUsed) {
@@ -1597,6 +1604,41 @@ async function createRentalFromDocContract(
     const rentalDepositMethod = depCardPortion > 0 ? "bank_transfer" : "cash";
 
     // Create rentals row
+    // TASK 102 idempotency guard: if a Telegram webhook delivery times out
+    // AFTER the rental row was written, Telegram retries the update and the
+    // whole /doc flow re-runs — previously producing a duplicate rentals row
+    // (the artifact dedup only covers artifacts). Same bike + same renter
+    // phone + doc_command + created within the last 15 minutes = the same
+    // deal; return the existing rental_id instead of inserting a twin.
+    try {
+      const renterPhoneForGuard = context.clientPhone ? context.clientPhone.replace(/[^\d]/g, "").slice(-10) : "";
+      if (renterPhoneForGuard) {
+        const { data: twinRows } = await supabaseAdmin
+          .from("rentals")
+          .select("rental_id, created_at, metadata")
+          .eq("vehicle_id", bike.id)
+          .eq("status", "active")
+          .gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(10);
+        const twin = (twinRows || []).find((r: any) => {
+          if ((r.metadata as any)?.source !== "doc_command") return false;
+          const phone = String((r.metadata as any)?.renter_phone || "").replace(/[^\d]/g, "");
+          return phone.endsWith(renterPhoneForGuard);
+        });
+        if (twin) {
+          logger.warn("[/doc] Duplicate /doc rental detected within 15-min window (webhook retry?) — reusing existing rental", {
+            existing: twin.rental_id,
+            vehicleId: bike.id,
+            renterPhone: renterPhoneForGuard,
+          });
+          return twin.rental_id;
+        }
+      }
+    } catch (guardErr) {
+      logger.warn("[/doc] idempotency guard failed (non-fatal, continuing):", guardErr);
+    }
+
     const rentalInsert = {
       user_id: crewOwnerChatId,
       owner_id: crewOwnerChatId,
@@ -2012,89 +2054,20 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       logger.warn("[/doc] Storage upload failed (non-fatal):", uploadErr);
     }
 
-    const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
-    const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
-
-    let qrPngBuffer: Buffer | null = null;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
-    } catch (qrErr) {
-      logger.warn("[/doc] QR failed:", qrErr);
-    }
-
-    // Send DOCX via Telegram directly (no media group, separate send)
-    try {
-      await sendTelegramDocument(String(chatId), docxBuf, docFileName);
-      logger.info("[/doc] DOCX sent via sendTelegramDocument");
-    } catch (e) {
-      logger.error("[/doc] sendTelegramDocument failed:", e);
-    }
-
-    // Send QR as separate photo (if available)
-    if (qrPngBuffer) {
-      try {
-        const formData = new FormData();
-        formData.append("chat_id", String(chatId));
-        formData.append("photo", new Blob([new Uint8Array(qrPngBuffer)], { type: "image/png" }), "qr.png");
-        formData.append("caption", `📲 QR для быстрой повторной аренды
-${qrDeepLink}`);
-        formData.append("parse_mode", "HTML");
-        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
-        logger.info("[/doc] QR photo sent");
-      } catch (qrSendErr) {
-        logger.warn("[/doc] QR photo send failed:", qrSendErr);
-      }
-    }
-
-    // ── Send DOCX to crew email (aligned with web app flow) ──────────────
-    try {
-      const smtpHost = process.env.SMTP_HOST || process.env.SMTP_YANDEX_HOST;
-      const smtpPort = Number(process.env.SMTP_PORT || process.env.SMTP_YANDEX_PORT || 465);
-      const smtpUser = process.env.SMTP_USER || process.env.SMTP_YANDEX_USER;
-      const smtpPass = process.env.SMTP_PASS || process.env.SMTP_YANDEX_PASS;
-      const emailFrom = process.env.EMAIL_FROM || smtpUser;
-      const emailTo = process.env.EMAIL_DEFAULT_TO || crewSecrets.email || "vip_bike@mail.ru";
-      if (smtpHost && smtpUser && smtpPass) {
-        const docType = isRent ? "аренды" : "купли-продажи";
-        const emailBody = [
-          `Договор ${docType} №${vars.contract_number || vars.document_key}`,
-          ``,
-          `Байк: ${bike.make} ${bike.model}`,
-          `Клиент: ${context.mpFullName || "—"}`,
-          `Телефон: ${context.clientPhone || "—"}`,
-          ``,
-          isRent
-            ? `Период: ${context.rentStartDate || "?"} ${context.rentStartTime || ""} → ${context.rentEndDate || "?"} ${context.rentEndTime || ""}`
-            : `Цена: ${context.salePrice || "?"} ₽`,
-          ``,
-          `Договор сгенерирован через /doc команду.`,
-          `Документ во вложении.`,
-        ].join("\n");
-        const transporter = nodemailer.createTransport({
-          host: smtpHost, port: smtpPort, secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-          connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 8000,
-        });
-        // Fire-and-forget — don't block the command on email
-        transporter.sendMail({
-          from: emailFrom, to: emailTo,
-          subject: `Договор ${docType} — ${bike.make} ${bike.model}`,
-          text: emailBody,
-          attachments: [{
-            filename: docFileName,
-            content: docxBuf,
-            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          }],
-        }).then(() => logger.info(`[/doc] Email with DOCX sent to ${emailTo}`))
-          .catch((emailErr: any) => logger.warn("[/doc] Email send failed (non-fatal):", emailErr?.message || emailErr));
-      }
-    } catch (emailSetupErr) {
-      logger.warn("[/doc] Email setup failed:", emailSetupErr);
-    }
+    // ── TASK 102 CRITICAL-ORDER FIX (2026-10-17 incident: bmw-f800r) ────────
+    // The money-critical DB writes (rentals row, user_rental_secrets,
+    // rental_contract_artifacts) used to run AFTER the whole cosmetic chain
+    // (external QR fetch up to 8s + docx upload to TG up to 40s forward→direct
+    // + a QR sendPhoto raw fetch with NO timeout that could hang forever).
+    // Inside the webhook's serverless budget that meant: docx built, uploaded,
+    // sent to the operator's chat… and then the invocation died BEFORE the
+    // rental row was inserted — the operator saw «doc sent directly to tg»,
+    // and the rental never appeared in analytics (2026-10-17 09:42 f800r,
+    // two aprilia retries at 09:29/09:32 — all three, same signature).
+    // NOW: rentals + secrets + artifacts are persisted FIRST, immediately
+    // after the storage upload; every network cosmetic runs after, so any
+    // hang/timeout costs visuals only, never money rows. The docx/QR sends
+    // themselves moved below (right before the success message).
 
     let rentalId: string | null = null;
     let rentalCreationError: string | null = null;
@@ -2326,6 +2299,61 @@ ${qrDeepLink}`);
       }
     }
     }
+
+  // ── Cosmetic network sends (AFTER the critical writes — task102 reorder) ──
+  // QR deep link + PNG fetch (external service, capped at 8s), then the docx
+  // and the QR photo to the operator's chat. If any of these hangs or dies,
+  // the rental row above is already persisted — the operator can re-send the
+  // file from analytics; nothing money-relevant is lost.
+  const qrDeepLink = `https://t.me/oneBikePlsBot/app?startapp=rent_${bike.id}_${docSha256}`;
+  const qrPngUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(qrDeepLink)}&color=000000&bgcolor=ffffff`;
+
+  let qrPngBuffer: Buffer | null = null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const qrRes = await fetch(qrPngUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (qrRes.ok) qrPngBuffer = Buffer.from(await qrRes.arrayBuffer());
+  } catch (qrErr) {
+    logger.warn("[/doc] QR failed:", qrErr);
+  }
+
+  // Send DOCX via Telegram directly (no media group, separate send)
+  try {
+    await sendTelegramDocument(String(chatId), docxBuf, docFileName);
+    logger.info("[/doc] DOCX sent via sendTelegramDocument");
+  } catch (e) {
+    logger.error("[/doc] sendTelegramDocument failed:", e);
+  }
+
+  // Send QR as separate photo (if available).
+  // TASK 102: was a RAW fetch with NO timeout — one hung call ate the rest of
+  // the serverless budget and killed everything below it (rental summary,
+  // admin notify, lead). Now routed through telegramDeliver for the standard
+  // deadline + logging + retryAfter handling.
+  if (qrPngBuffer) {
+    try {
+      const { telegramDeliver } = await import("@/lib/telegram-transport");
+      const qrSend = await telegramDeliver("sendPhoto", chatId, {
+        caption: `📲 QR для быстрой повторной аренды\n${qrDeepLink}`,
+        parse_mode: "HTML",
+      }, {
+        photo: {
+          data: qrPngBuffer.toString("base64"),
+          filename: "qr.png",
+          contentType: "image/png",
+        },
+      });
+      if (qrSend.ok) {
+        logger.info("[/doc] QR photo sent");
+      } else {
+        logger.warn("[/doc] QR photo send failed:", qrSend.error);
+      }
+    } catch (qrSendErr) {
+      logger.warn("[/doc] QR photo send failed:", qrSendErr);
+    }
+  }
 
   // ── Send confirmation to the operator (v3 polish: rich context + deep links) ──
   // Was: "✅ Договор аренды готов!" with generic "🚀 Открыть" button → bot app root.

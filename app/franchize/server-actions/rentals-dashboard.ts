@@ -78,6 +78,8 @@ export interface RentalDashboardItem {
     rent_end_date: string | null;
     created_by_operator_chat_id: string | null;
   } | null;
+  // Task 102: operator+owner verification state (null = no row / table absent).
+  verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
   // Resolved operator display name (username/full_name from public.users)
   operatorName?: string | null;
   // iter20: resolved partner-owner label ("@username · Full Name") for
@@ -753,6 +755,24 @@ export async function getRentalsDashboard(input: {
           subrenterLabel: id ? subrenterLabelById.get(id) ?? id : null,
         };
       });
+
+      // ── Task 102: attach the operator+owner VERIFICATION state ────────────
+      // The analytics cards/drawer mark each rental ✅/⏳/⚠️ so the crew sees
+      // at a glance which money is already reconciled (on-the-fly verification
+      // instead of the end-of-month review). Batched lookup; empty map when
+      // the rental_verifications table is not applied yet (graceful).
+      if (items.length > 0) {
+        try {
+          const { getVerificationStatusMap } = await import("@/app/franchize/lib/rental-verify");
+          const verificationMap = await getVerificationStatusMap(items.map((it) => it.rental_id));
+          items = items.map(item => ({
+            ...item,
+            verificationStatus: verificationMap.get(item.rental_id)?.status ?? null,
+          }));
+        } catch (verErr) {
+          console.warn("[rentals-dashboard] verification enrich failed (non-fatal):", verErr);
+        }
+      }
     }
 
     // Calculate summary statistics.

@@ -176,6 +176,20 @@ export function RentalDetailDrawer({
   useEffect(() => { void loadDepositSummary(); }, [loadDepositSummary]);
 
   const statusMeta = getRentalStatusMeta(rental.status);
+  // Task 102: verification chip — same mapping as AnalyticsRentalCard.
+  const ver = rental.verificationStatus ?? null;
+  const verMeta =
+    ver === "verified"
+      ? { color: "#22c55e", label: "✅ сверена" }
+      : ver === "disputed"
+        ? { color: "#ef4444", label: "⚠️ спор сверки" }
+        : ver === "operator_confirmed"
+          ? { color: "#f59e0b", label: "⏳ ждёт владельца" }
+          : ver === "owner_confirmed"
+            ? { color: "#f59e0b", label: "⏳ ждёт оператора" }
+            : ver === "pending"
+              ? { color: "#f59e0b", label: "⏳ сверка" }
+              : null;
   const bikeTitle = getRentalBikeTitle(rental);
   // iter32: gear rentals get their subject from the gear snapshot —
   // «Шлем LS2», «Шлем + ещё 2» instead of a fake bike title.
@@ -381,6 +395,17 @@ export function RentalDetailDrawer({
               >
                 {formatRubles(cost)}
               </span>
+              {/* Task 102: operator+owner commission verification chip — the
+                  money-reconciliation state, same semantics as the card. */}
+              {verMeta && (
+                <span
+                  className="rounded-full px-3 py-1 text-[11px] font-medium"
+                  style={{ background: `${verMeta.color}1a`, color: verMeta.color }}
+                  title="Сверка расчёта: оператор + владелец подтверждают комиссию сразу после закрытия аренды"
+                >
+                  {verMeta.label}
+                </span>
+              )}
             </div>
           </div>
         </div>

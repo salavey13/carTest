@@ -431,30 +431,75 @@ export async function handleRentalVerifyCallback(params: {
     }
 
     const current = row as RentalVerificationRow;
-    const result = applyVerificationAction(current, {
+    // ── TASK 102 race hardening ──────────────────────────────────────────────
+    // Both parties can tap ✅ within the same second: two callbacks each read
+    // `pending`, each computes its own next state, and the SECOND write used
+    // to blindly overwrite the first — final state stuck at operator_confirmed
+    // / owner_confirmed while BOTH humans had confirmed (buttons already
+    // stripped → dead end). The update is now a conditional (optimistic-lock)
+    // write: it only lands while the row still has the status we read. When a
+    // parallel writer won the race we re-read and re-apply against the fresh
+    // row — the state machine is idempotent, so the loser converges to
+    // «verified» instead of clobbering it.
+    let current_ = current;
+    let result = applyVerificationAction(current_, {
       action: ok ? "confirm" : "dispute",
       chatId: String(params.chatId),
       nowIso: new Date().toISOString(),
     });
-
     if (!result.row) {
       await answerCallback(params.callbackQueryId, result.error || "Действие недоступно.");
       return true;
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from("rental_verifications")
-      .update({
-        status: result.row.status,
-        operator_confirmed_at: result.row.operator_confirmed_at,
-        owner_confirmed_at: result.row.owner_confirmed_at,
-        verified_at: result.row.verified_at,
-        disputed_by: result.row.disputed_by,
-        dispute_reason: result.row.dispute_reason,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("rental_id", rentalId);
-    if (updateError) throw updateError;
+    let writeLanded = false;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const { data: written, error: updateError } = await supabaseAdmin
+        .from("rental_verifications")
+        .update({
+          status: result.row.status,
+          operator_confirmed_at: result.row.operator_confirmed_at,
+          owner_confirmed_at: result.row.owner_confirmed_at,
+          verified_at: result.row.verified_at,
+          disputed_by: result.row.disputed_by,
+          dispute_reason: result.row.dispute_reason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("rental_id", rentalId)
+        // Optimistic lock: only write while nobody else changed the status
+        // since our read. (verified is terminal — nobody can race past it.)
+        .eq("status", current_.status)
+        .select("status")
+        .maybeSingle();
+      if (updateError) throw updateError;
+      if (written) {
+        writeLanded = true;
+        break;
+      }
+      // Lost the race — re-read the row someone else just advanced and apply
+      // our action to THAT state instead.
+      const { data: fresh, error: rereadError } = await supabaseAdmin
+        .from("rental_verifications")
+        .select("*")
+        .eq("rental_id", rentalId)
+        .maybeSingle();
+      if (rereadError) throw rereadError;
+      if (!fresh) break;
+      current_ = fresh as RentalVerificationRow;
+      result = applyVerificationAction(current_, {
+        action: ok ? "confirm" : "dispute",
+        chatId: String(params.chatId),
+        nowIso: new Date().toISOString(),
+      });
+      if (!result.row) {
+        await answerCallback(params.callbackQueryId, result.error || "Действие недоступно.");
+        return true;
+      }
+    }
+    if (!writeLanded) {
+      await answerCallback(params.callbackQueryId, "Не удалось сохранить — попробуйте ещё раз.");
+      return true;
+    }
 
     // Best-effort: strip the buttons from the tapped message so the decision
     // feels final (cosmetic — failures are ignored).

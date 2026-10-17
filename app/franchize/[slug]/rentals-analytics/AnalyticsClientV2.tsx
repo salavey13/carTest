@@ -156,6 +156,7 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
       : null,
     contract: item.contract ?? null,
     operatorName: item.operatorName ?? null,
+    verificationStatus: item.verificationStatus ?? null,
   };
 }
 

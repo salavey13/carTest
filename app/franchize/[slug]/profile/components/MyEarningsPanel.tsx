@@ -50,6 +50,8 @@ type PeriodEarnings = {
       returnedByLabel: string;
       // Task 101: operator+owner verification state (null = no data yet).
       verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
+      // Task 102: rentals.status — manual verify button renders for completed only.
+      status?: string;
     }>;
     sales: Array<{
       saleId: string;
@@ -129,17 +131,29 @@ export function MyEarningsPanel({
   // double-check (mainly the backfill of rentals closed BEFORE the Telegram
   // verification flow shipped). Optimistic UI — the server action stays the
   // source of truth and is gated owner/co_owner/admin server-side.
+  // Task 102: failures are no longer silent — a short inline error flag is
+  // shown in place of the button (money surface: the boss must KNOW that a
+  // confirm did not land, not stare at an unchanged badge).
+  const [verifyErrorIds, setVerifyErrorIds] = useState<Set<string>>(new Set());
   const handleManualVerify = useCallback(
     async (rentalId: string) => {
       if (verifyingIds.has(rentalId)) return;
       setVerifyingIds((prev) => new Set(prev).add(rentalId));
+      setVerifyErrorIds((prev) => {
+        if (!prev.has(rentalId)) return prev;
+        const next = new Set(prev);
+        next.delete(rentalId);
+        return next;
+      });
       try {
         const res = await adminVerifyRentalAction({ slug, rentalId });
         if (res.success) {
           setVerifiedOverrides((prev) => ({ ...prev, [rentalId]: true }));
+        } else {
+          setVerifyErrorIds((prev) => new Set(prev).add(rentalId));
         }
       } catch {
-        /* the button just stays un-verified; no toast spam on the money surface */
+        setVerifyErrorIds((prev) => new Set(prev).add(rentalId));
       } finally {
         setVerifyingIds((prev) => {
           const next = new Set(prev);
@@ -609,16 +623,36 @@ export function MyEarningsPanel({
                                 </span>
                               ))}
                             {!r.verificationStatus && !verifiedOverrides[r.rentalId] && teamSalariesVisible && (
-                              <button
-                                type="button"
-                                onClick={() => handleManualVerify(r.rentalId)}
-                                disabled={verifyingIds.has(r.rentalId)}
-                                className="rounded px-1.5 py-0.5 text-[10px] font-semibold transition disabled:opacity-50"
-                                style={{ backgroundColor: "color-mix(in srgb, #22c55e 12%, transparent)", color: "#22c55e" }}
-                                title="Подтвердить расчёт вручную (после личной сверки)"
-                              >
-                                {verifyingIds.has(r.rentalId) ? "…" : "✓ подтвердить"}
-                              </button>
+                              r.status === "completed" ? (
+                                verifyErrorIds.has(r.rentalId) ? (
+                                  <span
+                                    className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                    style={{ backgroundColor: "color-mix(in srgb, #ef4444 15%, transparent)", color: "#ef4444" }}
+                                    title="Не удалось сохранить подтверждение — попробуйте ещё раз"
+                                  >
+                                    ✕ не сохранилось
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleManualVerify(r.rentalId)}
+                                    disabled={verifyingIds.has(r.rentalId)}
+                                    className="rounded px-1.5 py-0.5 text-[10px] font-semibold transition disabled:opacity-50"
+                                    style={{ backgroundColor: "color-mix(in srgb, #22c55e 12%, transparent)", color: "#22c55e" }}
+                                    title="Подтвердить расчёт вручную (после личной сверки)"
+                                  >
+                                    {verifyingIds.has(r.rentalId) ? "…" : "✓ подтвердить"}
+                                  </button>
+                                )
+                              ) : (
+                                <span
+                                  className="rounded px-1.5 py-0.5 text-[10px]"
+                                  style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 12%, transparent)", color: T.textMuted }}
+                                  title="Сверка появится после закрытия аренды"
+                                >
+                                  ⏳ в аренде
+                                </span>
+                              )
                             )}
                           </div>
                           {(r.createdByLabel || r.handedByLabel || r.returnedByLabel) && (

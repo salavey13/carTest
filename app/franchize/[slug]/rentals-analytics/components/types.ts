@@ -63,6 +63,10 @@ export interface AnalyticsRentalRow {
   } | null;
   /** Resolved operator display name (e.g. "@salavey13"). */
   operatorName?: string | null;
+  /** Task 102: operator+owner commission verification state
+   *  (rental_verifications row; null = no data / table not applied yet).
+   *  Rendered as ✅/⏳/⚠️ chips on the rental card + detail drawer. */
+  verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
 }
 
 export interface AnalyticsSaleRow {

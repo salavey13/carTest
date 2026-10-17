@@ -148,9 +148,19 @@ export async function adminVerifyRentalAction(params: {
     // ── Apply the owner-side confirm through the SAME state machine ──
     // applyVerificationAction refuses a second confirm on verified rows and
     // any foreign chat ids — the single funnel keeps the transitions audited.
+    // TASK 102: a co_owner/admin with a DIFFERENT chat id than the recorded
+    // owner_chat_id used to bounce off the party check («Вы не участник
+    // сверки») while the UI happily showed them the ✅ button. The action is
+    // owner-tier gated above, so a non-party authority acts ON THE OWNER
+    // SIDE (the docstring's «boss confirms FOR the pair» semantics) instead
+    // of failing silently.
+    const stateChatId =
+      row.operator_chat_id === actorChatId || row.owner_chat_id === actorChatId
+        ? actorChatId
+        : row.owner_chat_id || actorChatId;
     const result = applyVerificationAction(row, {
       action: "confirm",
-      chatId: actorChatId,
+      chatId: stateChatId,
       nowIso: new Date().toISOString(),
       reason: undefined,
     });

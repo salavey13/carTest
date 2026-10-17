@@ -40,6 +40,24 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
   const returnSignal = sla.find((s) => s.key === "until_return" || s.key === "return_overdue");
   const deposit = getDepositInfo(rental);
 
+  // Task 102: operator+owner verification highlight — the crew sees at a
+  // glance which money is already reconciled (✅) vs waiting (⏳) vs disputed
+  // (⚠️). Verified also tints the card border green so a scanned list reads
+  // «already done» without opening anything.
+  const ver = rental.verificationStatus ?? null;
+  const verMeta =
+    ver === "verified"
+      ? { color: "#22c55e", label: "✅ сверена" }
+      : ver === "disputed"
+        ? { color: "#ef4444", label: "⚠️ спор сверки" }
+        : ver === "operator_confirmed"
+          ? { color: "#f59e0b", label: "⏳ ждёт владельца" }
+          : ver === "owner_confirmed"
+            ? { color: "#f59e0b", label: "⏳ ждёт оператора" }
+            : ver === "pending"
+              ? { color: "#f59e0b", label: "⏳ сверка" }
+              : null;
+
   const startDate = rental.agreed_start_date || rental.requested_start_date;
   const endDate = rental.agreed_end_date || rental.requested_end_date;
 
@@ -51,10 +69,12 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
       whileHover={{ y: -1 }}
       transition={{ type: "spring", damping: 24, stiffness: 320 }}
       aria-pressed={selected}
-      aria-label={`Аренда: ${bikeTitle}, ${renterName}, ${statusMeta.label}`}
+      aria-label={`Аренда: ${bikeTitle}, ${renterName}, ${statusMeta.label}${verMeta ? `, ${verMeta.label}` : ""}`}
       className="relative w-full overflow-hidden rounded-2xl border p-3 pl-4 text-left transition focus:outline-none focus-visible:ring-2 md:p-4 md:pl-5"
       style={{
-        borderColor: selected ? T.borderActive : T.border,
+        borderColor: selected
+          ? T.borderActive
+          : verMeta?.color ?? T.border,
         backgroundColor: T.bgCard,
         cursor: "pointer",
         minHeight: "44px",
@@ -145,6 +165,18 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
           >
             {statusMeta.label}
           </span>
+          {/* Task 102: verification chip (operator+owner commission confirm) */}
+          {verMeta && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{
+                backgroundColor: `${verMeta.color}15`,
+                color: verMeta.color,
+              }}
+            >
+              {verMeta.label}
+            </span>
+          )}
           {selected && (
             <ArrowRight
               className="h-4 w-4"

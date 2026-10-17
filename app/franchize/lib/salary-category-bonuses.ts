@@ -87,6 +87,10 @@ export interface CategoryBonusRentalItem {
   returnedByChatId: string | null;
   /** Task 101: operator+owner commission confirmation state (null = no data yet). */
   verificationStatus: RentalVerificationStatus | null;
+  /** Task 102: rentals.status — the manual «✓ подтвердить» stamp must only
+   *  render for COMPLETED rentals (verifying a bike that is still in rent
+   *  makes no sense). Always present for rental rows. */
+  status: string;
 }
 
 /** One credited sale in the member's TL;DR list. */
@@ -239,6 +243,7 @@ export async function computeCategoryBonuses(params: {
       rentalId: String(r.rental_id || ""),
       dateIso: r.requested_start_date || r.agreed_start_date || null,
       bikeName: `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim(),
+      status: String(r.status || ""),
       totalCost: price,
       amount: salary.total,
       base: salary.base,
