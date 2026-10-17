@@ -61,7 +61,8 @@ targets AS (
   SELECT u.user_id, u.metadata, t.slug, t.shifts, t.hours
   FROM truth t
   JOIN users u ON u.user_id::text = t.member_id
-  WHERE u.metadata ? ARRAY['franchizeProfiles']::text[]
+  -- NB: jsonb «?» accepts a single text key only (no text[] overload → 42883).
+  WHERE u.metadata ? 'franchizeProfiles'
     AND u.metadata #> '{"franchizeProfiles"}' ? t.slug
     AND (
       (u.metadata #>> ARRAY['franchizeProfiles', t.slug, 'counters', 'shiftsCompleted'])  IS DISTINCT FROM t.shifts::text
@@ -118,6 +119,6 @@ SELECT u.username, t.slug,
        (u.metadata #> 'specs' -> 'owner_fix_20261017_counters_recompute') IS NOT NULL AS audited
 FROM truth t
 JOIN users u ON u.user_id::text = t.member_id
-WHERE u.metadata ? ARRAY['franchizeProfiles']::text[]
+WHERE u.metadata ? 'franchizeProfiles'
   AND u.metadata #> '{"franchizeProfiles"}' ? t.slug
 ORDER BY u.username, t.slug;

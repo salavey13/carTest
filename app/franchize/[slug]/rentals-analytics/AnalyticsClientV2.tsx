@@ -279,6 +279,10 @@ export function AnalyticsClientV2({
   // immediately (was: stale counters until a full app reopen).
   const [reloadToken, setReloadToken] = useState(0);
 
+  // Task 103: owner-tier flag from the dashboard action (owner/admin/co_owner
+  // /password-auth). Gates the drawer «✓ подтвердить сверку» affordance.
+  const [viewerIsOwnerTier, setViewerIsOwnerTier] = useState(false);
+
   const themeArgs = useMemo(() => resolveThemeTokens(crew.theme), [crew.theme]);
   const T: ThemeTokens = useTheme(themeArgs);
 
@@ -325,6 +329,7 @@ export function AnalyticsClientV2({
         );
         if (result.success && result.data) {
           setRentals(result.data.items.map(toAnalyticsRental));
+          setViewerIsOwnerTier(result.data.viewerIsOwnerTier === true);
         } else if (!result.success) {
           toast.error(result.error || "Не удалось загрузить аренды");
         }
@@ -594,6 +599,7 @@ export function AnalyticsClientV2({
       onFetchCsvText={fetchCsvText}
       onSendCsvToTelegram={sendCsvToTelegram}
       onDataRefresh={() => setReloadToken((t) => t + 1)}
+      viewerIsOwnerTier={viewerIsOwnerTier}
     />
   );
 }

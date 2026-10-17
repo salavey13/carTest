@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
+import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   AnalyticsTab,
@@ -26,6 +27,11 @@ import type {
   RentalTodo,
 } from "./types";
 import { computeAnalyticsKpis, isRentalRelevantForDate, isServiceRental, localDateOnly, todayLocalIso } from "./lib/analytics-utils";
+import {
+  applyVerificationListFilter,
+  verificationStripData,
+  type VerificationListFilter,
+} from "./lib/verification-utils";
 import { AnalyticsTabNav } from "./AnalyticsTabNav";
 import { AnalyticsDateNav } from "./AnalyticsDateNav";
 import { AnalyticsKPICards } from "./AnalyticsKPICards";
@@ -71,6 +77,11 @@ interface AnalyticsClientProps {
    *  cards kept showing the cancelled rental in the day's counters until a
    *  full app reopen. */
   onDataRefresh?: () => void;
+  /** Task 103: viewer passes the owner-tier gate (owner/admin/co_owner) —
+   *  shows the «✓ подтвердить сверку» affordance in the rental drawer. The
+   *  server action re-checks the role; this only hides the money button from
+   *  tiers that can never use it. */
+  viewerIsOwnerTier?: boolean;
 }
 
 export function AnalyticsClient({
@@ -93,6 +104,7 @@ export function AnalyticsClient({
   onFetchCsvText,
   onSendCsvToTelegram,
   onDataRefresh,
+  viewerIsOwnerTier = false,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -114,26 +126,50 @@ export function AnalyticsClient({
   // iter26: drawer status-action in flight (Отменить) — disables re-entry.
   const [actionPending, setActionPending] = useState(false);
 
+  // Task 103: on-the-fly verification UX.
+  //   verFilter — the «🤝 Сверка» quick filter for the rentals list (month-end
+  //               workflow: open the day → tap ⚠️ → resolve the dispute).
+  //   verifiedOverrides — optimistic stamps after a manual owner confirm from
+  //               the drawer; the refetch (onDataRefresh) brings the
+  //               authoritative state, the override just removes the flicker.
+  //   verifyPending/verifyFailed — drawer button states (money surface: a
+  //               failed confirm must be VISIBLE, never silent).
+  const [verFilter, setVerFilter] = useState<VerificationListFilter>("all");
+  const [verifiedOverrides, setVerifiedOverrides] = useState<Record<string, true>>({});
+  const [verifyPending, setVerifyPending] = useState(false);
+  const [verifyFailed, setVerifyFailed] = useState(false);
+
   // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
   // would let the wrong drawer render for one frame).
   const handleTabChange = (tab: AnalyticsTab) => {
     setSelectedRentalId(null);
     setSelectedSaleId(null);
     setActiveTab(tab);
+    setVerFilter("all");
   };
+
+  // Task 103: optimistic verification stamps — a manual owner ✅ flips the
+  // chip everywhere (list card + drawer) without waiting for the refetch.
+  const rentalsWithVerifyOverrides = useMemo(
+    () =>
+      rentals.map((r) =>
+        verifiedOverrides[r.rental_id] ? { ...r, verificationStatus: "verified" as const } : r,
+      ),
+    [rentals, verifiedOverrides],
+  );
 
   // Service rentals = rentals where vehicle_id starts with vip-bike-svc-
   const serviceRentals = useMemo(
-    () => rentals.filter(isServiceRental),
-    [rentals],
+    () => rentalsWithVerifyOverrides.filter(isServiceRental),
+    [rentalsWithVerifyOverrides],
   );
 
   // Display rentals (exclude services from rentals tab + cancelled rentals from KPIs)
   // FIX: cancelled rentals (aborted pre-created) should not pollute KPIs.
   // They remain queryable in the rentals list (for audit) but are excluded here.
   const nonServiceRentals = useMemo(
-    () => rentals.filter((r) => !isServiceRental(r)),
-    [rentals],
+    () => rentalsWithVerifyOverrides.filter((r) => !isServiceRental(r)),
+    [rentalsWithVerifyOverrides],
   );
   const displayRentals = useMemo(
     () => nonServiceRentals.filter((r) => r.status !== "cancelled"),
@@ -172,10 +208,26 @@ export function AnalyticsClient({
     [dayPageRentals, date],
   );
 
+  // Task 103: «🤝 Сверка» strip numbers, scoped to the same day page as the
+  // KPIs. Hidden entirely until at least one row carries verification data —
+  // crews without the table (or with pre-feature rentals) see no new UI.
+  const verStrip = useMemo(
+    () => verificationStripData(dayPageRentals),
+    [dayPageRentals],
+  );
+  // The filter applies to the day LIST (incl. cancelled created-that-day rows
+  // — they can carry verification data too after a cancel+recreate dance).
+  const filteredListRentals = useMemo(
+    () => applyVerificationListFilter(listRentals, verFilter),
+    [listRentals, verFilter],
+  );
+
   // Selected rental (with todos + notes + handoff derived from metadata)
   const selectedRental: DrawerRentalRow | null = useMemo(() => {
     if (!selectedRentalId) return null;
-    const rental = rentals.find((r) => r.rental_id === selectedRentalId);
+    // Task 103: look in the OVERRIDDEN array so a just-confirmed verification
+    // renders ✅ immediately (the raw `rentals` still holds the stale status).
+    const rental = rentalsWithVerifyOverrides.find((r) => r.rental_id === selectedRentalId);
     if (!rental) return null;
     // FIX (F12-iter2): todos link via crew_todos.rental_id ONLY.
     // The iter1 fallback (t.rental_id == null && t.assigned_to ===
@@ -247,7 +299,7 @@ export function AnalyticsClient({
           }
         : null,
     };
-  }, [selectedRentalId, rentals, todos]);
+  }, [selectedRentalId, rentalsWithVerifyOverrides, todos]);
 
   const selectedSale = useMemo(
     () => (selectedSaleId ? sales.find((s) => s.id === selectedSaleId) || null : null),
@@ -365,6 +417,46 @@ export function AnalyticsClient({
     }
   };
 
+  // Task 103: manual owner confirm of the operator+owner commission check
+  // («both agreed in person» semantics — the SAME adminVerifyRentalAction that
+  // MyEarningsPanel uses; it re-verifies the owner-tier role server-side and
+  // funnels through the canonical state machine). Money surface → explicit
+  // confirm dialog, visible failure flag, optimistic ✅ stamp + refetch.
+  const handleVerifyRental = async () => {
+    if (!selectedRentalId || verifyPending) return;
+    if (!actorUserId) {
+      toast.error("Не удалось определить пользователя — обновите страницу и попробуйте снова.");
+      return;
+    }
+    const rental = selectedRental;
+    const disputed = rental?.verificationStatus === "disputed";
+    const ok = window.confirm(
+      disputed
+        ? "Закрыть спор и пометить сверку подтверждённой?\n\nИспользуйте только после личного разбора с оператором — обе стороны получат отметку «проверено»."
+        : "Подтвердить сверку по этой аренде?\n\nАренда будет помечена «проверено» для оператора и владельца (используйте после личной сверки).",
+    );
+    if (!ok) return;
+
+    setVerifyPending(true);
+    setVerifyFailed(false);
+    try {
+      const res = await adminVerifyRentalAction({ slug: initialSlug, rentalId: selectedRentalId });
+      if (res.success) {
+        setVerifiedOverrides((prev) => ({ ...prev, [selectedRentalId]: true }));
+        toast.success(disputed ? "Спор закрыт — сверка подтверждена ✅" : "Сверка подтверждена ✅");
+        onDataRefresh?.();
+      } else {
+        setVerifyFailed(true);
+        toast.error(res.error || "Не удалось подтвердить сверку");
+      }
+    } catch {
+      setVerifyFailed(true);
+      toast.error("Не удалось подтвердить сверку");
+    } finally {
+      setVerifyPending(false);
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4" role="region" aria-label="Аналитика">
@@ -416,6 +508,47 @@ export function AnalyticsClient({
       {/* KPI cards */}
       <AnalyticsKPICards kpis={kpis} T={T} />
 
+      {/* Task 103: «🤝 Сверка» strip + quick filter (rentals tab only).
+          The month-end workflow compressed to one tap: open the day → see
+          «N ✅ · M ⏳ · K ⚠️» → tap ⚠️ → resolve. Hidden until at least one
+          rental of the day carries verification data. */}
+      {activeTab === "rentals" && verStrip.hasAny && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2.5"
+          style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+          role="group"
+          aria-label="Сверка расчётов по арендам"
+        >
+          <span className="text-xs font-semibold" style={{ color: T.textMuted }}>
+            🤝 Сверка:
+          </span>
+          <VerChip
+            label={`все · ${dayPageRentals.length}`}
+            active={verFilter === "all"}
+            onClick={() => setVerFilter("all")}
+            color={T.textMuted}
+          />
+          <VerChip
+            label={`${verStrip.verified} ✅`}
+            active={verFilter === "verified"}
+            onClick={() => setVerFilter("verified")}
+            color="#22c55e"
+          />
+          <VerChip
+            label={`${verStrip.waiting} ⏳`}
+            active={verFilter === "waiting"}
+            onClick={() => setVerFilter("waiting")}
+            color="#f59e0b"
+          />
+          <VerChip
+            label={`${verStrip.disputed} ⚠️`}
+            active={verFilter === "disputed"}
+            onClick={() => setVerFilter("disputed")}
+            color="#ef4444"
+          />
+        </div>
+      )}
+
       {/* List + Detail (split-pane on desktop, stacked on mobile) */}
       <div className="grid gap-4 lg:grid-cols-12">
         {/* Left: list */}
@@ -436,6 +569,21 @@ export function AnalyticsClient({
               T={T}
               icon={CalendarDays}
             />
+          ) : activeTab === "rentals" && filteredListRentals.length === 0 ? (
+            /* Task 103: the day HAS rentals but none match the verification
+               filter — a different (friendlier) empty state than «no rentals». */
+            <AnalyticsEmptyState
+              label={
+                verFilter === "disputed"
+                  ? "Спорных сверок нет — всё чисто ✅"
+                  : verFilter === "waiting"
+                    ? "Все сверки дня закрыты ✅"
+                    : "Подтверждённых сверок за этот день нет"
+              }
+              hint="Нажмите «все», чтобы увидеть полный список аренд"
+              T={T}
+              icon={CalendarDays}
+            />
           ) : activeTab === "sales" && sales.length === 0 ? (
             <AnalyticsEmptyState
               label={`Нет продаж за ${new Date(date).toLocaleDateString("ru-RU")}`}
@@ -452,7 +600,7 @@ export function AnalyticsClient({
             />
           ) : activeTab === "rentals" ? (
             <AnalyticsRentalList
-              rentals={listRentals}
+              rentals={filteredListRentals}
               selectedId={selectedRentalId}
               onSelect={setSelectedRentalId}
               T={T}
@@ -516,6 +664,10 @@ export function AnalyticsClient({
                   T={T}
                   onAction={handleRentalAction}
                   onClose={closeDrawer}
+                  canVerify={viewerIsOwnerTier}
+                  verifyPending={verifyPending}
+                  verifyFailed={verifyFailed}
+                  onVerifyRental={handleVerifyRental}
                 />
               )}
               {activeTab === "sales" && selectedSale && (
@@ -563,6 +715,10 @@ export function AnalyticsClient({
               onClose={closeDrawer}
               crewSlug={initialSlug}
               asSheetChild
+              canVerify={viewerIsOwnerTier}
+              verifyPending={verifyPending}
+              verifyFailed={verifyFailed}
+              onVerifyRental={handleVerifyRental}
             />
           )}
           {activeTab === "sales" && selectedSale && (
@@ -604,12 +760,20 @@ function RentalDetailDrawerInline({
   T,
   onAction,
   onClose,
+  canVerify,
+  verifyPending,
+  verifyFailed,
+  onVerifyRental,
 }: {
   rental: DrawerRentalRow;
   crewSlug: string;
   T: ThemeTokens;
   onAction: (a: DrawerAction) => void;
   onClose: () => void;
+  canVerify?: boolean;
+  verifyPending?: boolean;
+  verifyFailed?: boolean;
+  onVerifyRental?: () => void;
 }) {
   return (
     <RentalDetailDrawer
@@ -619,6 +783,10 @@ function RentalDetailDrawerInline({
       onClose={onClose}
       crewSlug={crewSlug}
       asSheetChild
+      canVerify={canVerify}
+      verifyPending={verifyPending}
+      verifyFailed={verifyFailed}
+      onVerifyRental={onVerifyRental}
     />
   );
 }
@@ -670,5 +838,36 @@ function ServiceDetailDrawerInline({
       asSheetChild
       mechanicName={mechanicName}
     />
+  );
+}
+
+// Task 103: one tappable bucket of the «🤝 Сверка» strip. Doubles as a count
+// badge and a filter toggle — the active bucket is filled, inactive ones are
+// tinted. 44px touch target preserved via negative-margin-free padding.
+function VerChip({
+  label,
+  active,
+  onClick,
+  color,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  color: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className="min-h-[36px] cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2"
+      style={{
+        backgroundColor: active ? color : `${color}1a`,
+        color: active ? "#0a0a0a" : color,
+        border: `1px solid ${active ? color : "transparent"}`,
+      }}
+    >
+      {label}
+    </button>
   );
 }

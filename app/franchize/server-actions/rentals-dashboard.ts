@@ -98,6 +98,11 @@ export interface RentalDashboardResult {
   items: RentalDashboardItem[];
   summary: RentalDashboardSummary;
   selectedDate: string;
+  // Task 103: true when the viewer passes the same owner-tier gate as
+  // adminVerifyRentalAction (owner / global admin / co_owner|admin membership
+  // / password-auth owner). Drives the «✓ подтвердить сверку» affordance in
+  // the analytics drawer — non-owner tiers never see the money button.
+  viewerIsOwnerTier?: boolean;
 }
 
 // ─── Sales Dashboard Types ───────────────────────────────────────────────────────
@@ -196,9 +201,9 @@ async function resolveRentalsAccess(
   actorUserId: string,
   crewId: string,
   crewOwnerId: string,
-): Promise<{ ok: true; subrenterVehicleIds: string[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; subrenterVehicleIds: string[]; ownerTier: boolean } | { ok: false; error: string }> {
   // 1. Owner — полный доступ
-  if (crewOwnerId === actorUserId) return { ok: true, subrenterVehicleIds: [] };
+  if (crewOwnerId === actorUserId) return { ok: true, subrenterVehicleIds: [], ownerTier: true };
 
   // 2. Глобальный админ (users.role/status + легаси metadata.role/status)
   const { data: adminUser } = await supabaseAdmin
@@ -228,7 +233,7 @@ async function resolveRentalsAccess(
   const isOrudjov = !!adminUser?.username && adminUser.username.toLowerCase().includes("orud");
 
   if (isGlobalAdmin || isActiveMember || isOrudjov) {
-    return { ok: true, subrenterVehicleIds: [] };
+    return { ok: true, subrenterVehicleIds: [], ownerTier: isGlobalAdmin };
   }
 
   // 4. Субарендатор: его байки в этом экипаже (specs.subrenter_chat_id)
@@ -243,7 +248,7 @@ async function resolveRentalsAccess(
     return { ok: false, error: "Недостаточно прав для просмотра." };
   }
   if (subrentedBikes && subrentedBikes.length > 0) {
-    return { ok: true, subrenterVehicleIds: subrentedBikes.map((b) => b.id) };
+    return { ok: true, subrenterVehicleIds: subrentedBikes.map((b) => b.id), ownerTier: false };
   }
 
   return { ok: false, error: "Недостаточно прав для просмотра." };
@@ -333,12 +338,32 @@ export async function getRentalsDashboard(input: {
     // Telegram-путь: владелец/админ/член экипажа — полный доступ; субарендатор
     // (cars.specs.subrenter_chat_id) — только аренды СВОИХ байков.
     let subrenterVehicleIds: string[] = [];
+    let viewerIsOwnerTier = false;
     if (!isPasswordAuth) {
       const access = await resolveRentalsAccess(actorUserId, crew.id, crew.owner_id);
       if (!access.ok) {
         return { success: false, error: access.error };
       }
       subrenterVehicleIds = access.subrenterVehicleIds;
+      // Task 103: owner-tier flag for the drawer verify button. Same gate as
+      // verifyCrewAccess().isOwner: crew owner, users.metadata admin, or an
+      // ACTIVE membership with role co_owner/admin. Subrenter/regular member
+      // → false (adminVerifyRentalAction re-checks server-side; this gates UI).
+      viewerIsOwnerTier = access.ownerTier;
+      if (!viewerIsOwnerTier) {
+        const { data: tierMembership } = await supabaseAdmin
+          .from("crew_members")
+          .select("role, membership_status")
+          .eq("crew_id", crew.id)
+          .eq("user_id", actorUserId)
+          .maybeSingle();
+        viewerIsOwnerTier =
+          tierMembership?.membership_status === "active" &&
+          ["co_owner", "admin"].includes(tierMembership?.role || "");
+      }
+    } else {
+      // Password auth proved the viewer IS the crew owner (verifyPasswordAuthOwner).
+      viewerIsOwnerTier = true;
     }
 
     // Parse date boundaries for the selected day (UTC to avoid timezone issues)
@@ -812,6 +837,7 @@ export async function getRentalsDashboard(input: {
         items,
         summary,
         selectedDate: date,
+        viewerIsOwnerTier,
       },
     };
   } catch (error) {
