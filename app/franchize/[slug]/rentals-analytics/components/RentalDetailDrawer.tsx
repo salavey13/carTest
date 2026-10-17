@@ -113,6 +113,11 @@ interface RentalDetailDrawerProps {
   verifyFailed?: boolean;
   /** Trigger the owner-side manual confirm. */
   onVerifyRental?: () => void;
+  /** Task 105: (re)send the verification DMs to operator+owner — creates the
+   *  row from current data when missing (bd948bd0 backfill), re-DMs otherwise. */
+  onResendDms?: () => void;
+  resendPending?: boolean;
+  resendFailed?: boolean;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
@@ -156,6 +161,9 @@ export function RentalDetailDrawer({
   verifyPending = false,
   verifyFailed = false,
   onVerifyRental,
+  onResendDms,
+  resendPending = false,
+  resendFailed = false,
 }: RentalDetailDrawerProps) {
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newNote, setNewNote] = useState("");
@@ -450,6 +458,31 @@ export function RentalDetailDrawer({
                     }
                   >
                     {verifyPending ? "…" : ver === "disputed" ? "✓ закрыть спор" : "✓ подтвердить сверку"}
+                  </button>
+                )
+              )}
+              {/* Task 105: (re)send the verification summary + ✅/⚠️ keyboard to
+                  operator+owner in Telegram — the row is created on the fly for
+                  rentals closed before the trigger fix (bd948bd0). */}
+              {canVerify && rental.status === "completed" && ver !== "verified" && onResendDms && (
+                resendFailed ? (
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px] font-semibold"
+                    style={{ background: "#ef44441a", color: "#ef4444" }}
+                    title="Не удалось отправить — попробуйте ещё раз"
+                  >
+                    ✕ не отправилось
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onResendDms}
+                    disabled={resendPending}
+                    className="cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
+                    style={{ background: "#8b5cf61f", color: "#a78bfa" }}
+                    title="Выслать сводку сверки с кнопками ✅/⚠️ оператору и владельцу в Telegram (если сообщение потерялось)"
+                  >
+                    {resendPending ? "…" : "📤 выслать сверку в TG"}
                   </button>
                 )
               )}

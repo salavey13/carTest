@@ -1944,18 +1944,22 @@ export async function confirmVehicleReturn(
         // penalty, deposit) are persisted — the perfect moment to ask BOTH the
         // attributed operator and the crew owner to confirm the calculated
         // commission (inline keyboard in DM). Verified rentals stop costing
-        // month-end review time. Non-fatal, fire-and-forget: closure must
-        // never wait on notifications. Graceful when the SQL (Paul) is not
-        // applied yet — requestRentalVerification no-ops with a warn.
+        // month-end review time. Non-fatal. Graceful when the SQL (Paul) is
+        // not applied yet — requestRentalVerification no-ops with a warn.
+        // ⚠️ TASK 105 LESSON (bd948bd0): this call used to be `void` fire-and-
+        // forget — the action returned, Vercel froze the lambda, and the whole
+        // verification (row insert + both DMs) died silently with 0 rows. Same
+        // incident class as the f800r /doc kill. EVERYTHING non-fatal here is
+        // awaited, like the ride-share notify and achievements above.
         try {
             const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
-            void requestRentalVerification({
+            await requestRentalVerification({
                 rentalId,
                 actorChatId: userId,
                 source: "return_page",
             });
         } catch (verifyErr) {
-            logger.warn(`[confirmVehicleReturn] Verification request failed to start (non-fatal):`, verifyErr);
+            logger.warn(`[confirmVehicleReturn] Verification request failed (non-fatal):`, verifyErr);
         }
 
         return {

@@ -56,6 +56,7 @@ import {
   formatVerificationSummary,
   labelFromUsersMap,
   verificationKeyboard,
+  verificationStatusNote,
   type RentalVerificationRow,
   type RentalVerificationSnapshot,
   type RentalVerificationStatus,
@@ -72,6 +73,7 @@ export {
   labelFromUsersMap,
   tallyVerificationStatuses,
   verificationKeyboard,
+  verificationStatusNote,
   VERIFICATION_STATUS_LABELS,
 } from "./rental-verify-core";
 export type {
@@ -191,7 +193,8 @@ function isMissingRelationError(error: { message?: string; code?: string } | nul
 
 // ── Users lookup ─────────────────────────────────────────────────────────────
 
-async function loadUsersMap(
+/** Chat id → @username/full_name labels (exported for the drawer resend action). */
+export async function loadUsersMap(
   chatIds: Array<string | null | undefined>,
 ): Promise<Map<string, { username?: string | null; full_name?: string | null }>> {
   const unique = [...new Set(chatIds.filter(Boolean).map(String))];
@@ -345,9 +348,12 @@ export async function requestRentalVerification(params: {
     const ownerLabel = labelFromUsersMap(usersMap, ownerChatId);
 
     const singleParty = !operatorChatId || operatorChatId === ownerChatId;
-    const statusNote = singleParty
-      ? "Подтвердите, что расчёт верный — после вашего ✅ аренда будет помечена как проверенная."
-      : `Ждёт подтверждения: ${escapeVerifyHtml(operatorLabel)} (оператор) и ${escapeVerifyHtml(ownerLabel)} (владелец). После двух ✅ аренда помечается как проверенная.`;
+    const statusNote = verificationStatusNote({
+      status: "pending",
+      singleParty,
+      operatorLabel,
+      ownerLabel,
+    });
 
     const summary = formatVerificationSummary({
       crewName,

@@ -261,6 +261,39 @@ export function verificationKeyboard(rentalId: string): Array<Array<{ text: stri
   ];
 }
 
+/**
+ * The status line under the verification summary — shared by the first DM
+ * (requestRentalVerification) and the drawer's «выслать сверку в Telegram»
+ * resend (task 105), so both surfaces always describe the SAME state.
+ * `labels` are pre-rendered @username strings (labelFromUsersMap).
+ */
+export function verificationStatusNote(params: {
+  status: RentalVerificationStatus;
+  singleParty: boolean;
+  operatorLabel: string;
+  ownerLabel: string;
+}): string {
+  const { status, singleParty, operatorLabel, ownerLabel } = params;
+  const op = escapeVerifyHtml(operatorLabel);
+  const own = escapeVerifyHtml(ownerLabel);
+  if (status === "verified") {
+    return "Аренда подтверждена обеими сторонами ✅ — в конце месяца разбирать уже не нужно.";
+  }
+  if (status === "disputed") {
+    return "Расчёт оспорен — идёт ручной разбор. Закройте вопрос до конца месяца (владелец может подтвердить сверку вручную в аналитике).";
+  }
+  if (singleParty) {
+    return "Подтвердите, что расчёт верный — после вашего ✅ аренда будет помечена как проверенная.";
+  }
+  if (status === "operator_confirmed") {
+    return `Ждёт подтверждения: ${op} (оператор) уже за, осталось ${own} (владелец).`;
+  }
+  if (status === "owner_confirmed") {
+    return `Ждёт подтверждения: ${own} (владелец) уже за, осталось ${op} (оператор).`;
+  }
+  return `Ждёт подтверждения: ${op} (оператор) и ${own} (владелец). После двух ✅ аренда помечается как проверенная.`;
+}
+
 // ── Month-end tally (pure) ───────────────────────────────────────────────────
 
 export interface VerificationBrief {

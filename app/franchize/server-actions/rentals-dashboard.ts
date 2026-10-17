@@ -2596,6 +2596,23 @@ export async function updateRentalStatus(input: {
           } catch (rideShareErr) {
             console.warn("[update-rental-status] Ride-share notify failed (non-fatal):", rideShareErr);
           }
+
+          // ── Task 105 PARITY: verification request on dashboard closures too ──
+          // rental-verify.ts's contract says BOTH closure paths request the
+          // verification, but this path never actually did — rentals closed
+          // from the analytics drawer never got the ✅/⚠️ DMs. Awaited, non-
+          // fatal: the `void` fire-and-forget variant was proven dead on
+          // Vercel (bd948bd0 — response returned, lambda frozen, 0 rows).
+          try {
+            const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
+            await requestRentalVerification({
+              rentalId,
+              actorChatId: actorUserId,
+              source: "analytics_dashboard",
+            });
+          } catch (verifyErr) {
+            console.warn("[update-rental-status] Verification request failed (non-fatal):", verifyErr);
+          }
         }
       }
     }

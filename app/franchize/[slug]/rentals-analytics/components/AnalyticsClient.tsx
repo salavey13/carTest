@@ -15,7 +15,10 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
-import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";
+import {
+  adminVerifyRentalAction,
+  resendVerificationDmsAction,
+} from "@/app/franchize/server-actions/rental-verify-actions";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   AnalyticsTab,
@@ -138,6 +141,10 @@ export function AnalyticsClient({
   const [verifiedOverrides, setVerifiedOverrides] = useState<Record<string, true>>({});
   const [verifyPending, setVerifyPending] = useState(false);
   const [verifyFailed, setVerifyFailed] = useState(false);
+  // Task 105: (re)send verification DMs from the drawer (no confirm dialog —
+  // it does not mutate money state; it creates the row when missing + DMs).
+  const [resendPending, setResendPending] = useState(false);
+  const [resendFailed, setResendFailed] = useState(false);
 
   // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
   // would let the wrong drawer render for one frame).
@@ -457,6 +464,34 @@ export function AnalyticsClient({
     }
   };
 
+  // Task 105: (re)send the verification summary + ✅/⚠️ keyboard to both
+  // parties. Creates the verification row on the fly for rentals closed
+  // before the awaited-trigger fix (bd948bd0: void → lambda frozen → 0 rows).
+  const handleResendDms = async () => {
+    if (!selectedRentalId || resendPending) return;
+    setResendPending(true);
+    setResendFailed(false);
+    try {
+      const res = await resendVerificationDmsAction({ slug: initialSlug, rentalId: selectedRentalId });
+      if (res.success) {
+        toast.success(
+          res.data?.created
+            ? "Сверка создана и отправлена в Telegram ✅"
+            : `Сверка отправлена в Telegram (${res.data?.sentTo?.length ?? 0} получено) ✅`,
+        );
+        if (res.data?.created) onDataRefresh?.();
+      } else {
+        setResendFailed(true);
+        toast.error(res.error || "Не удалось отправить сверку");
+      }
+    } catch {
+      setResendFailed(true);
+      toast.error("Не удалось отправить сверку");
+    } finally {
+      setResendPending(false);
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4" role="region" aria-label="Аналитика">
@@ -668,6 +703,9 @@ export function AnalyticsClient({
                   verifyPending={verifyPending}
                   verifyFailed={verifyFailed}
                   onVerifyRental={handleVerifyRental}
+                  onResendDms={handleResendDms}
+                  resendPending={resendPending}
+                  resendFailed={resendFailed}
                 />
               )}
               {activeTab === "sales" && selectedSale && (
@@ -719,6 +757,9 @@ export function AnalyticsClient({
               verifyPending={verifyPending}
               verifyFailed={verifyFailed}
               onVerifyRental={handleVerifyRental}
+              onResendDms={handleResendDms}
+              resendPending={resendPending}
+              resendFailed={resendFailed}
             />
           )}
           {activeTab === "sales" && selectedSale && (
@@ -764,6 +805,9 @@ function RentalDetailDrawerInline({
   verifyPending,
   verifyFailed,
   onVerifyRental,
+  onResendDms,
+  resendPending,
+  resendFailed,
 }: {
   rental: DrawerRentalRow;
   crewSlug: string;
@@ -774,6 +818,9 @@ function RentalDetailDrawerInline({
   verifyPending?: boolean;
   verifyFailed?: boolean;
   onVerifyRental?: () => void;
+  onResendDms?: () => void;
+  resendPending?: boolean;
+  resendFailed?: boolean;
 }) {
   return (
     <RentalDetailDrawer
@@ -787,6 +834,9 @@ function RentalDetailDrawerInline({
       verifyPending={verifyPending}
       verifyFailed={verifyFailed}
       onVerifyRental={onVerifyRental}
+      onResendDms={onResendDms}
+      resendPending={resendPending}
+      resendFailed={resendFailed}
     />
   );
 }

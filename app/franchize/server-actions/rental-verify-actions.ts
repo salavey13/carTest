@@ -27,9 +27,15 @@ import {
 import {
   applyVerificationAction,
   computeRentalVerificationSnapshot,
+  formatVerificationSummary,
   grantVerificationAchievements,
+  labelFromUsersMap,
+  loadUsersMap,
+  verificationKeyboard,
+  verificationStatusNote,
   type RentalVerificationRow,
 } from "@/app/franchize/lib/rental-verify";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 export interface AdminVerifyResult {
   rentalId: string;
@@ -66,83 +72,22 @@ export async function adminVerifyRentalAction(params: {
     const rental = rentalRow as any;
     if (!rental) return { success: false, error: "Аренда не найдена." };
 
-    // ── Load or create the verification row ──
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from("rental_verifications")
-      .select("*")
-      .eq("rental_id", params.rentalId)
-      .maybeSingle();
-    if (fetchError) {
-      const msg = fetchError.message || "";
-      if (!/relation .* does not exist|schema cache/i.test(msg) && fetchError.code !== "42P01") throw fetchError;
-      return { success: false, error: "Таблица сверок ещё не создана — примените SQL (rental-verifications-table-2026-10-17.sql)." };
-    }
-
+    // ── Load or create the verification row (shared with the resend action) ──
     let row: RentalVerificationRow;
-    let createdNow = false;
-    if (existing) {
-      row = existing as RentalVerificationRow;
-    } else {
-      // Old rental without a verification row — build one from current data.
-      const nowIso = new Date().toISOString();
-      const snapshot = await computeRentalVerificationSnapshot({
+    let createdNow: boolean;
+    try {
+      const loaded = await loadOrCreateVerificationRow({
         rental,
-        crewId: rental.crew_id,
-        requestedAtIso: nowIso,
-      });
-      const { data: crewRow } = await supabaseAdmin
-        .from("crews")
-        .select("slug")
-        .eq("id", rental.crew_id)
-        .maybeSingle();
-      const meta = (rental.metadata || {}) as Record<string, unknown>;
-      const freeze = meta.pickup_freeze as Record<string, unknown> | undefined;
-      const insert = {
-        rental_id: rental.rental_id,
-        crew_id: rental.crew_id,
-        crew_slug: (crewRow?.slug as string) || params.slug,
-        operator_chat_id:
-          typeof rental.created_by_operator_chat_id === "string" && rental.created_by_operator_chat_id.trim()
-            ? rental.created_by_operator_chat_id.trim()
-            : null,
-        owner_chat_id: rental.owner_id ? String(rental.owner_id) : null,
-        requested_by: actorChatId,
-        status: "pending" as const,
-        snapshot: {
-          ...snapshot,
-          attribution: {
-            ...snapshot.attribution,
-            handedByChatId:
-              freeze && typeof freeze.frozen_by === "string" && freeze.frozen_by.trim()
-                ? freeze.frozen_by.trim()
-                : null,
-            returnedByChatId:
-              typeof meta.return_confirmed_by === "string" && meta.return_confirmed_by.trim()
-                ? meta.return_confirmed_by.trim()
-                : null,
-          },
-        },
+        actorChatId,
         source: "admin_manual",
-      };
-      const { data: created, error: insertError } = await supabaseAdmin
-        .from("rental_verifications")
-        .upsert(insert, { onConflict: "rental_id", ignoreDuplicates: true })
-        .select("*")
-        .maybeSingle();
-      if (insertError) throw insertError;
-      if (!created) {
-        // Lost a race — re-read.
-        const { data: reread } = await supabaseAdmin
-          .from("rental_verifications")
-          .select("*")
-          .eq("rental_id", params.rentalId)
-          .maybeSingle();
-        if (!reread) return { success: false, error: "Не удалось создать запись сверки." };
-        row = reread as RentalVerificationRow;
-      } else {
-        row = created as RentalVerificationRow;
-        createdNow = true;
-      }
+        fallbackSlug: params.slug,
+      });
+      row = loaded.row;
+      createdNow = loaded.created;
+    } catch (rowErr: any) {
+      const msg = typeof rowErr?.message === "string" ? rowErr.message : "";
+      if (msg.includes("Таблица сверок")) return { success: false, error: msg };
+      throw rowErr;
     }
 
     // ── Apply the owner-side confirm through the SAME state machine ──
@@ -200,5 +145,175 @@ export async function adminVerifyRentalAction(params: {
   } catch (err) {
     logger.error("[rental-verify] adminVerifyRentalAction exception:", err);
     return errorResponse(handleError(err, "adminVerifyRentalAction"));
+  }
+}
+
+// ── Shared backfill: load the row or build one from current rental data ──────
+// Used by BOTH adminVerifyRentalAction and resendVerificationDmsAction so the
+// «old rental without a row» case is handled identically (attribution pulled
+// from pickup_freeze / return_confirmed_by when metadata is richer than the
+// plain snapshot).
+async function loadOrCreateVerificationRow(params: {
+  rental: any;
+  actorChatId: string;
+  source: string;
+  fallbackSlug: string;
+}): Promise<{ row: RentalVerificationRow; created: boolean }> {
+  const { data: existing, error: fetchError } = await supabaseAdmin
+    .from("rental_verifications")
+    .select("*")
+    .eq("rental_id", params.rental.rental_id)
+    .maybeSingle();
+  if (fetchError) {
+    const msg = fetchError.message || "";
+    if (!/relation .* does not exist|schema cache/i.test(msg) && fetchError.code !== "42P01") throw fetchError;
+    throw new Error("Таблица сверок ещё не создана — примените SQL (rental-verifications-table-2026-10-17.sql).");
+  }
+  if (existing) return { row: existing as RentalVerificationRow, created: false };
+
+  const nowIso = new Date().toISOString();
+  const snapshot = await computeRentalVerificationSnapshot({
+    rental: params.rental,
+    crewId: params.rental.crew_id,
+    requestedAtIso: nowIso,
+  });
+  const { data: crewRow } = await supabaseAdmin
+    .from("crews")
+    .select("slug")
+    .eq("id", params.rental.crew_id)
+    .maybeSingle();
+  const meta = (params.rental.metadata || {}) as Record<string, unknown>;
+  const freeze = meta.pickup_freeze as Record<string, unknown> | undefined;
+  const insert = {
+    rental_id: params.rental.rental_id,
+    crew_id: params.rental.crew_id,
+    crew_slug: (crewRow?.slug as string) || params.fallbackSlug,
+    operator_chat_id:
+      typeof params.rental.created_by_operator_chat_id === "string" && params.rental.created_by_operator_chat_id.trim()
+        ? params.rental.created_by_operator_chat_id.trim()
+        : null,
+    owner_chat_id: params.rental.owner_id ? String(params.rental.owner_id) : null,
+    requested_by: params.actorChatId,
+    status: "pending" as const,
+    snapshot: {
+      ...snapshot,
+      attribution: {
+        ...snapshot.attribution,
+        handedByChatId:
+          freeze && typeof freeze.frozen_by === "string" && freeze.frozen_by.trim()
+            ? freeze.frozen_by.trim()
+            : null,
+        returnedByChatId:
+          typeof meta.return_confirmed_by === "string" && meta.return_confirmed_by.trim()
+            ? meta.return_confirmed_by.trim()
+            : null,
+      },
+    },
+    source: params.source,
+  };
+  const { data: created, error: insertError } = await supabaseAdmin
+    .from("rental_verifications")
+    .upsert(insert, { onConflict: "rental_id", ignoreDuplicates: true })
+    .select("*")
+    .maybeSingle();
+  if (insertError) throw insertError;
+  if (created) return { row: created as RentalVerificationRow, created: true };
+  // Lost a race — re-read.
+  const { data: reread } = await supabaseAdmin
+    .from("rental_verifications")
+    .select("*")
+    .eq("rental_id", params.rental.rental_id)
+    .maybeSingle();
+  if (!reread) throw new Error("Не удалось создать запись сверки.");
+  return { row: reread as RentalVerificationRow, created: false };
+}
+
+// ── Task 105: (re)send the verification DMs to both parties ──────────────────
+// WHY: bd948bd0 closed while the verification trigger was a `void` fire-and-
+// forget — Vercel froze the lambda before the row was written, so NOBODY got
+// the ✅/⚠️ keyboard. Also covers lost chats / re-sent summaries after a
+// dispute talk. Owner-tier gated like adminVerifyRentalAction; sends from the
+// STORED snapshot (the numbers both parties must see are the frozen ones).
+export interface ResendDmsResult {
+  rentalId: string;
+  sentTo: string[];
+  created: boolean;
+  status: string;
+}
+
+export async function resendVerificationDmsAction(params: {
+  slug: string;
+  rentalId: string;
+}): Promise<ActionResponse<ResendDmsResult>> {
+  try {
+    const access = await verifyCrewAccess(params.slug);
+    if (!access.allowed) return { success: false, error: access.error };
+    if (access.isOwner !== true) {
+      return { success: false, error: "Выслать сверку может владелец или администратор экипажа." };
+    }
+    const actorChatId = String(access.actorUserId || "");
+
+    const { data: rentalRow, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select(`
+        rental_id, crew_id, owner_id, total_cost, metadata, status,
+        created_by_operator_chat_id, created_at,
+        requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
+        vehicle:cars(id, make, model, specs, daily_price, type, crew_id)
+      `)
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    if (rentalError) throw rentalError;
+    const rental = rentalRow as any;
+    if (!rental) return { success: false, error: "Аренда не найдена." };
+    if (rental.status !== "completed") {
+      return { success: false, error: "Сверка отправляется по закрытым арендам." };
+    }
+
+    const { row, created } = await loadOrCreateVerificationRow({
+      rental,
+      actorChatId,
+      source: "admin_resend",
+      fallbackSlug: params.slug,
+    });
+
+    const usersMap = await loadUsersMap([row.operator_chat_id, row.owner_chat_id]);
+    const operatorLabel = labelFromUsersMap(usersMap, row.operator_chat_id);
+    const ownerLabel = labelFromUsersMap(usersMap, row.owner_chat_id);
+    const singleParty = !row.operator_chat_id || row.operator_chat_id === row.owner_chat_id;
+    const summary = formatVerificationSummary({
+      crewName: row.crew_slug,
+      snapshot: row.snapshot as any,
+      usersMap,
+      operatorChatId: row.operator_chat_id,
+      ownerChatId: row.owner_chat_id,
+      statusNote: verificationStatusNote({
+        status: row.status,
+        singleParty,
+        operatorLabel,
+        ownerLabel,
+      }),
+    });
+    const withKeyboard = row.status === "pending" || row.status === "operator_confirmed" || row.status === "owner_confirmed";
+    const keyboard = withKeyboard ? verificationKeyboard(row.rental_id) : [];
+
+    const sentTo: string[] = [];
+    const recipients = [...new Set([row.operator_chat_id, row.owner_chat_id].filter(Boolean) as string[])];
+    for (const chatId of recipients) {
+      try {
+        const res = await sendComplexMessage(chatId, summary, keyboard, { parseMode: "HTML", keyboardType: "inline" });
+        if (res?.success !== false) sentTo.push(chatId);
+      } catch (e) {
+        logger.warn(`[rental-verify] resend DM failed for ${chatId} (rental ${row.rental_id}):`, e);
+      }
+    }
+    logger.info(`[rental-verify] DMs resent for ${row.rental_id} by ${actorChatId} (created=${created}, sent=${sentTo.length}/${recipients.length}, status=${row.status})`);
+    return successResponse({ rentalId: row.rental_id, sentTo, created, status: row.status });
+  } catch (err: any) {
+    logger.error("[rental-verify] resendVerificationDmsAction exception:", err);
+    const friendly = typeof err?.message === "string" && err.message.includes("Таблица сверок")
+      ? err.message
+      : handleError(err, "resendVerificationDmsAction");
+    return errorResponse(friendly);
   }
 }
