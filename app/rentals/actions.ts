@@ -1734,6 +1734,35 @@ export async function confirmVehicleReturn(
             rental_id: rentalId, type: 'return_confirmed', created_by: userId
         });
         if(eventError) logger.error(`[confirmVehicleReturn] Rental updated but failed to create event for ${rentalId}:`, eventError);
+
+        // ── Task 101: rental VERIFICATION request («verified» salary state) ──
+        // The rental is closed and all money fields (odometer, damage notes,
+        // penalty, deposit) are persisted — the perfect moment to ask BOTH the
+        // attributed operator and the crew owner to confirm the calculated
+        // commission (inline keyboard in DM). Verified rentals stop costing
+        // month-end review time. Non-fatal. Graceful when the SQL (Paul) is
+        // not applied yet — requestRentalVerification no-ops with a warn.
+        // ⚠️ TASK 105 LESSON (bd948bd0): this call used to be `void` fire-and-
+        // forget — the action returned, Vercel froze the lambda, and the whole
+        // verification (row insert + both DMs) died silently with 0 rows.
+        // ⚠️ VF-FIX 2026-10-18 (falcon-gt): even AWAITED, this call sat at the
+        // TAIL of the whole notify chain (receipt ≤10s fetch + nudge + ride-
+        // share + achievements) — under Vercel's ~10s default budget a slow
+        // run died right here: rental closed, verification never created
+        // (falcon 17:11 — the only 2 rows ever were return_page luck). The
+        // request is therefore the FIRST thing after the money writes; the
+        // cosmetic TG tail must never be able to starve it again.
+        try {
+            const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
+            await requestRentalVerification({
+                rentalId,
+                actorChatId: userId,
+                source: "return_page",
+            });
+        } catch (verifyErr) {
+            logger.warn(`[confirmVehicleReturn] Verification request failed (non-fatal):`, verifyErr);
+        }
+
         // TODO(task47-follow-up): everything from here to the return statement
         // is awaited INSIDE the action (receipt fetch ≤10s + review nudge +
         // ride-share post + achievements) — the operator's spinner and the
@@ -1939,29 +1968,9 @@ export async function confirmVehicleReturn(
             logger.warn(`[confirmVehicleReturn] Achievement grant failed (non-fatal):`, achErr);
         }
 
-        // ── Task 101: rental VERIFICATION request («verified» salary state) ──
-        // The rental is closed and all money fields (odometer, damage notes,
-        // penalty, deposit) are persisted — the perfect moment to ask BOTH the
-        // attributed operator and the crew owner to confirm the calculated
-        // commission (inline keyboard in DM). Verified rentals stop costing
-        // month-end review time. Non-fatal. Graceful when the SQL (Paul) is
-        // not applied yet — requestRentalVerification no-ops with a warn.
-        // ⚠️ TASK 105 LESSON (bd948bd0): this call used to be `void` fire-and-
-        // forget — the action returned, Vercel froze the lambda, and the whole
-        // verification (row insert + both DMs) died silently with 0 rows. Same
-        // incident class as the f800r /doc kill. EVERYTHING non-fatal here is
-        // awaited, like the ride-share notify and achievements above.
-        try {
-            const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
-            await requestRentalVerification({
-                rentalId,
-                actorChatId: userId,
-                source: "return_page",
-            });
-        } catch (verifyErr) {
-            logger.warn(`[confirmVehicleReturn] Verification request failed (non-fatal):`, verifyErr);
-        }
-
+        // ── Task 101 verification request MOVED UP (vf-fix 2026-10-18): it now
+        // runs right after the money writes, BEFORE this notify tail — see the
+        // block after the rental event insert above.
         return {
             success: true,
             data: 'OK',

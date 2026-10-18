@@ -2448,6 +2448,28 @@ export async function updateRentalStatus(input: {
       }
     }
 
+    // ── Task 105 PARITY: verification request on dashboard closures ──
+    // VF-FIX 2026-10-18 (falcon-gt): this call used to sit at the TAIL of the
+    // notify chain (renter receipt ≤10s fetch + review nudge + ride-share) —
+    // under Vercel's ~10s default budget a slow run died before reaching it:
+    // rental closed, verification row never created. It now runs right after
+    // the completion cascade (money fields are already persisted by the
+    // UPDATE above), BEFORE any cosmetic TG work. Fire on EVERY completed
+    // closure (incl. silent data-corrections — the row insert inside is
+    // idempotent, re-closures don't re-spam). Non-fatal, awaited (bd948bd0).
+    if (status === "completed" && rentalRow?.crew_id) {
+      try {
+        const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
+        await requestRentalVerification({
+          rentalId,
+          actorChatId: actorUserId,
+          source: "analytics_dashboard",
+        });
+      } catch (verifyErr) {
+        console.warn("[update-rental-status] Verification request failed (non-fatal):", verifyErr);
+      }
+    }
+
     // ── 2026-10-03: auto-cancel linked equipment mirrors on CANCELLATION ──
     // The completion cascade above never fired for cancelled rentals, so gear
     // mirrors of an aborted trip stayed active forever (the exact phantom the
@@ -2603,22 +2625,10 @@ export async function updateRentalStatus(input: {
             console.warn("[update-rental-status] Ride-share notify failed (non-fatal):", rideShareErr);
           }
 
-          // ── Task 105 PARITY: verification request on dashboard closures too ──
-          // rental-verify.ts's contract says BOTH closure paths request the
-          // verification, but this path never actually did — rentals closed
-          // from the analytics drawer never got the ✅/⚠️ DMs. Awaited, non-
-          // fatal: the `void` fire-and-forget variant was proven dead on
-          // Vercel (bd948bd0 — response returned, lambda frozen, 0 rows).
-          try {
-            const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
-            await requestRentalVerification({
-              rentalId,
-              actorChatId: actorUserId,
-              source: "analytics_dashboard",
-            });
-          } catch (verifyErr) {
-            console.warn("[update-rental-status] Verification request failed (non-fatal):", verifyErr);
-          }
+          // ── Task 105 PARITY: verification request MOVED UP (vf-fix 2026-10-18) ──
+          // It now runs right after the completion cascade, BEFORE this notify
+          // tail — see the block above. The tail (receipt + nudge + ride-share)
+          // must never be able to starve the verification again (falcon-gt).
         }
       }
     }

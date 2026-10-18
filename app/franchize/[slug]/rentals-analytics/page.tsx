@@ -2,6 +2,13 @@
 //
 // Page entry for the rentals analytics dashboard.
 //
+// maxDuration=60 (vf-fix 2026-10-18): the drawer's server actions
+// (updateRentalStatus, resend/verify verification actions) include awaited
+// Telegram sends + the verification request; under Vercel's ~10s default the
+// tail of that chain died non-deterministically (bd948bd0 incident class).
+// Segment config covers the actions POSTed from this page.
+export const maxDuration = 60;
+//
 // FIX (F10): the v1 UI (RentalsAnalyticsClient) and the AnalyticsUiSwitch
 // selector are REMOVED — v2 (AnalyticsClientV2) is the only UI now.
 // Deep-link ?ui=v1/v2 params are ignored.

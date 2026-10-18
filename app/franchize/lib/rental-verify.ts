@@ -428,6 +428,32 @@ export async function requestRentalVerification(params: {
         logger.warn(`[rental-verify] summary send failed for ${chatId} (rental ${rental.rental_id}):`, e);
       }
     }
+
+    // ── VF-FIX 2026-10-18: cc the crew owner + admins (read-only copy) ──
+    // Boss: «upon closing rental notification for verification is sent to
+    // crew owner, crew admins». The ✅/⚠️ game itself stays between the two
+    // parties (the state machine bounces foreign chat ids); the staff copy
+    // is FYI + a deeplink into the drawer, where an owner-tier admin can
+    // confirm manually (✓ подтвердить сверку / 📤 выслать сверку в TG).
+    try {
+      const ccSent = await ccVerificationToCrewStaff({
+        crewSlug,
+        rentalId: rental.rental_id,
+        summary,
+        exclude: [
+          operatorChatId,
+          ownerChatId,
+          String(params.actorChatId || ""),
+          snapshot.attribution.createdByChatId,
+          snapshot.attribution.handedByChatId,
+          snapshot.attribution.returnedByChatId,
+        ],
+      });
+      if (ccSent > 0) logger.info(`[rental-verify] staff cc sent to ${ccSent} chat(s) for ${rental.rental_id}`);
+    } catch (ccErr) {
+      logger.warn("[rental-verify] staff cc failed (non-fatal):", ccErr);
+    }
+
     logger.info(
       `[rental-verify] verification requested for ${rental.rental_id}: operator=${operatorChatId ?? "—"} owner=${ownerChatId ?? "—"} total=${snapshot.total}₽`,
     );
@@ -436,6 +462,73 @@ export async function requestRentalVerification(params: {
     logger.warn(`[rental-verify] requestRentalVerification failed for ${params.rentalId} (non-fatal):`, err);
     return { sent: false, reason: "exception" };
   }
+}
+
+// ── VF-FIX 2026-10-18: staff cc helper ─────────────────────────────────────
+
+/**
+ * Read-only copy of the verification summary to crew owner + admins
+ * (resolveLeadNotifyRecipients, no member fanout), deduped against the
+ * verification parties / actor / attribution chats. No ✅/⚠️ buttons — the
+ * state machine only accepts the two parties; staff confirm in the app
+ * drawer instead. Never throws (caller wraps non-fatal anyway).
+ */
+export async function ccVerificationToCrewStaff(params: {
+  crewSlug: string | null;
+  rentalId: string;
+  summary: string;
+  exclude: Array<string | null | undefined>;
+}): Promise<number> {
+  if (!params.crewSlug) return 0;
+  const { resolveLeadNotifyRecipients } = await import("@/app/franchize/lib/new-lead-notify");
+  const { telegramDeliver } = await import("@/lib/telegram-transport");
+  const { buildTelegramAppLink } = await import("@/lib/wall-deeplink");
+  const { resolveCrewBotUsername } = await import("@/app/franchize/lib/crew-bot");
+
+  const excludeSet = new Set(params.exclude.filter(Boolean).map(String));
+  const targets = (await resolveLeadNotifyRecipients(params.crewSlug, { includeMembers: false }))
+    .map((id) => (id == null ? null : String(id)))
+    .filter((id): id is string => !!id && !excludeSet.has(id));
+  if (targets.length === 0) return 0;
+
+  let botUsername: string | null = null;
+  try {
+    botUsername = await resolveCrewBotUsername(params.crewSlug);
+  } catch {
+    // deeplink — best effort
+  }
+
+  const text = [
+    params.summary,
+    "",
+    "📋 Копия для команды — кнопки ✅/⚠️ у оператора и владельца.",
+    "Подтвердить сверку вручную можно в приложении: аналитика аренд → карточка аренды.",
+  ].join("\n");
+  const payload: Record<string, unknown> = {
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+  };
+  if (botUsername) {
+    payload.reply_markup = {
+      inline_keyboard: [
+        [{ text: "🔑 Открыть аренду", url: buildTelegramAppLink(botUsername, `rental_${params.rentalId}`) }],
+      ],
+    };
+  }
+
+  let sent = 0;
+  await Promise.allSettled(
+    targets.map(async (chatId) => {
+      try {
+        const res = await telegramDeliver("sendMessage", chatId, payload);
+        if (res?.ok !== false) sent += 1;
+      } catch (e) {
+        logger.warn(`[rental-verify] staff cc send failed for ${chatId} (rental ${params.rentalId}):`, e);
+      }
+    }),
+  );
+  return sent;
 }
 
 // ── Callback handling (Telegram buttons) ─────────────────────────────────────

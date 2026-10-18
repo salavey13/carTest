@@ -1,4 +1,13 @@
 // /app/franchize/[slug]/rental/[id]/page.tsx
+// maxDuration=60 (vf-fix 2026-10-18): this segment hosts the return-flow server
+// actions (confirmVehicleReturn etc.). Their awaited chain — money writes,
+// renter receipt TG, review nudge, ride-share, achievements, VERIFICATION
+// request — routinely exceeds Vercel's ~10s default, and the lambda died at
+// the tail: the rental closed but the verification row/DMs never happened
+// (falcon-gt 2026-10-18 17:11 — exactly the bd948bd0 incident class).
+// The page segment config covers the actions POSTed from it.
+export const maxDuration = 60;
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";

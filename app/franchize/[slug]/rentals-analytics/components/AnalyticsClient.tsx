@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
 import {
   adminVerifyRentalAction,
+  bulkVerifyFineAction,
   resendVerificationDmsAction,
 } from "@/app/franchize/server-actions/rental-verify-actions";
 import type { ThemeTokens } from "../hooks/useTheme";
@@ -141,6 +142,8 @@ export function AnalyticsClient({
   const [verifiedOverrides, setVerifiedOverrides] = useState<Record<string, true>>({});
   const [verifyPending, setVerifyPending] = useState(false);
   const [verifyFailed, setVerifyFailed] = useState(false);
+  // VF-FIX 2026-10-18: bulk FINE confirm (month of the viewed day) in flight.
+  const [bulkFinePending, setBulkFinePending] = useState(false);
   // Task 105: (re)send verification DMs from the drawer (no confirm dialog —
   // it does not mutate money state; it creates the row when missing + DMs).
   const [resendPending, setResendPending] = useState(false);
@@ -492,6 +495,61 @@ export function AnalyticsClient({
     }
   };
 
+  // VF-FIX 2026-10-18: bulk FINE confirm for the month of the viewed day.
+  // Two-step on purpose: dryRun returns the candidate list WITHOUT writing,
+  // the confirm dialog names the count, then the apply pass runs. The action
+  // itself only touches pending rows graded 'fine' (owner-tier server gate).
+  const handleBulkVerifyFine = async () => {
+    if (bulkFinePending) return;
+    if (!viewerIsOwnerTier) {
+      toast.error("Массовое подтверждение доступно владельцу или администратору экипажа.");
+      return;
+    }
+    const month = date.slice(0, 7);
+    setBulkFinePending(true);
+    try {
+      const preview = await bulkVerifyFineAction({ slug: initialSlug, month, dryRun: true });
+      if (!preview.success) {
+        toast.error(preview.error || "Не удалось собрать кандидатов на массовое подтверждение");
+        return;
+      }
+      const list = preview.data?.candidates ?? [];
+      if (list.length === 0) {
+        toast.info(
+          preview.data?.skippedNotFine
+            ? `За ${month} нет fine-сверок; ${preview.data.skippedNotFine} «почти ок/подозрительных» требуют ручного разбора`
+            : `За ${month} нет fine-сверок для подтверждения`,
+        );
+        return;
+      }
+      const ok = window.confirm(
+        `Подтвердить ${list.length} сверок(и) за ${month} как проверенные?\n\n` +
+          list.slice(0, 12).map((c) => `• ${c.bikeName} — ${c.totalCost != null ? `${c.totalCost} ₽` : "?"}`).join("\n") +
+          (list.length > 12 ? `\n… и ещё ${list.length - 12}` : "") +
+          `\n\nСтатус станет «verified» (оператор + владелец). «Почти ок» и «подозрительные» не трогаются.`,
+      );
+      if (!ok) return;
+      const res = await bulkVerifyFineAction({ slug: initialSlug, month, dryRun: false });
+      if (res.success) {
+        toast.success(`Подтверждено: ${res.data?.applied ?? 0}. Не тронуто (не fine): ${res.data?.skippedNotFine ?? 0}${res.data?.failed ? `, ошибок: ${res.data.failed}` : ""}`);
+        setVerFilter("all");
+        setVerifiedOverrides((prev) => {
+          const next = { ...prev };
+          for (const c of list) next[c.rentalId] = true;
+          return next;
+        });
+        onDataRefresh?.();
+        router.refresh();
+      } else {
+        toast.error(res.error || "Массовое подтверждение не удалось");
+      }
+    } catch {
+      toast.error("Массовое подтверждение не удалось");
+    } finally {
+      setBulkFinePending(false);
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4" role="region" aria-label="Аналитика">
@@ -581,6 +639,22 @@ export function AnalyticsClient({
             onClick={() => setVerFilter("disputed")}
             color="#ef4444"
           />
+          {/* VF-FIX 2026-10-18: bulk FINE confirm — one owner-tier tap for the
+              month's fine-graded backlog (the Aug/Sep/Oct backfill rows carry
+              snapshot.audit.grade from the audit script). dryRun → confirm →
+              apply; almost/sus rows are never touched by the action. */}
+          {viewerIsOwnerTier && verStrip.waiting > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkVerifyFine}
+              disabled={bulkFinePending}
+              className="cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
+              style={{ background: "#22c55e1f", color: "#22c55e" }}
+              title="Подтвердить все проверенные аудитом сверки этого месяца (grade=fine). Спорные и «почти ок» не трогаются."
+            >
+              {bulkFinePending ? "…" : `✅ fine за ${date.slice(0, 7)}`}
+            </button>
+          )}
         </div>
       )}
 

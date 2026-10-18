@@ -308,6 +308,25 @@ export async function resendVerificationDmsAction(params: {
       }
     }
     logger.info(`[rental-verify] DMs resent for ${row.rental_id} by ${actorChatId} (created=${created}, sent=${sentTo.length}/${recipients.length}, status=${row.status})`);
+
+    // VF-FIX 2026-10-18: when this resend CREATED the row (rental closed
+    // before the trigger fix / lost to the ~10s tail), the staff cc from
+    // requestRentalVerification never happened — send it now. Pure resends
+    // of an already-announced verification stay party-only (no re-noise).
+    if (created) {
+      try {
+        const { ccVerificationToCrewStaff } = await import("@/app/franchize/lib/rental-verify");
+        await ccVerificationToCrewStaff({
+          crewSlug: row.crew_slug || params.slug,
+          rentalId: row.rental_id,
+          summary,
+          exclude: [row.operator_chat_id, row.owner_chat_id, actorChatId],
+        });
+      } catch (ccErr) {
+        logger.warn("[rental-verify] resend staff cc failed (non-fatal):", ccErr);
+      }
+    }
+
     return successResponse({ rentalId: row.rental_id, sentTo, created, status: row.status });
   } catch (err: any) {
     logger.error("[rental-verify] resendVerificationDmsAction exception:", err);
@@ -315,5 +334,164 @@ export async function resendVerificationDmsAction(params: {
       ? err.message
       : handleError(err, "resendVerificationDmsAction");
     return errorResponse(friendly);
+  }
+}
+
+// ── VF-FIX 2026-10-18: bulk FINE confirm (the backlog verifier) ─────────────
+// WHY: the Aug/Sep/Oct backfill (docs/crewDocs/rental-verifications-backfill-
+// aug-oct-2026-10-18.sql) creates pending verification rows for every closed
+// rental, each snapshot carrying snapshot.audit = { grade, notes } from the
+// audit script (fine / almost / sus). Confirming ~200 fine rows one drawer
+// tap at a time is a waste of the boss's evening — this action verifies a
+// MONTH's fine-graded pending rows in one owner-tier tap.
+//
+// SAFETY:
+//   • owner/co_owner/admin only (same gate as adminVerifyRentalAction);
+//   • ONLY rows with snapshot.audit.grade === 'fine' — almost/sus need human
+//     eyes and are never touched here (they are reported back as skipped);
+//   • ONLY pending rows (verified/disputed are left alone);
+//   • dryRun=true (the default first step) returns the list WITHOUT writing;
+//   • each row goes through the SAME applyVerificationAction state machine
+//     + optimistic .eq(status,'pending') guard as the single action, so a
+//     concurrent party tap cannot be clobbered.
+export interface BulkVerifyFineResult {
+  month: string;
+  dryRun: boolean;
+  candidates: Array<{
+    rentalId: string;
+    bikeName: string;
+    totalCost: number | null;
+    grade: string;
+    notes: string[];
+  }>;
+  skippedNotFine: number;
+  applied: number;
+  failed: number;
+}
+
+export async function bulkVerifyFineAction(params: {
+  slug: string;
+  /** MSK month, 'YYYY-MM' (the analytics month the boss is looking at). */
+  month: string;
+  dryRun?: boolean;
+}): Promise<ActionResponse<BulkVerifyFineResult>> {
+  try {
+    const access = await verifyCrewAccess(params.slug);
+    if (!access.allowed) return { success: false, error: access.error };
+    if (access.isOwner !== true) {
+      return { success: false, error: "Массовое подтверждение доступно владельцу или администратору экипажа." };
+    }
+    const actorChatId = String(access.actorUserId || "");
+    if (!/^\d{4}-\d{2}$/.test(params.month)) {
+      return { success: false, error: "Неверный формат месяца (ожидается ГГГГ-ММ)." };
+    }
+
+    // Pending rows of this crew; the MSK-month filter happens in JS off the
+    // rental's requested_start_date (snapshot has no month field on purpose).
+    const { data: rows, error: rowsError } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("rental_id, status, snapshot, operator_chat_id, owner_chat_id")
+      .eq("crew_slug", params.slug)
+      .eq("status", "pending")
+      .limit(500);
+    if (rowsError) {
+      const msg = rowsError.message || "";
+      if (rowsError.code === "42P01" || /relation .* does not exist/i.test(msg)) {
+        return { success: false, error: "Таблица сверок ещё не создана — примените SQL (rental-verifications-table-2026-10-17.sql)." };
+      }
+      throw rowsError;
+    }
+    const pendingRows = (rows || []) as Array<{
+      rental_id: string;
+      status: string;
+      snapshot: Record<string, unknown> | null;
+      operator_chat_id: string | null;
+      owner_chat_id: string | null;
+    }>;
+    if (pendingRows.length === 0) {
+      return successResponse({ month: params.month, dryRun: params.dryRun !== false, candidates: [], skippedNotFine: 0, applied: 0, failed: 0 });
+    }
+
+    // MSK month window over the rentals' requested_start_date.
+    const [y, m] = params.month.split("-").map(Number);
+    const startUtc = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0) - 3 * 3600 * 1000);
+    const endUtc = new Date(Date.UTC(y, m, 1, 0, 0, 0) - 3 * 3600 * 1000);
+    const { data: rentals, error: rentalsError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, requested_start_date, agreed_start_date")
+      .in("rental_id", pendingRows.map((r) => r.rental_id))
+      .gte("requested_start_date", startUtc.toISOString())
+      .lt("requested_start_date", endUtc.toISOString());
+    if (rentalsError) throw rentalsError;
+    const monthIds = new Set((rentals || []).map((r: any) => String(r.rental_id)));
+
+    const candidates: BulkVerifyFineResult["candidates"] = [];
+    let skippedNotFine = 0;
+    for (const row of pendingRows) {
+      if (!monthIds.has(row.rental_id)) continue;
+      const audit = (row.snapshot?.audit ?? null) as { grade?: string; notes?: string[] } | null;
+      if (audit?.grade !== "fine") {
+        skippedNotFine += 1;
+        continue;
+      }
+      const snap = (row.snapshot || {}) as { bikeName?: string; totalCost?: number | null };
+      candidates.push({
+        rentalId: row.rental_id,
+        bikeName: String(snap.bikeName || "аренда"),
+        totalCost: typeof snap.totalCost === "number" ? snap.totalCost : null,
+        grade: "fine",
+        notes: Array.isArray(audit.notes) ? audit.notes.map(String) : [],
+      });
+    }
+
+    const dryRun = params.dryRun !== false;
+    if (dryRun) {
+      return successResponse({ month: params.month, dryRun: true, candidates, skippedNotFine, applied: 0, failed: 0 });
+    }
+
+    // Apply — boss-confirms-for-the-pair semantics, same as the single action.
+    const nowIso = new Date().toISOString();
+    let applied = 0;
+    let failed = 0;
+    for (const row of pendingRows) {
+      if (!candidates.some((c) => c.rentalId === row.rental_id)) continue;
+      const fakeRow = {
+        rental_id: row.rental_id,
+        status: "pending",
+        operator_chat_id: row.operator_chat_id,
+        owner_chat_id: row.owner_chat_id,
+      } as unknown as RentalVerificationRow;
+      const stateChatId =
+        row.operator_chat_id === actorChatId || row.owner_chat_id === actorChatId
+          ? actorChatId
+          : row.owner_chat_id || actorChatId;
+      const result = applyVerificationAction(fakeRow, { action: "confirm", chatId: stateChatId, nowIso });
+      if (!result.row) {
+        failed += 1;
+        continue;
+      }
+      const { error: updateError } = await supabaseAdmin
+        .from("rental_verifications")
+        .update({
+          status: "verified",
+          operator_confirmed_at: result.row.operator_confirmed_at ?? nowIso,
+          owner_confirmed_at: result.row.owner_confirmed_at ?? nowIso,
+          verified_at: result.row.verified_at ?? nowIso,
+          updated_at: nowIso,
+        })
+        .eq("rental_id", row.rental_id)
+        .eq("status", "pending"); // optimistic lock — a concurrent party tap wins
+      if (updateError) {
+        logger.warn(`[rental-verify] bulk verify update failed for ${row.rental_id}:`, updateError);
+        failed += 1;
+      } else {
+        applied += 1;
+      }
+    }
+    logger.info(`[rental-verify] bulk fine verify ${params.month}/${params.slug} by ${actorChatId}: applied=${applied} failed=${failed} skippedNotFine=${skippedNotFine}`);
+    return successResponse({ month: params.month, dryRun: false, candidates, skippedNotFine, applied, failed });
+  } catch (err: any) {
+    logger.error("[rental-verify] bulkVerifyFineAction exception:", err);
+    return errorResponse(handleError(err, "bulkVerifyFineAction"));
   }
 }
