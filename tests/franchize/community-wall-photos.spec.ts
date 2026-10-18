@@ -384,7 +384,14 @@ describe("wall-photo-upload route", () => {
     expect(cronRoute).toContain("TIME_BUDGET_MS"); // liveness: partial passes durably
     expect(cronRoute).toContain("purgeFolder"); // remove INSIDE the scan loop
     const vercel = JSON.parse(read("vercel.json"));
-    expect(vercel.crons.some((c: { path: string }) => c.path === "/api/cron/cleanup-wallpix-staging")).toBe(true);
+    // NB task110 (pre-existing red, fixed): task107 removed the staging-purge
+    // cron from vercel.json — Vercel Hobby allows MAX 2 crons and the two
+    // slots belong to /api/fetch-crypto-prices + /api/cron/wall-renter-notify.
+    // The route + janitor script stay (manual / external scheduler can call
+    // it), so pin the DECISION, not the old schedule.
+    expect(vercel.crons.some((c: { path: string }) => c.path === "/api/cron/cleanup-wallpix-staging")).toBe(false);
+    expect(vercel.crons.map((c: { path: string }) => c.path).length).toBeLessThanOrEqual(2);
+    expect(vercel.functions["app/api/cron/cleanup-wallpix-staging/route.ts"].maxDuration).toBe(60);
   });
 
 

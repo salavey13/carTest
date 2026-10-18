@@ -35,7 +35,9 @@ export async function sosCommand(chatId: number, userId: string) {
         .upsert({
             user_id: userId,
             state: 'awaiting_sos_geotag',
-            context: { rental_id: activeRental.rental_id, crew_id: activeRental.vehicle.crew_id }
+            context: { rental_id: activeRental.rental_id, crew_id: activeRental.vehicle.crew_id },
+            // NB task110: set explicitly (see user_states class convention).
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         });
 
     const message = "🚨 *Экстренная Служба VIBE*\n\nПонял, нужна помощь. Чтобы я мог рассчитать стоимость и оповестить экипаж, пожалуйста, отправь свою геолокацию.\n\nИспользуй скрепку (📎) в Telegram и выбери 'Геопозиция'.";

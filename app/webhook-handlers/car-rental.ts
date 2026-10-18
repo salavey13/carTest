@@ -30,7 +30,10 @@ export const carRentalHandler: WebhookHandler = {
             throw new Error(`Failed to create hustle event for rental ${rental_id}: ${eventError?.message}`);
         }
         await supabaseAnon.from('user_states').upsert({
-            user_id: userId, state: 'awaiting_geotag', context: { rental_id: rental_id, event_id: eventData.id }
+            user_id: userId, state: 'awaiting_geotag', context: { rental_id: rental_id, event_id: eventData.id },
+            // NB task110: set explicitly — on-conflict updates would otherwise
+            // inherit a stale default; every user_states writer does this.
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         });
         const renterMessage = `✅ Оплата принята! Теперь, пожалуйста, отправьте свою геолокацию через Telegram (Скрепка -> Геопозиция), чтобы экипаж знал, где забрать транспорт.`;
         await sendComplexMessage(userId, renterMessage, [], { imageQuery: metadata?.image_url });

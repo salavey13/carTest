@@ -213,15 +213,21 @@ export async function handleCommand(update: any) {
                 .like("state", "pending_%");
 
             // Store the selected crew in user_states (using a stable key pattern)
-            await supabaseAdmin
+            // NB task110: NO `updated_at` key — the live user_states table has no
+            // such column (created by 20250721100000_create_user_states_table.sql);
+            // an unknown key makes PostgREST reject the WHOLE upsert silently
+            // (supabase-js returns error without throwing).
+            const { error: crewSelErr } = await supabaseAdmin
                 .from("user_states")
                 .upsert({
                     user_id: userIdStrLocal,
                     state: `crew_selected_${crewSlug}`,
                     context: { selectedCrew: crewSlug, selectedAt: Date.now() },
                     expires_at: pendingExpiryIso(),
-                    updated_at: new Date().toISOString(),
                 }, { onConflict: "user_id" });
+            if (crewSelErr) {
+                logger.warn(`[command-handler] crew_selected upsert failed (${crewSelErr.code}): ${crewSelErr.message}`);
+            }
 
             // Check if there's a pending command to resume
             const currentState = userFlowState || "";

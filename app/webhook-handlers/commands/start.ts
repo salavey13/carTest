@@ -348,6 +348,34 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     }
 
     const question = surveyQuestions.find((q) => q.step === newState.current_step)!;
+
+    // ── Task 110: HUGE «OPEN APP» note before the first question ──
+    // Most new users arrive wanting to RENT / BUY a bike or STORE it for
+    // winter — all of that lives in the Web App, not in this survey. Say it
+    // loudly BEFORE the first question, then continue with the survey.
+    // Decorative: sendComplexMessage never throws (it returns {success:false}
+    // and logs internally), the catch is belt-and-braces for future refactors
+    // — either way the survey must go on.
+    try {
+      const appUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
+      await sendComplexMessage(
+        chatId,
+        [
+          "‼️ *ВНИМАНИЕ* ‼️",
+          "",
+          "*ХОЧЕШЬ АРЕНДОВАТЬ, КУПИТЬ БАЙК*",
+          "*ИЛИ СДАТЬ МОТО НА ЗИМНЕЕ ХРАНЕНИЕ?*",
+          "",
+          "👉 Всё это — В ПРИЛОЖЕНИИ, не в опросе.",
+          "Жми кнопку ниже 👇",
+        ].join("\n"),
+        [[{ text: "🚀 Открыть приложение VIP Bike", url: appUrl }]],
+        { keyboardType: "inline", parseMode: "Markdown" },
+      );
+    } catch (noteErr) {
+      logger.warn("[StartCommand] OPEN APP note failed (non-fatal):", noteErr);
+    }
+
     await sendSurveyQuestion(chatId, question);
   } else {
     // Handle Answer (user is in the middle of a survey)
