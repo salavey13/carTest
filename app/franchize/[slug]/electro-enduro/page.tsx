@@ -6,6 +6,7 @@ import { FranchizeCatalogHero } from "../../components/FranchizeCatalogHero";
 import { ThemeInitializer } from "../../components/ThemeInitializer";
 import { type CatalogItemVM, getFranchizeBySlug } from "../../actions";
 import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "../../lib/theme";
+import { isLegacyDefaultsCrew } from "../../lib/content-blocks";
 import Link from "next/link";
 import { fallbackBikes } from "../configurator/fallback-catalog";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -205,7 +206,10 @@ export default async function ElectroEnduroPage({
         crew={crew}
         activePath={`/franchize/${crew.slug || slug}/electro-enduro`}
         groupLinks={saleItems.map((item) => item.category)}
-      items={hydrated.items} />
+        // N1 (review round 3): feed the FALLBACK-resolved items — the same
+        // array the page body renders — so the rail can never disagree with
+        // the page (the fallback edge case previously zeroed the balloons).
+      items={items} />
       <FranchizeCatalogHero crew={crew} slug={crew.slug || slug} variant="electro-enduro" />
       {accessoryHighlights.length > 0 && (
         <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">
@@ -285,12 +289,16 @@ export default async function ElectroEnduroPage({
                 <li>Отдельный flow: конфигурация → корзина → заказ.</li>
                 <li>Лучше для тех, кто ищет байк в постоянное владение.</li>
               </ul>
-              <Link
-                className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--enduro-accent)] bg-[var(--enduro-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--enduro-accent-text)] transition-all hover:opacity-90 sm:w-auto"
-                href={`/franchize/${crew.slug || slug}/configurator`}
-              >
-                Перейти в конфигуратор
-              </Link>
+              {/* N2 (review round 3): the configurator is a vip-bike product
+                  surface — non-legacy crews get no dead-end CTA here. */}
+              {isLegacyDefaultsCrew(crew.slug || slug) ? (
+                <Link
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-[var(--enduro-accent)] bg-[var(--enduro-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--enduro-accent-text)] transition-all hover:opacity-90 sm:w-auto"
+                  href={`/franchize/${crew.slug || slug}/configurator`}
+                >
+                  Перейти в конфигуратор
+                </Link>
+              ) : null}
             </article>
           </div>
         </div>
