@@ -437,6 +437,21 @@ export function RentalDetailDrawer({
                   {verMeta.label}
                 </span>
               )}
+              {/* Task 114: audit grade — WHY a row is almost/sus (paper-vs-books,
+                  missing odometer, …). Computed at verification request time and
+                  on the backfill; «fine» stays silent to avoid chip noise. */}
+              {ver && ver !== "verified" && rental.verificationAudit?.grade && rental.verificationAudit.grade !== "fine" && (
+                <span
+                  className="rounded-full px-3 py-1 text-[11px] font-medium"
+                  style={{
+                    background: rental.verificationAudit.grade === "sus" ? "#ef44441a" : "#f59e0b1a",
+                    color: rental.verificationAudit.grade === "sus" ? "#ef4444" : "#f59e0b",
+                  }}
+                  title={(rental.verificationAudit.notes || []).join("\n") || "Замечаний нет"}
+                >
+                  {rental.verificationAudit.grade === "sus" ? "🚨 audit: sus" : "👀 audit: почти ок"}
+                </span>
+              )}
               {/* Task 103: owner-tier manual confirm — closes the loop from the
                   analytics page (backfill of pre-feature rentals, dispute
                   resolution after an offline talk). Completed rentals only,
@@ -493,6 +508,22 @@ export function RentalDetailDrawer({
                 )
               )}
             </div>
+
+            {/* Task 114: visible audit notes — the reasons must not hide behind
+                a hover tooltip (Paul reads these on the phone). */}
+            {ver && ver !== "verified" && (rental.verificationAudit?.notes?.length ?? 0) > 0 && (
+              <ul className="mt-2.5 space-y-1 pl-1">
+                {rental.verificationAudit!.notes!.map((n, i) => (
+                  <li
+                    key={i}
+                    className="text-[11px] leading-snug"
+                    style={{ color: rental.verificationAudit?.grade === "sus" ? "#ef4444" : "#f59e0b" }}
+                  >
+                    • {n}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
         <button

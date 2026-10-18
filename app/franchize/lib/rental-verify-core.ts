@@ -57,6 +57,17 @@ export interface RentalVerificationSnapshot {
     returnedByChatId: string | null;
   };
   requestedAtIso: string;
+  /**
+   * Task 114: audit grade frozen with the numbers (task114: auto-audit at
+   * request time; the Aug/Sep/Oct backfill carried the same shape from the
+   * one-off audit script). Optional: rows created before task114 have none.
+   */
+  audit?: {
+    grade: "fine" | "almost" | "sus";
+    notes: string[];
+    checked_at?: string;
+    checker?: string;
+  };
 }
 
 export interface RentalVerificationRow {
@@ -733,6 +744,8 @@ export interface VerificationBrief {
   proposalOpen?: boolean;
   /** Task 106: agreed (corrected) split after an accepted proposal. */
   agreedSplit?: SplitParts | null;
+  /** Task 114: audit grade + notes — WHY a row is almost/sus, for the drawer. */
+  audit?: { grade?: string; notes?: string[] } | null;
 }
 
 /**

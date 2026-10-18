@@ -799,6 +799,7 @@ export async function getRentalsDashboard(input: {
             verificationStatus: verificationMap.get(item.rental_id)?.status ?? null,
             verificationProposalOpen: verificationMap.get(item.rental_id)?.proposalOpen === true,
             verificationAdjusted: !!verificationMap.get(item.rental_id)?.agreedSplit,
+            verificationAudit: verificationMap.get(item.rental_id)?.audit ?? null,
           }));
         } catch (verErr) {
           console.warn("[rentals-dashboard] verification enrich failed (non-fatal):", verErr);

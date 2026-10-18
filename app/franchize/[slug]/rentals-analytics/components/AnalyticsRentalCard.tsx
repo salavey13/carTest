@@ -48,6 +48,14 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
   // Task 106: negotiation variants — an open proposal means the dispute is
   // being actively settled (still needs attention), an agreed split means
   // the verified numbers were CORRECTED through the deal.
+  // Task 114: audit grade surfaces on the chip — 🚨 sus / 👀 almost — so a
+  // scanned month grid already shows WHICH pending rows need real attention.
+  const auditBadge =
+    ver && ver !== "verified" && rental.verificationAudit?.grade === "sus"
+      ? "🚨 "
+      : ver && ver !== "verified" && rental.verificationAudit?.grade === "almost"
+        ? "👀 "
+        : "";
   const verMeta =
     ver === "verified"
       ? (rental.verificationAdjusted
@@ -58,11 +66,11 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
             ? { color: "#f97316", label: "📤 предложение отправлено" }
             : { color: "#ef4444", label: "⚠️ спор сверки" })
         : ver === "operator_confirmed"
-          ? { color: "#f59e0b", label: "⏳ ждёт владельца" }
+          ? { color: "#f59e0b", label: `${auditBadge}⏳ ждёт владельца` }
           : ver === "owner_confirmed"
-            ? { color: "#f59e0b", label: "⏳ ждёт оператора" }
+            ? { color: "#f59e0b", label: `${auditBadge}⏳ ждёт оператора` }
             : ver === "pending"
-              ? { color: "#f59e0b", label: "⏳ сверка" }
+              ? { color: "#f59e0b", label: `${auditBadge}⏳ сверка` }
               : null;
 
   const startDate = rental.agreed_start_date || rental.requested_start_date;

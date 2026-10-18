@@ -35,6 +35,7 @@ import {
   verificationStatusNote,
   type RentalVerificationRow,
 } from "@/app/franchize/lib/rental-verify";
+import { buildAuditStamp, computeRentalAuditGrade } from "@/app/franchize/lib/rental-audit";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 export interface AdminVerifyResult {
@@ -62,9 +63,10 @@ export async function adminVerifyRentalAction(params: {
       .from("rentals")
       .select(`
         rental_id, crew_id, owner_id, total_cost, metadata, status,
+        deposit_amount, deposit_returned,
         created_by_operator_chat_id, created_at,
         requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
-        vehicle:cars(id, make, model, specs, daily_price, type, crew_id)
+        vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result)
       `)
       .eq("rental_id", params.rentalId)
       .maybeSingle();
@@ -171,12 +173,58 @@ async function loadOrCreateVerificationRow(params: {
   }
   if (existing) return { row: existing as RentalVerificationRow, created: false };
 
+  // Task 114: gear/service docs carry no operator bonus — nothing to verify.
+  // Same class the auto-trigger skips (rental-verify.ts); a manual tap on a
+  // service record must not spawn a pending row that would linger forever.
+  const vehicleSkip = Array.isArray(params.rental.vehicle) ? params.rental.vehicle[0] : params.rental.vehicle;
+  const metaSkip = (params.rental.metadata || {}) as Record<string, unknown>;
+  if (metaSkip.item_type === "equipment" || vehicleSkip?.type === "equipment" || vehicleSkip?.type === "service") {
+    throw new Error("Документы услуг и экипировки не требуют сверки — бонуса оператора нет.");
+  }
+
   const nowIso = new Date().toISOString();
   const snapshot = await computeRentalVerificationSnapshot({
     rental: params.rental,
     crewId: params.rental.crew_id,
     requestedAtIso: nowIso,
   });
+
+  // Task 114: audit grade — frozen with the numbers (same as the auto-trigger).
+  try {
+    let artifact: { total_sum?: number | null; deposit_rub?: number | null } | null = null;
+    if (metaSkip.source === "doc_command" && Number(params.rental.total_cost) > 0) {
+      const privateSchema = (supabaseAdmin as unknown as { schema: (s: string) => typeof supabaseAdmin }).schema("private");
+      const { data: art } = await privateSchema
+        .from("rental_contract_artifacts")
+        .select("total_sum, deposit_rub")
+        .eq("rental_id", params.rental.rental_id)
+        .maybeSingle();
+      artifact = art || null;
+    }
+    snapshot.audit = buildAuditStamp(
+      computeRentalAuditGrade({
+        status: params.rental.status,
+        totalCost: params.rental.total_cost,
+        depositAmount: params.rental.deposit_amount,
+        depositReturned: params.rental.deposit_returned,
+        metadata: metaSkip,
+        requestedStartDate: params.rental.requested_start_date,
+        requestedEndDate: params.rental.requested_end_date,
+        agreedStartDate: params.rental.agreed_start_date,
+        agreedEndDate: params.rental.agreed_end_date,
+        createdByOperatorChatId: params.rental.created_by_operator_chat_id,
+        vehicleType: vehicleSkip?.type ?? null,
+        isTestResult: (vehicleSkip as any)?.is_test_result === true,
+        artifact: artifact ? { totalSum: artifact.total_sum, depositRub: artifact.deposit_rub } : null,
+      }),
+      nowIso,
+      "auto-audit-2026-10-19",
+    );
+  } catch (auditErr) {
+    // Non-fatal: an ungraded row only loses the bulk sweep shortcut.
+    logger.warn(`[rental-verify] audit grade failed for ${params.rental.rental_id} (non-fatal):`, auditErr);
+  }
+
   const { data: crewRow } = await supabaseAdmin
     .from("crews")
     .select("slug")
@@ -257,9 +305,10 @@ export async function resendVerificationDmsAction(params: {
       .from("rentals")
       .select(`
         rental_id, crew_id, owner_id, total_cost, metadata, status,
+        deposit_amount, deposit_returned,
         created_by_operator_chat_id, created_at,
         requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
-        vehicle:cars(id, make, model, specs, daily_price, type, crew_id)
+        vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result)
       `)
       .eq("rental_id", params.rentalId)
       .maybeSingle();

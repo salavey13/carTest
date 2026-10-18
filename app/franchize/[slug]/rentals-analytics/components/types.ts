@@ -71,6 +71,9 @@ export interface AnalyticsRentalRow {
   verificationProposalOpen?: boolean;
   /** Task 106: the row was verified with a NEGOTIATED (corrected) split. */
   verificationAdjusted?: boolean;
+  /** Task 114: audit grade + notes from snapshot.audit — WHY a row is
+   *  almost/sus (paper-vs-books, missing odometer, …). null = not graded. */
+  verificationAudit?: { grade?: string; notes?: string[] } | null;
 }
 
 export interface AnalyticsSaleRow {
