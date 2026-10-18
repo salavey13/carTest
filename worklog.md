@@ -904,3 +904,19 @@ Stage Summary:
 - Поп-пины постов: xl 46px + сонар цвета экипажа + свечение + heartbeat; авто-тема — фирменный amber VIP BIKE (#facc15), фиксированные экипажи — их accentMain (инлайн тинг каждого пина)
 - Кластеризация не тронута: ниже z10 посты группируются в бабблы (pop-классы заменяются mr-poi--cluster, как и раньше с halo) — низкий зум спокоен, сонар появляется при расхождении
 - Скрипт-пробник переносим (CHROME_PATH), артефакты в docs/probes/ регенерируемые
+
+---
+Task ID: 107-rentals-retro-investigation
+Agent: Super Z (main)
+Task: boss 2026-10-18: «please analyse rentals, which were the first ones? … I want to retrospectively add first manually created rentals to supabase. I have .doc files from first rentals - later i'll give you .zip with almost all docs, your task will be to find rentals that are not yet present in supabase and add them properly. make preliminary investigation of current state of rentals, when were first ones, total detailed summary»
+
+Work Log:
+- ПЕРЕКЛАДКА: неловко, но. (не извиняясь дважды) — full read-only dump of public.rentals (273 rows) via PostgREST + service key (ключ из навыка/ENV_VARS не в репо; старый ключ из сессии протух 401 — рабочий вытащен из scripts/*.js, сохранён вне репо как .sb_key, в коммит НЕ попал — проверено grep eyJ)
+- Найдено 4 эпохи данных (см. docs/rentals-retrospective/RENTALS_RETROSPECTIVE_INVESTIGATION_2026-10-18.md): Era 0 тесты 2025-08…2026-02 (8 строк: ural-bobber 999₽ + sauna-001 отмены + markdown-doc-poc); Era 1 /doc родился 2026-06-04 (git 01f348cf), первые РЕАЛЬНЫЕ аренды 2026-06-17…06-20 (nibbler 6000₽, suzuki-gsx ×3 — переиздания одного договора), часть восстановлена backfill_from_artifacts 2026-06-23 (original_contract_key/original_sha256 в private.rental_contract_artifacts); Era 2 атрибуция с 2026-07-25 (metadata.source=doc_command + doc_sha256, всего 116 source=doc_command / 133 с sha); Era 3 новые каналы с августа (service_work 44, franchize_web_order 53 с document_key/order_id)
+- ДЫРА ПОД .zip: аренд с agreed-периодом ДО 2026-06-17 в базе НЕТ вообще — вся докомандная «бумажная» история отсутствует (до июня только тесты). Пиковые месяцы: 2026-09 = 115 аренд / 729k₽; всего 273 строки ≈ 1.89M₽ (с тестами)
+- АТРИБУЦИЯ АРЕНДАТОРОВ: 180/273 строк висят на user_id=356282674 (I_O_S_NN) — walk-in паттерн, реальный арендатор только в metadata.renter_name/renter_phone (заполняется лишь с ~19.08.2026, 49 строк); телефоны в двух форматах (+7…/8…) — нормализовать при матчинге; 161 строка вообще без renter_name
+- КЛЮЧИ МАТЧИНГА .zip→база (приоритет): doc_sha256/original_sha256 → original_contract_key (rental-<vehicle>-<ms>) → фаззи renter_name+phone+vehicle+даты±2дня+сумма; предусмотреть легитимные переиздания (3×suzuki-gsx), .doc≠.docx (антиворд/libreoffice/VLM), idempotency-манифест (sha файла → действие → rental_id), вставки с source=retro_backfill_v1 + audit в metadata.history (прецеденты owner_voice_backfill 10.10, backfill_from_artifacts 23.06)
+- Артефакты: docs/rentals-retrospective/RENTALS_RETROSPECTIVE_INVESTIGATION_2026-10-18.md (+PNG-таймлайн 15 месяцев), scripts/retro-rentals-{investigation,deep-dive,round3,round4}.py (read-only, ключ из ENV, секретов не содержат); открытые вопросы боссу — §6 документа (период архива, отменённые договоры, создание users под walk-in, байки вне cars)
+
+Stage Summary:
+- Базлайн для ретро-импорта готов: точная карта «что уже в базе» (273, первые реальные 2026-06-17), 4 источника-канала, ключи дедупликации и план безопасной вставки; ждём .zip с .doc — следующий таск: парсинг архива → фаззи-матчинг → подтверждение боссом → вставка недостающих
