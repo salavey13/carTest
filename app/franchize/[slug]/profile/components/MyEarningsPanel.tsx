@@ -22,6 +22,11 @@ import { getMyEarnings, getMyPayoutHistory } from "@/app/franchize/server-action
 import { sendSalaryReportTelegramAction } from "@/app/franchize/server-actions/salary-report";
 // Task 101: manual «verified» stamp for the owner (backfill of closed rentals).
 import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";
+// Task 107: verified-payout counters (✅ к выплате / ⏳ не сверено / 🏦 выплачено)
+// — the same buckets the Telegram payout hub (/payouts) shows. The hub is the
+// write surface (mark paid out); the web strip is read-only truth.
+import { getMyPayoutSummaryAction } from "@/app/franchize/server-actions/rental-payout-actions";
+import { buildStartLink } from "@/app/franchize/lib/onboarding/payload-parser";
 import { formatCurrency, itemVariants, type CrewTokens } from "./profile-shared";
 
 type PeriodEarnings = {
@@ -71,6 +76,17 @@ type LegacyEarnings = {
   currentPlan: { accrued: number; balanceDue: number; nextPayoutDate: string | null };
   recentCommissions: Array<{ amount: number; date: string; description: string }>;
 };
+
+// Task 107: verified-payout buckets (operator-commission money).
+type PayoutSummaryView = {
+  toPay: { sum: number; count: number };
+  unverified: { sum: number; count: number };
+  paid: { sum: number; count: number };
+  payoutColumnMissing: boolean;
+};
+
+/** Deep link into the Telegram payout hub (mark / convert happens there). */
+const PAYOUT_TG_LINK = buildStartLink("payout");
 
 // iter32: the member's own payout ledger — «когда и сколько выплачено».
 type PayoutHistory = {
@@ -123,6 +139,11 @@ export function MyEarningsPanel({
   // Task 101: optimistic per-rental verify stamps (admin tap-to-verify).
   const [verifyingIds, setVerifyingIds] = useState<Set<string>>(new Set());
   const [verifiedOverrides, setVerifiedOverrides] = useState<Record<string, true>>({});
+
+  // Task 107: verified-payout counters for this member (operator-commission
+  // money inside THIS crew). Hidden until at least one сверка carries money —
+  // pre-feature crews see zero new UI (the task-101 lesson).
+  const [payoutSummary, setPayoutSummary] = useState<PayoutSummaryView | null>(null);
 
   // Task 77: TG salary report delivery state (self-service — the action
   // enforces owner-or-self server-side; here it is always self).
@@ -293,6 +314,12 @@ export function MyEarningsPanel({
         if (!cancelled && res.success && res.data) setPayoutHistory(res.data);
       })
       .catch(() => undefined);
+    // Task 107: payout counters degrade silently (no сверка data → strip hidden).
+    getMyPayoutSummaryAction({ slug })
+      .then((res) => {
+        if (!cancelled && res.success && res.data) setPayoutSummary(res.data);
+      })
+      .catch(() => undefined);
     void fetchPeriodEarnings();
     return () => {
       cancelled = true;
@@ -306,6 +333,59 @@ export function MyEarningsPanel({
         <h2 className="flex items-center gap-2 text-base font-semibold" style={{ color: T.text }}>
           <Wallet className="h-4 w-4" /> Мои доходы
         </h2>
+
+        {/* Task 107: verified-payout counters — live money truth from the
+            verification flow. Hidden until at least one сверка exists, and
+            hidden for pre-feature crews (payoutColumnMissing degrades to
+            unpaid defaults, so the strip stays correct either way). */}
+        {payoutSummary &&
+         payoutSummary.toPay.count + payoutSummary.unverified.count + payoutSummary.paid.count > 0 ? (
+          <div className="mt-3 rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold" style={{ color: T.textMuted }}>
+                💰 Выплаты по сверкам
+                {payoutSummary.payoutColumnMissing ? " (выплата отмечается в Telegram)" : ""}
+              </p>
+              <a
+                href={PAYOUT_TG_LINK}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                  color: T.accent,
+                  border: `1px solid ${T.borderSoft}`,
+                }}
+              >
+                <Send className="h-3 w-3" />
+                Хаб выплат
+              </a>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>✅ К выплате</p>
+                <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                  {formatCurrency(payoutSummary.toPay.sum)}
+                </p>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>{payoutSummary.toPay.count} ар.</p>
+              </div>
+              <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>⏳ Не сверено</p>
+                <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                  {formatCurrency(payoutSummary.unverified.sum)}
+                </p>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>{payoutSummary.unverified.count} ар.</p>
+              </div>
+              <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>🏦 Выплачено</p>
+                <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                  {formatCurrency(payoutSummary.paid.sum)}
+                </p>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>{payoutSummary.paid.count} ар.</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Period selector */}
         <div className="mt-3 rounded-lg border p-3" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>

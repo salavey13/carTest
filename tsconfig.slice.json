@@ -4,10 +4,14 @@
     "app/webhook-handlers/commands/doc-manual.ts",
     "app/webhook-handlers/commands/command-handler.ts",
     "app/webhook-handlers/commands/rental-verify.ts",
+    "app/webhook-handlers/commands/rental-payout.ts",
     "app/franchize/lib/rental-verify.ts",
     "app/franchize/lib/rental-verify-core.ts",
+    "app/franchize/lib/rental-payout.ts",
+    "app/franchize/lib/rental-payout-core.ts",
     "app/franchize/lib/salary-category-bonuses.ts",
     "app/franchize/server-actions/rental-verify-actions.ts",
+    "app/franchize/server-actions/rental-payout-actions.ts",
     "app/franchize/server-actions/rentals-dashboard.ts",
     "app/franchize/[slug]/profile/components/MyEarningsPanel.tsx",
     "app/franchize/[slug]/rentals-analytics/AnalyticsClientV2.tsx",
@@ -20,6 +24,7 @@
     "tests/franchize/task103-verify-analytics.spec.ts",
     "tests/franchize/task105-verify-trigger.spec.ts",
     "tests/franchize/task106-verify-negotiation.spec.ts",
+    "tests/franchize/task107-payout.spec.ts",
     "lib/csv-builders/rentals-csv.ts"
   ]
 }

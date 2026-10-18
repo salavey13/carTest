@@ -27,6 +27,7 @@ import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 import { ekipCommand, handleEkipText, handleEkipCallback } from "./ekip-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
 import { handleRentalVerifyCallbackCommand, handleRentalVerifyProposalCallbackCommand, handleRentalVerifyTextCommand } from "./rental-verify";
+import { handleRentalPayoutCallbackCommand, handlePayoutsCommand, isPayoutStartPayload } from "./rental-payout";
 import { analyticsPassCommand } from "./analytics_pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
 import { sampleCommand } from "./sample";
@@ -126,6 +127,21 @@ export async function handleCommand(update: any) {
                     callbackQueryId: update.callback_query.id,
                     messageId: update.callback_query?.message?.message_id,
                 });
+            if (handled) return;
+        }
+
+        // Task 107: `payo_*` routes the VERIFIED PAYOUT flow (hub / card /
+        // mark / undo / mark-all). Prefix is unique — `pay_` (without the o)
+        // stays with the /doc payment-split callbacks; `payo_` must be checked
+        // BEFORE the broad /doc router below for symmetry with `vrf_`.
+        if (update.callback_query && text.startsWith("payo_")) {
+            const handled = await handleRentalPayoutCallbackCommand({
+                userIdStr,
+                chatId,
+                text,
+                callbackQueryId: update.callback_query.id,
+                messageId: update.callback_query?.message?.message_id,
+            });
             if (handled) return;
         }
 
@@ -266,7 +282,18 @@ export async function handleCommand(update: any) {
         }
 
         const commandMap: { [key: string]: Function } = {
-            "/start": () => startCommand(chatId, userId, update.message?.from || update.callback_query?.from, text),
+            "/start": () => {
+                // Task 107: deep links (t.me/<bot>?start=payout) open the payout
+                // hub instead of the onboarding survey — the survey parser would
+                // treat the payload as bare /start and reset onboarding state.
+                if (isPayoutStartPayload(text)) {
+                    return handlePayoutsCommand({ userIdStr, chatId });
+                }
+                return startCommand(chatId, userId, update.message?.from || update.callback_query?.from, text);
+            },
+            "/payouts": () => handlePayoutsCommand({ userIdStr, chatId }),
+            "/payout": () => handlePayoutsCommand({ userIdStr, chatId }),
+            "/выплаты": () => handlePayoutsCommand({ userIdStr, chatId }),
             "/help": () => helpCommand(chatId, userId),
             "/shift": () => shiftCommand(chatId, userIdStr, username),
             "/actions": () => actionsCommand(chatId, userIdStr),
@@ -490,7 +517,9 @@ export async function handleCommand(update: any) {
             || (command.startsWith("/doc@") ? commandMap["/doc"] : undefined)
             || (command.startsWith("/ekip@") ? commandMap["/ekip"] : undefined)
             || (command.startsWith("/subrent@") ? commandMap["/subrent"] : undefined)
-            || (command.startsWith("/testdrive@") ? commandMap["/testdrive"] : undefined);
+            || (command.startsWith("/testdrive@") ? commandMap["/testdrive"] : undefined)
+            || (command.startsWith("/payouts@") ? commandMap["/payouts"] : undefined)
+            || (command.startsWith("/payout@") ? commandMap["/payout"] : undefined);
 
         if (commandFunction) {
             logger.info(`[Command Handler] Executing command: ${command}`);

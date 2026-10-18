@@ -228,7 +228,7 @@ export async function computeRentalVerificationSnapshot(params: {
 // ── Graceful table access ────────────────────────────────────────────────────
 
 /** True when the failure is «Paul hasn't applied the SQL yet» — feature no-ops. */
-function isMissingRelationError(error: { message?: string; code?: string } | null | undefined): boolean {
+export function isMissingRelationError(error: { message?: string; code?: string } | null | undefined): boolean {
   if (!error) return false;
   if (error.code === "42P01") return true; // undefined_table
   return /relation .* does not exist|schema cache/i.test(error.message || "");
@@ -440,7 +440,7 @@ export async function requestRentalVerification(params: {
 
 // ── Callback handling (Telegram buttons) ─────────────────────────────────────
 
-async function answerCallback(callbackQueryId: string, text: string): Promise<void> {
+export async function answerCallback(callbackQueryId: string, text: string): Promise<void> {
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) return;
@@ -605,9 +605,12 @@ export async function handleRentalVerifyCallback(params: {
             acceptorLabel: labelFromUsersMap(usersMap, agreedNego.agreed.acceptedBy),
           })
         : doneText;
+      // Task 107: every «verified» DM now carries the payout-hub entry —
+      // the money game continues after the confirm (see the payout counter).
+      const payoutDoneKb = [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]];
       for (const chatId of [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])]) {
         try {
-          await sendComplexMessage(chatId, doneFinal, [], { parseMode: "HTML" });
+          await sendComplexMessage(chatId, doneFinal, payoutDoneKb, { parseMode: "HTML", keyboardType: "inline" });
         } catch {
           /* non-fatal */
         }
@@ -673,7 +676,7 @@ export async function handleRentalVerifyCallback(params: {
 // negotiation jsonb only carries the DRAFT / OPEN proposal / AGREED split.
 
 /** True editMessageText (the shared editMessage deletes+resends — flickers). */
-async function editTelegramMessageText(
+export async function editTelegramMessageText(
   chatId: string | number,
   messageId: number,
   text: string,
@@ -1018,7 +1021,10 @@ export async function handleRentalVerifyProposalCallback(params: {
           });
           for (const c of [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])]) {
             try {
-              await sendComplexMessage(c, done, [], { parseMode: "HTML" });
+              await sendComplexMessage(c, done, [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]], {
+                parseMode: "HTML",
+                keyboardType: "inline",
+              });
             } catch {
               /* non-fatal */
             }
