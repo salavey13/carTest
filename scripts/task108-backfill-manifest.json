@@ -1,0 +1,58 @@
+{
+ "applied_at": "2026-10-18T15:20:14.095+00:00",
+ "source": "xlsx Аренда sheet v1",
+ "inserted": [
+  {
+   "tag": "arrenda-row3",
+   "rental_id": "6e87f332-26ac-4f89-9d70-91b204cc6891",
+   "total_cost": 10000
+  },
+  {
+   "tag": "arrenda-row4",
+   "rental_id": "2d203a20-4a8b-4ce3-a804-952fda4915fb",
+   "total_cost": 10000
+  },
+  {
+   "tag": "arrenda-row5",
+   "rental_id": "30d18929-7a37-42f2-9c9f-266ce3fed980",
+   "total_cost": 10000
+  },
+  {
+   "tag": "arrenda-row12",
+   "rental_id": "a1846383-67d4-499a-9665-8d0ce58c4ad8",
+   "total_cost": 6000
+  },
+  {
+   "tag": "arrenda-row13",
+   "rental_id": "6adc56df-72ec-4962-a1a2-8adf84aeca45",
+   "total_cost": 10000
+  }
+ ],
+ "skipped": [
+  {
+   "tag": "arrenda-row1",
+   "desc": "«Zero» — Платонов Данил — 2 дн + дефект + экип — 30 000 ₽",
+   "why": "нет даты в xlsx"
+  },
+  {
+   "tag": "arrenda-row2",
+   "desc": "Зелёный Хорвин — Коля «наш Бог» — 2 часа — 2 000 ₽",
+   "why": "нет даты; Хорвина нет в арендном парке базы (партнёрский?)"
+  },
+  {
+   "tag": "arrenda-row10",
+   "desc": "Кава зелёная — слава — 4 000 ₽ — «в счёт работ»",
+   "why": "бартер, нет даты"
+  },
+  {
+   "tag": "arrenda-row11",
+   "desc": "Кава зелёная — Борский — 2 суток — 19 000 ₽ — залог 20 000/возврат 18 500 (разбил Вайвольт)",
+   "why": "нет даты"
+  },
+  {
+   "tag": "arrenda-row15",
+   "desc": "Кава зелёная — 1.5 дня — без клиента и суммы",
+   "why": "нет данных"
+  }
+ ]
+}

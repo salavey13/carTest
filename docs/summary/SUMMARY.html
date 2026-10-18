@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Статистика VIP BIKE 2026 — SUMMARY</title>
+<style>
+:root{--bg:#0b1220;--card:#111a2e;--card2:#0e1626;--ink:#e6ecf7;--dim:#8fa0bd;--line:#1f2b45;
+--blue:#3b82f6;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--violet:#8b5cf6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 'Segoe UI',system-ui,Arial,sans-serif;padding:26px 18px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:26px;letter-spacing:.3px} h1 b{color:var(--amber)}
+.sub{color:var(--dim);margin:6px 0 20px;font-size:13.5px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 26px}
+nav a{color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);padding:7px 14px;border-radius:20px;font-size:13.5px}
+nav a:hover{border-color:var(--blue)}
+section{margin:0 0 34px}
+h2{font-size:19px;margin:0 0 14px;padding-left:11px;border-left:4px solid var(--blue)}
+h2.sales{border-color:var(--green)} h2.exp{border-color:var(--amber)} h2.tot{border-color:var(--violet)}
+.grid{display:grid;gap:12px}
+.g5{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi-l{color:var(--dim);font-size:12.5px;text-transform:uppercase;letter-spacing:.6px}
+.kpi-v{font-size:23px;font-weight:700;margin-top:3px} .kpi-s{color:var(--dim);font-size:12px;margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h3{font-size:14.5px;color:var(--dim);font-weight:600;margin-bottom:10px}
+.chart{width:100%;height:auto} .cl{fill:var(--dim);font-size:11.5px} .cv{fill:var(--ink);font-size:11.5px;font-weight:600}
+.cvbig{fill:var(--ink);font-size:15px;font-weight:700}
+.donut-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.donut{width:180px;height:180px;flex:none} .legend .lg{font-size:13px;margin:3px 0}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--dim);text-align:left;font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:hover td{background:#16203a} .lt{max-width:320px} .dim{color:var(--dim);font-size:12px}
+.pos{color:var(--green);font-weight:600} .neg{color:var(--red);font-weight:600}
+.ph{background:#3a2c07;color:var(--amber);border:1px dashed var(--amber);padding:1px 8px;border-radius:10px;font-size:12px;white-space:nowrap}
+.note{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--dim);font-size:13px;margin-top:12px}
+.note b{color:var(--ink)}
+.flag{display:inline-block;background:#1e2a4a;color:#93c5fd;border-radius:8px;padding:1px 8px;font-size:11.5px;margin-left:6px}
+.ledger td:first-child{color:var(--dim)}
+.ledger .sum td{font-weight:700;border-top:2px solid var(--line);font-size:14px}
+.big-total{background:linear-gradient(135deg,#1a2440,#101a30);border:1px solid #2a3a63;border-radius:16px;padding:18px;text-align:center}
+.big-total .v{font-size:30px;font-weight:800;color:var(--amber)}
+footer{color:var(--dim);font-size:12px;margin-top:40px;border-top:1px solid var(--line);padding-top:14px}
+.steps{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.step{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;color:var(--dim)}
+.step b{color:var(--ink)}
+@media print {body{background:#fff;color:#000} .card,.kpi{border-color:#ccc;background:#fff} }
+</style></head><body><div class="wrap">
+
+<h1>СТАТИСТИКА <b>VIP BIKE</b> · сезон 2026</h1>
+<div class="sub">май — октябрь 2026 · собрано 18.10.2026 · до дедлайна 25.10.2026 · <b>версия v0.1 (итерация 1)</b>
+· <span class="flag">амбер-плашки = ждём данные</span></div>
+
+<nav>
+<a href="#rent">📍 Аренда</a><a href="#sales">💰 Продажи</a><a href="#exp">🧾 Расходы</a>
+<a href="#tot">🧮 Итог ±</a><a href="#next">🗺️ Дальше</a>
+</nav>
+
+<section id="rent">
+<h2>1 · АРЕНДА — все аренды через бота, май → октябрь</h2>
+<div class="grid g5">
+<div class="kpi "><div class="kpi-l">Аренд байков</div><div class="kpi-v">186</div><div class="kpi-s">на 1 834 732 ₽</div></div>
+<div class="kpi "><div class="kpi-l">Средний чек</div><div class="kpi-v">9 864 ₽</div><div class="kpi-s">за аренду байка</div></div>
+<div class="kpi "><div class="kpi-l">Экипировка</div><div class="kpi-v">43 аренд</div><div class="kpi-s">на 11 500 ₽ + 4 000 ₽ вручную</div></div>
+<div class="kpi "><div class="kpi-l">Залоги собрано</div><div class="kpi-v">1 683 000 ₽</div><div class="kpi-s">по строкам с залогом</div></div>
+<div class="kpi "><div class="kpi-l">Сервис/работы</div><div class="kpi-v">44 нарядов</div><div class="kpi-s">на 27 735 ₽ (вкл. manual 7 000)</div></div>
+</div>
+
+<div class="grid g2" style="margin-top:12px">
+<div class="card"><h3>Аренды по месяцам (шт)</h3><svg viewBox="0 0 560 190" class="chart"><rect x="27.1" y="148.2" width="55.8" height="7.8" rx="5" fill="#2563eb"/><text x="55.0" y="142.2" text-anchor="middle" class="cv">4</text><text x="55.0" y="174" text-anchor="middle" class="cl">май</text><rect x="117.1" y="142.4" width="55.8" height="13.6" rx="5" fill="#2563eb"/><text x="145.0" y="136.4" text-anchor="middle" class="cv">7</text><text x="145.0" y="174" text-anchor="middle" class="cl">июнь</text><rect x="207.1" y="91.9" width="55.8" height="64.1" rx="5" fill="#2563eb"/><text x="235.0" y="85.9" text-anchor="middle" class="cv">33</text><text x="235.0" y="174" text-anchor="middle" class="cl">июль</text><rect x="297.1" y="64.7" width="55.8" height="91.3" rx="5" fill="#2563eb"/><text x="325.0" y="58.7" text-anchor="middle" class="cv">47</text><text x="325.0" y="174" text-anchor="middle" class="cl">август</text><rect x="387.1" y="22.0" width="55.8" height="134.0" rx="5" fill="#2563eb"/><text x="415.0" y="16.0" text-anchor="middle" class="cv">69</text><text x="415.0" y="174" text-anchor="middle" class="cl">сентябрь</text><rect x="477.1" y="105.5" width="55.8" height="50.5" rx="5" fill="#2563eb"/><text x="505.0" y="99.5" text-anchor="middle" class="cv">26</text><text x="505.0" y="174" text-anchor="middle" class="cl">октябрь*</text></svg></div>
+<div class="card"><h3>Выручка по месяцам, тыс ₽</h3><svg viewBox="0 0 560 190" class="chart"><rect x="27.1" y="149.1" width="55.8" height="6.9" rx="5" fill="#059669"/><text x="55.0" y="143.1" text-anchor="middle" class="cv">36k</text><text x="55.0" y="174" text-anchor="middle" class="cl">май</text><rect x="117.1" y="151.4" width="55.8" height="4.6" rx="5" fill="#059669"/><text x="145.0" y="145.4" text-anchor="middle" class="cv">24k</text><text x="145.0" y="174" text-anchor="middle" class="cl">июнь</text><rect x="207.1" y="80.8" width="55.8" height="75.2" rx="5" fill="#059669"/><text x="235.0" y="74.8" text-anchor="middle" class="cv">393k</text><text x="235.0" y="174" text-anchor="middle" class="cl">июль</text><rect x="297.1" y="87.1" width="55.8" height="68.9" rx="5" fill="#059669"/><text x="325.0" y="81.1" text-anchor="middle" class="cv">360k</text><text x="325.0" y="174" text-anchor="middle" class="cl">август</text><rect x="387.1" y="22.0" width="55.8" height="134.0" rx="5" fill="#059669"/><text x="415.0" y="16.0" text-anchor="middle" class="cv">701k</text><text x="415.0" y="174" text-anchor="middle" class="cl">сентябрь</text><rect x="477.1" y="94.6" width="55.8" height="61.4" rx="5" fill="#059669"/><text x="505.0" y="88.6" text-anchor="middle" class="cv">321k</text><text x="505.0" y="174" text-anchor="middle" class="cl">октябрь*</text></svg></div>
+</div>
+
+<div class="card" style="margin-top:12px"><h3>Сколько заработал каждый байк</h3><svg viewBox="0 0 560 406" class="chart"><text x="182" y="15.84" text-anchor="end" class="cl">Kawasaki EX650K (Ninja 650</text><rect x="190" y="0" width="220.0" height="22" rx="4" fill="#2563eb"/><text x="416.0" y="15.84" class="cv">234 500 ₽ · 25 шт</text><text x="182" y="44.84" text-anchor="end" class="cl">BMW F800R</text><rect x="190" y="29" width="170.1" height="22" rx="4" fill="#2563eb"/><text x="366.1" y="44.84" class="cv">181 300 ₽ · 19 шт</text><text x="182" y="73.84" text-anchor="end" class="cl">Aprilia Shiver 750</text><rect x="190" y="58" width="147.9" height="22" rx="4" fill="#2563eb"/><text x="343.9" y="73.84" class="cv">157 600 ₽ · 12 шт</text><text x="182" y="102.84" text-anchor="end" class="cl">Ducati Panigale S Electro </text><rect x="190" y="87" width="147.0" height="22" rx="4" fill="#2563eb"/><text x="343.0" y="102.84" class="cv">156 719 ₽ · 20 шт</text><text x="182" y="131.84" text-anchor="end" class="cl">BENDA LFC700</text><rect x="190" y="116" width="128.5" height="22" rx="4" fill="#2563eb"/><text x="324.5" y="131.84" class="cv">137 000 ₽ · 2 шт</text><text x="182" y="160.84" text-anchor="end" class="cl">Yamaha R7</text><rect x="190" y="145" width="116.5" height="22" rx="4" fill="#2563eb"/><text x="312.5" y="160.84" class="cv">124 150 ₽ · 8 шт</text><text x="182" y="189.84" text-anchor="end" class="cl">Yamaha R6</text><rect x="190" y="174" width="94.8" height="22" rx="4" fill="#2563eb"/><text x="290.8" y="189.84" class="cv">101 000 ₽ · 7 шт</text><text x="182" y="218.84" text-anchor="end" class="cl">Sequence Zero</text><rect x="190" y="203" width="94.1" height="22" rx="4" fill="#2563eb"/><text x="290.1" y="218.84" class="cv">100 333 ₽ · 8 шт</text><text x="182" y="247.84" text-anchor="end" class="cl">Ducati Panigale S Electro </text><rect x="190" y="232" width="83.7" height="22" rx="4" fill="#2563eb"/><text x="279.7" y="247.84" class="cv">89 250 ₽ · 10 шт</text><text x="182" y="276.84" text-anchor="end" class="cl">Honda CBR600RR</text><rect x="190" y="261" width="75.8" height="22" rx="4" fill="#2563eb"/><text x="271.8" y="276.84" class="cv">80 750 ₽ · 8 шт</text><text x="182" y="305.84" text-anchor="end" class="cl">Suzuki M109R 1800 Boulevar</text><rect x="190" y="290" width="74.2" height="22" rx="4" fill="#2563eb"/><text x="270.2" y="305.84" class="cv">79 100 ₽ · 8 шт</text><text x="182" y="334.84" text-anchor="end" class="cl">Regulmoto Nibbler 300 4V</text><rect x="190" y="319" width="67.3" height="22" rx="4" fill="#2563eb"/><text x="263.3" y="334.84" class="cv">71 703 ₽ · 11 шт</text><text x="182" y="363.84" text-anchor="end" class="cl">Ducati 1199 Panigale</text><rect x="190" y="348" width="54.4" height="22" rx="4" fill="#2563eb"/><text x="250.4" y="363.84" class="cv">58 000 ₽ · 4 шт</text><text x="182" y="392.84" text-anchor="end" class="cl">Suzuki GSX-S1000F</text><rect x="190" y="377" width="38.5" height="22" rx="4" fill="#2563eb"/><text x="234.5" y="392.84" class="cv">41 008 ₽ · 7 шт</text></svg></div>
+
+<table style="margin-top:12px">
+<tr><th>Месяц</th><th>Аренд байков</th><th>Выручка</th><th>Экип (вручную)</th></tr>
+<tr><td>май</td><td>4</td><td>36 000 ₽</td><td>—</td></tr><tr><td>июнь</td><td>7</td><td>24 000 ₽</td><td>4 000 ₽</td></tr><tr><td>июль</td><td>33</td><td>393 141 ₽</td><td>—</td></tr><tr><td>август</td><td>47</td><td>360 153 ₽</td><td>—</td></tr><tr><td>сентябрь</td><td>69</td><td>700 588 ₽</td><td>—</td></tr><tr><td>октябрь*</td><td>26</td><td>320 850 ₽</td><td>—</td></tr>
+<tr><th>Итого</th><th>186</th><th>1 834 732 ₽</th><th>4 000 ₽</th></tr>
+</table>
+
+<div class="grid g2" style="margin-top:12px">
+<div class="card"><h3>Партнёрские байки 50/50 <span class="flag">требует подтверждения</span></h3>
+  <p style="font-size:13.5px">В закупе под аренду (4,113,000 ₽) нет «Zero», «Кава зелёная» и «Хорвин» — похоже, это партнёрские байки.
+  Если так, их выручка делится 50/50:</p>
+  <div class="big-total" style="margin-top:10px"><div class="v">334 833 ₽</div>
+  <div class="sub">Zero + Кава зелёная · 33 аренд → компании ~167 416 ₽</div></div>
+  <p class="dim" style="font-size:12px;margin-top:8px">Подтвердите список партнёрских байков — пересчитаю.</p></div>
+<div class="card"><h3>Расходы по аренде</h3>
+  <table><tr><th>Статья</th><th>Сумма</th></tr>
+  <tr><td>Бензин</td><td><span class="ph">примерно?</span></td></tr>
+  <tr><td>Масла / расходники</td><td><span class="ph">примерно?</span></td></tr>
+  <tr><td>Мойка / мелкий ремонт в сезон</td><td><span class="ph">?</span></td></tr>
+  <tr><td>Ремонт после «падальщиков»</td><td><span class="ph">?</span></td></tr></table>
+  <p class="dim" style="font-size:12px;margin-top:8px">В боте расходы не фиксируются (только одометры). Назовите прикидку — внесу.</p></div>
+</div>
+
+<div class="card" style="margin-top:12px"><h3>Майский ручной период — статус загрузки</h3>
+<p style="font-size:13.5px;margin-bottom:8px">✅ В базу добавлены 5 аренд мая—начала июня (46 000 ₽ + 4 000 ₽ экип): Коняхин (Ducati, 04.05), Zero (04.05, без ФИО), Ульви Мамед (Zero, 06.05), Забалдин (Кава, 30.05, залог 20 000), Шаронов (Кава, 05.06 + экип 4 000).</p>
+<p style="font-size:13.5px;margin-bottom:4px">⏳ Ожидают даты из архива договоров (.zip не загрузился — пришлите ещё раз):</p>
+<table><tr><th>Байк</th><th>Клиент</th><th>Срок</th><th>Сумма</th><th>Почему ждём</th></tr><tr><td class="lt">Мотоцикл «Zero»</td><td>Платонов Данил</td><td>2 дн + дефект + экип</td><td>30 000 ₽</td><td class="dim">нет даты</td></tr><tr><td class="lt">Мотоцикл Зеленый Хорвин</td><td>Коля «наш Бог»</td><td>2 часа</td><td>2 000 ₽</td><td class="dim">нет даты</td></tr><tr><td class="lt">Кава зелёная</td><td>слава</td><td>—</td><td>4 000 ₽</td><td class="dim">бартер</td></tr><tr><td class="lt">Кава зелёная</td><td>Борский</td><td>2 суток</td><td>19 000 ₽</td><td class="dim">возврат залога 18 500; «из Гереных разбил Вайвольт»</td></tr><tr><td class="lt">Кава зелёная</td><td>—</td><td>1.5 дня</td><td>—</td><td class="dim">нет даты</td></tr></table></div>
+</section>
+
+<section id="sales">
+<h2 class="sales">2 · ПРОДАЖИ — закуп → реализация → прибыль</h2>
+<div class="grid g5">
+<div class="kpi "><div class="kpi-l">Закуп под продажу</div><div class="kpi-v">16 612 515 ₽</div><div class="kpi-s">68 мото в учёте</div></div>
+<div class="kpi "><div class="kpi-l">Выручка (реализация)</div><div class="kpi-v">17 793 800 ₽</div><div class="kpi-s">сумма продаж</div></div>
+<div class="kpi kpi-win"><div class="kpi-l">Прибыль с продаж</div><div class="kpi-v">3 995 460 ₽</div><div class="kpi-s">по столбцу «Прибыль»</div></div>
+<div class="kpi "><div class="kpi-l">Остаток: салон/склад</div><div class="kpi-v">3 125 900 ₽</div><div class="kpi-s">наша техника, на 29.09</div></div>
+<div class="kpi "><div class="kpi-l">Остаток: партнёрская</div><div class="kpi-v">1 483 000 ₽</div><div class="kpi-s">инвесторы, на 29.09</div></div>
+</div>
+
+<div class="grid g2" style="margin-top:12px">
+<div class="card"><h3>Структура остатков техники</h3><div class="donut-wrap"><svg viewBox="0 0 190 190" class="donut"><circle cx="95.0" cy="95.0" r="81.0" fill="none" stroke="#2563eb" stroke-width="26" stroke-dasharray="345.2 163.8" stroke-dashoffset="0.0" transform="rotate(-90 95.0 95.0)"/><circle cx="95.0" cy="95.0" r="81.0" fill="none" stroke="#059669" stroke-width="26" stroke-dasharray="163.8 345.2" stroke-dashoffset="-345.2" transform="rotate(-90 95.0 95.0)"/><text x="95.0" y="91.0" text-anchor="middle" class="cvbig">4 608 900 ₽</text><text x="95.0" y="109.0" text-anchor="middle" class="cl">всего</text></svg><div class="legend"><div class="lg"><span class="dot" style="background:#2563eb"></span>Салон/склад (наша) — <b>3 125 900 ₽</b></div><div class="lg"><span class="dot" style="background:#059669"></span>Партнёрская (инвесторы) — <b>1 483 000 ₽</b></div></div></div></div>
+<div class="card"><h3>Топ-10 прибыльных продаж</h3><svg viewBox="0 0 560 290" class="chart"><text x="182" y="15.84" text-anchor="end" class="cl">Хорвин SK3 зеленый</text><rect x="190" y="0" width="220.0" height="22" rx="4" fill="#059669"/><text x="416.0" y="15.84" class="cv">300 000 ₽</text><text x="182" y="44.84" text-anchor="end" class="cl">«Zero» (рустам 30)</text><rect x="190" y="29" width="209.7" height="22" rx="4" fill="#059669"/><text x="405.7" y="44.84" class="cv">286 000 ₽</text><text x="182" y="73.84" text-anchor="end" class="cl">«Zero»</text><rect x="190" y="58" width="193.6" height="22" rx="4" fill="#059669"/><text x="389.6" y="73.84" class="cv">264 000 ₽</text><text x="182" y="102.84" text-anchor="end" class="cl">BMW Поставщик Мото Весна</text><rect x="190" y="87" width="162.5" height="22" rx="4" fill="#059669"/><text x="358.5" y="102.84" class="cv">221 575 ₽</text><text x="182" y="131.84" text-anchor="end" class="cl">BMW с Калининграда (13000)</text><rect x="190" y="116" width="148.1" height="22" rx="4" fill="#059669"/><text x="344.1" y="131.84" class="cv">202 000 ₽</text><text x="182" y="160.84" text-anchor="end" class="cl">Ducati Panigale ч/красная Каза</text><rect x="190" y="145" width="143.7" height="22" rx="4" fill="#059669"/><text x="339.7" y="160.84" class="cv">196 000 ₽</text><text x="182" y="189.84" text-anchor="end" class="cl">Horwin EK1 голубой</text><rect x="190" y="174" width="134.2" height="22" rx="4" fill="#059669"/><text x="330.2" y="189.84" class="cv">183 000 ₽</text><text x="182" y="218.84" text-anchor="end" class="cl">Мотоцикл Y-VOLT серый</text><rect x="190" y="203" width="123.2" height="22" rx="4" fill="#059669"/><text x="319.2" y="218.84" class="cv">168 000 ₽</text><text x="182" y="247.84" text-anchor="end" class="cl">Дукасу с Калининграда (12900)</text><rect x="190" y="232" width="109.8" height="22" rx="4" fill="#059669"/><text x="305.8" y="247.84" class="cv">149 790 ₽</text><text x="182" y="276.84" text-anchor="end" class="cl">Хорвин SK1 желтый</text><rect x="190" y="261" width="95.3" height="22" rx="4" fill="#059669"/><text x="291.3" y="276.84" class="cv">130 000 ₽</text></svg></div>
+</div>
+
+<div class="card" style="margin-top:12px"><h3>Ведомость продаж (лист «Закупка продажа»)</h3>
+<div style="max-height:420px;overflow:auto"><table>
+<tr><th>№</th><th>Товар</th><th>Клиент</th><th>Закуп</th><th>Продажа</th><th>Прибыль</th><th>Дата</th><th>Статус</th></tr>
+<tr><td>1</td><td class="lt">Мотоцикл R3</td><td>Синев</td><td>280 900 ₽</td><td>350 000 ₽</td><td class="pos">+69 100 ₽</td><td>—</td><td>продан</td></tr><tr><td>2</td><td class="lt">Мотоцикл белый Falcon GT</td><td>Шабалин</td><td>321 000 ₽</td><td>390 000 ₽</td><td class="pos">+69 000 ₽</td><td>2026-04-24</td><td>продан</td></tr><tr><td>3</td><td class="lt">Мотоцикл Эндуро «Макс»</td><td>Зелёный город</td><td>165 000 ₽</td><td>175 000 ₽</td><td class="pos">+10 000 ₽</td><td>2026-04-26</td><td>продан</td></tr><tr><td>4</td><td class="lt">Мотоцикл черный Falcon GT</td><td>Алишер</td><td>321 000 ₽</td><td>358 800 ₽</td><td class="pos">+37 800 ₽</td><td>2026-05-01</td><td>продан</td></tr><tr><td>5</td><td class="lt">Мотоцикл черный Falcon GT</td><td>Игорь</td><td>329 000 ₽</td><td>370 000 ₽</td><td class="pos">+41 000 ₽</td><td>2026-05-01</td><td>продан</td></tr><tr><td>6</td><td class="lt">Мотоцикл Falcon Pro фиол</td><td>Орлова</td><td>266 950 ₽</td><td>310 000 ₽</td><td class="pos">+43 050 ₽</td><td>2026-05-05</td><td>продан</td></tr><tr><td>9</td><td class="lt">BMW Поставщик Мото Весна</td><td>Богородск</td><td>268 500 ₽</td><td>490 000 ₽</td><td class="pos">+221 575 ₽</td><td>2026-05-17</td><td>продан</td></tr><tr><td>9.14</td><td class="lt">Малыш Поставщик Мото Весна</td><td>НАШ</td><td>45 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>10.36</td><td class="lt">Мотоцикл Y-VOLT серый</td><td>Бор</td><td>432 000 ₽</td><td>600 000 ₽</td><td class="pos">+168 000 ₽</td><td>2026-06-26</td><td>продан</td></tr><tr><td>11.57</td><td class="lt">Мотоцикл Y-VOLT белый</td><td>Ижевск</td><td>401 000 ₽</td><td>530 000 ₽</td><td class="pos">+129 000 ₽</td><td>2026-07-17</td><td>продан</td></tr><tr><td>12.79</td><td class="lt">Хорвин SK3 зеленый</td><td>Дима Кукушкин</td><td>100 000 ₽</td><td>400 000 ₽</td><td class="pos">+300 000 ₽</td><td>2026-05-20</td><td>продан</td></tr><tr><td>14</td><td class="lt">Хорвин SK1 желтый</td><td>Надежда</td><td>100 000 ₽</td><td>230 000 ₽</td><td class="pos">+130 000 ₽</td><td>2026-05-23</td><td>продан</td></tr><tr><td>15.21</td><td class="lt">Falcon Pro черн/желт + черн/красн б/у</td><td>Гузяков А.С.; Туманов Артём</td><td>533 900 ₽</td><td>589 000 ₽</td><td class="pos">+55 100 ₽</td><td>2026-06-06</td><td>продан</td></tr><tr><td>16.43</td><td class="lt">Мотоцикл белый Falcon GT</td><td>Кирилл</td><td>321 000 ₽</td><td>390 000 ₽</td><td class="pos">+69 000 ₽</td><td>2026-06-14</td><td>продан</td></tr><tr><td>17.64</td><td class="lt">Мотоцикл белый Falcon GT</td><td>Блаженный</td><td>321 000 ₽</td><td>360 000 ₽</td><td class="pos">+39 000 ₽</td><td>2026-06-25</td><td>продан</td></tr><tr><td>18.86</td><td class="lt">Дукати черн/золотая 130А (дост. 10349+4500)</td><td>Артём Мустанг</td><td>405 000 ₽</td><td>—</td><td class="pos">0 ₽</td><td>2026-07-15</td><td>продан</td></tr><tr><td>20.07</td><td class="lt">Дукати красно/белая 100А (дост. 9100+10349+4500)</td><td>Евгений</td><td>390 000 ₽</td><td>460 000 ₽</td><td class="pos">+70 000 ₽</td><td>2026-07-13</td><td>продан</td></tr><tr><td>22.5</td><td class="lt">Дукати черная Китай</td><td>—</td><td>285 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>—</td></tr><tr><td>23.71</td><td class="lt">Мотоцикл «Zero»</td><td>Навашино косяк</td><td>566 000 ₽</td><td>700 000 ₽</td><td class="pos">+119 000 ₽</td><td>2026-06-22</td><td>продан</td></tr><tr><td>24.93</td><td class="lt">Мотоцикл Y-VOLT белый тест</td><td>краснодар Никита</td><td>400 000 ₽</td><td>420 000 ₽</td><td class="pos">+20 000 ₽</td><td>2026-06-19</td><td>продан</td></tr><tr><td>26.14</td><td class="lt">Мотоцикл КУГА ор/черн</td><td>—</td><td>93 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>катается</td></tr><tr><td>27.36</td><td class="lt">Falcon Pro серб/фиолетовый</td><td>Данила</td><td>278 955 ₽</td><td>300 000 ₽</td><td class="pos">+21 045 ₽</td><td>2026-06-25</td><td>продан</td></tr><tr><td>28.57</td><td class="lt">Falcon Pro черно/серый</td><td>Копалкин</td><td>250 000 ₽</td><td>310 000 ₽</td><td class="pos">+60 000 ₽</td><td>2026-06-24</td><td>продан</td></tr><tr><td>29.79</td><td class="lt">Horwin EK1 голубой</td><td>Пьяный</td><td>70 000 ₽</td><td>250 000 ₽</td><td class="pos">+183 000 ₽</td><td>2026-06-27</td><td>продан</td></tr><tr><td>31</td><td class="lt">Falcon Lynx фиолетовый</td><td>Роман</td><td>271 000 ₽</td><td>360 000 ₽</td><td class="pos">+89 000 ₽</td><td>2026-07-14</td><td>продан</td></tr><tr><td>32.21</td><td class="lt">Юшка макс Тифани</td><td>Сергей Александрович</td><td>85 000 ₽</td><td>110 000 ₽</td><td class="pos">+25 000 ₽</td><td>2026-08-11</td><td>продан</td></tr><tr><td>33.43</td><td class="lt">Юшка макс Серая Монстр</td><td>—</td><td>85 000 ₽</td><td>150 000 ₽</td><td class="pos">+65 000 ₽</td><td>—</td><td>продан</td></tr><tr><td>34.64</td><td class="lt">Юшка простая</td><td>Афонин Николай</td><td>75 000 ₽</td><td>95 000 ₽</td><td class="pos">+20 000 ₽</td><td>2026-09-08</td><td>продан</td></tr><tr><td>35.86</td><td class="lt">Falcon GT белый</td><td>—</td><td>315 000 ₽</td><td>390 000 ₽</td><td class="pos">+75 000 ₽</td><td>2026-06-29</td><td>продан</td></tr><tr><td>37.07</td><td class="lt">Falcon GT черный</td><td>—</td><td>315 000 ₽</td><td>390 000 ₽</td><td class="pos">+75 000 ₽</td><td>2026-07-15</td><td>продан</td></tr><tr><td>38.29</td><td class="lt">Falcon GT белый</td><td>—</td><td>315 000 ₽</td><td>390 000 ₽</td><td class="pos">+75 000 ₽</td><td>2026-05-11</td><td>продан</td></tr><tr><td>39.5</td><td class="lt">R1+ белый</td><td>—</td><td>280 000 ₽</td><td>200 000 ₽</td><td class="neg">−80 000 ₽</td><td>2026-07-29</td><td>продан</td></tr><tr><td>40.71</td><td class="lt">R1+ зелёный тест</td><td>—</td><td>280 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>43.14</td><td class="lt">«Zero» (рустам 30)</td><td>Дзержинск Александр Григорьевич</td><td>564 000 ₽</td><td>850 000 ₽</td><td class="pos">+286 000 ₽</td><td>2026-07-14</td><td>продан</td></tr><tr><td>44.36</td><td class="lt">«Zero»</td><td>—</td><td>564 000 ₽</td><td>900 000 ₽</td><td class="pos">+264 000 ₽</td><td>2026-07-24</td><td>продан</td></tr><tr><td>45.57</td><td class="lt">Ducati Diavel</td><td>Григорий Сочи</td><td>450 000 ₽</td><td>480 000 ₽</td><td class="pos">+30 000 ₽</td><td>2026-07-12</td><td>продан</td></tr><tr><td>46.79</td><td class="lt">Falcon Pro желтый/черный</td><td>Роман</td><td>250 000 ₽</td><td>310 000 ₽</td><td class="pos">+60 000 ₽</td><td>2026-07-10</td><td>продан</td></tr><tr><td>48</td><td class="lt">Falcon Pro желтый-серебро</td><td>Кукушкин</td><td>275 000 ₽</td><td>303 000 ₽</td><td class="pos">+28 000 ₽</td><td>2026-07-09</td><td>продан</td></tr><tr><td>49.21</td><td class="lt">Falcon Pro красный/серебро</td><td>Дэнзо</td><td>275 000 ₽</td><td>300 000 ₽</td><td class="pos">+25 000 ₽</td><td>2026-07-23</td><td>продан</td></tr><tr><td>50.43</td><td class="lt">HDM M02 + дукати черный (СКОЛЬКО забрал Макс??)</td><td>—</td><td>425 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>—</td></tr><tr><td>50.43b</td><td class="lt">HDM M02 (20 Максим)</td><td>Сергей Александрович</td><td>90 000 ₽</td><td>125 000 ₽</td><td class="pos">+35 000 ₽</td><td>2026-08-03</td><td>продан</td></tr><tr><td>51.64</td><td class="lt">Falcon Pro черно/серый (25 Гео)</td><td>Ноговицын</td><td>275 000 ₽</td><td>310 000 ₽</td><td class="pos">+35 125 ₽</td><td>2026-07-04</td><td>продан</td></tr><tr><td>52.86</td><td class="lt">Дукати Касперский (10000 доставка)</td><td>Ульяна</td><td>310 000 ₽</td><td>390 000 ₽</td><td class="pos">+80 000 ₽</td><td>2026-08-01</td><td>продан</td></tr><tr><td>54</td><td class="lt">Falcon Pro желтый/черный</td><td>Наиль</td><td>250 000 ₽</td><td>300 000 ₽</td><td class="pos">+50 000 ₽</td><td>2026-07-29</td><td>продан</td></tr><tr><td>55</td><td class="lt">Falcon GT белый (доставка 3400/отправка 7600)</td><td>Александр Магнитогорск</td><td>321 000 ₽</td><td>388 000 ₽</td><td class="pos">+67 000 ₽</td><td>2026-07-28</td><td>продан</td></tr><tr><td>56</td><td class="lt">Falcon GT черный (доставка 3300)</td><td>Артём Кирилович</td><td>313 300 ₽</td><td>375 000 ₽</td><td class="pos">+61 700 ₽</td><td>2026-08-27</td><td>продан</td></tr><tr><td>57</td><td class="lt">Falcon Linx фиолетовый (доставка 3300)</td><td>—</td><td>263 300 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>58</td><td class="lt">Falcon Linx фиолетовый (доставка 3300)</td><td>—</td><td>263 300 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>59</td><td class="lt">Falcon Lite (доставка 3300)</td><td>Роксана Саров</td><td>258 300 ₽</td><td>280 000 ₽</td><td class="pos">—</td><td>—</td><td>Продан</td></tr><tr><td>60</td><td class="lt">Falcon Lite (доставка 3300)</td><td>—</td><td>258 300 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>61</td><td class="lt">Falcon Pro серб/фиолетовый (1000)</td><td>—</td><td>256 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>62</td><td class="lt">Falcon Pro серый (1000+2500)</td><td>Александр Норильск</td><td>258 500 ₽</td><td>290 000 ₽</td><td class="pos">+32 000 ₽</td><td>2026-08-09</td><td>Продан</td></tr><tr><td>63-66</td><td class="lt">Falcon Pro серый ×4 (Георгий/Саша инвесторы)</td><td>—</td><td>—</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад/инвесторы</td></tr><tr><td>67-68</td><td class="lt">Falcon GT белый ×2 (1000)</td><td>—</td><td>612 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr><tr><td>69</td><td class="lt">Y Volt серый (2000)</td><td>—</td><td>407 000 ₽</td><td>500 000 ₽</td><td class="pos">+93 000 ₽</td><td>—</td><td>продан</td></tr><tr><td>70</td><td class="lt">Ducati Panigale ч/красная Казань (14000)</td><td>Артём Мустанг</td><td>404 000 ₽</td><td>600 000 ₽</td><td class="pos">+196 000 ₽</td><td>—</td><td>Продан</td></tr><tr><td>71</td><td class="lt">Y Volt белый (8000)</td><td>—</td><td>393 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>—</td></tr><tr><td>72</td><td class="lt">Y Volt белый (8000)</td><td>Дмитрий</td><td>393 000 ₽</td><td>495 000 ₽</td><td class="pos">+102 000 ₽</td><td>—</td><td>продан</td></tr><tr><td>73</td><td class="lt">BMW с Калининграда (13000)</td><td>Алексей</td><td>308 000 ₽</td><td>510 000 ₽</td><td class="pos">+202 000 ₽</td><td>2026-08-23</td><td>продан</td></tr><tr><td>74</td><td class="lt">Дукасу с Калининграда (12900)</td><td>Палагичев Александр</td><td>370 210 ₽</td><td>520 000 ₽</td><td class="pos">+149 790 ₽</td><td>2026-09-22</td><td>продан</td></tr><tr><td>75-76</td><td class="lt">Sequence Zero ×2 (доставка 11500)</td><td>—</td><td>1 223 000 ₽</td><td>—</td><td class="pos">—</td><td>—</td><td>Склад</td></tr>
+</table></div>
+<p class="dim" style="font-size:12px;margin-top:8px">⚠ Сверка: 17 793 800 − 16 612 515 = 1 181 285 ₽ ≠ 3 995 460 ₽ (прибыль по строкам).
+Расхождение объяснимо (в закуп-сумму входит нераспроданный склад) — проверим построчно на следующей итерации по оригиналу xlsx.</p></div>
+
+<div class="card" style="margin-top:12px"><h3>Закуп мото под аренду — 4 113 000 ₽ (11 мото)</h3>
+<table><tr><th>№</th><th>Мотоцикл</th><th>Закуп</th></tr><tr><td>1</td><td class="lt">Мотоцикл черный Falcon GT</td><td>321 000 ₽</td></tr><tr><td>2</td><td class="lt">Мотоцикл Ducati черный зубик</td><td>350 000 ₽</td></tr><tr><td>3</td><td class="lt">Мотоцикл Мотоленд Breakout бензин</td><td>222 000 ₽</td></tr><tr><td>4</td><td class="lt">Мотоцикл РиглМото Ниблер бензин</td><td>222 000 ₽</td></tr><tr><td>5</td><td class="lt">Мотоцикл БМВ F800R бензин</td><td>423 000 ₽</td></tr><tr><td>6</td><td class="lt">Дукати черн/золотая 130А</td><td>404 000 ₽</td></tr><tr><td>7</td><td class="lt">Harley Davidson</td><td>1 200 000 ₽</td></tr><tr><td>8</td><td class="lt">Jelang Max PRO</td><td>100 000 ₽</td></tr><tr><td>9</td><td class="lt">Honda CBR 600RR</td><td>421 000 ₽</td></tr><tr><td>10</td><td class="lt">Малыш/пиздюк</td><td>45 000 ₽</td></tr><tr><td>11</td><td class="lt">Дукати черн/золотая</td><td>405 000 ₽</td></tr></table>
+<p class="dim" style="font-size:12px;margin-top:8px">Плюс техники вне списка в аренде: «Zero», «Кава зелёная», «Хорвин» — вероятно партнёрские (см. блок 50/50).</p></div>
+
+<div class="card" style="margin-top:12px"><h3>Доход от повреждений («падальщики»)</h3><span class="ph">сумма?</span> <span class="dim">— по записям о повреждениях (Вайвольт и др.) — нужна цифра.</span></div>
+</section>
+
+<section id="exp">
+<h2 class="exp">3 · РАСХОДЫ VipBike</h2>
+<div class="grid g2">
+<div class="card"><h3>Структура учтённых расходов</h3><div class="donut-wrap"><svg viewBox="0 0 190 190" class="donut"><circle cx="95.0" cy="95.0" r="81.0" fill="none" stroke="#2563eb" stroke-width="26" stroke-dasharray="282.3 226.6" stroke-dashoffset="0.0" transform="rotate(-90 95.0 95.0)"/><circle cx="95.0" cy="95.0" r="81.0" fill="none" stroke="#059669" stroke-width="26" stroke-dasharray="119.6 389.3" stroke-dashoffset="-282.3" transform="rotate(-90 95.0 95.0)"/><circle cx="95.0" cy="95.0" r="81.0" fill="none" stroke="#d97706" stroke-width="26" stroke-dasharray="83.9 425.0" stroke-dashoffset="-401.9" transform="rotate(-90 95.0 95.0)"/><circle cx="95.0" cy="95.0" r="81.0" fill="none" stroke="#dc2626" stroke-width="26" stroke-dasharray="23.1 485.9" stroke-dashoffset="-485.9" transform="rotate(-90 95.0 95.0)"/><text x="95.0" y="91.0" text-anchor="middle" class="cvbig">1 673 110 ₽</text><text x="95.0" y="109.0" text-anchor="middle" class="cl">всего</text></svg><div class="legend"><div class="lg"><span class="dot" style="background:#2563eb"></span>Выставки и маркетинг — <b>928 141 ₽</b></div><div class="lg"><span class="dot" style="background:#059669"></span>Экипировка (закуп) — <b>393 160 ₽</b></div><div class="lg"><span class="dot" style="background:#d97706"></span>Салон (аренда+обустройство) — <b>275 922 ₽</b></div><div class="lg"><span class="dot" style="background:#dc2626"></span>Сервис (закуп з/ч) — <b>75 887 ₽</b></div></div></div></div>
+<div class="card"><h3>Затраты по статьям</h3>
+<table><tr><th>Статья</th><th>Сумма</th></tr>
+<tr><td>Выставки, мероприятия, маркетинг</td><td><b>928 141 ₽</b></td></tr>
+<tr><td>Экипировка и комплектующие (закуп)</td><td><b>393 160 ₽</b></td></tr>
+<tr><td>Салон: аренда + обустройство</td><td><b>275 922 ₽</b></td></tr>
+<tr><td>Сервис: запчасти и оснащение</td><td><b>75 887 ₽</b></td></tr>
+<tr><td>З/П сотрудников (Рустам, Коля, Паша, Лёха, Lama…)</td><td><span class="ph">?</span></td></tr>
+<tr><td>Поездки (МСК ×3 учтены в маркетинге: 151 794)</td><td class="dim">в маркетинге</td></tr>
+<tr><td>Электричество / текущие</td><td><span class="ph">?</span></td></tr>
+<tr class="sum"><td>Учтено сейчас</td><td><b>1 673 110 ₽</b></td></tr></table></div>
+</div>
+<div class="card" style="margin-top:12px"><h3>Мероприятия и маркетинг — детализация</h3><svg viewBox="0 0 560 232" class="chart"><text x="182" y="15.84" text-anchor="end" class="cl">МОТО ВЕСНА 2026</text><rect x="190" y="0" width="220.0" height="22" rx="4" fill="#d97706"/><text x="416.0" y="15.84" class="cv">255 056 ₽</text><text x="182" y="44.84" text-anchor="end" class="cl">Океанис</text><rect x="190" y="29" width="154.7" height="22" rx="4" fill="#d97706"/><text x="350.7" y="44.84" class="cv">179 406 ₽</text><text x="182" y="73.84" text-anchor="end" class="cl">Парк победы</text><rect x="190" y="58" width="96.8" height="22" rx="4" fill="#d97706"/><text x="292.8" y="73.84" class="cv">112 185 ₽</text><text x="182" y="102.84" text-anchor="end" class="cl">Олегу за сайт и т.д. (КУГА</text><rect x="190" y="87" width="80.2" height="22" rx="4" fill="#d97706"/><text x="276.2" y="102.84" class="cv">93 000 ₽</text><text x="182" y="131.84" text-anchor="end" class="cl">Поездка МСК 3 (10.08)</text><rect x="190" y="116" width="64.7" height="22" rx="4" fill="#d97706"/><text x="260.7" y="131.84" class="cv">74 994 ₽</text><text x="182" y="160.84" text-anchor="end" class="cl">Яндекс карты 3 мес</text><rect x="190" y="145" width="44.9" height="22" rx="4" fill="#d97706"/><text x="240.9" y="160.84" class="cv">52 000 ₽</text><text x="182" y="189.84" text-anchor="end" class="cl">Поездка МСК 1</text><rect x="190" y="174" width="40.4" height="22" rx="4" fill="#d97706"/><text x="236.4" y="189.84" class="cv">46 800 ₽</text><text x="182" y="218.84" text-anchor="end" class="cl">Поездка МСК 2 (21.07)</text><rect x="190" y="203" width="25.9" height="22" rx="4" fill="#d97706"/><text x="221.9" y="218.84" class="cv">30 000 ₽</text></svg>
+<table style="margin-top:10px"><tr><th>Мероприятие</th><th>Дата</th><th>Сумма</th><th>Состав</th></tr><tr><td class="lt">МОТО ВЕСНА 2026</td><td>2026-04-01</td><td>255 056 ₽</td><td class="lt dim">проживание 63989, питание 17725, газель/бензин/штрафы 62193, Илье на карту 15000, детейлинг+троса+перевозка 28120, печать прайсов 4080, Артем (листовки/визитки/роллап/футболки) 45100, футболки 6344, % за снятие/оплату 12505</td></tr><tr><td class="lt">Форум А</td><td>2026-04-23</td><td>20 000 ₽</td><td class="lt dim">участие</td></tr><tr><td class="lt">Океанис</td><td>2026-05</td><td>179 406 ₽</td><td class="lt dim">аренда+презентация 106140, диджей+такси 9650, визитки/листовка 3000, ТВ+стойка+дост 36094, микрофон 1223, АКБ+шлешка 4975, лампа 2750, стол+стулья 6954, доставака мото 8620</td></tr><tr><td class="lt">Велобор</td><td>2026-05-16</td><td>20 100 ₽</td><td class="lt dim">участие 15000, доставака 3900, питание 1200</td></tr><tr><td class="lt">Молодые предприниматели</td><td>2026-05-25</td><td>10 000 ₽</td><td class="lt dim">доставака+питание</td></tr><tr><td class="lt">Беги герой сбер прайм</td><td>2026-05-30</td><td>9 000 ₽</td><td class="lt dim">возврат мото в салон + питание</td></tr><tr><td class="lt">АвтоФест</td><td>2026-06-20</td><td>25 600 ₽</td><td class="lt dim">доставка мото 11000, питание 3800, печать в байкленд 10800</td></tr><tr><td class="lt">Яндекс карты 3 мес</td><td>—</td><td>52 000 ₽</td><td class="lt dim">реклама</td></tr><tr><td class="lt">Олегу за сайт и т.д. (КУГА)</td><td>—</td><td>93 000 ₽</td><td class="lt dim">бартер</td></tr><tr><td class="lt">Поездка МСК 1</td><td>—</td><td>46 800 ₽</td><td class="lt dim">Я, Илья и Георгий (23400 Георгий вернул)</td></tr><tr><td class="lt">Поездка МСК 2 (21.07)</td><td>2026-07-21</td><td>30 000 ₽</td><td class="lt dim">Я, Илья — ПОСЧИТАТЬ</td></tr><tr><td class="lt">Поездка МСК 3 (10.08)</td><td>2026-08-10</td><td>74 994 ₽</td><td class="lt dim">Я, Илья и Георгий</td></tr><tr><td class="lt">Парк победы</td><td>2026-09-05</td><td>112 185 ₽</td><td class="lt dim">доставка в обе стороны 5885, медали Макс 33600, флаги/листовки Артём 72700</td></tr></table>
+<p class="dim" style="font-size:12px;margin-top:8px">«Поездка МСК 2» = 30 000 (в таблице помечено «посчитать»); сайт Олега 93 000 — бартер за КУГУ.</p></div>
+<div class="card" style="margin-top:12px"><h3>Сервис (ремонтные работы, май—июнь)</h3>
+<table><tr><th>Работа</th><th>Дата</th><th>Мастер</th><th>Сумма</th><th>Заметка</th></tr>
+<tr><td class="lt">Смазка цепи</td><td>2026-05</td><td>Николай</td><td>1 000 ₽</td><td class="dim">потрачено ильей</td></tr><tr><td class="lt">Замена ручек газа и пер.скоростей, рег.колеса</td><td>2026-05</td><td>Николай</td><td>5 000 ₽</td><td class="dim">в кассе и вложено в оборот</td></tr><tr><td class="lt">Смазка цепи</td><td>2026-06-03</td><td>Николай</td><td>1 000 ₽</td><td class="dim"></td></tr>
+<tr class="sum"><td colspan="3">Итого сервис-выручка</td><td>7 000 ₽</td></tr></table></div>
+</section>
+
+<section id="tot">
+<h2 class="tot">4 · ИТОГ — свести все суммы ±</h2>
+<div class="grid g2">
+<div class="card"><h3>Сводный баланс сезона (что известно)</h3>
+<table class="ledger">
+<tr><th>Строка</th><th>Сумма</th></tr>
+<tr><td>+ Прибыль с продаж</td><td class="pos">+3 995 460 ₽</td></tr>
+<tr><td>+ Выручка аренды (бот, байки)</td><td class="pos">+1 834 732 ₽</td></tr>
+<tr><td>+ Аренда экипировки + экип вручную</td><td class="pos">+15 500 ₽</td></tr>
+<tr><td>+ Сервис/работы</td><td class="pos">+34 735 ₽</td></tr>
+<tr><td>+ Доход от повреждений</td><td><span class="ph">вопрос</span></td></tr>
+<tr><td>− Маркетинг и мероприятия</td><td class="neg">−928 141 ₽</td></tr>
+<tr><td>− Экипировка (закуп)</td><td class="neg">−393 160 ₽</td></tr>
+<tr><td>− Салон</td><td class="neg">−275 922 ₽</td></tr>
+<tr><td>− Сервис (закуп з/ч)</td><td class="neg">−75 887 ₽</td></tr>
+<tr><td>− З/П сотрудников</td><td><span class="ph">вопрос</span></td></tr>
+<tr><td>− Кредит (расход/остаток)</td><td><span class="ph">вопрос</span></td></tr>
+<tr><td>− Прочие расходы</td><td><span class="ph">вопрос</span></td></tr>
+<tr class="sum"><td>ИТОГ (без «вопросов»)</td><td>+4 207 317 ₽</td></tr>
+</table>
+<p class="dim" style="font-size:12px;margin-top:8px">Не входит в арендную выручку: депозитные обороты (залоги возвращаемы), нереализованный склад техники (4 608 900 ₽), закуп парка под аренду 4 113 000 ₽ (это актив, не расход сезона).</p></div>
+
+<div class="card"><h3>Итог по владельцам (50/50)</h3>
+<div class="big-total"><div class="v">2 103 659 ₽</div>
+<div class="sub">Илье / Роману — по половине (без учёта «вопросов»)</div></div>
+<table style="margin-top:12px">
+<tr><th></th><th>Илья</th><th>Роман</th></tr>
+<tr><td>Сколько вышло денег (вложено/получено)</td><td><span class="ph">вопрос</span></td><td><span class="ph">вопрос</span></td></tr>
+<tr><td>Доля сезона 50/50 (предварительно)</td><td>2 103 659 ₽</td><td>2 103 659 ₽</td></tr>
+</table>
+<div class="note"><b>Как в рукописной памятке:</b> итог сводится по трём колонкам — деньги / продажи / аренда (+ техника).
+Когда закроем «вопросы» (кредит, з/п, полученные Илья/Роман, падальщики, бензин), разложу итог по этим колонкам.</div></div>
+</div>
+</section>
+
+<section id="next">
+<h2>5 · Дальнейшие шаги (план из памятки)</h2>
+<div class="steps">
+<div class="step"><b>1.</b> Ремонт + открытие шоурума + сервис</div>
+<div class="step"><b>2.</b> Закуп на зиму</div>
+<div class="step"><b>3.</b> Закуп на сезон + оптимизация работы</div>
+</div>
+<div class="note" style="margin-top:14px">
+<b>Что нужно для v1.0 (собрать всё точно):</b>
+1) <b>.zip с договорами не загрузился</b> — пришлите повторно: докуплю оставшиеся майские аренды (Zero/Платонов 30 000, Борский 19 000, Хорвин 2 000, слава 4 000, 1.5 дня) и сверю по документам;
+2) оригинал <b>xlsx</b> (в чат пришла выжимка — свержу построчно);
+3) цифры-«вопросы»: кредит, з/П, полученные Илья/Роман, бензин/масла, повреждения;
+4) подтвердите список <b>партнёрских байков 50/50</b>.
+</div>
+</section>
+
+<footer>
+Источники: Supabase public.rentals (281 строк, выгрузка 18.10.2026) · «Все движения по ВипБайкЭлектро 2026.xlsx» (листы Аренда / Закупка продажа / Экип / сервис / Выставки,маркетинг / салон) · рукописные памятки-спецификации от 18.10.2026.
+Сгенерировано task108 · SUMMARY.html v0.1 · метки <span class="ph">вопрос</span> — данные pending, не выдуманы.
+</footer>
+</div></body></html>
