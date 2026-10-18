@@ -318,7 +318,10 @@ describe("structural guarantees — verification wiring", () => {
     expect(actions).toContain("requestRentalVerification");
     expect(actions).toContain('source: "return_page"');
     expect(dashboard).toContain("requestRentalVerification");
-    expect(dashboard).toContain('source: "dashboard"');
+    // task105 renamed the label to analytics_dashboard; task109 removed the
+    // duplicate `void` twin that still carried the old "dashboard" label.
+    expect(dashboard).toContain('source: "analytics_dashboard"');
+    expect(dashboard).not.toContain('source: "dashboard"');
   });
 
   it("server lib uses the CANONICAL commission math (no private re-implementation)", () => {

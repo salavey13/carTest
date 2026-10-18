@@ -2783,23 +2783,14 @@ export async function updateRentalStatus(input: {
       }
     }
 
-    // ── Task 101: rental VERIFICATION request (second closure path) ──
-    // updateRentalStatus closes rentals from the analytics dashboard — mirror
-    // the confirmVehicleReturn hook so BOTH closure paths start the operator+
-    // owner commission confirmation. Fire-and-forget, non-fatal; no-ops
-    // gracefully when the rental_verifications table is not applied yet.
-    if (status === "completed" && (rental as { old_status?: string | null } | null)?.old_status !== "completed") {
-      try {
-        const { requestRentalVerification } = await import("@/app/franchize/lib/rental-verify");
-        void requestRentalVerification({
-          rentalId,
-          actorChatId: actorUserId,
-          source: "dashboard",
-        });
-      } catch (verifyErr) {
-        console.warn("[update-rental-status] Verification request failed to start (non-fatal):", verifyErr);
-      }
-    }
+    // ── Task 109 cleanup: the fire-and-forget verification twin is GONE ──
+    // updateRentalStatus used to request verification TWICE per closure: the
+    // awaited task105 call above (source "analytics_dashboard") AND this
+    // task102-era `void` leftover (source "dashboard"). The second call was
+    // dead-on-Vercel (lambda freezes after return — proven by bd948bd0) and
+    // pure wasted work in the frozen zone anywhere else; requestRental-
+    // Verification's upsert dedup hid the damage. ONE awaited trigger per
+    // closure path, one source label — see the task105 PARITY block above.
 
     const msgParts: string[] = [];
     msgParts.push(`Статус изменён на «${status}»`);

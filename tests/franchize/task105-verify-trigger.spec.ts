@@ -34,6 +34,16 @@ describe("task105 · verification trigger survives the serverless invocation", (
     const s = src("app/franchize/server-actions/rentals-dashboard.ts");
     expect(s).toContain("await requestRentalVerification({");
     expect(s).toContain('source: "analytics_dashboard"');
+    // task109: the task102-era `void` twin (source "dashboard") fired a SECOND,
+    // dead-on-Vercel request per closure — dedup hid it, but it was waste in
+    // the frozen zone and a zombie-DM landmine. Exactly one trigger, awaited.
+    expect(s).not.toContain("void requestRentalVerification");
+    expect(s).not.toContain('source: "dashboard"');
+  });
+
+  it("telegram webhook route pins maxDuration=60 at route level (task109)", () => {
+    const s = src("app/api/telegramWebhook/route.ts");
+    expect(s).toContain("export const maxDuration = 60");
   });
 
   it("resend action exists, owner-gated, sends from the STORED snapshot", () => {
