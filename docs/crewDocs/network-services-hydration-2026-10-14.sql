@@ -5,8 +5,9 @@
 -- idempotent (ON CONFLICT / jsonb_set), safe to re-run.
 --
 -- 1) moto-selection — NEW prefab provider crew (partner moto-selection.ru,
---    services scraped from the site 2026-10-14; owner = I_O_S_NN by default
---    until a final owner is assigned via the network-tab role manager);
+--    services scraped from the site 2026-10-14; owner = @romani14 (5659185161)
+--    since 2026-10-18 — see moto-selection-owner-romani14-2026-10-18.sql; on a
+--    FRESH db the insert below creates the crew with the FINAL owner directly);
 -- 2) georg-electro — services for Georgiy (electro systems diagnostics,
 --    controller reflashing/custom tuning, extra equipment install);
 -- 3) vip-bike — catalog adCards/promoBanners/ticker: map-riders «Сеть» promo
@@ -26,7 +27,9 @@ values (
   'Moto Selection',
   'Moto Selection — мото-сервис и школа Нижнего Новгорода: обучение вождению с нуля, подбор и покупка мотоцикла, эвакуация 24/7, аренда (80–1000сс), ТО и ремонт, зимнее хранение, детейлинг и кастомизация. moto-selection.ru',
   'https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png',
-  '356282674', -- I_O_S_NN: prefab default owner, см. network-tab role manager
+  '5659185161', -- @romani14 (Роман Лосев): real owner since 2026-10-18
+                 -- (was prefab default I_O_S_NN; on conflict-branch does NOT touch owner_id,
+                 --  so re-runs never clobber the transferred ownership)
   'moto-selection',
   null,
   '{}'::jsonb,
