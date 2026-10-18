@@ -63,7 +63,7 @@ export default async function RentalReviewPage({
         crew={crew}
         activePath={`/franchize/${resolvedSlug}`}
         groupLinks={items.map((item) => item.category)}
-      />
+      items={items} />
       <section className="px-4 py-8">
         <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           {rental ? (

@@ -43,7 +43,7 @@ export default async function FranchizeSlugAdminPage({
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
-      />
+      items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         {/* U5: breadcrumb navigation */}
         <nav className="flex items-center gap-1.5 text-xs" style={{ color: "var(--franchize-text-secondary, #999)" }}>

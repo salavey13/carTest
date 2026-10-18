@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function CalcExplainerPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
 
   const cookieStore = await cookies();
@@ -57,7 +57,7 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/calc-explainer`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/calc-explainer`} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6 max-w-3xl mx-auto">
         <CalcExplainer />
       </FranchizePageShell>

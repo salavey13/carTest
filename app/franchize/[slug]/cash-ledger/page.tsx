@@ -22,7 +22,7 @@ interface CashLedgerPageProps {
 
 export default async function CashLedgerPage({ params }: CashLedgerPageProps) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
 
   // Gate: check crew membership via signed cookie
@@ -62,7 +62,7 @@ export default async function CashLedgerPage({ params }: CashLedgerPageProps) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cash-ledger`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/cash-ledger`} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         <Suspense fallback={<div className="text-center py-12">Загрузка...</div>}>
           <CashLedgerClient slug={crew.slug || slug} crew={crew} />

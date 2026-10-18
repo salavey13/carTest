@@ -294,7 +294,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
         crew={crew}
         activePath={`/franchize/${resolvedSlug}/rental/${id}`}
         groupLinks={items.map((item) => item.category)}
-      />
+      items={items} />
       </FranchizeErrorBoundary>
       </DisplayModeProvider>
 

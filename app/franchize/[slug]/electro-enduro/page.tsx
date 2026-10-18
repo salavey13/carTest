@@ -205,7 +205,7 @@ export default async function ElectroEnduroPage({
         crew={crew}
         activePath={`/franchize/${crew.slug || slug}/electro-enduro`}
         groupLinks={saleItems.map((item) => item.category)}
-      />
+      items={hydrated.items} />
       <FranchizeCatalogHero crew={crew} slug={crew.slug || slug} variant="electro-enduro" />
       {accessoryHighlights.length > 0 && (
         <section className="mx-auto w-full max-w-7xl px-4 pt-6 2xl:max-w-[1600px]">

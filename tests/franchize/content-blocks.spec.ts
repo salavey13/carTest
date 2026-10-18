@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_FRANCHIZE_CONTENT_BLOCKS,
+  buildSalesHeadline,
   isLegacyDefaultsCrew,
   readFranchizeContentBlocks,
 } from "@/app/franchize/lib/content-blocks";
@@ -116,5 +117,29 @@ describe("isLegacyDefaultsCrew", () => {
     expect(isLegacyDefaultsCrew(" vip-bike ")).toBe(true);
     expect(isLegacyDefaultsCrew("moto-selection")).toBe(false);
     expect(isLegacyDefaultsCrew("")).toBe(false);
+  });
+});
+
+describe("buildSalesHeadline", () => {
+  const verticals = [{ title: "79bike Электро" }, { title: "Тест-драйв" }];
+
+  it("legacy crew keeps its literal latin tail (pixel-identical H1)", () => {
+    expect(buildSalesHeadline("VIP BIKE ELECTRO", verticals, true)).toBe(
+      "Продажи VIP BIKE ELECTRO: new / electric / used / trade-in",
+    );
+    // even with zero verticals — the legacy page always had the tail
+    expect(buildSalesHeadline("VIP BIKE ELECTRO", [], true)).toBe(
+      "Продажи VIP BIKE ELECTRO: new / electric / used / trade-in",
+    );
+  });
+
+  it("a crew with its own verticals headlines with THOSE titles", () => {
+    expect(buildSalesHeadline("MOTO SELECTION", verticals, false)).toBe(
+      "Продажи MOTO SELECTION: 79bike Электро / Тест-драйв",
+    );
+  });
+
+  it("a crew without verticals gets a neutral headline — never vip copy", () => {
+    expect(buildSalesHeadline("MOTO SELECTION", [], false)).toBe("Продажи MOTO SELECTION");
   });
 });

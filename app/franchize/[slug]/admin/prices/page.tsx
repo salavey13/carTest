@@ -37,7 +37,7 @@ export default async function FranchizeAdminPricesPage({
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
-      />
+      items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         <FranchizePriceQuickEditor initialSlug={resolvedSlug} initialCrew={crew} />
       </FranchizePageShell>

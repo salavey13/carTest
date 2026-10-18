@@ -32,7 +32,7 @@ export default async function FranchizeCommercialOffersAnalyticsPage({
 }: FranchizeCommercialOffersAnalyticsPageProps) {
   const { slug } = await params;
   const { date: dateParam } = await searchParams;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/commercial-offers-analytics`;
   const surface = crewPaletteForSurface(crew.theme);
@@ -48,7 +48,7 @@ export default async function FranchizeCommercialOffersAnalyticsPage({
         activePath={activePath}
         groupLinks={[]}
         showRail={false}
-      />
+      items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
         <CommercialOffersAnalyticsClient
           initialSlug={resolvedSlug}

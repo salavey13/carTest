@@ -22,7 +22,7 @@ interface SalaryCoefficientsPageProps {
 
 export default async function SalaryCoefficientsPage({ params }: SalaryCoefficientsPageProps) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
 
   const cookieStore = await cookies();
@@ -61,7 +61,7 @@ export default async function SalaryCoefficientsPage({ params }: SalaryCoefficie
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/salary-coefficients`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/salary-coefficients`} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         <Suspense fallback={<div className="text-center py-12">Загрузка...</div>}>
           <SalaryCoefficientsClient slug={crew.slug || slug} crew={crew} />

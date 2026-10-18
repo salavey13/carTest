@@ -198,6 +198,18 @@ export function isLegacyDefaultsCrew(slug: string): boolean {
   return slug.trim() === DEFAULTS_ONLY_FOR_SLUG;
 }
 
+/**
+ * Sales page H1 (2026-10-18 review round 2/3): the latin «new / electric /
+ * used / trade-in» tail is the LEGACY crew's pitch and stays vip-bike-only;
+ * a crew with its own hydrated verticals headlines with THOSE titles; a crew
+ * without verticals gets a neutral headline (never vip copy).
+ */
+export function buildSalesHeadline(brandName: string, verticals: Array<{ title: string }>, isLegacyCrew: boolean): string {
+  if (isLegacyCrew) return `Продажи ${brandName}: new / electric / used / trade-in`;
+  if (verticals.length > 0) return `Продажи ${brandName}: ${verticals.map((vertical) => vertical.title).join(" / ")}`;
+  return `Продажи ${brandName}`;
+}
+
 function nonEmptyGated<T extends object>(items: T[], fallback: T[], slug: string): T[] {
   if (items.length > 0) return items.map((item) => ({ ...item }));
   return isLegacyDefaultsCrew(slug) ? fallback.map((item) => ({ ...item })) : [];

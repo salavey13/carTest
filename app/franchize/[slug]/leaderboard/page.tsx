@@ -37,7 +37,7 @@ export default async function LeaderboardPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const crewSlug = crew.slug || slug;
   const activePath = `/franchize/${crewSlug}/leaderboard`;
   const surface = crewPaletteForSurface(crew.theme);
@@ -52,7 +52,7 @@ export default async function LeaderboardPage({
         crew={crew}
         activePath={activePath}
         sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })}
-      />
+      items={items} />
       <FranchizeLeaderboardClient crew={crew} slug={crewSlug} />
       <CrewFooter crew={crew} />
     </main>

@@ -66,6 +66,7 @@ set metadata = jsonb_set(
     '{franchize,storage,seasonEnd}',
     '"06-01"'::jsonb
   ),
+  '{franchize,contentBlocks}',
   jsonb_build_object(
     'aboutCapabilities', jsonb_build_array(
       jsonb_build_object('title', 'Обучение вождению с нуля', 'icon', 'bike',

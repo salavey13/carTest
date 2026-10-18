@@ -26,7 +26,7 @@ interface SalaryPageProps {
 
 export default async function SalaryPage({ params }: SalaryPageProps) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
 
   const cookieStore = await cookies();
@@ -90,7 +90,7 @@ export default async function SalaryPage({ params }: SalaryPageProps) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/salary`} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/salary`} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4">
         {/* Сверка расчётов × зарплата: сверенная часть выплат + ссылки на
             последние несверенные аренды (проверить/выслать сверку). */}

@@ -40,7 +40,7 @@ export default async function FranchizeSlugCrewShiftsPage({
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
-      />
+      items={items} />
       <FranchizePageShell
         theme={crew.theme}
         width="wide"

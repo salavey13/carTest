@@ -41,7 +41,7 @@ function themeTokens(theme: Parameters<typeof crewPaletteForSurface>[0]): Season
 
 export default async function SeasonStatsPage({ params }: Props) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteForSurface(crew.theme);
   const resolvedSlug = crew.slug || slug;
   const tokens = themeTokens(crew.theme);
@@ -93,7 +93,7 @@ export default async function SeasonStatsPage({ params }: Props) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/season-stats`} showRail={false} />
+      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/season-stats`} showRail={false} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
         <SeasonStatsClient
           slug={resolvedSlug}

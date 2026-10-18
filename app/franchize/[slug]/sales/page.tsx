@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, BatteryCharging, Bike, ClipboardList, RefreshCcw, Sparkles } from "lucide-react";
 import { getFranchizeBySlug, type CatalogItemVM } from "@/app/franchize/actions";
 import { hasSalePrice } from "../../lib/catalog-utils";
-import { isLegacyDefaultsCrew } from "../../lib/content-blocks";
+import { buildSalesHeadline, isLegacyDefaultsCrew } from "../../lib/content-blocks";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
@@ -23,12 +23,15 @@ function itemMatchesVertical(item: CatalogItemVM, verticalId: string): boolean {
   if (verticalId === "electric") return category.includes("electro") || category.includes("электро") || category.includes("e-") || isTruthySpec(specs.electric);
   if (verticalId === "used") return category.includes("used") || category.includes("б/у") || category.includes("пробег") || isTruthySpec(specs.used);
   if (verticalId === "trade-in") return isTruthySpec(specs.trade_in) || isTruthySpec(specs.tradeIn) || category.includes("trade");
-  return item.saleAvailable || isTruthySpec(specs.sale) || Number(item.salePrice || 0) > 0;
+  // review round 3: same strict predicate as the SKU counter / rail pill /
+  // about CTA — vertical previews must not list items the counter excludes
+  // (equipment/service never inflate the sales surfaces).
+  return hasSalePrice(item);
 }
 
 function previewItems(items: CatalogItemVM[], verticalId: string): CatalogItemVM[] {
   const matches = items.filter((item) => itemMatchesVertical(item, verticalId));
-  return (matches.length ? matches : items.filter((item) => item.saleAvailable)).slice(0, 3);
+  return (matches.length ? matches : items.filter(hasSalePrice)).slice(0, 3);
 }
 
 const verticalIconById = {
@@ -80,9 +83,7 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
   // block, not just via the empty state.
   const hasVerticals = salesVerticals.length > 0;
   const isLegacyCrew = isLegacyDefaultsCrew(crewSlug);
-  const salesHeadline = !hasVerticals || isLegacyCrew
-    ? `Продажи ${brandName}${isLegacyCrew ? ": new / electric / used / trade-in" : ""}`
-    : `Продажи ${brandName}: ${salesVerticals.map((vertical) => vertical.title).join(" / ")}`;
+  const salesHeadline = buildSalesHeadline(brandName, salesVerticals, isLegacyCrew);
   const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
   return (

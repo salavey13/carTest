@@ -51,7 +51,7 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
 }: FranchizeSlugRentalsAnalyticsPageProps) {
   const { slug } = await params;
   const { date: dateParam, tab: tabParam, rentalId: rentalIdParam, saleId: saleIdParam } = await searchParams;
-  const { crew } = await getFranchizeBySlug(slug);
+  const { crew, items } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const activePath = `/franchize/${resolvedSlug}/rentals-analytics`;
   const surface = crewPaletteForSurface(crew.theme);
@@ -70,7 +70,7 @@ export default async function FranchizeSlugRentalsAnalyticsPage({
         activePath={activePath}
         groupLinks={[]}
         showRail={false}
-      />
+      items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-4" width="full">
         <AnalyticsClientV2
           initialSlug={resolvedSlug}
