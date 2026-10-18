@@ -936,3 +936,24 @@ Work Log:
 
 Stage Summary:
 - Сезонная статистика собрана и опубликована v0.1; май-дыра закрыта частично (5/10 известных аренд с датами — вставлены; 5 ждут .zip). ИТОГ сезона ≈ +4.21M ₽ (без кредита/з/п/падальщиков/бензина), 50/50 ≈ 2.10M. Для v1.0 нужно от босса: .zip повторно, оригинал xlsx, цифры-вопросы (кредит, з/П, Илья/Роман полученное, бензин, повреждения), подтверждение партнёрских байков.
+
+---
+Task ID: 109-zip-archive-parse-summary-v02
+Agent: main (Claude)
+Task: Parse "все договора.zip" (145 files) + xlsx + screenshots; find rentals missing from Supabase before mid-June for TOTAL SEASON stats; iterate SUMMARY.html.
+
+Work Log:
+- Restored env after session reset: re-cloned repo, recovered service_role key via scripts/season-2026/find_key.py (scans repo for JWTs, tests against PostgREST; working key saved outside repo at ../scripts/.sb_key).
+- Extracted zip: 145 files (143 docx / 1 pdf / 1 txt). Built parser scripts/season-2026/{zip_inventory.py,master_parse_match.py}: sha256, contract_no, date, renter, vehicle, period, total, deposit, phone; matched vs Supabase by (vehicle_id + date ±2d + surname), sha256 matched only 1/145 (Telegram re-encodes files).
+- sales table investigation: public.sales does NOT exist; ДКП live in private.sale_contract_artifacts (REST-inaccessible), money in cash_transactions.income_sale = 35 ops / 14 593 000 ₽ (июнь 3.93M, июль 6.06M, авг 2.61M, сен 1.68M, окт 0.31M).
+- Found: 88 contracts already in DB; 26 rental contracts NOT in DB (7 May old-format + 17 July + 2 long-term 05.08); 4 rentals only in xlsx (55 000 ₽); 9 blank templates; 11 testdrives; 4 sale contracts.
+- Discovered prior partial backfill (source=retro_backfill_v1, 5 rows, 46 000 ₽: Коняхин 04.05, Zero 04.05, Ульви 06.05, Забалдин 30.05, Шаронов 05.06) — excluded from import plan, no duplicates.
+- Known missing sums: July 171 250 ₽ (16 contracts, 5 TBD in body) + xlsx-only 55 000 ₽ + May 7 contracts TBD. Projected season rentals after import ≈ 2 019 716 ₽+ (now 1 793 466 ₽).
+- Notable data quirks: «Ларин» file named 29.06 but contains contract №05.08/APRILIA 05.08; Red Ducati Panigale (Чуфыркин 05.07, Халикова 08.07) not in cars; 2 long-term Сидоров/Буробин sublease contracts; Борский case "из Горелых разбил Вайвольт".
+- Built 6 infographics (download/charts, repo docs/summary/charts/) and TWO summary artifacts: light analysis version (DOWNLOAD/SUMMARY.html) + merged dark v0.2 of docs/summary/SUMMARY.html (task108 structure + new «1b · Архив договоров» section, cash verification, updated next-steps).
+- Charts: coverage timeline, zip donut, DB revenue by month, missing money, sales cash vs xlsx, DB sources.
+
+Stage Summary:
+- Full gap map ready for retro_backfill_v2 import: ~30 rentals (26 contracts + 4 xlsx-only), ≈226 250 ₽ known + TBD from 7 old-format bodies.
+- docs/summary/SUMMARY.html v0.2 published in repo + synced to local download/. Import plan: iter2 = deep-parse 5 May bodies + 5 no-sum contracts; iter3 = insert with source=retro_backfill_v2 + metadata.history; iter4 = TOTAL SEASON dashboard (rental+sales+expenses, per-bike, 50/50).
+- Open questions to boss: long-term contracts in/out, Red Panigale card, Борский insurance, barter in revenue, gear line for Шаронов.
