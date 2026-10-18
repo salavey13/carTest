@@ -41,6 +41,7 @@ export default async function FranchizeSlugDashboardPage({
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
+        items={items}
       />
       <FranchizePageShell
         theme={crew.theme}

@@ -38,6 +38,7 @@ export default async function FranchizeProfilePage({
         crew={crew}
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
+        items={items}
       />
       {/* overflowMode="clip": the tab dock in ProfileClient is position:sticky
           — overflow:hidden (default) creates a scroll container that silently
