@@ -87,6 +87,9 @@ export interface CategoryBonusRentalItem {
   returnedByChatId: string | null;
   /** Task 101: operator+owner commission confirmation state (null = no data yet). */
   verificationStatus: RentalVerificationStatus | null;
+  /** Task 106: true when the numbers above are the NEGOTIATED (agreed) split
+   *  — an accepted proposal corrected them after the frozen snapshot. */
+  verificationAdjusted?: boolean;
   /** Task 102: rentals.status — the manual «✓ подтвердить» stamp must only
    *  render for COMPLETED rentals (verifying a bike that is still in rent
    *  makes no sense). Always present for rental rows. */
@@ -211,6 +214,9 @@ export async function computeCategoryBonuses(params: {
 
   const byRentalCategory: SalaryBucketMap = new Map();
   let rentalTotal = 0;
+  // Task 106: parallel to rentalItems — where each item's bucket lives, so
+  // the agreed-split correction can adjust the breakdown amounts in place.
+  const rentalItemBuckets: Array<{ label: string; source: AttributionSource }> = [];
   for (const { rental: r, source } of attributedRentals) {
     const meta = r.metadata || {};
     const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
@@ -267,6 +273,36 @@ export async function computeCategoryBonuses(params: {
       // Task 101: batch-filled right below from rental_verifications.
       verificationStatus: null,
     });
+    rentalItemBuckets.push({ label, source });
+  }
+
+  // Task 101: batch-fetch the operator+owner verification state for the
+  // credited rentals (one chunked query; empty map when the table is not
+  // applied yet — badges then simply do not render).
+  // Task 106: when the row carries an AGREED (corrected) split — the pair
+  // settled a dispute through the negotiation flow — the corrected numbers
+  // are THE truth: item amounts, the bucket breakdown and rentalTotal all
+  // move to them, so the profile pays what was actually agreed.
+  const verificationMap = await getVerificationStatusMap(rentalItems.map((i) => i.rentalId));
+  for (let idx = 0; idx < rentalItems.length; idx += 1) {
+    const item = rentalItems[idx];
+    const brief = verificationMap.get(item.rentalId);
+    item.verificationStatus = brief?.status ?? null;
+    if (brief?.agreedSplit) {
+      const agreed = brief.agreedSplit;
+      const agreedTotal = agreed.base + agreed.equipment + agreed.overprice;
+      const delta = agreedTotal - item.amount;
+      if (delta !== 0) {
+        const bucket = byRentalCategory.get(rentalItemBuckets[idx]?.label || "");
+        if (bucket) bucket.amount += delta;
+        rentalTotal += delta;
+      }
+      item.base = agreed.base;
+      item.equipment = agreed.equipment;
+      item.overprice = agreed.overprice;
+      item.amount = agreedTotal;
+      item.verificationAdjusted = true;
+    }
   }
 
   if (rentalTotal > 0 || byRentalCategory.size > 0) {
@@ -275,14 +311,6 @@ export async function computeCategoryBonuses(params: {
       noun: "Аренда",
       sourceLabels: ATTRIBUTION_SOURCE_LABELS as unknown as Record<string, string>,
     }));
-  }
-
-  // Task 101: batch-fetch the operator+owner verification state for the
-  // credited rentals (one chunked query; empty map when the table is not
-  // applied yet — badges then simply do not render).
-  const verificationMap = await getVerificationStatusMap(rentalItems.map((i) => i.rentalId));
-  for (const item of rentalItems) {
-    item.verificationStatus = verificationMap.get(item.rentalId)?.status ?? null;
   }
 
   // ── Sale bonuses: sale contracts created in the member's chat ──

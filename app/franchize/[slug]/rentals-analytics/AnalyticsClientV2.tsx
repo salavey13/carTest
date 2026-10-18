@@ -157,6 +157,8 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     contract: item.contract ?? null,
     operatorName: item.operatorName ?? null,
     verificationStatus: item.verificationStatus ?? null,
+    verificationProposalOpen: item.verificationProposalOpen === true,
+    verificationAdjusted: item.verificationAdjusted === true,
   };
 }
 

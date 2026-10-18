@@ -26,7 +26,7 @@ import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 import { ekipCommand, handleEkipText, handleEkipCallback } from "./ekip-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
-import { handleRentalVerifyCallbackCommand } from "./rental-verify";
+import { handleRentalVerifyCallbackCommand, handleRentalVerifyProposalCallbackCommand, handleRentalVerifyTextCommand } from "./rental-verify";
 import { analyticsPassCommand } from "./analytics_pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
 import { sampleCommand } from "./sample";
@@ -108,14 +108,24 @@ export async function handleCommand(update: any) {
         // doc/ekip/subrent routers so no shared-prefix state logic can eat it.
         // Both parties (attributed operator + crew owner) confirm the frozen
         // commission snapshot right after the rental closes.
-        if (update.callback_query && (text.startsWith("vrf_ok_") || text.startsWith("vrf_dis_"))) {
-            const handled = await handleRentalVerifyCallbackCommand({
-                userIdStr,
-                chatId,
-                text,
-                callbackQueryId: update.callback_query.id,
-                messageId: update.callback_query?.message?.message_id,
-            });
+        // Task 106: `vrfp_*` routes the dispute editor / proposal flow —
+        // same unique-prefix logic, checked together with `vrf_`.
+        if (update.callback_query && (text.startsWith("vrf_ok_") || text.startsWith("vrf_dis_") || text.startsWith("vrfp_"))) {
+            const handled = text.startsWith("vrfp_")
+                ? await handleRentalVerifyProposalCallbackCommand({
+                    userIdStr,
+                    chatId,
+                    text,
+                    callbackQueryId: update.callback_query.id,
+                    messageId: update.callback_query?.message?.message_id,
+                })
+                : await handleRentalVerifyCallbackCommand({
+                    userIdStr,
+                    chatId,
+                    text,
+                    callbackQueryId: update.callback_query.id,
+                    messageId: update.callback_query?.message?.message_id,
+                });
             if (handled) return;
         }
 
@@ -520,6 +530,13 @@ export async function handleCommand(update: any) {
                 await sendComplexMessage(chatId, "Неизвестная кнопка. Используй /help или /doc.", []);
                 return;
             }
+
+            // Check if user is in the verification-editor comment capture mode
+            // (task 106): tapped «✍️ Комментарий» → the next plain text message
+            // becomes the proposal comment. MUST run before the other text
+            // handlers so the comment cannot leak into /doc, /ekip etc.
+            const vrfTextHandled = await handleRentalVerifyTextCommand({ userIdStr, chatId, text });
+            if (vrfTextHandled) return;
 
             // Check if user is in /doc flow (awaiting bike selection or schedule)
             const docHandled = await handleDocText(userIdStr, chatId, text);

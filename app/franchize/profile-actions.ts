@@ -539,6 +539,23 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
       category: "operations",
       triggerSources: ["rental:verified"],
     },
+    // Task 106 (2026-10-18): negotiation «дил» badges — the dispute settle-
+    // ment game. Granted when a rental reaches «verified» THROUGH an accepted
+    // proposal (the pair corrected the split right in the chat and agreed).
+    {
+      id: "deal_first",
+      title: "Дилмейкер ⚖️",
+      description: "Первый спор, закрытый сделкой: предложил корректировку, вторая сторона согласилась — расчёт подтверждён с новыми числами.",
+      category: "operations",
+      triggerSources: ["rental:deal"],
+    },
+    {
+      id: "deal_5",
+      title: "Мастер компромисса 🎯",
+      description: "5 аренд урегулированы через согласованное предложение. Споры больше не стопорят месяц — это уже навык.",
+      category: "operations",
+      triggerSources: ["rental:deal"],
+    },
   ];
 
   if (slug === "vip-bike") return [...shared, ...workAchievements, ...rentalAchievements, ...storageAchievements, ...superlistAchievements, ...explorationAchievements, ...crewJoinAchievements, ...verificationAchievements, ...vipBikeOnly];

@@ -45,11 +45,18 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
   // (⚠️). Verified also tints the card border green so a scanned list reads
   // «already done» without opening anything.
   const ver = rental.verificationStatus ?? null;
+  // Task 106: negotiation variants — an open proposal means the dispute is
+  // being actively settled (still needs attention), an agreed split means
+  // the verified numbers were CORRECTED through the deal.
   const verMeta =
     ver === "verified"
-      ? { color: "#22c55e", label: "✅ сверена" }
+      ? (rental.verificationAdjusted
+          ? { color: "#22c55e", label: "✅ сверена · скорректирована" }
+          : { color: "#22c55e", label: "✅ сверена" })
       : ver === "disputed"
-        ? { color: "#ef4444", label: "⚠️ спор сверки" }
+        ? (rental.verificationProposalOpen
+            ? { color: "#f97316", label: "📤 предложение отправлено" }
+            : { color: "#ef4444", label: "⚠️ спор сверки" })
         : ver === "operator_confirmed"
           ? { color: "#f59e0b", label: "⏳ ждёт владельца" }
           : ver === "owner_confirmed"

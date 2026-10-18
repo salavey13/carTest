@@ -203,11 +203,17 @@ export function RentalDetailDrawer({
   const statusMeta = getRentalStatusMeta(rental.status);
   // Task 102: verification chip — same mapping as AnalyticsRentalCard.
   const ver = rental.verificationStatus ?? null;
+  // Task 106: same negotiation variants as the card (adjusted verified / open
+  // proposal). DrawerRentalRow may predate the new fields — optional chaining.
   const verMeta =
     ver === "verified"
-      ? { color: "#22c55e", label: "✅ сверена" }
+      ? (rental.verificationAdjusted
+          ? { color: "#22c55e", label: "✅ сверена · скорректирована" }
+          : { color: "#22c55e", label: "✅ сверена" })
       : ver === "disputed"
-        ? { color: "#ef4444", label: "⚠️ спор сверки" }
+        ? (rental.verificationProposalOpen
+            ? { color: "#f97316", label: "📤 предложение отправлено" }
+            : { color: "#ef4444", label: "⚠️ спор сверки" })
         : ver === "operator_confirmed"
           ? { color: "#f59e0b", label: "⏳ ждёт владельца" }
           : ver === "owner_confirmed"

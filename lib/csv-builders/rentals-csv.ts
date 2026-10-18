@@ -229,10 +229,18 @@ export async function buildRentalsCsv(
   // Task 101: operator+owner verification state per rental (empty map until
   // Paul applies rental-verifications-table-2026-10-17.sql — the column then
   // just stays empty, the sheet keeps its shape).
+  // Task 106: the label gains «· скорректировано (N ₽)» when the row carries
+  // an agreed (negotiated) split — the export shows the money as settled.
   const verificationMap = await getVerificationStatusMap(rentalRows.map((r: any) => String(r.rental_id)));
   const verificationLabel = (rentalId: unknown): string => {
     const brief = verificationMap.get(String(rentalId || ""));
-    return brief ? VERIFICATION_STATUS_LABELS[brief.status] : "";
+    if (!brief) return "";
+    const base = VERIFICATION_STATUS_LABELS[brief.status];
+    if (brief.agreedSplit) {
+      const agreedTotal = brief.agreedSplit.base + brief.agreedSplit.equipment + brief.agreedSplit.overprice;
+      return `${base} · скорректировано (${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(agreedTotal)} ₽)`;
+    }
+    return base;
   };
 
   // ── Batched users lookup — subrenter labels (АРЕНДЫ) + «Выдал»/«Принял»
@@ -676,7 +684,7 @@ export async function buildRentalsCsv(
 
   rows.push(rowOf([
     "Аренды", blockRentals.count, blockRentals.revenue, blockRentals.salary,
-    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор (ЗП)/Атрибуция ЗП: фильтр по оператору и сумма «ЗП Аренда» = его комиссии в профиле; верификация — колонка «Верификация»: подтверждено = расчёт сверен оператором и владельцем, пусто = сверки ещё нет`,
+    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор (ЗП)/Атрибуция ЗП: фильтр по оператору и сумма «ЗП Аренда» = его комиссии в профиле; верификация — колонка «Верификация»: подтверждено = расчёт сверен оператором и владельцем, «· скорректировано (N ₽)» = спор закрыт согласованном предложением с новой суммой, пусто = сверки ещё нет`,
   ]));
   rows.push(rowOf([
     "Экип", blockEquipment.count, blockEquipment.revenue, 0,

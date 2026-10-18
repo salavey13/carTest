@@ -18,6 +18,8 @@
     "app/franchize/[slug]/rentals-analytics/components/lib/verification-utils.ts",
     "tests/franchize/task102-verify-hardening.spec.ts",
     "tests/franchize/task103-verify-analytics.spec.ts",
-    "tests/franchize/task105-verify-trigger.spec.ts"
+    "tests/franchize/task105-verify-trigger.spec.ts",
+    "tests/franchize/task106-verify-negotiation.spec.ts",
+    "lib/csv-builders/rentals-csv.ts"
   ]
 }

@@ -5,6 +5,16 @@
 // unit-testable without dragging Supabase/Telegram/"use server" modules into
 // the test graph. The server half (request/callback orchestration) lives in
 // app/franchize/lib/rental-verify.ts and re-exports this surface.
+//
+// Task 106 — NEGOTIATION («дил»): «⚠️ Оспорить» is no longer a dead end.
+// The disputant gets a game-like split editor (tap a part → ±50/±100 with a
+// live preview → optional comment → send proposal), the other party answers
+// ✅ Согласиться / ⚠️ Предложить своё / ❌ Отклонить. An accepted proposal
+// VERIFIES the rental with the CORRECTED numbers (agreed split) — the
+// corrected numbers then flow into the profile earnings, CSV and analytics.
+// The whole negotiation lives in ONE jsonb column (rental_verifications
+// .negotiation) so the SQL migration stays trivial and the feature degrades
+// to the old plain dispute when the column is not applied yet.
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -294,12 +304,435 @@ export function verificationStatusNote(params: {
   return `Ждёт подтверждения: ${op} (оператор) и ${own} (владелец). После двух ✅ аренда помечается как проверенная.`;
 }
 
+// ── Negotiation («дил», task 106) — split editor ──────────────────────────────────
+//
+// A dispute used to be a terminal stop (manual reconciliation, owner-only
+// admin ✅). Now the disputant gets an interactive split editor and the pair
+// can settle the numbers right in the chat. Everything below is PURE: the
+// server half (rental-verify.ts) does the DB/Telegram I/O.
+
+/** The three operator-commission parts the verification summary shows. */
+export interface SplitParts {
+  base: number;
+  equipment: number;
+  overprice: number;
+}
+
+export type SplitPartKey = keyof SplitParts;
+
+export const SPLIT_PART_META: Record<SplitPartKey, { label: string; icon: string }> = {
+  base: { label: "техника", icon: "🏍" },
+  equipment: { label: "экипировка", icon: "🧰" },
+  overprice: { label: "наценка", icon: "📈" },
+};
+
+export const SPLIT_PART_ORDER: SplitPartKey[] = ["base", "equipment", "overprice"];
+
+export interface InlineButton {
+  text: string;
+  callback_data: string;
+}
+
+/** One round in the negotiation history (capped — see ROUNDS_CAP). */
+export interface NegotiationRound {
+  action: "propose" | "counter" | "accept" | "decline";
+  by: string;
+  role: "operator" | "owner";
+  at: string;
+  split: SplitParts;
+  comment?: string | null;
+}
+
+export interface OpenProposal {
+  by: string;
+  role: "operator" | "owner";
+  at: string;
+  split: SplitParts;
+  comment?: string | null;
+}
+
+export interface NegotiationState {
+  /** Split being edited right now (one editor at a time, last-write-wins). */
+  draft?: { by: string; role: "operator" | "owner"; split: SplitParts; comment?: string | null } | null;
+  /** A sent proposal awaiting the other party's answer. */
+  open?: OpenProposal | null;
+  /** Frozen at the moment a proposal was accepted — the corrected truth. */
+  agreed?: { split: SplitParts; proposedBy: string; acceptedBy: string; at: string } | null;
+  rounds?: NegotiationRound[];
+}
+
+export const ROUNDS_CAP = 20;
+
+export function emptyNegotiation(): NegotiationState {
+  return {};
+}
+
+/** Safe-parse the jsonb column — anything unexpected becomes an empty state. */
+export function parseNegotiation(raw: unknown): NegotiationState {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const r = raw as Record<string, unknown>;
+  const state: NegotiationState = {};
+  if (r.draft && typeof r.draft === "object") state.draft = r.draft as NegotiationState["draft"];
+  if (r.open && typeof r.open === "object") state.open = r.open as OpenProposal;
+  if (r.agreed && typeof r.agreed === "object") state.agreed = r.agreed as NonNullable<NegotiationState["agreed"]>;
+  if (Array.isArray(r.rounds)) state.rounds = r.rounds as NegotiationRound[];
+  return state;
+}
+
+export function snapshotSplitOf(snapshot: Partial<RentalVerificationSnapshot> | null | undefined): SplitParts {
+  return {
+    base: Math.max(0, Number(snapshot?.base) || 0),
+    equipment: Math.max(0, Number(snapshot?.equipment) || 0),
+    overprice: Math.max(0, Number(snapshot?.overprice) || 0),
+  };
+}
+
+export function splitTotal(s: SplitParts): number {
+  return (Number(s.base) || 0) + (Number(s.equipment) || 0) + (Number(s.overprice) || 0);
+}
+
+export function splitsEqual(a: SplitParts, b: SplitParts): boolean {
+  return a.base === b.base && a.equipment === b.equipment && a.overprice === b.overprice;
+}
+
+/** Parts whose value differs from the frozen snapshot (what the proposal edits). */
+export function splitChanges(vs: SplitParts, original: SplitParts): SplitPartKey[] {
+  return SPLIT_PART_ORDER.filter((k) => vs[k] !== original[k]);
+}
+
+/** Clamp ≥0 — a correction can remove a part but never make it negative. */
+export function applySplitDelta(split: SplitParts, part: SplitPartKey, delta: number): SplitParts {
+  return { ...split, [part]: Math.max(0, (Number(split[part]) || 0) + delta) };
+}
+
+export function resetSplitPart(split: SplitParts, part: SplitPartKey, original: SplitParts): SplitParts {
+  return { ...split, [part]: original[part] };
+}
+
+// ── Callback grammar (≤ 64 bytes, unique `vrfp_` prefix) ────────────────────
+//   vrfp_v_<rentalId>           — open / return to the editor main view
+//   vrfp_p<part>_<rentalId>     — open the part adjuster (part = b|e|o)
+//   vrfp_a<part><op>_<rentalId> — apply delta (op = d1 −100, d2 −50, i1 +50, i2 +100, z reset)
+//   vrfp_cm_<rentalId>          — comment input mode
+//   vrfp_s_<rentalId>           — send the proposal to the other party
+//   vrfp_x_<rentalId>           — «расчёт верный» — confirm right from the editor
+//   vrfp_y_<rentalId>           — accept the open proposal
+//   vrfp_n_<rentalId>           — decline the open proposal
+//   vrfp_c_<rentalId>           — counter-proposal (open editor from the open one)
+
+export type ProposalCallbackAction =
+  | "view"
+  | "part"
+  | "adjust"
+  | "comment"
+  | "send"
+  | "confirm"
+  | "accept"
+  | "decline"
+  | "counter";
+
+export interface ParsedProposalCallback {
+  action: ProposalCallbackAction;
+  part?: SplitPartKey;
+  delta?: number;
+  rentalId: string;
+}
+
+const PART_BY_CODE: Record<string, SplitPartKey> = { b: "base", e: "equipment", o: "overprice" };
+const CODE_BY_PART: Record<SplitPartKey, string> = { base: "b", equipment: "e", overprice: "o" };
+const DELTA_BY_OP: Record<string, number> = { d1: -100, d2: -50, i1: 50, i2: 100, z: 0 };
+
+export function encodeProposalCallback(kind: "view" | "comment" | "send" | "confirm" | "accept" | "decline" | "counter", rentalId: string): string {
+  const cmd = { view: "v", comment: "cm", send: "s", confirm: "x", accept: "y", decline: "n", counter: "c" }[kind];
+  return `vrfp_${cmd}_${rentalId}`;
+}
+
+export function encodePartCallback(part: SplitPartKey, rentalId: string): string {
+  return `vrfp_p${CODE_BY_PART[part]}_${rentalId}`;
+}
+
+export function encodeAdjustCallback(part: SplitPartKey, op: keyof typeof DELTA_BY_OP, rentalId: string): string {
+  return `vrfp_a${CODE_BY_PART[part]}${op}_${rentalId}`;
+}
+
+/** Returns null for foreign data — the caller must fall through to other routers. */
+export function parseProposalCallback(data: string): ParsedProposalCallback | null {
+  const raw = String(data || "");
+  if (!raw.startsWith("vrfp_")) return null;
+  const body = raw.slice("vrfp_".length);
+  const us = body.indexOf("_");
+  if (us < 0) return null;
+  const head = body.slice(0, us);
+  const rentalId = body.slice(us + 1).trim();
+  if (!rentalId || !head) return null;
+  const cmd = head[0];
+  if (cmd === "v") return { action: "view", rentalId };
+  if (cmd === "p") {
+    const part = PART_BY_CODE[head.slice(1)];
+    return part ? { action: "part", part, rentalId } : null;
+  }
+  if (cmd === "a") {
+    const part = PART_BY_CODE[head[1]];
+    const delta = DELTA_BY_OP[head.slice(2)];
+    if (!part || delta === undefined) return null;
+    return { action: "adjust", part, delta, rentalId };
+  }
+  if (head === "cm") return { action: "comment", rentalId };
+  if (head === "s") return { action: "send", rentalId };
+  if (head === "x") return { action: "confirm", rentalId };
+  if (head === "y") return { action: "accept", rentalId };
+  if (head === "n") return { action: "decline", rentalId };
+  if (head === "c") return { action: "counter", rentalId };
+  return null;
+}
+
+// ── Negotiation reducers (pure) ──────────────────────────────────────────────
+
+export function partyRole(state: { operator_chat_id?: string | null; owner_chat_id?: string | null }, chatId: string): "operator" | "owner" | null {
+  if (state.operator_chat_id && String(state.operator_chat_id) === chatId) return "operator";
+  if (state.owner_chat_id && String(state.owner_chat_id) === chatId) return "owner";
+  return null;
+}
+
+/** Other negotiation party (null for single-party rows — no one to negotiate with). */
+export function otherPartyChatId(row: { operator_chat_id?: string | null; owner_chat_id?: string | null }, chatId: string): string | null {
+  const role = partyRole(row, chatId);
+  if (role === "operator") {
+    // operator === owner (the same human) → no second party
+    return row.owner_chat_id && row.owner_chat_id !== row.operator_chat_id ? String(row.owner_chat_id) : null;
+  }
+  if (role === "owner") return row.operator_chat_id && row.operator_chat_id !== row.owner_chat_id ? String(row.operator_chat_id) : null;
+  return null;
+}
+
+export function startDraft(nego: NegotiationState, chatId: string, role: "operator" | "owner", original: SplitParts, fromSplit?: SplitParts): NegotiationState {
+  return {
+    ...nego,
+    draft: { by: chatId, role, split: fromSplit ? { ...fromSplit } : { ...original }, comment: nego.draft?.by === chatId ? nego.draft.comment : null },
+  };
+}
+
+export function setDraftSplit(nego: NegotiationState, split: SplitParts): NegotiationState {
+  if (!nego.draft) return nego;
+  return { ...nego, draft: { ...nego.draft, split } };
+}
+
+export function setDraftComment(nego: NegotiationState, comment: string): NegotiationState {
+  if (!nego.draft) return nego;
+  return { ...nego, draft: { ...nego.draft, comment: comment.slice(0, 300) } };
+}
+
+export function clearDraft(nego: NegotiationState): NegotiationState {
+  return { ...nego, draft: null };
+}
+
+export function pushRound(nego: NegotiationState, round: NegotiationRound): NegotiationState {
+  const rounds = [...(nego.rounds || []), round].slice(-ROUNDS_CAP);
+  return { ...nego, rounds };
+}
+
+/**
+ * Send the current draft as a proposal to the other party.
+ * Requires a draft with at least one changed part or a comment.
+ */
+export function sendProposalFromDraft(
+  nego: NegotiationState,
+  params: { chatId: string; role: "operator" | "owner"; nowIso: string; original: SplitParts },
+): { state: NegotiationState; ok: boolean; error?: string } {
+  const draft = nego.draft;
+  if (!draft || draft.by !== params.chatId) {
+    return { state: nego, ok: false, error: "Сначала откройте редактор и измените хотя бы одну часть расчёта." };
+  }
+  const changed = splitChanges(draft.split, params.original);
+  if (changed.length === 0 && !(draft.comment || "").trim()) {
+    return { state: nego, ok: false, error: "Изменений нет — поправьте хотя бы одну часть расчёта или добавьте комментарий." };
+  }
+  if (nego.open) {
+    return { state: nego, ok: false, error: "Предложение уже отправлено и ждёт ответа второй стороны." };
+  }
+  const proposal: OpenProposal = {
+    by: params.chatId,
+    role: params.role,
+    at: params.nowIso,
+    split: { ...draft.split },
+    comment: (draft.comment || "").trim() || null,
+  };
+  const round: NegotiationRound = {
+    action: nego.rounds?.some((r) => r.action === "propose" || r.action === "counter") ? "counter" : "propose",
+    by: params.chatId,
+    role: params.role,
+    at: params.nowIso,
+    split: { ...draft.split },
+    comment: proposal.comment,
+  };
+  return { state: pushRound({ ...clearDraft(nego), open: proposal }, round), ok: true };
+}
+
+/** The other party agrees → negotiation closes with the agreed numbers. */
+export function acceptOpenProposal(
+  nego: NegotiationState,
+  params: { chatId: string; role: "operator" | "owner" },
+): { state: NegotiationState; ok: boolean; error?: string } {
+  const open = nego.open;
+  if (!open) return { state: nego, ok: false, error: "Открытого предложения нет." };
+  if (open.by === params.chatId) return { state: nego, ok: false, error: "Нельзя согласиться со своим предложением — дождитесь ответа второй стороны." };
+  const accepted: NonNullable<NegotiationState["agreed"]> = {
+    split: { ...open.split },
+    proposedBy: open.by,
+    acceptedBy: params.chatId,
+    at: new Date().toISOString(),
+  };
+  const round: NegotiationRound = { action: "accept", by: params.chatId, role: params.role, at: accepted.at, split: { ...open.split }, comment: open.comment };
+  return { state: pushRound({ ...nego, open: null, agreed: accepted }, round), ok: true };
+}
+
+/** The other party declines → back to a plain disputed row (manual talk). */
+export function declineOpenProposal(
+  nego: NegotiationState,
+  params: { chatId: string; role: "operator" | "owner"; nowIso: string },
+): { state: NegotiationState; ok: boolean; error?: string } {
+  const open = nego.open;
+  if (!open) return { state: nego, ok: false, error: "Открытого предложения нет." };
+  if (open.by === params.chatId) return { state: nego, ok: false, error: "Своё предложение нельзя отклонить — дождитесь ответа второй стороны." };
+  const round: NegotiationRound = { action: "decline", by: params.chatId, role: params.role, at: params.nowIso, split: { ...open.split }, comment: open.comment };
+  return { state: pushRound({ ...nego, open: null }, round), ok: true };
+}
+
+// ── Negotiation keyboards ────────────────────────────────────────────────────
+
+export function disputeEditorKeyboard(rentalId: string, draft: SplitParts, original: SplitParts): InlineButton[][] {
+  const changed = new Set(splitChanges(draft, original));
+  const partButton = (part: SplitPartKey): InlineButton => ({
+    text: `${changed.has(part) ? "✏️" : ""}${SPLIT_PART_META[part].icon} ${SPLIT_PART_META[part].label}: ${formatRubVerify(draft[part])}`,
+    callback_data: encodePartCallback(part, rentalId),
+  });
+  return [
+    [partButton("base")],
+    [partButton("equipment")],
+    [partButton("overprice")],
+    [
+      { text: "✍️ Комментарий", callback_data: encodeProposalCallback("comment", rentalId) },
+      { text: "📤 Отправить", callback_data: encodeProposalCallback("send", rentalId) },
+    ],
+    [{ text: "✅ Расчёт верный — подтвердить", callback_data: encodeProposalCallback("confirm", rentalId) }],
+  ];
+}
+
+export function adjustPartKeyboard(part: SplitPartKey, rentalId: string): InlineButton[][] {
+  return [
+    [
+      { text: "−100", callback_data: encodeAdjustCallback(part, "d1", rentalId) },
+      { text: "−50", callback_data: encodeAdjustCallback(part, "d2", rentalId) },
+      { text: "+50", callback_data: encodeAdjustCallback(part, "i1", rentalId) },
+      { text: "+100", callback_data: encodeAdjustCallback(part, "i2", rentalId) },
+    ],
+    [
+      { text: "↺ Сброс", callback_data: encodeAdjustCallback(part, "z", rentalId) },
+      { text: "⬅️ К частям", callback_data: encodeProposalCallback("view", rentalId) },
+    ],
+    [{ text: "📤 Отправить предложение", callback_data: encodeProposalCallback("send", rentalId) }],
+  ];
+}
+
+export function proposalResponseKeyboard(rentalId: string): InlineButton[][] {
+  return [
+    [
+      { text: "✅ Согласиться", callback_data: encodeProposalCallback("accept", rentalId) },
+      { text: "⚠️ Предложить своё", callback_data: encodeProposalCallback("counter", rentalId) },
+    ],
+    [{ text: "❌ Отклонить", callback_data: encodeProposalCallback("decline", rentalId) }],
+  ];
+}
+
+// ── Negotiation formatters ───────────────────────────────────────────────────
+
+/** Split line: «`🏍 техника: 500 ₽»` — shared by editor / proposal / done texts. */
+function splitLine(part: SplitPartKey, value: number, prev?: number): string {
+  const meta = SPLIT_PART_META[part];
+  if (prev === undefined || prev === value) return `  ${meta.icon} ${meta.label}: ${formatRubVerify(value)}`;
+  const diff = value - prev;
+  const sign = diff > 0 ? "+" : "−";
+  return `  ${meta.icon} ${meta.label}: ${formatRubVerify(prev)} → <b>${formatRubVerify(value)}</b> (${sign}${formatRubVerify(Math.abs(diff))})`;
+}
+
+export function formatDisputeEditor(params: {
+  snapshot: Partial<RentalVerificationSnapshot>;
+  draft: SplitParts;
+  actorLabel: string;
+  comment?: string | null;
+  activePart?: SplitPartKey | null;
+}): string {
+  const original = snapshotSplitOf(params.snapshot);
+  const d = params.draft;
+  const lines: string[] = [
+    `⚖️ <b>Редактор расчёта</b> — ${escapeVerifyHtml(params.snapshot.bikeName || "аренда")}`,
+    `💵 Сумма аренды (клиент): ${formatRubVerify(Number(params.snapshot.totalCost) || 0)}`,
+    ``,
+    `📊 <b>Комиссия оператора: ${formatRubVerify(splitTotal(original))} → ${formatRubVerify(splitTotal(d))}</b>`,
+  ];
+  for (const part of SPLIT_PART_ORDER) lines.push(splitLine(part, d[part], original[part]));
+  if (params.comment) lines.push(``, `✍️ Комментарий: ${escapeVerifyHtml(params.comment)}`);
+  if (params.activePart) {
+    lines.push(
+      ``,
+      `👉 ${SPLIT_PART_META[params.activePart].icon} <b>${SPLIT_PART_META[params.activePart].label}</b> — жмите кнопки, чтобы изменить сумму:`,
+    );
+  } else {
+    lines.push(``, `👉 Тапайте часть расчёта, чтобы изменить её. Готовы — жмите «📤 Отправить».`);
+  }
+  return lines.join("\n");
+}
+
+export function formatProposalMessage(params: {
+  snapshot: Partial<RentalVerificationSnapshot>;
+  proposal: OpenProposal;
+  proposerLabel: string;
+  forChatId: string;
+}): string {
+  const original = snapshotSplitOf(params.snapshot);
+  const p = params.proposal;
+  const lines: string[] = [
+    `⚖️ <b>Предложение по сверке</b> — ${escapeVerifyHtml(params.snapshot.bikeName || "аренда")}`,
+    ``,
+    `${escapeVerifyHtml(params.proposerLabel)} предлагает скорректировать расчёт:`,
+    ``,
+  ];
+  for (const part of SPLIT_PART_ORDER) lines.push(splitLine(part, p.split[part], original[part]));
+  lines.push(``, `📊 Итог оператору: ${formatRubVerify(splitTotal(original))} → <b>${formatRubVerify(splitTotal(p.split))}</b>`);
+  if (p.comment) lines.push(``, `✍️ ${escapeVerifyHtml(p.comment)}`);
+  lines.push(``, `Согласны — жмите ✅. Думаете иначе — «⚠️ Предложить своё».`);
+  return lines.join("\n");
+}
+
+export function formatDealDoneText(params: {
+  snapshot: Partial<RentalVerificationSnapshot>;
+  agreedSplit: SplitParts;
+  proposerLabel: string;
+  acceptorLabel: string;
+}): string {
+  const original = snapshotSplitOf(params.snapshot);
+  const a = params.agreedSplit;
+  const lines: string[] = [
+    `🤝 <b>Расчёт скорректирован и подтверждён</b>`,
+    ``,
+    `${escapeVerifyHtml(params.proposerLabel)} → ${escapeVerifyHtml(params.acceptorLabel)} договорились:`,
+  ];
+  for (const part of SPLIT_PART_ORDER) lines.push(splitLine(part, a[part], original[part]));
+  lines.push(``, `📊 Итог оператору: ${formatRubVerify(splitTotal(a))} (было ${formatRubVerify(splitTotal(original))})`);
+  lines.push(`Аренда помечена как <b>проверенная</b> ✅ с этими числами.`);
+  return lines.join("\n");
+}
+
 // ── Month-end tally (pure) ───────────────────────────────────────────────────
 
 export interface VerificationBrief {
   status: RentalVerificationStatus;
   operatorChatId: string | null;
   ownerChatId: string | null;
+  /** Task 106: an open proposal is waiting for the other party's answer. */
+  proposalOpen?: boolean;
+  /** Task 106: agreed (corrected) split after an accepted proposal. */
+  agreedSplit?: SplitParts | null;
 }
 
 /**

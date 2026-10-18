@@ -80,6 +80,10 @@ export interface RentalDashboardItem {
   } | null;
   // Task 102: operator+owner verification state (null = no row / table absent).
   verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
+  /** Task 106: an open negotiation proposal awaits the other party's answer. */
+  verificationProposalOpen?: boolean;
+  /** Task 106: the row was verified with a NEGOTIATED (corrected) split. */
+  verificationAdjusted?: boolean;
   // Resolved operator display name (username/full_name from public.users)
   operatorName?: string | null;
   // iter20: resolved partner-owner label ("@username · Full Name") for
@@ -793,6 +797,8 @@ export async function getRentalsDashboard(input: {
           items = items.map(item => ({
             ...item,
             verificationStatus: verificationMap.get(item.rental_id)?.status ?? null,
+            verificationProposalOpen: verificationMap.get(item.rental_id)?.proposalOpen === true,
+            verificationAdjusted: !!verificationMap.get(item.rental_id)?.agreedSplit,
           }));
         } catch (verErr) {
           console.warn("[rentals-dashboard] verification enrich failed (non-fatal):", verErr);

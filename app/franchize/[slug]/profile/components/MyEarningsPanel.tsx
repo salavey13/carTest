@@ -50,6 +50,8 @@ type PeriodEarnings = {
       returnedByLabel: string;
       // Task 101: operator+owner verification state (null = no data yet).
       verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
+      // Task 106: the numbers were corrected by an accepted negotiation deal.
+      verificationAdjusted?: boolean;
       // Task 102: rentals.status — manual verify button renders for completed only.
       status?: string;
     }>;
@@ -604,8 +606,9 @@ export function MyEarningsPanel({
                                 <span
                                   className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
                                   style={{ backgroundColor: "color-mix(in srgb, #22c55e 15%, transparent)", color: "#22c55e" }}
+                                  title={r.verificationAdjusted ? "Числа скорректированы по согласованному предложению" : undefined}
                                 >
-                                  ✅ подтверждено
+                                  {r.verificationAdjusted ? "✅ скорректировано" : "✅ подтверждено"}
                                 </span>
                               ) : r.verificationStatus === "disputed" ? (
                                 <span

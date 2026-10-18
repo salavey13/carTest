@@ -67,6 +67,10 @@ export interface AnalyticsRentalRow {
    *  (rental_verifications row; null = no data / table not applied yet).
    *  Rendered as ✅/⏳/⚠️ chips on the rental card + detail drawer. */
   verificationStatus?: "pending" | "operator_confirmed" | "owner_confirmed" | "verified" | "disputed" | null;
+  /** Task 106: an open negotiation proposal awaits the other party's answer. */
+  verificationProposalOpen?: boolean;
+  /** Task 106: the row was verified with a NEGOTIATED (corrected) split. */
+  verificationAdjusted?: boolean;
 }
 
 export interface AnalyticsSaleRow {
