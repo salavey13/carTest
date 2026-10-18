@@ -53,7 +53,7 @@ export function FranchizeContactsMap({ gps, address, mapImageUrl, mapBounds, the
           backgroundColor: theme?.palette.bgCard ? `${theme.palette.bgCard}88` : undefined,
         }}
       >
-        Карта появится после добавления coordinates в metadata.contacts.map.gps
+        Карта скоро появится — уточнить маршрут можно по телефону или в Telegram из блока контактов выше
       </div>
     );
   }

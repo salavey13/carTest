@@ -260,7 +260,11 @@ export function CrewHeader({
               className="relative h-12 w-12 min-h-12 min-w-12 overflow-hidden rounded-full border shadow-lg"
               style={{
                 borderColor: accentMain,
-                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
+                // 2026-10-18: transparent circle bg — logos with transparent
+                // backgrounds (e.g. moto-selection's 2:1 tildacdn PNG) must
+                // show the page behind them, not a filled disc (boss: «bg is
+                // transparent btw, so no need to fill empty space with color»).
+                backgroundColor: "transparent",
               }}
             >
               {logoUrl ? (
@@ -271,7 +275,11 @@ export function CrewHeader({
                       alt={`${crew.header.brandName} logo`}
                       fill
                       sizes="48px"
-                      className="object-cover"
+                      // 2026-10-18: object-contain — wide (2:1) logos must fit
+                      // INSIDE the round icon uncropped; object-cover used to
+                      // slice their sides off. With contain + transparent bg
+                      // the letterbox area just shows the page.
+                      className="object-contain"
                       onLoad={() => setLogoLoaded(true)}
                       onError={() => {
                         const localSrc = localImageSrc(logoUrl);
@@ -399,7 +407,18 @@ export function CrewHeader({
               // 2026-09-27: «Хранение» — route pill to the winter-storage wall
               // (same pattern as parts; visibility gated on storageEnabled).
               { key: "storage" as const, label: tabLabels.storage, count: 0, icon: Snowflake, isStorage: true },
-            ]).filter((pill) => !hiddenTabs.has(pill.key) && (pill.key !== "storage" || storageEnabled)).map((pill) => {
+            ])
+              // 2026-10-18 (boss): hide countable balloons (rent/sale/service/
+              // equipment) when the catalog HAS loaded and that type is empty —
+              // moto-selection's services-only rail must not show empty «Аренда»
+              // /«Продажа» pills. Gate only on a real array: `items === undefined`
+              // (callers that don't pass the prop) keeps the classic rail.
+              .filter((pill) =>
+                !hiddenTabs.has(pill.key)
+                && (pill.key !== "storage" || storageEnabled)
+                && !(Array.isArray(items) && (pill.key === "rent" || pill.key === "sale" || pill.key === "service" || pill.key === "equipment") && pill.count === 0)
+              )
+              .map((pill) => {
               // Equipment/Parts/Storage use pathname-based active state (separate
               // routes); rent/sale/service use displayMode-based active state
               const isActive = pill.isEquipment

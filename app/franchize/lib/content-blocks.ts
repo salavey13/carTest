@@ -54,6 +54,9 @@ export interface FranchizeContentBlocks {
   onboardingReadinessRows: OnboardingReadinessRowBlock[];
   aboutCapabilities: AboutCapabilityBlock[];
   aboutWorkSteps: AboutWorkStepBlock[];
+  /** Optional «О нас» hero override from metadata (about.heroTitle).
+   *  Empty string = page keeps its own generic hero line. */
+  aboutHeroTitle: string;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -173,9 +176,29 @@ export const DEFAULT_FRANCHIZE_CONTENT_BLOCKS: FranchizeContentBlocks = {
   onboardingReadinessRows: DEFAULT_ONBOARDING_READINESS_ROWS,
   aboutCapabilities: DEFAULT_ABOUT_CAPABILITIES,
   aboutWorkSteps: DEFAULT_ABOUT_WORK_STEPS,
+  aboutHeroTitle: "",
 };
 
-export function cloneFranchizeContentBlocks(blocks: FranchizeContentBlocks = DEFAULT_FRANCHIZE_CONTENT_BLOCKS): FranchizeContentBlocks {
+// ── vip-bike-gated defaults (2026-10-18) ────────────────────────────────────
+// Every DEFAULT_* block below was written for the FIRST crew (vip-bike:
+// rental + sales + configurator wording like «Выберите байк», «Продажи и
+// конфигуратор»). vip-bike hydrates its OWN contentBlocks in metadata, so
+// these literals only ever surface through the fallback path — and until
+// 2026-10-18 that fallback leaked them onto OTHER crews' pages (moto-selection
+// about page showed «Выберите байк» ride flow). The fallback rule now mirrors
+// storage-config's legacy rule: defaults apply to vip-bike ONLY; any other
+// crew without hydrated blocks gets EMPTY arrays and the pages hide those
+// sections (boss 2026-10-18: «add guard around this hardcode to be shown only
+// for vip-bike, or ditch ungeneral text»). A crew opts into its own copy via
+// metadata.franchize.contentBlocks (see docs/crewDocs hydration SQLs).
+const DEFAULTS_ONLY_FOR_SLUG = "vip-bike";
+
+function nonEmptyGated<T extends object>(items: T[], fallback: T[], slug: string): T[] {
+  if (items.length > 0) return items.map((item) => ({ ...item }));
+  return slug.trim() === DEFAULTS_ONLY_FOR_SLUG ? fallback.map((item) => ({ ...item })) : [];
+}
+
+export function cloneFranchizeContentBlocks(blocks: FranchizeContentBlocks = DEFAULT_FRANCHIZE_CONTENT_BLOCKS, slug = DEFAULTS_ONLY_FOR_SLUG): FranchizeContentBlocks {
   return {
     communityEvents: blocks.communityEvents.map((item) => ({ ...item })),
     partnerCards: blocks.partnerCards.map((item) => ({ ...item })),
@@ -185,6 +208,7 @@ export function cloneFranchizeContentBlocks(blocks: FranchizeContentBlocks = DEF
     onboardingReadinessRows: blocks.onboardingReadinessRows.map((item) => ({ ...item })),
     aboutCapabilities: blocks.aboutCapabilities.map((item) => ({ ...item })),
     aboutWorkSteps: blocks.aboutWorkSteps.map((item) => ({ ...item })),
+    aboutHeroTitle: blocks.aboutHeroTitle,
   };
 }
 
@@ -229,8 +253,9 @@ const readContentSource = (metadata: unknown): UnknownRecord => {
 };
 
 const nonEmpty = <T extends object>(items: T[], fallback: T[]) => (items.length > 0 ? items : fallback.map((item) => ({ ...item })));
+void nonEmpty; // kept for reference; the gated variant below replaced all uses
 
-const readCommunityEvents = (source: UnknownRecord): CommunityEventBlock[] => nonEmpty(
+const readCommunityEvents = (source: UnknownRecord, slug: string): CommunityEventBlock[] => nonEmptyGated(
   readArray(source, [["communityEvents"], ["community", "events"]])
     .map((item) => {
       const event = asRecord(item);
@@ -243,9 +268,10 @@ const readCommunityEvents = (source: UnknownRecord): CommunityEventBlock[] => no
     })
     .filter((event) => event.title && event.text),
   DEFAULT_COMMUNITY_EVENTS,
+  slug,
 );
 
-const readPartnerCards = (source: UnknownRecord): PartnerCardBlock[] => nonEmpty(
+const readPartnerCards = (source: UnknownRecord, slug: string): PartnerCardBlock[] => nonEmptyGated(
   readArray(source, [["partnerCards"], ["community", "partnerCards"], ["community", "partners"]])
     .map((item) => {
       const partner = asRecord(item);
@@ -257,16 +283,18 @@ const readPartnerCards = (source: UnknownRecord): PartnerCardBlock[] => nonEmpty
     })
     .filter((partner) => partner.name && partner.perk),
   DEFAULT_PARTNER_CARDS,
+  slug,
 );
 
-const readCityRiderTips = (source: UnknownRecord): CityRiderTipBlock[] => nonEmpty(
+const readCityRiderTips = (source: UnknownRecord, slug: string): CityRiderTipBlock[] => nonEmptyGated(
   readArray(source, [["cityRiderTips"], ["cityTips"], ["community", "cityRiderTips"], ["community", "cityTips"], ["community", "tips"]])
     .map((item) => (typeof item === "string" ? { text: item.trim() } : { text: readString(asRecord(item), ["text", "tip", "title"]) }))
     .filter((tip) => tip.text),
   DEFAULT_CITY_RIDER_TIPS,
+  slug,
 );
 
-const readSalesVerticals = (source: UnknownRecord): SalesVerticalCopyBlock[] => nonEmpty(
+const readSalesVerticals = (source: UnknownRecord, slug: string): SalesVerticalCopyBlock[] => nonEmptyGated(
   readArray(source, [["salesVerticals"], ["sales", "verticals"], ["sales", "verticalCopy"]])
     .map((item) => {
       const vertical = asRecord(item);
@@ -280,9 +308,10 @@ const readSalesVerticals = (source: UnknownRecord): SalesVerticalCopyBlock[] => 
     })
     .filter((vertical) => vertical.id && vertical.title && vertical.pitch),
   DEFAULT_SALES_VERTICALS,
+  slug,
 );
 
-const readOnboardingChecklist = (source: UnknownRecord): OnboardingChecklistBlock[] => nonEmpty(
+const readOnboardingChecklist = (source: UnknownRecord, slug: string): OnboardingChecklistBlock[] => nonEmptyGated(
   readArray(source, [["onboardingChecklist"], ["onboarding", "checklist"]])
     .map((item) => {
       const checklistItem = asRecord(item);
@@ -294,9 +323,10 @@ const readOnboardingChecklist = (source: UnknownRecord): OnboardingChecklistBloc
     })
     .filter((item) => item.title && item.text),
   DEFAULT_ONBOARDING_CHECKLIST,
+  slug,
 );
 
-const readReadinessRows = (source: UnknownRecord): OnboardingReadinessRowBlock[] => nonEmpty(
+const readReadinessRows = (source: UnknownRecord, slug: string): OnboardingReadinessRowBlock[] => nonEmptyGated(
   readArray(source, [["onboardingReadinessRows"], ["readinessRows"], ["onboarding", "readinessRows"], ["onboarding", "readiness"]])
     .map((item) => {
       if (Array.isArray(item)) {
@@ -314,10 +344,11 @@ const readReadinessRows = (source: UnknownRecord): OnboardingReadinessRowBlock[]
     })
     .filter((row) => row.label && row.text),
   DEFAULT_ONBOARDING_READINESS_ROWS,
+  slug,
 );
 
 
-const readAboutCapabilities = (source: UnknownRecord): AboutCapabilityBlock[] => nonEmpty(
+const readAboutCapabilities = (source: UnknownRecord, slug: string): AboutCapabilityBlock[] => nonEmptyGated(
   readArray(source, [["aboutCapabilities"], ["about", "capabilities"]])
     .map((item) => {
       const capability = asRecord(item);
@@ -329,9 +360,10 @@ const readAboutCapabilities = (source: UnknownRecord): AboutCapabilityBlock[] =>
     })
     .filter((item) => item.title && item.text),
   DEFAULT_ABOUT_CAPABILITIES,
+  slug,
 );
 
-const readAboutWorkSteps = (source: UnknownRecord): AboutWorkStepBlock[] => nonEmpty(
+const readAboutWorkSteps = (source: UnknownRecord, slug: string): AboutWorkStepBlock[] => nonEmptyGated(
   readArray(source, [["aboutWorkSteps"], ["about", "workSteps"], ["about", "steps"]])
     .map((item) => {
       const step = asRecord(item);
@@ -342,19 +374,27 @@ const readAboutWorkSteps = (source: UnknownRecord): AboutWorkStepBlock[] => nonE
     })
     .filter((item) => item.title && item.text),
   DEFAULT_ABOUT_WORK_STEPS,
+  slug,
 );
 
-export function readFranchizeContentBlocks(metadata: unknown): FranchizeContentBlocks {
+export function readFranchizeContentBlocks(metadata: unknown, slug = DEFAULTS_ONLY_FOR_SLUG): FranchizeContentBlocks {
   const source = readContentSource(metadata);
 
   return {
-    communityEvents: readCommunityEvents(source),
-    partnerCards: readPartnerCards(source),
-    cityRiderTips: readCityRiderTips(source),
-    salesVerticals: readSalesVerticals(source),
-    onboardingChecklist: readOnboardingChecklist(source),
-    onboardingReadinessRows: readReadinessRows(source),
-    aboutCapabilities: readAboutCapabilities(source),
-    aboutWorkSteps: readAboutWorkSteps(source),
+    communityEvents: readCommunityEvents(source, slug),
+    partnerCards: readPartnerCards(source, slug),
+    cityRiderTips: readCityRiderTips(source, slug),
+    salesVerticals: readSalesVerticals(source, slug),
+    onboardingChecklist: readOnboardingChecklist(source, slug),
+    onboardingReadinessRows: readReadinessRows(source, slug),
+    aboutCapabilities: readAboutCapabilities(source, slug),
+    aboutWorkSteps: readAboutWorkSteps(source, slug),
+    // «О нас» hero override — any crew may set about.heroTitle (hydration
+    // metadata shape) or contentBlocks.aboutHeroTitle directly. No default:
+    // empty = the page keeps its own hero line (vip-bike's about hero is the
+    // page-level legacy literal, untouched).
+    aboutHeroTitle:
+      readString(asRecord(source.about), ["heroTitle", "tagline"])
+      || readString(source, ["aboutHeroTitle"], ""),
   };
 }

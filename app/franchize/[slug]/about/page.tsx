@@ -18,6 +18,7 @@ import {
   type CatalogItemVM,
   type FranchizeCrewVM,
 } from "../../actions";
+import { hasSalePrice } from "../../lib/catalog-utils";
 import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizeHero } from "../../components/FranchizeHero";
@@ -117,6 +118,20 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
       : "Отзывы появятся после первых заказов";
   const capabilities = crew.contentBlocks.aboutCapabilities;
   const workSteps = crew.contentBlocks.aboutWorkSteps;
+  // ── vip-bike-gated hardcode (boss 2026-10-18) ────────────────────────────
+  // The legacy hero tail, the «Telegram-first» positioning card and the
+  // sales CTA were written for the FIRST crew. Other crews: hero tail comes
+  // from metadata (about.heroTitle via contentBlocks) or a neutral line, the
+  // Telegram-first card is hidden, and the sales CTA shows only when the
+  // catalog actually has sale items.
+  const isVipBike = resolvedSlug === "vip-bike";
+  const heroTitle = isVipBike
+    ? `${brandName}: байки, маршруты и поддержка в одном экипаже`
+    : crew.contentBlocks.aboutHeroTitle
+      ? `${brandName}: ${crew.contentBlocks.aboutHeroTitle}`
+      : `${brandName} — экипаж сети OneBikePls`;
+  const showTelegramFirstCard = isVipBike;
+  const hasSaleItems = items.some(hasSalePrice);
   const trustStrip: TrustStripItem[] = [
     {
       label: "Рейтинг",
@@ -147,24 +162,27 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
         activePath={activePath}
         groupLinks={items.map((item) => item.category)}
         sectionLinks={buildFranchizeIntentLinks(resolvedSlug, activePath, { storageEnabled: crew.storage?.enabled })}
+        items={items}
       />
       <FranchizePageShell theme={crew.theme} className="pb-14">
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/about · экипаж`}
-          title={`${brandName}: байки, маршруты и поддержка в одном экипаже`}
+          title={heroTitle}
           subcopy={pitch}
           primaryCta={{ label: "Смотреть каталог", href: `/franchize/${resolvedSlug}` }}
           secondaryCta={{ label: "Связаться", href: `/franchize/${resolvedSlug}/contacts` }}
         >
-          <div className="rounded-2xl border px-4 py-3 text-sm" style={surface.subtleCard}>
-            <div className={`flex items-center gap-2 font-bold ${accentTextClass}`}>
-              <ShieldCheck className="h-5 w-5" />
-              Telegram-first экипаж
+          {showTelegramFirstCard ? (
+            <div className="rounded-2xl border px-4 py-3 text-sm" style={surface.subtleCard}>
+              <div className={`flex items-center gap-2 font-bold ${accentTextClass}`}>
+                <ShieldCheck className="h-5 w-5" />
+                Telegram-first экипаж
+              </div>
+              <p className={`mt-2 leading-6 ${mutedTextClass}`}>
+                Позиционирование строится вокруг быстрой заявки, прозрачного контакта и понятной точки выдачи.
+              </p>
             </div>
-            <p className={`mt-2 leading-6 ${mutedTextClass}`}>
-              Позиционирование строится вокруг быстрой заявки, прозрачного контакта и понятной точки выдачи.
-            </p>
-          </div>
+          ) : null}
         </FranchizeHero>
 
         <section className="mt-8 grid gap-3 md:grid-cols-3" aria-label="Доверие к экипажу">
@@ -195,49 +213,53 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
           </section>
         ) : null}
 
-        <section className="mt-10">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${accentTextClass}`}>
-                capabilities
+        {capabilities.length > 0 ? (
+          <section className="mt-10">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${accentTextClass}`}>
+                  capabilities
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold">Что умеет экипаж</h2>
+              </div>
+              <p className={`max-w-xl text-sm leading-6 ${mutedTextClass}`}>
+                От первой идеи поездки до возврата и повторной покупки — всё завязано на понятный операторский сценарий.
               </p>
-              <h2 className="mt-2 text-3xl font-semibold">Что умеет экипаж</h2>
             </div>
-            <p className={`max-w-xl text-sm leading-6 ${mutedTextClass}`}>
-              От первой идеи поездки до возврата и повторной покупки — всё завязано на понятный операторский сценарий.
-            </p>
-          </div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {capabilities.map((capability) => {
-              const Icon = capability.icon ? (capabilityIconMap[capability.icon] ?? CircleHelp) : CircleHelp;
-              return (
-                <article key={capability.title} className="rounded-3xl border p-5" style={surface.subtleCard}>
-                  <Icon className={`h-7 w-7 ${accentTextClass}`} />
-                  <h3 className="mt-4 text-xl font-semibold">{capability.title}</h3>
-                  <p className={`mt-2 text-sm leading-6 ${mutedTextClass}`}>{capability.text}</p>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              {capabilities.map((capability) => {
+                const Icon = capability.icon ? (capabilityIconMap[capability.icon] ?? CircleHelp) : CircleHelp;
+                return (
+                  <article key={capability.title} className="rounded-3xl border p-5" style={surface.subtleCard}>
+                    <Icon className={`h-7 w-7 ${accentTextClass}`} />
+                    <h3 className="mt-4 text-xl font-semibold">{capability.title}</h3>
+                    <p className={`mt-2 text-sm leading-6 ${mutedTextClass}`}>{capability.text}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
-        <section className="mt-10">
-          <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${accentTextClass}`}>
-            ride flow
-          </p>
-          <h2 className="mt-2 text-3xl font-semibold">Как это работает</h2>
-          <div className="mt-5 grid gap-4 lg:grid-cols-4">
-            {workSteps.map((step, index) => (
-              <article key={step.title} className="rounded-3xl border p-5" style={surface.subtleCard}>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--franchize-shell-accent)] text-sm font-black text-[var(--franchize-shell-primary-contrast)]">
-                  {index + 1}
-                </div>
-                <h3 className="mt-4 text-lg font-semibold">{step.title}</h3>
-                <p className={`mt-2 text-sm leading-6 ${mutedTextClass}`}>{step.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        {workSteps.length > 0 ? (
+          <section className="mt-10">
+            <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${accentTextClass}`}>
+              ride flow
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold">Как это работает</h2>
+            <div className="mt-5 grid gap-4 lg:grid-cols-4">
+              {workSteps.map((step, index) => (
+                <article key={step.title} className="rounded-3xl border p-5" style={surface.subtleCard}>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--franchize-shell-accent)] text-sm font-black text-[var(--franchize-shell-primary-contrast)]">
+                    {index + 1}
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold">{step.title}</h3>
+                  <p className={`mt-2 text-sm leading-6 ${mutedTextClass}`}>{step.text}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-10 rounded-3xl border p-5 sm:p-6" style={surface.subtleCard}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -249,16 +271,18 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
                 Каталог, покупка или прямой контакт — без лишних экранов.
               </h2>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3 md:min-w-[32rem]">
+            <div className={`grid gap-2 ${hasSaleItems ? "sm:grid-cols-3" : "sm:grid-cols-2"} md:min-w-[24rem]`}>
               <Link
                 href={`/franchize/${resolvedSlug}`}
                 className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[var(--franchize-shell-accent)] bg-[var(--franchize-shell-accent)] px-4 py-3 text-center text-sm font-semibold text-[var(--franchize-shell-primary-contrast)] transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--franchize-shell-ring)]"
               >
                 Каталог
               </Link>
-              <Link href={`/franchize/${resolvedSlug}/sales`} className={secondaryCtaClass}>
-                Продажи / конфигуратор
-              </Link>
+              {hasSaleItems ? (
+                <Link href={`/franchize/${resolvedSlug}/sales`} className={secondaryCtaClass}>
+                  Продажи / конфигуратор
+                </Link>
+              ) : null}
               <Link href={`/franchize/${resolvedSlug}/contacts`} className={`${secondaryCtaClass} gap-2`}>
                 <CheckCircle2 className="h-4 w-4" /> Контакты
               </Link>

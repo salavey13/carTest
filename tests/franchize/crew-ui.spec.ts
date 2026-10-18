@@ -116,7 +116,12 @@ describe('crew-ui wiring', () => {
     expect(crewHeaderSrc).toContain('label: tabLabels.rent');
     // 2026-09-27: the filter also drops the storage pill when the crew has
     // storage disabled (pill.key !== "storage" || storageEnabled).
-    expect(crewHeaderSrc).toContain('.filter((pill) => !hiddenTabs.has(pill.key) && (pill.key !== "storage" || storageEnabled))');
+    // 2026-10-18 (boss): countable pills (rent/sale/service/equipment) also
+    // hide when the catalog loaded empty for that type — services-only crews
+    // (moto-selection) must not show «Аренда»/«Продажа» balloons with 0 items.
+    expect(crewHeaderSrc).toContain('!hiddenTabs.has(pill.key)');
+    expect(crewHeaderSrc).toContain('(pill.key !== "storage" || storageEnabled)');
+    expect(crewHeaderSrc).toContain('Array.isArray(items)');
     // no hardcoded rail labels left in the component
     expect(crewHeaderSrc).not.toContain('label: "Аренда"');
   });

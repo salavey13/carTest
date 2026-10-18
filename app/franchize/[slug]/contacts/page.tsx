@@ -68,7 +68,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
         <FranchizeHero
           eyebrow={`/franchize/${resolvedSlug}/contacts · связь`}
           title="Контакты экипажа"
-          subcopy="Быстрый операторский блок для связи, маршрута и проверки точки выдачи перед арендой или покупкой."
+          subcopy="Быстрая связь с экипажем: телефон, Telegram и маршрут до точки — оператор подтвердит детали перед визитом."
           primaryCta={primaryContactCta}
           secondaryCta={{ label: "Открыть каталог", href: `/franchize/${resolvedSlug}` }}
         />
@@ -94,12 +94,14 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
               </div>
               <h2 className="mt-3 text-2xl font-bold text-[var(--crew-text)]">Выберите быстрый канал</h2>
               <p className="mt-2 max-w-2xl text-sm text-[var(--crew-muted)]">
-                Telegram — основной канал экипажа, телефон и маршрут помогают быстро подтвердить выдачу перед поездкой.
+                {hasTelegram
+                  ? "Telegram — основной канал экипажа, телефон и маршрут помогают быстро подтвердить выдачу перед поездкой."
+                  : "Телефон и почта — основные каналы экипажа; оставьте заявку, и оператор свяжется с вами в удобном мессенджере."}
               </p>
 
               {crew.contacts.workingHours && (
                 <p className="mt-3 inline-flex rounded-full border border-[var(--crew-border)] bg-[var(--crew-card)] px-3 py-1 text-xs font-semibold text-[var(--crew-text)]">
-                  Open now / график: {crew.contacts.workingHours}
+                  График: {crew.contacts.workingHours}
                 </p>
               )}
 

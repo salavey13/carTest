@@ -58,6 +58,11 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
   const brandName = crew.header.brandName || crew.name || "VIP BIKE";
   const saleItems = items.filter((item) => item.saleAvailable || Number(item.salePrice || 0) > 0 || isTruthySpec(item.rawSpecs?.sale));
   const salesVerticals = crew.contentBlocks.salesVerticals;
+  // vip-bike-gate (2026-10-18): the «new / electric / used / trade-in» hero
+  // and the configurator CTA are the FIRST crew's sales pitch. A crew with
+  // neither sale items nor its own verticals gets a neutral empty state
+  // instead of vip-bike copy (moto-selection: services-only catalog).
+  const showSalesEmptyState = saleItems.length === 0 && salesVerticals.length === 0;
   const accentText = readablePaletteTextOnColor(crew.theme.palette.accentMain, crew.theme.palette);
 
   return (
@@ -77,6 +82,24 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
           color: crew.theme.isAuto ? "var(--franchize-text-primary)" : crew.theme.palette.textPrimary,
         }}
       >
+        {showSalesEmptyState ? (
+          <section className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-card)] p-6 text-center shadow-2xl md:p-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--sales-accent)]">продажи</p>
+            <h1 className="mt-3 text-2xl font-semibold md:text-3xl">Витрина продаж у {brandName} пока не заполнена</h1>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 opacity-70">
+              Каталог и услуги экипажа уже на месте. Как только появятся позиции на продажу, они соберутся здесь по вертикалям — от витрины до сделки.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link href={`/franchize/${crewSlug}`} className="rounded-full bg-[var(--sales-accent)] px-5 py-3 text-sm font-semibold text-[var(--sales-accent-text)] transition hover:brightness-110">
+                Открыть каталог
+              </Link>
+              <Link href={`/franchize/${crewSlug}/contacts`} className="rounded-full border border-current/20 px-5 py-3 text-sm font-semibold transition hover:border-current/50">
+                Связаться с экипажем
+              </Link>
+            </div>
+          </section>
+        ) : (
+          <>
         <section className="rounded-3xl border border-[var(--sales-border)] bg-[var(--sales-card)] p-6 shadow-2xl md:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--sales-accent)]">FRZ-R8 • sales vertical</p>
           <div className="mt-4 grid gap-8 lg:grid-cols-[1.15fr,0.85fr] lg:items-end">
@@ -141,6 +164,8 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
             );
           })}
         </section>
+          </>
+        )}
       </div>
       <CrewFooter crew={crew} />
     </main>

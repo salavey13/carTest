@@ -14,7 +14,7 @@ import { getCrewSensitiveDataOrDefault, getUserSensitiveDataOrDefault, saveCrewS
 import { getUserRentalSecrets as getVerifiedRentalSecrets, getUserRentalSecretsByPhone, saveUserRentalSecrets } from "@/app/lib/user-rental-secrets";
 import { buildFranchizeDocxFromTemplate, uploadDocxToStorage } from "@/app/franchize/lib/docx-capability";
 import { upsertFranchizeIntent } from "@/app/franchize/server-actions/intents";
-import { cloneFranchizeContentBlocks, readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
+import { readFranchizeContentBlocks, type FranchizeContentBlocks } from "@/app/franchize/lib/content-blocks";
 import { buildFranchizeCrewUi, type FranchizeCrewUiVM } from "@/app/franchize/lib/crew-ui";
 import { resolveFranchizeTheme, resolvePaletteByMode } from "@/app/franchize/lib/theme-resolver";
 import { isTrustedTelegramBypassDeployment } from "@/lib/telegram-bypass-context";
@@ -726,7 +726,9 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     textColor: "#16130A",
   },
   reservationHold: buildFranchizeReservationHold({}, ""),
-  contentBlocks: cloneFranchizeContentBlocks(),
+  // slug-gated defaults: only vip-bike keeps the legacy content blocks on the
+  // fallback crew (2026-10-18, see content-blocks.ts header note).
+  contentBlocks: readFranchizeContentBlocks(null, slug),
   storage: resolveStorageConfig(null, slug),
   cta: {
     title: "Тест-драйв",
@@ -1028,7 +1030,9 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         textColor: readPath(franchize, ["footer", "textColor"], DEFAULT_FOOTER_TEXT_COLOR),
       },
       reservationHold: buildFranchizeReservationHold(franchize, readPath(franchize, ["contacts", "address"], "")),
-      contentBlocks: readFranchizeContentBlocks(franchize),
+      // slug gates the vip-bike-only DEFAULT fallbacks (2026-10-18) — a crew
+      // without hydrated contentBlocks gets empty arrays, never vip-bike copy.
+      contentBlocks: readFranchizeContentBlocks(franchize, crew.slug ?? safeSlug),
       cta: {
         title: readPath(franchize, ["cta", "title"], "Тест-драйв"),
         description: readPath(franchize, ["cta", "description"], ""),
