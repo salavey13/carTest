@@ -7,6 +7,7 @@ import { ArrowLeft, Menu, Send, Snowflake, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
+import { isRailPillVisible } from "../lib/crew-rail";
 import { localImageSrc } from "@/lib/image-fallback";
 import { HeaderMenu } from "../modals/HeaderMenu";
 import { FranchizeProfileButton, CrewButtonErrorBoundary } from "./FranchizeProfileButton";
@@ -411,13 +412,9 @@ export function CrewHeader({
               // 2026-10-18 (boss): hide countable balloons (rent/sale/service/
               // equipment) when the catalog HAS loaded and that type is empty —
               // moto-selection's services-only rail must not show empty «Аренда»
-              // /«Продажа» pills. Gate only on a real array: `items === undefined`
-              // (callers that don't pass the prop) keeps the classic rail.
-              .filter((pill) =>
-                !hiddenTabs.has(pill.key)
-                && (pill.key !== "storage" || storageEnabled)
-                && !(Array.isArray(items) && (pill.key === "rent" || pill.key === "sale" || pill.key === "service" || pill.key === "equipment") && pill.count === 0)
-              )
+              // /«Продажа» pills. Contract lives in lib/crew-rail.ts (unit-tested):
+              // an UNLOADED catalog (`items === undefined`) keeps the classic rail.
+              .filter((pill) => isRailPillVisible(pill, { itemsLoaded: Array.isArray(items), hiddenTabs, storageEnabled }))
               .map((pill) => {
               // Equipment/Parts/Storage use pathname-based active state (separate
               // routes); rent/sale/service use displayMode-based active state

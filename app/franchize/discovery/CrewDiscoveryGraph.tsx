@@ -1662,6 +1662,9 @@ export function CrewDiscoveryGraph({
                     {/* logo (falls through to initials when absent/broken) */}
                     {node.logoUrl && (
                       <g clipPath={`url(#cp-${index})`}>
+                        {/* 2026-10-18: «meet» (= contain) — wide crew logos
+                            (moto-selection 2:1) must fit the round marker
+                            uncropped; «slice» cut their sides off. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <image
                           href={node.logoUrl}
@@ -1669,7 +1672,7 @@ export function CrewDiscoveryGraph({
                           y={-r * 0.66}
                           width={r * 1.32}
                           height={r * 1.32}
-                          preserveAspectRatio="xMidYMid slice"
+                          preserveAspectRatio="xMidYMid meet"
                         />
                       </g>
                     )}
@@ -2286,7 +2289,9 @@ export function CrewDiscoveryGraph({
                     alt=""
                     width={52}
                     height={52}
-                    className="rounded-2xl object-cover"
+                    // object-contain (2026-10-18): wide crew logos (2:1) fit
+                    // uncropped — same rule as CrewHeader's round icon.
+                    className="rounded-2xl object-contain"
                     style={{ height: 52, width: 52, boxShadow: `0 0 0 2px ${selected.accent}66` }}
                   />
                 ) : (

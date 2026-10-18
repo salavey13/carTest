@@ -26,7 +26,9 @@ export async function generateMetadata({ params }: FranchizeStorageOrderPageProp
 
 export default async function FranchizeStorageOrderPage({ params }: FranchizeStorageOrderPageProps) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  // items feed the CrewHeader rail (countable balloons hide per type on an
+  // EMPTY loaded catalog — 2026-10-18 review: never pass a fake [] here).
+  const { crew, items } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteWithCssVars(crew.theme);
   // Admin/crewowner config (metadata.franchize.storage) — the legacy
@@ -36,7 +38,7 @@ export default async function FranchizeStorageOrderPage({ params }: FranchizeSto
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/storage/new`} groupLinks={[]} items={[]} />
+      <CrewHeader crew={crew} activePath={`/franchize/${resolvedSlug}/storage/new`} groupLinks={[]} items={items} />
       <FranchizePageShell theme={crew.theme} contentClassName="max-w-2xl space-y-5">
         <FranchizeErrorBoundary
           resetKey={`${slug}:storage-new`}

@@ -35,7 +35,11 @@ export async function generateMetadata({ params }: PartnerOnboardingPageProps): 
   const { slug } = await params;
   return buildFranchizeSectionMetadata(slug, {
     sectionTitle: "Partner onboarding",
-    sectionDescription: "Чеклист подключения партнёра VIP-bike к франшизной витрине.",
+    // vip-bike keeps its brand wording; other crews get a crew-agnostic
+    // description (2026-10-18 review: no vip wording in shared SEO).
+    sectionDescription: ({ crew }) => crew.slug === "vip-bike"
+      ? "Чеклист подключения партнёра VIP-bike к франшизной витрине."
+      : "Чеклист подключения партнёра к франшизной витрине экипажа.",
     pathSuffix: "/onboarding",
   });
 }
@@ -91,38 +95,47 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
                 </Link>
               </div>
             </div>
-            <div className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-base-soft)] p-5">
-              <div className="flex items-center gap-3 text-[var(--onboarding-accent)]">
-                <Handshake className="h-6 w-6" />
-                <span className="text-sm font-semibold uppercase tracking-[0.16em]">Definition of ready</span>
+            {/* 2026-10-18 review: readiness rows are now vip-bike-gated in
+                content-blocks — crews without hydrated copy get [] and this
+                card must NOT render as an empty «Definition of ready» shell. */}
+            {onboardingReadinessRows.length > 0 ? (
+              <div className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-base-soft)] p-5">
+                <div className="flex items-center gap-3 text-[var(--onboarding-accent)]">
+                  <Handshake className="h-6 w-6" />
+                  <span className="text-sm font-semibold uppercase tracking-[0.16em]">Definition of ready</span>
+                </div>
+                <ul className="mt-4 space-y-3 text-sm opacity-75">
+                  {onboardingReadinessRows.map((row) => (
+                    <li key={row.label} className="grid gap-1 rounded-2xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card-faint)] p-3">
+                      <span className="font-semibold opacity-100">{row.label}</span>
+                      <span>{row.text}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="mt-4 space-y-3 text-sm opacity-75">
-                {onboardingReadinessRows.map((row) => (
-                  <li key={row.label} className="grid gap-1 rounded-2xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card-faint)] p-3">
-                    <span className="font-semibold opacity-100">{row.label}</span>
-                    <span>{row.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ) : null}
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          {onboardingChecklist.map((item, index) => {
-            const Icon = getChecklistIcon(item.icon, index);
-            return (
-              <article key={item.title} className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card)] p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <Icon className="h-6 w-6 text-[var(--onboarding-accent)]" />
-                  <span className="rounded-full border border-[var(--onboarding-accent)]/35 px-3 py-1 text-xs text-[var(--onboarding-accent)]">шаг {index + 1}</span>
-                </div>
-                <h2 className="mt-4 text-2xl font-semibold">{item.title}</h2>
-                <p className="mt-2 text-sm leading-6 opacity-70">{item.text}</p>
-              </article>
-            );
-          })}
-        </section>
+        {/* Checklist cards render only when the crew has its own (or legacy)
+            onboarding copy — an empty grid would just leave dead whitespace. */}
+        {onboardingChecklist.length > 0 ? (
+          <section className="grid gap-4 md:grid-cols-2">
+            {onboardingChecklist.map((item, index) => {
+              const Icon = getChecklistIcon(item.icon, index);
+              return (
+                <article key={item.title} className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-card)] p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <Icon className="h-6 w-6 text-[var(--onboarding-accent)]" />
+                    <span className="rounded-full border border-[var(--onboarding-accent)]/35 px-3 py-1 text-xs text-[var(--onboarding-accent)]">шаг {index + 1}</span>
+                  </div>
+                  <h2 className="mt-4 text-2xl font-semibold">{item.title}</h2>
+                  <p className="mt-2 text-sm leading-6 opacity-70">{item.text}</p>
+                </article>
+              );
+            })}
+          </section>
+        ) : null}
 
         <section className="rounded-3xl border border-[var(--onboarding-border)] bg-[var(--onboarding-base-soft)] p-6">
           <div className="flex items-start gap-3">

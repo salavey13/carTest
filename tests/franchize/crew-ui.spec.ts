@@ -119,9 +119,11 @@ describe('crew-ui wiring', () => {
     // 2026-10-18 (boss): countable pills (rent/sale/service/equipment) also
     // hide when the catalog loaded empty for that type — services-only crews
     // (moto-selection) must not show «Аренда»/«Продажа» balloons with 0 items.
-    expect(crewHeaderSrc).toContain('!hiddenTabs.has(pill.key)');
-    expect(crewHeaderSrc).toContain('(pill.key !== "storage" || storageEnabled)');
-    expect(crewHeaderSrc).toContain('Array.isArray(items)');
+    // Review round 2: the filter chain moved into lib/crew-rail.ts — the
+    // BEHAVIORAL contract is unit-tested in crew-rail.spec.ts (source-string
+    // assertions can't catch an inverted condition); here we only pin the
+    // wiring (helper import + loaded-catalog flag threading).
+    expect(crewHeaderSrc).toContain('isRailPillVisible(pill, { itemsLoaded: Array.isArray(items), hiddenTabs, storageEnabled })');
     // no hardcoded rail labels left in the component
     expect(crewHeaderSrc).not.toContain('label: "Аренда"');
   });
@@ -147,8 +149,11 @@ describe('crew-ui wiring', () => {
     // 2026-09-27: the pill navigates to the winter-storage wall like the
     // parts/equipment route pills; visibility = NOT hiddenTabs-hidden AND
     // storage enabled (resolveStorageConfig keeps the vip-bike legacy rule).
+    // Review round 2: the visibility gate itself lives in lib/crew-rail.ts
+    // (unit-tested in crew-rail.spec.ts); here we pin the wiring + routes.
+    const railLibSrc = readFileSync('app/franchize/lib/crew-rail.ts', 'utf8');
     expect(crewHeaderSrc).toContain('key: "storage" as const');
-    expect(crewHeaderSrc).toContain("pill.key !== \"storage\" || storageEnabled");
+    expect(railLibSrc).toContain('pill.key === "storage" && !options.storageEnabled');
     expect(crewHeaderSrc).toContain('pathname.startsWith(`${mainCatalogPath}/storage`)');
     expect(crewHeaderSrc).toContain('router.push(`${mainCatalogPath}/storage`)');
     expect(crewHeaderSrc).toContain('const storageEnabled = crew.storage?.enabled ?? false;');

@@ -193,23 +193,14 @@ export const DEFAULT_FRANCHIZE_CONTENT_BLOCKS: FranchizeContentBlocks = {
 // metadata.franchize.contentBlocks (see docs/crewDocs hydration SQLs).
 const DEFAULTS_ONLY_FOR_SLUG = "vip-bike";
 
-function nonEmptyGated<T extends object>(items: T[], fallback: T[], slug: string): T[] {
-  if (items.length > 0) return items.map((item) => ({ ...item }));
-  return slug.trim() === DEFAULTS_ONLY_FOR_SLUG ? fallback.map((item) => ({ ...item })) : [];
+/** True when the legacy DEFAULT_* blocks may surface for this crew. */
+export function isLegacyDefaultsCrew(slug: string): boolean {
+  return slug.trim() === DEFAULTS_ONLY_FOR_SLUG;
 }
 
-export function cloneFranchizeContentBlocks(blocks: FranchizeContentBlocks = DEFAULT_FRANCHIZE_CONTENT_BLOCKS, slug = DEFAULTS_ONLY_FOR_SLUG): FranchizeContentBlocks {
-  return {
-    communityEvents: blocks.communityEvents.map((item) => ({ ...item })),
-    partnerCards: blocks.partnerCards.map((item) => ({ ...item })),
-    cityRiderTips: blocks.cityRiderTips.map((item) => ({ ...item })),
-    salesVerticals: blocks.salesVerticals.map((item) => ({ ...item })),
-    onboardingChecklist: blocks.onboardingChecklist.map((item) => ({ ...item })),
-    onboardingReadinessRows: blocks.onboardingReadinessRows.map((item) => ({ ...item })),
-    aboutCapabilities: blocks.aboutCapabilities.map((item) => ({ ...item })),
-    aboutWorkSteps: blocks.aboutWorkSteps.map((item) => ({ ...item })),
-    aboutHeroTitle: blocks.aboutHeroTitle,
-  };
+function nonEmptyGated<T extends object>(items: T[], fallback: T[], slug: string): T[] {
+  if (items.length > 0) return items.map((item) => ({ ...item }));
+  return isLegacyDefaultsCrew(slug) ? fallback.map((item) => ({ ...item })) : [];
 }
 
 const asRecord = (value: unknown): UnknownRecord => (
@@ -251,9 +242,6 @@ const readContentSource = (metadata: unknown): UnknownRecord => {
     ...contentBlocks,
   };
 };
-
-const nonEmpty = <T extends object>(items: T[], fallback: T[]) => (items.length > 0 ? items : fallback.map((item) => ({ ...item })));
-void nonEmpty; // kept for reference; the gated variant below replaced all uses
 
 const readCommunityEvents = (source: UnknownRecord, slug: string): CommunityEventBlock[] => nonEmptyGated(
   readArray(source, [["communityEvents"], ["community", "events"]])
@@ -377,7 +365,12 @@ const readAboutWorkSteps = (source: UnknownRecord, slug: string): AboutWorkStepB
   slug,
 );
 
-export function readFranchizeContentBlocks(metadata: unknown, slug = DEFAULTS_ONLY_FOR_SLUG): FranchizeContentBlocks {
+// ⚠ slug has NO vip-bike default (2026-10-18 review): a call site that forgets
+// to thread the crew slug must get the SAFE behavior (empty arrays), never the
+// legacy vip copy. The only consumer allowed to see defaults is vip-bike
+// itself — its callers pass the real slug. Current call sites:
+// actions-runtime.ts (VM + emptyCrew) both thread it explicitly.
+export function readFranchizeContentBlocks(metadata: unknown, slug = ""): FranchizeContentBlocks {
   const source = readContentSource(metadata);
 
   return {
@@ -392,7 +385,9 @@ export function readFranchizeContentBlocks(metadata: unknown, slug = DEFAULTS_ON
     // «О нас» hero override — any crew may set about.heroTitle (hydration
     // metadata shape) or contentBlocks.aboutHeroTitle directly. No default:
     // empty = the page keeps its own hero line (vip-bike's about hero is the
-    // page-level legacy literal, untouched).
+    // page-level legacy literal, untouched). The about.tagline alias is NOT
+    // speculative — three hydration SQLs set it (vip-bike, sly13,
+    // network-services/moto-selection).
     aboutHeroTitle:
       readString(asRecord(source.about), ["heroTitle", "tagline"])
       || readString(source, ["aboutHeroTitle"], ""),

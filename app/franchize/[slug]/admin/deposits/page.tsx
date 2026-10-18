@@ -13,7 +13,9 @@ interface Props {
 
 export default async function DepositsAdminPage({ params }: Props) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  // items feed the CrewHeader rail (countable balloons hide per type on an
+  // EMPTY loaded catalog — 2026-10-18 review: never pass a fake [] here).
+  const { crew, items } = await getFranchizeBySlug(slug);
   const resolvedSlug = crew.slug || slug;
   const surface = crewPaletteForSurface(crew.theme);
   const activePath = `/franchize/${resolvedSlug}/admin/deposits`;
@@ -80,7 +82,7 @@ export default async function DepositsAdminPage({ params }: Props) {
 
   return (
     <main className="min-h-screen" style={surface.page}>
-      <CrewHeader crew={crew} activePath={activePath} groupLinks={[]} items={[]} />
+      <CrewHeader crew={crew} activePath={activePath} groupLinks={[]} items={items} />
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
         <h1 className="text-2xl font-bold" style={{ color: "var(--franchize-text-primary, inherit)" }}>
           🏥 Депозиты

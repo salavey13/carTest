@@ -67,9 +67,9 @@ export async function generateMetadata({ params }: Omit<FranchizeSlugLayoutProps
     const keywords = [
       crew.header.brandName,
       "franchize",
-      "электробайки",
-      "аренда байков",
-      "покупка байков",
+      // 2026-10-18 review: «электробайки/аренда/покупка байков» are the LEGACY
+      // crew's SEO words — other crews (moto-selection) must not rank for them.
+      ...(crew.slug === "vip-bike" ? ["электробайки", "аренда байков", "покупка байков"] : []),
       ...Array.from(new Set(items.map((item) => item.category).filter(Boolean))),
     ];
 

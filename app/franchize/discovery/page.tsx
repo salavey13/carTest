@@ -220,7 +220,11 @@ export default async function CrewDiscoveryPage() {
                           alt=""
                           width={44}
                           height={44}
-                          className="h-11 w-11 rounded-full object-cover"
+                          // object-contain (2026-10-18): crew logos may be wide
+                          // (moto-selection 2:1 tildacdn PNG) — «cover» sliced
+                          // the sides inside the round node; contain fits them
+                          // uncropped over the transparent node background.
+                          className="h-11 w-11 rounded-full object-contain"
                           style={{ boxShadow: `0 0 0 2px ${node.accent}55` }}
                         />
                       ) : (

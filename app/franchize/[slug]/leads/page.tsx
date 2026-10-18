@@ -15,7 +15,9 @@ export const metadata = { title: "Клиенты и заявки" };
 
 export default async function LeadsPage({ params }: LeadsPageProps) {
   const { slug } = await params;
-  const { crew } = await getFranchizeBySlug(slug);
+  // items feed the CrewHeader rail (countable balloons hide per type on an
+  // EMPTY loaded catalog — 2026-10-18 review: never pass a fake [] here).
+  const { crew, items } = await getFranchizeBySlug(slug);
   const surface = crewPaletteWithCssVars(crew.theme);
 
   // SECURITY FIX: pass EMPTY arrays — LeadsClient fetches data client-side
@@ -33,7 +35,7 @@ export default async function LeadsPage({ params }: LeadsPageProps) {
   return (
     <main className="min-h-screen" style={surface.page}>
       <AchievementExplorer slug={crew.slug || slug} achievementId="explorer_leads" />
-      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/leads`} groupLinks={[]} items={[]} />
+      <CrewHeader crew={crew} activePath={`/franchize/${crew.slug || slug}/leads`} groupLinks={[]} items={items} />
       <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:py-6">
         {/* СПА-ССЫЛКА НА ПЛЕЙБУК-ГАЙД прямо в шапке лидов: полный SOP
             (/docs/avito-leads-guide.html, self-contained, офлайн) доступен

@@ -9,10 +9,15 @@ import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
 
-export const metadata = buildFranchizeSectionMetadata("vip-bike", {
-  sectionTitle: "Как считаются деньги",
-  sectionDescription: "Объяснение всех расчётов: аренда, экипировка, депозиты, комиссия, зарплата",
-});
+// 2026-10-18 review: metadata must resolve the REAL crew slug — the static
+// "vip-bike" export pointed every crew's /calc canonical at vip-bike.
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Как считаются деньги",
+    sectionDescription: "Объяснение всех расчётов: аренда, экипировка, депозиты, комиссия, зарплата",
+  });
+}
 
 export default async function CalcExplainerPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

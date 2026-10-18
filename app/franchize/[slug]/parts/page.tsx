@@ -1,4 +1,5 @@
 // app/franchize/[slug]/parts/page.tsx
+import type { Metadata } from "next";
 import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { CrewHeader } from "../../components/CrewHeader";
@@ -10,11 +11,16 @@ import { buildFranchizeSectionMetadata } from "../metadata";
 import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
 import { loadPartsData } from "../../lib/parts-data";
 
-export const metadata = buildFranchizeSectionMetadata("vip-bike", {
-  sectionTitle: "Запчасти",
-  sectionDescription: "Каталог запчастей",
-  pathSuffix: "/parts",
-});
+// 2026-10-18 review: metadata must resolve the REAL crew slug — the static
+// "vip-bike" export pointed every crew's /parts canonical at vip-bike.
+export async function generateMetadata({ params }: PartsPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  return buildFranchizeSectionMetadata(slug, {
+    sectionTitle: "Запчасти",
+    sectionDescription: "Каталог запчастей",
+    pathSuffix: "/parts",
+  });
+}
 
 interface PartsPageProps {
   params: Promise<{ slug: string }>;
