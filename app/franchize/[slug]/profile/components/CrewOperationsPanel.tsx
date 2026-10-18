@@ -39,6 +39,9 @@ export function CrewOperationsPanel({ slug, T }: { slug: string; T: CrewTokens }
           <FranchizeOperatorLinkButton href={`/franchize/${slug}/rentals-analytics`}>
             📈 Аналитика
           </FranchizeOperatorLinkButton>
+          <FranchizeOperatorLinkButton href={`/franchize/${slug}/season-stats`}>
+            🏁 Сезон 2026
+          </FranchizeOperatorLinkButton>
           <FranchizeOperatorLinkButton href={`/franchize/${slug}/leads`}>
             👥 Лиды
           </FranchizeOperatorLinkButton>

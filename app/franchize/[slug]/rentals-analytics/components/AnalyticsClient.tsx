@@ -20,6 +20,7 @@ import {
   bulkVerifyFineAction,
   resendVerificationDmsAction,
 } from "@/app/franchize/server-actions/rental-verify-actions";
+import { startSeasonVerificationRound } from "@/app/franchize/server-actions/season-stats";
 import type { ThemeTokens } from "../hooks/useTheme";
 import type {
   AnalyticsTab,
@@ -148,6 +149,8 @@ export function AnalyticsClient({
   // it does not mutate money state; it creates the row when missing + DMs).
   const [resendPending, setResendPending] = useState(false);
   const [resendFailed, setResendFailed] = useState(false);
+  // Сезон-2026: bulk «раунд сверки» прямо из списка (owner-tier на сервере).
+  const [roundPending, setRoundPending] = useState(false);
 
   // Switch tab — reset selection SYNCHRONOUSLY (not via useEffect, which
   // would let the wrong drawer render for one frame).
@@ -550,6 +553,33 @@ export function AnalyticsClient({
     }
   };
 
+  // Сезон-2026: «раунд сверки» из списка — последним закрытым арендам без
+  // сверки уходят личные сообщения с кнопками ✅/⚠️ (owner-tier, идемпотентно).
+  const handleStartVerificationRound = async () => {
+    if (roundPending) return;
+    setRoundPending(true);
+    try {
+      const res = await startSeasonVerificationRound({ slug: initialSlug, limit: 10 });
+      if (res.success && res.data) {
+        const r = res.data;
+        if (r.sent > 0) {
+          toast.success(
+            `🎲 Раунд сверки: выслано ${r.sent}${r.skipped ? `, пропущено ${r.skipped}` : ""}${r.dmed ? " — список в TG" : ""}`,
+          );
+          onDataRefresh?.();
+        } else {
+          toast.info("Новых сверок для отправки нет — всё уже разослано.");
+        }
+      } else {
+        toast.error(res.error || "Не удалось запустить раунд сверки");
+      }
+    } catch {
+      toast.error("Не удалось запустить раунд сверки");
+    } finally {
+      setRoundPending(false);
+    }
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4" role="region" aria-label="Аналитика">
@@ -605,7 +635,9 @@ export function AnalyticsClient({
           The month-end workflow compressed to one tap: open the day → see
           «N ✅ · M ⏳ · K ⚠️» → tap ⚠️ → resolve. Hidden until at least one
           rental of the day carries verification data. */}
-      {activeTab === "rentals" && verStrip.hasAny && (
+      {/* owner-tier видит полосу всегда — иначе кнопке «🎲 Раунд сверки»
+          негде жить, пока в экипаже нет ни одной сверки (сезон-2026). */}
+      {activeTab === "rentals" && (verStrip.hasAny || viewerIsOwnerTier) && (
         <div
           className="flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2.5"
           style={{ borderColor: T.border, backgroundColor: T.bgCard }}
@@ -653,6 +685,20 @@ export function AnalyticsClient({
               title="Подтвердить все проверенные аудитом сверки этого месяца (grade=fine). Спорные и «почти ок» не трогаются."
             >
               {bulkFinePending ? "…" : `✅ fine за ${date.slice(0, 7)}`}
+            </button>
+          )}
+          {/* Сезон-2026: «раунд сверки» — последним закрытым арендам без сверки
+              уходят ЛС с кнопками ✅/⚠️ (owner-tier, идемпотентно). */}
+          {viewerIsOwnerTier && (
+            <button
+              type="button"
+              onClick={handleStartVerificationRound}
+              disabled={roundPending}
+              className="ml-1 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
+              style={{ borderColor: "#f59e0b", color: "#f59e0b" }}
+              title="Выслать сверки последним закрытым арендам (до 10), которых ещё нет в сверке"
+            >
+              {roundPending ? "🎲 Запускаем…" : "🎲 Раунд сверки"}
             </button>
           )}
         </div>

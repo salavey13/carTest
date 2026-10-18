@@ -957,3 +957,23 @@ Stage Summary:
 - Full gap map ready for retro_backfill_v2 import: ~30 rentals (26 contracts + 4 xlsx-only), ≈226 250 ₽ known + TBD from 7 old-format bodies.
 - docs/summary/SUMMARY.html v0.2 published in repo + synced to local download/. Import plan: iter2 = deep-parse 5 May bodies + 5 no-sum contracts; iter3 = insert with source=retro_backfill_v2 + metadata.history; iter4 = TOTAL SEASON dashboard (rental+sales+expenses, per-bike, 50/50).
 - Open questions to boss: long-term contracts in/out, Red Panigale card, Борский insurance, barter in revenue, gear line for Шаронов.
+
+---
+Task ID: 112-season-stats-page
+Agent: main (Claude)
+Task: All 145 zip docs accounted (extraction middle step) + dynamic /franchize/[slug]/season-stats subpage (cached, lazy, code-drawn infographics) + verification round entry points + salary verified-payout strip. Boss brief: «may/june only 4 or 9? doublecheck».
+
+Work Log:
+- extraction_accounting.py: joined doc_inventory + zip_structured + zip_match_v2 + task108 manifest + FRESH DB (259 non-cancelled crew rentals). All 145 files classified: 89 imported_db + 2 imported_backfill_v1 (sha / fuzzy score>=5 / exact date+total override) + 14 retro_missing + 16 retro_needs_review (renter-conflict penalty) + 11 testdrive + 4 sale + 9 template; same-sha + same-day/same-bike dup pass; money 68 500 ₽ missing + 88 500 ₽ review. Artifact: scripts/season-2026/extraction_v1.json (+inputs).
+- MAY/JUNE VERDICT: DB май = 4 (36 000 ₽, retro_backfill_v1 rows), июнь = 7 (24 000 ₽; Шаронов из майского Excel лёг на 05.06). Docs: май +7 договоров → будет 11; июнь +2 → будет 9. Июль +14 нетто → 32→46. Август +1 → 82.
+- season-stats page (app/franchize/[slug]/season-stats/): page.tsx (member guard, ownerTier flags), SeasonStatsClient.tsx (KPI grid, CSS-bar timeline per month, conic-gradient verification donut, latest-unverified list with resend, lazy month details w/ client cache: аренды/продажи/касса tabs, archive-coverage card from generated archive-snapshot.ts). NO picture charts — все инфографики кодом (CSS/SVG).
+- server-actions/season-stats.ts: getSeasonStatsOverview (3 narrow range queries + getVerificationStatusMap, in-memory TTL 10 min single-flight cache), getSeasonMonthDetails (lazy, two-range merge dedup), startSeasonVerificationRound (owner-tier, latest completed w/o row, idempotent requestRentalVerification per rental + summary DM, limit<=25), getSalaryVerificationStrip (getCrewPayoutSummary + latest 3). constants split out (use-server files may only export async fns).
+- Verification entry points added: (1) rental page section «🤝 Сверка расчёта» for completed rentals (RoleGuard, resendVerificationDmsAction); (2) rentals-analytics strip button «🎲 Раунд сверки» (owner-tier, strip now visible for owner-tier even with 0 rows); (3) season-stats round button + per-row resends; existing drawer resend/verify + payout-hub untouched (132 pins green).
+- Salary page: «🤝 Сверка выплат» strip (сверено к выплате / не сверено / выплачено counters + latest unverified with rental links + compact resend).
+- Nav: «Сезон 2026» chip in AnalyticsLeadsNav + CrewOperationsPanel.
+- SUMMARY.html v0.3: PNG charts → code-drawn SVG/CSS (archive composition, coverage, missing money), extraction-v1 KPIs (145/145, 30 files not in DB), May/June doublecheck table, live-page card; synced to download/.
+- Verified: next lint clean; scoped tsc 0 errors in changed files (96 pre-existing repo-wide, ignoreBuildErrors); vitest task101–107 (132 tests) pass; dev-server E2E via agent-browser with forged actor cookie: season-stats 200 + real numbers (1 777 667 ₽ / 249 completed / 31 ДКП 13 048 000 ₽ / касса 16 529 382 ₽), июль details lazy-load, donut 0% / 248 ждут / 1 спор, salary strip counters (2 550 ₽ / 2 аренды), guard lock-screen for anon.
+
+Stage Summary:
+- Deliverables: /franchize/[slug]/season-stats (crew-scoped, cached ~10min, lazy details, zero pictures), 3 new verification entry points, salary verification strip, SUMMARY v0.3, extraction_v1.json ready as retro_backfill_v2 payload.
+- Next: boss ✅ → retro_backfill_v2 insert (14+16 contracts, source=retro_backfill_v2, metadata.history audit, idempotent by doc sha + date+vehicle+total); xlsx no-date rows decision (5 шт); Red Panigale в cars?

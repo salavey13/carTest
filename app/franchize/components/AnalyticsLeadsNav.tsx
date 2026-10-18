@@ -8,6 +8,7 @@ interface AnalyticsLeadsNavProps {
 }
 
 const ANALYTICS_LINKS = [
+  { label: "Сезон 2026", icon: BarChart3, href: (slug: string) => `/franchize/${slug}/season-stats`, color: "#f59e0b" },
   { label: "Аналитика аренд", icon: Calendar, href: (slug: string) => `/franchize/${slug}/rentals-analytics`, color: "#3b82f6" },
   { label: "Продажи", icon: Tag, href: (slug: string) => `/franchize/${slug}/sales-analytics`, color: "#10b981" },
   { label: "Коммерческие предложения", icon: FileText, href: (slug: string) => `/franchize/${slug}/commercial-offers-analytics`, color: "#8b5cf6" },

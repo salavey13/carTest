@@ -23,6 +23,7 @@ import { CrewHeader } from "../../../components/CrewHeader";
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { DisplayModeProvider } from "../../../components/DisplayModeContext";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
+import { VerificationResendButton } from "../../../components/VerificationResendButton";
 // goodmorning-polish: removed FranchizePageShell import — replaced with plain <div>
 // to avoid backdrop-blur breaking position:fixed on QuickActionBar + excessive padding.
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
@@ -785,6 +786,33 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             </FranchizeErrorBoundary>
           </div>
         </FranchizeRentalRoleGuard>
+
+        {/* Сверка расчёта — ручной запуск по закрытой аренде (owner-tier).
+            Дублирует entry points сверки: страница аренды теперь тоже может
+            инициировать раунд «✅/⚠️» без похода в аналитику. */}
+        {status === "completed" && (
+          <FranchizeRentalRoleGuard
+            allowedRoles={["operator", "admin", "owner"]}
+            ownerId={rental.ownerId}
+            renterId={rental.renterId}
+            renterTelegramChatId={rental.renterTelegramChatId}
+            subrenterChatId={rental.subrenterChatId}
+            crewId={crew.id}
+            crewSlug={resolvedSlug}
+          >
+            <section className="rounded-2xl border p-3 flex flex-wrap items-center gap-2" style={surface.subtleCard}>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold" style={{ color: textPrimary }}>🤝 Сверка расчёта</p>
+                <p className="text-[11px]" style={{ color: textSecondary }}>
+                  Оператор и владелец получат личные сообщения с кнопками ✅/⚠️ по этой аренде.
+                </p>
+              </div>
+              <div className="ml-auto">
+                <VerificationResendButton slug={resolvedSlug} rentalId={rental.rentalId} />
+              </div>
+            </section>
+          </FranchizeRentalRoleGuard>
+        )}
 
         {/* Phase 5: Renter-specific actions panel */}
         {rental.found && (

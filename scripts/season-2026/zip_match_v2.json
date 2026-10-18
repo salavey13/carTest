@@ -1,0 +1,872 @@
+[
+ {
+  "file": "01 Договор аренды мотоцикла без экипажа с тарифами.docx DUCATI.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=3 db=yamaha-r7 2026-08-04 None"
+ },
+ {
+  "file": "1rent-Ducati-Panigale-S-Electro-Black-18.07.2026 (2).docx Семенченков.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "de3cd079-edf9-4e1a-8311-3ef38c2ce9fd",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-07-18 renter=None"
+ },
+ {
+  "file": "1rent-Ducati-Panigale-S-Electro-Black-18.07.2026 (2).docx Семенченков.docx Семинченко Алексей.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "de3cd079-edf9-4e1a-8311-3ef38c2ce9fd",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-07-18 renter=None"
+ },
+ {
+  "file": "rent-79BIKE-Falcon-GT-11.08.2026 Гордов Александр Валерьевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7fb45254-5082-449f-82f8-23801bd7d5fd",
+  "how": "score=5 db=falcon-gt-2026 2026-08-11 renter=None"
+ },
+ {
+  "file": "rent-79BIKE-Falcon-GT-13.08.2026.docx Захаров Денис.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "e57a8ffc-47b8-4aea-a80d-89710aa39e33",
+  "how": "score=5 db=falcon-gt-2026 2026-08-13 renter=None"
+ },
+ {
+  "file": "rent-79BIKE-Falcon-GT-18.10.2026 (1).docx Баукин Алексей Николаевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "221cbd97-bdff-467a-8890-8c681a2ac640",
+  "how": "score=8 db=falcon-gt-2026 2026-10-18 renter=Баукин Алексей Николаевич."
+ },
+ {
+  "file": "rent-79BIKE-Falcon-GT-18.10.2026.docx Баукин Алексей Николаевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "221cbd97-bdff-467a-8890-8c681a2ac640",
+  "how": "score=8 db=falcon-gt-2026 2026-10-18 renter=Баукин Алексей Николаевич."
+ },
+ {
+  "file": "rent-Aprilia-Shiver-750-12.09.2026Клюев Сергей Алексеевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "693eacd0-10f6-404f-8f8d-6891720867b0",
+  "how": "score=8 db=aprilia-shiver 2026-09-12 renter=Клюев Сергей Алексеевич"
+ },
+ {
+  "file": "rent-Aprilia-Shiver-750-17.10.2026.docx Гусев Владислав Юрьевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "a5532f57-7e00-41d3-a5c5-1abfb615de0a",
+  "how": "score=8 db=aprilia-shiver 2026-10-17 renter=Гусев Владислав Юрьевич"
+ },
+ {
+  "file": "rent-Aprilia-Shiver-750-25.07.2026 (2).docxКривенышев Александр Михайлович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "8a52700d-9f5e-48f1-872b-bcb882221eed",
+  "how": "score=5 db=aprilia-shiver 2026-07-25 renter=None"
+ },
+ {
+  "file": "rent-Aprilia-Shiver-750-28.07.2026 (1) (Восстановлен).docx Басыров Антон Михайлович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "a1c640d6-52f9-46a2-9397-779cfa2f3403",
+  "how": "score=5 db=aprilia-shiver 2026-07-28 renter=None"
+ },
+ {
+  "file": "rent-Aprilia-Shiver-750-31.08.2026 (1).docx Черемухин Денис Михайлович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b1511be7-4c84-405b-8967-7cb2fe2c716d",
+  "how": "score=8 db=aprilia-shiver 2026-08-31 renter=Черемухин Денис Михайлович"
+ },
+ {
+  "file": "rent-BENDA-LFC700-24.09.2026.docx Климов Евгений Евгеньевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "a2658887-ad89-45f2-a4a2-9a74a7d50bab",
+  "how": "score=8 db=benda-lfc700-2024 2026-09-24 renter=Климов Евгений Евгеньевич"
+ },
+ {
+  "file": "rent-BMW-F800R-03.07.2026 (Фимин Максим).docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-BMW-F800R-04.07.2026_Локтев_Дмитрий (Восстановлен).docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-BMW-F800R-04.07.2026_Локтев_Дмитрий.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-BMW-F800R-10.07.2026_Павликов__BMW_F800R.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=3 db=falcon-pro-2026 2026-07-11 None"
+ },
+ {
+  "file": "rent-BMW-F800R-10.07.2026_Павликов__BMW_F800R.docx Павликов.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=3 db=falcon-pro-2026 2026-07-11 None"
+ },
+ {
+  "file": "rent-BMW-F800R-11.08.2026 Черемухин .docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "c14e9f79-150d-475b-a6db-441392b22d09",
+  "how": "score=5 db=bmw-f800r 2026-08-11 renter=None"
+ },
+ {
+  "file": "rent-BMW-F800R-14.10.2026 ( Пронин Александр Владимирович).docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "28702ae4-21a2-45bb-9dd2-e770223ff933",
+  "how": "score=8 db=bmw-f800r 2026-10-14 renter=Пронин Александр Владимирович."
+ },
+ {
+  "file": "rent-BMW-F800R-14.10.2026.docx Пронин Александр Владимирович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "28702ae4-21a2-45bb-9dd2-e770223ff933",
+  "how": "score=8 db=bmw-f800r 2026-10-14 renter=Пронин Александр Владимирович."
+ },
+ {
+  "file": "rent-BMW-F800R-17.10.2026 (1).docx Мишин Кирилл Александрович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "bd948bd0-e9db-44ef-8955-97933cee066f",
+  "how": "score=8 db=bmw-f800r 2026-10-17 renter=Мишин Кирилл Александрович."
+ },
+ {
+  "file": "rent-BMW-F800R-19.09.2026 (1).docx Куликов Даниил Сергеевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "45a22663-4bea-44bc-b226-877da3f558a0",
+  "how": "score=8 db=bmw-f800r 2026-09-19 renter=Куликов Даниил Сергеевич"
+ },
+ {
+  "file": "rent-BMW-F800R-20.09.2026.docx Володин Анатолий Сергеевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "801a2e9d-0975-4793-ac6a-b0c5f53ebd0e",
+  "how": "score=8 db=bmw-f800r 2026-09-20 renter=Володин Анатолий Сергеевич."
+ },
+ {
+  "file": "rent-BMW-F800R-21.07.2026.docx Логунов.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "e7aca532-3b7c-4618-b75e-995a754db1b1",
+  "how": "score=5 db=bmw-f800r 2026-07-21 renter=None"
+ },
+ {
+  "file": "rent-BMW-F800R-25.07.2026 (1).docx ГУСЕВ вЛАДИСЛАВ юРЬЕВИЧ.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "be839f2f-a669-47af-8fe0-229544001674",
+  "how": "score=5 db=bmw-f800r 2026-07-25 renter=None"
+ },
+ {
+  "file": "rent-BMW-F800R-25.09.2026 (автовосстановление).docx Лебедева Вероника Андреевна.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b1f3f659-7235-45cc-a909-c7911969f3db",
+  "how": "score=8 db=bmw-f800r 2026-09-25 renter=Лебедева Вероника Андреевна"
+ },
+ {
+  "file": "rent-BMW-F800R-26.07.2026.docx Клишин Роман Дмитриевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "be839f2f-a669-47af-8fe0-229544001674",
+  "how": "score=5 db=bmw-f800r 2026-07-25 renter=None"
+ },
+ {
+  "file": "rent-BMW-F800R-27.07.2026 (Восстановлен).docx Гусев Владислав Юрьевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "096b15a7-ab1d-4738-9d86-c2e52ba829d4",
+  "how": "score=5 db=bmw-f800r 2026-07-26 renter=None"
+ },
+ {
+  "file": "rent-Ducati-1199-Panigale-21.08.2026 (1).docx Головин Яков Алексеевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7b2bab65-5327-42f2-aa46-9a1cd3fcac53",
+  "how": "score=6 db=ducati-1199-panigale-2012 2026-08-21 renter=Головин Яков Алексеевич"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-03.07.2026_Сидоров_Андрей.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=2 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-03.07.2026_Томашевский_Нектарий.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=2 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-04.07.2026_Гречковский_Сергей.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=2 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-04.07.2026_Заваленский.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=2 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-03.08.2026 (1).docx Самородова Александра Анатольевна.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "955bd31a-487e-4dcb-a6be-028d91987cf0",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-08-03 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-08.08.2026 (1).docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "cb2dfa38-fa01-4054-91fe-6048c58b10b1",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-08-08 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-20.07.2026.docx Титков Алексей.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "c61b53c9-8acd-490f-a474-42ca20e60ec0",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-07-20 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Aero-19.07.2026.docx Семинченко Алексей.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "fc07cb61-445f-4379-95a0-b4ae0b205171",
+  "how": "score=5 db=ducati-panigale-s-electro-black-aero 2026-07-19 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Aero-20.07.2026.docx Боканов Роман.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "fc07cb61-445f-4379-95a0-b4ae0b205171",
+  "how": "score=5 db=ducati-panigale-s-electro-black-aero 2026-07-19 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-12.09.2026Борисов Д. И. (Восстановлен).docx Борисов Даниил Иванович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7641ee62-6bb5-4f61-9b37-c12333d9c119",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-09-12 renter=Борисов Даниил Иванович."
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-12.09.2026Борисов Д. И..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7641ee62-6bb5-4f61-9b37-c12333d9c119",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-09-12 renter=Борисов Даниил Иванович."
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-19.08.2026 Шонов (Восстановлен).docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b5707303-c104-47a3-a797-71ede05ac0d3",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-08-19 renter=Шонов Дмитрий Николаевич"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-19.08.2026 Шонов.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b5707303-c104-47a3-a797-71ede05ac0d3",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-08-19 renter=Шонов Дмитрий Николаевич"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-19.09.2026.docx Пенкин Александр Александрович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "f773d365-2e4b-4c19-9833-a36d69d624ac",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-09-19 renter=Пенкин Александр Александрович"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-24.08.2026 Семенов Сергей Юрьевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "cec5daab-aac6-4e1f-b2e8-ab69a1f9f93c",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-08-24 renter=Семенов Сергей Юрьевич"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-27.09.2026.docx Мартышев Владимир Александрович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "55bf172b-ae6c-4c85-90d3-8915522ec919",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-09-27 renter=Мартышев Владимир Александрович"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-30.08.2026_Пургаев ДИджей .docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "ff73acb5-e9ff-43d7-b79d-c9701a516317",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-08-30 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-30.08.2026_Пургаев ДИджей .docx Пургаев Владимир Анатольевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "ff73acb5-e9ff-43d7-b79d-c9701a516317",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-08-30 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Black-Z-31.08.2026.docx Кудрявцев Григорий Александрович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "d9dea17f-2bf6-4bd0-9a5a-9fbc0b3d855a",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-08-31 renter=Кудрявцев Григорий Александрович"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Gold-08.07.2026.docx Кузьминков Никита Сергеевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "94b5b41d-e435-4e28-9773-483f0cf59c7c",
+  "how": "score=5 db=ducati-panigale-s-electro-gold 2026-07-08 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Gold-08.08.2026 (Восстановлен).docx Васильев Дмитрий Владиславович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b3e9b4a1-796a-46df-80a9-77b39cba3fd8",
+  "how": "score=5 db=ducati-panigale-s-electro-gold 2026-08-08 renter=None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Green-Z-02.09.2026 (Федяков Роман Вячеславович).docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "aea9e510-f73f-478b-804c-688651daf266",
+  "how": "score=8 db=ducati-panigale-s-electro-green 2026-09-02 renter=Федяков Роман Вячеславович"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Red-05.07.2026_Чуфыркин.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=1 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Red-05.07.2026_Чуфыркин.docx Чуфыркин.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=1 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Ducati-Panigale-S-Electro-Red-08.07.2026.docx Халикова Диана.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=3 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Honda-CBR600RR-02.10.2026.docx Челноков Дмитрий Иванович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "645e5f9d-74dd-4dfc-a920-c3279cb00fe8",
+  "how": "score=6 db=yamaha-r6-2007 2026-10-02 renter=Челноков Максим Иванович"
+ },
+ {
+  "file": "rent-Honda-CBR600RR-06.09.2026 (Восстановлен).docx Живайкин Александр Сергеевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "a5908ba2-2da3-43ac-ba31-9ca689a73340",
+  "how": "score=8 db=honda-cbr600rr-2003 2026-09-06 renter=Живайкин Александр Сергеевич."
+ },
+ {
+  "file": "rent-Honda-CBR600RR-11.09.2026 (Восстановлен).docx Федотов Денис Витальевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "8bad98ff-f14c-4e19-a9c4-436ea647dcf9",
+  "how": "score=8 db=honda-cbr600rr-2003 2026-09-11 renter=Федотов Денис Витальевич."
+ },
+ {
+  "file": "rent-Honda-CBR600RR-22.08.2026 (1).docx Афанасьев Станислав Александрович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "78759a77-43de-4cd2-8890-a887ca578e8a",
+  "how": "score=8 db=honda-cbr600rr-2003 2026-08-22 renter=Афанасьев Станислав Александрович"
+ },
+ {
+  "file": "rent-Jilang-Max-Pro-03.07.2026.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Jilang-Max-Pro-19.07.2026.docx Беляков Александр.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "766b7c54-b1a6-4412-a282-96dc1a876c5b",
+  "how": "score=5 db=jilang-max-pro 2026-07-19 renter=None"
+ },
+ {
+  "file": "rent-Jilang-Max-Pro-21.07.2026.docx Акопян.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "d870bc5f-51b3-4c81-9314-2bf4c62fc28a",
+  "how": "score=5 db=jilang-max-pro 2026-07-21 renter=None"
+ },
+ {
+  "file": "rent-Jilang-Max-Pro-22.08.2026 (1).docx Мутовкин Алексей Валерьевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "38d38ec1-f6fb-4b98-a346-969f344da191",
+  "how": "score=8 db=jilang-max-pro 2026-08-22 renter=Мутовкин Алексей Валерьевич"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-09.10.2026.docx Садовников Олег Эдуардович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "15db0028-ece6-4e62-9c50-a891bcd32fe7",
+  "how": "score=8 db=kawasaki-ex650k 2026-10-09 renter=Садовников Олег Эдуардович"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-10.08.2026 (3) (Восстановлен).docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "e53b8598-adc1-499c-a9d4-ceb05ab077f4",
+  "how": "score=5 db=kawasaki-ex650k 2026-08-10 renter=None"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-10.08.2026 Большухин С Ю.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "e53b8598-adc1-499c-a9d4-ceb05ab077f4",
+  "how": "score=5 db=kawasaki-ex650k 2026-08-10 renter=None"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-10.08.2026 Большухин С Ю.docx Большухин Сергей Юрьевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "e53b8598-adc1-499c-a9d4-ceb05ab077f4",
+  "how": "score=5 db=kawasaki-ex650k 2026-08-10 renter=None"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-14.09.2026 (2).docx Салин Роман Анатольевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "734e63c5-9a8b-439a-91c3-3272292b684c",
+  "how": "score=8 db=kawasaki-ex650k 2026-09-14 renter=Салин Роман Анатольевич"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-17.07.2026.docx Алексей Комков.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "1a8a1ffd-388d-4be5-aeb3-b60fee14a629",
+  "how": "score=5 db=kawasaki-ex650k 2026-07-17 renter=None"
+ },
+ {
+  "file": "rent-Kawasaki-EX650K-Ninja-650-18.09.2026.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "d7e91c86-753a-4c20-a4ad-ecf53992a96e",
+  "how": "score=8 db=kawasaki-ex650k 2026-09-18 renter=Кузьмин Сергей Анатольевич"
+ },
+ {
+  "file": "rent-Leopard-Asaka-22.08.2026 (Восстановлен).docx Богдан Алексей Анатольевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "0aebaf91-2b74-4b68-9cbc-05c567bf7a74",
+  "how": "score=8 db=leopard-asaka 2026-08-22 renter=Богдан Алексей Анатольевич"
+ },
+ {
+  "file": "rent-Motoland-Breakout-300-03.08.2026 (Восстановлен).docx Савостьянов Александр Михайлович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "f44fe33e-c994-4fee-affd-e8a329adecb3",
+  "how": "score=5 db=motoland-breakout 2026-08-03 renter=None"
+ },
+ {
+  "file": "rent-Motoland-Breakout-300-09.10.2026.docx 9.10.docx Сахаров Сергей Владимирович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "9d7582e5-dfa6-469d-bfad-5c47d3f51129",
+  "how": "score=8 db=motoland-breakout 2026-10-09 renter=Сахаров Сергей Владимирович"
+ },
+ {
+  "file": "rent-Motoland-Breakout-300-22.08.2026 (1) (Восстановлен).docx Хорцев Тимур Олегович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "3e572c0d-848b-4c1b-9f88-ff06c3d1eab7",
+  "how": "score=8 db=motoland-breakout 2026-08-22 renter=Хорцев Тимур Олегович"
+ },
+ {
+  "file": "rent-Motoland-Breakout-300-27.09.2026 (1) (автовосстановление).docx Орыщак Дмитрий Евгеньевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "ed44441f-c8c0-492e-a3a7-1c4e1c5a67bf",
+  "how": "score=8 db=motoland-breakout 2026-09-27 renter=Орыщак Дмитрий Евгеньевич"
+ },
+ {
+  "file": "rent-Motoland-Breakout-300-30.08.2026 Салин Роман Анатольевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7027a3ce-44e4-4bbb-beee-eea6c799e4e3",
+  "how": "score=8 db=motoland-breakout 2026-08-30 renter=Салин Роман Анатольевич"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-04.07.2026.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=nibbler-regumoto-4v 2026-06-17 None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-04.07.2026.docx Новиков.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=nibbler-regumoto-4v 2026-06-17 None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-06.07.2026_Шевчук.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=1 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-08.08.2026 (2) (Восстановлен).docx Васильев Даниил Александрович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "60d3defb-0e73-4b16-828d-707e28af9d68",
+  "how": "score=5 db=nibbler-regumoto-4v 2026-08-08 renter=None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-11.08.2026 Гахраманов .docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "5c135994-c47a-4792-a6c6-73be814fa708",
+  "how": "score=5 db=nibbler-regumoto-4v 2026-08-11 renter=None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-15.08.2026.docx Гузяева Ольга Александровна.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "d6187779-49ef-4b51-8b19-6fa108a755cf",
+  "how": "score=5 db=nibbler-regumoto-4v 2026-08-15 renter=None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-20.07.2026.docx Вадим.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b2521c19-a106-4a9c-9b50-7bd0de4c45a2",
+  "how": "score=5 db=nibbler-regumoto-4v 2026-07-20 renter=None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-23.07.2026.docx Алимов Станислав (Восстановлен).docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "4138ac74-0015-490a-9840-c991685910e2",
+  "how": "score=5 db=nibbler-regumoto-4v 2026-07-23 renter=None"
+ },
+ {
+  "file": "rent-Regulmoto-Nibbler-300-4V-23.07.2026.docx Алимов Станислав.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "4138ac74-0015-490a-9840-c991685910e2",
+  "how": "score=5 db=nibbler-regumoto-4v 2026-07-23 renter=None"
+ },
+ {
+  "file": "rent-Rerode-R1-10.07.2026_Ворожейкин_Степан.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=3 db=falcon-pro-2026 2026-07-11 None"
+ },
+ {
+  "file": "rent-Rerode-R1-20.07.2026 (1) (Восстановлен).docx артур Рафаэльевич.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "dd88a007-273b-4372-af36-029cd878e329",
+  "how": "score=5 db=rerode-r1-plus 2026-07-20 renter=None"
+ },
+ {
+  "file": "rent-Rerode-R1-25.07.2026.docx Рыжаков Роман Алексеевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "a6b38276-52f8-49d7-8599-94c1c1afbbb7",
+  "how": "score=5 db=rerode-r1-plus 2026-07-25 renter=None"
+ },
+ {
+  "file": "rent-Rerode-R1-28.07.2026 (Восстановлен).docx Малясов Николай Николаевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "d009f0a7-0201-4877-9a90-045a410c906d",
+  "how": "score=5 db=rerode-r1-plus 2026-07-28 renter=None"
+ },
+ {
+  "file": "rent-Sequence-Zero-03.10.2026.docx Кильчинский Анвер Фаикович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "de2de03c-e071-4796-89bd-e0effcc614f8",
+  "how": "score=8 db=sequence-zero 2026-10-03 renter=Кильчинский Анвер Фаикович"
+ },
+ {
+  "file": "rent-Sequence-Zero-19.07.2026.docx Платонов Даниил.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "d43766ba-bcac-4531-a4f7-cdef3219abfd",
+  "how": "score=5 db=sequence-zero 2026-07-18 renter=None"
+ },
+ {
+  "file": "rent-Suzuki-GSX-S1000F-11.07.2026_КиргинцевМ (Восстановлен).docx Киргинцев Михаил Александрович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "10c53dde-6fd3-4147-ba4d-2529dd475586",
+  "how": "score=5 db=suzuki-gsx-s1000f 2026-07-11 renter=None"
+ },
+ {
+  "file": "rent-Suzuki-GSX-S1000F-11.07.2026_КиргинцевМ.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "10c53dde-6fd3-4147-ba4d-2529dd475586",
+  "how": "score=5 db=suzuki-gsx-s1000f 2026-07-11 renter=None"
+ },
+ {
+  "file": "rent-Suzuki-GSX-S1000F-28.07.2026 (1) (Восстановлен).docx Лазарев Дмитрий Михайлович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "b1e4ac4c-b3c2-46f7-bccc-1d3840a70180",
+  "how": "score=5 db=suzuki-gsx-s1000f 2026-07-28 renter=None"
+ },
+ {
+  "file": "rent-Suzuki-M109R-1800-Boulevard-18.10.2026.docx Нарушева Елена Владимировна..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "f17df94a-2736-4b0f-b084-089aeb77ca17",
+  "how": "score=8 db=suzuki-vzr1800-boulevard-2006 2026-10-18 renter=Нарушева Елена Владимировна."
+ },
+ {
+  "file": "rent-Suzuki-M109R-1800-Boulevard-20.09.2026 (автовосстановление).docx Любимов Роман Валерьевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "3b1e7657-32be-408b-800a-624655ca7a55",
+  "how": "score=8 db=suzuki-vzr1800-boulevard-2006 2026-09-20 renter=Любимов Роман Валерьевич."
+ },
+ {
+  "file": "rent-Wenbox-U2-Pro-01.08.2026 (1).docx Васильев Дмитрий.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "9c0ba304-0a95-4534-88e9-9ecb18c7cacb",
+  "how": "score=5 db=wenbox-u2-pro 2026-08-01 renter=None"
+ },
+ {
+  "file": "rent-Yamaha-R6-27.09.2026 (автовосстановление).docx Челноков Дмитрий Иванович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7b1f597d-2ef1-4f3a-bcf3-16ef2b23666b",
+  "how": "score=8 db=yamaha-r6-2007 2026-09-27 renter=Челноков Дмитрий Иванович."
+ },
+ {
+  "file": "rent-Yamaha-R7-02.10.2026 (1)Челноков Дмитрий Иванович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "add63811-8067-4c13-9e5a-292308c089c9",
+  "how": "score=8 db=yamaha-r7 2026-10-02 renter=Челноков Дмитрий Иванович"
+ },
+ {
+  "file": "rent-Yamaha-R7-04.08.2026.docx Данилин Юрий Алексеевич..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7b5c12ed-9d13-4c31-80d9-8f67c1d0979e",
+  "how": "score=5 db=yamaha-r7 2026-08-04 renter=None"
+ },
+ {
+  "file": "rent-Yamaha-R7-11.07.2026_ЛевинД.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "7129ef6d-8ca4-412d-8534-5e04720fcb6e",
+  "how": "score=5 db=yamaha-r7 2026-07-11 renter=None"
+ },
+ {
+  "file": "rent-bike-KAWASAKI-EX650K-02.07.2026.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=kawasaki-ex650k 2026-05-30 Забалдин Артём"
+ },
+ {
+  "file": "rent-bike-KAWASAKI-EX650K-29.06.2026.docx Ларин.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=kawasaki-ex650k 2026-05-30 Забалдин Артём"
+ },
+ {
+  "file": "rental-Suzuki-VZR1800-Boulevard-2026-09-17 (2).docx Максим Зефиров.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "a78ebd3c-d95a-4b0c-a8a5-a648597c7438",
+  "how": "score=8 db=suzuki-vzr1800-boulevard-2006 2026-09-17 renter=Максим Зефиров"
+ },
+ {
+  "file": "rental-contract-1780156819969.pdf",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "30.5/KAWASAKI-EX650K None  2026-05-30"
+ },
+ {
+  "file": "sale-79BIKE-Falcon-GT-2026-07-27.docx Николаев Александр Геннадьевич..docx111.docx222.docx3.docx",
+  "kind": "SALE_CONTRACT",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "sale-79BIKE-Falcon-GT-2026-08-27 (1).docx Митрохин Артем Кириллович.docx Митрохин Артем Кириллович.docx",
+  "kind": "SALE_CONTRACT",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "sale-BMW-S1000RR-Electro-Silver-2026-08-24.docx Яканин Алексей Николаевич.docx",
+  "kind": "SALE_CONTRACT",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "sale-Y-VOLT-Surge-V-2026-09-01 Гусев Д. А. (Восстановлен).docx Гусев Дмитрий Александрович..docx",
+  "kind": "SALE_CONTRACT",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-79BIKE-Falcon-GT-2026-10-01 Жуков Дмитрий Игоревич.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-79BIKE-Falcon-Lynx-Purple-2026-10-16 Грязнов Евгений Геннадьевич.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-79BIKE-Falcon-Pro-2026-09-13 Колымаев Данила Иванович.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Ducati-Panigale-S-Electro-Black-Z-2026-09-12Борисов Д. И..docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Ducati-Panigale-S-Electro-Black-Z-2026-10-01 Елагин Кирилл Сергеевич.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Ducati-Panigale-S-Electro-Gold-2026-09-13 Ильинский.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Ducati-Panigale-S-Electro-Gold-2026-10-15 Тарнава Андрей Юрьевич.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Ducati-Panigale-S-Electro-Green-Z-2026-08-30_Федяев.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Ducati-Panigale-S-Electro-Green-Z-2026-08-30_Федяев.docx Федяев Роман Вячеславович.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Regulmoto-Nibbler-300-4V-2026-08-30 Салин Роман.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "testdrive-Y-VOLT-Surge-V-2026-09-10 (Восстановлен).docx Мусякаев Александр Владимирович.docx",
+  "kind": "TESTDRIVE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "ДОГОВОР.docx Васильев Дмитрий Владиславович..docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "9c0ba304-0a95-4534-88e9-9ecb18c7cacb",
+  "how": "score=5 db=wenbox-u2-pro 2026-08-01 renter=None"
+ },
+ {
+  "file": "ДОГОВОР.docx Лобанов Михаил Олегович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "abd9cf5f-3bff-4aee-9c6e-36b3f2cfb490",
+  "how": "score=8 db=yamaha-r6-2007 2026-09-11 renter=Лобанов Михаил Олегович"
+ },
+ {
+  "file": "ДОГОВОР.docx Мартышев Владимир Александрович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "55bf172b-ae6c-4c85-90d3-8915522ec919",
+  "how": "score=8 db=ducati-panigale-s-electro-black 2026-09-27 renter=Мартышев Владимир Александрович"
+ },
+ {
+  "file": "ДОГОВОР.docx Черутов Алексей Павлович.docx",
+  "kind": "MATCHED_DB",
+  "rental_id": "cb2dfa38-fa01-4054-91fe-6048c58b10b1",
+  "how": "score=5 db=ducati-panigale-s-electro-black 2026-08-08 renter=None"
+ },
+ {
+  "file": "Договор 3 проката аренды электромотоцикла Zero.docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "9-05/1 Стерлягов Алексей Николаевич Sequence Zero 2026-05-09"
+ },
+ {
+  "file": "Договор аренды мотоцикла Suzuki GSXS 1000F чистый .docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "777 Шаронов Александр Владимирович Regulmoto Nibbler 300 2026-06-05"
+ },
+ {
+  "file": "Договор аренды мотоцикла Suzuki GSXS 1000F чистый .docx не чистый.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=0 db=ducati-panigale-s-electro-gold 2026-07-08 None"
+ },
+ {
+  "file": "Договор аренды мотоцикла nibbler 300.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды мотоцикла nibbler 300.docx Алиев Амаль.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=3 db=falcon-pro-2026 2026-07-11 None"
+ },
+ {
+  "file": "Договор аренды мотоцикла без экипажа с тарифами.docx",
+  "kind": "DOC_ERA_UNMATCHED",
+  "rental_id": null,
+  "how": "best score=1 db=nibbler-regumoto-4v 2026-06-17 None"
+ },
+ {
+  "file": "Договор аренды электромотоцикла   Falcon GT + PRO чистый — — копия — копия.docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "16-5 Калинин Илья Викторович  2026-05-16"
+ },
+ {
+  "file": "Договор аренды электромотоцикла   Falcon GT + PRO чистый — — копия — копия.docx1.docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "16-51 Могучев Иван Вахтангович  2026-05-18"
+ },
+ {
+  "file": "Договор аренды электромотоцикла  Horwin CR1  20.05.2026 Мирощников С.В..docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "20-05/1 Мирошников Станислав Валерьевич  2026-05-20"
+ },
+ {
+  "file": "Договор аренды электромотоцикла  Horwin CR1 чистый .docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды электромотоцикла  Horwin SK3plus чистый  — копия.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды электромотоцикла Ducati Panigale чистый Шкитин М.О — копия.docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "20-05/2 Голубев Валерий Юрьевич Ducati Panigale 2026-06-01"
+ },
+ {
+  "file": "Договор аренды электромотоцикла Ducati Panigale чистый Шкитин М.О.docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "20-05/2 Шкитин Михаил Олегович Ducati Panigale 2026-05-20"
+ },
+ {
+  "file": "Договор аренды электромотоцикла Ducati Panigale чистый — — копия.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды электромотоцикла Ducati Panigale чистый — — копия.docx Дудочкин Виталий.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды электромотоцикла KAWASAKI EX650K чистый — — копия — копия.docx",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "26.5/1 Воронцов Денис Сергеевич Kawasaki EX650K Ninja 650 2026-05-26"
+ },
+ {
+  "file": "Договор аренды электромотоцикла KAWASAKI EX650K чистый — — копия — копия.txt",
+  "kind": "PRE_DOC_ERA",
+  "rental_id": null,
+  "how": "None None Kawasaki EX650K Ninja 650 2026-05-26"
+ },
+ {
+  "file": "Договор аренды электромотоцикла Sequence Zero 17.05—.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды электромотоцикла Sequence Zero чистый —.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор аренды_электромотоцикла ДУКАТИ чистый.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ },
+ {
+  "file": "Договор_проката_аренды_электромотоцикла ДУКАТИ.docx",
+  "kind": "TEMPLATE",
+  "rental_id": null,
+  "how": null
+ }
+]
