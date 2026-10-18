@@ -6,13 +6,15 @@
 //  • Обзор сезона грузится один раз (сервер кэширует ~10 мин).
 //  • Детали месяца — лениво, только по клику (кэш на клиенте тоже держим).
 //  • Раунд сверки + повторная отправка сверки — owner-tier (сервер проверяет).
+//  • Все данные — только из Supabase (rentals / sale artifacts / cash /
+//    verification), ничего внешнего: страница честная для любого экипажа.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
   Bike, Banknote, CalendarRange, CarFront, CheckCircle2, Loader2,
-  RefreshCw, Send, Tag, TrendingUp, Wallet, AlertTriangle,
+  RefreshCw, Send, Tag, TrendingUp, Wallet,
 } from "lucide-react";
 import {
   getSeasonStatsOverview,
@@ -23,7 +25,6 @@ import {
   type VerificationRoundResult,
 } from "@/app/franchize/server-actions/season-stats";
 import { resendVerificationDmsAction } from "@/app/franchize/server-actions/rental-verify-actions";
-import { ARCHIVE_SNAPSHOT } from "./archive-snapshot";
 
 export interface SeasonStatsTokens {
   bg: string;
@@ -452,46 +453,6 @@ export function SeasonStatsClient({ slug, crewName, ownerTier, tokens }: Props) 
           })()}
         </section>
       )}
-
-      {/* ── Archive coverage (docs vs DB) ────────────────────────────────── */}
-      <section className="rounded-2xl border p-4" style={{ borderColor: tokens.border, backgroundColor: tokens.card }}>
-        <h2 className="flex items-center gap-2 text-sm font-bold mb-1" style={{ color: tokens.text }}>
-          <AlertTriangle className="w-4 h-4" style={{ color: AMBER }} />
-          Архив договоров vs база — что досчитается после ретроимпорта
-        </h2>
-        <p className="text-[11px] mb-3" style={{ color: tokens.textMuted }}>
-          Разбор архива от {ARCHIVE_SNAPSHOT.generatedAt.slice(0, 10)}: файлов {ARCHIVE_SNAPSHOT.filesTotal} ·
-          в базе уже {ARCHIVE_SNAPSHOT.byStatus.imported_db + ARCHIVE_SNAPSHOT.byStatus.imported_backfill_v1} ·
-          ждут импорта {ARCHIVE_SNAPSHOT.byStatus.retro_missing + ARCHIVE_SNAPSHOT.byStatus.retro_needs_review} ·
-          тест-драйвов {ARCHIVE_SNAPSHOT.byStatus.testdrive} · продаж {ARCHIVE_SNAPSHOT.byStatus.sale} · шаблонов {ARCHIVE_SNAPSHOT.byStatus.template}
-        </p>
-        <div className="space-y-1">
-          {ARCHIVE_SNAPSHOT.months.filter((m) => m.docs > 0 || m.db > 0).map((m) => {
-            const gap = m.expected - m.db;
-            return (
-              <div key={m.month} className="flex items-center gap-2 text-xs" style={{ color: tokens.text }}>
-                <span className="w-16 shrink-0" style={{ color: tokens.textMuted }}>{m.month}</span>
-                <div className="flex-1 flex items-center gap-1">
-                  <div className="h-4 rounded-md" style={{ width: `${Math.min(100, (m.db / Math.max(1, m.expected)) * 100)}%`, backgroundColor: `color-mix(in srgb, ${tokens.accent} 55%, transparent)` }} />
-                  <div className="h-4 rounded-md border border-dashed" style={{ width: gap > 0 ? `${Math.min(100 - (m.db / Math.max(1, m.expected)) * 100, 45)}%` : 0, borderColor: AMBER, backgroundColor: `color-mix(in srgb, ${AMBER} 14%, transparent)` }} />
-                  <span className="text-[10px] tabular-nums" style={{ color: tokens.textMuted }}>
-                    в базе {m.db}{gap > 0 ? ` → будет ${m.expected} (+${gap})` : ""}
-                  </span>
-                </div>
-                {(m.month === "2026-05" || m.month === "2026-06") && gap > 0 && (
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: `color-mix(in srgb, ${AMBER} 16%, transparent)`, color: AMBER }}>
-                    май/июн уточнится
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-[10px] mt-2" style={{ color: tokens.textMuted }}>
-          Известные суммы по ненайденным договорам: {rub(ARCHIVE_SNAPSHOT.missingMoneyKnownRub)} + {rub(ARCHIVE_SNAPSHOT.reviewMoneyKnownRub)} на проверке.
-          Ретроимпорт запустим отдельным шагом — ничего не теряется.
-        </p>
-      </section>
 
       <p className="text-center text-[10px] pb-2" style={{ color: tokens.textMuted }}>
         {crewName} · сезон {overview.seasonYear} · данные кэшируются ≈10 минут, детали месяца грузятся по клику · обновлено {overview.generatedAt.slice(11, 16)} MSK

@@ -1,0 +1,739 @@
+{
+ "applied_at": "2026-10-18T22:15:43.589+00:00",
+ "source": "все договора.zip via extraction_v1.json",
+ "imported": [
+  {
+   "file": "Договор аренды мотоцикла nibbler 300.docx Алиев Амаль.docx",
+   "sha256": "92a182a70324cad2c685f0ab99239e2880bd89b121b334287a4e984198df141f",
+   "rental_id": "7da7230b-fa9c-4013-8fd0-755604643a2a",
+   "vehicle_id": "nibbler-regumoto-4v",
+   "doc_date": "2026-07-11",
+   "total_cost": 0,
+   "total_unknown": true,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/dogovor arendy mototsikla nibbler 300.docx aliev amal.docx",
+   "original_filename": "Договор аренды мотоцикла nibbler 300.docx Алиев Амаль.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла   Falcon GT + PRO чистый — — копия — копия.docx",
+   "sha256": "c8fe036922bb4abf2234129b0a71ca66d9e8d52ea022cb2e1b6430d366e45f16",
+   "rental_id": "2304a4a1-2fa4-4424-b32c-223a8a4238cc",
+   "vehicle_id": "falcon-pro-2026",
+   "doc_date": "2026-05-16",
+   "total_cost": 0,
+   "total_unknown": true,
+   "deposit": 10000,
+   "note": null,
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla   falcon gt _ pro chistyy _ _ kopiya _ kopiya.docx",
+   "original_filename": "Договор аренды электромотоцикла   Falcon GT + PRO чистый — — копия — копия.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла   Falcon GT + PRO чистый — — копия — копия.docx1.docx",
+   "sha256": "346e3b43d21d9b68c26c31df555bd28c861aa4fc976d4f666953bf49a7453810",
+   "rental_id": "1b84cde7-0303-43b7-b529-57d8abc05bb5",
+   "vehicle_id": "falcon-pro-2026",
+   "doc_date": "2026-05-18",
+   "total_cost": 0,
+   "total_unknown": true,
+   "deposit": 10000,
+   "note": null,
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla   falcon gt _ pro chistyy _ _ kopiya _ kopiya.docx1.docx",
+   "original_filename": "Договор аренды электромотоцикла   Falcon GT + PRO чистый — — копия — копия.docx1.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла KAWASAKI EX650K чистый — — копия — копия.docx",
+   "sha256": "0a998454fd0d999fd7fd6f8963b013b231f8b7b29179f5023240cf6913f19a56",
+   "rental_id": "3bfbe2a0-5c6b-4891-8f27-00e3bf240b58",
+   "vehicle_id": "kawasaki-ex650k",
+   "doc_date": "2026-05-26",
+   "total_cost": 0,
+   "total_unknown": true,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla kawasaki ex650k chistyy _ _ kopiya _ kopiya.docx",
+   "original_filename": "Договор аренды электромотоцикла KAWASAKI EX650K чистый — — копия — копия.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-03.07.2026 (Фимин Максим).docx",
+   "sha256": "77684eb1f37c40348810cb2491cb6433d956b9679a9fbd94faf8885c68e84986",
+   "rental_id": "c3e322c8-fa27-4811-9086-d035fc3a3cc5",
+   "vehicle_id": "bmw-f800r",
+   "doc_date": "2026-07-03",
+   "total_cost": 12000,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-03.07.2026 _fimin maksim.docx",
+   "original_filename": "rent-BMW-F800R-03.07.2026 (Фимин Максим).docx"
+  },
+  {
+   "file": "rent-BMW-F800R-04.07.2026_Локтев_Дмитрий (Восстановлен).docx",
+   "sha256": "32c5b052b6c78be490665b9d438365c8f0c258aae4d7d287648459d410d7493d",
+   "rental_id": "0aeb3d99-726e-4c7e-b8ca-e64ff7f24689",
+   "vehicle_id": "bmw-f800r",
+   "doc_date": "2026-07-04",
+   "total_cost": 12000,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-04.07.2026_loktev_dmitriy _vosstanovlen.docx",
+   "original_filename": "rent-BMW-F800R-04.07.2026_Локтев_Дмитрий (Восстановлен).docx"
+  },
+  {
+   "file": "rent-BMW-F800R-10.07.2026_Павликов__BMW_F800R.docx",
+   "sha256": "35c3ba4a7bdc43e15f9058481f15e8ce48ca121c1640f4c5c47b8adb4434e09b",
+   "rental_id": "821b49cf-6deb-462c-a038-855a67aecfef",
+   "vehicle_id": "bmw-f800r",
+   "doc_date": "2026-07-10",
+   "total_cost": 28000,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-10.07.2026_pavlikov_bmw_f800r.docx",
+   "original_filename": "rent-BMW-F800R-10.07.2026_Павликов__BMW_F800R.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-03.07.2026_Сидоров_Андрей.docx",
+   "sha256": "f524a737e1d7be035452ab1019c38fbf4a3f4ca92882fafc239448d5ff7066f7",
+   "rental_id": "bb42163b-cddb-4cec-8530-df397fc1d291",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "doc_date": "2026-07-03",
+   "total_cost": 8500,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": "арендная плата 8500 из п.4.1 договора (Итого не заполнено)",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-03.07.2026_sidorov_andrey.docx",
+   "original_filename": "rent-Ducati-Panigale-S-Electro-03.07.2026_Сидоров_Андрей.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-03.07.2026_Томашевский_Нектарий.docx",
+   "sha256": "35b97c85a4b04bab098deb9ac79bf35ebb32ebd4018f38fb07d4e81762787e3c",
+   "rental_id": "30500682-a0a6-4a4e-9a46-fdaf70c771c3",
+   "vehicle_id": "ducati-panigale-s-electro-black-chain",
+   "doc_date": "2026-07-03",
+   "total_cost": 8500,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": "второй чёрный Panigale в этот же день (договор 3.7_2); арендная плата 8500 из п.4.1",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-03.07.2026_tomashevskiy_nektariy.docx",
+   "original_filename": "rent-Ducati-Panigale-S-Electro-03.07.2026_Томашевский_Нектарий.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-04.07.2026_Гречковский_Сергей.docx",
+   "sha256": "52db1a3303e2d79f945f52b5136aa037e51c94e8dbc95285bbaf8e7ca0aa21d9",
+   "rental_id": "27376c21-173a-4737-a938-ed24daeb00ab",
+   "vehicle_id": "ducati-panigale-s-electro-black-chain",
+   "doc_date": "2026-07-04",
+   "total_cost": 10000,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": "в договоре цвет Чёрный; black Z занят Заваленским 04.07 — прикреплено к black-chain вариации",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-04.07.2026_grechkovskiy_sergey.docx",
+   "original_filename": "rent-Ducati-Panigale-S-Electro-04.07.2026_Гречковский_Сергей.docx"
+  },
+  {
+   "file": "rent-bike-KAWASAKI-EX650K-02.07.2026.docx",
+   "sha256": "d2f02930ed526d236d4056483fc33dbac16d1dc1c3e629ad4516ebeb1cd9d8ba",
+   "rental_id": "63e6cf8d-93a3-40da-8e40-7477446921df",
+   "vehicle_id": "kawasaki-ex650k",
+   "doc_date": "2026-07-02",
+   "total_cost": 20000,
+   "total_unknown": false,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/rent-bike-kawasaki-ex650k-02.07.2026.docx",
+   "original_filename": "rent-bike-KAWASAKI-EX650K-02.07.2026.docx"
+  },
+  {
+   "file": "rent-bike-KAWASAKI-EX650K-29.06.2026.docx Ларин.docx",
+   "sha256": "1c91bcfdf1e3ef22d6939a4bb728c455581c50c4ab220d89eecc9bd65e7d53a0",
+   "rental_id": "38ab65f2-5c80-4481-b14a-ec8003e9c2a4",
+   "vehicle_id": "aprilia-shiver",
+   "doc_date": "2026-08-05",
+   "total_cost": 6500,
+   "total_unknown": false,
+   "deposit": 13500,
+   "note": "в договоре №05.08/APRILIA Aprilia Shiver; дата в имени файла (29.06) — от старого шаблона",
+   "storage_path": "vip-bike/retro/rent-bike-kawasaki-ex650k-29.06.2026.docx larin.docx",
+   "original_filename": "rent-bike-KAWASAKI-EX650K-29.06.2026.docx Ларин.docx"
+  },
+  {
+   "file": "Договор 3 проката аренды электромотоцикла Zero.docx",
+   "sha256": "f8b6e9fcc63330ad12acd23ce693dd6841b847b85453ef371672c9d3fa1fe9a4",
+   "rental_id": "3f24ff4b-4422-4e5a-80e2-18266ed66f4e",
+   "vehicle_id": "sequence-zero",
+   "doc_date": "2026-05-09",
+   "total_cost": 0,
+   "total_unknown": true,
+   "deposit": 20000,
+   "note": null,
+   "storage_path": "vip-bike/retro/dogovor 3 prokata arendy elektromototsikla zero.docx",
+   "original_filename": "Договор 3 проката аренды электромотоцикла Zero.docx"
+  },
+  {
+   "file": "Договор аренды мотоцикла Suzuki GSXS 1000F чистый .docx не чистый.docx",
+   "sha256": "597cb7b3d322be770f88b1ee782799edbb5c2f3392468e2075b17664e5d263f7",
+   "rental_id": "ddfe2ae5-15e3-41ae-a720-470225563685",
+   "vehicle_id": "suzuki-gsx-s1000f",
+   "doc_date": "2026-07-03",
+   "total_cost": 0,
+   "total_unknown": true,
+   "deposit": null,
+   "note": "дата из тела договора «03» 07 2026 (пробельные цифры); суммы в договоре нет",
+   "storage_path": "vip-bike/retro/dogovor arendy mototsikla suzuki gsxs 1000f chistyy .docx ne chistyy.docx",
+   "original_filename": "Договор аренды мотоцикла Suzuki GSXS 1000F чистый .docx не чистый.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Red-05.07.2026_Чуфыркин.docx",
+   "sha256": "8c8cce9ad671171d47ccbd3d4f7bbea26af9f181257b57b42e17e883ebc6bf27",
+   "rental_id": "e0fe8aa7-2e5c-40e1-bdd0-42957d28ad89",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "doc_date": "2026-07-05",
+   "total_cost": 12000,
+   "total_unknown": false,
+   "deposit": null,
+   "note": "в договоре Panigale S Electro RED — прикреплено к базовой Panigale; представитель пары дубликатов «...Чуфыркин.docx»",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-red-05.07.2026_chufyrkin.docx",
+   "original_filename": "rent-Ducati-Panigale-S-Electro-Red-05.07.2026_Чуфыркин.docx"
+  }
+ ],
+ "linked": [
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-04.07.2026_Заваленский.docx",
+   "rental_id": "75a1117c-83f5-4ae2-91a2-31bf8f5d9628",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-04.07.2026_zavalenskiy.docx",
+   "original_filename": "rent-Ducati-Panigale-S-Electro-04.07.2026_Заваленский.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Red-08.07.2026.docx Халикова Диана.docx",
+   "rental_id": "bfb7c524-6180-4eaf-9fe2-0b29a83bfd74",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-red-08.07.2026.docx halikova diana.docx",
+   "original_filename": "rent-Ducati-Panigale-S-Electro-Red-08.07.2026.docx Халикова Диана.docx"
+  },
+  {
+   "file": "rent-Jilang-Max-Pro-03.07.2026.docx",
+   "rental_id": "694091de-39e2-476e-ae8c-8b86fc301aa0",
+   "storage_path": "vip-bike/retro/rent-jilang-max-pro-03.07.2026.docx",
+   "original_filename": "rent-Jilang-Max-Pro-03.07.2026.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-04.07.2026.docx",
+   "rental_id": "d01a13ca-2438-4f10-a089-a4c2cd0edd85",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-04.07.2026.docx",
+   "original_filename": "rent-Regulmoto-Nibbler-300-4V-04.07.2026.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-06.07.2026_Шевчук.docx",
+   "rental_id": "4c3a86e9-462e-4c8d-9a71-9971d5f97e26",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-06.07.2026_shevchuk.docx",
+   "original_filename": "rent-Regulmoto-Nibbler-300-4V-06.07.2026_Шевчук.docx"
+  },
+  {
+   "file": "rent-Rerode-R1-10.07.2026_Ворожейкин_Степан.docx",
+   "rental_id": "74e048cf-a404-4a3e-9a36-31e0fd77a845",
+   "storage_path": "vip-bike/retro/rent-rerode-r1-10.07.2026_vorozheykin_stepan.docx",
+   "original_filename": "rent-Rerode-R1-10.07.2026_Ворожейкин_Степан.docx"
+  }
+ ],
+ "skipped": [],
+ "uploaded": [
+  {
+   "file": "01 Договор аренды мотоцикла без экипажа с тарифами.docx DUCATI.docx",
+   "storage_path": "vip-bike/retro/01 dogovor arendy mototsikla bez ekipazha s tarifami.docx ducati.docx"
+  },
+  {
+   "file": "1rent-Ducati-Panigale-S-Electro-Black-18.07.2026 (2).docx Семенченков.docx",
+   "storage_path": "vip-bike/retro/1rent-ducati-panigale-s-electro-black-18.07.2026 _2_.docx semenchenkov.docx"
+  },
+  {
+   "file": "1rent-Ducati-Panigale-S-Electro-Black-18.07.2026 (2).docx Семенченков.docx Семинченко Алексей.docx",
+   "storage_path": "vip-bike/retro/1rent-ducati-panigale-s-electro-black-18.07.2026 _2_.docx semenchenkov.docx seminchenko aleksey.docx"
+  },
+  {
+   "file": "rent-79BIKE-Falcon-GT-11.08.2026 Гордов Александр Валерьевич.docx",
+   "storage_path": "vip-bike/retro/rent-79bike-falcon-gt-11.08.2026 gordov aleksandr valerevich.docx"
+  },
+  {
+   "file": "rent-79BIKE-Falcon-GT-13.08.2026.docx Захаров Денис.docx",
+   "storage_path": "vip-bike/retro/rent-79bike-falcon-gt-13.08.2026.docx zaharov denis.docx"
+  },
+  {
+   "file": "rent-79BIKE-Falcon-GT-18.10.2026 (1).docx Баукин Алексей Николаевич..docx",
+   "storage_path": "vip-bike/retro/rent-79bike-falcon-gt-18.10.2026 _1_.docx baukin aleksey nikolaevich..docx"
+  },
+  {
+   "file": "rent-79BIKE-Falcon-GT-18.10.2026.docx Баукин Алексей Николаевич..docx",
+   "storage_path": "vip-bike/retro/rent-79bike-falcon-gt-18.10.2026.docx baukin aleksey nikolaevich..docx"
+  },
+  {
+   "file": "rent-Aprilia-Shiver-750-12.09.2026Клюев Сергей Алексеевич.docx",
+   "storage_path": "vip-bike/retro/rent-aprilia-shiver-750-12.09.2026klyuev sergey alekseevich.docx"
+  },
+  {
+   "file": "rent-Aprilia-Shiver-750-17.10.2026.docx Гусев Владислав Юрьевич.docx",
+   "storage_path": "vip-bike/retro/rent-aprilia-shiver-750-17.10.2026.docx gusev vladislav yurevich.docx"
+  },
+  {
+   "file": "rent-Aprilia-Shiver-750-25.07.2026 (2).docxКривенышев Александр Михайлович.docx",
+   "storage_path": "vip-bike/retro/rent-aprilia-shiver-750-25.07.2026 _2_.docxkrivenyshev aleksandr mihaylovich.docx"
+  },
+  {
+   "file": "rent-Aprilia-Shiver-750-28.07.2026 (1) (Восстановлен).docx Басыров Антон Михайлович.docx",
+   "storage_path": "vip-bike/retro/rent-aprilia-shiver-750-28.07.2026 _1_ _vosstanovlen_.docx basyrov anton mihaylovich.docx"
+  },
+  {
+   "file": "rent-Aprilia-Shiver-750-31.08.2026 (1).docx Черемухин Денис Михайлович.docx",
+   "storage_path": "vip-bike/retro/rent-aprilia-shiver-750-31.08.2026 _1_.docx cheremuhin denis mihaylovich.docx"
+  },
+  {
+   "file": "rent-BENDA-LFC700-24.09.2026.docx Климов Евгений Евгеньевич.docx",
+   "storage_path": "vip-bike/retro/rent-benda-lfc700-24.09.2026.docx klimov evgeniy evgenevich.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-04.07.2026_Локтев_Дмитрий.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-04.07.2026_loktev_dmitriy.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-10.07.2026_Павликов__BMW_F800R.docx Павликов.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-10.07.2026_pavlikov_bmw_f800r.docx pavlikov.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-11.08.2026 Черемухин .docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-11.08.2026 cheremuhin .docx"
+  },
+  {
+   "file": "rent-BMW-F800R-14.10.2026 ( Пронин Александр Владимирович).docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-14.10.2026 _ pronin aleksandr vladimirovich.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-14.10.2026.docx Пронин Александр Владимирович..docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-14.10.2026.docx pronin aleksandr vladimirovich..docx"
+  },
+  {
+   "file": "rent-BMW-F800R-17.10.2026 (1).docx Мишин Кирилл Александрович..docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-17.10.2026 _1_.docx mishin kirill aleksandrovich..docx"
+  },
+  {
+   "file": "rent-BMW-F800R-19.09.2026 (1).docx Куликов Даниил Сергеевич.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-19.09.2026 _1_.docx kulikov daniil sergeevich.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-20.09.2026.docx Володин Анатолий Сергеевич..docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-20.09.2026.docx volodin anatoliy sergeevich..docx"
+  },
+  {
+   "file": "rent-BMW-F800R-21.07.2026.docx Логунов.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-21.07.2026.docx logunov.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-25.07.2026 (1).docx ГУСЕВ вЛАДИСЛАВ юРЬЕВИЧ.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-25.07.2026 _1_.docx gusev vladislav yurevich.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-25.09.2026 (автовосстановление).docx Лебедева Вероника Андреевна.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-25.09.2026 _avtovosstanovlenie_.docx lebedeva veronika andreevna.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-26.07.2026.docx Клишин Роман Дмитриевич.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-26.07.2026.docx klishin roman dmitrievich.docx"
+  },
+  {
+   "file": "rent-BMW-F800R-27.07.2026 (Восстановлен).docx Гусев Владислав Юрьевич.docx",
+   "storage_path": "vip-bike/retro/rent-bmw-f800r-27.07.2026 _vosstanovlen_.docx gusev vladislav yurevich.docx"
+  },
+  {
+   "file": "rent-Ducati-1199-Panigale-21.08.2026 (1).docx Головин Яков Алексеевич.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-1199-panigale-21.08.2026 _1_.docx golovin yakov alekseevich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-03.08.2026 (1).docx Самородова Александра Анатольевна.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-03.08.2026 _1_.docx samorodova aleksandra anatolevna.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-08.08.2026 (1).docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-08.08.2026 _1.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-20.07.2026.docx Титков Алексей.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-20.07.2026.docx titkov aleksey.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Aero-19.07.2026.docx Семинченко Алексей.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-aero-19.07.2026.docx seminchenko aleksey.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Aero-20.07.2026.docx Боканов Роман.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-aero-20.07.2026.docx bokanov roman.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-12.09.2026Борисов Д. И. (Восстановлен).docx Борисов Даниил Иванович..docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-12.09.2026borisov d. i. _vosstanovlen_.docx borisov daniil ivanovich..docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-12.09.2026Борисов Д. И..docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-12.09.2026borisov d. i..docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-19.08.2026 Шонов (Восстановлен).docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-19.08.2026 shonov _vosstanovlen.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-19.08.2026 Шонов.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-19.08.2026 shonov.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-19.09.2026.docx Пенкин Александр Александрович.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-19.09.2026.docx penkin aleksandr aleksandrovich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-24.08.2026 Семенов Сергей Юрьевич.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-24.08.2026 semenov sergey yurevich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-27.09.2026.docx Мартышев Владимир Александрович.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-27.09.2026.docx martyshev vladimir aleksandrovich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-30.08.2026_Пургаев ДИджей .docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-30.08.2026_purgaev didzhey .docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-30.08.2026_Пургаев ДИджей .docx Пургаев Владимир Анатольевич.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-30.08.2026_purgaev didzhey .docx purgaev vladimir anatolevich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Black-Z-31.08.2026.docx Кудрявцев Григорий Александрович.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-black-z-31.08.2026.docx kudryavtsev grigoriy aleksandrovich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Gold-08.07.2026.docx Кузьминков Никита Сергеевич.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-gold-08.07.2026.docx kuzminkov nikita sergeevich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Gold-08.08.2026 (Восстановлен).docx Васильев Дмитрий Владиславович..docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-gold-08.08.2026 _vosstanovlen_.docx vasilev dmitriy vladislavovich..docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Green-Z-02.09.2026 (Федяков Роман Вячеславович).docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-green-z-02.09.2026 _fedyakov roman vyacheslavovich.docx"
+  },
+  {
+   "file": "rent-Ducati-Panigale-S-Electro-Red-05.07.2026_Чуфыркин.docx Чуфыркин.docx",
+   "storage_path": "vip-bike/retro/rent-ducati-panigale-s-electro-red-05.07.2026_chufyrkin.docx chufyrkin.docx"
+  },
+  {
+   "file": "rent-Honda-CBR600RR-02.10.2026.docx Челноков Дмитрий Иванович..docx",
+   "storage_path": "vip-bike/retro/rent-honda-cbr600rr-02.10.2026.docx chelnokov dmitriy ivanovich..docx"
+  },
+  {
+   "file": "rent-Honda-CBR600RR-06.09.2026 (Восстановлен).docx Живайкин Александр Сергеевич..docx",
+   "storage_path": "vip-bike/retro/rent-honda-cbr600rr-06.09.2026 _vosstanovlen_.docx zhivaykin aleksandr sergeevich..docx"
+  },
+  {
+   "file": "rent-Honda-CBR600RR-11.09.2026 (Восстановлен).docx Федотов Денис Витальевич..docx",
+   "storage_path": "vip-bike/retro/rent-honda-cbr600rr-11.09.2026 _vosstanovlen_.docx fedotov denis vitalevich..docx"
+  },
+  {
+   "file": "rent-Honda-CBR600RR-22.08.2026 (1).docx Афанасьев Станислав Александрович.docx",
+   "storage_path": "vip-bike/retro/rent-honda-cbr600rr-22.08.2026 _1_.docx afanasev stanislav aleksandrovich.docx"
+  },
+  {
+   "file": "rent-Jilang-Max-Pro-19.07.2026.docx Беляков Александр.docx",
+   "storage_path": "vip-bike/retro/rent-jilang-max-pro-19.07.2026.docx belyakov aleksandr.docx"
+  },
+  {
+   "file": "rent-Jilang-Max-Pro-21.07.2026.docx Акопян.docx",
+   "storage_path": "vip-bike/retro/rent-jilang-max-pro-21.07.2026.docx akopyan.docx"
+  },
+  {
+   "file": "rent-Jilang-Max-Pro-22.08.2026 (1).docx Мутовкин Алексей Валерьевич.docx",
+   "storage_path": "vip-bike/retro/rent-jilang-max-pro-22.08.2026 _1_.docx mutovkin aleksey valerevich.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-09.10.2026.docx Садовников Олег Эдуардович.docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-09.10.2026.docx sadovnikov oleg eduardovich.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-10.08.2026 (3) (Восстановлен).docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-10.08.2026 _3_ _vosstanovlen.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-10.08.2026 Большухин С Ю.docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-10.08.2026 bolshuhin s yu.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-10.08.2026 Большухин С Ю.docx Большухин Сергей Юрьевич.docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-10.08.2026 bolshuhin s yu.docx bolshuhin sergey yurevich.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-14.09.2026 (2).docx Салин Роман Анатольевич.docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-14.09.2026 _2_.docx salin roman anatolevich.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-17.07.2026.docx Алексей Комков.docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-17.07.2026.docx aleksey komkov.docx"
+  },
+  {
+   "file": "rent-Kawasaki-EX650K-Ninja-650-18.09.2026.docx",
+   "storage_path": "vip-bike/retro/rent-kawasaki-ex650k-ninja-650-18.09.2026.docx"
+  },
+  {
+   "file": "rent-Leopard-Asaka-22.08.2026 (Восстановлен).docx Богдан Алексей Анатольевич.docx",
+   "storage_path": "vip-bike/retro/rent-leopard-asaka-22.08.2026 _vosstanovlen_.docx bogdan aleksey anatolevich.docx"
+  },
+  {
+   "file": "rent-Motoland-Breakout-300-03.08.2026 (Восстановлен).docx Савостьянов Александр Михайлович.docx",
+   "storage_path": "vip-bike/retro/rent-motoland-breakout-300-03.08.2026 _vosstanovlen_.docx savostyanov aleksandr mihaylovich.docx"
+  },
+  {
+   "file": "rent-Motoland-Breakout-300-09.10.2026.docx 9.10.docx Сахаров Сергей Владимирович.docx",
+   "storage_path": "vip-bike/retro/rent-motoland-breakout-300-09.10.2026.docx 9.10.docx saharov sergey vladimirovich.docx"
+  },
+  {
+   "file": "rent-Motoland-Breakout-300-22.08.2026 (1) (Восстановлен).docx Хорцев Тимур Олегович.docx",
+   "storage_path": "vip-bike/retro/rent-motoland-breakout-300-22.08.2026 _1_ _vosstanovlen_.docx hortsev timur olegovich.docx"
+  },
+  {
+   "file": "rent-Motoland-Breakout-300-27.09.2026 (1) (автовосстановление).docx Орыщак Дмитрий Евгеньевич.docx",
+   "storage_path": "vip-bike/retro/rent-motoland-breakout-300-27.09.2026 _1_ _avtovosstanovlenie_.docx oryschak dmitriy evgenevich.docx"
+  },
+  {
+   "file": "rent-Motoland-Breakout-300-30.08.2026 Салин Роман Анатольевич.docx",
+   "storage_path": "vip-bike/retro/rent-motoland-breakout-300-30.08.2026 salin roman anatolevich.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-04.07.2026.docx Новиков.docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-04.07.2026.docx novikov.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-08.08.2026 (2) (Восстановлен).docx Васильев Даниил Александрович..docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-08.08.2026 _2_ _vosstanovlen_.docx vasilev daniil aleksandrovich..docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-11.08.2026 Гахраманов .docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-11.08.2026 gahramanov .docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-15.08.2026.docx Гузяева Ольга Александровна.docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-15.08.2026.docx guzyaeva olga aleksandrovna.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-20.07.2026.docx Вадим.docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-20.07.2026.docx vadim.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-23.07.2026.docx Алимов Станислав (Восстановлен).docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-23.07.2026.docx alimov stanislav _vosstanovlen.docx"
+  },
+  {
+   "file": "rent-Regulmoto-Nibbler-300-4V-23.07.2026.docx Алимов Станислав.docx",
+   "storage_path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-23.07.2026.docx alimov stanislav.docx"
+  },
+  {
+   "file": "rent-Rerode-R1-20.07.2026 (1) (Восстановлен).docx артур Рафаэльевич.docx",
+   "storage_path": "vip-bike/retro/rent-rerode-r1-20.07.2026 _1_ _vosstanovlen_.docx artur rafaelevich.docx"
+  },
+  {
+   "file": "rent-Rerode-R1-25.07.2026.docx Рыжаков Роман Алексеевич..docx",
+   "storage_path": "vip-bike/retro/rent-rerode-r1-25.07.2026.docx ryzhakov roman alekseevich..docx"
+  },
+  {
+   "file": "rent-Rerode-R1-28.07.2026 (Восстановлен).docx Малясов Николай Николаевич..docx",
+   "storage_path": "vip-bike/retro/rent-rerode-r1-28.07.2026 _vosstanovlen_.docx malyasov nikolay nikolaevich..docx"
+  },
+  {
+   "file": "rent-Sequence-Zero-03.10.2026.docx Кильчинский Анвер Фаикович.docx",
+   "storage_path": "vip-bike/retro/rent-sequence-zero-03.10.2026.docx kilchinskiy anver faikovich.docx"
+  },
+  {
+   "file": "rent-Sequence-Zero-19.07.2026.docx Платонов Даниил.docx",
+   "storage_path": "vip-bike/retro/rent-sequence-zero-19.07.2026.docx platonov daniil.docx"
+  },
+  {
+   "file": "rent-Suzuki-GSX-S1000F-11.07.2026_КиргинцевМ (Восстановлен).docx Киргинцев Михаил Александрович.docx",
+   "storage_path": "vip-bike/retro/rent-suzuki-gsx-s1000f-11.07.2026_kirgintsevm _vosstanovlen_.docx kirgintsev mihail aleksandrovich.docx"
+  },
+  {
+   "file": "rent-Suzuki-GSX-S1000F-11.07.2026_КиргинцевМ.docx",
+   "storage_path": "vip-bike/retro/rent-suzuki-gsx-s1000f-11.07.2026_kirgintsevm.docx"
+  },
+  {
+   "file": "rent-Suzuki-GSX-S1000F-28.07.2026 (1) (Восстановлен).docx Лазарев Дмитрий Михайлович.docx",
+   "storage_path": "vip-bike/retro/rent-suzuki-gsx-s1000f-28.07.2026 _1_ _vosstanovlen_.docx lazarev dmitriy mihaylovich.docx"
+  },
+  {
+   "file": "rent-Suzuki-M109R-1800-Boulevard-18.10.2026.docx Нарушева Елена Владимировна..docx",
+   "storage_path": "vip-bike/retro/rent-suzuki-m109r-1800-boulevard-18.10.2026.docx narusheva elena vladimirovna..docx"
+  },
+  {
+   "file": "rent-Suzuki-M109R-1800-Boulevard-20.09.2026 (автовосстановление).docx Любимов Роман Валерьевич..docx",
+   "storage_path": "vip-bike/retro/rent-suzuki-m109r-1800-boulevard-20.09.2026 _avtovosstanovlenie_.docx lyubimov roman valerevich..docx"
+  },
+  {
+   "file": "rent-Wenbox-U2-Pro-01.08.2026 (1).docx Васильев Дмитрий.docx",
+   "storage_path": "vip-bike/retro/rent-wenbox-u2-pro-01.08.2026 _1_.docx vasilev dmitriy.docx"
+  },
+  {
+   "file": "rent-Yamaha-R6-27.09.2026 (автовосстановление).docx Челноков Дмитрий Иванович..docx",
+   "storage_path": "vip-bike/retro/rent-yamaha-r6-27.09.2026 _avtovosstanovlenie_.docx chelnokov dmitriy ivanovich..docx"
+  },
+  {
+   "file": "rent-Yamaha-R7-02.10.2026 (1)Челноков Дмитрий Иванович.docx",
+   "storage_path": "vip-bike/retro/rent-yamaha-r7-02.10.2026 _1_chelnokov dmitriy ivanovich.docx"
+  },
+  {
+   "file": "rent-Yamaha-R7-04.08.2026.docx Данилин Юрий Алексеевич..docx",
+   "storage_path": "vip-bike/retro/rent-yamaha-r7-04.08.2026.docx danilin yuriy alekseevich..docx"
+  },
+  {
+   "file": "rent-Yamaha-R7-11.07.2026_ЛевинД.docx",
+   "storage_path": "vip-bike/retro/rent-yamaha-r7-11.07.2026_levind.docx"
+  },
+  {
+   "file": "rental-Suzuki-VZR1800-Boulevard-2026-09-17 (2).docx Максим Зефиров.docx",
+   "storage_path": "vip-bike/retro/rental-suzuki-vzr1800-boulevard-2026-09-17 _2_.docx maksim zefirov.docx"
+  },
+  {
+   "file": "rental-contract-1780156819969.pdf",
+   "storage_path": "vip-bike/retro/rental-contract-1780156819969.pdf"
+  },
+  {
+   "file": "sale-79BIKE-Falcon-GT-2026-07-27.docx Николаев Александр Геннадьевич..docx111.docx222.docx3.docx",
+   "storage_path": "vip-bike/retro/sale-79bike-falcon-gt-2026-07-27.docx nikolaev aleksandr gennadevich..docx111.docx222.docx3.docx"
+  },
+  {
+   "file": "sale-79BIKE-Falcon-GT-2026-08-27 (1).docx Митрохин Артем Кириллович.docx Митрохин Артем Кириллович.docx",
+   "storage_path": "vip-bike/retro/sale-79bike-falcon-gt-2026-08-27 _1_.docx mitrohin artem kirillovich.docx mitrohin artem kirillovich.docx"
+  },
+  {
+   "file": "sale-BMW-S1000RR-Electro-Silver-2026-08-24.docx Яканин Алексей Николаевич.docx",
+   "storage_path": "vip-bike/retro/sale-bmw-s1000rr-electro-silver-2026-08-24.docx yakanin aleksey nikolaevich.docx"
+  },
+  {
+   "file": "sale-Y-VOLT-Surge-V-2026-09-01 Гусев Д. А. (Восстановлен).docx Гусев Дмитрий Александрович..docx",
+   "storage_path": "vip-bike/retro/sale-y-volt-surge-v-2026-09-01 gusev d. a. _vosstanovlen_.docx gusev dmitriy aleksandrovich..docx"
+  },
+  {
+   "file": "testdrive-79BIKE-Falcon-GT-2026-10-01 Жуков Дмитрий Игоревич.docx",
+   "storage_path": "vip-bike/retro/testdrive-79bike-falcon-gt-2026-10-01 zhukov dmitriy igorevich.docx"
+  },
+  {
+   "file": "testdrive-79BIKE-Falcon-Lynx-Purple-2026-10-16 Грязнов Евгений Геннадьевич.docx",
+   "storage_path": "vip-bike/retro/testdrive-79bike-falcon-lynx-purple-2026-10-16 gryaznov evgeniy gennadevich.docx"
+  },
+  {
+   "file": "testdrive-79BIKE-Falcon-Pro-2026-09-13 Колымаев Данила Иванович.docx",
+   "storage_path": "vip-bike/retro/testdrive-79bike-falcon-pro-2026-09-13 kolymaev danila ivanovich.docx"
+  },
+  {
+   "file": "testdrive-Ducati-Panigale-S-Electro-Black-Z-2026-09-12Борисов Д. И..docx",
+   "storage_path": "vip-bike/retro/testdrive-ducati-panigale-s-electro-black-z-2026-09-12borisov d. i..docx"
+  },
+  {
+   "file": "testdrive-Ducati-Panigale-S-Electro-Black-Z-2026-10-01 Елагин Кирилл Сергеевич.docx",
+   "storage_path": "vip-bike/retro/testdrive-ducati-panigale-s-electro-black-z-2026-10-01 elagin kirill sergeevich.docx"
+  },
+  {
+   "file": "testdrive-Ducati-Panigale-S-Electro-Gold-2026-09-13 Ильинский.docx",
+   "storage_path": "vip-bike/retro/testdrive-ducati-panigale-s-electro-gold-2026-09-13 ilinskiy.docx"
+  },
+  {
+   "file": "testdrive-Ducati-Panigale-S-Electro-Gold-2026-10-15 Тарнава Андрей Юрьевич.docx",
+   "storage_path": "vip-bike/retro/testdrive-ducati-panigale-s-electro-gold-2026-10-15 tarnava andrey yurevich.docx"
+  },
+  {
+   "file": "testdrive-Ducati-Panigale-S-Electro-Green-Z-2026-08-30_Федяев.docx",
+   "storage_path": "vip-bike/retro/testdrive-ducati-panigale-s-electro-green-z-2026-08-30_fedyaev.docx"
+  },
+  {
+   "file": "testdrive-Ducati-Panigale-S-Electro-Green-Z-2026-08-30_Федяев.docx Федяев Роман Вячеславович.docx",
+   "storage_path": "vip-bike/retro/testdrive-ducati-panigale-s-electro-green-z-2026-08-30_fedyaev.docx fedyaev roman vyacheslavovich.docx"
+  },
+  {
+   "file": "testdrive-Regulmoto-Nibbler-300-4V-2026-08-30 Салин Роман.docx",
+   "storage_path": "vip-bike/retro/testdrive-regulmoto-nibbler-300-4v-2026-08-30 salin roman.docx"
+  },
+  {
+   "file": "testdrive-Y-VOLT-Surge-V-2026-09-10 (Восстановлен).docx Мусякаев Александр Владимирович.docx",
+   "storage_path": "vip-bike/retro/testdrive-y-volt-surge-v-2026-09-10 _vosstanovlen_.docx musyakaev aleksandr vladimirovich.docx"
+  },
+  {
+   "file": "ДОГОВОР.docx Васильев Дмитрий Владиславович..docx",
+   "storage_path": "vip-bike/retro/dogovor.docx vasilev dmitriy vladislavovich..docx"
+  },
+  {
+   "file": "ДОГОВОР.docx Лобанов Михаил Олегович.docx",
+   "storage_path": "vip-bike/retro/dogovor.docx lobanov mihail olegovich.docx"
+  },
+  {
+   "file": "ДОГОВОР.docx Мартышев Владимир Александрович.docx",
+   "storage_path": "vip-bike/retro/dogovor.docx martyshev vladimir aleksandrovich.docx"
+  },
+  {
+   "file": "ДОГОВОР.docx Черутов Алексей Павлович.docx",
+   "storage_path": "vip-bike/retro/dogovor.docx cherutov aleksey pavlovich.docx"
+  },
+  {
+   "file": "Договор аренды мотоцикла Suzuki GSXS 1000F чистый .docx",
+   "storage_path": "vip-bike/retro/dogovor arendy mototsikla suzuki gsxs 1000f chistyy .docx"
+  },
+  {
+   "file": "Договор аренды мотоцикла nibbler 300.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy mototsikla nibbler 300.docx"
+  },
+  {
+   "file": "Договор аренды мотоцикла без экипажа с тарифами.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy mototsikla bez ekipazha s tarifami.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла  Horwin CR1  20.05.2026 Мирощников С.В..docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla  horwin cr1  20.05.2026 miroschnikov s.v..docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла  Horwin CR1 чистый .docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla  horwin cr1 chistyy .docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла  Horwin SK3plus чистый  — копия.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla  horwin sk3plus chistyy  _ kopiya.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла Ducati Panigale чистый Шкитин М.О — копия.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla ducati panigale chistyy shkitin m.o _ kopiya.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла Ducati Panigale чистый Шкитин М.О.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla ducati panigale chistyy shkitin m.o.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла Ducati Panigale чистый — — копия.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla ducati panigale chistyy _ _ kopiya.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла Ducati Panigale чистый — — копия.docx Дудочкин Виталий.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla ducati panigale chistyy _ _ kopiya.docx dudochkin vitaliy.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла KAWASAKI EX650K чистый — — копия — копия.txt",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla kawasaki ex650k chistyy _ _ kopiya _ kopiya.txt"
+  },
+  {
+   "file": "Договор аренды электромотоцикла Sequence Zero 17.05—.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla sequence zero 17.05.docx"
+  },
+  {
+   "file": "Договор аренды электромотоцикла Sequence Zero чистый —.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy elektromototsikla sequence zero chistyy .docx"
+  },
+  {
+   "file": "Договор аренды_электромотоцикла ДУКАТИ чистый.docx",
+   "storage_path": "vip-bike/retro/dogovor arendy_elektromototsikla dukati chistyy.docx"
+  },
+  {
+   "file": "Договор_проката_аренды_электромотоцикла ДУКАТИ.docx",
+   "storage_path": "vip-bike/retro/dogovor_prokata_arendy_elektromototsikla dukati.docx"
+  }
+ ],
+ "upload_failed": []
+}
