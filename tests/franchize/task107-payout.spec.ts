@@ -431,4 +431,12 @@ describe("task107 · wiring pins", () => {
     expect(sql).toContain("ADD COLUMN IF NOT EXISTS payout jsonb");
     expect(sql).toContain("POST-CHECK FAILED");
   });
+
+  it("SQL: no string concatenation outside comments — COMMENT ON ... IS accepts ONLY a single literal (42601 mine, task108)", () => {
+    const sql = src("docs/crewDocs/rental-verifications-payout-2026-10-18.sql");
+    const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    // 'a' || 'b' inside COMMENT ON ... IS fails with «syntax error at or near "||"»
+    // (Supabase editor = one implicit tx → the whole file rolls back). Keep literals merged.
+    expect(code).not.toContain("||");
+  });
 });

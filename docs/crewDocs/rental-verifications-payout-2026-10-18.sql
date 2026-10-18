@@ -28,11 +28,13 @@ ALTER TABLE public.rental_verifications
   ADD COLUMN IF NOT EXISTS payout jsonb;
 
 -- ── 2. Audit comment (visible in \d+ and Data API introspection) ─────────────
+-- NB (2026-10-18, task108): COMMENT ON ... IS accepts ONLY a single string
+-- literal — no expressions, so 'a' || 'b' here fails with 42601 «syntax error
+-- at or near "||"». Multi-line comments are merged into ONE literal instead.
+-- The other crewDocs «||» uses are fine (they sit inside expressions/UPDATEs).
 
 COMMENT ON COLUMN public.rental_verifications.payout IS
-  'Task 107 verified-payout: per-party paid-out stamps + audit log. '
-  || 'NULL = never touched (= unpaid). operator.marked=true = commission paid. '
-  || 'App-managed; do not edit by hand.';
+  'Task 107 verified-payout: per-party paid-out stamps + audit log. NULL = never touched (= unpaid). operator.marked=true = commission paid. App-managed; do not edit by hand. Degrades: hub stays read-only until this column exists.';
 
 -- ── 3. Post-check (must return payout = jsonb) ───────────────────────────────
 
