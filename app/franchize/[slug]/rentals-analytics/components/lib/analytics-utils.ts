@@ -283,6 +283,8 @@ const DEPOSIT_METHOD_LABELS: Record<string, string> = {
   // boss 2026-09-29: web-flow deposit rail choice — renter may route the
   // deposit through СБП instead of the crew's card or cash.
   sbp: "СБП",
+  // boss 2026-10-19: Яндекс PAY QR rail (rent + deposit).
+  yandex_pay: "Яндекс PAY",
 };
 
 /** Deposit from metadata.deposit_amount/deposit_method/deposit_returned with

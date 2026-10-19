@@ -10,7 +10,7 @@
 // helpers implement the corrected model; they are intentionally framework-
 // free so the split matrix is unit-testable (tests/franchize/deposit-rail.spec.ts).
 
-export type DepositRail = "cash" | "card" | "sbp";
+export type DepositRail = "cash" | "card" | "sbp" | "yandex_pay";
 
 /** Rails the UI offers explicitly (plus "same" = follow the main payment). */
 export type DepositChoice = DepositRail | "same";
@@ -26,7 +26,14 @@ export function resolveDepositRail(
   mainPayment: string,
 ): DepositRail {
   if (choice && choice !== "same") return choice;
-  if (mainPayment === "cash" || mainPayment === "card" || mainPayment === "sbp") return mainPayment;
+  if (
+    mainPayment === "cash" ||
+    mainPayment === "card" ||
+    mainPayment === "sbp" ||
+    mainPayment === "yandex_pay" // boss 2026-10-19: Яндекс PAY rides like СБП (QR transfer)
+  ) {
+    return mainPayment;
+  }
   return "cash";
 }
 
@@ -105,8 +112,16 @@ export function buildWebOrderPaymentSplit(input: {
     bank: (rentInCash ? 0 : input.lineTotal) + (depositInCash ? 0 : dep),
     cash: (rentInCash ? input.lineTotal : 0) + (depositInCash ? dep : 0),
     // Destination hint for the analytics sheet (getPaymentSplit renders it
-    // raw): the crew's T-Bank card for card rents, «СБП» for СБП rents.
-    card_destination: input.mainPayment === "card" ? "tbank" : input.mainPayment === "sbp" ? "sbp" : null,
+    // raw): the crew's T-Bank card for card rents, «СБП» for СБП rents,
+    // «Яндекс PAY» for the Yandex Pay QR rail (boss 2026-10-19).
+    card_destination:
+      input.mainPayment === "card"
+        ? "tbank"
+        : input.mainPayment === "sbp"
+          ? "sbp"
+          : input.mainPayment === "yandex_pay"
+            ? "yandex_pay"
+            : null,
   };
 }
 
@@ -114,8 +129,8 @@ export function buildWebOrderPaymentSplit(input: {
  * metadata.deposit_method label — keeps the destination flavour that
  * DEPOSIT_METHOD_LABELS (analytics-utils) renders: cash / tbank / sbp.
  */
-export function depositMethodMetadataLabel(rail: DepositRail): "cash" | "tbank" | "sbp" {
-  return rail === "cash" ? "cash" : rail === "sbp" ? "sbp" : "tbank";
+export function depositMethodMetadataLabel(rail: DepositRail): "cash" | "tbank" | "sbp" | "yandex_pay" {
+  return rail === "cash" ? "cash" : rail === "sbp" ? "sbp" : rail === "yandex_pay" ? "yandex_pay" : "tbank";
 }
 
 /**

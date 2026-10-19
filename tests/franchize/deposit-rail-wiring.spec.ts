@@ -27,13 +27,15 @@ describe("deposit UI wiring (OrderPageClient)", () => {
   });
 
   it("offers the deposit rail selector defaulting to same-as-payment", () => {
-    expect(src.includes('useState<"same" | "cash" | "card" | "sbp">("same")')).toBe(true);
+    expect(src.includes('useState<"same" | "cash" | "card" | "sbp" | "yandex_pay">("same")')).toBe(true);
     expect(src.includes("Как и оплата")).toBe(true);
     expect(src.includes("Наличными")).toBe(true);
     expect(src.includes("Картой")).toBe(true);
     // reviewer R1: СБП must be reachable for /doc parity + the resolved rail
     // must always be named next to the default marker
     expect(src.includes('id: "sbp" as const')).toBe(true);
+    // boss 2026-10-19: Яндекс PAY rail reachable in the deposit selector too
+    expect(src.includes('id: "yandex_pay" as const')).toBe(true);
     expect(src.includes("depositResolvedHint")).toBe(true);
     expect(src.includes("Сейчас: {depositResolvedHint}")).toBe(true);
   });
@@ -73,7 +75,7 @@ describe("deposit server wiring (actions-runtime + schema)", () => {
   const src = read("app/franchize/actions-runtime.ts");
 
   it("checkout schema accepts the renter-chosen deposit rail", () => {
-    expect(src.includes('depositMethod: z.enum(["cash", "card", "sbp"]).optional()')).toBe(true);
+    expect(src.includes('depositMethod: z.enum(["cash", "card", "sbp", "yandex_pay"]).optional()')).toBe(true);
   });
 
   it("builds the split via the unit-tested helper (doc shape)", () => {

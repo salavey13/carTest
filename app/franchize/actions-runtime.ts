@@ -3831,7 +3831,14 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         flowType,
       );
       if (expectedOrderDeposit > 0) {
-        const railLabel = orderDepositRail === "cash" ? "наличными" : orderDepositRail === "sbp" ? "СБП" : "картой";
+        const railLabel =
+          orderDepositRail === "cash"
+            ? "наличными"
+            : orderDepositRail === "sbp"
+              ? "СБП"
+              : orderDepositRail === "yandex_pay"
+                ? "Яндекс PAY"
+                : "картой";
         notificationParts.push(
           `Залог: ${formatMoney(expectedOrderDeposit).replace(/[  ]/g, " ")} ₽ (${railLabel}, при получении)`,
         );
@@ -4838,6 +4845,122 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
         : { last_error: "" }),
     });
 
+    // ── Яндекс PAY: QR alongside the contract (boss 2026-10-19) ─────────────
+    // When the rent rides the Yandex Pay rail, the renter gets a PAYMENT QR
+    // (Merchant API order → paymentUrl → PNG) right after the contract doc —
+    // scan → confirm → money. Everything here is best-effort: the docs and
+    // rental rows are already persisted, a Yandex/QR hiccup must NOT fail
+    // the order. The payment link is stored in rentals.metadata.yandex_pay
+    // so the rental page / analytics can re-show it. Runs INLINE (before the
+    // lead/todos tail) so the serverless invocation stays alive for the
+    // external roundtrips — the same lesson as the task102 email freeze.
+    if (payload.payment === "yandex_pay") {
+      try {
+        const { createYandexPayPayment, fetchQrPngBuffer } = await import("@/app/franchize/lib/yandex-pay");
+        const payTitle = createdRentals.length > 0
+          ? createdRentals.map((r) => r.bikeName).join(", ").slice(0, 120) || "Аренда"
+          : "Аренда";
+        const pay = await createYandexPayPayment({
+          orderId: payload.orderId,
+          amountRub: payload.totalAmount,
+          title: payTitle,
+          description: `Аренда #${payload.orderId}`,
+          phone: payload.phone,
+        });
+
+        if (!pay.ok) {
+          logger.warn("[franchize] Yandex Pay order create failed (QR skipped, order NOT affected)", {
+            orderId: payload.orderId,
+            reason: pay.reason,
+            error: pay.error,
+          });
+        } else {
+          // QR PNG (external renderer, 8s cap) → sendPhoto to the renter.
+          const qrBuffer = await fetchQrPngBuffer(pay.paymentUrl);
+          if (payload.telegramUserId) {
+            try {
+              if (qrBuffer) {
+                const { telegramDeliver } = await import("@/lib/telegram-transport");
+                const qrSend = await telegramDeliver("sendPhoto", payload.telegramUserId, {
+                  caption: sanitizeTelegramText([
+                    `💳 <b>Оплата аренды — Яндекс PAY</b>`,
+                    `Сумма: ${formatMoney(payload.totalAmount)} ₽`,
+                    ``,
+                    `Отсканируйте QR-код камерой телефона и подтвердите оплату.`,
+                    pay.demo ? `⚠️ Тестовый режим — ключи Яндекс Пэй ещё не подключены.` : "",
+                    ``,
+                    `Ссылка (если QR не открывается): ${pay.paymentUrl}`,
+                  ].filter(Boolean).join("\n")),
+                  parse_mode: "HTML",
+                }, {
+                  photo: {
+                    data: qrBuffer.toString("base64"),
+                    filename: `yandex-pay-${payload.orderId}.png`,
+                    contentType: "image/png",
+                  },
+                });
+                if (!qrSend.ok) logger.warn("[franchize] Yandex Pay QR sendPhoto failed:", { orderId: payload.orderId, error: qrSend.error });
+              } else {
+                // QR renderer down → at least deliver the link as text.
+                const { sendComplexMessage } = await import("@/app/webhook-handlers/actions/sendComplexMessage");
+                await sendComplexMessage(
+                  payload.telegramUserId,
+                  sanitizeTelegramText([
+                    `💳 <b>Оплата аренды — Яндекс PAY</b>`,
+                    `Сумма: ${formatMoney(payload.totalAmount)} ₽`,
+                    ``,
+                    `Оплатите по ссылке: ${pay.paymentUrl}`,
+                    pay.demo ? `⚠️ Тестовый режим — ключи Яндекс Пэй ещё не подключены.` : "",
+                  ].filter(Boolean).join("\n")),
+                  undefined,
+                  { parseMode: "HTML" },
+                );
+              }
+            } catch (qrSendErr) {
+              logger.warn("[franchize] Yandex Pay QR delivery failed (non-fatal):", {
+                orderId: payload.orderId,
+                error: qrSendErr instanceof Error ? qrSendErr.message : String(qrSendErr),
+              });
+            }
+          }
+
+          // Persist the payment link on the order's rental rows (re-show on
+          // the rental page / analytics without re-calling the API).
+          const yandexPayMeta = {
+            payment_url: pay.paymentUrl,
+            payment_id: pay.paymentId,
+            amount_rub: Math.round(payload.totalAmount),
+            created_at: new Date().toISOString(),
+            demo: pay.demo || undefined,
+          };
+          const { data: ypRows, error: ypLookupError } = await supabaseAdmin
+            .from("rentals")
+            .select("rental_id, metadata")
+            .eq("metadata->>orderId", payload.orderId);
+          if (ypLookupError) {
+            logger.warn("[franchize] Yandex Pay metadata lookup failed:", { orderId: payload.orderId, error: ypLookupError.message });
+          } else {
+            for (const row of ypRows ?? []) {
+              const existingMeta = row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : {};
+              const { error: ypUpdateError } = await supabaseAdmin
+                .from("rentals")
+                .update({ metadata: { ...existingMeta, yandex_pay: yandexPayMeta } })
+                .eq("rental_id", row.rental_id);
+              if (ypUpdateError) {
+                logger.warn("[franchize] Yandex Pay metadata write failed:", { rentalId: row.rental_id, error: ypUpdateError.message });
+              }
+            }
+          }
+        }
+      } catch (yandexPayErr) {
+        // NEVER let the payment QR break an already-saved order.
+        logger.warn("[franchize] Yandex Pay QR block failed (non-fatal):", {
+          orderId: payload.orderId,
+          error: yandexPayErr instanceof Error ? yandexPayErr.message : String(yandexPayErr),
+        });
+      }
+    }
+
     // ── Lead identity (boss-R1 fix 1 + follow-up): for testdrives the lead
     // identity is the TELEGRAM id (numeric) — never the phone (bot bugfix
     // 2026-09: phone-as-user_id pollutes users/crew_todos matching). Anonymous
@@ -5448,7 +5571,7 @@ const franchizeOrderInvoiceSchema = z.object({
   signatureName: z.string().trim().optional(),
   signatureAccepted: z.boolean().optional(),
   signatureFingerprint: z.string().trim().optional(),
-  payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]),
+  payment: z.enum(["telegram_xtr", "card", "cash", "sbp", "yandex_pay"]),
   delivery: z.enum(["pickup", "delivery"]),
   deliveryCompany: z.string().trim().optional(),
   subtotal: z.number().finite().nonnegative(),
@@ -5501,7 +5624,7 @@ const franchizeOrderInvoiceSchema = z.object({
   // a different rail than the rent — mirrors /doc's deposit_destination step
   // (doc-manual.ts). Resolved client-side ("same" → main payment method);
   // absent for old clients / flows without a deposit.
-  depositMethod: z.enum(["cash", "card", "sbp"]).optional(),
+  depositMethod: z.enum(["cash", "card", "sbp", "yandex_pay"]).optional(),
   checkoutBlockers: z.array(z.object({
     id: z.string().trim().min(1).max(80),
     label: z.string().trim().min(1).max(180),
@@ -6013,7 +6136,7 @@ const franchizeCheckoutRecoverySnapshotSchema = z.object({
   })).max(20),
   totalAmount: z.number().finite().nonnegative(),
   depositAmount: z.number().finite().nonnegative(),
-  payment: z.enum(["telegram_xtr", "card", "cash", "sbp"]).optional(),
+  payment: z.enum(["telegram_xtr", "card", "cash", "sbp", "yandex_pay"]).optional(),
   flowType: z.enum(["rental", "sale", "mixed"]).default("rental"),
 });
 

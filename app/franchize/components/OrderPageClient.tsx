@@ -53,16 +53,20 @@ const payments = [
   { id: "card", label: "Карта", description: "Оплата картой при подтверждении" },
   { id: "cash", label: "Наличные", description: "Оплата при получении" },
   { id: "sbp", label: "СБП", description: "Перевод по QR-коду" },
+  // boss 2026-10-19: Яндекс PAY — QR generated via the Yandex Pay Merchant
+  // API on the server, delivered to the renter together with the contract.
+  { id: "yandex_pay", label: "Яндекс PAY", description: "Оплата по QR-коду Яндекс Пэй" },
 ] as const;
 
 type PaymentMethod = (typeof payments)[number]["id"];
 
 /** Human labels for the resolved deposit rail — used in the deposit card and
  *  the order summary aside. "same" never reaches here (resolved upstream). */
-const DEPOSIT_METHOD_CHOICE_LABELS: Record<"cash" | "card" | "sbp", string> = {
+const DEPOSIT_METHOD_CHOICE_LABELS: Record<"cash" | "card" | "sbp" | "yandex_pay", string> = {
   cash: "наличными",
   card: "картой",
   sbp: "СБП",
+  yandex_pay: "Яндекс PAY",
 };
 
 /** Deposit rail selector options — "same" = follow the main payment method.
@@ -73,6 +77,7 @@ const DEPOSIT_CHOICES = [
   { id: "cash" as const, label: "Наличными" },
   { id: "card" as const, label: "Картой" },
   { id: "sbp" as const, label: "СБП" },
+  { id: "yandex_pay" as const, label: "Яндекс PAY" },
 ];
 
 const orderExtras = [
@@ -92,7 +97,7 @@ type CheckoutPayload = {
   /** Renter-chosen deposit collection method — resolved (never "same").
    *  Mirrors the /doc deposit_destination step (doc-manual.ts): the deposit
    *  is a separate money event and can ride a different rail than the rent. */
-  depositMethod?: "cash" | "card" | "sbp";
+  depositMethod?: "cash" | "card" | "sbp" | "yandex_pay";
   rentalStartDate?: string;
   rentalEndDate?: string;
   // ── Personal data for contract generation (aligned with /doc flow) ──
@@ -156,7 +161,7 @@ const orderFormSchema = z.object({
   licenseNumber: z.string().trim().optional(),
   licenseCategories: z.string().trim().optional(),
   licenseExpiryDate: z.string().trim().optional(),
-  payment: z.enum(["card", "cash", "sbp"]),
+  payment: z.enum(["card", "cash", "sbp", "yandex_pay"]),
   deliveryMode: z.enum(["pickup", "delivery"]).default("pickup"),
   selectedExtras: z.array(z.string()).default([]),
   promo: z.string().default(""),
@@ -207,7 +212,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   //     (price calculator → bike specs.deposit_rub),
   //   - the method defaults to the main payment rail ("Как и оплата") and can
   //     be overridden to cash or card per renter's preference.
-  const [depositMethodChoice, setDepositMethodChoice] = useState<"same" | "cash" | "card" | "sbp">("same");
+  const [depositMethodChoice, setDepositMethodChoice] = useState<"same" | "cash" | "card" | "sbp" | "yandex_pay">("same");
   // ── ПЭП (простая электронная подпись, ст. 5–6 ФЗ-63) ──
   // The renter taps «Подписать договор (ПЭП)» at checkout; we forward
   // Telegram's initData (HMAC-signed by Telegram) with the order — the
@@ -312,7 +317,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
   // the choice is NOT an RHF field, so watch() can't see it — it is mirrored
   // through this ref into the watch snapshot and persisted explicitly on
   // change (a WebView reload must not reset an explicit «Картой» silently).
-  const depositChoiceRef = useRef<"same" | "cash" | "card" | "sbp">(depositMethodChoice);
+  const depositChoiceRef = useRef<"same" | "cash" | "card" | "sbp" | "yandex_pay">(depositMethodChoice);
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     mode: "onChange",
@@ -574,7 +579,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     [cartLines, flowType]);
   // Resolved deposit rail: explicit renter choice wins; otherwise the deposit
   // follows the main payment method (XTR can't hold a deposit → cash).
-  const resolvedDepositMethod: "cash" | "card" | "sbp" = resolveDepositRail(
+  const resolvedDepositMethod: "cash" | "card" | "sbp" | "yandex_pay" = resolveDepositRail(
     depositMethodChoice,
     payment,
   );
@@ -2197,7 +2202,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
 
           <div className="rounded-2xl border p-4" style={surface.card}>
             <p className="text-sm font-medium">Оплата</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3">
+            <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
               {visiblePayments.map((item) => (
                 <button
                   key={item.id}

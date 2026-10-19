@@ -35,6 +35,15 @@ describe("resolveDepositRail", () => {
     expect(resolveDepositRail(undefined, "sbp")).toBe("sbp");
   });
 
+  it("Яндекс PAY rides like a QR transfer rail (boss 2026-10-19)", () => {
+    expect(resolveDepositRail(undefined, "yandex_pay")).toBe("yandex_pay");
+    expect(resolveDepositRail("same", "yandex_pay")).toBe("yandex_pay");
+    expect(resolveDepositRail("yandex_pay", "card")).toBe("yandex_pay");
+    // XTR still falls back to cash.
+    expect(resolveDepositRail("same", "telegram_xtr")).toBe("cash");
+  });
+
+
   it("XTR (telegram stars) can't hold a deposit → cash", () => {
     expect(resolveDepositRail(undefined, "telegram_xtr")).toBe("cash");
     expect(resolveDepositRail("same", "telegram_xtr")).toBe("cash");

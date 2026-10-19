@@ -13,12 +13,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { reduceImageResolution } from "@/lib/client-image-compress";
+import {
+  specFromEditable,
+  specFromNewRow,
+  specToEditable,
+} from "@/lib/spec-serializer";
 import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database["public"]["Tables"]["cars"]["Row"]>;
 
 type CarType = "car" | "bike" | "cross" | "sauna" | "blog" | "stream" | "massage" | "massage_master" | "equipment" | "service";
-type SpecItem = { id: string; key: string; value: string };
+// FIX (2026-10-19, boss): complex jsonb values used to become "[object Object]"
+// here (String(value)) and any save wrote that string back over the real
+// value. rawValue keeps the untouched DB value, isComplex opens the JSON
+// editor, isDirty gates the round-trip — see lib/spec-serializer.ts.
+type SpecItem = { id: string; key: string; value: string; rawValue?: unknown; isComplex?: boolean; isDirty?: boolean };
 type GalleryItem = { id: string; url: string };
 
 interface Props {
@@ -113,7 +122,13 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
     if (vehicleToEdit?.specs && typeof vehicleToEdit.specs === "object") {
       const s = vehicleToEdit.specs as Record<string, any>;
       const entries = Object.entries(s).filter(([k]) => k !== "gallery" && k !== "title" && k !== "slug" && k !== "excerpt" && k !== "content" && k !== "tags");
-      setSpecs(entries.map(([key, value]) => ({ id: uuidv4(), key, value: String(value) })));
+      // FIX (2026-10-19): objects/arrays → pretty JSON in a textarea (was
+      // "[object Object]"); primitives keep their display string; the raw
+      // value travels along so untouched rows restore byte-exact on save.
+      setSpecs(entries.map(([key, value]) => {
+        const ed = specToEditable(value);
+        return { id: uuidv4(), key, value: ed.text, rawValue: value, isComplex: ed.isComplex, isDirty: false };
+      }));
       const g = Array.isArray(s.gallery) ? s.gallery.map((url: string) => ({ id: uuidv4(), url })) : [];
       setGallery(g);
       setVinValue(String(s.vin ?? ""));
@@ -147,10 +162,18 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   }, [defaultStreamTemplate, vehicleToEdit]);
 
   function addSpec() {
-    setSpecs((prev) => [...prev, { id: uuidv4(), key: "", value: "" }]);
+    setSpecs((prev) => [...prev, { id: uuidv4(), key: "", value: "", isComplex: false, isDirty: true }]);
   }
   function updateSpec(id: string, field: "key" | "value", value: string) {
-    setSpecs((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+    // Value edits mark the row dirty — an untouched row keeps the exact DB
+    // value on save; an edited row round-trips through its original type.
+    setSpecs((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, [field]: value, ...(field === "value" ? { isDirty: true } : {}) } : p)),
+    );
+  }
+  /** Input ↔ JSON editor toggle for one row (boss: complex values visible + editable). */
+  function toggleSpecComplex(id: string) {
+    setSpecs((prev) => prev.map((p) => (p.id === id ? { ...p, isComplex: !p.isComplex } : p)));
   }
   function removeSpec(id: string) {
     setSpecs((prev) => prev.filter((p) => p.id !== id));
@@ -201,7 +224,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   function generateJsonForBot() {
     const payload = {
       action: "generate_stream_overlay",
-      streamer: make || model || id,
+      // FIX: was `make || model || id` — `id` never existed in this scope
+      // (latent TS2304; surfaced when this file entered the typecheck slice).
+      streamer: make || model || "streamer",
       hint: "Создай структуру секций для 30-минутного стрима: intro, main, q&a, outro",
     };
     return JSON.stringify(payload, null, 2);
@@ -245,8 +270,23 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   // validation + build specs object
   function buildSpecsObject(): Record<string, any> {
     const obj: Record<string, any> = {};
+    // FIX (2026-10-19): each row round-trips with type fidelity — untouched
+    // rows restore the exact DB value (editing other fields can no longer
+    // overwrite complex jsonb with "[object Object]"), edited complex rows
+    // are JSON-parsed with a named validation error, edited primitives keep
+    // their original type. SpecJsonError propagates → submit aborts + toast.
     specs.forEach((s) => {
-      if (s.key) obj[s.key] = s.value;
+      if (!s.key) return;
+      obj[s.key] =
+        s.rawValue === undefined
+          ? specFromNewRow(s.key, s.value)
+          : specFromEditable({
+              key: s.key,
+              text: s.value,
+              isComplex: !!s.isComplex,
+              isDirty: !!s.isDirty,
+              rawValue: s.rawValue,
+            });
     });
     if ((type === "bike" || type === "car") && vinValue.trim()) {
       obj.vin = vinValue.trim();
@@ -470,7 +510,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
                 <Button type="button" onClick={() => { setSpecs([]); toast.success("Specs очищены"); }} variant="ghost" size="sm">Очистить</Button>
               </div>
             </div>
-            <p className="text-xs text-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается.</p> {/* Fixed */}
+            <p className="text-xs text-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается. Сложные значения (объекты/массивы) редактируются как JSON и сохраняются без искажений.</p> {/* Fixed */}
             {(type === "bike" || type === "car") && (
               <div className="mb-3 grid gap-2 sm:grid-cols-[160px,1fr]">
                 <Label className="text-xs text-foreground">VIN (быстрое поле)</Label>
@@ -479,20 +519,46 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
             )}
             <div className="space-y-2 overflow-hidden">
               {specs.map((s) => (
-                <div key={s.id} className="flex flex-col gap-2 lg:flex-row">
-                  <Input value={s.key} onChange={(e) => updateSpec(s.id, "key", e.target.value)} placeholder="ключ (например engine_cc)" className="input-cyber" />
-                  <Input value={s.value} onChange={(e) => updateSpec(s.id, "value", e.target.value)} placeholder="значение" className="input-cyber" />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="h-9 sm:h-10 sm:w-auto sm:px-3 px-2"
-                    onClick={() => removeSpec(s.id)}
-                    aria-label="Удалить характеристику"
-                  >
-                    <VibeContentRenderer content="::FaTrashCan::" className="h-3.5 w-3.5 sm:mr-1" />
-                    <span className="hidden sm:inline">Удалить</span>
-                  </Button>
+                <div key={s.id} className="flex flex-col gap-2 lg:flex-row lg:items-start">
+                  <Input value={s.key} onChange={(e) => updateSpec(s.id, "key", e.target.value)} placeholder="ключ (например engine_cc)" className="input-cyber lg:w-[240px] shrink-0" />
+                  {s.isComplex ? (
+                    <div className="flex-1 min-w-0">
+                      <Textarea
+                        value={s.value}
+                        onChange={(e) => updateSpec(s.id, "value", e.target.value)}
+                        placeholder='{ "ключ": "значение" }'
+                        className="textarea-cyber min-h-[84px] font-mono text-xs"
+                        aria-label={`JSON значение: ${s.key}`}
+                      />
+                      <p className="text-[10px] text-foreground mt-1 font-mono">JSON-значение из карточки — сохранится без изменений, если не редактировать</p>
+                    </div>
+                  ) : (
+                    <Input value={s.value} onChange={(e) => updateSpec(s.id, "value", e.target.value)} placeholder="значение" className="input-cyber flex-1 min-w-0" />
+                  )}
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 sm:h-10 px-2 font-mono text-[11px]"
+                      onClick={() => toggleSpecComplex(s.id)}
+                      title={s.isComplex ? "Переключить в обычное поле" : "Редактировать значение как JSON"}
+                      aria-label={s.isComplex ? "Переключить в обычное поле" : "Редактировать значение как JSON"}
+                    >
+                      {s.isComplex ? "{}→abc" : "abc→{}"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="h-9 sm:h-10 sm:w-auto sm:px-3 px-2"
+                      onClick={() => removeSpec(s.id)}
+                      aria-label="Удалить характеристику"
+                    >
+                      <VibeContentRenderer content="::FaTrashCan::" className="h-3.5 w-3.5 sm:mr-1" />
+                      <span className="hidden sm:inline">Удалить</span>
+                    </Button>
+                  </div>
                 </div>
               ))}
               <Button type="button" onClick={addSpec} variant="outline">Добавить характеристику</Button>

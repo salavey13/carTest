@@ -35,11 +35,11 @@ export const ORDER_DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export const orderDraftStorageKey = (slug: string): string =>
   `franchize-order-draft:${slug}`;
 
-export type OrderDraftPayment = "card" | "cash" | "sbp";
+export type OrderDraftPayment = "card" | "cash" | "sbp" | "yandex_pay";
 
 /** Deposit rail choice — "same" = follow the main payment (boss 2026-09-29).
  *  Optional-at-restore (old v1 drafts lack the field → default "same"). */
-export type OrderDraftDepositChoice = "same" | "cash" | "card" | "sbp";
+export type OrderDraftDepositChoice = "same" | "cash" | "card" | "sbp" | "yandex_pay";
 
 export type OrderDraftForm = {
   recipient: string;
@@ -74,8 +74,8 @@ export type OrderDraft = OrderDraftForm & {
   savedAt: number;
 };
 
-const PAYMENT_VALUES: OrderDraftPayment[] = ["card", "cash", "sbp"];
-const DEPOSIT_CHOICE_VALUES: OrderDraftDepositChoice[] = ["same", "cash", "card", "sbp"];
+const PAYMENT_VALUES: OrderDraftPayment[] = ["card", "cash", "sbp", "yandex_pay"];
+const DEPOSIT_CHOICE_VALUES: OrderDraftDepositChoice[] = ["same", "cash", "card", "sbp", "yandex_pay"];
 
 const asTrimmedString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
