@@ -480,10 +480,17 @@ export function AnalyticsClient({
     try {
       const res = await resendVerificationDmsAction({ slug: initialSlug, rentalId: selectedRentalId });
       if (res.success) {
+        // boss 2026-10-20: honest delivery report — the parties are operator +
+        // owner, so the presser usually gets only the actor proof copy; the
+        // toast must say exactly who was reached and who failed.
+        const sent = res.data?.sentTo?.length ?? 0;
+        const failed = res.data?.failed ?? [];
+        const copied = res.data?.actorCopied === true;
+        const failNote = failed.length
+          ? ` ⚠️ Не доставлено: ${failed.map((f) => f.chatId).join(", ")}`
+          : "";
         toast.success(
-          res.data?.created
-            ? "Сверка создана и отправлена в Telegram ✅"
-            : `Сверка отправлена в Telegram (${res.data?.sentTo?.length ?? 0} получено) ✅`,
+          `${res.data?.created ? "Сверка создана и отправлена" : "Сверка отправлена в Telegram"} (${sent} получено${copied ? " + копия вам" : ""}) ✅${failNote}`,
         );
         if (res.data?.created) onDataRefresh?.();
       } else {

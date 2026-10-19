@@ -44,7 +44,17 @@ export function VerificationResendButton({
     try {
       const res = await resendVerificationDmsAction({ slug, rentalId });
       if (res.success) {
-        toast.success("🤝 Сверка выслана в Telegram");
+        // boss 2026-10-20: honest delivery report — sent count + actor copy +
+        // per-chat failures (the action never hides them anymore).
+        const sent = res.data?.sentTo?.length ?? 0;
+        const failed = res.data?.failed ?? [];
+        const copied = res.data?.actorCopied === true;
+        const failNote = failed.length
+          ? ` ⚠️ Не доставлено: ${failed.map((f) => f.chatId).join(", ")}`
+          : "";
+        toast.success(
+          `🤝 Сверка выслана в Telegram (${sent} получено${copied ? " + копия вам" : ""})${failNote}`,
+        );
       } else {
         toast.error(res.error || "Не удалось выслать сверку.");
       }

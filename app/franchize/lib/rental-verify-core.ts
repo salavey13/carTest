@@ -423,7 +423,7 @@ export function resetSplitPart(split: SplitParts, part: SplitPartKey, original: 
 // ── Callback grammar (≤ 64 bytes, unique `vrfp_` prefix) ────────────────────
 //   vrfp_v_<rentalId>           — open / return to the editor main view
 //   vrfp_p<part>_<rentalId>     — open the part adjuster (part = b|e|o)
-//   vrfp_a<part><op>_<rentalId> — apply delta (op = d1 −100, d2 −50, i1 +50, i2 +100, z reset)
+//   vrfp_a<part><op>_<rentalId> — apply delta (op = d1 −100, d2 −500, i1 +500, i2 +100, z reset)
 //   vrfp_cm_<rentalId>          — comment input mode
 //   vrfp_s_<rentalId>           — send the proposal to the other party
 //   vrfp_x_<rentalId>           — «расчёт верный» — confirm right from the editor
@@ -451,7 +451,10 @@ export interface ParsedProposalCallback {
 
 const PART_BY_CODE: Record<string, SplitPartKey> = { b: "base", e: "equipment", o: "overprice" };
 const CODE_BY_PART: Record<SplitPartKey, string> = { base: "b", equipment: "e", overprice: "o" };
-const DELTA_BY_OP: Record<string, number> = { d1: -100, d2: -50, i1: 50, i2: 100, z: 0 };
+// boss 2026-10-20: ±50 steps were too small for real disputes — the middle
+// buttons now move ±500 (opcodes d2/i1 unchanged, so old keyboards in already
+// sent messages apply the NEW deltas — accepted trade-off).
+const DELTA_BY_OP: Record<string, number> = { d1: -100, d2: -500, i1: 500, i2: 100, z: 0 };
 
 export function encodeProposalCallback(kind: "view" | "comment" | "send" | "confirm" | "accept" | "decline" | "counter", rentalId: string): string {
   const cmd = { view: "v", comment: "cm", send: "s", confirm: "x", accept: "y", decline: "n", counter: "c" }[kind];
@@ -633,8 +636,8 @@ export function adjustPartKeyboard(part: SplitPartKey, rentalId: string): Inline
   return [
     [
       { text: "−100", callback_data: encodeAdjustCallback(part, "d1", rentalId) },
-      { text: "−50", callback_data: encodeAdjustCallback(part, "d2", rentalId) },
-      { text: "+50", callback_data: encodeAdjustCallback(part, "i1", rentalId) },
+      { text: "−500", callback_data: encodeAdjustCallback(part, "d2", rentalId) },
+      { text: "+500", callback_data: encodeAdjustCallback(part, "i1", rentalId) },
       { text: "+100", callback_data: encodeAdjustCallback(part, "i2", rentalId) },
     ],
     [

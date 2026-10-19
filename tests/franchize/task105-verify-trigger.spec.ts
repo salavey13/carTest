@@ -55,6 +55,21 @@ describe("task105 · verification trigger survives the serverless invocation", (
     expect(s).toContain("access.isOwner !== true");
   });
 
+  it("resend reports honest delivery + proof copy for the presser (boss 2026-10-20)", () => {
+    const s = src("app/franchize/server-actions/rental-verify-actions.ts");
+    const fn = s.slice(s.indexOf("export async function resendVerificationDmsAction"));
+    // per-chat Telegram failures are collected and returned, never swallowed
+    expect(fn).toContain("failed.push");
+    expect(fn).toMatch(/sentTo, failed, created, status: row\.status, actorCopied/);
+    // 0 delivered is an ERROR now, not a lying success toast
+    expect(fn).toMatch(/if \(sentTo\.length === 0\) \{/);
+    // keyboardless proof copy when the presser is not operator/owner
+    expect(fn).toMatch(/!recipients\.includes\(actorChatId\)/);
+    // stale backfill rows (operator_chat_id = NULL) heal before sending
+    expect(fn).toMatch(/resolveRentalOperator/);
+    expect(fn).toMatch(/update\(\{ operator_chat_id: healed \}\)/);
+  });
+
   it("drawer exposes the resend button wired to the action", () => {
     const drawer = src("app/franchize/[slug]/rentals-analytics/components/RentalDetailDrawer.tsx");
     expect(drawer).toContain("onResendDms");

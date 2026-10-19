@@ -36,6 +36,7 @@ import {
   type RentalVerificationRow,
 } from "@/app/franchize/lib/rental-verify";
 import { buildAuditStamp, computeRentalAuditGrade } from "@/app/franchize/lib/rental-audit";
+import { resolveRentalOperator, type ShiftLike } from "@/app/franchize/lib/operator-attribution";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 export interface AdminVerifyResult {
@@ -285,8 +286,13 @@ async function loadOrCreateVerificationRow(params: {
 export interface ResendDmsResult {
   rentalId: string;
   sentTo: string[];
+  /** Per-recipient Telegram failures — the client must show them, never hide. */
+  failed: Array<{ chatId: string; error: string }>;
   created: boolean;
   status: string;
+  /** True when the clicking admin got a keyboardless proof copy (they are not
+   *  a verification party — boss 2026-10-20: the presser must SEE the result). */
+  actorCopied: boolean;
 }
 
 export async function resendVerificationDmsAction(params: {
@@ -326,10 +332,58 @@ export async function resendVerificationDmsAction(params: {
       fallbackSlug: params.slug,
     });
 
-    const usersMap = await loadUsersMap([row.operator_chat_id, row.owner_chat_id]);
-    const operatorLabel = labelFromUsersMap(usersMap, row.operator_chat_id);
-    const ownerLabel = labelFromUsersMap(usersMap, row.owner_chat_id);
-    const singleParty = !row.operator_chat_id || row.operator_chat_id === row.owner_chat_id;
+    // HEAL 2026-10-20: task111 backfill rows (44 шт.) carry operator_chat_id =
+    // NULL (old rentals without created_by_operator_chat_id) — resend reached
+    // only the owner and the operator could never ✅. Re-resolve via the
+    // canonical chain (same ±25h shift idiom as requestRentalVerification)
+    // and patch the row so the state machine sees both parties again.
+    const ownerChatId = row.owner_chat_id ? String(row.owner_chat_id) : null;
+    let operatorChatId = row.operator_chat_id ? String(row.operator_chat_id) : null;
+    if (!operatorChatId) {
+      try {
+        const createdAtMs = Date.parse(String(rental.created_at || "")) || Date.now();
+        const { data: shiftRows } = await supabaseAdmin
+          .from("crew_member_shifts")
+          .select("member_id, clock_in_time, clock_out_time")
+          .eq("crew_id", rental.crew_id)
+          .gte("clock_in_time", new Date(createdAtMs - 25 * 3600 * 1000).toISOString())
+          .lte("clock_in_time", new Date(createdAtMs + 25 * 3600 * 1000).toISOString());
+        const shifts: ShiftLike[] = (shiftRows || []).map((s: any) => ({
+          member_id: s.member_id,
+          clock_in_time: s.clock_in_time,
+          clock_out_time: s.clock_out_time ?? null,
+        }));
+        const attribution = resolveRentalOperator(
+          {
+            created_by_operator_chat_id: rental.created_by_operator_chat_id,
+            created_at: rental.created_at,
+            metadata: rental.metadata,
+          },
+          shifts,
+        );
+        const healed = attribution.operatorId ? String(attribution.operatorId) : null;
+        if (healed && healed !== ownerChatId) {
+          const { error: patchErr } = await supabaseAdmin
+            .from("rental_verifications")
+            .update({ operator_chat_id: healed })
+            .eq("rental_id", row.rental_id);
+          if (!patchErr) {
+            operatorChatId = healed;
+            row.operator_chat_id = healed;
+            logger.info(`[rental-verify] healed operator_chat_id=${healed} for ${row.rental_id} (was NULL)`);
+          } else {
+            logger.warn(`[rental-verify] operator heal patch failed for ${row.rental_id}:`, patchErr);
+          }
+        }
+      } catch (healErr) {
+        logger.warn(`[rental-verify] operator heal skipped for ${row.rental_id} (non-fatal):`, healErr);
+      }
+    }
+
+    const usersMap = await loadUsersMap([operatorChatId, ownerChatId, actorChatId]);
+    const operatorLabel = labelFromUsersMap(usersMap, operatorChatId);
+    const ownerLabel = labelFromUsersMap(usersMap, ownerChatId);
+    const singleParty = !operatorChatId || operatorChatId === ownerChatId;
     const summary = formatVerificationSummary({
       crewName: row.crew_slug,
       snapshot: row.snapshot as any,
@@ -347,16 +401,42 @@ export async function resendVerificationDmsAction(params: {
     const keyboard = withKeyboard ? verificationKeyboard(row.rental_id) : [];
 
     const sentTo: string[] = [];
-    const recipients = [...new Set([row.operator_chat_id, row.owner_chat_id].filter(Boolean) as string[])];
+    const failed: Array<{ chatId: string; error: string }> = [];
+    const recipients = [...new Set([operatorChatId, ownerChatId].filter(Boolean) as string[])];
     for (const chatId of recipients) {
       try {
         const res = await sendComplexMessage(chatId, summary, keyboard, { parseMode: "HTML", keyboardType: "inline" });
         if (res?.success !== false) sentTo.push(chatId);
+        else failed.push({ chatId, error: res?.error || "Telegram API error" });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         logger.warn(`[rental-verify] resend DM failed for ${chatId} (rental ${row.rental_id}):`, e);
+        failed.push({ chatId, error: msg });
       }
     }
-    logger.info(`[rental-verify] DMs resent for ${row.rental_id} by ${actorChatId} (created=${created}, sent=${sentTo.length}/${recipients.length}, status=${row.status})`);
+
+    // boss 2026-10-20: the presser must SEE the result. Parties are operator +
+    // owner — the clicking admin is often NEITHER (e.g. the boss resending on
+    // vip-bike, where the owner is Ilya and the operator is DJORUDJOV): both
+    // DMs landed fine, the toast said «(2 получено) ✅», and the boss still got
+    // NOTHING (actor is also excluded from the staff cc). Send a keyboardless
+    // proof copy to the actor — same policy as the staff cc: no ✅/⚠️ buttons,
+    // foreign taps bounce in the state machine.
+    let actorCopied = false;
+    if (actorChatId && !recipients.includes(actorChatId)) {
+      const who = recipients.length
+        ? recipients.map((c) => labelFromUsersMap(usersMap, c)).join(", ")
+        : "получатели не найдены";
+      const proof = `📤 <b>Копия сверки</b> (вы высылали · получатели: ${who})\n\n${summary}`;
+      try {
+        const res = await sendComplexMessage(actorChatId, proof, [], { parseMode: "HTML", keyboardType: "inline" });
+        actorCopied = res?.success !== false;
+        if (!actorCopied) failed.push({ chatId: actorChatId, error: `копия: ${res?.error || "Telegram API error"}` });
+      } catch (e) {
+        logger.warn(`[rental-verify] actor proof copy failed for ${actorChatId} (rental ${row.rental_id}):`, e);
+      }
+    }
+    logger.info(`[rental-verify] DMs resent for ${row.rental_id} by ${actorChatId} (created=${created}, sent=${sentTo.length}/${recipients.length}, actorCopied=${actorCopied}, status=${row.status})`);
 
     // VF-FIX 2026-10-18: when this resend CREATED the row (rental closed
     // before the trigger fix / lost to the ~10s tail), the staff cc from
@@ -376,7 +456,20 @@ export async function resendVerificationDmsAction(params: {
       }
     }
 
-    return successResponse({ rentalId: row.rental_id, sentTo, created, status: row.status });
+    // Honest result: parties delivered → success (with per-chat failures if
+    // partial). Nothing delivered → ERROR with the reasons; the actor proof
+    // copy above still went out so the presser sees what happened.
+    if (recipients.length === 0) {
+      return errorResponse(
+        `Получатели не найдены — в строке сверки нет ни оператора, ни владельца.${actorCopied ? " Копия выслана вам." : ""}`,
+      );
+    }
+    if (sentTo.length === 0) {
+      return errorResponse(
+        `Telegram не доставил сверку: ${failed.map((f) => `${f.chatId}: ${f.error}`).join("; ")}.${actorCopied ? " Копия выслана вам." : ""}`,
+      );
+    }
+    return successResponse({ rentalId: row.rental_id, sentTo, failed, created, status: row.status, actorCopied });
   } catch (err: any) {
     logger.error("[rental-verify] resendVerificationDmsAction exception:", err);
     const friendly = typeof err?.message === "string" && err.message.includes("Таблица сверок")

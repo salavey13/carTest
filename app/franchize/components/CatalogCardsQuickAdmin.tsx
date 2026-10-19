@@ -155,12 +155,16 @@ export function CatalogCardsQuickAdmin({ slug }: CatalogCardsQuickAdminProps) {
 
   return (
     <>
-      {/* Плавающая кнопка быстрой админки (только staff) */}
+      {/* Плавающая кнопка быстрой админки (только staff).
+          boss 2026-10-20: на витрине каталога блок «стрелка вверх + корзина»
+          занимает bottom-[calc(6rem+safe)] … ~144px — кнопка «Карточки»
+          перекрывалась им (тот же right-4, z ниже). Ставим её СТРОГО ВЫШЕ
+          этого блока (верх корзины ≈144px → 10rem = 160px + safe-area). */}
       <button
         type="button"
         onClick={handleOpen}
         aria-label="Редактировать промо-карточки"
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold shadow-lg transition hover:opacity-90 active:scale-95 lg:bottom-6"
+        className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold shadow-lg transition hover:opacity-90 active:scale-95 lg:bottom-6"
         style={{ backgroundColor: "var(--franchize-accent-main, #D99A00)", color: "var(--franchize-accent-contrast, #1a1a1a)" }}
       >
         <PencilLine className="h-4 w-4" />

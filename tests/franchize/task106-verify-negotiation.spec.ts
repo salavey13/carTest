@@ -91,7 +91,7 @@ describe("task106 · vrfp_ callback grammar", () => {
         expect(parsed!.action).toBe("adjust");
         expect(parsed!.part).toBe(part);
         expect(parsed!.rentalId).toBe(UUID);
-        const expectedDelta = { d1: -100, d2: -50, i1: 50, i2: 100, z: 0 }[op];
+        const expectedDelta = { d1: -100, d2: -500, i1: 500, i2: 100, z: 0 }[op];
         expect(parsed!.delta).toBe(expectedDelta);
       }
     }
@@ -294,9 +294,9 @@ describe("task106 · editor keyboards", () => {
 
   it("adjuster: deltas + reset + back + send, every callback parses", () => {
     const kb = adjustPartKeyboard("base", UUID);
-    expect(kb[0].map((b) => b.text)).toEqual(["−100", "−50", "+50", "+100"]);
+    expect(kb[0].map((b) => b.text)).toEqual(["−100", "−500", "+500", "+100"]);
     const ops = kb[0].map((b) => parseProposalCallback(b.callback_data));
-    expect(ops.map((p) => p!.delta)).toEqual([-100, -50, 50, 100]);
+    expect(ops.map((p) => p!.delta)).toEqual([-100, -500, 500, 100]);
     expect(parseProposalCallback(kb[1][0].callback_data)).toMatchObject({ action: "adjust", delta: 0 });
     expect(parseProposalCallback(kb[1][1].callback_data)?.action).toBe("view");
     expect(parseProposalCallback(kb[2][0].callback_data)?.action).toBe("send");
