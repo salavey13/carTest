@@ -6,6 +6,7 @@ import { notifyAdmin, sendTelegramDocument, sendTelegramInvoice } from "@/app/ac
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import nodemailer from "nodemailer";
+import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { readFile } from "fs/promises";
@@ -5251,8 +5252,13 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           auth: { user: smtpUser, pass: smtpPass },
           connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 8000,
         });
-        // Fire-and-forget — don't block checkout on email
-        transporter.sendMail({
+        // FIX (2026-10-19): fire-and-forget dies on Vercel — after the action
+        // responds, the invocation is frozen and the SMTP upload never
+        // completes. waitUntil keeps the checkout snappy (zero added latency)
+        // while the runtime holds the lambda until the send settles (no-op on
+        // long-lived runtimes — the event loop covers it). Detailed write-up
+        // in doc-manual.ts /doc email block (same-day fix).
+        waitUntil(transporter.sendMail({
           from: emailFrom, to: emailTo,
           subject: `Договор ${docType} — ${bikeDocs[0]?.bikeName || payload.orderId}`,
           text: emailBody,
@@ -5262,7 +5268,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
             contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           })),
         }).then(() => logger.info(`[franchize] Email with DOCX sent to ${emailTo}`))
-          .catch((emailErr: any) => logger.warn("[franchize] Email send failed (non-fatal):", emailErr?.message || emailErr));
+          .catch((emailErr: any) => logger.warn("[franchize] Email send failed (non-fatal):", emailErr?.message || emailErr)));
       }
     } catch (emailSetupErr) {
       logger.warn("[franchize] Email setup failed:", emailSetupErr);

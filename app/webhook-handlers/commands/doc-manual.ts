@@ -56,6 +56,7 @@ import { convertTextDateToTimestamp, resolveCrewOwnerChatId } from "@/lib/rental
 import { buildRentalContractVariables, type CrewSecrets as RentalCrewSecrets } from "@/app/lib/rental-contract-vars";
 import { privateSchema } from "@/lib/private-secrets";
 import nodemailer from "nodemailer";
+import { waitUntil } from "@vercel/functions";
 import { calculatePriceForDuration, getHelmetPrice } from "@/app/franchize/lib/pricing-calculator";
 import { getOtherGearUnitPrice } from "@/lib/rental-pricing-calculator";
 // v3 polish: centralized notification templates (HTML-escaped, Russian-ized, with deep links)
@@ -2690,8 +2691,6 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         `Документ во вложении.`,
       ].filter(Boolean).join("\n");
 
-      // Fire-and-forget: start SMTP send but don't await it.
-      // The function returns immediately; email completes in background.
       const transporter = nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
@@ -2702,8 +2701,19 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
         socketTimeout: 8000,
       });
 
-      // Don't await — let it run in background
-      transporter.sendMail({
+      // FIX (2026-10-19, "email stopped working"): this used to be pure
+      // fire-and-forget. The task102 critical-writes-first reorder moved the
+      // block to the very end of the flow — with ZERO awaits after it — so on
+      // Vercel the lambda froze the moment the handler returned true and the
+      // SMTP upload never completed. The DOCX still reached Telegram (sent
+      // earlier), but the crew email copy silently vanished. Two layers now:
+      //   1. waitUntil — the platform-blessed way to keep a serverless
+      //      invocation alive until the promise settles (no-op outside
+      //      Vercel, where a long-lived process needs no help);
+      //   2. a bounded 2s grace await — same belt-and-suspenders as
+      //      testdrive-manual.ts — covers fast SMTP lanes even if the
+      //      request context is missing.
+      const emailDelivery = transporter.sendMail({
         from: emailFrom,
         to: emailTo,
         subject: `Договор ${docType} — ${bike.make} ${bike.model}`,
@@ -2718,6 +2728,11 @@ async function generateContract(chatId: number, userId: string, context: DocFlow
       }).catch((emailErr: any) => {
         logger.warn("[/doc] Email send failed (non-fatal):", emailErr?.message || emailErr);
       });
+      waitUntil(emailDelivery);
+      await Promise.race([
+        emailDelivery,
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
     }
   } catch (emailSetupErr) {
     logger.warn("[/doc] Email setup failed (non-fatal):", emailSetupErr);

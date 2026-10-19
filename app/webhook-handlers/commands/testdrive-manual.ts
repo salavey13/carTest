@@ -30,6 +30,7 @@ import { privateSchema } from "@/lib/private-secrets";
 import { isCrewMember } from "@/app/lib/user-rental-secrets";
 import { createLeadFollowupTodos } from "@/app/franchize/server-actions/crew-todos";
 import nodemailer from "nodemailer";
+import { waitUntil } from "@vercel/functions";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { getCrewBikes, getAllBikes, loadCrewSecrets as loadCrewSecretsShared, loadTemplateForCrewWithOverrides } from "../lib/crew-access";
@@ -706,6 +707,12 @@ async function generateContract(chatId: number, userId: string, context: TestDri
       docxBuf,
       crewEmail: crewSecrets.email,
     });
+    // FIX (2026-10-19): the 1.5s grace race below only covers FAST SMTP
+    // lanes; slower sends were still frozen mid-upload when the handler
+    // returned (same Vercel freeze that killed /doc emails — see the
+    // write-up in doc-manual.ts). waitUntil holds the invocation until the
+    // send fully settles.
+    waitUntil(crewEmailPromise);
 
     // Upload to storage (non-fatal)
     let docStoragePath: string | null = null;
