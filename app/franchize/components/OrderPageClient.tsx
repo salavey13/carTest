@@ -772,7 +772,13 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       }
     };
 
-    const unsubscribe = watch((values) => {
+    // FIX (2026-10-19, "error boundary on the order form"): RHF v7's
+    // watch(callback) returns a SUBSCRIPTION OBJECT ({ unsubscribe }), not a
+    // bare function. Calling it directly in the cleanup threw
+    // `TypeError: unsubscribe is not a function` whenever the effect was
+    // destroyed (user hydration flips user?.id, StrictMode remount, unmount)
+    // — the throw bubbled to the error boundary and killed the whole form.
+    const watchSubscription = watch((values) => {
       const snapshot: OrderDraftForm = {
         recipient: (values.recipient ?? "").trim(),
         phone: (values.phone ?? "").trim(),
@@ -809,7 +815,7 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     window.addEventListener("pagehide", handlePageHide);
 
     return () => {
-      unsubscribe();
+      watchSubscription.unsubscribe();
       window.removeEventListener("pagehide", handlePageHide);
       if (draftSaveTimerRef.current) {
         clearTimeout(draftSaveTimerRef.current);
@@ -1096,6 +1102,69 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
     }
   }, [resolvedStartDate, rentalStartDate, setValue]);
 
+  // ── FIX (2026-10-19, "error boundary on the order form"): TDZ regression ──
+  // The promo auto-revalidate effect below lists applyPromoByCode in its dep
+  // array, and a dep array is EVALUATED DURING RENDER. With the callback
+  // declared further down the file, that evaluation hit the temporal dead
+  // zone → `ReferenceError: Cannot access 'applyPromoByCode' before
+  // initialization` on EVERY render (minified in prod to the cryptic
+  // «Cannot access 'sh' before initialization» the boss saw in the error
+  // boundary). The declaration now lives above its first reference.
+  const applyPromoByCode = useCallback(
+    // silent = авто-ревалидация при изменении состава заказа (B1/B2 review,
+    // boss round 2): обновляем сумму без тостов — юзер видит свежую скидку
+    // в итогах; ошибки по-прежнему показываем. Явный ввод — с тостами.
+    async (rawCode: string, opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
+      const requestedCode = normalizePromoCode(rawCode);
+      setIsPromoValidating(true);
+
+      try {
+        const result = await validateFranchizePromoCode({ slug, code: rawCode, baseAmount: baseOrderAmount });
+        if (!result.success) {
+          setAppliedPromo(null);
+          setPromoMessage({ tone: "error", text: result.error });
+          if (!silent) toast.error(result.error);
+          return;
+        }
+
+        if (result.code !== requestedCode) {
+          setPromoMessage({ tone: "info", text: "Поле промокода изменилось во время проверки — примените актуальный код ещё раз." });
+          return;
+        }
+
+        const promoResult: AppliedPromo = {
+          code: result.code,
+          title: result.title,
+          discountAmount: result.discountAmount,
+          description: result.description,
+          baseAmount: baseOrderAmount,
+        };
+        setAppliedPromo(promoResult);
+        if (silent) {
+          // тихий ре-апплай: только строка-статус, без тостов (анти-спам)
+          setPromoMessage({ tone: "success", text: `${result.code} пересчитан под новый состав заказа.` });
+          return;
+        }
+        setPromoMessage({
+          tone: "success",
+          text: result.discountAmount > 0
+            ? `${result.code} применён: −${result.discountAmount.toLocaleString("ru-RU")} ₽ (${result.description}).`
+            : `${result.code} проверен: ${result.description}.`,
+        });
+        toast.success(result.discountAmount > 0 ? "Промокод применён к заказу." : "Промокод проверен и закреплён за заказом.");
+      } catch {
+        const error = "Не удалось проверить промокод. Попробуйте ещё раз.";
+        setAppliedPromo(null);
+        setPromoMessage({ tone: "error", text: error });
+        if (!silent) toast.error(error);
+      } finally {
+        setIsPromoValidating(false);
+      }
+    },
+    [baseOrderAmount, slug],
+  );
+
   useEffect(() => {
     if (!appliedPromo) return;
     if (normalizePromoCode(promo) !== appliedPromo.code) {
@@ -1335,61 +1404,6 @@ export function OrderPageClient({ crew, slug, orderId, items }: OrderPageClientP
       setFocus("promo");
     }
   };
-
-  const applyPromoByCode = useCallback(
-    // silent = авто-ревалидация при изменении состава заказа (B1/B2 review,
-    // boss round 2): обновляем сумму без тостов — юзер видит свежую скидку
-    // в итогах; ошибки по-прежнему показываем. Явный ввод — с тостами.
-    async (rawCode: string, opts?: { silent?: boolean }) => {
-      const silent = opts?.silent === true;
-      const requestedCode = normalizePromoCode(rawCode);
-      setIsPromoValidating(true);
-
-      try {
-        const result = await validateFranchizePromoCode({ slug, code: rawCode, baseAmount: baseOrderAmount });
-        if (!result.success) {
-          setAppliedPromo(null);
-          setPromoMessage({ tone: "error", text: result.error });
-          if (!silent) toast.error(result.error);
-          return;
-        }
-
-        if (result.code !== requestedCode) {
-          setPromoMessage({ tone: "info", text: "Поле промокода изменилось во время проверки — примените актуальный код ещё раз." });
-          return;
-        }
-
-        const promoResult: AppliedPromo = {
-          code: result.code,
-          title: result.title,
-          discountAmount: result.discountAmount,
-          description: result.description,
-          baseAmount: baseOrderAmount,
-        };
-        setAppliedPromo(promoResult);
-        if (silent) {
-          // тихий ре-апплай: только строка-статус, без тостов (анти-спам)
-          setPromoMessage({ tone: "success", text: `${result.code} пересчитан под новый состав заказа.` });
-          return;
-        }
-        setPromoMessage({
-          tone: "success",
-          text: result.discountAmount > 0
-            ? `${result.code} применён: −${result.discountAmount.toLocaleString("ru-RU")} ₽ (${result.description}).`
-            : `${result.code} проверен: ${result.description}.`,
-        });
-        toast.success(result.discountAmount > 0 ? "Промокод применён к заказу." : "Промокод проверен и закреплён за заказом.");
-      } catch {
-        const error = "Не удалось проверить промокод. Попробуйте ещё раз.";
-        setAppliedPromo(null);
-        setPromoMessage({ tone: "error", text: error });
-        if (!silent) toast.error(error);
-      } finally {
-        setIsPromoValidating(false);
-      }
-    },
-    [baseOrderAmount, slug],
-  );
 
   const handleApplyPromo = () => {
     void applyPromoByCode(promo);
