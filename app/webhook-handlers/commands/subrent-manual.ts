@@ -119,14 +119,32 @@ function formatInitials(fullName: string | undefined): string {
 
 // ── Keyboard builders ─────────────────────────────────────────────────────────────
 
-function buildBikeKeyboard(bikes: any[]): KeyboardButton[][] {
+const BIKES_PAGE_SIZE = 10;
+
+function buildBikeKeyboard(bikes: any[], page = 0): KeyboardButton[][] {
+  const totalPages = Math.max(1, Math.ceil(bikes.length / BIKES_PAGE_SIZE));
+  const safePage = Math.min(Math.max(0, page), totalPages - 1);
   const rows: KeyboardButton[][] = [];
 
-  for (const bike of bikes.slice(0, 10)) {
+  for (const bike of bikes.slice(safePage * BIKES_PAGE_SIZE, safePage * BIKES_PAGE_SIZE + BIKES_PAGE_SIZE)) {
     rows.push([{
       text: `${bike.make} ${bike.model}`,
       callback_data: `bike_${bike.id}`,
     }]);
+  }
+
+  // FIX 2026-10-19: раньше показывались только первые 10 байков по алфавиту —
+  // при большом парке выбрать существующий байк (Yamaha/Suzuki внизу списка)
+  // было нельзя, приходилось вводить вручную через "Новый мотоцикл".
+  if (totalPages > 1) {
+    const navRow: KeyboardButton[] = [];
+    if (safePage > 0) {
+      navRow.push({ text: "⬅️ Предыдущие 10", callback_data: `bike_page_${safePage - 1}` });
+    }
+    if (safePage < totalPages - 1) {
+      navRow.push({ text: `⏭ Следующие 10 мотоциклов (${safePage + 2}/${totalPages})`, callback_data: `bike_page_${safePage + 1}` });
+    }
+    rows.push(navRow);
   }
 
   rows.push([{ text: "✏️ Новый мотоцикл", callback_data: "bike_new" }]);
@@ -487,48 +505,58 @@ function calculateEndDate(startDate: string, startTime: string, duration: string
   };
 }
 
+// FIX 2026-10-19: старая версия ломалась на тысячах >= 10 (12000 → "undefined тысяч").
+// Triple-реализация как в scripts/make-deal-contract-skill.mjs.
+const NUM_WORDS_ONES_M = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"];
+const NUM_WORDS_ONES_F = ["", "одна", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"];
+const NUM_WORDS_TEENS = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"];
+const NUM_WORDS_TENS = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"];
+const NUM_WORDS_HUNDREDS = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"];
+const NUM_WORDS_SCALE = [
+  { one: "", few: "", many: "" },
+  { one: "тысяча", few: "тысячи", many: "тысяч" },
+  { one: "миллион", few: "миллиона", many: "миллионов" },
+  { one: "миллиард", few: "миллиарда", many: "миллиардов" },
+];
+
+function tripleToWords(n: number, genderF: boolean): string {
+  if (n === 0) return "";
+  const h = Math.floor(n / 100);
+  const rem = n % 100;
+  const t = Math.floor(rem / 10);
+  const o = rem % 10;
+  const parts: string[] = [];
+  if (h > 0) parts.push(NUM_WORDS_HUNDREDS[h]);
+  if (rem >= 10 && rem < 20) {
+    parts.push(NUM_WORDS_TEENS[rem - 10]);
+  } else {
+    if (t > 0) parts.push(NUM_WORDS_TENS[t]);
+    if (o > 0) parts.push(genderF ? NUM_WORDS_ONES_F[o] : NUM_WORDS_ONES_M[o]);
+  }
+  return parts.join(" ");
+}
+
 function numberToRussianWords(num: number): string {
-  const ones = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"];
-  const teens = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"];
-  const tens = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"];
-  const hundreds = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"];
-  const thousands = ["", "тысяча", "тысячи", "тысяч"];
-
   if (num === 0) return "ноль";
-
-  let words: string[] = [];
-  let n = num;
-
-  // Thousands
-  if (n >= 1000) {
-    const t = Math.floor(n / 1000);
-    if (t === 1) words.push("одна тысяча");
-    else if (t === 2) words.push("две тысячи");
-    else if (t < 5) words.push(`${ones[t]} тысячи`);
-    else words.push(`${ones[t]} тысяч`);
-    n %= 1000;
+  const chunks: string[] = [];
+  let n = Math.abs(Math.floor(num));
+  let scaleIdx = 0;
+  while (n > 0 && scaleIdx < NUM_WORDS_SCALE.length) {
+    const triple = n % 1000;
+    if (triple > 0) {
+      const s = NUM_WORDS_SCALE[scaleIdx];
+      let suffix = "";
+      if (s.one) {
+        const mod10 = triple % 10;
+        const mod100 = triple % 100;
+        suffix = mod100 >= 11 && mod100 <= 14 ? s.many : mod10 === 1 ? s.one : mod10 >= 2 && mod10 <= 4 ? s.few : s.many;
+      }
+      chunks.unshift([tripleToWords(triple, scaleIdx === 1), suffix].filter(Boolean).join(" "));
+    }
+    n = Math.floor(n / 1000);
+    scaleIdx++;
   }
-
-  // Hundreds
-  if (n >= 100) {
-    words.push(hundreds[Math.floor(n / 100)]);
-    n %= 100;
-  }
-
-  // Tens and ones
-  if (n >= 20) {
-    words.push(tens[Math.floor(n / 10)]);
-    n %= 10;
-  }
-  if (n >= 10) {
-    words.push(teens[n - 10]);
-    n = 0;
-  }
-  if (n > 0) {
-    words.push(ones[n]);
-  }
-
-  return words.join(" ") || String(num);
+  return chunks.join(" ") || String(num);
 }
 
 // ── State management ─────────────────────────────────────────────────────────────
@@ -704,6 +732,23 @@ async function handleCallback(context: SubrentFlowContext, callbackData: string,
         });
         context.step = isEditMode ? "edit_bike_new" : "bike_new";
         await saveState(userId, context);
+      } else if (value.startsWith("page_")) {
+        // FIX 2026-10-19: пагинация списка байков — «Следующие 10 мотоциклов».
+        const page = Math.max(0, parseInt(value.slice(5), 10) || 0);
+        if (context.step === "bike" || context.step === "edit_bike") {
+          const bikes = await getAvailableBikes(context.crewId || await getSubrentCrewSlug(userId));
+          const totalPages = Math.max(1, Math.ceil(bikes.length / BIKES_PAGE_SIZE));
+          const safePage = Math.min(page, totalPages - 1);
+          await sendComplexMessage({
+            botToken: TELEGRAM_BOT_TOKEN,
+            chatId: userId,
+            text: `🏍 *Субаренда мотоцикла в парк*\n\nМотоциклы, страница ${safePage + 1} из ${totalPages}:`,
+            parseMode: "Markdown",
+            replyMarkup: JSON.stringify({ inline_keyboard: buildBikeKeyboard(bikes, safePage) }),
+          });
+        } else {
+          await sendComplexMessage({ botToken: TELEGRAM_BOT_TOKEN, chatId: userId, text: "ℹ️ Кнопка неактуальна — /subrent заново, если нужно." });
+        }
       } else {
         const bike = await resolveBikeById(value);
         if (bike) {
