@@ -61,6 +61,7 @@ supabase db push          # применит ~160 чистых миграций 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `TELEGRAM_BOT_TOKEN`, `ADMIN_CHAT_ID`
 - `NEXT_PUBLIC_SITE_URL`
+- `YANDEX_PAY_API_KEY` (+ опционально `YANDEX_PAY_MERCHANT_ID`, `YANDEX_PAY_API_BASE` для песочницы)
 
 **Опциональные:** `GITHUB_TOKEN`, `GEMINI_API_KEY`, `ZAI_*` (AI-функции),
 `SLACK_*` (мост `/codex` → Slack), `RENTAL_DOC_TEMPLATE_MODE=html`,
