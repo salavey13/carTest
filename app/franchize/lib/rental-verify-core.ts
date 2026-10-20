@@ -778,3 +778,26 @@ export function tallyVerificationStatuses(
   }
   return { verified, waiting, disputed, unknown };
 }
+
+// ── Task 115 · self-heal texts ───────────────────────────────────────────────
+// «We should be able to "сверять" already closed rentals» (boss 2026-10-20):
+// taps on pre-system / cleaned-up DMs re-create the сверка instead of
+// dead-ending. This maps requestRentalVerification rejections (reason strings
+// live in rental-verify.ts) to human answers; null → the caller keeps its
+// classic «Сверка не найдена…» wording.
+
+export function selfHealErrorText(reason: string | undefined): string | null {
+  switch (reason) {
+    case "rental not found":
+      return "Аренда не найдена.";
+    case "no crew — personal rental":
+      return "Личная аренда без экипажа — сверка не нужна.";
+    case "equipment/service doc — no operator bonus":
+      return "По этой позиции нет комиссии оператора — сверка не нужна.";
+    case "no parties to verify":
+      return "Нет участников сверки — оператор и владелец не найдены.";
+    default:
+      // exception / table missing / unknown — keep the classic wording.
+      return null;
+  }
+}

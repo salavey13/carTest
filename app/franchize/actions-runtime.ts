@@ -4734,10 +4734,15 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
     // flow).
     try {
       if (flowType === "rental") {
+        // FIX (ywp review 2026-10-20): the filter used the camelCase orderId
+        // jsonb key, but the rentals insert writes metadata.order_id
+        // (snake_case) — the lookup matched ZERO rows ever (prod-checked:
+        // 0 camel vs 5+ snake), so contract verifiers never attached to
+        // web-order rentals.
         const { data: rentalRow, error: rentalLookupError } = await supabaseAdmin
           .from("rentals")
           .select("rental_id, metadata")
-          .eq("metadata->>orderId", payload.orderId)
+          .eq("metadata->>order_id", payload.orderId)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -4876,9 +4881,12 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           });
         } else {
           // QR PNG (external renderer, 8s cap) → sendPhoto to the renter.
-          const qrBuffer = await fetchQrPngBuffer(pay.paymentUrl);
-          if (payload.telegramUserId) {
+          // Only REAL Telegram users can receive it (anonymous web orders keep
+          // a non-numeric telegramUserId like "manual-order" — sendPhoto there
+          // can only fail); the QR fetch itself is skipped for them too.
+          if (payload.telegramUserId && /^\d+$/.test(String(payload.telegramUserId))) {
             try {
+              const qrBuffer = await fetchQrPngBuffer(pay.paymentUrl);
               if (qrBuffer) {
                 const { telegramDeliver } = await import("@/lib/telegram-transport");
                 const qrSend = await telegramDeliver("sendPhoto", payload.telegramUserId, {
@@ -4926,6 +4934,9 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
 
           // Persist the payment link on the order's rental rows (re-show on
           // the rental page / analytics without re-calling the API).
+          // FIX (ywp review 2026-10-20): lookup key order_id (snake) — the
+          // camelCase orderId jsonb key matched ZERO rows (same bug as the
+          // contract attachment above).
           const yandexPayMeta = {
             payment_url: pay.paymentUrl,
             payment_id: pay.paymentId,
@@ -4936,7 +4947,7 @@ async function buildFranchizeOrderDocAndNotify(payload: FranchizeOrderNotifyPayl
           const { data: ypRows, error: ypLookupError } = await supabaseAdmin
             .from("rentals")
             .select("rental_id, metadata")
-            .eq("metadata->>orderId", payload.orderId);
+            .eq("metadata->>order_id", payload.orderId);
           if (ypLookupError) {
             logger.warn("[franchize] Yandex Pay metadata lookup failed:", { orderId: payload.orderId, error: ypLookupError.message });
           } else {

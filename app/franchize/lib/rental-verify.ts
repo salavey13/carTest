@@ -73,6 +73,7 @@ import {
   proposalResponseKeyboard,
   resetSplitPart,
   sendProposalFromDraft,
+  selfHealErrorText,
   setDraftComment,
   setDraftSplit,
   snapshotSplitOf,
@@ -107,6 +108,7 @@ export {
   parseProposalCallback,
   proposalResponseKeyboard,
   sendProposalFromDraft,
+  selfHealErrorText,
   snapshotSplitOf,
   splitTotal,
   startDraft,
@@ -592,6 +594,49 @@ export async function answerCallback(callbackQueryId: string, text: string): Pro
   }
 }
 
+// ── Self-heal: сверка for an already-closed rental ──────────────────────────
+// Boss 2026-10-20: «we should be able to "сверять" already closed rentals».
+// Old messages (pre-system closures, or rows removed by the svc/equipment
+// cleanup) carry ✅/⚠️/hub buttons that used to dead-end with «Сверка не
+// найдена (аренда закрыта до ввода сверки)». Instead of a dead end the tap
+// now re-creates the сверка on the fly (requestRentalVerification — frozen
+// snapshot + DMs to both parties + staff cc) and the game continues.
+
+/**
+ * A tap hit a rental with NO verification row: for a completed regular rental
+ * create the сверка row right now (same machine as a fresh closure). Returns
+ * `healed` on success; otherwise `message` is a ready-to-show refusal (null →
+ * caller falls back to its classic dead-end text). Service/equipment docs and
+ * non-closed rentals are deliberately NOT converted.
+ */
+export async function selfHealVerificationRow(
+  rentalId: string,
+  actorChatId: string,
+): Promise<{ healed: boolean; message?: string | null }> {
+  try {
+    const { data: rentalRow } = await supabaseAdmin
+      .from("rentals")
+      .select("status")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+    if (!rentalRow) return { healed: false, message: "Аренда не найдена." };
+    if ((rentalRow as any).status !== "completed") {
+      // An active/cancelled rental has nothing to сверять yet — classic text.
+      return { healed: false, message: null };
+    }
+    const res = await requestRentalVerification({
+      rentalId,
+      actorChatId,
+      source: "self-heal",
+    });
+    if (res.sent) return { healed: true };
+    return { healed: false, message: selfHealErrorText(res.reason) };
+  } catch (e) {
+    logger.warn(`[rental-verify] self-heal failed for ${rentalId}:`, e);
+    return { healed: false, message: null };
+  }
+}
+
 /**
  * Entry point from command-handler.ts (prefix `vrf_`):
  *   vrf_ok_<rentalId>   — «✅ Подтверждаю»
@@ -621,12 +666,30 @@ export async function handleRentalVerifyCallback(params: {
       .eq("rental_id", rentalId)
       .maybeSingle();
     if (error && !isMissingRelationError(error)) throw error;
-    if (!row) {
-      await answerCallback(params.callbackQueryId, "Сверка не найдена (аренда закрыта до ввода сверки).");
-      return true;
-    }
 
-    const current = row as RentalVerificationRow;
+    let current: RentalVerificationRow | null = (row as RentalVerificationRow) || null;
+    if (!current) {
+      // No row (old DM before the verification system, or the row was cleaned
+      // up later) → try to re-create the сверка instead of dead-ending; a
+      // healed row joins the normal state machine below.
+      const heal = await selfHealVerificationRow(rentalId, String(params.chatId));
+      if (!heal.healed) {
+        await answerCallback(params.callbackQueryId, heal.message || "Сверка не найдена (аренда закрыта до ввода сверки).");
+        return true;
+      }
+      const { data: fresh, error: freshError } = await supabaseAdmin
+        .from("rental_verifications")
+        .select("*")
+        .eq("rental_id", rentalId)
+        .maybeSingle();
+      if (freshError && !isMissingRelationError(freshError)) throw freshError;
+      if (!fresh) {
+        await answerCallback(params.callbackQueryId, "Сверка создана, но не сохранилась — попробуйте ещё раз.");
+        return true;
+      }
+      current = fresh as RentalVerificationRow;
+      await answerCallback(params.callbackQueryId, "Сверка не была заведена — создал заново ✅");
+    }
     // ── TASK 102 race hardening ──────────────────────────────────────────────
     // Both parties can tap ✅ within the same second: two callbacks each read
     // `pending`, each computes its own next state, and the SECOND write used

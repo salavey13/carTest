@@ -482,9 +482,11 @@ export function RentalDetailDrawer({
                   </button>
                 )
               )}
-              {/* Task 105: (re)send the verification summary + ✅/⚠️ keyboard to
-                  operator+owner in Telegram — the row is created on the fly for
-                  rentals closed before the trigger fix (bd948bd0). */}
+              {/* Task 105 / Task C: initiate-or-resend the verification summary
+                  + ✅/⚠️ keyboard to operator+owner in Telegram. When the rental
+                  has NO verification row yet (closed pre-system / row cleaned),
+                  the label honestly says «завести» — the tap CREATES the сверка
+                  (loadOrCreateVerificationRow + staff cc), not just re-sends. */}
               {canVerify && rental.status === "completed" && ver !== "verified" && onResendDms && (
                 resendFailed ? (
                   <span
@@ -501,9 +503,13 @@ export function RentalDetailDrawer({
                     disabled={resendPending}
                     className="cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
                     style={{ background: "#8b5cf61f", color: "#a78bfa" }}
-                    title="Выслать сводку сверки с кнопками ✅/⚠️ оператору и владельцу в Telegram (если сообщение потерялось)"
+                    title={
+                      ver === null
+                        ? "Сверки ещё нет — завести её и выслать сводку с кнопками ✅/⚠️ оператору и владельцу в Telegram"
+                        : "Выслать сводку сверки с кнопками ✅/⚠️ оператору и владельцу в Telegram (если сообщение потерялось)"
+                    }
                   >
-                    {resendPending ? "…" : "📤 выслать сверку в TG"}
+                    {resendPending ? "…" : ver === null ? "➕ завести сверку и выслать в TG" : "📤 выслать сверку в TG"}
                   </button>
                 )
               )}

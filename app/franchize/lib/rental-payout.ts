@@ -32,6 +32,7 @@ import {
   labelFromUsersMap,
   loadUsersMap,
   requestRentalVerification,
+  selfHealVerificationRow,
 } from "./rental-verify";
 import {
   buildPayoutItem,
@@ -265,7 +266,9 @@ async function loadConvertibles(
   crewIds: string[],
   rowsWithPayout: Map<string, unknown>,
 ): Promise<PayoutConvertible[]> {
-  const sinceIso = new Date(Date.now() - 45 * 24 * 3600 * 1000).toISOString();
+  // 92 days (was 45): the boss asked to сверять ALREADY closed rentals — the
+  // July closures (pre-verification-system era) must surface here too.
+  const sinceIso = new Date(Date.now() - 92 * 24 * 3600 * 1000).toISOString();
   const found = new Map<string, { bike: string; at: string }>();
   const grab = (rows: any[] | null) => {
     for (const r of rows || []) {
@@ -287,7 +290,9 @@ async function loadConvertibles(
       .gte("created_at", sinceIso)
       .or(`owner_id.eq.${viewer},created_by_operator_chat_id.eq.${viewer}`)
       .order("created_at", { ascending: false })
-      .limit(30);
+      // limit 500 (was 30): 30 only reached back ~2 weeks, so older closures
+      // were invisible to the conversion list forever.
+      .limit(500);
     grab(personal.data);
     if (crewIds.length > 0) {
       const crewRows = await supabaseAdmin
@@ -297,7 +302,7 @@ async function loadConvertibles(
         .gte("created_at", sinceIso)
         .in("crew_id", crewIds)
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(500);
       grab(crewRows.data);
     }
   } catch (e) {
@@ -309,7 +314,8 @@ async function loadConvertibles(
     if (rowsWithPayout.has(rentalId)) continue; // already a сверка row
     out.push({ rentalId, bikeName: info.bike, dateLabel: isoToDateLabel(info.at) });
   }
-  return out.slice(0, 5);
+  // 10 (was 5): the July-era rowless backlog alone is 13 rentals.
+  return out.slice(0, 10);
 }
 
 /** Page slice for the hub keyboard (the summary always covers ALL items). */
@@ -524,7 +530,22 @@ export async function markAllPayouts(chatId: string): Promise<{ count: number; s
 // ── Callback flow (payo_*) ───────────────────────────────────────────────────
 
 async function buildCardFor(rentalId: string, chatId: string): Promise<{ text: string; keyboard: any[][] } | { error: string }> {
-  const { row, payoutColumnMissing } = await loadRowById(rentalId);
+  let { row, payoutColumnMissing } = await loadRowById(rentalId);
+  if (!row) {
+    // Boss 2026-10-20: «we should be able to "сверять" already closed rentals»
+    // — a stale hub entry (row cleaned up later, or a pre-system closure that
+    // still floats in an old hub render) must CONVert, not dead-end: create
+    // the сверка on the fly and show the real card. Service/equipment docs
+    // answer with a polite refusal instead.
+    const heal = await selfHealVerificationRow(rentalId, chatId);
+    if (heal.healed) {
+      const fresh = await loadRowById(rentalId);
+      row = fresh.row;
+      payoutColumnMissing = payoutColumnMissing || fresh.payoutColumnMissing;
+    } else if (heal.message) {
+      return { error: heal.message };
+    }
+  }
   if (!row) return { error: "Сверка не найдена (аренда закрыта до ввода сверки)." };
   const item = buildPayoutItem(row, chatId);
   if (!item) return { error: "У этой аренды нет выплаты оператору." };

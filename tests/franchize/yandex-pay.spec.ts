@@ -205,3 +205,35 @@ describe("yandex-pay wiring", () => {
     expect(route).toContain("not_configured");
   });
 });
+
+// ── Review round (boss 2026-10-20: «codereview yandex pay, polish it») ──────
+describe("yandex-pay review polish", () => {
+  const fs = require("node:fs");
+  const read = (p: string) => fs.readFileSync(`${process.cwd()}/${p}`, "utf8");
+
+  it("metadata lookups key on order_id (snake) — camelCase orderId matched ZERO prod rows", () => {
+    const src = read("app/franchize/actions-runtime.ts");
+    expect(src).not.toContain('metadata->>orderId');
+    expect(src.match(/metadata->>order_id/g)?.length).toBe(2); // contract attach + ywp persist
+  });
+
+  it("QR sendPhoto only targets REAL telegram users (numeric id), QR fetch skipped otherwise", () => {
+    const src = read("app/franchize/actions-runtime.ts");
+    const block = src.slice(src.indexOf('payload.payment === "yandex_pay"'), src.indexOf("── Lead identity (boss-R1 fix 1"));
+    expect(block).toContain('/^\\d+$/.test(String(payload.telegramUserId))');
+    // the external QR fetch lives INSIDE the numeric-guard branch
+    expect(block.indexOf("fetchQrPngBuffer(pay.paymentUrl)")).toBeGreaterThan(
+      block.indexOf("/^\\d+$/.test(String(payload.telegramUserId))"),
+    );
+  });
+
+  it("rental page re-shows the stored payment QR (metadata.yandex_pay → RentalYandexPayCard, operator-only)", () => {
+    const page = read("app/franchize/[slug]/rental/[id]/page.tsx");
+    expect(page).toContain("rentalMeta?.yandex_pay?.payment_url");
+    expect(page).toContain("<RentalYandexPayCard");
+    expect(page).not.toContain("fetchQrDataUrl"); // no Yandex/QR calls on the server page
+    const card = read("app/franchize/components/RentalYandexPayCard.tsx");
+    expect(card).toContain("api.qrserver.com"); // same public renderer as the claim-QR card
+    expect(card).toContain("30 * 60 * 1000"); // ttl honesty (Merchant API ttl=1800s)
+  });
+});

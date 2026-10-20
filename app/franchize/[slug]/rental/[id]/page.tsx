@@ -65,6 +65,7 @@ import { RenterActionsPanel } from "../../../components/RenterActionsPanel";
 import { GuestRentalCta } from "../../../components/GuestRentalCta";
 import { RentalBikePhoto } from "../../../components/RentalBikePhoto";
 import { RentalQrCode } from "../../../components/RentalQrCode";
+import { RentalYandexPayCard } from "../../../components/RentalYandexPayCard";
 
 interface FranchizeRentalPageProps {
   params: Promise<{ slug: string; id: string }>;
@@ -537,6 +538,34 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
                 vehicleId={rental.vehicleId}
                 docSha256={rental.docSha256}
                 botUsername={crewBotUsername || ""}
+                accentColor={accent}
+                borderColor={borderSoft}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+              />
+            </FranchizeRentalRoleGuard>
+          )}
+
+          {/* Яндекс PAY re-show (boss 2026-10-19 «show/send it to renter along
+              with generated doc»): the checkout already persisted the payment
+              link in metadata.yandex_pay — this card re-shows the QR + link
+              WITHOUT calling the Yandex API again. Same operator-only guard as
+              the claim-QR card above. */}
+          {rental.found && typeof rentalMeta?.yandex_pay?.payment_url === "string" && rentalMeta.yandex_pay.payment_url && (
+            <FranchizeRentalRoleGuard
+              allowedRoles={["operator", "admin", "owner"]}
+              ownerId={rental.ownerId}
+              renterId={rental.renterId}
+              renterTelegramChatId={rental.renterTelegramChatId}
+              subrenterChatId={rental.subrenterChatId}
+              crewId={crew.id}
+              crewSlug={resolvedSlug}
+            >
+              <RentalYandexPayCard
+                paymentUrl={rentalMeta.yandex_pay.payment_url}
+                amountRub={typeof rentalMeta.yandex_pay.amount_rub === "number" ? rentalMeta.yandex_pay.amount_rub : null}
+                createdAt={typeof rentalMeta.yandex_pay.created_at === "string" ? rentalMeta.yandex_pay.created_at : null}
+                demo={rentalMeta.yandex_pay.demo === true}
                 accentColor={accent}
                 borderColor={borderSoft}
                 textPrimary={textPrimary}
