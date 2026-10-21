@@ -1,0 +1,151 @@
+{
+ "run_at": "2026-10-21T12:26:15.808798+00:00",
+ "tag": "task111-retro-finish",
+ "apply": true,
+ "inserted": [],
+ "patched": [
+  {
+   "rental_id": "e0fe8aa7-2e5c-40e1-bdd0-42957d28ad89",
+   "what": "vehicle black→red",
+   "ok": false
+  },
+  {
+   "rental_id": "bfb7c524-6180-4eaf-9fe2-0b29a83bfd74",
+   "what": "vehicle black→red",
+   "ok": false
+  }
+ ],
+ "uploads": [
+  {
+   "rental_id": "3f24ff4b-4422-4e5a-80e2-18266ed66f4e",
+   "path": "vip-bike/retro/dogovor_3_prokata_arendy_elektromotocikla_zero.docx"
+  },
+  {
+   "rental_id": "2304a4a1-2fa4-4424-b32c-223a8a4238cc",
+   "path": "vip-bike/retro/dogovor_arendy_elektromotocikla_falcon_gt_pro_chistyy_kopiya_kopiya.docx"
+  },
+  {
+   "rental_id": "1b84cde7-0303-43b7-b529-57d8abc05bb5",
+   "path": "vip-bike/retro/dogovor_arendy_elektromotocikla_falcon_gt_pro_chistyy_kopiya_kopiya.docx1.docx"
+  },
+  {
+   "rental_id": "46a0a4cf-08c6-4e5f-b9bf-f3bbc91a1d06",
+   "path": "vip-bike/retro/dogovor_arendy_elektromotocikla_ducati_panigale_chistyy_shkitin_m.o.docx"
+  },
+  {
+   "rental_id": "8d3dd4d8-235d-44c7-8417-15431f65dc1a",
+   "path": "vip-bike/retro/dogovor_arendy_elektromotocikla_ducati_panigale_chistyy_shkitin_m.o_kopiya.docx"
+  },
+  {
+   "rental_id": "3bfbe2a0-5c6b-4891-8f27-00e3bf240b58",
+   "path": "vip-bike/retro/dogovor_arendy_elektromotocikla_kawasaki_ex650k_chistyy_kopiya_kopiya.docx"
+  },
+  {
+   "rental_id": "c3e322c8-fa27-4811-9086-d035fc3a3cc5",
+   "path": "vip-bike/retro/rent-bmw-f800r-03.07.2026_fimin_maksim_.docx"
+  },
+  {
+   "rental_id": "0aeb3d99-726e-4c7e-b8ca-e64ff7f24689",
+   "path": "vip-bike/retro/rent-bmw-f800r-04.07.2026_loktev_dmitriy.docx"
+  },
+  {
+   "rental_id": "0aeb3d99-726e-4c7e-b8ca-e64ff7f24689",
+   "path": "vip-bike/retro/rent-bmw-f800r-04.07.2026_loktev_dmitriy_vosstanovlen_.docx"
+  },
+  {
+   "rental_id": "821b49cf-6deb-462c-a038-855a67aecfef",
+   "path": "vip-bike/retro/rent-bmw-f800r-10.07.2026_pavlikov_bmw_f800r.docx"
+  },
+  {
+   "rental_id": "821b49cf-6deb-462c-a038-855a67aecfef",
+   "path": "vip-bike/retro/rent-bmw-f800r-10.07.2026_pavlikov_bmw_f800r.docx_pavlikov.docx"
+  },
+  {
+   "rental_id": "bb42163b-cddb-4cec-8530-df397fc1d291",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-03.07.2026_sidorov_andrey.docx"
+  },
+  {
+   "rental_id": "30500682-a0a6-4a4e-9a46-fdaf70c771c3",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-03.07.2026_tomashevskiy_nektariy.docx"
+  },
+  {
+   "rental_id": "27376c21-173a-4737-a938-ed24daeb00ab",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-04.07.2026_grechkovskiy_sergey.docx"
+  },
+  {
+   "rental_id": "75a1117c-83f5-4ae2-91a2-31bf8f5d9628",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-04.07.2026_zavalenskiy.docx"
+  },
+  {
+   "rental_id": "e0fe8aa7-2e5c-40e1-bdd0-42957d28ad89",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-red-05.07.2026_chufyrkin.docx"
+  },
+  {
+   "rental_id": "e0fe8aa7-2e5c-40e1-bdd0-42957d28ad89",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-red-05.07.2026_chufyrkin.docx_chufyrkin.docx"
+  },
+  {
+   "rental_id": "bfb7c524-6180-4eaf-9fe2-0b29a83bfd74",
+   "path": "vip-bike/retro/rent-ducati-panigale-s-electro-red-08.07.2026.docx_halikova_diana.docx"
+  },
+  {
+   "rental_id": "694091de-39e2-476e-ae8c-8b86fc301aa0",
+   "path": "vip-bike/retro/rent-jilang-max-pro-03.07.2026.docx"
+  },
+  {
+   "rental_id": "d01a13ca-2438-4f10-a089-a4c2cd0edd85",
+   "path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-04.07.2026.docx"
+  },
+  {
+   "rental_id": "d01a13ca-2438-4f10-a089-a4c2cd0edd85",
+   "path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-04.07.2026.docx_novikov.docx"
+  },
+  {
+   "rental_id": "4c3a86e9-462e-4c8d-9a71-9971d5f97e26",
+   "path": "vip-bike/retro/rent-regulmoto-nibbler-300-4v-06.07.2026_shevchuk.docx"
+  },
+  {
+   "rental_id": "74e048cf-a404-4a3e-9a36-31e0fd77a845",
+   "path": "vip-bike/retro/rent-rerode-r1-10.07.2026_vorozheykin_stepan.docx"
+  },
+  {
+   "rental_id": "63e6cf8d-93a3-40da-8e40-7477446921df",
+   "path": "vip-bike/retro/rent-bike-kawasaki-ex650k-02.07.2026.docx"
+  },
+  {
+   "rental_id": "38ab65f2-5c80-4481-b14a-ec8003e9c2a4",
+   "path": "vip-bike/retro/rent-bike-kawasaki-ex650k-29.06.2026.docx_larin.docx"
+  },
+  {
+   "rental_id": "ddfe2ae5-15e3-41ae-a720-470225563685",
+   "path": "vip-bike/retro/dogovor_arendy_motocikla_suzuki_gsxs_1000f_chistyy_.docx_ne_chistyy.docx"
+  },
+  {
+   "rental_id": "7da7230b-fa9c-4013-8fd0-755604643a2a",
+   "path": "vip-bike/retro/dogovor_arendy_motocikla_nibbler_300.docx_aliev_amal.docx"
+  }
+ ],
+ "errors": [
+  {
+   "file": "Договор аренды электромотоцикла  Horwin CR1  20.05.2026 Мирощников С.В..docx",
+   "error": "{\"code\":\"23503\",\"details\":\"Key (vehicle_id)=(horwin-cr1) is not present in table \\\"cars\\\".\",\"hint\":null,\"message\":\"insert or update on table \\\"rentals\\\" violates foreign key constraint \\\"rentals_vehicle_id_fkey\\\"\"}"
+  },
+  {
+   "cars": "horwin-cr1",
+   "error": "{\"code\":\"23502\",\"details\":\"Failing row contains (horwin-cr1, Horwin, CR1, null, null, null, null, null, f, {\\\"hidden\\\": true, \\\"retro_note\\\": \\\"Майский флот 2026 (п..., null, bike, 2d5fde70-1dd3-4f0d-"
+  },
+  {
+   "cars": "ducati-panigale-s-electro-red",
+   "error": "{\"code\":\"23502\",\"details\":\"Failing row contains (ducati-panigale-s-electro-red, Ducati, Panigale S Electro Red, null, null, null, null, null, f, {\\\"hidden\\\": true, \\\"retro_note\\\": \\\"партнёрский Red Pa"
+  },
+  {
+   "file": "Договор аренды электромотоцикла  Horwin CR1  20.05.2026 Мирощников С.В..docx",
+   "error": "{\"code\":\"23503\",\"details\":\"Key (vehicle_id)=(horwin-cr1) is not present in table \\\"cars\\\".\",\"hint\":null,\"message\":\"insert or update on table \\\"rentals\\\" violates foreign key constraint \\\"rentals_vehicle_id_fkey\\\"\"}"
+  }
+ ],
+ "already_there": [
+  "Договор аренды электромотоцикла Ducati Panigale чистый Шкитин М.О.docx",
+  "Договор аренды электромотоцикла Ducati Panigale чистый Шкитин М.О — копия.docx",
+  "larin-dates-ok"
+ ]
+}

@@ -997,3 +997,24 @@ Stage Summary:
 - Retroimport ZIP завершён: 145/145 документов учтены (21 импорт + 5 skip по правилу «байк есть в cars» + остальные уже были в базе/шаблоны/тест-драйвы/продажи).
 - Сезонная статистика считается целиком из Supabase и корректна для любого crew; май/июнь больше не «rooky».
 - Хвосты для босса: 6 договоров с total_unknown (суммы проставить руками на странице аренды), Red Panigale можно завести в cars и перепривязать 2 аренды, 2 DK400-S и Horwin — вне парка.
+
+---
+Task ID: 111-monthly-stats-lightbox-retro-v2
+Agent: main (Claude)
+Task: Monthly rentals summary (May-Oct) + May/June doublecheck (boss: «isn't count too low? seems suspicious»); finish retro_backfill_v2 leftovers; map-riders lightbox ✕ fix.
+
+Work Log:
+- monthly_rentals.py (fresh fetch, agreed_start_date fallback created_at): May=4, Jun=7 vs Jul=33/Aug=83/Sep=109 → confirmed suspicious; gap = zip contracts not yet in DB (see tasks 112/113).
+- Reconciled this session's curated 24-row list against task113's 21 imported rows (fresh-DB idempotency pre-check) and FINISHED the leftovers:
+  - +3 rentals that task113 skipped «байка нет в cars»: Мирошников 20.05 (Horwin CR1), Шкитин 20.05 и Голубев 01.06 (Ducati Panigale) — для FK добавлены hidden cars rows (specs.hidden=true, quantity=0; cars required: description+image_url NOT NULL).
+  - Ларин №05.08/APRILIA: договор подписан 05.08 задним числом, но срок аренды по тексту — 29.06 18:30–20:30 → даты записи исправлены на 29.06 (июнь +6500 ₽, август -6500 ₽).
+  - Чуфыркин 05.07 и Халикова 08.07: в договоре ТС RED → добавлен hidden cars id ducati-panigale-s-electro-red, vehicle_id перепривязан с black.
+  - total_cost 0→null ×4 (Стерлягов/Воронцов/Кузовлев/Алиев — суммы в договорах не зафиксированы; 0 искажал средний чек).
+  - Хвосты task113 закрыты: «Red Panigale в cars» — сделано; «2 DK400-S и Horwin вне парка» — заведены hidden.
+- Storage: canonical 145-doc архив task113 сохранён; 18 дублей этого сеанса удалены (точное совпадение размера+имени), 24/24 retro-арендам проставлен metadata.doc_storage_paths → canonical-объекты (retro_storage_dedupe.py / retro_storage_relink.py). manifest: scripts/season-2026/retro_backfill_v2_manifest.json.
+- Итог по месяцам (agreed_start_date): May 4→10, Jun 7→9 (+6 500 ₽), Jul 33→49 (+179 500 ₽), Aug 83 (без Ларина), Sep 109. Всего в БД 308 rentals, из них 24 retro_backfill_v2.
+- map-riders lightbox ✕ (PC, clicks go through to map): воспроизведён headless (dev server + agent-browser). Root cause: Radix DismissableLayer (disableOutsidePointerEvents) ставит body.style.pointerEvents='none' и восстанавливает только на чистом unmount — при ошибке жизненного цикла body остаётся «none», body-порталы наследуют, MapPhotoLightbox становится click-прозрачным (elementFromPoint на ✕ возвращал <html>). Fix: явный pointerEvents:auto на корнях фуллскрин-порталов (MapPhotoLightbox, PhotoLightbox стены, route-replay оверлей шита) — тот же приём, что у Radix DialogOverlay. Проверено: ✕ кликается, клик закрывает, клик по фону закрывает — при stuck body pe=none.
+
+Stage Summary:
+- Ретро-импорт доведён до конца: 24 retro_backfill_v2 аренды, все документы в storage связаны с записями, дубли удалены, май/июнь больше не «rooky» (10/9), сезон по деньгам ~+186 000 ₽ к состоянию task113.
+- Lightbox fix: fix(map-riders) commit в этом же пуше.
