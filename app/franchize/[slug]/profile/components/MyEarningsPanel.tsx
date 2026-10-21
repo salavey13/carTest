@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, RotateCw, Send, Users, Wallet } from "lucide-react";
+import { Calendar, PiggyBank, RotateCw, Send, Users, Wallet } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FranchizeOperatorPanel } from "@/app/franchize/components/FranchizeOperatorSurface";
 import { formatDateRu } from "@/app/franchize/components/DateInputRu";
@@ -26,6 +26,13 @@ import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-v
 // — the same buckets the Telegram payout hub (/payouts) shows. The hub is the
 // write surface (mark paid out); the web strip is read-only truth.
 import { getMyPayoutSummaryAction } from "@/app/franchize/server-actions/rental-payout-actions";
+// Task 117: КОПИЛКА КОМАНДЫ — crew-wide ledger + owner-side payout marking
+// (the stamps live in the same payout jsonb the bot hub writes).
+import {
+  getCrewPayoutLedgerAction,
+  markCrewPayoutAction,
+} from "@/app/franchize/server-actions/rental-payout-actions";
+import type { CrewPayoutLedgerView } from "@/app/franchize/lib/rental-payout-core";
 import { buildStartLink } from "@/app/franchize/lib/onboarding/payload-parser";
 import { formatCurrency, itemVariants, type CrewTokens } from "./profile-shared";
 
@@ -145,6 +152,16 @@ export function MyEarningsPanel({
   // pre-feature crews see zero new UI (the task-101 lesson).
   const [payoutSummary, setPayoutSummary] = useState<PayoutSummaryView | null>(null);
 
+  // Task 117: КОПИЛКА КОМАНДЫ modal (owner-tier) — crew-wide ledger + the
+  // «отметить выплаченным» actions. Optimistic-free: every mark refetches
+  // the ledger (money surface — the row must SHOW its new state).
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [ledger, setLedger] = useState<CrewPayoutLedgerView | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [ledgerNotice, setLedgerNotice] = useState<string | null>(null);
+  const [markingIds, setMarkingIds] = useState<Set<string>>(new Set());
+
   // Task 77: TG salary report delivery state (self-service — the action
   // enforces owner-or-self server-side; here it is always self).
   const [tgReportState, setTgReportState] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -186,6 +203,46 @@ export function MyEarningsPanel({
       }
     },
     [slug, verifyingIds],
+  );
+
+  // Task 117: КОПИЛКА КОМАНДЫ — fetch + mark handlers (owner-tier).
+  const fetchLedger = useCallback(async () => {
+    setLedgerLoading(true);
+    setLedgerError(null);
+    setLedgerNotice(null);
+    try {
+      const res = await getCrewPayoutLedgerAction({ slug });
+      if (res.success && res.data) setLedger(res.data);
+      else setLedgerError(res.error || "Не удалось загрузить копилку команды");
+    } catch {
+      setLedgerError("Не удалось загрузить копилку команды");
+    }
+    setLedgerLoading(false);
+  }, [slug]);
+
+  const handleMarkPayout = useCallback(
+    async (rentalId: string, mark: boolean) => {
+      if (markingIds.has(rentalId)) return;
+      setMarkingIds((prev) => new Set(prev).add(rentalId));
+      try {
+        const res = await markCrewPayoutAction({ slug, rentalId, mark });
+        if (res.success && res.data?.ok) {
+          setLedgerNotice(mark ? "Выплата записана в копилку команды 💰" : "Возвращено в ожидание ↩️");
+          await fetchLedger(); // refetch — the row must SHOW its new state
+        } else {
+          setLedgerNotice(res.data?.error || res.error || "Не удалось сохранить отметку");
+        }
+      } catch {
+        setLedgerNotice("Не удалось сохранить отметку");
+      } finally {
+        setMarkingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(rentalId);
+          return next;
+        });
+      }
+    },
+    [slug, markingIds, fetchLedger],
   );
 
   const handleSendTgReport = async () => {
@@ -363,7 +420,7 @@ export function MyEarningsPanel({
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
-                <p className="text-[10px]" style={{ color: T.textMuted }}>✅ К выплате</p>
+                <p className="text-[10px]" style={{ color: T.textMuted }}>✅ Сверено · к выплате</p>
                 <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
                   {formatCurrency(payoutSummary.toPay.sum)}
                 </p>
@@ -384,6 +441,11 @@ export function MyEarningsPanel({
                 <p className="text-[10px]" style={{ color: T.textMuted }}>{payoutSummary.paid.count} ар.</p>
               </div>
             </div>
+            {/* Task 117: the boss's rule — сверка covers RENTALS only, shifts
+                stay on the old rails (no confirm step, no payout marking). */}
+            <p className="mt-2 text-[10px]" style={{ color: T.textMuted }}>
+              Сверка только по арендам. Смены не сверяются — считаются как раньше (блок «За смены» ниже).
+            </p>
           </div>
         ) : null}
 
@@ -394,28 +456,48 @@ export function MyEarningsPanel({
               📅 Период расчёта
             </p>
             {teamSalariesVisible ? (
-              <button
-                onClick={() => void fetchTeamEarnings()}
-                disabled={teamEarningsLoading}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
-                style={{
-                  backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
-                  color: T.accent,
-                  border: `1px solid ${T.borderSoft}`,
-                }}
-              >
-                {teamEarningsLoading ? (
-                  <>
-                    <RotateCw className="h-3 w-3 animate-spin" />
-                    Загрузка...
-                  </>
-                ) : (
-                  <>
-                    <Users className="h-3 w-3" />
-                    Зарплаты команды
-                  </>
-                )}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Task 117: КОПИЛКА КОМАНДЫ — the crew-wide payout ledger with
+                    the owner-side «отметить выплаченным» actions. */}
+                <button
+                  onClick={() => {
+                    setShowLedgerModal(true);
+                    void fetchLedger();
+                  }}
+                  disabled={ledgerLoading}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                    color: T.accent,
+                    border: `1px solid ${T.borderSoft}`,
+                  }}
+                >
+                  <PiggyBank className="h-3 w-3" />
+                  Копилка команды
+                </button>
+                <button
+                  onClick={() => void fetchTeamEarnings()}
+                  disabled={teamEarningsLoading}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+                  style={{
+                    backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 15%, transparent)",
+                    color: T.accent,
+                    border: `1px solid ${T.borderSoft}`,
+                  }}
+                >
+                  {teamEarningsLoading ? (
+                    <>
+                      <RotateCw className="h-3 w-3 animate-spin" />
+                      Загрузка...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-3 w-3" />
+                      Зарплаты команды
+                    </>
+                  )}
+                </button>
+              </div>
             ) : null}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -948,6 +1030,19 @@ export function MyEarningsPanel({
           error={teamEarningsError}
           T={T}
         />
+        {/* Task 117: КОПИЛКА КОМАНДЫ — the owner's money board. */}
+        <CrewPayoutLedgerModal
+          open={showLedgerModal}
+          onOpenChange={setShowLedgerModal}
+          ledger={ledger}
+          loading={ledgerLoading}
+          error={ledgerError}
+          notice={ledgerNotice}
+          markingIds={markingIds}
+          onMark={handleMarkPayout}
+          onRetry={fetchLedger}
+          T={T}
+        />
       </FranchizeOperatorPanel>
     </motion.div>
   );
@@ -1133,6 +1228,216 @@ function TeamEarningsModal({
               Нет данных о зарплатах за выбранный период
             </div>
           ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Task 117: КОПИЛКА КОМАНДЫ (owner-only payout ledger modal) ───────────────
+//
+// The boss's money board: per-operator piggy banks (счёт), the actionable
+// «к выплате» list with mark-paid buttons, and the paid archive. Every mark
+// writes an entry into the row's payout journal (the same jsonb the Telegram
+// hub writes) — the ledger IS those entries, so both surfaces always agree.
+
+function CrewPayoutLedgerModal({
+  open,
+  onOpenChange,
+  ledger,
+  loading,
+  error,
+  notice,
+  markingIds,
+  onMark,
+  onRetry,
+  T,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  ledger: CrewPayoutLedgerView | null;
+  loading: boolean;
+  error: string | null;
+  notice: string | null;
+  markingIds: Set<string>;
+  onMark: (rentalId: string, mark: boolean) => void;
+  onRetry: () => void;
+  T: CrewTokens;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-h-[90dvh] max-w-2xl w-[calc(100vw_-_2rem)] overflow-y-auto p-4 sm:p-6"
+        style={{ backgroundColor: T.bgCard, borderColor: T.borderSoft }}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2" style={{ color: T.text }}>
+            <PiggyBank className="h-5 w-5" style={{ color: T.accent }} />
+            🏦 Копилка команды
+          </DialogTitle>
+        </DialogHeader>
+        <div className="min-w-0 space-y-3">
+          {error && (
+            <div className="rounded px-3 py-2 text-sm" style={{ backgroundColor: "color-mix(in srgb, #ef4444 12%, transparent)", color: "#ef4444" }}>
+              ⚠️ {error}
+            </div>
+          )}
+          {notice && (
+            <div className="rounded px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 10%, transparent)", color: T.accent }}>
+              {notice}
+            </div>
+          )}
+
+          {loading && (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded" style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }} />
+              ))}
+            </div>
+          )}
+
+          {!loading && ledger && (
+            <>
+              {/* Crew totals */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>✅ К выплате</p>
+                  <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                    {formatCurrency(ledger.totals.toPay.sum)}
+                  </p>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>{ledger.totals.toPay.count} ар.</p>
+                </div>
+                <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>⏳ Не сверено</p>
+                  <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                    {formatCurrency(ledger.totals.unverified.sum)}
+                  </p>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>{ledger.totals.unverified.count} ар.</p>
+                </div>
+                <div className="rounded-md border p-2" style={{ borderColor: T.borderSoft }}>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>🏦 Выплачено</p>
+                  <p className="text-sm font-bold tabular-nums" style={{ color: T.text }}>
+                    {formatCurrency(ledger.totals.paid.sum)}
+                  </p>
+                  <p className="text-[10px]" style={{ color: T.textMuted }}>{ledger.totals.paid.count} ар.</p>
+                </div>
+              </div>
+
+              {/* Per-operator piggy banks (the game score per human) */}
+              {ledger.operators.length > 0 && (
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft }}>
+                  <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
+                    🏅 Счёт операторов (свернутые бонусы)
+                  </p>
+                  <div className="space-y-1.5">
+                    {ledger.operators.map((op) => (
+                      <div
+                        key={op.chatId}
+                        className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs"
+                        style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 8%, transparent)" }}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium" style={{ color: T.text }}>{op.label}</p>
+                          <p className="text-[10px]" style={{ color: T.textMuted }}>
+                            {op.verifiedCount} ар. · выплачено {formatCurrency(op.paidSum)} · к выплате {formatCurrency(op.toPaySum)}
+                          </p>
+                        </div>
+                        <span className="shrink-0 font-mono text-sm font-bold tabular-nums" style={{ color: T.accent }}>
+                          {formatCurrency(op.verifiedSum)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actionable: verified but unpaid */}
+              <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft }}>
+                <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
+                  💸 К выплате — отметь после передачи денег ({ledger.unpaid.length})
+                </p>
+                {ledger.unpaid.length === 0 ? (
+                  <p className="py-2 text-xs" style={{ color: T.textMuted }}>
+                    Всё выплачено — новая сверка появится после закрытия следующей аренды.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {ledger.unpaid.map((e) => (
+                      <div key={e.rentalId} className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 6%, transparent)" }}>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium" style={{ color: T.text }}>
+                            {e.bikeName} · {e.dateLabel}
+                            {e.adjusted ? " · скорректирована" : ""}
+                          </p>
+                          <p className="text-[10px]" style={{ color: T.textMuted }}>{e.operatorLabel}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="font-mono font-bold tabular-nums" style={{ color: T.accent }}>{formatCurrency(e.amount)}</span>
+                          <button
+                            onClick={() => onMark(e.rentalId, true)}
+                            disabled={markingIds.has(e.rentalId)}
+                            className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:opacity-85 disabled:opacity-50"
+                            style={{ backgroundColor: T.accent, color: T.accentContrast }}
+                          >
+                            {markingIds.has(e.rentalId) ? "..." : "💸 Выплачено"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Paid archive (the «записи в копилке») */}
+              {ledger.paidLog.length > 0 && (
+                <div className="rounded-lg border p-3" style={{ borderColor: T.borderSoft }}>
+                  <p className="mb-2 text-xs font-semibold" style={{ color: T.textMuted }}>
+                    🏦 Записи в копилке — выплачено ({ledger.paidLog.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {ledger.paidLog.slice(0, 20).map((e) => (
+                      <div key={e.rentalId} className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs" style={{ backgroundColor: "color-mix(in srgb, #10b981 8%, transparent)" }}>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium" style={{ color: T.text }}>
+                            {e.bikeName} · {e.operatorLabel}
+                          </p>
+                          <p className="text-[10px]" style={{ color: T.textMuted }}>
+                            {e.markedAt ? new Date(e.markedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                            {e.markedByLabel ? ` · отметил ${e.markedByLabel}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="font-mono font-bold tabular-nums" style={{ color: "#10b981" }}>+{formatCurrency(e.amount)}</span>
+                          <button
+                            onClick={() => onMark(e.rentalId, false)}
+                            disabled={markingIds.has(e.rentalId)}
+                            className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:opacity-85 disabled:opacity-50"
+                            style={{ border: `1px solid ${T.borderSoft}`, color: T.textMuted }}
+                          >
+                            {markingIds.has(e.rentalId) ? "..." : "↩️"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px]" style={{ color: T.textMuted }}>
+                  Записи хранятся в сверке каждой аренды. Смены не сверяются.
+                </p>
+                <button
+                  onClick={onRetry}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition hover:opacity-85"
+                  style={{ border: `1px solid ${T.borderSoft}`, color: T.accent }}
+                >
+                  <RotateCw className="h-3 w-3" />
+                  Обновить
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

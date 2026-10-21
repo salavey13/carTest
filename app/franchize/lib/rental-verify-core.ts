@@ -68,6 +68,59 @@ export interface RentalVerificationSnapshot {
     checked_at?: string;
     checker?: string;
   };
+  /**
+   * Task 117 — RICH DM: the rental window as frozen at request time.
+   * Optional: rows created before task117 have none (the DM degrades).
+   */
+  rentalWindow?: {
+    startIso: string | null;
+    endIso: string | null;
+    /** Charged hours (0 when unknown). */
+    hours: number;
+    /** Charged days for ≥24h rentals, else 0. */
+    days: number;
+    /** «6 суток» / «5 ч» / «—» — pre-formatted at freeze time. */
+    durationLabel: string;
+  };
+  /**
+   * Task 117 — RICH DM: the full commission formula, frozen so the numbers
+   * both parties saw are the numbers the state machine verified. Every value
+   * is digit-equal to computeRentalSalary's inputs (one canon — see
+   * standardRentalPriceDetailed). Optional: pre-task117 rows degrade to the
+   * plain 3-line breakdown.
+   */
+  formula?: {
+    /** True when dates/specs were unusable → baseline = client price → наценка 0. */
+    fallback: boolean;
+    /** Bike ladder price (мот-часть эталона). */
+    bikeStandard: number;
+    /** «6 суток · тариф 2–4 дня» / «Почасово» — what the ladder charged. */
+    bikeTierLabel: string | null;
+    /** Per-day tier rate (or hourly rate for <24h). */
+    bikeRate: number | null;
+    /** Charged days (0 = hourly). */
+    bikeDays: number;
+    /** Charged hours for hourly rentals (0 = daily+). */
+    bikeHours: number;
+    /** Per-unit gear lines («1 шлем — 1 000 ₽»), digit-equal equipmentStandardCost. */
+    gearLines: string[];
+    /** Flat standard gear cost (the overprice baseline gear part). */
+    gearStandard: number;
+    /** bikeStandard + gearStandard. */
+    standardTotal: number;
+    /** What the client actually paid (rentals.total_cost). */
+    clientTotal: number;
+    /** max(0, clientTotal − standardTotal) — what onценка pays from. */
+    markup: number;
+    /** Crew coefficients used (the legend): ₽/closed rental for the category. */
+    baseCoef: number;
+    /** ₽ per equipment unit. */
+    equipmentUnitCoef: number;
+    /** % of markup. */
+    overpricePercent: number;
+  };
+  /** Task 117: bike main photo (cars.image_url) — sent as a preview photo. */
+  bikePhotoUrl?: string | null;
 }
 
 export interface RentalVerificationRow {
@@ -211,9 +264,78 @@ export function labelFromUsersMap(
 }
 
 /**
+ * Task 117 — MSK timestamp for the DM date line (pure: Intl handles the TZ).
+ * «12.10 15:30» — compact, the format every crew chat already reads.
+ */
+export function formatMskShort(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const parts = new Intl.DateTimeFormat("ru-RU", {
+      timeZone: "Europe/Moscow",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
+    return `${get("day")}.${get("month")} ${get("hour")}:${get("minute")}`;
+  } catch {
+    return "";
+  }
+}
+
+/** ru tier label for the formula block (pure mirror of PricingTier values). */
+export function bikeTierLabelRu(
+  tier: string | null | undefined,
+  days: number,
+  hours: number,
+): string {
+  switch (tier) {
+    case "multi-day-11-30":
+      return `тариф 11–30 дней`;
+    case "multi-day-5-10":
+      return `тариф 5–10 дней`;
+    case "multi-day-2-4":
+      return `тариф 2–4 дня`;
+    case "daily":
+      return `суточный тариф`;
+    case "hourly":
+    case "3-hours":
+    case "3-6-hours":
+    case "6-hours":
+    case "6-12-hours":
+    case "12-hours":
+    case "extended-hours":
+      return `почасовой тариф`;
+    default:
+      return days > 0 ? `${days} ${days === 1 ? "сутки" : "суток"}` : hours > 0 ? `${hours} ч` : "каталог";
+  }
+}
+
+/** Audit-grade badge line for the DM (task117 — «нажать окей без сомнений»). */
+export function auditGradeLine(audit?: { grade: "fine" | "almost" | "sus"; notes: string[] }): string | null {
+  if (!audit) return null;
+  if (audit.grade === "fine") return `🧾 Аудит: ✅ всё чисто`;
+  const notes = (audit.notes || []).filter(Boolean).slice(0, 2).join("; ");
+  return notes
+    ? `🧾 Аудит: ${audit.grade === "almost" ? "⚠️ есть замечания" : "🚨 подозрительно"} — ${escapeVerifyHtml(notes)}`
+    : `🧾 Аудит: ${audit.grade === "almost" ? "⚠️ есть замечания" : "🚨 подозрительно"}`;
+}
+
+/**
  * Builds the HTML summary both parties receive. Same numbers as the profile
  * TL;DR rows (техника · экип · нац. split) — the operator recognizes the
  * format, the owner gets the audit trail (damage, penalty, deposit, notes).
+ *
+ * Task 117 — RICH DM: adds the rental window (dates + duration), the full
+ * «откуда цифры» formula (ladder tier × rate + flat gear baseline + markup%),
+ * the crew coefficient legend and the operator's verified score — so the
+ * recipient can press ✅ from the message alone, without digging for
+ * coefficients. Everything degrades to the old compact view for rows frozen
+ * before task117 (optional fields absent).
  */
 export function formatVerificationSummary(params: {
   crewName: string | null;
@@ -222,6 +344,8 @@ export function formatVerificationSummary(params: {
   operatorChatId: string | null;
   ownerChatId: string | null;
   statusNote: string;
+  /** Task 117: the operator's confirmed-bonus score (копилка) to display. */
+  operatorScore?: { sum: number; count: number } | null;
 }): string {
   const { snapshot: s } = params;
   const bike = escapeVerifyHtml(s.bikeName || "байк");
@@ -229,17 +353,73 @@ export function formatVerificationSummary(params: {
     `🤝 <b>Сверка аренды</b> — ${escapeVerifyHtml(params.crewName || "экипаж")}`,
     ``,
     `🛵 ${bike} · ${escapeVerifyHtml(s.rentalCategoryLabel)}`,
-    `💵 Сумма аренды (клиент): <b>${formatRubVerify(s.totalCost)}</b>`,
-    ``,
-    `📊 <b>Комиссия оператора: ${formatRubVerify(s.total)}</b>`,
-    `  • техника (${escapeVerifyHtml(s.rentalCategoryLabel)}): +${formatRubVerify(s.base)}`,
+  ];
+
+  // ── Task 117: rental window ──
+  const win = s.rentalWindow;
+  if (win && (win.startIso || win.endIso)) {
+    const from = formatMskShort(win.startIso);
+    const to = formatMskShort(win.endIso);
+    const dur = win.durationLabel && win.durationLabel !== "—" ? ` · ${escapeVerifyHtml(win.durationLabel)}` : "";
+    lines.push(`📅 ${from || "—"} → ${to || "—"}${dur}`);
+  } else if (win && win.durationLabel && win.durationLabel !== "—") {
+    lines.push(`📅 ${escapeVerifyHtml(win.durationLabel)}`);
+  }
+  lines.push(`💵 Сумма аренды (клиент): <b>${formatRubVerify(s.totalCost)}</b>`, ``);
+
+  lines.push(`📊 <b>Комиссия оператора: ${formatRubVerify(s.total)}</b>`);
+  lines.push(`  • техника (${escapeVerifyHtml(s.rentalCategoryLabel)}): +${formatRubVerify(s.base)}`);
+  lines.push(
     s.equipment > 0
       ? `  • экипировка${s.equipmentFlags ? ` (${escapeVerifyHtml(s.equipmentFlags)})` : ""}: +${formatRubVerify(s.equipment)}`
       : `  • экипировка: нет`,
+  );
+  lines.push(
     s.overprice > 0
       ? `  • наценка (${s.overpricePercent}%): +${formatRubVerify(s.overprice)}`
       : `  • наценка: нет`,
-  ];
+  );
+
+  // ── Task 117: «откуда цифры» — the full formula ──
+  const f = s.formula;
+  if (f && !f.fallback && f.standardTotal > 0) {
+    lines.push(``, `🧮 <b>Откуда цифры</b>`);
+    if (f.bikeHours > 0 && f.bikeDays === 0) {
+      lines.push(`  🏍 мот: ${f.bikeHours} ч × ${formatRubVerify(f.bikeRate || 0)} = ${formatRubVerify(f.bikeStandard)}`);
+    } else {
+      lines.push(
+        `  🏍 мот: ${f.bikeDays} ${f.bikeDays === 1 ? "сутки" : "суток"} × ${formatRubVerify(f.bikeRate || 0)}${
+          f.bikeTierLabel ? ` (${escapeVerifyHtml(f.bikeTierLabel)})` : ""
+        } = ${formatRubVerify(f.bikeStandard)}`,
+      );
+    }
+    if (f.gearLines.length > 0) {
+      lines.push(`  🧰 экип по прайсу: ${f.gearLines.map((l) => escapeVerifyHtml(l)).join(" · ")} = ${formatRubVerify(f.gearStandard)}`);
+    } else {
+      lines.push(`  🧰 экип по прайсу: нет`);
+    }
+    lines.push(`  ↳ эталон: ${formatRubVerify(f.standardTotal)} · клиент: ${formatRubVerify(f.clientTotal)} → наценка ${formatRubVerify(f.markup)}`);
+    if (s.overprice > 0) {
+      lines.push(`  ↳ наценка: ${formatRubVerify(f.markup)} × ${f.overpricePercent}% = ${formatRubVerify(s.overprice)}`);
+    }
+    lines.push(
+      `  📜 коэф.: мот ${formatRubVerify(f.baseCoef)}/аренда · экип ${formatRubVerify(f.equipmentUnitCoef)}/ед · наценка ${f.overpricePercent}%`,
+    );
+    lines.push(`  ℹ️ экип клиенту: 1-е сутки полная цена, дальше — половина; мот: тариф зависит от длительности`);
+  }
+
+  // ── Task 117: the operator's score (копилка) ──
+  if (params.operatorScore) {
+    const opLabel = escapeVerifyHtml(labelFromUsersMap(params.usersMap, params.operatorChatId || s.attribution?.createdByChatId));
+    lines.push(
+      ``,
+      `🏅 Счёт ${opLabel}: <b>${formatRubVerify(params.operatorScore.sum)}</b> подтверждено (${params.operatorScore.count} ар.)`,
+    );
+  }
+
+  // ── Task 117: audit grade (frozen at request) ──
+  const auditLine = auditGradeLine(s.audit);
+  if (auditLine) lines.push(auditLine);
 
   const attrs = [
     s.attribution.createdByChatId

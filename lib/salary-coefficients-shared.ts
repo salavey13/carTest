@@ -334,6 +334,92 @@ export function countEquipmentUnits(eq: RentalEquipment | null | undefined): num
 }
 
 /**
+ * Task 117 — STANDARD GEAR PRICE LINES (pure, client-safe).
+ * Per-unit «эталонная» price lines for the verification DM formula block.
+ * MUST stay digit-equal with equipmentStandardCost (lib/salary-coefficients.ts):
+ * helmets 1000, gloves 500, everything else 500, charger free/absent.
+ * Each line = one merged group (e.g. «2 шлема — 2 000 ₽»).
+ */
+export interface EquipmentStandardLine {
+  label: string;
+  units: number;
+  sum: number;
+}
+
+const GEAR_STD_PRICE: Record<string, number> = {
+  helmets: 1000,
+  gloves: 500,
+  jacket: 500,
+  pants: 500,
+  boots: 500,
+  net: 500,
+  backpack: 500,
+};
+
+const GEAR_STD_LABEL_ONE: Record<string, string> = {
+  helmets: "шлем",
+  gloves: "пара перчаток",
+  jacket: "куртка",
+  pants: "пара штанов",
+  boots: "бот",
+  net: "сетка",
+  backpack: "рюкзак",
+};
+
+/** ru plural: 1 шлем / 2 шлема / 5 шлемов (gloves get their own label shape). */
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+export function equipmentStandardLines(eq: RentalEquipment | null | undefined): EquipmentStandardLine[] {
+  if (!eq) return [];
+  const lines: EquipmentStandardLine[] = [];
+  const push = (key: string, units: number) => {
+    const n = Math.max(0, Number(units) || 0);
+    if (!n) return;
+    const price = GEAR_STD_PRICE[key];
+    const one = GEAR_STD_LABEL_ONE[key];
+    // «пара …» labels are already plural-shaped — pluralize only the numeral
+    // word (пара/пары/пар) for them; everything else uses noun plurals.
+    if (one.startsWith("пара ")) {
+      const noun = one.slice("пара ".length);
+      const label = `${n} ${pluralRu(n, "пара", "пары", "пар")} ${noun}`;
+      lines.push({ label, units: n, sum: n * price });
+      return;
+    }
+    const label = `${n} ${pluralRu(n, one, `${one}а`, `${one}ов`)}`;
+    lines.push({ label, units: n, sum: n * price });
+  };
+  push("helmets", eq.helmets);
+  push("gloves", eq.gloves);
+  if (eq.jacket) push("jacket", 1);
+  if (eq.pants) push("pants", 1);
+  if (eq.boots) push("boots", 1);
+  if (eq.net) push("net", 1);
+  if (eq.backpack) push("backpack", 1);
+  return lines;
+}
+
+/** ru plural for days: 1 сутки / 2 суток / 21 сутки (нет единственного числа). */
+export function daysLabelRu(n: number): string {
+  const d = Math.max(0, Math.floor(Number(n) || 0));
+  const mod10 = d % 10;
+  const mod100 = d % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? "сутки" : "суток";
+  return `${d} ${word}`;
+}
+
+/** ru plural for hours: 1 час / 2 часа / 5 часов. */
+export function hoursLabelRu(n: number): string {
+  const h = Math.round(Number(n) || 0);
+  return `${h} ${pluralRu(h, "час", "часа", "часов")}`;
+}
+
+/**
  * Compact ru equipment flags — same idiom as the CSV «Экип» column
  * («1шл+1перч+курт»). Task 101: moved HERE from salary-category-bonuses.ts
  * (pure, zero deps) so the rental-verify lib can share it without a circular

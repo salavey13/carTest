@@ -1520,7 +1520,7 @@ export async function confirmVehicleReturn(
         // ── Fetch rental + vehicle for closure flow ────────────────────────────
         const { data: rental, error: fetchError } = await supabaseAdmin
             .from('rentals')
-            .select('rental_id, owner_id, user_id, crew_id, vehicle_id, metadata, total_cost, agreed_end_date, agreed_start_date, vehicle:cars(make, model, id, specs)')
+            .select('rental_id, owner_id, user_id, crew_id, vehicle_id, metadata, total_cost, agreed_end_date, agreed_start_date, start_photo_count, end_photo_count, vehicle:cars(make, model, id, specs)')
             .eq('rental_id', rentalId)
             .maybeSingle();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
@@ -1954,11 +1954,21 @@ export async function confirmVehicleReturn(
             const { grantRentalClosureAchievements } = await import(
                 "@/app/franchize/server-actions/rental-achievements"
             );
+            // Task 117: the full documentation picture — odometer BEFORE comes
+            // from the rental metadata (written at pickup freeze), photo counts
+            // from the rental columns. «Идеальная» = пробег до/после + фото до/после.
+            const closureMeta = (rental.metadata || {}) as Record<string, unknown>;
             await grantRentalClosureAchievements({
                 rentalId,
                 actingUserId: userId,
                 closureData: {
                     odometerAfter: closureData?.odometerAfter ?? null,
+                    odometerBefore:
+                        typeof closureMeta.odometer_before === "number"
+                            ? (closureMeta.odometer_before as number)
+                            : null,
+                    startPhotoCount: (rental as any).start_photo_count ?? null,
+                    endPhotoCount: (rental as any).end_photo_count ?? null,
                     depositReturned: closureData?.depositReturned ?? null,
                     damageLevel:
                         (closureData as any)?.damageLevel ?? null,

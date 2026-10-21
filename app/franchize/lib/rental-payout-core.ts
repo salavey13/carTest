@@ -586,3 +586,137 @@ export function formatPayoutNotifyText(params: {
         `${actor} вернул отметку выплаты — сумма снова в счётчике «К выплате».`,
       ].join("\n");
 }
+
+// ── Task 117: КОПИЛКА КОМАНДЫ (crew-wide payout ledger, pure half) ──────────
+//
+// Boss: «в профиле владельца можно помечать подтверждённые как выплаченные,
+// с соответствующими записями в копилке команды». The per-row payout stamp
+// (payout jsonb → log[]) IS the ledger entry — this view aggregates it
+// crew-wide: per-operator piggy bank lines + the actionable «к выплате»
+// list + the paid archive. Marking itself goes through stampRentalPayout
+// (canMarkPayout enforces operator-party / owner-tier rights server-side).
+
+/** One entry of the crew payout ledger (a verified commission row). */
+export interface CrewPayoutLedgerEntry {
+  rentalId: string;
+  bikeName: string;
+  /** The tracked money: agreed split when corrected, else snapshot total. */
+  amount: number;
+  operatorChatId: string | null;
+  operatorLabel: string;
+  dateLabel: string;
+  /** ISO of the payout stamp (paid rows) — null for unpaid. */
+  markedAt: string | null;
+  markedByLabel: string | null;
+  adjusted: boolean;
+}
+
+/** Per-operator piggy bank (the game score per human). */
+export interface CrewOperatorMoney {
+  chatId: string;
+  label: string;
+  /** Verified commissions total (счёт). */
+  verifiedSum: number;
+  verifiedCount: number;
+  /** Already stamped paid. */
+  paidSum: number;
+  paidCount: number;
+  /** Verified but not yet paid (к выплате). */
+  toPaySum: number;
+  toPayCount: number;
+}
+
+export interface CrewPayoutLedgerView {
+  crewSlug: string | null;
+  totals: {
+    toPay: PayoutBucket;
+    paid: PayoutBucket;
+    unverified: PayoutBucket;
+  };
+  operators: CrewOperatorMoney[];
+  /** verified && !paid — the owner marks these from the profile. */
+  unpaid: CrewPayoutLedgerEntry[];
+  /** verified && paid — the archive (log visually newest-first). */
+  paidLog: CrewPayoutLedgerEntry[];
+  payoutColumnMissing: boolean;
+}
+
+/**
+ * Aggregate crew-wide verification rows into the ledger view. `labelOf`
+ * renders @username/full-name labels (server half feeds the users map);
+ * rows missing money (non-payout rows) are skipped exactly like the hub.
+ */
+export function buildCrewPayoutLedger(
+  rows: PayoutSourceRow[],
+  params: { crewSlug: string | null; labelOf: (chatId: string | null | undefined) => string; payoutColumnMissing?: boolean },
+): CrewPayoutLedgerView {
+  const view: CrewPayoutLedgerView = {
+    crewSlug: params.crewSlug,
+    totals: { toPay: { sum: 0, count: 0 }, paid: { sum: 0, count: 0 }, unverified: { sum: 0, count: 0 } },
+    operators: [],
+    unpaid: [],
+    paidLog: [],
+    payoutColumnMissing: params.payoutColumnMissing === true,
+  };
+  const byOperator = new Map<string, CrewOperatorMoney>();
+
+  for (const row of rows) {
+    if (!row || !row.rental_id) continue;
+    if (!isPayoutRow(row)) continue; // boss's own cash never enters the ledger
+    const snap = (row.snapshot || {}) as Record<string, unknown>;
+    const { amount, adjusted } = commissionOf(row);
+    const opChatId = row.operator_chat_id ? String(row.operator_chat_id) : null;
+    const opLabel = params.labelOf(opChatId);
+    const payout = parsePayoutInfo(row.payout);
+    const paid = payout.operator?.marked === true;
+    const moneyIso = row.verified_at || row.requested_at || null;
+    const entry: CrewPayoutLedgerEntry = {
+      rentalId: String(row.rental_id),
+      bikeName: String(snap.bikeName || "аренда"),
+      amount,
+      operatorChatId: opChatId,
+      operatorLabel: opLabel,
+      dateLabel: isoToDateLabel(moneyIso),
+      markedAt: paid ? payout.operator?.at || null : null,
+      markedByLabel: paid ? params.labelOf(payout.operator?.by) : null,
+      adjusted,
+    };
+
+    if (row.status === "verified") {
+      const bucket = paid ? view.totals.paid : view.totals.toPay;
+      bucket.sum += amount;
+      bucket.count += 1;
+      if (opChatId) {
+        let m = byOperator.get(opChatId);
+        if (!m) {
+          m = { chatId: opChatId, label: opLabel, verifiedSum: 0, verifiedCount: 0, paidSum: 0, paidCount: 0, toPaySum: 0, toPayCount: 0 };
+          byOperator.set(opChatId, m);
+        }
+        m.verifiedSum += amount;
+        m.verifiedCount += 1;
+        if (paid) {
+          m.paidSum += amount;
+          m.paidCount += 1;
+        } else {
+          m.toPaySum += amount;
+          m.toPayCount += 1;
+        }
+      }
+      if (paid) view.paidLog.push(entry);
+      else view.unpaid.push(entry);
+    } else {
+      // Not verified yet — money not real; show the volume for context only.
+      view.totals.unverified.sum += amount;
+      view.totals.unverified.count += 1;
+    }
+  }
+
+  // Biggest piggy bank first; archives newest-stamp-first.
+  view.operators = [...byOperator.values()].sort((a, b) => b.verifiedSum - a.verifiedSum);
+  const stampTs = (e: CrewPayoutLedgerEntry) => Date.parse(e.markedAt || "") || 0;
+  view.paidLog.sort((a, b) => stampTs(b) - stampTs(a));
+  view.paidLog = view.paidLog.slice(0, 50);
+  const moneyTs = (e: CrewPayoutLedgerEntry) => Date.parse(e.dateLabel.split(".").reverse().join("-")) || 0;
+  view.unpaid.sort((a, b) => moneyTs(b) - moneyTs(a));
+  return view;
+}

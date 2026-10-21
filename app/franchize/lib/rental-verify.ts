@@ -32,6 +32,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { logger } from "@/lib/logger";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { telegramDeliver } from "@/lib/telegram-transport";
 import {
   getSalaryConfig,
   getBikeCategoryOverrides,
@@ -39,14 +40,22 @@ import {
   countEquipmentUnits,
   computeRentalSalary,
   equipmentStandardCost,
+  equipmentStandardLines,
   standardRentalPrice,
+  standardRentalPriceDetailed,
   RENTAL_CATEGORY_LABELS,
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
-import { equipmentFlagsLabel } from "@/lib/salary-coefficients-shared";
+import {
+  daysLabelRu,
+  equipmentFlagsLabel,
+  hoursLabelRu,
+} from "@/lib/salary-coefficients-shared";
 import { resolveRentalOperator, type ShiftLike } from "@/app/franchize/lib/operator-attribution";
 // Task 114: per-rental audit grade computed at request time (pure module).
 import { buildAuditStamp, computeRentalAuditGrade } from "@/app/franchize/lib/rental-audit";
+// Task 117: the operator score uses the SAME commission math as the payout hub.
+import { commissionOf } from "./rental-payout-core";
 import {
   grantFranchizeAchievementAction,
   syncFranchizeCountersAction,
@@ -56,6 +65,8 @@ import {
   adjustPartKeyboard,
   applyVerificationAction,
   applySplitDelta,
+  auditGradeLine,
+  bikeTierLabelRu,
   clearDraft,
   declineOpenProposal,
   disputeEditorKeyboard,
@@ -166,18 +177,21 @@ export async function computeRentalVerificationSnapshot(params: {
   const eq = (meta.equipment || {}) as RentalEquipment;
   const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
   const price = Number(rental.total_cost) || 0;
-  const stdPrice =
-    standardRentalPrice({
-      specs: vehicle?.specs,
-      startIso: rental.requested_start_date || rental.agreed_start_date,
-      endIso: rental.requested_end_date || rental.agreed_end_date,
-      dailyPrice: vehicle?.daily_price,
-      fallbackTotalCost: price,
-    }) + equipmentStandardCost(eq);
+  const startIso = rental.requested_start_date || rental.agreed_start_date || null;
+  const endIso = rental.requested_end_date || rental.agreed_end_date || null;
+  const stdDetail = standardRentalPriceDetailed({
+    specs: vehicle?.specs,
+    startIso,
+    endIso,
+    dailyPrice: vehicle?.daily_price,
+    fallbackTotalCost: price,
+  });
+  const stdPrice = stdDetail.price + equipmentStandardCost(eq);
+  const equipmentUnits = countEquipmentUnits(eq);
   const salary = computeRentalSalary({
     config,
     rentalCategory: categories.rental,
-    equipmentUnits: countEquipmentUnits(eq),
+    equipmentUnits,
     totalCost: price,
     standardPrice: stdPrice,
   });
@@ -185,6 +199,11 @@ export async function computeRentalVerificationSnapshot(params: {
   const freeze = meta.pickup_freeze as Record<string, unknown> | undefined;
   const penaltyMeta = meta.penalty as { amount?: number; destination?: string; reason?: string } | undefined;
 
+  // ── Task 117: freeze the formula the DM shows («откуда цифры») ──
+  // Digit-equal with the salary math above: same baseline, same config.
+  const gearLines = equipmentStandardLines(eq).map((l) => `${l.label} — ${l.sum} ₽`);
+  const markup = Math.max(0, price - stdPrice);
+  const bikeImage = typeof (vehicle as any)?.image_url === "string" ? (vehicle as any).image_url.trim() : "";
   return {
     bikeName: `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim(),
     rentalCategory: categories.rental,
@@ -194,7 +213,7 @@ export async function computeRentalVerificationSnapshot(params: {
     equipment: salary.equipment,
     overprice: salary.overprice,
     total: salary.total,
-    equipmentUnits: countEquipmentUnits(eq),
+    equipmentUnits,
     equipmentFlags: equipmentFlagsLabel(eq),
     overpricePercent: config.overpricePercent,
     depositReturned: typeof meta.deposit_returned === "boolean" ? (meta.deposit_returned as boolean) : null,
@@ -226,6 +245,35 @@ export async function computeRentalVerificationSnapshot(params: {
           : null,
     },
     requestedAtIso: params.requestedAtIso,
+    rentalWindow: {
+      startIso,
+      endIso,
+      hours: stdDetail.hours,
+      days: stdDetail.days,
+      durationLabel:
+        stdDetail.hours > 0
+          ? stdDetail.hours >= 24
+            ? daysLabelRu(stdDetail.days || Math.ceil(stdDetail.hours / 24))
+            : hoursLabelRu(stdDetail.hours)
+          : "—",
+    },
+    formula: {
+      fallback: stdDetail.fallback,
+      bikeStandard: stdDetail.price,
+      bikeTierLabel: stdDetail.fallback ? null : bikeTierLabelRu(stdDetail.tier, stdDetail.days, stdDetail.hours),
+      bikeRate: stdDetail.rate,
+      bikeDays: stdDetail.days,
+      bikeHours: stdDetail.hours,
+      gearLines,
+      gearStandard: equipmentStandardCost(eq),
+      standardTotal: stdPrice,
+      clientTotal: price,
+      markup,
+      baseCoef: config.rental[categories.rental] ?? 0,
+      equipmentUnitCoef: config.equipmentRentalUnit,
+      overpricePercent: config.overpricePercent,
+    },
+    bikePhotoUrl: bikeImage.startsWith("http") ? bikeImage : null,
   };
 }
 
@@ -287,6 +335,8 @@ export async function requestRentalVerification(params: {
 }): Promise<{ sent: boolean; reason?: string }> {
   try {
     // ── Fetch the closed rental + vehicle ──
+    // Task 117: image_url rides along — the DM opens with the bike photo so
+    // the recipient INSTANTLY knows which trip this сверка is about.
     const { data: rentalRow, error: rentalError } = await supabaseAdmin
       .from("rentals")
       .select(`
@@ -294,7 +344,7 @@ export async function requestRentalVerification(params: {
         deposit_amount, deposit_returned,
         created_by_operator_chat_id, created_at,
         requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
-        vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result)
+        vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result, image_url)
       `)
       .eq("rental_id", params.rentalId)
       .maybeSingle();
@@ -454,6 +504,9 @@ export async function requestRentalVerification(params: {
       ownerLabel,
     });
 
+    // ── Task 117: the operator's verified score (копилка) shown in the DM ──
+    const operatorScore = await loadOperatorVerifiedScore(operatorChatId).catch(() => null);
+
     const summary = formatVerificationSummary({
       crewName,
       snapshot,
@@ -461,12 +514,17 @@ export async function requestRentalVerification(params: {
       operatorChatId,
       ownerChatId,
       statusNote,
+      operatorScore,
     });
     const keyboard = verificationKeyboard(rental.rental_id);
 
     const recipients = [...new Set([operatorChatId, ownerChatId].filter(Boolean) as string[])];
     for (const chatId of recipients) {
       try {
+        // Task 117: bike photo first (separate message — sendPhoto captions
+        // cap at 1024 chars, too tight for the rich formula text), then the
+        // full summary. Photo failure is cosmetic — the summary must land.
+        await sendVerificationBikePhoto(chatId, snapshot.bikePhotoUrl, snapshot.bikeName);
         await sendComplexMessage(chatId, summary, keyboard, { parseMode: "HTML", keyboardType: "inline" });
       } catch (e) {
         logger.warn(`[rental-verify] summary send failed for ${chatId} (rental ${rental.rental_id}):`, e);
@@ -484,6 +542,7 @@ export async function requestRentalVerification(params: {
         crewSlug,
         rentalId: rental.rental_id,
         summary,
+        bikePhotoUrl: snapshot.bikePhotoUrl,
         exclude: [
           operatorChatId,
           ownerChatId,
@@ -508,6 +567,79 @@ export async function requestRentalVerification(params: {
   }
 }
 
+// ── Task 117: operator score (копилка) + bike photo preview ────────────────
+
+/**
+ * The operator's «счёт» — sum of their CONFIRMED (verified) commissions.
+ * The money game: every ✅✅ сверка drops its bonus into this piggy bank;
+ * the running total is shown inside every verification DM (boss 2026-10-21:
+ * «добавь счетчик текущего "счета"… показывай текущий "счет" в оповещении»).
+ * Commission source = commissionOf (agreed negotiation split wins) — the
+ * SAME money the payout hub and the profile strip count.
+ */
+export async function loadOperatorVerifiedScore(
+  chatId: string | null | undefined,
+): Promise<{ sum: number; count: number }> {
+  const out = { sum: 0, count: 0 };
+  const viewer = chatId ? String(chatId) : "";
+  if (!viewer) return out;
+  try {
+    const { data: rows, error } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("snapshot, negotiation, payout")
+      .eq("operator_chat_id", viewer)
+      .eq("status", "verified")
+      .limit(1000);
+    if (error) {
+      if (!isMissingRelationError(error)) logger.warn("[rental-verify] score query failed:", error.message);
+      return out;
+    }
+    for (const row of (rows || []) as PayoutSourceRowLike[]) {
+      out.sum += commissionOf(row).amount;
+      out.count += 1;
+    }
+  } catch (e) {
+    logger.warn("[rental-verify] loadOperatorVerifiedScore failed (non-fatal):", e);
+  }
+  return out;
+}
+
+/** Minimal shape commissionOf needs (avoids importing the payout row type). */
+interface PayoutSourceRowLike {
+  snapshot?: unknown;
+  negotiation?: unknown;
+  payout?: unknown;
+}
+
+/**
+ * Bike preview photo before the verification summary (task 117). A separate
+ * plain message — sendPhoto captions cap at 1024 chars, and the rich summary
+ * needs every byte of the 4096 text budget. Any failure is cosmetic: the
+ * summary message follows and must never be blocked by the photo.
+ */
+async function sendVerificationBikePhoto(
+  chatId: string,
+  photoUrl: string | null | undefined,
+  bikeName: string,
+): Promise<void> {
+  const url = (photoUrl || "").trim();
+  if (!url || !/^https:\/\//i.test(url)) return;
+  try {
+    const payload = {
+      photo: url,
+      caption: bikeName
+        ? `🛵 ${escapeVerifyHtml(bikeName)} — сверка этой аренды 👇`
+        : `🛵 Фото байка — сверка ниже 👇`,
+    };
+    const res = await telegramDeliver("sendPhoto", chatId, payload);
+    if (res?.ok === false) {
+      logger.warn(`[rental-verify] bike photo rejected for ${chatId}: ${res.error || "unknown"}`);
+    }
+  } catch (e) {
+    logger.warn(`[rental-verify] bike photo send failed for ${chatId} (cosmetic):`, e);
+  }
+}
+
 // ── VF-FIX 2026-10-18: staff cc helper ─────────────────────────────────────
 
 /**
@@ -521,6 +653,8 @@ export async function ccVerificationToCrewStaff(params: {
   crewSlug: string | null;
   rentalId: string;
   summary: string;
+  /** Task 117: bike photo preview sent right before the copy (cosmetic). */
+  bikePhotoUrl?: string | null;
   exclude: Array<string | null | undefined>;
 }): Promise<number> {
   if (!params.crewSlug) return 0;
@@ -564,6 +698,13 @@ export async function ccVerificationToCrewStaff(params: {
   let sent = 0;
   await Promise.allSettled(
     targets.map(async (chatId) => {
+      try {
+        // Task 117: the same bike preview the parties got (cosmetic — never
+        // counted as a delivery, never blocks the text copy).
+        await sendVerificationBikePhoto(chatId, params.bikePhotoUrl, "");
+      } catch {
+        /* cosmetic only */
+      }
       try {
         const res = await telegramDeliver("sendMessage", chatId, payload);
         if (res?.ok !== false) sent += 1;
@@ -786,6 +927,11 @@ export async function handleRentalVerifyCallback(params: {
 
     if (result.effect === "verified") {
       await answerCallback(params.callbackQueryId, "✅ Подтверждено — спасибо!");
+      // Task 117: fresh operator score AFTER this сверка landed — the piggy
+      // bank grew right now, show it (+this commission) instead of a stale
+      // number. Falls back to «без счёта» on any failure (never blocks).
+      const freshScore = await loadOperatorVerifiedScore(current_.operator_chat_id).catch(() => null);
+      const { amount: confirmedAmount } = commissionOf(current_);
       const doneText = [
         `🤝 <b>Расчёт подтверждён обеими сторонами</b>`,
         ``,
@@ -795,14 +941,19 @@ export async function handleRentalVerifyCallback(params: {
       // Task 106: when the row carries an AGREED (corrected) split, both
       // parties get the honest final numbers instead of the frozen ones.
       const agreedNego = parseNegotiation((current_ as any).negotiation);
-      const doneFinal = agreedNego.agreed
-        ? formatDealDoneText({
-            snapshot: snapshot || {},
-            agreedSplit: agreedNego.agreed.split,
-            proposerLabel: labelFromUsersMap(usersMap, agreedNego.agreed.proposedBy),
-            acceptorLabel: labelFromUsersMap(usersMap, agreedNego.agreed.acceptedBy),
-          })
-        : doneText;
+      const scoreTail =
+        freshScore && current_.operator_chat_id
+          ? `\n\n🏅 Счёт ${escapeVerifyHtml(labelFromUsersMap(usersMap, current_.operator_chat_id))}: <b>${formatRubVerify(freshScore.sum)}</b> (${freshScore.count} ар.) — +${formatRubVerify(confirmedAmount)} за эту аренду 💰`
+          : "";
+      const doneFinal =
+        (agreedNego.agreed
+          ? formatDealDoneText({
+              snapshot: snapshot || {},
+              agreedSplit: agreedNego.agreed.split,
+              proposerLabel: labelFromUsersMap(usersMap, agreedNego.agreed.proposedBy),
+              acceptorLabel: labelFromUsersMap(usersMap, agreedNego.agreed.acceptedBy),
+            })
+          : doneText) + scoreTail;
       // Task 107: every «verified» DM now carries the payout-hub entry —
       // the money game continues after the confirm (see the payout counter).
       const payoutDoneKb = [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]];

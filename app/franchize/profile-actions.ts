@@ -272,7 +272,32 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
     {
       id: "rental_ideal_closure",
       title: "Идеальная аренда ⭐",
-      description: "Закрыл аренду безупречно: контракт проверен, все задачи выполнены, одометр зафиксирован, залог возвращён, без повреждений.",
+      // Task 117 (boss): «идеальная» аренда = пробег до/после И фото до/после
+      // на месте. Documentation completeness is the whole definition now.
+      description: "Закрыл аренду идеально: пробег до/после зафиксирован, фото до/после на месте. Эталон документации!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    // Task 117: separate achievements for documented rentals (the boss's
+    // definition of ideal has TWO components — each gets its own badge).
+    {
+      id: "rental_odometer_full",
+      title: "Пробег до/после",
+      description: "Зафиксировал пробег И до выезда, И после возврата. Честный учёт километров!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_photo_full",
+      title: "Фото до/после",
+      description: "Прикрепил фото состояния байка И до выезда, И после возврата. Никаких споров о состоянии!",
+      category: "operations",
+      triggerSources: ["rental:return_confirmed"],
+    },
+    {
+      id: "rental_ideal_10",
+      title: "10 идеальных аренд",
+      description: "Десять аренд закрыты идеально: пробег и фото до/после на месте. Документация — твоя суперспособность!",
       category: "operations",
       triggerSources: ["rental:return_confirmed"],
     },

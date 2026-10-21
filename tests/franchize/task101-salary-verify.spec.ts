@@ -328,7 +328,9 @@ describe("structural guarantees — verification wiring", () => {
     const lib = read("app/franchize/lib/rental-verify.ts");
     expect(lib).toContain("computeRentalSalary({");
     expect(lib).toContain("resolveRentalOperator(");
-    expect(lib).toContain("standardRentalPrice({");
+    // task117: the snapshot now calls the DETAILED canon (same baseline, plus
+    // the tier/rate pieces the rich DM shows) — still ONE canon, no private math.
+    expect(lib).toContain("standardRentalPriceDetailed({");
   });
 
   it("pure core has ZERO imports (test-graph isolation)", () => {

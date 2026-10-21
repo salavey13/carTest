@@ -2367,7 +2367,7 @@ export async function updateRentalStatus(input: {
     // notification (partner-owner + his 50% cut) when status flips to "active".
     const { data: rental } = await supabaseAdmin
       .from("rentals")
-      .select("rental_id, status as old_status, total_cost, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, metadata, user_id, crew_id, vehicle:cars(id, make, model, specs)")
+      .select("rental_id, status as old_status, total_cost, requested_start_date, requested_end_date, agreed_start_date, agreed_end_date, metadata, user_id, crew_id, start_photo_count, end_photo_count, vehicle:cars(id, make, model, specs)")
       .eq("rental_id", rentalId)
       .maybeSingle();
 
@@ -2468,6 +2468,29 @@ export async function updateRentalStatus(input: {
         });
       } catch (verifyErr) {
         console.warn("[update-rental-status] Verification request failed (non-fatal):", verifyErr);
+      }
+
+      // ── Task 117: closure achievements on the MODAL path too ──
+      // The rental-page path (confirmVehicleReturn) always granted them; the
+      // analytics-modal close used to skip the whole achievements game. Same
+      // documentation picture: odometer before/after (just written to the
+      // metadata above) + photo counts (rental columns). Non-fatal.
+      try {
+        const { grantRentalClosureAchievements } = await import(
+          "@/app/franchize/server-actions/rental-achievements"
+        );
+        await grantRentalClosureAchievements({
+          rentalId,
+          actingUserId: actorUserId,
+          closureData: {
+            odometerAfter: odometerAfter ?? (typeof currentMeta.odometer_after === "number" ? (currentMeta.odometer_after as number) : null),
+            odometerBefore: odometerBefore ?? (typeof currentMeta.odometer_before === "number" ? (currentMeta.odometer_before as number) : null),
+            startPhotoCount: (rental as any)?.start_photo_count ?? null,
+            endPhotoCount: (rental as any)?.end_photo_count ?? null,
+          },
+        });
+      } catch (achErr) {
+        console.warn("[update-rental-status] Achievement grant failed (non-fatal):", achErr);
       }
     }
 

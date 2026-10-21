@@ -23,7 +23,7 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { privateSchema } from "@/lib/private-secrets";
 import { logger } from "@/lib/logger";
-import { grantFranchizeAchievementAction } from "@/app/franchize/profile-actions";
+import { grantFranchizeAchievementAction, syncFranchizeCountersAction } from "@/app/franchize/profile-actions";
 
 type SupabaseSchemaClient = {
   schema: (schema: string) => {
@@ -144,42 +144,56 @@ async function countRecentClosures(
   return { totalAllTime, totalThisMonth, consecutiveCurrentStreak: streak };
 }
 
-// Count how many closures by this operator were "ideal" — based on the
-// same criteria as RentalIdealBadge:
-//   - contract verified
-//   - all return todos done (todosTotal > 0 && todosDone === todosTotal)
-//   - odometer captured (odometer_after is non-null)
-//   - deposit returned
-//   - damage level "none" / null / undefined
-async function countIdealClosures(operatorId: string): Promise<number> {
+/**
+ * Task 117 — ONE scan of the operator's completed closures, counting every
+ * documentation-driven stat the badges need (boss: «идеальная» аренда это
+ * когда пробег до/после и фото до/после на месте — отдельные ачивки):
+ *   • ideal      — odometer BEFORE > 0 AND odometer after > 0 AND photos
+ *                  before > 0 AND photos after > 0 (the boss's definition —
+ *                  documentation completeness, deposit/damage no longer gate);
+ *   • odoFull    — both odometer readings present;
+ *   • photosFull — both photo sets present;
+ *   • odoCaptured— odometer_after present (legacy counter meaning kept).
+ * ABSOLUTE values — consumed by syncFranchizeCountersAction (the «731 смены»
+ * lesson: derived counters are SET from the source of truth, never
+ * incremented from stale totals).
+ */
+interface OperatorClosureStats {
+  ideal: number;
+  odoFull: number;
+  photosFull: number;
+  odoCaptured: number;
+}
+
+const odoOk = (v: unknown) => typeof v === "number" && v > 0;
+
+async function countOperatorClosureStats(operatorId: string): Promise<OperatorClosureStats> {
+  const empty = { ideal: 0, odoFull: 0, photosFull: 0, odoCaptured: 0 };
   const { data, error } = await supabaseAdmin
     .from("rentals")
-    .select("rental_id, metadata, status")
+    .select("rental_id, metadata, status, start_photo_count, end_photo_count")
     .eq("status", "completed")
-    .eq("created_by_operator_chat_id", operatorId);
+    .eq("created_by_operator_chat_id", operatorId)
+    .limit(1000);
 
   if (error || !data) {
-    logger.warn("[rental-achievements] countIdealClosures query failed", error);
-    return 0;
+    logger.warn("[rental-achievements] countOperatorClosureStats query failed", error);
+    return empty;
   }
 
-  let ideal = 0;
-  for (const r of (data as any[])) {
+  const stats = { ...empty };
+  for (const r of data as any[]) {
     const meta = (r.metadata || {}) as any;
-    if (!meta) continue;
-    const odoAfter = meta.odometer_after;
-    if (typeof odoAfter !== "number" || odoAfter <= 0) continue;
-    if (meta.deposit_returned !== true) continue;
-    const damageLevel = meta.damage_level;
-    if (damageLevel === "light" || damageLevel === "heavy") continue;
-    // NOTE: verified + todos-done require a join with rental_contract_artefacts
-    // and crew_todos. Skipping that here for performance — the ideal closure
-    // badge is granted per-rental at the moment of closure when we already
-    // have those facts in hand. This routine is only used for the streak
-    // count of past closures (best-effort).
-    ideal++;
+    const odoBefore = odoOk(meta?.odometer_before);
+    const odoAfter = odoOk(meta?.odometer_after);
+    const photosBefore = Number(r.start_photo_count) > 0;
+    const photosAfter = Number(r.end_photo_count) > 0;
+    if (odoAfter) stats.odoCaptured += 1;
+    if (odoBefore && odoAfter) stats.odoFull += 1;
+    if (photosBefore && photosAfter) stats.photosFull += 1;
+    if (odoBefore && odoAfter && photosBefore && photosAfter) stats.ideal += 1;
   }
-  return ideal;
+  return stats;
 }
 
 export interface GrantRentalClosureAchievementsParams {
@@ -187,22 +201,33 @@ export interface GrantRentalClosureAchievementsParams {
   actingUserId: string;
   closureData?: {
     odometerAfter?: number | null;
+    /** Task 117: the full documentation picture (ideal = both odo + both photos). */
+    odometerBefore?: number | null;
+    startPhotoCount?: number | null;
+    endPhotoCount?: number | null;
     depositReturned?: boolean | null;
     damageLevel?: "none" | "light" | "heavy" | null;
   };
 }
 
-// Compute the "is ideal closure?" flag at the moment of closure — we have
-// all the facts in hand here, so this is the authoritative check.
+/**
+ * Task 117 — the boss redefined the game: «идеальная» аренда = пробег ДО/ПОСЛЕ
+ * и фото ДО/ПОСЛЕ на месте. Documentation completeness is the whole check —
+ * deposit/damage no longer gate the badge (they stay in the verification
+ * audit, where money lives). This runs at the moment of closure, when all
+ * four facts are already persisted → authoritative per-closure check.
+ */
 function isIdealClosure(closure: {
   odometerAfter?: number | null;
-  depositReturned?: boolean | null;
-  damageLevel?: "none" | "light" | "heavy" | null;
+  odometerBefore?: number | null;
+  startPhotoCount?: number | null;
+  endPhotoCount?: number | null;
 }): boolean {
-  const odoOk = typeof closure.odometerAfter === "number" && (closure.odometerAfter as number) > 0;
-  const depOk = closure.depositReturned === true;
-  const dmgOk = closure.damageLevel === "none" || closure.damageLevel === null || closure.damageLevel === undefined;
-  return odoOk && depOk && dmgOk;
+  const odoBefore = typeof closure.odometerBefore === "number" && closure.odometerBefore > 0;
+  const odoAfter = typeof closure.odometerAfter === "number" && closure.odometerAfter > 0;
+  const photosBefore = Number(closure.startPhotoCount) > 0;
+  const photosAfter = Number(closure.endPhotoCount) > 0;
+  return odoBefore && odoAfter && photosBefore && photosAfter;
 }
 
 export async function grantRentalClosureAchievements(
@@ -220,15 +245,43 @@ export async function grantRentalClosureAchievements(
 
   const stats = await countRecentClosures(operatorId, { sinceDays: 365 });
   const isIdeal = isIdealClosure(closureData || {});
+  const hasOdoAfter = closureData?.odometerAfter != null;
+  const odoFull = isOdoFull(closureData);
+  const photosFull = isPhotosFull(closureData);
 
-  // Increment counters regardless of badge state.
-  const incrementCounters: Record<string, number> = {
-    rentalsClosed: 1,
-  };
-  if (isIdeal) incrementCounters.idealClosures = 1;
-  if (closureData?.odometerAfter != null) incrementCounters.odometerCaptured = 1;
+  // Task 117 COUNTER FIX — the «731 смены» bug again, rental edition.
+  // tryGrant passed {rentalsClosed: 1} to EVERY badge grant, so a closure
+  // unlocking 3-4 badges inflated rentalsClosed ×3-4 (grantAchievementOnce
+  // applies the counter delta on every call, even alreadyUnlocked).
+  // Per the established philosophy, profile counters are DERIVED values:
+  // SET them once from the source of truth, then grant badges with NO
+  // counter deltas. Absolute scan includes the current closure (it is
+  // already persisted when this runs).
+  try {
+    const { count, error } = await supabaseAdmin
+      .from("events")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "return_confirmed")
+      .eq("created_by", operatorId);
+    if (error) throw error;
+    const docStats = await countOperatorClosureStats(operatorId);
+    await syncFranchizeCountersAction({
+      slug,
+      userId: operatorId,
+      counters: {
+        rentalsClosed: count || 0,
+        idealClosures: docStats.ideal,
+        odometerCaptured: docStats.odoCaptured,
+        odometerFullClosures: docStats.odoFull,
+        photosFullClosures: docStats.photosFull,
+      },
+      source: "rental:return_confirmed",
+    });
+  } catch (syncErr) {
+    errors.push(`counter sync: ${syncErr instanceof Error ? syncErr.message : String(syncErr)}`);
+  }
 
-  // Helper to attempt grant + collect result
+  // Helper to attempt grant + collect result (NO counter deltas — see above).
   const tryGrant = async (id: string, ctx?: Record<string, unknown>) => {
     try {
       const r = await grantFranchizeAchievementAction({
@@ -237,7 +290,6 @@ export async function grantRentalClosureAchievements(
         achievementId: id,
         source: "rental:return_confirmed",
         context: { rentalId, ...(ctx || {}) },
-        incrementCounters,
       });
       if (!r.success) {
         errors.push(`${id}: ${r.error || "grant failed"}`);
@@ -265,7 +317,17 @@ export async function grantRentalClosureAchievements(
     await tryGrant("rental_streak_10", { streak: stats.consecutiveCurrentStreak + 1 });
   }
 
-  // rental_ideal_closure — this single closure was ideal
+  // Task 117: separate achievements for documented rentals
+  // rental_odometer_full — пробег до/после на месте
+  if (odoFull) {
+    await tryGrant("rental_odometer_full", { closure: closureData });
+  }
+  // rental_photo_full — фото до/после на месте
+  if (photosFull) {
+    await tryGrant("rental_photo_full", { closure: closureData });
+  }
+
+  // rental_ideal_closure — this single closure was ideal (odo both + photos both)
   if (isIdeal) {
     await tryGrant("rental_ideal_closure", { closure: closureData });
   }
@@ -273,20 +335,23 @@ export async function grantRentalClosureAchievements(
   // rental_ideal_streak_5 — 5 ideal closures in a row
   // We don't keep a strict streak counter for ideal closures (would need
   // an extra column). Instead: count total ideal closures so far; grant at 5.
+  // Task 117: the absolute scan already includes THIS closure.
   if (isIdeal) {
-    const totalIdeal = await countIdealClosures(operatorId);
-    if (totalIdeal + 1 >= 5) {
-      await tryGrant("rental_ideal_streak_5", { totalIdeal: totalIdeal + 1 });
+    const docStats = await countOperatorClosureStats(operatorId);
+    if (docStats.ideal >= 5) {
+      await tryGrant("rental_ideal_streak_5", { totalIdeal: docStats.ideal });
+    }
+    // rental_ideal_10 — ten documented-ideal closures (the «игра» milestone)
+    if (docStats.ideal >= 10) {
+      await tryGrant("rental_ideal_10", { totalIdeal: docStats.ideal });
     }
   }
 
-  // rental_odometer_pro — captured final odometer 25+ times
-  if (closureData?.odometerAfter != null) {
-    // We don't have an exact count without iterating; approximate using
-    // total closures (which is a lower bound for odometer captures when
-    // most closures do capture it).
-    if (stats.totalAllTime + 1 >= 25) {
-      await tryGrant("rental_odometer_pro", { closuresWithOdometer: stats.totalAllTime + 1 });
+  // rental_odometer_pro — captured final odometer 25+ times (absolute truth)
+  if (hasOdoAfter) {
+    const docStats = await countOperatorClosureStats(operatorId);
+    if (docStats.odoCaptured >= 25) {
+      await tryGrant("rental_odometer_pro", { closuresWithOdometer: docStats.odoCaptured });
     }
   }
 
@@ -296,8 +361,21 @@ export async function grantRentalClosureAchievements(
   }
 
   logger.info("[rental-achievements] grantRentalClosureAchievements", {
-    rentalId, operatorId, slug, granted, errors, isIdeal, stats,
+    rentalId, operatorId, slug, granted, errors, isIdeal, odoFull, photosFull, stats,
   });
 
   return { granted, errors };
+}
+
+/** Both odometer readings present (before AND after). */
+function isOdoFull(closure: GrantRentalClosureAchievementsParams["closureData"]): boolean {
+  return (
+    typeof closure?.odometerBefore === "number" && closure.odometerBefore > 0 &&
+    typeof closure?.odometerAfter === "number" && closure.odometerAfter > 0
+  );
+}
+
+/** Both photo sets present (before AND after). */
+function isPhotosFull(closure: GrantRentalClosureAchievementsParams["closureData"]): boolean {
+  return Number(closure?.startPhotoCount) > 0 && Number(closure?.endPhotoCount) > 0;
 }

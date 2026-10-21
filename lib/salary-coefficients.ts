@@ -415,12 +415,48 @@ export function standardRentalPrice(params: {
   dailyPrice: number | null | undefined;
   fallbackTotalCost: number;
 }): number {
+  return standardRentalPriceDetailed(params).price;
+}
+
+/**
+ * Task 117 — the SAME canonical baseline, but with the FORMULA pieces the
+ * verification DM needs («что откуда берётся»): charged hours/days, the tier
+ * that applied and its per-day rate. One canon with standardRentalPrice —
+ * it IS standardRentalPrice (delegates), so the frozen snapshot numbers and
+ * the human-readable formula can never drift apart.
+ */
+export interface StandardRentalPriceDetail {
+  /** Bike-part baseline (fallback → fallbackTotalCost, markup 0). */
+  price: number;
+  /** True when dates/specs were unusable — the formula block degrades. */
+  fallback: boolean;
+  /** Rental window hours (0 when unknown). */
+  hours: number;
+  /** Charged days for ≥24h (ceil), else 0. */
+  days: number;
+  /** Pricing tier that applied ("daily" | "multi-day-2-4" | "hourly" | …). */
+  tier: string | null;
+  /** Per-day tier rate (multi-day/daily) or the hourly price paid. */
+  rate: number | null;
+  /** Human period label from the calculator («6 дней» / «5 часов»). */
+  periodLabel: string | null;
+  /** «7 500 ₽/день» style label straight from the calculator. */
+  rateLabel: string | null;
+}
+
+export function standardRentalPriceDetailed(params: {
+  specs: BikePricingSpecs | null | undefined;
+  startIso: string | null;
+  endIso: string | null;
+  dailyPrice: number | null | undefined;
+  fallbackTotalCost: number;
+}): StandardRentalPriceDetail {
   const { specs, startIso, endIso, dailyPrice, fallbackTotalCost } = params;
   try {
-    if (!startIso || !endIso) return fallbackTotalCost;
+    if (!startIso || !endIso) return { price: fallbackTotalCost, fallback: true, hours: 0, days: 0, tier: null, rate: null, periodLabel: null, rateLabel: null };
     const start = splitIsoToMoscow(startIso);
     const end = splitIsoToMoscow(endIso);
-    if (!start || !end) return fallbackTotalCost;
+    if (!start || !end) return { price: fallbackTotalCost, fallback: true, hours: 0, days: 0, tier: null, rate: null, periodLabel: null, rateLabel: null };
     const pricing = calculatePrice(
       {
         ...(specs || {}),
@@ -432,11 +468,32 @@ export function standardRentalPrice(params: {
       end.time,
       0,
     );
-    if (!Number.isFinite(pricing.basePriceRub) || pricing.basePriceRub <= 0) return fallbackTotalCost;
-    return pricing.basePriceRub;
+    if (!Number.isFinite(pricing.basePriceRub) || pricing.basePriceRub <= 0) {
+      return { price: fallbackTotalCost, fallback: true, hours: 0, days: 0, tier: null, rate: null, periodLabel: null, rateLabel: null };
+    }
+    // Hours: the calculator derives them internally from the MSK-split window;
+    // recompute here the same way (date+time → Date) for the detail report.
+    const hours = Math.max(
+      0,
+      Math.round(
+        (new Date(`${end.date}T${end.time}`).getTime() - new Date(`${start.date}T${start.time}`).getTime()) / 3600000,
+      ),
+    );
+    return {
+      price: pricing.basePriceRub,
+      fallback: false,
+      hours,
+      days: pricing.breakdown.periods > 0 && hours >= 24 ? pricing.breakdown.periods : 0,
+      tier: pricing.tier,
+      rate: Number.isFinite(pricing.basePriceRub) && pricing.breakdown.periods > 0
+        ? Math.round(pricing.basePriceRub / (hours >= 24 ? pricing.breakdown.periods : hours))
+        : null,
+      periodLabel: pricing.breakdown.period || null,
+      rateLabel: pricing.breakdown.ratePerPeriod || null,
+    };
   } catch (e) {
     logger.debug("[salary-coefficients] standardRentalPrice failed, markup = 0:", e);
-    return fallbackTotalCost;
+    return { price: fallbackTotalCost, fallback: true, hours: 0, days: 0, tier: null, rate: null, periodLabel: null, rateLabel: null };
   }
 }
 
