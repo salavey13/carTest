@@ -482,9 +482,14 @@ export function formatVerificationSummary(params: {
     );
     // Task 120: the short-rental rule is part of the legend — the halved
     // numbers in the breakdown above must be explainable from the DM alone.
+    // ⚠️ HOTFIX 2026-10-22 (bmw-f800r 8450ef3b): this summary goes out with
+    // parse_mode=HTML — a RAW `<` literal in the legend text made Telegram
+    // reject EVERY copy with 400 "can't parse entities", so neither the
+    // operator nor the owner received the сверка at all (row was already
+    // persisted → silent death after the insert). Always escape: `&lt;`.
     if (f.shortRental) {
       lines.push(
-        `  ↳ аренда < 24 ч — комиссия пополам: мот ${formatRubVerify(f.baseCoef)} → ${formatRubVerify(Math.round(f.baseCoef / 2))} · экип ${formatRubVerify(f.equipmentUnitCoef)} → ${formatRubVerify(Math.round(f.equipmentUnitCoef / 2))}/ед`,
+        `  ↳ аренда &lt; 24 ч — комиссия пополам: мот ${formatRubVerify(f.baseCoef)} → ${formatRubVerify(Math.round(f.baseCoef / 2))} · экип ${formatRubVerify(f.equipmentUnitCoef)} → ${formatRubVerify(Math.round(f.equipmentUnitCoef / 2))}/ед`,
       );
     }
     lines.push(
