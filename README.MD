@@ -62,6 +62,7 @@ supabase db push          # применит ~160 чистых миграций 
 - `TELEGRAM_BOT_TOKEN`, `ADMIN_CHAT_ID`
 - `NEXT_PUBLIC_SITE_URL`
 - `YANDEX_PAY_API_KEY` (+ опционально `YANDEX_PAY_MERCHANT_ID`, `YANDEX_PAY_API_BASE` для песочницы)
+- `ONC_BASE_URL`=http://localhost/demo1c, `ONC_USERNAME`, `ONC_PASSWORD`, `ONC_SERVICE_NAME`
 
 **Опциональные:** `GITHUB_TOKEN`, `GEMINI_API_KEY`, `ZAI_*` (AI-функции),
 `SLACK_*` (мост `/codex` → Slack), `RENTAL_DOC_TEMPLATE_MODE=html`,
