@@ -268,6 +268,30 @@ export async function computeRentalVerificationSnapshot(params: {
     startPhotoUrl ? 1 : 0,
   );
   const photosAfter = Math.max(Number(rental.end_photo_count) || 0, endPhotoUrl ? 1 : 0);
+  // Task 123 (durable): the latest «ДО»/«ПОСЛЕ» storage paths from
+  // rental_photos — the private bucket serves via SIGNED urls, so the path is
+  // what gets frozen; the signed link is minted at send time and never stale.
+  let beforePath: string | null = null;
+  let afterPath: string | null = null;
+  if (photosBefore > 0 || photosAfter > 0) {
+    try {
+      const { data: photoRows } = await supabaseAdmin
+        .from("rental_photos")
+        .select("photo_type, storage_path, created_at")
+        .eq("rental_id", rental.rental_id)
+        .in("photo_type", ["start", "end"])
+        .order("created_at", { ascending: false })
+        .limit(20);
+      for (const p of (photoRows || []) as Array<{ photo_type: string; storage_path: string }>) {
+        if (!p.storage_path) continue;
+        if (p.photo_type === "end" && !afterPath) afterPath = p.storage_path;
+        if (p.photo_type === "start" && !beforePath) beforePath = p.storage_path;
+        if (beforePath && afterPath) break;
+      }
+    } catch {
+      // non-fatal: paths are an upgrade — counts and metadata URLs still work
+    }
+  }
   const photosBlock =
     photosBefore > 0 || photosAfter > 0
       ? {
@@ -275,6 +299,8 @@ export async function computeRentalVerificationSnapshot(params: {
           after: photosAfter,
           beforeUrl: startPhotoUrl || freezePhotos[0] || null,
           afterUrl: endPhotoUrl,
+          beforePath,
+          afterPath,
         }
       : null;
   return {
@@ -963,20 +989,44 @@ async function sendVerificationBikePhoto(
  * presence»). ONE extra message per recipient, deliberately: the «ПОСЛЕ»
  * shot is the one a сверка actually needs (state at return), «ДО» rides as
  * the fallback when no return photo exists; both counts still show in the
- * summary text. Cosmetic-only — never blocks the summary.
+ * summary text. Private-bucket paths are signed HERE (send time, 1h TTL) —
+ * frozen paths never go stale. Cosmetic-only — never blocks the summary.
  */
+async function signedStatePhoto(
+  photos: RentalVerificationSnapshot["photos"],
+): Promise<{ url: string; caption: string } | null> {
+  const attempts: Array<{ url?: string | null; path?: string | null; caption: string }> = [
+    { url: photos?.afterUrl, path: photos?.afterPath, caption: "📸 ПОСЛЕ — состояние при возврате" },
+    { url: photos?.beforeUrl, path: photos?.beforePath, caption: "📸 ДО — состояние при выдаче" },
+  ];
+  for (const a of attempts) {
+    // 1) a public metadata URL (start/end_photo_url) — usable as-is
+    const url = (a.url || "").trim();
+    if (url && /^https:\/\//i.test(url)) return { url, caption: a.caption };
+    // 2) the durable storage path — mint a short-lived signed link
+    const path = (a.path || "").trim();
+    if (path) {
+      try {
+        const { data, error } = await supabaseAdmin.storage
+          .from("rental-photos")
+          .createSignedUrl(path, 3600);
+        const signed = data?.signedUrl;
+        if (!error && signed && /^https?:\/\//i.test(signed)) return { url: signed, caption: a.caption };
+        logger.warn(`[rental-verify] state photo sign failed for ${path}: ${error?.message || "no url"}`);
+      } catch (e) {
+        logger.warn("[rental-verify] state photo sign threw (cosmetic):", e);
+      }
+    }
+  }
+  return null;
+}
+
 async function sendVerificationStatePhoto(
   chatId: string,
   photos: RentalVerificationSnapshot["photos"],
 ): Promise<void> {
-  const afterUrl = (photos?.afterUrl || "").trim();
-  const beforeUrl = (photos?.beforeUrl || "").trim();
-  const pick = afterUrl
-    ? { url: afterUrl, caption: "📸 ПОСЛЕ — состояние при возврате" }
-    : beforeUrl
-      ? { url: beforeUrl, caption: "📸 ДО — состояние при выдаче" }
-      : null;
-  if (!pick || !/^https:\/\//i.test(pick.url)) return;
+  const pick = await signedStatePhoto(photos);
+  if (!pick) return;
   try {
     const res = await telegramDeliver("sendPhoto", chatId, {
       photo: pick.url,

@@ -280,12 +280,20 @@ describe("task123 · photo presence", () => {
     expect(photoPresenceLine({ before: 0, after: 3 })).toBe("📸 Фото: 3 после");
   });
 
-  it("source pin: sendVerificationStatePhoto prefers ПОСЛЕ, ДО is the fallback", () => {
+  it("source pin: state photo prefers ПОСЛЕ, ДО is the fallback; private paths signed at send", () => {
     const src = read("app/franchize/lib/rental-verify.ts");
     expect(src).toContain("📸 ПОСЛЕ — состояние при возврате");
     expect(src).toContain("📸 ДО — состояние при выдаче");
-    const pickOrder = src.indexOf("afterUrl\n    ? { url: afterUrl");
-    expect(pickOrder).toBeGreaterThan(-1);
+    // the ПОСЛЕ attempt is listed before the ДО attempt (array order = pick order)
+    const afterIdx = src.indexOf('path: photos?.afterPath');
+    const beforeIdx = src.indexOf('path: photos?.beforePath');
+    expect(afterIdx).toBeGreaterThan(-1);
+    expect(beforeIdx).toBeGreaterThan(afterIdx);
+    // private rental-photos bucket → signed URL minted at SEND time (durable paths)
+    expect(src).toContain('createSignedUrl(path, 3600)');
+    expect(src).toContain('from("rental-photos")');
+    // the snapshot freezes the durable storage paths from rental_photos
+    expect(src).toContain('from("rental_photos")');
   });
 
   it("source pin: the request select carries the photo counters", () => {

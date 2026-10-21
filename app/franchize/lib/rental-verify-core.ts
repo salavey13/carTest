@@ -145,6 +145,14 @@ export interface RentalVerificationSnapshot {
     after: number;
     beforeUrl?: string | null;
     afterUrl?: string | null;
+    /**
+     * Task 123 (durable part): storage paths of the LATEST «ДО»/«ПОСЛЕ» shot
+     * in the private `rental-photos` bucket (rental_photos table). A signed
+     * URL is generated at SEND time (sendVerificationStatePhoto) — paths
+     * never expire, signed links do, so resends months later still work.
+     */
+    beforePath?: string | null;
+    afterPath?: string | null;
   } | null;
   /**
    * Task 123 — NO PROBLEMO verdict frozen at request time (same pattern as
