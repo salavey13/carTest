@@ -172,8 +172,8 @@ export default async function CrewDiscoveryPage() {
                 <HowtoCard
                   icon={<Trophy className="h-5 w-5" aria-hidden />}
                   accent="#4ade80"
-                  title="Стена и рейтинг"
-                  body="Знакомься в Стене сообщества, следи за рейтингом райдеров и поездками. Лучшая реклама экипажа — живая стена и люди на карте."
+                  title="Стена и живая карта"
+                  body="Знакомься в Стене сообщества и следи за поездками райдеров на карте. Лучшая реклама экипажа — живая стена и люди на карте."
                   ctaLabel={flagship ? `Стена · ${flagship.name}` : "Стена сообщества"}
                   ctaHref={flagship ? `/franchize/${slugOf(flagship)}/community` : "/franchize/create"}
                 />
@@ -191,7 +191,6 @@ export default async function CrewDiscoveryPage() {
                   )}
                   <QuickLink href={`/franchize/${slugOf(flagship)}/map-riders`} icon={<MapPin className="h-4 w-4" aria-hidden />} label="Live-карта" sub="кто где прямо сейчас" />
                   <QuickLink href={`/franchize/${slugOf(flagship)}/community`} icon={<MessagesSquare className="h-4 w-4" aria-hidden />} label="Стена" sub={flagship.name} />
-                  <QuickLink href={`/franchize/${slugOf(flagship)}/leaderboard`} icon={<Trophy className="h-4 w-4" aria-hidden />} label="Рейтинг райдеров" sub="кто в топе" />
                   <QuickLink href={`/franchize/${slugOf(flagship)}/about`} icon={<Info className="h-4 w-4" aria-hidden />} label="Об экипаже" sub={flagship.name} />
                   <QuickLink href={`/franchize/create`} icon={<Sparkles className="h-4 w-4" aria-hidden />} label="Создать экипаж" sub="за пару минут" />
                   <QuickLink href="#all-crews" icon={<Users className="h-4 w-4" aria-hidden />} label="Все экипажи" sub={`${nodes.length} в сети`} />

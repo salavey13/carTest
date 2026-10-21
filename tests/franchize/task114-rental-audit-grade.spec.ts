@@ -237,7 +237,8 @@ describe("task114: every new verification row is graded + svc/equipment stay out
 
   it("auto-trigger stamps snapshot.audit from the pure grader before the insert", () => {
     const s = src("app/franchize/lib/rental-verify.ts");
-    expect(s).toContain('import { buildAuditStamp, computeRentalAuditGrade } from "@/app/franchize/lib/rental-audit";');
+    // Task 123 extended the same import with computeVerificationReasonability.
+    expect(s).toContain('buildAuditStamp, computeRentalAuditGrade, computeVerificationReasonability } from "@/app/franchize/lib/rental-audit";');
     const stamp = s.indexOf("snapshot.audit = buildAuditStamp(");
     const insert = s.indexOf("const insertPayload = {");
     expect(stamp).toBeGreaterThan(-1);

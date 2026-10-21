@@ -109,7 +109,9 @@ describe("discovery page — howtos + useful links", () => {
       "Создать свой экипаж",
       "Попасть на Live-карту",
       "Рукопожатия и круги",
-      "Стена и рейтинг",
+      // task 123: the fake /leaderboard is gone — the howto now sells the wall
+      // + the live map instead of a rating page that never had real data.
+      "Стена и живая карта",
     ]) {
       expect(page).toContain(title);
     }
@@ -125,19 +127,21 @@ describe("discovery page — howtos + useful links", () => {
   it("the useful-links grid is anchored on the flagship crew (most people, oldest wins ties)", () => {
     expect(page).toContain('aria-label="Полезные ссылки"');
     expect(page).toContain("node.memberCount > best.memberCount ? node : best");
-    // every key destination is one tap away
+    // every key destination is one tap away (task 123: «Рейтинг райдеров»
+    // removed — the fake /leaderboard page is dead, no link points at it)
     for (const label of [
       "Каталог мото",
       "Зимнее хранение",
       "Live-карта",
       "Стена",
-      "Рейтинг райдеров",
       "Об экипаже",
       "Создать экипаж",
       "Все экипажи",
     ]) {
       expect(page).toContain(`"${label}"`);
     }
+    expect(page).not.toContain("Рейтинг райдеров");
+    expect(page).not.toContain("/leaderboard");
   });
 
   it("storage howto targets a crew that ACTUALLY runs the storage service", () => {

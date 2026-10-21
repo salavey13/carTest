@@ -564,6 +564,14 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
       category: "operations",
       triggerSources: ["rental:verified"],
     },
+    // Task 123 (boss: «verify_100 tier») — the ladder keeps running past 50.
+    {
+      id: "verify_100",
+      title: "Сотня без споров 🎖",
+      description: "100 аренд подтверждены обеими сторонами. Сверка стала привычкой, а не разборкой — уровень легенды экипажа.",
+      category: "operations",
+      triggerSources: ["rental:verified"],
+    },
     // Task 106 (2026-10-18): negotiation «дил» badges — the dispute settle-
     // ment game. Granted when a rental reaches «verified» THROUGH an accepted
     // proposal (the pair corrected the split right in the chat and agreed).

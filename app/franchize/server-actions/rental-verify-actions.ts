@@ -35,7 +35,7 @@ import {
   verificationStatusNote,
   type RentalVerificationRow,
 } from "@/app/franchize/lib/rental-verify";
-import { buildAuditStamp, computeRentalAuditGrade } from "@/app/franchize/lib/rental-audit";
+import { buildAuditStamp, computeRentalAuditGrade, computeVerificationReasonability } from "@/app/franchize/lib/rental-audit";
 import { resolveRentalOperator, type ShiftLike } from "@/app/franchize/lib/operator-attribution";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
@@ -67,6 +67,7 @@ export async function adminVerifyRentalAction(params: {
         deposit_amount, deposit_returned,
         created_by_operator_chat_id, created_at,
         requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
+        start_photo_count, end_photo_count,
         vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result)
       `)
       .eq("rental_id", params.rentalId)
@@ -226,6 +227,27 @@ async function loadOrCreateVerificationRow(params: {
     logger.warn(`[rental-verify] audit grade failed for ${params.rental.rental_id} (non-fatal):`, auditErr);
   }
 
+  // ── Task 123: reasonability — the same freeze the auto-trigger does, so
+  // a drawer-created row collapses its расчёт too when the rental is clean.
+  try {
+    const reasonability = computeVerificationReasonability({
+      audit: {
+        grade: snapshot.audit?.grade ?? "almost",
+        notes: snapshot.audit?.notes ?? ["аудит не выполнен"],
+      },
+      markup: Number.isFinite(Number(snapshot.formula?.markup)) ? Number(snapshot.formula?.markup) : null,
+      total: Number(snapshot.totalCost) || 0,
+      penaltyAmount: Number(snapshot.penalty?.amount) || 0,
+      damageNotes: snapshot.damageNotes,
+      depositReturned: snapshot.depositReturned,
+      depositAmount: Number(params.rental.deposit_amount) || 0,
+      hasFormula: !!snapshot.formula && snapshot.formula.standardTotal > 0,
+    });
+    snapshot.reasonability = { ...reasonability, checkedAt: nowIso };
+  } catch (reasonErr) {
+    logger.warn(`[rental-verify] reasonability failed for ${params.rental.rental_id} (non-fatal):`, reasonErr);
+  }
+
   const { data: crewRow } = await supabaseAdmin
     .from("crews")
     .select("slug")
@@ -314,6 +336,7 @@ export async function resendVerificationDmsAction(params: {
         deposit_amount, deposit_returned,
         created_by_operator_chat_id, created_at,
         requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
+        start_photo_count, end_photo_count,
         vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result)
       `)
       .eq("rental_id", params.rentalId)

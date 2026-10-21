@@ -133,6 +133,31 @@ export interface RentalVerificationSnapshot {
   };
   /** Task 117: bike main photo (cars.image_url) — sent as a preview photo. */
   bikePhotoUrl?: string | null;
+  /**
+   * Task 123 — photo presence frozen at request time: how many «ДО»/«ПОСЛЕ»
+   * shots the rental carries (metadata counts + pickup_freeze), plus the
+   * canonical URL of each state when one exists (start_photo_url /
+   * end_photo_url, fallback pickup_freeze.photo_urls[0]). Optional — rows
+   * created before task 123 degrade gracefully.
+   */
+  photos?: {
+    before: number;
+    after: number;
+    beforeUrl?: string | null;
+    afterUrl?: string | null;
+  } | null;
+  /**
+   * Task 123 — NO PROBLEMO verdict frozen at request time (same pattern as
+   * the audit block): when «no_problemo», the DM collapses the full расчёт
+   * into a Telegram <blockquote expandable> under a calm 🟢 headline with
+   * these ✅ checks. «normal» keeps the rich task-117 layout. Optional —
+   * pre-task-123 rows degrade to normal.
+   */
+  reasonability?: {
+    mode: "no_problemo" | "normal";
+    checks: string[];
+    checkedAt?: string;
+  } | null;
 }
 
 export interface RentalVerificationRow {
@@ -388,6 +413,21 @@ export function auditGradeLine(audit?: { grade: "fine" | "almost" | "sus"; notes
 }
 
 /**
+ * Task 123 — the 📸 presence line: how many «ДО»/«ПОСЛЕ» shots the rental
+ * carries. null when the rental has no photo data at all (old rows).
+ */
+export function photoPresenceLine(photos?: RentalVerificationSnapshot["photos"]): string | null {
+  if (!photos) return null;
+  const before = Math.max(0, Math.trunc(Number(photos.before) || 0));
+  const after = Math.max(0, Math.trunc(Number(photos.after) || 0));
+  if (before <= 0 && after <= 0) return null;
+  const parts: string[] = [];
+  if (before > 0) parts.push(`${before} до`);
+  if (after > 0) parts.push(`${after} после`);
+  return `📸 Фото: ${parts.join(" · ")}`;
+}
+
+/**
  * Builds the HTML summary both parties receive. Same numbers as the profile
  * TL;DR rows (техника · экип · нац. split) — the operator recognizes the
  * format, the owner gets the audit trail (damage, penalty, deposit, notes).
@@ -398,6 +438,14 @@ export function auditGradeLine(audit?: { grade: "fine" | "almost" | "sus"; notes
  * recipient can press ✅ from the message alone, without digging for
  * coefficients. Everything degrades to the old compact view for rows frozen
  * before task117 (optional fields absent).
+ *
+ * Task 123 — NO PROBLEMO layout: when snapshot.reasonability.mode is
+ * «no_problemo» (audit fine + no penalty + no damage + formula frozen), the
+ * message LEADS with a calm 🟢 headline + the short ✅ checklist, and the
+ * whole расчёт (commission breakdown + formula + audit + attribution +
+ * flags) collapses into a Telegram <blockquote expandable> — the native
+ * collapsible spoiler. The rich layout stays for every rental worth a
+ * second look, so «normal» rows visually EARN the extra reading time.
  */
 export function formatVerificationSummary(params: {
   crewName: string | null;
@@ -429,14 +477,42 @@ export function formatVerificationSummary(params: {
   }
   lines.push(`💵 Сумма аренды (клиент): <b>${formatRubVerify(s.totalCost)}</b>`, ``);
 
-  lines.push(`📊 <b>Комиссия оператора: ${formatRubVerify(s.total)}</b>`);
-  lines.push(`  • техника (${escapeVerifyHtml(s.rentalCategoryLabel)}): +${formatRubVerify(s.base)}`);
-  lines.push(
+  // ── Task 123: NO PROBLEMO compact layout ──
+  // The расчёт below (commission + formula + audit + attribution + flags)
+  // becomes an expandable spoiler; the calm verdict leads instead.
+  const noProblemo = s.reasonability?.mode === "no_problemo";
+  if (noProblemo) {
+    lines.push(`🟢 <b>No problemo</b> — все проверки сошлись, можно одним глазом:`);
+    for (const c of s.reasonability?.checks || []) lines.push(`  ✅ ${escapeVerifyHtml(c)}`);
+    const photoLine = photoPresenceLine(s.photos);
+    if (photoLine) lines.push(photoLine);
+    // A return comment is context, not a problem — keep it OUT of the
+    // spoiler so the reader sees it without expanding anything.
+    if (s.returnNotes) lines.push(`📝 комментарий: ${escapeVerifyHtml(s.returnNotes)}`);
+  }
+
+  if (noProblemo) lines.push(``, `🧾 <b>Детали расчёта</b> — свёрнуты, развернуть можно тапом:`);
+
+  const detail: string[] = [];
+  if (noProblemo) {
+    detail.push(`📊 <b>Комиссия оператора: ${formatRubVerify(s.total)}</b>`);
+  } else {
+    lines.push(`📊 <b>Комиссия оператора: ${formatRubVerify(s.total)}</b>`);
+  }
+  // Task 123 router: in the compact layout every расчёт line below lands in
+  // the spoiler (detail) instead of the visible body (lines). Variadic —
+  // some blocks push a blank separator + content in one call.
+  const out = (...ls: string[]): void => {
+    if (noProblemo) detail.push(...ls);
+    else lines.push(...ls);
+  };
+  out(`  • техника (${escapeVerifyHtml(s.rentalCategoryLabel)}): +${formatRubVerify(s.base)}`);
+  out(
     s.equipment > 0
       ? `  • экипировка${s.equipmentFlags ? ` (${escapeVerifyHtml(s.equipmentFlags)})` : ""}: +${formatRubVerify(s.equipment)}`
       : `  • экипировка: нет`,
   );
-  lines.push(
+  out(
     s.overprice > 0
       ? `  • наценка (${s.overpricePercent}%): +${formatRubVerify(s.overprice)}`
       : `  • наценка: нет`,
@@ -445,39 +521,39 @@ export function formatVerificationSummary(params: {
   // ── Task 117: «откуда цифры» — the full formula ──
   const f = s.formula;
   if (f && !f.fallback && f.standardTotal > 0) {
-    lines.push(``, `🧮 <b>Откуда цифры</b>`);
+    out(``, `🧮 <b>Откуда цифры</b>`);
     if (f.bikeHours > 0 && f.bikeDays === 0) {
-      lines.push(`  🏍 мот: ${f.bikeHours} ч × ${formatRubVerify(f.bikeRate || 0)} = ${formatRubVerify(f.bikeStandard)}`);
+      out(`  🏍 мот: ${f.bikeHours} ч × ${formatRubVerify(f.bikeRate || 0)} = ${formatRubVerify(f.bikeStandard)}`);
     } else {
-      lines.push(
+      out(
         `  🏍 мот: ${f.bikeDays} ${f.bikeDays === 1 ? "сутки" : "суток"} × ${formatRubVerify(f.bikeRate || 0)}${
           f.bikeTierLabel ? ` (${escapeVerifyHtml(f.bikeTierLabel)})` : ""
         } = ${formatRubVerify(f.bikeStandard)}`,
       );
     }
     if (f.gearLines.length > 0) {
-      lines.push(`  🧰 экип по прайсу: ${f.gearLines.map((l) => escapeVerifyHtml(l)).join(" · ")} = ${formatRubVerify(f.gearStandard)}`);
+      out(`  🧰 экип по прайсу: ${f.gearLines.map((l) => escapeVerifyHtml(l)).join(" · ")} = ${formatRubVerify(f.gearStandard)}`);
       // Task 118: the day ladder for multi-day gear (1st day full, then half).
       if (f.gearDaysLine) {
         const label = f.gearDaysLabel || (f.gearDays && f.gearDays > 1 ? `${f.gearDays} суток` : "");
-        lines.push(`  ↳ экип за ${escapeVerifyHtml(label)}: ${escapeVerifyHtml(f.gearDaysLine)}`);
+        out(`  ↳ экип за ${escapeVerifyHtml(label)}: ${escapeVerifyHtml(f.gearDaysLine)}`);
       }
     } else {
-      lines.push(`  🧰 экип по прайсу: нет`);
+      out(`  🧰 экип по прайсу: нет`);
     }
-    lines.push(`  ↳ эталон: ${formatRubVerify(f.standardTotal)} · клиент: ${formatRubVerify(f.clientTotal)} → наценка ${formatRubVerify(f.markup)}`);
+    out(`  ↳ эталон: ${formatRubVerify(f.standardTotal)} · клиент: ${formatRubVerify(f.clientTotal)} → наценка ${formatRubVerify(f.markup)}`);
     if (s.overprice > 0) {
-      lines.push(`  ↳ наценка: ${formatRubVerify(f.markup)} × ${f.overpricePercent}% = ${formatRubVerify(s.overprice)}`);
+      out(`  ↳ наценка: ${formatRubVerify(f.markup)} × ${f.overpricePercent}% = ${formatRubVerify(s.overprice)}`);
     }
     // Task 118: the equipment commission ladder («(200 + 100 + 100) × 3 ед. = 1 200 ₽»).
     if (f.equipCommLine && s.equipment > 0) {
-      lines.push(`  ↳ комиссия за экип: ${escapeVerifyHtml(f.equipCommLine)} = ${formatRubVerify(s.equipment)}`);
+      out(`  ↳ комиссия за экип: ${escapeVerifyHtml(f.equipCommLine)} = ${formatRubVerify(s.equipment)}`);
     }
     const followupNote =
       Number(f.equipFollowupUnit) > 0 && Number(f.equipmentUnitCoef) !== Number(f.equipFollowupUnit)
         ? ` (со 2-х суток ${formatRubVerify(Number(f.equipFollowupUnit))}/ед)`
         : "";
-    lines.push(
+    out(
       `  📜 коэф.: мот ${formatRubVerify(f.baseCoef)}/аренда · экип ${formatRubVerify(f.equipmentUnitCoef)}/ед${followupNote} · наценка ${f.overpricePercent}%`,
     );
     // Task 120: the short-rental rule is part of the legend — the halved
@@ -488,11 +564,11 @@ export function formatVerificationSummary(params: {
     // operator nor the owner received the сверка at all (row was already
     // persisted → silent death after the insert). Always escape: `&lt;`.
     if (f.shortRental) {
-      lines.push(
+      out(
         `  ↳ аренда &lt; 24 ч — комиссия пополам: мот ${formatRubVerify(f.baseCoef)} → ${formatRubVerify(Math.round(f.baseCoef / 2))} · экип ${formatRubVerify(f.equipmentUnitCoef)} → ${formatRubVerify(Math.round(f.equipmentUnitCoef / 2))}/ед`,
       );
     }
-    lines.push(
+    out(
       `  ℹ️ экип клиенту: 1-е сутки полная цена, дальше — половина; мот: тариф зависит от длительности, комиссия — фикс за аренду${f.shortRental ? "; аренда меньше суток — комиссия пополам" : ""}`,
     );
   }
@@ -500,7 +576,7 @@ export function formatVerificationSummary(params: {
   // ── Task 117: the operator's score (копилка) ──
   if (params.operatorScore) {
     const opLabel = escapeVerifyHtml(labelFromUsersMap(params.usersMap, params.operatorChatId || s.attribution?.createdByChatId));
-    lines.push(
+    out(
       ``,
       `🏅 Счёт ${opLabel}: <b>${formatRubVerify(params.operatorScore.sum)}</b> подтверждено (${params.operatorScore.count} ар.)`,
     );
@@ -508,7 +584,7 @@ export function formatVerificationSummary(params: {
 
   // ── Task 117: audit grade (frozen at request) ──
   const auditLine = auditGradeLine(s.audit);
-  if (auditLine) lines.push(auditLine);
+  if (auditLine) out(auditLine);
 
   const attrs = [
     s.attribution.createdByChatId
@@ -521,7 +597,7 @@ export function formatVerificationSummary(params: {
       ? `принял ${escapeVerifyHtml(labelFromUsersMap(params.usersMap, s.attribution.returnedByChatId))}`
       : "",
   ].filter(Boolean);
-  if (attrs.length) lines.push(``, `👥 ${attrs.join(" · ")}`);
+  if (attrs.length) out(``, `👥 ${attrs.join(" · ")}`);
 
   const flags: string[] = [];
   if (s.depositReturned === true) flags.push("💰 депозит: возвращён");
@@ -534,9 +610,22 @@ export function formatVerificationSummary(params: {
     );
   }
   if (s.damageNotes) flags.push(`🩹 ущерб: ${escapeVerifyHtml(s.damageNotes)}`);
-  if (s.returnNotes) flags.push(`📝 комментарий: ${escapeVerifyHtml(s.returnNotes)}`);
-  if (flags.length) lines.push(``, ...flags);
+  if (flags.length) out(``, ...flags);
 
+  if (!noProblemo) {
+    // Task 123: the photo presence line lives right before the status note in
+    // the rich layout (in the compact one it is already up top).
+    const photoLine = photoPresenceLine(s.photos);
+    if (photoLine) lines.push(``, photoLine);
+    lines.push(``, params.statusNote);
+    return lines.join("\n");
+  }
+
+  // ── Task 123: assemble the collapsed spoiler ──
+  // <blockquote expandable> is Telegram's native collapsible section: the
+  // text inside renders folded until the reader taps it. The calculation is
+  // still fully there (audit trail!) — it just stops shouting.
+  lines.push(``, `<blockquote expandable>${detail.join("\n")}</blockquote>`);
   lines.push(``, params.statusNote);
   return lines.join("\n");
 }
@@ -649,8 +738,9 @@ export function verificationSpeedLine(
 /**
  * 🏆 The ladder to the NEXT verification achievement (names mirror the
  * profile-actions catalog: verify_10 «Безупречная десятка 🧾», verify_50
- * «Полсотни рукопожатий 💯»). null once the ladder is finished — the line
- * would only be noise for a 50× veteran.
+ * «Полсотни рукопожатий 💯», verify_100 «Сотня без споров 🎖» — task 123).
+ * null once the ladder is finished — the line would only be noise for a
+ * 100× veteran.
  */
 export function verifyProgressLine(verifiedCount: number): string | null {
   const c = Math.max(0, Math.trunc(verifiedCount) || 0);
@@ -658,6 +748,8 @@ export function verifyProgressLine(verifiedCount: number): string | null {
     `🏆 До достижения «${title}» — ещё ${target - c} ${ruPlural(target - c, "сверку", "сверки", "сверок")}`;
   if (c < 10) return line(10, "Безупречная десятка 🧾");
   if (c < 50) return line(50, "Полсотни рукопожатий 💯");
+  // Task 123 (boss: «verify_100 tier») — the ladder keeps running past 50.
+  if (c < 100) return line(100, "Сотня без споров 🎖");
   return null;
 }
 

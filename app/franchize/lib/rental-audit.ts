@@ -168,3 +168,75 @@ export function computeRentalAuditGrade(input: RentalAuditInput): RentalAuditRes
 export function buildAuditStamp(audit: RentalAuditResult, nowIso: string, checker: string) {
   return { ...audit, notes: [...audit.notes], checked_at: nowIso, checker };
 }
+
+// ── Task 123 — NO PROBLEMO: the reasonability layer over the audit ──────────
+//
+// Boss (2026-10-22): «if it looks super ok, then verification notification can
+// be simpler — kinda details can be collapsed into spoiler; highlight such
+// rentals as "no problemo" — that should increase speed of verification and
+// overall enjoyment of the process».
+//
+// The audit grade (fine/almost/sus) already answers «do the books agree?».
+// Reasonability adds the last-mile checks the audit never saw (penalty,
+// damage notes) and converts the whole picture into ONE DM layout decision:
+//
+//   no_problemo → compact DM, the full расчёт collapses into a Telegram
+//                 <blockquote expandable> (the native spoiler), headline
+//                 «🟢 No problemo».
+//   normal      → the task-117 rich layout, every line visible.
+//
+// Deliberately NOT a blocker (numbers are still internally consistent, the
+// наценка is a computed+frozen part of the deal): markup > 0. A premium
+// price is business as usual — the DM still spells it out, just inside the
+// spoiler. Pure module, no I/O.
+
+export type ReasonabilityMode = "no_problemo" | "normal";
+
+export interface VerificationReasonability {
+  mode: ReasonabilityMode;
+  /** Calm «что именно проверено» lines for the collapsed DM headline. */
+  checks: string[];
+}
+
+export interface ReasonabilityInput {
+  audit: { grade: RentalAuditGrade; notes: string[] };
+  /** What the client paid over the эталон (null when the formula is absent). */
+  markup: number | null;
+  total: number;
+  penaltyAmount: number;
+  damageNotes: string | null;
+  depositReturned: boolean | null;
+  depositAmount: number | null;
+  /** The formula block is frozen (task 117+) — old rows degrade to normal. */
+  hasFormula: boolean;
+}
+
+export function computeVerificationReasonability(input: ReasonabilityInput): VerificationReasonability {
+  // ru-RU grouping (1 0 000 → «10 000») so the check line matches the way
+  // every other сумма in the DM renders (the NBSP is intentional).
+  const rubFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
+  const fmtRub = (v: number): string => `${rubFmt.format(Math.round(v))} ₽`;
+  const blockers: string[] = [];
+
+  // The audit verdict is the backbone: any almost/sus note → normal layout.
+  if (input.audit.grade !== "fine") blockers.push(...(input.audit.notes || []).slice(0, 2));
+  if (Number(input.penaltyAmount) > 0) blockers.push("удержан штраф из залога");
+  if (input.damageNotes && String(input.damageNotes).trim()) blockers.push("отмечен ущерб");
+  if (!(Number(input.total) > 0)) blockers.push("нулевой или неизвестный чек");
+  // Old rows (pre-task117) have no frozen formula — nothing to collapse.
+  if (!input.hasFormula) blockers.push("нет замороженного расчёта (аренда до task117)");
+
+  if (blockers.length > 0) {
+    return { mode: "normal", checks: [] };
+  }
+
+  // The calm checklist — what the one-glance ✅ actually confirms.
+  const checks: string[] = [];
+  checks.push(`расчёт сошёлся с эталоном${Number(input.markup) > 0 ? ` (наценка ${fmtRub(Math.round(Number(input.markup)))} учтена в расчёте)` : " — без наценки"}`);
+  if (input.depositReturned === true) checks.push("депозит возвращён");
+  else if (Number(input.depositAmount) > 0) checks.push("депозит помечен возвращённым");
+  else checks.push("депозит не собирался");
+  checks.push("без ущерба и штрафов");
+
+  return { mode: "no_problemo", checks };
+}

@@ -122,8 +122,17 @@ describe("task122 · achievement ladder (🏆 mirrors the profile catalog)", () 
     expect(verifyProgressLine(49)).toContain("ещё 1 сверку");
   });
 
-  it("null once the ladder is finished (50+)", () => {
-    expect(verifyProgressLine(50)).toBeNull();
+  // Task 123 (boss: «verify_100 tier»): the ladder continues past 50 —
+  // 50..99 now point at «Сотня без споров 🎖», null only from 100 up.
+  it("targets Сотня без споров from 50 to 99 (task123 ladder continuation)", () => {
+    expect(verifyProgressLine(50)).toContain("Сотня без споров 🎖");
+    expect(verifyProgressLine(50)).toContain("ещё 50 сверок");
+    expect(verifyProgressLine(98)).toContain("ещё 2 сверки");
+    expect(verifyProgressLine(99)).toContain("ещё 1 сверку");
+  });
+
+  it("null once the ladder is finished (100+)", () => {
+    expect(verifyProgressLine(100)).toBeNull();
     expect(verifyProgressLine(120)).toBeNull();
   });
 

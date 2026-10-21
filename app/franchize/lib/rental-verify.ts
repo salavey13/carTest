@@ -55,7 +55,7 @@ import {
 } from "@/lib/salary-coefficients-shared";
 import { resolveRentalOperator, type ShiftLike } from "@/app/franchize/lib/operator-attribution";
 // Task 114: per-rental audit grade computed at request time (pure module).
-import { buildAuditStamp, computeRentalAuditGrade } from "@/app/franchize/lib/rental-audit";
+import { buildAuditStamp, computeRentalAuditGrade, computeVerificationReasonability } from "@/app/franchize/lib/rental-audit";
 // Task 117: the operator score uses the SAME commission math as the payout hub.
 import { commissionOf } from "./rental-payout-core";
 import {
@@ -169,6 +169,9 @@ export async function computeRentalVerificationSnapshot(params: {
     agreed_end_date: string | null;
     created_by_operator_chat_id?: string | null;
     created_at?: string | null;
+    /** Task 123: photo counters — optional so old callers keep compiling. */
+    start_photo_count?: number | null;
+    end_photo_count?: number | null;
     vehicle: {
       id?: string;
       make?: string | null;
@@ -241,6 +244,39 @@ export async function computeRentalVerificationSnapshot(params: {
     gearDays,
   );
   const bikeImage = typeof (vehicle as any)?.image_url === "string" ? (vehicle as any).image_url.trim() : "";
+  // ── Task 123: photo presence frozen with the numbers ──
+  // Counts: the rental columns are the truth the return page shows; the
+  // metadata sources (pickup_freeze.photo_urls, start/end_photo_url) fill the
+  // gaps when a column was not maintained. Canonical URL per state: the
+  // renter-uploaded «ДО»/«ПОСЛЕ» shot wins, otherwise the first pickup-freeze
+  // photo represents «ДО». null (field absent) when a rental has neither —
+  // the DM then simply shows no photo line.
+  const freezePhotos = Array.isArray(freeze?.photo_urls)
+    ? (freeze!.photo_urls as unknown[]).filter((u): u is string => typeof u === "string" && /^https:\/\//i.test(u.trim()))
+    : [];
+  const startPhotoUrl =
+    typeof meta.start_photo_url === "string" && /^https:\/\//i.test(meta.start_photo_url.trim())
+      ? meta.start_photo_url.trim()
+      : null;
+  const endPhotoUrl =
+    typeof meta.end_photo_url === "string" && /^https:\/\//i.test(meta.end_photo_url.trim())
+      ? meta.end_photo_url.trim()
+      : null;
+  const photosBefore = Math.max(
+    Number(rental.start_photo_count) || 0,
+    freezePhotos.length,
+    startPhotoUrl ? 1 : 0,
+  );
+  const photosAfter = Math.max(Number(rental.end_photo_count) || 0, endPhotoUrl ? 1 : 0);
+  const photosBlock =
+    photosBefore > 0 || photosAfter > 0
+      ? {
+          before: photosBefore,
+          after: photosAfter,
+          beforeUrl: startPhotoUrl || freezePhotos[0] || null,
+          afterUrl: endPhotoUrl,
+        }
+      : null;
   return {
     bikeName: `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim(),
     rentalCategory: categories.rental,
@@ -317,6 +353,7 @@ export async function computeRentalVerificationSnapshot(params: {
       overpricePercent: config.overpricePercent,
     },
     bikePhotoUrl: bikeImage.startsWith("http") ? bikeImage : null,
+    photos: photosBlock,
   };
 }
 
@@ -387,6 +424,7 @@ export async function requestRentalVerification(params: {
         deposit_amount, deposit_returned,
         created_by_operator_chat_id, created_at,
         requested_start_date, requested_end_date, agreed_start_date, agreed_end_date,
+        start_photo_count, end_photo_count,
         vehicle:cars(id, make, model, specs, daily_price, type, crew_id, is_test_result, image_url)
       `)
       .eq("rental_id", params.rentalId)
@@ -444,6 +482,8 @@ export async function requestRentalVerification(params: {
         agreed_end_date: rental.agreed_end_date,
         created_by_operator_chat_id: rental.created_by_operator_chat_id,
         created_at: rental.created_at,
+        start_photo_count: (rental as any).start_photo_count,
+        end_photo_count: (rental as any).end_photo_count,
         vehicle,
       },
       crewId: rental.crew_id,
@@ -487,6 +527,32 @@ export async function requestRentalVerification(params: {
     } catch (auditErr) {
       // Non-fatal: an ungraded row only loses the bulk sweep shortcut.
       logger.warn(`[rental-verify] audit grade failed for ${rental.rental_id} (non-fatal):`, auditErr);
+    }
+
+    // ── Task 123: NO PROBLEMO verdict — frozen with the numbers ──
+    // The audit grade + the last-mile checks (penalty/damage/deposit) decide
+    // the DM layout NOW, at request time: clean rentals collapse their расчёт
+    // into a Telegram expandable spoiler under the 🟢 headline. Frozen like
+    // the audit block so a resend months later shows the SAME layout the
+    // parties first saw.
+    try {
+      const reasonability = computeVerificationReasonability({
+        audit: {
+          grade: snapshot.audit?.grade ?? "almost",
+          notes: snapshot.audit?.notes ?? ["аудит не выполнен"],
+        },
+        markup: Number.isFinite(Number(snapshot.formula?.markup)) ? Number(snapshot.formula?.markup) : null,
+        total: Number(snapshot.totalCost) || 0,
+        penaltyAmount: Number(snapshot.penalty?.amount) || 0,
+        damageNotes: snapshot.damageNotes,
+        depositReturned: snapshot.depositReturned,
+        depositAmount: Number(rental.deposit_amount) || 0,
+        hasFormula: !!snapshot.formula && snapshot.formula.standardTotal > 0,
+      });
+      snapshot.reasonability = { ...reasonability, checkedAt: nowIso };
+    } catch (reasonErr) {
+      // Non-fatal: an ungraded layout just means the rich DM stays.
+      logger.warn(`[rental-verify] reasonability failed for ${rental.rental_id} (non-fatal):`, reasonErr);
     }
 
     const { data: crewRow } = await supabaseAdmin
@@ -568,6 +634,9 @@ export async function requestRentalVerification(params: {
         // cap at 1024 chars, too tight for the rich formula text), then the
         // full summary. Photo failure is cosmetic — the summary must land.
         await sendVerificationBikePhoto(chatId, snapshot.bikePhotoUrl, snapshot.bikeName);
+        // Task 123: the rental's own ДО/ПОСЛЕ state shot (one photo, see
+        // sendVerificationStatePhoto) + photo counts live in the summary.
+        await sendVerificationStatePhoto(chatId, snapshot.photos);
         await sendComplexMessage(chatId, summary, keyboard, { parseMode: "HTML", keyboardType: "inline" });
       } catch (e) {
         logger.warn(`[rental-verify] summary send failed for ${chatId} (rental ${rental.rental_id}):`, e);
@@ -586,6 +655,7 @@ export async function requestRentalVerification(params: {
         rentalId: rental.rental_id,
         summary,
         bikePhotoUrl: snapshot.bikePhotoUrl,
+        statePhotos: snapshot.photos,
         keyboard: keyboard as unknown as InlineButton[][],
         exclude: [
           operatorChatId,
@@ -887,6 +957,39 @@ async function sendVerificationBikePhoto(
   }
 }
 
+/**
+ * Task 123 — the rental's own «ДО/ПОСЛЕ» state photo, right after the bike
+ * preview (boss: «besides picture of the bike — send photos before/after
+ * presence»). ONE extra message per recipient, deliberately: the «ПОСЛЕ»
+ * shot is the one a сверка actually needs (state at return), «ДО» rides as
+ * the fallback when no return photo exists; both counts still show in the
+ * summary text. Cosmetic-only — never blocks the summary.
+ */
+async function sendVerificationStatePhoto(
+  chatId: string,
+  photos: RentalVerificationSnapshot["photos"],
+): Promise<void> {
+  const afterUrl = (photos?.afterUrl || "").trim();
+  const beforeUrl = (photos?.beforeUrl || "").trim();
+  const pick = afterUrl
+    ? { url: afterUrl, caption: "📸 ПОСЛЕ — состояние при возврате" }
+    : beforeUrl
+      ? { url: beforeUrl, caption: "📸 ДО — состояние при выдаче" }
+      : null;
+  if (!pick || !/^https:\/\//i.test(pick.url)) return;
+  try {
+    const res = await telegramDeliver("sendPhoto", chatId, {
+      photo: pick.url,
+      caption: pick.caption,
+    });
+    if (res?.ok === false) {
+      logger.warn(`[rental-verify] state photo rejected for ${chatId}: ${res.error || "unknown"}`);
+    }
+  } catch (e) {
+    logger.warn(`[rental-verify] state photo send failed for ${chatId} (cosmetic):`, e);
+  }
+}
+
 // ── VF-FIX 2026-10-18: staff cc helper ─────────────────────────────────────
 
 /**
@@ -943,6 +1046,8 @@ export async function ccVerificationToCrewStaff(params: {
   summary: string;
   /** Task 117: bike photo preview sent right before the copy (cosmetic). */
   bikePhotoUrl?: string | null;
+  /** Task 123: the rental's own ДО/ПОСЛЕ state shot for the staff copy. */
+  statePhotos?: RentalVerificationSnapshot["photos"];
   exclude: Array<string | null | undefined>;
   /** Task 118: the ✅/⚠️ keyboard for staff (they are first-class actors now). */
   keyboard?: InlineButton[][];
@@ -1001,6 +1106,8 @@ export async function ccVerificationToCrewStaff(params: {
         // Task 117: the same bike preview the parties got (cosmetic — never
         // counted as a delivery, never blocks the text copy).
         await sendVerificationBikePhoto(chatId, params.bikePhotoUrl, "");
+        // Task 123: the ДО/ПОСЛЕ state shot rides along for staff too.
+        await sendVerificationStatePhoto(chatId, params.statePhotos);
       } catch {
         /* cosmetic only */
       }
@@ -2181,7 +2288,7 @@ function isSpeedyConfirm(row: RentalVerificationRow): boolean {
  *   • rentalsVerified counter — ABSOLUTE SET from the DB (the shift.ts
  *     «731 смены» lesson: derived values are never incremented from stale
  *     totals);
- *   • verify_first / verify_10 / verify_50 thresholds;
+ *   • verify_first / verify_10 / verify_50 / verify_100 thresholds;
  *   • verify_speedy — both sides agreed within one hour of the request.
  */
 export async function grantVerificationAchievements(
@@ -2215,6 +2322,8 @@ export async function grantVerificationAchievements(
       if (verifiedCount >= 1) grants.push({ id: "verify_first", context: { verifiedCount } });
       if (verifiedCount >= 10) grants.push({ id: "verify_10", context: { verifiedCount } });
       if (verifiedCount >= 50) grants.push({ id: "verify_50", context: { verifiedCount } });
+      // Task 123 (boss: «verify_100 tier») — the ladder continues.
+      if (verifiedCount >= 100) grants.push({ id: "verify_100", context: { verifiedCount } });
       if (opts.speedy) {
         grants.push({
           id: "verify_speedy",
