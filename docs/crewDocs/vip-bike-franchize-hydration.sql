@@ -3,6 +3,10 @@
 -- Purpose: production-like seed with metadata-first approach + private.crew_secrets extraction
 -- Safe to re-run: uses ON CONFLICT + jsonb_set + private upsert
 -- Updated: 2026-06-16 — Black + Gold / Cyan palette (gold dark theme, electric cyan light theme)
+-- Updated: 2026-10-21 — task 115: «Колесо фортуны» in header.menuLinks (after «Карта»)
+--   + catalog.adCards re-synced to live metadata (wheel-fortune-card, 4 cards total).
+--   Wheel page /franchize/{slug}/wheel is crew-agnostic; WHEEL* promo codes are
+--   platform-level BUILT_IN_PROMO_CODES (app/franchize/actions-runtime.ts).
 --   Dark: Deep black (#0A0A0A) with gold accents (#FFD700) for premium feel
 --   Light: Off-white (#FAFAFA) with electric cyan (#00FFFF) accents for crisp modern look
 --   Palette trimmed to 7 tokens — the only keys consumed by resolvePaletteByMode():
@@ -145,6 +149,11 @@ set
           'menuLinks', jsonb_build_array(
             jsonb_build_object('label', 'Каталог', 'href', '/franchize/{slug}'),
             jsonb_build_object('label', 'Карта', 'href', '/franchize/{slug}/map-riders'),
+            -- task 115 (boss 2026-10-21): wheel of fortune promo page in the
+            -- hamburger menu. Page /franchize/{slug}/wheel is crew-agnostic
+            -- (dynamic slug route + slug-parameterized server actions;
+            -- WHEEL* promo codes are platform-level BUILT_IN_PROMO_CODES).
+            jsonb_build_object('label', 'Колесо фортуны', 'href', '/franchize/{slug}/wheel'),
             jsonb_build_object('label', 'Каталог-electro', 'href', '/franchize/{slug}/electro-enduro'),
             jsonb_build_object('label', 'Конфигуратор', 'href', '/franchize/{slug}/configurator'),
             jsonb_build_object('label', 'О нас', 'href', '/franchize/{slug}/about'),
@@ -316,8 +325,13 @@ set
             )
           ),
           'adCards', jsonb_build_array(
-            jsonb_build_object('id', 'map-riders-card', 'title', 'Карта райдеров', 'subtitle', 'Найдите попутчиков и маршруты для электропоездок по Нижнему Новгороду', 'href', '/franchize/vip-bike/map-riders', 'imageUrl', '', 'badge', 'Сообщество', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 85, 'ctaLabel', 'Открыть карту'),
-            jsonb_build_object('id', 'configurator-card', 'title', 'Конфигуратор электробайка', 'subtitle', 'Соберите свой VipBike: мотор, батарея, цвет, аксессуары — мгновенный расчёт цены', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Популярное', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Собрать байк')
+            -- task 115 (2026-10-21): mirror of the LIVE metadata (patched via
+            -- scripts/task115-hydrate-wheel-vipbike.py). Re-hydration from this
+            -- file must never wipe live cards (same rule as menuLinks above).
+            jsonb_build_object('id', 'wheel-fortune-card', 'title', 'Колесо фортуны', 'subtitle', 'Крути колесо и забирай скидку: 1 000 ₽, 2 000 ₽, 5 000 ₽ или 15% на аренду и покупку. Одна крутка в сутки — зайди и попробуй удачу.', 'href', '/franchize/vip-bike/wheel', 'imageUrl', '', 'badge', 'Призы каждый день', 'activeFrom', '2026-10-21', 'activeTo', '2026-12-31', 'priority', 96, 'ctaLabel', 'Крутить колесо'),
+            jsonb_build_object('id', 'map-riders-card', 'title', 'Карта райдеров и Сеть экипажей', 'subtitle', 'Живая карта маршрутов и вкладка «Сеть»: круги экипажей, связи райдеров и зум с деталями. Находи попутчиков и смотри, кто с кем катает.', 'href', '/franchize/vip-bike/map-riders', 'imageUrl', '', 'badge', 'Сообщество · обновлено', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 92, 'ctaLabel', 'Открыть карту и Сеть'),
+            jsonb_build_object('id', 'configurator-card', 'title', 'Конфигуратор электробайка', 'subtitle', 'Соберите свой VipBike: мотор, батарея, цвет, аксессуары — мгновенный расчёт цены', 'href', '/franchize/vip-bike/configurator', 'imageUrl', '', 'badge', 'Популярное', 'activeFrom', '2026-08-01', 'activeTo', '2026-12-31', 'priority', 90, 'ctaLabel', 'Собрать байк'),
+            jsonb_build_object('id', 'community-wall-card', 'title', 'Стена экипажа', 'subtitle', 'Посты, отчёты о заездах и встречи райдеров — прямая ссылка на сообщество. Публикуй, собирай лайки, подогревай движ.', 'href', '/franchize/vip-bike/community', 'imageUrl', '', 'badge', 'Прожарка', 'activeFrom', '2026-10-14', 'activeTo', '2026-12-31', 'priority', 86, 'ctaLabel', 'Читать сообщество')
           ),
           'floatingCart', jsonb_build_object('showOn', jsonb_build_array('catalog', 'about', 'contacts', 'order'), 'showScrollTopButton', true)
         ),

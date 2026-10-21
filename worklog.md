@@ -1049,3 +1049,21 @@ Work Log:
 Stage Summary:
 - Creator теперь получает ДВЕ нотификации: «рассылка начата (аудитория N)» перед fanout и «✅ завершено: доставлено X / не доставлено Y» после; счётчик доставленных честный (ledger + один in-run ретрай провалов).
 - startapp=wheel в коде корректен — баг живёт в устаревшем prod-деплое rental.vip-bike.ru; нужно redeploy production.
+
+---
+Task ID: 115-ads-crud-wheel-hydration
+Agent: main (Claude)
+Task: boss 2026-10-21 — extend catalog ADS editing with delete/create; add wheel AD to vip-bike; doublecheck wheel is crew-agnostic; add wheel link to crew header main menu via crew metadata (docs/crewDocs vip-bike hydration sql).
+
+Work Log:
+- Root cause «can't create ad items»: CatalogCardsQuickAdmin.addRow set expandedId «new-ad-N», but rowKey() built «ad-N» from empty row.id → keys NEVER matched, fresh card rendered collapsed at the list bottom → looked like create is broken (edit-only UI). Delete existed all along inside the expanded panel.
+- Fix: addRow mints a stable temp id (`ad-<base36 ts>` / `promo-…`) right at creation; expandedId matches rowKey exactly → new card auto-expands + scrollIntoView (block:center) via rAF; row wrapper got id="card-row-<key>" anchor. Server keeps non-empty client ids as-is (row.id.trim() || mint) — id stable across saves.
+- Wheel crew-agnosticism VERIFIED: page /franchize/[slug]/wheel (dynamic slug), server action slug from request, lib slug-parameterized (storage key `franchize-wheel-spin:{slug}`), zero vip-bike hardcode; WHEEL1000/2000/5000/15 are platform-level BUILT_IN_PROMO_CODES valid on any crew cart.
+- Hydrated live vip-bike metadata (scripts/task115-hydrate-wheel-vipbike.py, idempotent, re-run verified): catalog.adCards += wheel-fortune-card (badge «Призы каждый день», prio 96 top, href /franchize/vip-bike/wheel, active 2026-10-21..2026-12-31); header.menuLinks += «Колесо фортуны» → /franchize/{slug}/wheel inserted after «Карта» (12→13 links). Only these two arrays touched, sibling metadata byte-identical.
+- docs/crewDocs/vip-bike-franchize-hydration.sql: menuLinks + wheel entry, adCards re-synced to live mirror (4 cards incl. wheel) — re-hydration never wipes live cards (file's own rule).
+- Tests: catalog-cards-admin.spec.ts +1 (client temp id survives save) → 15/15 ✓; wheel-promo + wheel-winner-notify 39/39 ✓. Scoped tsc on touched files: 24 pre-existing union-access errors at HEAD == 24 with change (0 regressions; full-repo tsc OOMs in sandbox, exit 137).
+- E2E on local dev vs prod Supabase: /franchize/vip-bike renders wheel ad (badge+CTA in HTML), /franchize/vip-bike/wheel 200 with КРУТИТЬ CTA.
+
+Stage Summary:
+- QuickAdmin «Карточки» now honestly supports create (auto-expanded new card) + edit + delete for both Промо-баннеры and Анонсы tabs; boss note: prod (rental.vip-bike.ru) may still serve an older build — redeploy production to see it (same story as startapp=wheel from task 114).
+- vip-bike live: wheel is the top ad card (prio 96) and sits in the hamburger menu 3rd; hydration SQL + idempotent script committed for reproducibility.

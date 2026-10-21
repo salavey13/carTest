@@ -232,6 +232,30 @@ describe("saveFranchizeCatalogCardsAction", () => {
     expect(metadata.contacts).toEqual({ telegram: "@vipbike" });
   });
 
+  it("task 115: keeps a client-provided temp id (QuickAdmin «Добавить» flow) instead of re-minting", async () => {
+    mockTables({
+      crewRow: { data: { ...CREW, metadata: { franchize: { catalog: { adCards: [] } } } } },
+      memberRow: { role: "owner", membership_status: "active" },
+    });
+    const res = await saveFranchizeCatalogCardsAction({
+      slug: "vip-bike",
+      initData: "signed-init-data",
+      claimedActorUserId: "100",
+      promoBanners: [],
+      adCards: [
+        // Клиент (CatalogCardsQuickAdmin.addRow) создаёт строку со стабильным
+        // временным id — сервер обязан сохранить его как есть, чтобы
+        // expandedId/scroll-якоря не потерялись и id не менялся при каждом save.
+        { id: "ad-mhxyz8k", title: "Колесо фортуны", subtitle: "", href: "/franchize/vip-bike/wheel", imageUrl: "", badge: "Призы", activeFrom: "2026-10-21", activeTo: "2026-12-31", priority: 96, ctaLabel: "Крутить" },
+      ],
+    });
+    expect(res.ok).toBe(true);
+    const metadata = writtenMetadata as Record<string, any>;
+    expect(metadata.franchize.catalog.adCards).toHaveLength(1);
+    expect(metadata.franchize.catalog.adCards[0].id).toBe("ad-mhxyz8k");
+    expect(metadata.franchize.catalog.adCards[0].href).toBe("/franchize/vip-bike/wheel");
+  });
+
   it("reports a friendly error when the metadata update fails", async () => {
     mockTables({
       crewRow: { data: CREW },

@@ -141,14 +141,27 @@ export function CatalogCardsQuickAdmin({ slug }: CatalogCardsQuickAdminProps) {
     else setAds((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // FIX (task 115, boss 2026-10-21): «Добавить» выглядела сломанной — новая
+  // карточка получала expandedId «new-ad-N», но rowKey() строил ключ из
+  // row.id (пусто) → индексный «ad-N», который НИКОГДА не совпадал с
+  // expandedId. Свежая карточка рендерилась свёрнутой внизу списка, и казалось,
+  // что создавать новые карточки нельзя (доступна только правка существующих).
+  // Теперь новая строка сразу получает стабильный временный id: ключ уникален,
+  // карточка автраскрывается и скроллится в зону видимости. Сервер сохраняет
+  // непустой id как есть (row.id.trim() || сгенерит свой) — id остаётся
+  // стабильным и после сохранения.
   const addRow = () => {
+    const tempId = `${shownBanners ? "promo" : "ad"}-${Date.now().toString(36)}`;
     if (shownBanners) {
-      setBanners((prev) => [...prev, { ...EMPTY_BANNER }]);
-      setExpandedId(`new-banner-${banners.length}`);
+      setBanners((prev) => [...prev, { ...EMPTY_BANNER, id: tempId }]);
     } else {
-      setAds((prev) => [...prev, { ...EMPTY_AD }]);
-      setExpandedId(`new-ad-${ads.length}`);
+      setAds((prev) => [...prev, { ...EMPTY_AD, id: tempId }]);
     }
+    setExpandedId(tempId);
+    // Прокрутка после коммита React — новая карточка видна даже в длинном списке.
+    requestAnimationFrame(() => {
+      document.getElementById(`card-row-${tempId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   };
 
   const rowKey = (row: { id: string }, index: number) => row.id || `${shownBanners ? "banner" : "ad"}-${index}`;
@@ -236,7 +249,7 @@ export function CatalogCardsQuickAdmin({ slug }: CatalogCardsQuickAdminProps) {
                   const key = rowKey(row, index);
                   const expanded = expandedId === key;
                   return (
-                    <div key={key} className="rounded-2xl border" style={{ borderColor: "var(--franchize-border-soft, #2a2a2a)" }}>
+                    <div key={key} id={`card-row-${key}`} className="rounded-2xl border" style={{ borderColor: "var(--franchize-border-soft, #2a2a2a)" }}>
                       <button
                         type="button"
                         onClick={() => setExpandedId(expanded ? null : key)}
