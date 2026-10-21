@@ -413,7 +413,10 @@ describe("task107 · wiring pins", () => {
   });
 
   it("verified DMs now carry the 💰 payout-hub button", () => {
-    expect((verifyLib.match(/payo_hub_0/g) || []).length).toBeGreaterThanOrEqual(2);
+    // Task 122: BOTH verify paths (plain ✅✅ + accepted deal) funnel through
+    // the shared sendVerifiedDoneDms — the button is defined ONCE there.
+    expect((verifyLib.match(/payo_hub_0/g) || []).length).toBeGreaterThanOrEqual(1);
+    expect(verifyLib).toContain("sendVerifiedDoneDms");
     expect(verifyLib).toContain("Мои выплаты");
   });
 

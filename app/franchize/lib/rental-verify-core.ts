@@ -584,6 +584,111 @@ export function verificationStatusNote(params: {
   return `Ждёт подтверждения: ${op} (оператор) и ${own} (владелец). После двух ✅ аренда помечается как проверенная.`;
 }
 
+// ── Task 122 — the warm half of the money game ─────────────────────────────
+//
+// Boss (2026-10-21): «splitting the revenue is viscerally aggressive — let's
+// fix that; gamify the сверка experience». The cold machine (state machine,
+// freezes, optimistic locks) already exists; these helpers add the pleasant
+// layer on top: a warm closer under the done-DM, a speed flex, an explicit
+// ladder to the NEXT achievement, and a «next up» pointer so finishing one
+// сверка flows straight into the next one. All PURE — the server half wires
+// them into the done-DM and the payout hub.
+
+/** Russian plural for counts (1 сверку / 2 сверки / 5 сверок). */
+export function ruPlural(n: number, one: string, few: string, many: string): string {
+  const a = Math.abs(Math.trunc(n)) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+
+/**
+ * Rotating warm closers for the «verified» DM. Seed = rental_id — stable per
+ * rental (no flicker on resend), varied across rentals.
+ */
+const WARM_CLOSERS = [
+  "Деньги поделены — экипаж в плюсе 😌",
+  "Честный сплит быстрее любого спора 💪",
+  "Ещё одна аренда закрыта красиво ✨",
+  "Сработались — так держать 🤝",
+  "Прозрачные числа — спокойный конец месяца 🌙",
+  "Кто сверяет сразу — тот в конце месяца отдыхает 🏖",
+  "Команда, которая сверяется вместе, растёт вместе 🚀",
+];
+
+export function warmCloserLine(seed: string | number | null | undefined): string {
+  const s = String(seed ?? "");
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return WARM_CLOSERS[h % WARM_CLOSERS.length];
+}
+
+/**
+ * ⚡️ Speed flex under the done-DM when both sides confirmed within an hour —
+ * the same 60-min window the verify_speedy achievement rewards. null when
+ * the timestamps are unusable or the confirm took longer.
+ */
+export function verificationSpeedLine(
+  requestedAtIso: string | null | undefined,
+  verifiedAtIso: string | null | undefined,
+): string | null {
+  const from = Date.parse(String(requestedAtIso || ""));
+  const to = Date.parse(String(verifiedAtIso || ""));
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
+  // floor, not round (review #6): 59.9 мин must still flex («59 минут»), the
+  // same boundary isSpeedyConfirm uses — the line can never contradict the
+  // achievement that just fired.
+  const mins = Math.floor((to - from) / 60000);
+  if (mins < 1) return "⚡️ Молниеносно: сверка заняла меньше минуты";
+  if (mins >= 60) return null;
+  return `⚡️ Молниеносно: сверка заняла ${mins} ${ruPlural(mins, "минуту", "минуты", "минут")}`;
+}
+
+/**
+ * 🏆 The ladder to the NEXT verification achievement (names mirror the
+ * profile-actions catalog: verify_10 «Безупречная десятка 🧾», verify_50
+ * «Полсотни рукопожатий 💯»). null once the ladder is finished — the line
+ * would only be noise for a 50× veteran.
+ */
+export function verifyProgressLine(verifiedCount: number): string | null {
+  const c = Math.max(0, Math.trunc(verifiedCount) || 0);
+  const line = (target: number, title: string): string =>
+    `🏆 До достижения «${title}» — ещё ${target - c} ${ruPlural(target - c, "сверку", "сверки", "сверок")}`;
+  if (c < 10) return line(10, "Безупречная десятка 🧾");
+  if (c < 50) return line(50, "Полсотни рукопожатий 💯");
+  return null;
+}
+
+/** What the «⏭ Следующая сверка» pointer needs to phrase itself. */
+export interface NextUpInfo {
+  bikeName: string;
+  amountRub: number;
+  status: RentalVerificationStatus;
+  /** The viewer is the operator party of THAT row. */
+  viewerIsOperator: boolean;
+  /** The viewer is the owner party of THAT row. */
+  viewerIsOwner: boolean;
+}
+
+/** ⏭ The «next up» pointer line for the done-DM. */
+export function nextUpLine(info: NextUpInfo): string {
+  const bike = escapeVerifyHtml(String(info.bikeName || "аренда"));
+  const rub = formatRubVerify(Math.max(0, Number(info.amountRub) || 0));
+  let waiting: string;
+  if (info.status === "operator_confirmed") {
+    waiting = info.viewerIsOwner ? "осталось ваше ✅" : "осталось ✅ владельца";
+  } else if (info.status === "owner_confirmed") {
+    waiting = info.viewerIsOperator ? "осталось ваше ✅" : "осталось ✅ оператора";
+  } else if (info.viewerIsOperator || info.viewerIsOwner) {
+    waiting = "ждёт вашего ✅";
+  } else {
+    waiting = "ждёт подтверждения сторон";
+  }
+  return `⏭ Следующая сверка: ${bike} · ${rub} — ${waiting}`;
+}
+
 // ── Negotiation («дил», task 106) — split editor ──────────────────────────────────
 //
 // A dispute used to be a terminal stop (manual reconciliation, owner-only

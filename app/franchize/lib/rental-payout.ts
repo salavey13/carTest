@@ -28,8 +28,10 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import {
   answerCallback,
   editTelegramMessageText,
+  handleRentalVerifyCallback,
   isMissingRelationError,
   labelFromUsersMap,
+  loadOperatorVerifiedScore,
   loadUsersMap,
   requestRentalVerification,
   selfHealVerificationRow,
@@ -45,6 +47,7 @@ import {
   formatPayoutHub,
   formatPayoutNotifyText,
   formatPayoutResult,
+  hubQueueOf,
   isPayoutRow,
   isoToDateLabel,
   parsePayoutCallback,
@@ -204,6 +207,10 @@ export interface PayoutHubData {
   payoutColumnMissing: boolean;
   /** Completed rentals without a verification row (one-tap conversion). */
   convertibles: PayoutConvertible[];
+  /** Task 122 — rows ready for the viewer's final ✅ (party-targeted). */
+  queue: PayoutItem[];
+  /** Task 122 — the viewer's lifetime verified-score (null on any failure). */
+  score: { sum: number; count: number } | null;
 }
 
 /**
@@ -250,6 +257,12 @@ export async function loadPayoutHubData(chatId: string): Promise<PayoutHubData> 
 
   const convertibles = await loadConvertibles(viewer, crewIds, byId);
 
+  // Task 122 (gamify the сверка): the «ready for your final ✅» queue rides
+  // on top of the hub, and the 🏅 piggy bank number matches the one every
+  // verification DM shows. Both degrade to empty/null — never fatal.
+  const queue = hubQueueOf(items);
+  const score = await loadOperatorVerifiedScore(viewer).catch(() => null);
+
   return {
     items,
     summary: summarizePayoutItems(items),
@@ -257,6 +270,8 @@ export async function loadPayoutHubData(chatId: string): Promise<PayoutHubData> 
     scopeLabel: isOwnerTier ? "все экипажи" : "Мои комиссии",
     payoutColumnMissing,
     convertibles,
+    queue,
+    score,
   };
 }
 
@@ -338,7 +353,11 @@ async function renderHubInto(params: {
 }): Promise<void> {
   const { chatId, page, messageId } = params;
   const data = await loadPayoutHubData(chatId);
-  const { slice, hasMore } = sliceHubPage(data.items, page);
+  // Task 122 (review #8): queued rentals already have their 🎯 bullet +
+  // button — dedupe them out of the paginated list so nothing shows twice.
+  const queueIds = new Set(data.queue.map((q) => q.rentalId));
+  const listItems = queueIds.size > 0 ? data.items.filter((i) => !queueIds.has(i.rentalId)) : data.items;
+  const { slice, hasMore } = sliceHubPage(listItems, page);
   const text = formatPayoutHub({
     scopeLabel: data.scopeLabel,
     summary: data.summary,
@@ -348,12 +367,15 @@ async function renderHubInto(params: {
     isOwnerTier: data.isOwnerTier,
     sqlNote: data.payoutColumnMissing ? `выплаты пока только на чтение — ${PAYOUT_SQL_HINT}` : null,
     convertibles: data.convertibles,
+    queue: data.queue,
+    score: data.score,
   });
   const keyboard = payoutHubKeyboard(slice, {
     page,
     hasMore,
     toPayCount: data.summary.toPay.count,
     convertibles: data.convertibles,
+    queue: data.queue,
   });
   if (messageId) {
     const ok = await editTelegramMessageText(chatId, messageId, text, keyboard);
@@ -668,6 +690,22 @@ export async function handleRentalPayoutCallback(params: {
           return true;
         }
         await answerCallback(params.callbackQueryId, "📨 Сверка выслана обеим сторонам!");
+        await renderHubInto({ chatId, page: 0, messageId });
+        return true;
+      }
+      case "ok": {
+        // Task 122 (review #1): the 🎯 queue button on the hub. The vrf_ok_
+        // handler STRIPS the tapped message's keyboard — fine on a verification
+        // DM, fatal on the hub (it would erase queue/pagination/pay-all). So we
+        // route through the SAME state machine but WITHOUT the messageId (no
+        // strip), then re-render the hub: the confirmed row leaves the queue
+        // and the keyboard survives. The verify handler owns the callback
+        // answer («✅ Подтверждено — спасибо!» or the error toast).
+        await handleRentalVerifyCallback({
+          data: `vrf_ok_${parsed.rentalId}`,
+          chatId,
+          callbackQueryId: params.callbackQueryId,
+        });
         await renderHubInto({ chatId, page: 0, messageId });
         return true;
       }

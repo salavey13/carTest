@@ -30,6 +30,7 @@ import {
   escapeVerifyHtml,
   formatRubVerify,
   parseNegotiation,
+  ruPlural,
   splitTotal,
   snapshotSplitOf,
   type RentalVerificationStatus,
@@ -103,6 +104,8 @@ export interface PayoutItem {
   adjusted: boolean;
   /** The viewer is the operator who receives this money. */
   mine: boolean;
+  /** Task 122 — the viewer is the owner party of this row (queue targeting). */
+  amOwnerParty: boolean;
   /** An open negotiation proposal is waiting (money not final yet). */
   proposalOpen: boolean;
 }
@@ -214,6 +217,7 @@ export function buildPayoutItem(row: PayoutSourceRow, viewerChatId: string): Pay
     dateLabel: isoToDateLabel(moneyIso),
     adjusted,
     mine: !!row.operator_chat_id && String(row.operator_chat_id) === viewer,
+    amOwnerParty: !!row.owner_chat_id && String(row.owner_chat_id) === viewer,
     proposalOpen: !!negoOpen(row),
   };
 }
@@ -269,6 +273,7 @@ export type PayoutCallbackAction =
   | "yes"
   | "undo"
   | "conv"
+  | "ok"
   | "all"
   | "allyes";
 
@@ -280,7 +285,10 @@ export interface ParsedPayoutCallback {
 
 export function encodePayoutCallback(kind: "all" | "allyes"): string;
 export function encodePayoutCallback(kind: "hub", page: number): string;
-export function encodePayoutCallback(kind: "open" | "mark" | "yes" | "undo" | "conv", rentalId: string): string;
+export function encodePayoutCallback(
+  kind: "open" | "mark" | "yes" | "undo" | "conv" | "ok",
+  rentalId: string,
+): string;
 export function encodePayoutCallback(kind: PayoutCallbackAction, arg: number | string = 0): string {
   if (kind === "all") return "payo_all";
   if (kind === "allyes") return "payo_allyes";
@@ -302,7 +310,7 @@ export function parsePayoutCallback(data: string): ParsedPayoutCallback | null {
     const page = Math.max(0, Math.floor(Number(tail) || 0));
     return { action: "hub", rentalId: null, page };
   }
-  if ((head === "open" || head === "mark" || head === "yes" || head === "undo" || head === "conv") && tail) {
+  if ((head === "open" || head === "mark" || head === "yes" || head === "undo" || head === "conv" || head === "ok") && tail) {
     return { action: head, rentalId: tail, page: 0 };
   }
   return null;
@@ -313,6 +321,28 @@ export function parsePayoutCallback(data: string): ParsedPayoutCallback | null {
 export interface PayoutButton {
   text: string;
   callback_data: string;
+}
+
+/**
+ * Task 122 — rows ready for the viewer's FINAL confirm: the other party has
+ * already ✅'d, one tap closes the row. Party-targeted (operator_confirmed →
+ * owner party; owner_confirmed → operator party), paid rows never re-enter,
+ * capped to keep the hub scannable.
+ */
+export const HUB_QUEUE_CAP = 5;
+
+export function hubQueueOf(items: PayoutItem[]): PayoutItem[] {
+  const ready = items.filter((i) => {
+    if (i.paid) return false;
+    // Review #7: an open deal proposal means the numbers are NOT final —
+    // «ready to confirm» would be a lie while the negotiation is in flight.
+    if (i.proposalOpen) return false;
+    if (i.status === "operator_confirmed") return i.amOwnerParty;
+    if (i.status === "owner_confirmed") return i.mine;
+    return false;
+  });
+  ready.sort((a, b) => (Date.parse(b.requestedAt || "") || 0) - (Date.parse(a.requestedAt || "") || 0));
+  return ready.slice(0, HUB_QUEUE_CAP);
 }
 
 export const PAYOUT_PAGE_SIZE = 6;
@@ -338,9 +368,31 @@ export interface PayoutConvertible {
 
 export function payoutHubKeyboard(
   items: PayoutItem[],
-  params: { page: number; hasMore: boolean; toPayCount: number; convertibles?: PayoutConvertible[] },
+  params: {
+    page: number;
+    hasMore: boolean;
+    toPayCount: number;
+    convertibles?: PayoutConvertible[];
+    /** Task 122 — rows ready for the viewer's final ✅ (one-tap confirm). */
+    queue?: PayoutItem[];
+  },
 ): PayoutButton[][] {
   const rows: PayoutButton[][] = [];
+  // Task 122: the queue rides FIRST — «quick list of pending verifications
+  // ready for the final owner's touch». Review #1: the opcode is payo_ok_,
+  // NOT vrf_ok_ — the vrf_ handler strips the tapped message's keyboard,
+  // which on the hub would erase the whole hub UI (queue, pagination,
+  // 💸 Выплатить всё). payo_ok_ runs the same state machine and then
+  // RE-RENDERS the hub, so the confirmed row leaves the queue visually.
+  for (const q of params.queue || []) {
+    const bike = q.bikeName.length > 24 ? `${q.bikeName.slice(0, 23)}…` : q.bikeName;
+    rows.push([
+      {
+        text: `✅ ${bike} · ${formatRubVerify(q.amount)}`,
+        callback_data: encodePayoutCallback("ok", q.rentalId),
+      },
+    ]);
+  }
   for (const item of items) rows.push(payoutItemButtons(item));
   // Old rentals without a сверка — tap to send the verification request
   // (row + DMs to both parties). Money enters the counters after two ✅.
@@ -419,6 +471,10 @@ export function formatPayoutHub(params: {
   sqlNote?: string | null;
   /** Completed rentals without a verification row (one-tap conversion). */
   convertibles?: PayoutConvertible[];
+  /** Task 122 — rows waiting for the VIEWER's final ✅ (party-targeted). */
+  queue?: PayoutItem[];
+  /** Task 122 — the viewer's lifetime verified-score (🏅 счёт сверк). */
+  score?: { sum: number; count: number } | null;
 }): string {
   const { summary: s } = params;
   const lines: string[] = [
@@ -429,6 +485,11 @@ export function formatPayoutHub(params: {
     bucketLine("🏦", "Выплачено всего", s.paid),
   ];
   if (params.sqlNote) lines.push(``, `ℹ️ ${escapeVerifyHtml(params.sqlNote)}`);
+  // Task 122: the DM carries «🏅 Счёт …» on every сверка — the hub shows the
+  // same number so the piggy bank feels consistent everywhere money lives.
+  if (params.score && params.score.count > 0) {
+    lines.push(`🏅 Счёт сверк: <b>${formatRubVerify(params.score.sum)}</b> (${params.score.count} ${ruPlural(params.score.count, "аренда", "аренды", "аренд")})`);
+  }
   if (s.toPay.count > 0) {
     lines.push(
       ``,
@@ -455,6 +516,15 @@ export function formatPayoutHub(params: {
         ? `Пока нет свёрок с деньгами. Закройте аренду — сверка появится автоматически.`
         : `На этой странице аренд нет — листайте дальше.`,
     );
+  }
+  // Task 122: «quick list of pending verifications ready for the final
+  // owner's touch» — rows where the OTHER side already ✅'d and the viewer's
+  // confirm closes the row. Pure pointer; the buttons below do the work.
+  if ((params.queue || []).length > 0) {
+    lines.push(``, `🎯 <b>Готовы к вашему ✅</b> — вторая сторона уже подтвердила:`);
+    for (const q of params.queue || []) {
+      lines.push(`• ${escapeVerifyHtml(q.bikeName)} — ${formatRubVerify(q.amount)} · ждёт вас`);
+    }
   }
   if ((params.convertibles || []).length > 0) {
     lines.push(

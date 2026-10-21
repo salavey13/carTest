@@ -79,6 +79,7 @@ import {
   formatRubVerify,
   formatVerificationSummary,
   labelFromUsersMap,
+  nextUpLine,
   otherPartyChatId,
   parseNegotiation,
   parseProposalCallback,
@@ -94,13 +95,17 @@ import {
   splitTotal,
   startDraft,
   verificationKeyboard,
+  verificationSpeedLine,
   verificationStatusNote,
+  verifyProgressLine,
+  warmCloserLine,
   withdrawOpenProposal,
   type InlineButton,
   type NegotiationState,
   type OpenProposal,
   type RentalVerificationRow,
   type RentalVerificationSnapshot,
+  type RentalVerificationStatus,
   type SplitPartKey,
   type VerificationActor,
   type VerificationBrief,
@@ -573,7 +578,8 @@ export async function requestRentalVerification(params: {
     // Boss: «upon closing rental notification for verification is sent to
     // crew owner, crew admins». Task 118 (boss: «show buttons to admin as
     // well»): the staff copy carries the SAME ✅/⚠️ keyboard — crew staff act
-    // as «admin» (an admin ✅ verifies instantly, ⚠️ joins the negotiation).
+    // as «admin» (an admin ✅ stamps the administration's voice; the final
+    // word stays with the owner party — task 120; ⚠️ joins the negotiation).
     try {
       const ccSent = await ccVerificationToCrewStaff({
         crewSlug,
@@ -650,6 +656,209 @@ interface PayoutSourceRowLike {
 }
 
 /**
+ * Task 122 — lifetime verified count for ONE viewer (both party roles).
+ * Feeds the 🏆 progress line («до „Безупречная десятка" ещё N сверк») in the
+ * done-DM. Same head-count query grantVerificationAchievements uses.
+ */
+async function countVerifiedFor(chatId: string | null | undefined): Promise<number> {
+  const viewer = chatId ? String(chatId) : "";
+  if (!viewer) return 0;
+  try {
+    const { count, error } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("rental_id", { count: "exact", head: true })
+      .eq("status", "verified")
+      .or(`operator_chat_id.eq.${viewer},owner_chat_id.eq.${viewer}`);
+    if (error) return 0;
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export interface NextVerificationPointer {
+  rentalId: string;
+  status: RentalVerificationStatus;
+  operatorChatId: string | null;
+  ownerChatId: string | null;
+  bikeName: string;
+  amountRub: number;
+  /** Own crew of THAT row — the 👀 deeplink must use ITS bot (review #3). */
+  crewSlug: string | null;
+}
+
+/**
+ * Task 122 — the NEXT open сверка for this viewer: «notification can contain
+ * quick "next" latest unverified rental to maybe look at» (boss 2026-10-21).
+ * Party rows first, newest request wins (memory is freshest — the season
+ * stats list makes the same choice). When the viewer has no personal open
+ * rows but IS crew staff, fall back to the crew's newest open row: the owner
+ * always gets a pointer, even for rentals where he is not the owner party.
+ * Strictly non-fatal — any error → null (no pointer line).
+ */
+export async function findNextVerificationFor(params: {
+  chatId: string;
+  crewSlug: string | null | undefined;
+  excludeRentalId?: string | null;
+}): Promise<NextVerificationPointer | null> {
+  const viewer = String(params.chatId || "");
+  if (!viewer) return null;
+  const exclude = params.excludeRentalId ? String(params.excludeRentalId) : null;
+  const pick = (rows: any[] | null): NextVerificationPointer | null => {
+    const row = (rows || [])[0] as any;
+    if (!row?.rental_id) return null;
+    const snap = (row.snapshot || {}) as Record<string, unknown>;
+    const total = Number(snap.total);
+    return {
+      rentalId: String(row.rental_id),
+      status: row.status as RentalVerificationStatus,
+      operatorChatId: row.operator_chat_id ? String(row.operator_chat_id) : null,
+      ownerChatId: row.owner_chat_id ? String(row.owner_chat_id) : null,
+      bikeName: String(snap.bikeName || "аренда"),
+      amountRub: Number.isFinite(total) && total > 0 ? total : 0,
+      crewSlug: row.crew_slug ? String(row.crew_slug) : null,
+    };
+  };
+  try {
+    const baseSelect =
+      "rental_id, status, operator_chat_id, owner_chat_id, crew_slug, requested_at, snapshot";
+    const openStatuses = ["pending", "operator_confirmed", "owner_confirmed"] as const;
+    // 1) Personal queue — rows where the viewer is a party.
+    {
+      let q = supabaseAdmin
+        .from("rental_verifications")
+        .select(baseSelect)
+        .in("status", [...openStatuses])
+        .or(`operator_chat_id.eq.${viewer},owner_chat_id.eq.${viewer}`)
+        .order("requested_at", { ascending: false })
+        .limit(1);
+      if (exclude) q = q.neq("rental_id", exclude);
+      const { data, error } = await q;
+      if (!error) {
+        const hit = pick(data);
+        if (hit) return hit;
+      } else if (isMissingRelationError(error)) {
+        return null;
+      } else {
+        logger.warn("[rental-verify] next-pointer party query failed:", error.message);
+      }
+    }
+    // 2) Crew-wide fallback for staff (owner sees the crew's queue).
+    if (params.crewSlug) {
+      const staff = await loadCrewStaffChatIds(params.crewSlug);
+      if (staff.includes(viewer)) {
+        const { data: crew } = await supabaseAdmin
+          .from("crews")
+          .select("id")
+          .eq("slug", params.crewSlug)
+          .maybeSingle();
+        if (crew?.id) {
+          let q2 = supabaseAdmin
+            .from("rental_verifications")
+            .select(baseSelect)
+            .in("status", [...openStatuses])
+            .eq("crew_id", crew.id)
+            .order("requested_at", { ascending: false })
+            .limit(1);
+          if (exclude) q2 = q2.neq("rental_id", exclude);
+          const { data: rows2, error: err2 } = await q2;
+          if (!err2) return pick(rows2);
+        }
+      }
+    }
+  } catch (e) {
+    logger.warn("[rental-verify] findNextVerificationFor failed (non-fatal):", e);
+  }
+  return null;
+}
+
+/**
+ * Task 122 — the shared «verified» done-DM (both verify paths funnel here:
+ * the plain ✅✅ and the accepted deal). Base text + the warm half:
+ * ⚡️ speed flex (same 60-min window as verify_speedy), 🏆 explicit ladder to
+ * the next verification achievement, a ✨ warm closer instead of a cold stop,
+ * and the ⏭ NEXT open сверка pointer with a 👀 deeplink («notification can
+ * contain quick "next" latest unverified rental to maybe look at» — boss
+ * 2026-10-21). Every step per-recipient and strictly non-fatal.
+ */
+async function sendVerifiedDoneDms(params: {
+  rentalId: string;
+  crewSlug: string | null | undefined;
+  requestedAtIso: string | null | undefined;
+  verifiedAtIso: string | null | undefined;
+  /** Full base text WITHOUT the warm half (may differ per recipient). */
+  baseText: (chatId: string) => string;
+  recipients: string[];
+}): Promise<void> {
+  const speedLine = verificationSpeedLine(params.requestedAtIso, params.verifiedAtIso);
+  const warm = warmCloserLine(params.rentalId);
+  let botUsername: string | null = null;
+  try {
+    const { resolveCrewBotUsername } = await import("@/app/franchize/lib/crew-bot");
+    botUsername = await resolveCrewBotUsername(params.crewSlug || null);
+  } catch {
+    botUsername = null;
+  }
+  const { buildTelegramAppLink } = await import("@/lib/wall-deeplink");
+  for (const chatId of params.recipients) {
+    try {
+      const parts: string[] = [params.baseText(chatId)];
+      if (speedLine) parts.push(`\n\n${speedLine}`);
+      const progress = verifyProgressLine(await countVerifiedFor(chatId).catch(() => 0));
+      if (progress) parts.push(`\n${progress}`);
+      parts.push(`\n✨ ${warm}`);
+      const next = await findNextVerificationFor({
+        chatId,
+        crewSlug: params.crewSlug || null,
+        excludeRentalId: params.rentalId,
+      }).catch(() => null);
+      const keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+      if (next) {
+        parts.push(
+          `\n\n${nextUpLine({
+            bikeName: next.bikeName,
+            amountRub: next.amountRub,
+            status: next.status,
+            viewerIsOperator: !!next.operatorChatId && next.operatorChatId === chatId,
+            viewerIsOwner: !!next.ownerChatId && next.ownerChatId === chatId,
+          })}`,
+        );
+        if (botUsername) {
+          // Review #3: a cross-crew pointer must deeplink through THAT crew's
+          // bot (startapp=rental_… resolves per-crew bot), falling back to the
+          // current bot when the pointer's crew has no bot of its own.
+          let linkBot = botUsername;
+          if (next.crewSlug && next.crewSlug !== (params.crewSlug || null)) {
+            try {
+              const { resolveCrewBotUsername } = await import("@/app/franchize/lib/crew-bot");
+              linkBot = (await resolveCrewBotUsername(next.crewSlug)) || botUsername;
+            } catch {
+              linkBot = botUsername;
+            }
+          }
+          const bikeLabel = next.bikeName.length > 24 ? `${next.bikeName.slice(0, 23)}…` : next.bikeName;
+          keyboard.push([
+            {
+              text: `👀 Следующая: ${bikeLabel}`,
+              url: buildTelegramAppLink(linkBot, `rental_${next.rentalId}`),
+            },
+          ]);
+        }
+      }
+      // Task 107: every «verified» DM still carries the payout-hub entry —
+      // the money game continues after the confirm.
+      keyboard.push([{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]);
+      await sendComplexMessage(chatId, parts.join(""), keyboard, {
+        parseMode: "HTML",
+        keyboardType: "inline",
+      });
+    } catch {
+      /* non-fatal */
+    }
+  }
+}
+
+/**
  * Bike preview photo before the verification summary (task 117). A separate
  * plain message — sendPhoto captions cap at 1024 chars, and the rich summary
  * needs every byte of the 4096 text budget. Any failure is cosmetic: the
@@ -683,10 +892,12 @@ async function sendVerificationBikePhoto(
 /**
  * Task 118 — chat ids of the CREW STAFF: crew owner + admins/co_owner
  * (active). They act as «admin» in the verification machine (same ✅/⚠️
- * buttons as the parties; ✅ verifies instantly). Deliberately NOT
- * resolveLeadNotifyRecipients — that one also appends the global
- * ADMIN_CHAT_ID, which is a server-level operator, not this crew's supervisor.
- * Never throws — worst case an empty list (then admins simply have no buttons).
+ * buttons as the parties). Task 120 semantics: an admin ✅ stamps the
+ * administration's voice — the FINAL word always stays with the owner party.
+ * Deliberately NOT resolveLeadNotifyRecipients — that one also appends the
+ * global ADMIN_CHAT_ID, which is a server-level operator, not this crew's
+ * supervisor. Never throws — worst case an empty list (then admins simply
+ * have no buttons).
  */
 export async function loadCrewStaffChatIds(crewSlug: string | null | undefined): Promise<string[]> {
   if (!crewSlug) return [];
@@ -723,7 +934,8 @@ export async function loadCrewStaffChatIds(crewSlug: string | null | undefined):
  * verification parties / actor / attribution chats.
  * Task 118 (boss: «show buttons to admin as well»): the copy now carries the
  * SAME ✅/⚠️ keyboard — staff act as «admin» in the state machine (an admin ✅
- * verifies instantly, ⚠️ opens the dispute editor). Never throws.
+ * stamps the administration's voice, the owner party's ✅ stays mandatory-
+ * final per task 120; ⚠️ opens the dispute editor). Never throws.
  */
 export async function ccVerificationToCrewStaff(params: {
   crewSlug: string | null;
@@ -973,7 +1185,9 @@ export async function handleRentalVerifyCallback(params: {
     // row — the state machine is idempotent, so the loser converges to
     // «verified» instead of clobbering it.
     // Task 118: crew staff (owner/admin/co_owner of the CREW) act as «admin» —
-    // an admin ✅ verifies instantly, an admin ⚠️ disputes + opens the editor.
+    // an admin ✅ stamps the administration's voice (final only when the owner
+    // party has already confirmed — task 120), an admin ⚠️ disputes + opens
+    // the editor.
     let current_ = current;
     const staffChatIds = await loadCrewStaffChatIds(current_.crew_slug || null);
     let result = applyVerificationAction(current_, {
@@ -1101,31 +1315,35 @@ export async function handleRentalVerifyCallback(params: {
         freshScore && current_.operator_chat_id
           ? `\n\n🏅 Счёт ${escapeVerifyHtml(labelFromUsersMap(usersMap, current_.operator_chat_id))}: <b>${formatRubVerify(freshScore.sum)}</b> (${freshScore.count} ар.) — +${formatRubVerify(confirmedAmount)} за эту аренду 💰`
           : "";
-      const doneFinal =
-        (agreedNego.agreed
-          ? formatDealDoneText({
-              snapshot: snapshot || {},
-              agreedSplit: agreedNego.agreed.split,
-              proposerLabel: labelFromUsersMap(usersMap, agreedNego.agreed.proposedBy),
-              acceptorLabel: labelFromUsersMap(usersMap, agreedNego.agreed.acceptedBy),
-            })
-          : doneText) + scoreTail;
-      // Task 107: every «verified» DM now carries the payout-hub entry —
-      // the money game continues after the confirm (see the payout counter).
-      const payoutDoneKb = [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]];
+      const baseDone = agreedNego.agreed
+        ? formatDealDoneText({
+            snapshot: snapshot || {},
+            agreedSplit: agreedNego.agreed.split,
+            proposerLabel: labelFromUsersMap(usersMap, agreedNego.agreed.proposedBy),
+            acceptorLabel: labelFromUsersMap(usersMap, agreedNego.agreed.acceptedBy),
+          })
+        : doneText;
+      // Task 122: the warm half (speed / ladder / closer / next-up) is shared
+      // with the deal-accept path — one funnel, same game feel everywhere.
+      const staffNoteText = baseDone + scoreTail;
       const verifiedRecipients = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
-      for (const chatId of verifiedRecipients) {
-        try {
-          await sendComplexMessage(chatId, doneFinal, payoutDoneKb, { parseMode: "HTML", keyboardType: "inline" });
-        } catch {
-          /* non-fatal */
-        }
-      }
+      await sendVerifiedDoneDms({
+        rentalId,
+        crewSlug: current.crew_slug || null,
+        requestedAtIso: current_.requested_at,
+        verifiedAtIso: current_.verified_at,
+        baseText: () =>
+          // Review #2: restore the pre-122 behavior — BOTH parties (and the
+          // staff note) see the operator's 🏅 score tail, same as the old
+          // doneFinal. The scoreTail is "" when there is no operator party.
+          baseDone + scoreTail,
+        recipients: verifiedRecipients,
+      });
       // Task 118: staff (who were not parties) see the outcome too — plain note.
       await ccVerificationNoteToCrewStaff({
         crewSlug: current.crew_slug || null,
         rentalId,
-        text: doneFinal,
+        text: staffNoteText,
         exclude: [...verifiedRecipients, isAdminVerify ? String(params.chatId) : ""],
       });
       await grantVerificationAchievements(current_, { speedy: isSpeedyConfirm(current_) });
@@ -1633,17 +1851,24 @@ export async function handleRentalVerifyProposalCallback(params: {
             proposerLabel: labelFromUsersMap(usersMap, proposerChatId),
             acceptorLabel: actorLabel,
           });
+          // Task 122: the deal path funnels through the SAME gamified done-DM
+          // (speed / ladder / closer / next-up) + the operator piggy bank
+          // grows here too — the deal IS a verified сверка.
+          const dealScore = await loadOperatorVerifiedScore(current.operator_chat_id).catch(() => null);
+          const { amount: dealAmount } = commissionOf({ snapshot: current.snapshot, negotiation: acc.state });
+          const dealScoreTail =
+            dealScore && current.operator_chat_id
+              ? `\n\n🏅 Счёт ${escapeVerifyHtml(labelFromUsersMap(usersMap, current.operator_chat_id))}: <b>${formatRubVerify(dealScore.sum)}</b> (${dealScore.count} ар.) — +${formatRubVerify(dealAmount)} за эту аренду 💰`
+              : "";
           const doneRecipients = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
-          for (const c of doneRecipients) {
-            try {
-              await sendComplexMessage(c, done, [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]], {
-                parseMode: "HTML",
-                keyboardType: "inline",
-              });
-            } catch {
-              /* non-fatal */
-            }
-          }
+          await sendVerifiedDoneDms({
+            rentalId,
+            crewSlug: current.crew_slug || null,
+            requestedAtIso: current.requested_at,
+            verifiedAtIso: confirmRow.verified_at,
+            baseText: () => done + dealScoreTail,
+            recipients: doneRecipients,
+          });
           // Task 118: staff see the closed deal too (an admin acceptor gets no
           // DM — he pressed the button — so the note is his visibility).
           await ccVerificationNoteToCrewStaff({
