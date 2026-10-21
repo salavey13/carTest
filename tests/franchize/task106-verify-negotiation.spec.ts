@@ -41,6 +41,7 @@ import {
   splitTotal,
   splitsEqual,
   startDraft,
+  withdrawOpenProposal,
   SPLIT_PART_ORDER,
   type NegotiationState,
   type SplitParts,
@@ -198,18 +199,53 @@ describe("task106 · negotiation reducers", () => {
     expect(res.state.open!.comment).toBe("проверьте наценку по чеку");
   });
 
-  it("cannot send twice while an open proposal waits", () => {
+  it("task118: re-sending over your OWN open proposal REPLACES it (edit-after-send loop)", () => {
     let nego = startDraft(parseNegotiation({}), "7813830016", "operator", original);
     nego = setDraftSplit(nego, applySplitDelta(original, "base", 100));
     const first = sendProposalFromDraft(nego, { chatId: "7813830016", role: "operator", nowIso: "t0", original });
     expect(first.ok).toBe(true);
     // The handler always re-reads the row: the next send attempt starts from
-    // the SAVED state (which now carries the open proposal).
+    // the SAVED state (which now carries the open proposal). Task 118 (boss:
+    // «after i sent my suggestion buttons disappeared, so i can't edit again»):
+    // the SAME author may replace his own pending proposal; a FOREIGN author
+    // must still counter (vrfp_c_) instead of blind-sending.
     const again = startDraft(first.state, "7813830016", "operator", original, first.state.open?.split);
-    const editedAgain = setDraftSplit(again, applySplitDelta(original, "base", 100));
+    const editedAgain = setDraftSplit(again, applySplitDelta(original, "base", 300));
     const second = sendProposalFromDraft(editedAgain, { chatId: "7813830016", role: "operator", nowIso: "t1", original });
-    expect(second.ok).toBe(false);
-    expect(second.error).toMatch(/уже отправлено/);
+    expect(second.ok).toBe(true);
+    expect(second.state.open!.split.base).toBe(original.base + 300);
+    expect(second.state.rounds!.at(-1)!.action).toBe("propose");
+  });
+
+  it("task118: a foreign author still cannot blind-send over an open proposal", () => {
+    let nego = startDraft(parseNegotiation({}), "7813830016", "operator", original);
+    nego = setDraftSplit(nego, applySplitDelta(original, "base", 100));
+    const first = sendProposalFromDraft(nego, { chatId: "7813830016", role: "operator", nowIso: "t0", original });
+    expect(first.ok).toBe(true);
+    const foreign = startDraft(first.state, "356282674", "owner", original);
+    const foreignEdited = setDraftSplit(foreign, applySplitDelta(original, "overprice", 200));
+    const res = sendProposalFromDraft(foreignEdited, { chatId: "356282674", role: "owner", nowIso: "t1", original });
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/уже отправлено/);
+  });
+
+  it("task118: withdrawOpenProposal — the author takes the proposal back", () => {
+    let nego = startDraft(parseNegotiation({}), "7813830016", "operator", original);
+    nego = setDraftSplit(nego, applySplitDelta(original, "base", 100));
+    const sent = sendProposalFromDraft(nego, { chatId: "7813830016", role: "operator", nowIso: "t0", original });
+    expect(sent.ok).toBe(true);
+    // Author withdraws → open cleared, history keeps the round.
+    const wd = withdrawOpenProposal(sent.state, { chatId: "7813830016", role: "operator", nowIso: "t1" });
+    expect(wd.ok).toBe(true);
+    expect(wd.state.open).toBeNull();
+    expect(wd.state.rounds!.at(-1)!.action).toBe("withdraw");
+    // A foreign chat cannot withdraw someone else's proposal.
+    const wdForeign = withdrawOpenProposal(sent.state, { chatId: "356282674", role: "owner", nowIso: "t1" });
+    expect(wdForeign.ok).toBe(false);
+    expect(wdForeign.error).toMatch(/только своё/);
+    // Nothing open → nothing to withdraw.
+    const wdEmpty = withdrawOpenProposal(parseNegotiation({}), { chatId: "7813830016", role: "operator", nowIso: "t2" });
+    expect(wdEmpty.ok).toBe(false);
   });
 
   it("a counter round is tagged after the first propose", () => {

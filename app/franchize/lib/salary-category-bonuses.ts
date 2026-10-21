@@ -42,7 +42,8 @@ import {
   computeRentalSalary,
   computeSaleSalary,
   equipmentStandardCost,
-  standardRentalPrice,
+  standardRentalPriceDetailed,
+  effectiveGearDays,
   RENTAL_CATEGORY_LABELS,
   equipmentFlagsLabel,
   type RentalEquipment,
@@ -223,20 +224,24 @@ export async function computeCategoryBonuses(params: {
     const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
     const eq = (meta.equipment || {}) as RentalEquipment;
     const price = Number(r.total_cost) || 0;
-    const stdPrice =
-      standardRentalPrice({
-        specs: vehicle?.specs,
-        startIso: r.requested_start_date || r.agreed_start_date,
-        endIso: r.requested_end_date || r.agreed_end_date,
-        dailyPrice: vehicle?.daily_price,
-        fallbackTotalCost: price,
-      }) + equipmentStandardCost(eq);
+    // Task 118: day-aware canon — gear bills every charged day (1st full, then
+    // half), the commission ladder is 200/ед day 1 + 100/ед days 2+.
+    const stdDetail = standardRentalPriceDetailed({
+      specs: vehicle?.specs,
+      startIso: r.requested_start_date || r.agreed_start_date,
+      endIso: r.requested_end_date || r.agreed_end_date,
+      dailyPrice: vehicle?.daily_price,
+      fallbackTotalCost: price,
+    });
+    const gearDays = effectiveGearDays(stdDetail);
+    const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays);
     const salary = computeRentalSalary({
       config,
       rentalCategory: categories.rental,
       equipmentUnits: countEquipmentUnits(eq),
       totalCost: price,
       standardPrice: stdPrice,
+      equipmentDays: gearDays,
     });
     rentalTotal += salary.total;
     const label = RENTAL_CATEGORY_LABELS[categories.rental];

@@ -106,6 +106,16 @@ export interface RentalVerificationSnapshot {
     gearLines: string[];
     /** Flat standard gear cost (the overprice baseline gear part). */
     gearStandard: number;
+    /** Task 118 — charged gear days the эталон/комиссия used (≥1; hourly → 1). */
+    gearDays?: number;
+    /** Task 118 — the crew's followup per-unit coef (days 2+), for the legend. */
+    equipFollowupUnit?: number;
+    /** Task 118 — «3 суток» pre-formatted at freeze time (plural-safe). */
+    gearDaysLabel?: string | null;
+    /** Task 118 — «(500 + 250 + 250) × 3 ед. = 3 000 ₽» frozen at request time. */
+    gearDaysLine?: string | null;
+    /** Task 118 — «(200 + 100 + 100) × 3 ед.» frozen at request time. */
+    equipCommLine?: string | null;
     /** bikeStandard + gearStandard. */
     standardTotal: number;
     /** What the client actually paid (rentals.total_cost). */
@@ -147,12 +157,15 @@ export type VerificationEffect =
   | "verified"
   | "disputed";
 
+/** Who acted on a verification — «admin» = crew staff (owner/admin/co_owner of the CREW). */
+export type VerificationActor = "operator" | "owner" | "admin";
+
 export interface ApplyActionResult {
   /** null → DB must NOT be written (no-op / error). */
   row: RentalVerificationRow | null;
   effect: VerificationEffect;
   /** Which side acted — for notifications. */
-  actor: "operator" | "owner" | null;
+  actor: VerificationActor | null;
   error?: string;
 }
 
@@ -160,7 +173,12 @@ export interface ApplyActionResult {
 
 /**
  * Transition rules (money-sensitive, deliberately conservative):
- *   • Only the two recorded parties may act.
+ *   • The two recorded parties may always act.
+ *   • Task 118 (boss: «show buttons to admin as well»): crew staff (owner /
+ *     admin / co_owner of the CREW, passed via adminChatIds) get the same
+ *     buttons. An admin ✅ VERIFIES immediately (the TG equivalent of the
+ *     drawer's manual owner-tier confirm); an admin ⚠️ opens the same
+ *     dispute editor and joins the negotiation as a third voice.
  *   • «Оспорить» is available to both parties until VERIFIED and always wins —
  *     a doubt stops the verification (manual reconciliation follows; an owner
  *     can still final-verify via the admin ✅ after an offline talk).
@@ -170,23 +188,51 @@ export interface ApplyActionResult {
  */
 export function applyVerificationAction(
   row: RentalVerificationRow,
-  params: { action: "confirm" | "dispute"; chatId: string; nowIso: string; reason?: string },
+  params: {
+    action: "confirm" | "dispute";
+    chatId: string;
+    nowIso: string;
+    reason?: string;
+    /** Task 118: crew-staff chat ids (crew owner + admins) — they act as «admin». */
+    adminChatIds?: Array<string | null | undefined> | null;
+  },
 ): ApplyActionResult {
   const chatId = String(params.chatId);
-  const isOperator = !!row.operator_chat_id && row.operator_chat_id === chatId;
-  const isOwner = !!row.owner_chat_id && row.owner_chat_id === chatId;
-  if (!isOperator && !isOwner) {
+  const role = resolveVerificationRole(row, chatId, params.adminChatIds);
+  if (!role) {
     return { row: null, effect: "noop", actor: null, error: "Вы не участник сверки по этой аренде." };
   }
   if (row.status === "verified") {
     return {
       row: null,
       effect: "noop",
-      actor: isOperator ? "operator" : "owner",
+      actor: role,
       error: "Уже подтверждено обеими сторонами.",
     };
   }
-  const actor: "operator" | "owner" = isOperator ? "operator" : "owner";
+
+  // ── Task 118: crew staff — supervisor override ──
+  if (role === "admin") {
+    if (params.action === "confirm") {
+      return {
+        row: { ...row, status: "verified", verified_at: params.nowIso },
+        effect: "verified",
+        actor: "admin",
+      };
+    }
+    return {
+      row: {
+        ...row,
+        status: "disputed",
+        disputed_by: chatId,
+        dispute_reason: params.reason?.trim() || "оспорено администратором — ручной разбор",
+      },
+      effect: "disputed",
+      actor: "admin",
+    };
+  }
+
+  const actor: "operator" | "owner" = role;
 
   if (params.action === "dispute") {
     return {
@@ -395,6 +441,11 @@ export function formatVerificationSummary(params: {
     }
     if (f.gearLines.length > 0) {
       lines.push(`  🧰 экип по прайсу: ${f.gearLines.map((l) => escapeVerifyHtml(l)).join(" · ")} = ${formatRubVerify(f.gearStandard)}`);
+      // Task 118: the day ladder for multi-day gear (1st day full, then half).
+      if (f.gearDaysLine) {
+        const label = f.gearDaysLabel || (f.gearDays && f.gearDays > 1 ? `${f.gearDays} суток` : "");
+        lines.push(`  ↳ экип за ${escapeVerifyHtml(label)}: ${escapeVerifyHtml(f.gearDaysLine)}`);
+      }
     } else {
       lines.push(`  🧰 экип по прайсу: нет`);
     }
@@ -402,10 +453,20 @@ export function formatVerificationSummary(params: {
     if (s.overprice > 0) {
       lines.push(`  ↳ наценка: ${formatRubVerify(f.markup)} × ${f.overpricePercent}% = ${formatRubVerify(s.overprice)}`);
     }
+    // Task 118: the equipment commission ladder («(200 + 100 + 100) × 3 ед. = 1 200 ₽»).
+    if (f.equipCommLine && s.equipment > 0) {
+      lines.push(`  ↳ комиссия за экип: ${escapeVerifyHtml(f.equipCommLine)} = ${formatRubVerify(s.equipment)}`);
+    }
+    const followupNote =
+      Number(f.equipFollowupUnit) > 0 && Number(f.equipmentUnitCoef) !== Number(f.equipFollowupUnit)
+        ? ` (со 2-х суток ${formatRubVerify(Number(f.equipFollowupUnit))}/ед)`
+        : "";
     lines.push(
-      `  📜 коэф.: мот ${formatRubVerify(f.baseCoef)}/аренда · экип ${formatRubVerify(f.equipmentUnitCoef)}/ед · наценка ${f.overpricePercent}%`,
+      `  📜 коэф.: мот ${formatRubVerify(f.baseCoef)}/аренда · экип ${formatRubVerify(f.equipmentUnitCoef)}/ед${followupNote} · наценка ${f.overpricePercent}%`,
     );
-    lines.push(`  ℹ️ экип клиенту: 1-е сутки полная цена, дальше — половина; мот: тариф зависит от длительности`);
+    lines.push(
+      `  ℹ️ экип клиенту: 1-е сутки полная цена, дальше — половина; мот: тариф зависит от длительности, комиссия — фикс за аренду`,
+    );
   }
 
   // ── Task 117: the operator's score (копилка) ──
@@ -526,9 +587,10 @@ export interface InlineButton {
 
 /** One round in the negotiation history (capped — see ROUNDS_CAP). */
 export interface NegotiationRound {
-  action: "propose" | "counter" | "accept" | "decline";
+  action: "propose" | "counter" | "accept" | "decline" | "withdraw";
   by: string;
-  role: "operator" | "owner";
+  /** Task 118: «admin» = crew staff joined the deal as a third voice. */
+  role: "operator" | "owner" | "admin";
   at: string;
   split: SplitParts;
   comment?: string | null;
@@ -536,7 +598,8 @@ export interface NegotiationRound {
 
 export interface OpenProposal {
   by: string;
-  role: "operator" | "owner";
+  /** Task 118: «admin» = crew staff proposing numbers. */
+  role: "operator" | "owner" | "admin";
   at: string;
   split: SplitParts;
   comment?: string | null;
@@ -544,12 +607,14 @@ export interface OpenProposal {
 
 export interface NegotiationState {
   /** Split being edited right now (one editor at a time, last-write-wins). */
-  draft?: { by: string; role: "operator" | "owner"; split: SplitParts; comment?: string | null } | null;
+  draft?: { by: string; role: "operator" | "owner" | "admin"; split: SplitParts; comment?: string | null } | null;
   /** A sent proposal awaiting the other party's answer. */
   open?: OpenProposal | null;
   /** Frozen at the moment a proposal was accepted — the corrected truth. */
   agreed?: { split: SplitParts; proposedBy: string; acceptedBy: string; at: string } | null;
   rounds?: NegotiationRound[];
+  /** Task 118 — audit stamp when a crew admin verified from TG (admin ✅). */
+  adminVerified?: { by: string; at: string } | null;
 }
 
 export const ROUNDS_CAP = 20;
@@ -566,6 +631,9 @@ export function parseNegotiation(raw: unknown): NegotiationState {
   if (r.draft && typeof r.draft === "object") state.draft = r.draft as NegotiationState["draft"];
   if (r.open && typeof r.open === "object") state.open = r.open as OpenProposal;
   if (r.agreed && typeof r.agreed === "object") state.agreed = r.agreed as NonNullable<NegotiationState["agreed"]>;
+  if (r.adminVerified && typeof r.adminVerified === "object") {
+    state.adminVerified = r.adminVerified as NonNullable<NegotiationState["adminVerified"]>;
+  }
   if (Array.isArray(r.rounds)) state.rounds = r.rounds as NegotiationRound[];
   return state;
 }
@@ -610,6 +678,7 @@ export function resetSplitPart(split: SplitParts, part: SplitPartKey, original: 
 //   vrfp_y_<rentalId>           — accept the open proposal
 //   vrfp_n_<rentalId>           — decline the open proposal
 //   vrfp_c_<rentalId>           — counter-proposal (open editor from the open one)
+//   vrfp_w_<rentalId>           — Task 118: withdraw YOUR open proposal
 
 export type ProposalCallbackAction =
   | "view"
@@ -620,7 +689,8 @@ export type ProposalCallbackAction =
   | "confirm"
   | "accept"
   | "decline"
-  | "counter";
+  | "counter"
+  | "withdraw";
 
 export interface ParsedProposalCallback {
   action: ProposalCallbackAction;
@@ -636,8 +706,8 @@ const CODE_BY_PART: Record<SplitPartKey, string> = { base: "b", equipment: "e", 
 // sent messages apply the NEW deltas — accepted trade-off).
 const DELTA_BY_OP: Record<string, number> = { d1: -100, d2: -500, i1: 500, i2: 100, z: 0 };
 
-export function encodeProposalCallback(kind: "view" | "comment" | "send" | "confirm" | "accept" | "decline" | "counter", rentalId: string): string {
-  const cmd = { view: "v", comment: "cm", send: "s", confirm: "x", accept: "y", decline: "n", counter: "c" }[kind];
+export function encodeProposalCallback(kind: "view" | "comment" | "send" | "confirm" | "accept" | "decline" | "counter" | "withdraw", rentalId: string): string {
+  const cmd = { view: "v", comment: "cm", send: "s", confirm: "x", accept: "y", decline: "n", counter: "c", withdraw: "w" }[kind];
   return `vrfp_${cmd}_${rentalId}`;
 }
 
@@ -677,6 +747,7 @@ export function parseProposalCallback(data: string): ParsedProposalCallback | nu
   if (head === "y") return { action: "accept", rentalId };
   if (head === "n") return { action: "decline", rentalId };
   if (head === "c") return { action: "counter", rentalId };
+  if (head === "w") return { action: "withdraw", rentalId };
   return null;
 }
 
@@ -686,6 +757,24 @@ export function partyRole(state: { operator_chat_id?: string | null; owner_chat_
   if (state.operator_chat_id && String(state.operator_chat_id) === chatId) return "operator";
   if (state.owner_chat_id && String(state.owner_chat_id) === chatId) return "owner";
   return null;
+}
+
+/**
+ * Task 118 — full actor resolution: the two recorded parties act as
+ * operator/owner; crew staff (crew owner + admins, see loadCrewStaffChatIds)
+ * act as «admin» — same buttons, supervisor powers (instant verify / dispute
+ * / negotiation). Parties win when a chat id is both (e.g. the crew owner is
+ * also the rental's owner) — a party's own side is the more specific role.
+ */
+export function resolveVerificationRole(
+  row: { operator_chat_id?: string | null; owner_chat_id?: string | null },
+  chatId: string,
+  adminChatIds?: Array<string | null | undefined> | null,
+): "operator" | "owner" | "admin" | null {
+  const party = partyRole(row, chatId);
+  if (party) return party;
+  const ids = (adminChatIds || []).filter(Boolean).map(String);
+  return ids.includes(String(chatId)) ? "admin" : null;
 }
 
 /** Other negotiation party (null for single-party rows — no one to negotiate with). */
@@ -699,7 +788,7 @@ export function otherPartyChatId(row: { operator_chat_id?: string | null; owner_
   return null;
 }
 
-export function startDraft(nego: NegotiationState, chatId: string, role: "operator" | "owner", original: SplitParts, fromSplit?: SplitParts): NegotiationState {
+export function startDraft(nego: NegotiationState, chatId: string, role: "operator" | "owner" | "admin", original: SplitParts, fromSplit?: SplitParts): NegotiationState {
   return {
     ...nego,
     draft: { by: chatId, role, split: fromSplit ? { ...fromSplit } : { ...original }, comment: nego.draft?.by === chatId ? nego.draft.comment : null },
@@ -713,7 +802,8 @@ export function setDraftSplit(nego: NegotiationState, split: SplitParts): Negoti
 
 export function setDraftComment(nego: NegotiationState, comment: string): NegotiationState {
   if (!nego.draft) return nego;
-  return { ...nego, draft: { ...nego.draft, comment: comment.slice(0, 300) } };
+  // Task 118: 300 → 600 — the boss sends full recalc walkthroughs as comments.
+  return { ...nego, draft: { ...nego.draft, comment: comment.slice(0, 600) } };
 }
 
 export function clearDraft(nego: NegotiationState): NegotiationState {
@@ -728,10 +818,12 @@ export function pushRound(nego: NegotiationState, round: NegotiationRound): Nego
 /**
  * Send the current draft as a proposal to the other party.
  * Requires a draft with at least one changed part or a comment.
+ * Task 118: sending over your OWN open proposal REPLACES it (the «buttons
+ * disappeared, can't edit again» fix — boss tested, edit→send→edit loop).
  */
 export function sendProposalFromDraft(
   nego: NegotiationState,
-  params: { chatId: string; role: "operator" | "owner"; nowIso: string; original: SplitParts },
+  params: { chatId: string; role: "operator" | "owner" | "admin"; nowIso: string; original: SplitParts },
 ): { state: NegotiationState; ok: boolean; error?: string } {
   const draft = nego.draft;
   if (!draft || draft.by !== params.chatId) {
@@ -741,7 +833,8 @@ export function sendProposalFromDraft(
   if (changed.length === 0 && !(draft.comment || "").trim()) {
     return { state: nego, ok: false, error: "Изменений нет — поправьте хотя бы одну часть расчёта или добавьте комментарий." };
   }
-  if (nego.open) {
+  // Someone else's proposal is awaiting an answer — counter instead (vrfp_c_).
+  if (nego.open && nego.open.by !== params.chatId) {
     return { state: nego, ok: false, error: "Предложение уже отправлено и ждёт ответа второй стороны." };
   }
   const proposal: OpenProposal = {
@@ -751,8 +844,9 @@ export function sendProposalFromDraft(
     split: { ...draft.split },
     comment: (draft.comment || "").trim() || null,
   };
+  const isReplace = !!nego.open;
   const round: NegotiationRound = {
-    action: nego.rounds?.some((r) => r.action === "propose" || r.action === "counter") ? "counter" : "propose",
+    action: isReplace ? "propose" : nego.rounds?.some((r) => r.action === "propose" || r.action === "counter") ? "counter" : "propose",
     by: params.chatId,
     role: params.role,
     at: params.nowIso,
@@ -762,10 +856,33 @@ export function sendProposalFromDraft(
   return { state: pushRound({ ...clearDraft(nego), open: proposal }, round), ok: true };
 }
 
+/**
+ * Task 118 — the proposer takes their pending proposal back (new button on
+ * the «sent» stub: «↩️ Отозвать»). Only the author may withdraw; the row
+ * stays «disputed» — the pair keeps talking or confirms as-is.
+ */
+export function withdrawOpenProposal(
+  nego: NegotiationState,
+  params: { chatId: string; role: "operator" | "owner" | "admin"; nowIso: string },
+): { state: NegotiationState; ok: boolean; error?: string } {
+  const open = nego.open;
+  if (!open) return { state: nego, ok: false, error: "Открытого предложения нет." };
+  if (open.by !== params.chatId) return { state: nego, ok: false, error: "Отозвать можно только своё предложение." };
+  const round: NegotiationRound = {
+    action: "withdraw",
+    by: params.chatId,
+    role: params.role,
+    at: params.nowIso,
+    split: { ...open.split },
+    comment: open.comment,
+  };
+  return { state: pushRound({ ...nego, open: null }, round), ok: true };
+}
+
 /** The other party agrees → negotiation closes with the agreed numbers. */
 export function acceptOpenProposal(
   nego: NegotiationState,
-  params: { chatId: string; role: "operator" | "owner" },
+  params: { chatId: string; role: "operator" | "owner" | "admin" },
 ): { state: NegotiationState; ok: boolean; error?: string } {
   const open = nego.open;
   if (!open) return { state: nego, ok: false, error: "Открытого предложения нет." };
@@ -783,7 +900,7 @@ export function acceptOpenProposal(
 /** The other party declines → back to a plain disputed row (manual talk). */
 export function declineOpenProposal(
   nego: NegotiationState,
-  params: { chatId: string; role: "operator" | "owner"; nowIso: string },
+  params: { chatId: string; role: "operator" | "owner" | "admin"; nowIso: string },
 ): { state: NegotiationState; ok: boolean; error?: string } {
   const open = nego.open;
   if (!open) return { state: nego, ok: false, error: "Открытого предложения нет." };
@@ -835,6 +952,23 @@ export function proposalResponseKeyboard(rentalId: string): InlineButton[][] {
       { text: "⚠️ Предложить своё", callback_data: encodeProposalCallback("counter", rentalId) },
     ],
     [{ text: "❌ Отклонить", callback_data: encodeProposalCallback("decline", rentalId) }],
+  ];
+}
+
+/**
+ * Task 118 — the proposer's «sent» stub is no longer a dead end (the boss
+ * tested: after sending a suggestion the buttons vanished and he could not
+ * edit again). Edit re-opens the editor prefilled with the sent numbers
+ * (sending replaces the proposal); withdraw takes it back; confirm lets the
+ * proposer also ✅ the deal while the other side is thinking.
+ */
+export function proposalSentKeyboard(rentalId: string): InlineButton[][] {
+  return [
+    [{ text: "✏️ Изменить предложение", callback_data: encodeProposalCallback("view", rentalId) }],
+    [
+      { text: "↩️ Отозвать", callback_data: encodeProposalCallback("withdraw", rentalId) },
+      { text: "✅ Расчёт верный", callback_data: encodeProposalCallback("confirm", rentalId) },
+    ],
   ];
 }
 

@@ -419,9 +419,11 @@ export async function resendVerificationDmsAction(params: {
     // owner — the clicking admin is often NEITHER (e.g. the boss resending on
     // vip-bike, where the owner is Ilya and the operator is DJORUDJOV): both
     // DMs landed fine, the toast said «(2 получено) ✅», and the boss still got
-    // NOTHING (actor is also excluded from the staff cc). Send a keyboardless
-    // proof copy to the actor — same policy as the staff cc: no ✅/⚠️ buttons,
-    // foreign taps bounce in the state machine.
+    // NOTHING (actor is also excluded from the staff cc). Task 118: the proof
+    // copy now carries the ✅/⚠️ keyboard — crew staff are first-class actors
+    // in the TG machine (admin ✅ verifies instantly), so the boss can settle
+    // the сверка right from the copy. The old keyboardless-copy comment is
+    // history.
     let actorCopied = false;
     if (actorChatId && !recipients.includes(actorChatId)) {
       const who = recipients.length
@@ -429,7 +431,12 @@ export async function resendVerificationDmsAction(params: {
         : "получатели не найдены";
       const proof = `📤 <b>Копия сверки</b> (вы высылали · получатели: ${who})\n\n${summary}`;
       try {
-        const res = await sendComplexMessage(actorChatId, proof, [], { parseMode: "HTML", keyboardType: "inline" });
+        const res = await sendComplexMessage(
+          actorChatId,
+          proof,
+          withKeyboard ? verificationKeyboard(row.rental_id) : [],
+          { parseMode: "HTML", keyboardType: "inline" },
+        );
         actorCopied = res?.success !== false;
         if (!actorCopied) failed.push({ chatId: actorChatId, error: `копия: ${res?.error || "Telegram API error"}` });
       } catch (e) {

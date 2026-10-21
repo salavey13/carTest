@@ -123,6 +123,7 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
   // Preview calculator state
   const [previewBikeId, setPreviewBikeId] = useState<string>("");
   const [previewEquipUnits, setPreviewEquipUnits] = useState(1);
+  const [previewDays, setPreviewDays] = useState(3);
   const [previewPrice, setPreviewPrice] = useState(12000);
 
   // Bike search
@@ -181,6 +182,9 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
     setConfig((c) => ({ ...c, rental: { ...c.rental, [cat]: Number(value) || 0 } }));
   const setEquipRentalUnit = (value: string) =>
     setConfig((c) => ({ ...c, equipmentRentalUnit: Number(value) || 0 }));
+  // Task 118: followup coef for gear days 2+ (the boss's 200/100 rule).
+  const setEquipRentalFollowup = (value: string) =>
+    setConfig((c) => ({ ...c, equipmentRentalUnitFollowup: Math.max(0, Number(value) || 0) }));
   const setSaleCoef = (cat: SaleCategory, value: string) =>
     setConfig((c) => ({ ...c, sale: { ...c.sale, [cat]: Number(value) || 0 } }));
   const setEquipSaleCoef = (cat: EquipmentSaleCategory, value: string) =>
@@ -274,6 +278,7 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
   const previewBike = bikes.find((b) => b.bikeId === previewBikeId);
   const previewBreakdown = useMemo(() => {
     if (!previewBike) return null;
+    const days = Math.max(1, Math.floor(previewDays || 1));
     const salary = computeRentalSalary({
       config,
       rentalCategory: previewBike.rentalCategory,
@@ -282,13 +287,15 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
       // Preview: assume the catalog price is 10% below the input price so the
       // overprice line is visible; pure UI illustration.
       standardPrice: Math.round(previewPrice * 0.9),
+      // Task 118: gear commission tapers after day 1 (200 → 100 ₽/ед/сут).
+      equipmentDays: days,
     });
     const sale = computeSaleSalary({
       config,
       saleCategory: previewBike.saleCategory,
     });
-    return { salary, sale };
-  }, [previewBike, config, previewEquipUnits, previewPrice]);
+    return { salary, sale, days };
+  }, [previewBike, config, previewEquipUnits, previewDays, previewPrice]);
 
   const filteredBikes = useMemo(() => {
     const q = bikeSearch.trim().toLowerCase();
@@ -356,7 +363,7 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
             Проверьте, как считается ЗП оператора: категория + экип + оверпрайс.
           </p>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-4">
             <div>
               <label className="mb-1 block text-xs font-medium" style={{ color: T.textMuted }}>Техника</label>
               <select
@@ -379,6 +386,18 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
                 min={0}
                 value={previewEquipUnits}
                 onChange={(e) => setPreviewEquipUnits(Math.max(0, Number(e.target.value) || 0))}
+                className={franchizeOperatorInputClassName}
+                style={franchizeOperatorInputStyle}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium" style={{ color: T.textMuted }}>Суток аренды</label>
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={previewDays}
+                onChange={(e) => setPreviewDays(Math.min(60, Math.max(1, Number(e.target.value) || 1)))}
                 className={franchizeOperatorInputClassName}
                 style={franchizeOperatorInputStyle}
               />
@@ -419,7 +438,9 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: T.textMuted }}>
                 <span>База: {rub(previewBreakdown.salary.base)}</span>
                 <span>
-                  Экип: {previewEquipUnits} × {rub(config.equipmentRentalUnit)} = {rub(previewBreakdown.salary.equipment)}
+                  Экип: {previewBreakdown.days > 1
+                    ? `${previewEquipUnits} ед. × ${previewBreakdown.days} сут (${config.equipmentRentalUnit}+${config.equipmentRentalUnitFollowup}×${previewBreakdown.days - 1}) = ${rub(previewBreakdown.salary.equipment)}`
+                    : `${previewEquipUnits} × ${rub(config.equipmentRentalUnit)} = ${rub(previewBreakdown.salary.equipment)}`}
                 </span>
                 <span>
                   Оверпрайс {config.overpricePercent}%: {rub(previewBreakdown.salary.overprice)}
@@ -529,11 +550,21 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
               T={T}
               disabled={!isOwner}
               accent="#10b981"
-              label="Экип (за единицу)"
-              hint="Шлемы, перчатки, куртка, штаны, ботинки, сет, рюкзак. Зарядка — бесплатно"
+              label="Экип (за единицу, 1-е сутки)"
+              hint="Шлемы, перчатки, куртка, штаны, ботинки, сет, рюкзак. Зарядка — бесплатно. Ставка за ПЕРВЫЕ сутки аренды"
               value={config.equipmentRentalUnit}
               official={OFFICIAL_SALARY_CONFIG.equipmentRentalUnit}
               onChange={setEquipRentalUnit}
+            />
+            <CoefRow
+              T={T}
+              disabled={!isOwner}
+              accent="#14b8a6"
+              label="Экип (за единицу, каждые следующие сутки)"
+              hint="Правило босса (2026-10-21): экип за 1-е сутки — полная ставка, за каждые следующие — половина (200 → 100 ₽). Почасовые аренды считаются как 1 сутки. Эталон экипировки клиенту тоже половинный со 2-х суток"
+              value={config.equipmentRentalUnitFollowup}
+              official={OFFICIAL_SALARY_CONFIG.equipmentRentalUnitFollowup}
+              onChange={setEquipRentalFollowup}
             />
           </div>
         </FranchizeOperatorPanel>

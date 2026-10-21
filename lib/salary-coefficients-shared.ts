@@ -42,8 +42,13 @@ export type PriceTier = "budget" | "regular" | "premium";
 export interface SalaryConfig {
   /** ₽ per closed rental by bike category */
   rental: Record<RentalCategory, number>;
-  /** ₽ per equipment unit rented alongside a bike */
+  /** ₽ per equipment unit rented alongside a bike (charged for the FIRST day) */
   equipmentRentalUnit: number;
+  /** Task 118 (boss 2026-10-21): ₽ per equipment unit for each FOLLOWING day
+   *  of a multi-day rental (1st day pays equipmentRentalUnit). Boss's rule:
+   *  «1st day full 500₽ (commission 200₽), following days 250₽ — commission 100₽».
+   *  Hourly (<24h) rentals bill gear as ONE day. */
+  equipmentRentalUnitFollowup: number;
   /** ₽ per closed sale by bike category */
   sale: Record<SaleCategory, number>;
   /** ₽ per equipment unit sold */
@@ -78,6 +83,9 @@ export const OFFICIAL_SALARY_CONFIG: SalaryConfig = {
     partner_premium: 750,
   },
   equipmentRentalUnit: 200,
+  // Task 118: 200 ₽/ед за 1-е сутки, 100 ₽/ед за каждые следующие (босс 2026-10-21:
+  // «1st day full 500rub (comission 200rub) following days 250rub and comission is 100rub»).
+  equipmentRentalUnitFollowup: 100,
   sale: {
     enduro_moped: 5000,
     regular: 10000,
@@ -394,8 +402,8 @@ export function equipmentStandardLines(eq: RentalEquipment | null | undefined): 
     const label = `${n} ${pluralRu(n, one, `${one}а`, `${one}ов`)}`;
     lines.push({ label, units: n, sum: n * price });
   };
-  push("helmets", eq.helmets);
-  push("gloves", eq.gloves);
+  push("helmets", Number(eq.helmets) || 0);
+  push("gloves", Number(eq.gloves) || 0);
   if (eq.jacket) push("jacket", 1);
   if (eq.pants) push("pants", 1);
   if (eq.boots) push("boots", 1);
@@ -417,6 +425,109 @@ export function daysLabelRu(n: number): string {
 export function hoursLabelRu(n: number): string {
   const h = Math.round(Number(n) || 0);
   return `${h} ${pluralRu(h, "час", "часа", "часов")}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task 118 — MULTI-DAY GEAR MATH (boss 2026-10-21)
+// «1st day full 500₽ (commission 200₽), following days 250₽ — commission 100₽».
+// The same taper applies to BOTH the эталон (what the client should pay for
+// gear: full price day 1, half price days 2+) and the operator's per-unit
+// commission (equipmentRentalUnit day 1, equipmentRentalUnitFollowup days 2+).
+// Bikes have NO taper: the client price is the tier ladder × days, the
+// operator's bike bonus is a flat ₽/аренда regardless of duration.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Charged gear days for a rental window. Multi-day (≥24h) rentals bill gear
+ * for every charged day; hourly windows (<24h) and unknown/fallback windows
+ * bill gear as ONE day (the legacy flat behavior).
+ */
+export function effectiveGearDays(
+  detail: { days?: number | null; hours?: number | null } | null | undefined,
+): number {
+  const d = Math.max(0, Math.floor(Number(detail?.days) || 0));
+  if (d >= 1) return d;
+  return 1;
+}
+
+/** Per-unit price multiplier over `days` days: 1st day full, each following day half. 3 days → 2.0. */
+export function gearDayFactor(days: number): number {
+  const d = Math.max(1, Math.floor(Number(days) || 1));
+  return (d + 1) / 2;
+}
+
+/**
+ * Standard equipment cost (matches the CSV «Экип» column: charger free).
+ * Task 118: `days` — charged gear days; the эталон follows the client rule
+ * «1-е сутки полная цена, дальше — половина» (3 units × 3 days @500 → 3 000 ₽).
+ * Omitted/1 → the legacy flat single-day cost, so old callers keep numbers.
+ * (Pure + client-safe: lives here so tests and the admin preview reuse ONE
+ * canon; the server module re-exports it.)
+ */
+export function equipmentStandardCost(eq: RentalEquipment | null | undefined, days = 1): number {
+  if (!eq) return 0;
+  const factor = gearDayFactor(days);
+  let c = 0;
+  if (Number(eq.helmets) > 0) c += Number(eq.helmets) * 1000 * factor;
+  if (Number(eq.gloves) > 0) c += Number(eq.gloves) * 500 * factor;
+  if (eq.jacket) c += 500 * factor;
+  if (eq.pants) c += 500 * factor;
+  if (eq.boots) c += 500 * factor;
+  if (eq.net) c += 500 * factor;
+  if (eq.backpack) c += 500 * factor;
+  return Math.round(c);
+}
+
+/** Compact ₽ formatter for the frozen formula strings (pure, ru-RU, no kopecks). */
+function rubPlain(n: number): string {
+  return `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(Math.round(n))} ₽`;
+}
+
+/**
+ * «(500 + 250 + 250) × 3 ед. = 3 000 ₽» — the per-unit day ladder × units for
+ * UNIFORM-price gear (the common case). Mixed-price gear degrades to the
+ * total-only line. Null when there is nothing to break down (1 day / no gear).
+ * Pure — frozen into the verification snapshot AND reused by the fix scripts.
+ */
+export function buildGearDaysLine(
+  eq: RentalEquipment | null | undefined,
+  days: number,
+  total: number,
+): string | null {
+  const d = Math.max(1, Math.floor(Number(days) || 1));
+  if (d <= 1 || !eq) return null;
+  const lines = equipmentStandardLines(eq);
+  if (lines.length === 0) return null;
+  const unitPrices = new Set(lines.map((l) => Math.round(l.sum / Math.max(1, l.units))));
+  if (unitPrices.size === 1) {
+    const p = [...unitPrices][0];
+    const units = lines.reduce((acc, l) => acc + l.units, 0);
+    const parts = [String(p)];
+    for (let i = 1; i < d; i += 1) parts.push(String(Math.round(p / 2)));
+    return `(${parts.join(" + ")}) × ${units} ед. = ${rubPlain(total)}`;
+  }
+  return `${rubPlain(total)} за ${d} ${d % 10 === 1 && d % 100 !== 11 ? "сутки" : "суток"} (1-е сутки полная цена, дальше — половина)`;
+}
+
+/**
+ * «(200 + 100 + 100) × 3 ед.» — the per-unit COMMISSION ladder over the
+ * charged days. NO money in the string — the DM formatter appends the frozen
+ * snapshot.equipment (one money source, never two). Null for 1-day rentals /
+ * zero followup coef (nothing new vs the flat rule).
+ */
+export function buildEquipmentCommLine(
+  units: number,
+  first: number,
+  followup: number,
+  days: number,
+): string | null {
+  const d = Math.max(1, Math.floor(Number(days) || 1));
+  const n = Math.max(0, Math.floor(Number(units) || 0));
+  const fu = Math.max(0, Math.round(Number(followup) || 0));
+  if (d <= 1 || n <= 0 || fu <= 0) return null;
+  const parts = [String(Math.max(0, Math.round(Number(first) || 0)))];
+  for (let i = 1; i < d; i += 1) parts.push(String(fu));
+  return `(${parts.join(" + ")}) × ${n} ед.`;
 }
 
 /**
@@ -457,6 +568,9 @@ export interface RentalSalaryBreakdown {
  * Salary for one closed rental.
  * `standardPrice` — canonical catalog price for the rental period + standard
  * equipment cost (see buildRentalsCsv); markup above it pays overprice%.
+ * Task 118: `equipmentDays` — charged gear days (1st day pays the full unit
+ * coefficient, each following day the followup coefficient). Omitted → 1 day
+ * (the legacy flat per-unit behavior), so old callers keep their numbers.
  */
 export function computeRentalSalary(params: {
   config: SalaryConfig;
@@ -464,10 +578,15 @@ export function computeRentalSalary(params: {
   equipmentUnits: number;
   totalCost: number;
   standardPrice: number;
+  /** Charged gear days (≥1). Hourly/unknown windows bill gear as 1 day. */
+  equipmentDays?: number;
 }): RentalSalaryBreakdown {
   const { config, rentalCategory, equipmentUnits, totalCost, standardPrice } = params;
   const base = config.rental[rentalCategory] ?? 0;
-  const equipment = equipmentUnits * config.equipmentRentalUnit;
+  const gearDays = Math.max(1, Math.floor(Number(params.equipmentDays) || 1));
+  const followup = Math.max(0, Math.round(Number(config.equipmentRentalUnitFollowup) || 0));
+  const perUnit = Math.round(Number(config.equipmentRentalUnit) || 0) + (gearDays - 1) * followup;
+  const equipment = equipmentUnits * perUnit;
   const markup = Math.max(0, (Number(totalCost) || 0) - (Number(standardPrice) || 0));
   const overprice = Math.round((markup * config.overpricePercent) / 100);
   return {

@@ -33,7 +33,8 @@ import {
   computeRentalSalary,
   computeSaleSalary,
   equipmentStandardCost,
-  standardRentalPrice,
+  standardRentalPriceDetailed,
+  effectiveGearDays,
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
 import {
@@ -371,20 +372,24 @@ export async function buildRentalsCsv(
     const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
     const eq = (meta.equipment || {}) as RentalEquipment;
     const equipmentUnits = countEquipmentUnits(eq);
-    const stdPrice =
-      standardRentalPrice({
-        specs: vehicle?.specs,
-        startIso: startDate,
-        endIso: endDate,
-        dailyPrice: vehicle?.daily_price,
-        fallbackTotalCost: price,
-      }) + equipmentStandardCost(eq);
+    // Task 118: day-aware canon — gear bills every charged day (1st full, then
+    // half), the commission ladder is 200/ед day 1 + 100/ед days 2+.
+    const stdDetail = standardRentalPriceDetailed({
+      specs: vehicle?.specs,
+      startIso: startDate,
+      endIso: endDate,
+      dailyPrice: vehicle?.daily_price,
+      fallbackTotalCost: price,
+    });
+    const gearDays = effectiveGearDays(stdDetail);
+    const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays);
     const salary = computeRentalSalary({
       config: salaryConfig,
       rentalCategory: categories.rental,
       equipmentUnits,
       totalCost: price,
       standardPrice: stdPrice,
+      equipmentDays: gearDays,
     });
     const salaryStr = String(salary.total);
     blockRentals.salary += salary.total;

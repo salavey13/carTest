@@ -165,6 +165,9 @@ export async function saveSalaryCoefficientsConfig(params: {
     if (!Number.isFinite(Number(config.equipmentRentalUnit)) || Number(config.equipmentRentalUnit) < 0) {
       problems.push("Экип (аренда)");
     }
+    if (!Number.isFinite(Number(config.equipmentRentalUnitFollowup)) || Number(config.equipmentRentalUnitFollowup) < 0) {
+      problems.push("Экип (со 2-х суток)");
+    }
     const op = Number(config.overpricePercent);
     if (!Number.isFinite(op) || op < 0 || op > 100) {
       problems.push("Оверпрайс %");
@@ -188,6 +191,7 @@ export async function saveSalaryCoefficientsConfig(params: {
     const configResult = await saveSalaryConfigToMetadata(crewId, {
       rental: config.rental,
       equipmentRentalUnit: Math.round(Number(config.equipmentRentalUnit)),
+      equipmentRentalUnitFollowup: Math.round(Number(config.equipmentRentalUnitFollowup) || 0),
       sale: config.sale,
       equipmentSale: config.equipmentSale,
       overpricePercent: Math.round(op),

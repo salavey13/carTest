@@ -14,7 +14,8 @@ import {
   countEquipmentUnits,
   computeRentalSalary,
   equipmentStandardCost,
-  standardRentalPrice,
+  standardRentalPriceDetailed,
+  effectiveGearDays,
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
 import {
@@ -214,14 +215,17 @@ export async function getMyWorkDayAction(params: {
       const price = Number(r.total_cost) || 0;
       const startDate = r.requested_start_date || r.agreed_start_date;
       const endDate = r.requested_end_date || r.agreed_end_date;
-      const stdPrice =
-        standardRentalPrice({
-          specs: vehicle?.specs,
-          startIso: startDate,
-          endIso: endDate,
-          dailyPrice: vehicle?.daily_price,
-          fallbackTotalCost: price,
-        }) + equipmentStandardCost(eq);
+      // Task 118: day-aware canon (gear: 1st day full, then half; commission
+      // 200/ед day 1 + 100/ед days 2+) — identical to the verification DM.
+      const stdDetail = standardRentalPriceDetailed({
+        specs: vehicle?.specs,
+        startIso: startDate,
+        endIso: endDate,
+        dailyPrice: vehicle?.daily_price,
+        fallbackTotalCost: price,
+      });
+      const gearDays = effectiveGearDays(stdDetail);
+      const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays);
       const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
       const salary = computeRentalSalary({
         config: salaryConfig,
@@ -229,6 +233,7 @@ export async function getMyWorkDayAction(params: {
         equipmentUnits: countEquipmentUnits(eq),
         totalCost: price,
         standardPrice: stdPrice,
+        equipmentDays: gearDays,
       });
 
       rentalsRevenue += price;

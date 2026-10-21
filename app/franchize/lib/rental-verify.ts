@@ -41,9 +41,11 @@ import {
   computeRentalSalary,
   equipmentStandardCost,
   equipmentStandardLines,
-  standardRentalPrice,
   standardRentalPriceDetailed,
   RENTAL_CATEGORY_LABELS,
+  effectiveGearDays,
+  buildGearDaysLine,
+  buildEquipmentCommLine,
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
 import {
@@ -80,9 +82,10 @@ import {
   otherPartyChatId,
   parseNegotiation,
   parseProposalCallback,
-  partyRole,
   proposalResponseKeyboard,
+  proposalSentKeyboard,
   resetSplitPart,
+  resolveVerificationRole,
   sendProposalFromDraft,
   selfHealErrorText,
   setDraftComment,
@@ -92,12 +95,14 @@ import {
   startDraft,
   verificationKeyboard,
   verificationStatusNote,
+  withdrawOpenProposal,
   type InlineButton,
   type NegotiationState,
   type OpenProposal,
   type RentalVerificationRow,
   type RentalVerificationSnapshot,
   type SplitPartKey,
+  type VerificationActor,
   type VerificationBrief,
 } from "./rental-verify-core";
 
@@ -118,6 +123,8 @@ export {
   parseNegotiation,
   parseProposalCallback,
   proposalResponseKeyboard,
+  proposalSentKeyboard,
+  resolveVerificationRole,
   sendProposalFromDraft,
   selfHealErrorText,
   snapshotSplitOf,
@@ -126,6 +133,7 @@ export {
   tallyVerificationStatuses,
   verificationKeyboard,
   verificationStatusNote,
+  withdrawOpenProposal,
   VERIFICATION_STATUS_LABELS,
 } from "./rental-verify-core";
 export type {
@@ -186,7 +194,13 @@ export async function computeRentalVerificationSnapshot(params: {
     dailyPrice: vehicle?.daily_price,
     fallbackTotalCost: price,
   });
-  const stdPrice = stdDetail.price + equipmentStandardCost(eq);
+  // Task 118 (boss 2026-10-21): gear bills EVERY charged day — the client rule
+  // «1-е сутки полная цена, дальше — половина» is now ALSO the эталон rule and
+  // the operator's commission ladder (200 ₽/ед day 1, 100 ₽/ед days 2+).
+  // Bikes have NO taper: ladder price × days, flat ₽/аренда bonus.
+  const gearDays = effectiveGearDays({ days: stdDetail.days, hours: stdDetail.hours });
+  const gearStandardCost = equipmentStandardCost(eq, gearDays);
+  const stdPrice = stdDetail.price + gearStandardCost;
   const equipmentUnits = countEquipmentUnits(eq);
   const salary = computeRentalSalary({
     config,
@@ -194,6 +208,7 @@ export async function computeRentalVerificationSnapshot(params: {
     equipmentUnits,
     totalCost: price,
     standardPrice: stdPrice,
+    equipmentDays: gearDays,
   });
 
   const freeze = meta.pickup_freeze as Record<string, unknown> | undefined;
@@ -203,6 +218,16 @@ export async function computeRentalVerificationSnapshot(params: {
   // Digit-equal with the salary math above: same baseline, same config.
   const gearLines = equipmentStandardLines(eq).map((l) => `${l.label} — ${l.sum} ₽`);
   const markup = Math.max(0, price - stdPrice);
+  // Task 118: pre-format the day-ladder lines (plural-safe labels frozen here,
+  // the pure formatter only prints what it is given).
+  const gearDaysLabel = gearDays > 1 ? daysLabelRu(gearDays) : null;
+  const gearDaysLine = buildGearDaysLine(eq, gearDays, gearStandardCost);
+  const equipCommLine = buildEquipmentCommLine(
+    equipmentUnits,
+    config.equipmentRentalUnit,
+    config.equipmentRentalUnitFollowup,
+    gearDays,
+  );
   const bikeImage = typeof (vehicle as any)?.image_url === "string" ? (vehicle as any).image_url.trim() : "";
   return {
     bikeName: `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim(),
@@ -265,7 +290,12 @@ export async function computeRentalVerificationSnapshot(params: {
       bikeDays: stdDetail.days,
       bikeHours: stdDetail.hours,
       gearLines,
-      gearStandard: equipmentStandardCost(eq),
+      gearStandard: gearStandardCost,
+      gearDays,
+      equipFollowupUnit: config.equipmentRentalUnitFollowup,
+      gearDaysLabel,
+      gearDaysLine,
+      equipCommLine,
       standardTotal: stdPrice,
       clientTotal: price,
       markup,
@@ -531,18 +561,18 @@ export async function requestRentalVerification(params: {
       }
     }
 
-    // ── VF-FIX 2026-10-18: cc the crew owner + admins (read-only copy) ──
+    // ── VF-FIX 2026-10-18: cc the crew owner + admins ──
     // Boss: «upon closing rental notification for verification is sent to
-    // crew owner, crew admins». The ✅/⚠️ game itself stays between the two
-    // parties (the state machine bounces foreign chat ids); the staff copy
-    // is FYI + a deeplink into the drawer, where an owner-tier admin can
-    // confirm manually (✓ подтвердить сверку / 📤 выслать сверку в TG).
+    // crew owner, crew admins». Task 118 (boss: «show buttons to admin as
+    // well»): the staff copy carries the SAME ✅/⚠️ keyboard — crew staff act
+    // as «admin» (an admin ✅ verifies instantly, ⚠️ joins the negotiation).
     try {
       const ccSent = await ccVerificationToCrewStaff({
         crewSlug,
         rentalId: rental.rental_id,
         summary,
         bikePhotoUrl: snapshot.bikePhotoUrl,
+        keyboard: keyboard as unknown as InlineButton[][],
         exclude: [
           operatorChatId,
           ownerChatId,
@@ -643,11 +673,49 @@ async function sendVerificationBikePhoto(
 // ── VF-FIX 2026-10-18: staff cc helper ─────────────────────────────────────
 
 /**
+ * Task 118 — chat ids of the CREW STAFF: crew owner + admins/co_owner
+ * (active). They act as «admin» in the verification machine (same ✅/⚠️
+ * buttons as the parties; ✅ verifies instantly). Deliberately NOT
+ * resolveLeadNotifyRecipients — that one also appends the global
+ * ADMIN_CHAT_ID, which is a server-level operator, not this crew's supervisor.
+ * Never throws — worst case an empty list (then admins simply have no buttons).
+ */
+export async function loadCrewStaffChatIds(crewSlug: string | null | undefined): Promise<string[]> {
+  if (!crewSlug) return [];
+  try {
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", crewSlug)
+      .maybeSingle();
+    if (!crew) return [];
+    const ids = new Set<string>();
+    if (crew.owner_id) ids.add(String(crew.owner_id));
+    if (crew.id) {
+      const { data: admins } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id, role, membership_status")
+        .eq("crew_id", crew.id)
+        .in("role", ["owner", "admin", "co_owner"])
+        .eq("membership_status", "active");
+      for (const a of admins || []) {
+        if (a?.user_id) ids.add(String(a.user_id));
+      }
+    }
+    return [...ids];
+  } catch (e) {
+    logger.warn("[rental-verify] loadCrewStaffChatIds failed (non-fatal):", e);
+    return [];
+  }
+}
+
+/**
  * Read-only copy of the verification summary to crew owner + admins
  * (resolveLeadNotifyRecipients, no member fanout), deduped against the
- * verification parties / actor / attribution chats. No ✅/⚠️ buttons — the
- * state machine only accepts the two parties; staff confirm in the app
- * drawer instead. Never throws (caller wraps non-fatal anyway).
+ * verification parties / actor / attribution chats.
+ * Task 118 (boss: «show buttons to admin as well»): the copy now carries the
+ * SAME ✅/⚠️ keyboard — staff act as «admin» in the state machine (an admin ✅
+ * verifies instantly, ⚠️ opens the dispute editor). Never throws.
  */
 export async function ccVerificationToCrewStaff(params: {
   crewSlug: string | null;
@@ -656,6 +724,8 @@ export async function ccVerificationToCrewStaff(params: {
   /** Task 117: bike photo preview sent right before the copy (cosmetic). */
   bikePhotoUrl?: string | null;
   exclude: Array<string | null | undefined>;
+  /** Task 118: the ✅/⚠️ keyboard for staff (they are first-class actors now). */
+  keyboard?: InlineButton[][];
 }): Promise<number> {
   if (!params.crewSlug) return 0;
   const { resolveLeadNotifyRecipients } = await import("@/app/franchize/lib/new-lead-notify");
@@ -676,23 +746,32 @@ export async function ccVerificationToCrewStaff(params: {
     // deeplink — best effort
   }
 
+  const withKeyboard = (params.keyboard || []).length > 0;
   const text = [
     params.summary,
     "",
-    "📋 Копия для команды — кнопки ✅/⚠️ у оператора и владельца.",
+    withKeyboard
+      ? "📋 Копия для команды — кнопки ✅/⚠️ работают у оператора, владельца и админов экипажа (админ ✅ подтверждает сверку сразу)."
+      : "📋 Копия для команды — кнопки ✅/⚠️ у оператора и владельца.",
     "Подтвердить сверку вручную можно в приложении: аналитика аренд → карточка аренды.",
   ].join("\n");
+
+  // URL buttons are not InlineButton (callback_data) — the deeplink row rides
+  // along with the ✅/⚠️ keyboard, so the payload type stays loose here.
+  type CcButton = { text: string; callback_data?: string; url?: string };
+  const rows: CcButton[][] = [
+    ...(params.keyboard || []),
+    ...(botUsername
+      ? [[{ text: "🔑 Открыть аренду", url: buildTelegramAppLink(botUsername, `rental_${params.rentalId}`) }]]
+      : []),
+  ];
   const payload: Record<string, unknown> = {
     text,
     parse_mode: "HTML",
     disable_web_page_preview: true,
   };
-  if (botUsername) {
-    payload.reply_markup = {
-      inline_keyboard: [
-        [{ text: "🔑 Открыть аренду", url: buildTelegramAppLink(botUsername, `rental_${params.rentalId}`) }],
-      ],
-    };
+  if (rows.length > 0) {
+    payload.reply_markup = { inline_keyboard: rows };
   }
 
   let sent = 0;
@@ -714,6 +793,50 @@ export async function ccVerificationToCrewStaff(params: {
     }),
   );
   return sent;
+}
+
+/**
+ * Task 118 — lightweight staff note (proposal sent / accepted / declined /
+ * withdrawn / verified / disputed): plain text, no keyboard, deduped against
+ * the directly-notified chats. The boss watches negotiations without being
+ * dragged into every DM thread. Never throws.
+ */
+export async function ccVerificationNoteToCrewStaff(params: {
+  crewSlug: string | null;
+  rentalId: string;
+  text: string;
+  /** Chats that already get the news directly (parties/proposer) — deduped out. */
+  exclude: Array<string | null | undefined>;
+}): Promise<number> {
+  if (!params.crewSlug) return 0;
+  try {
+    const { resolveLeadNotifyRecipients } = await import("@/app/franchize/lib/new-lead-notify");
+    const { telegramDeliver } = await import("@/lib/telegram-transport");
+    const excludeSet = new Set(params.exclude.filter(Boolean).map(String));
+    const targets = (await resolveLeadNotifyRecipients(params.crewSlug, { includeMembers: false }))
+      .map((id) => (id == null ? null : String(id)))
+      .filter((id): id is string => !!id && !excludeSet.has(id));
+    if (targets.length === 0) return 0;
+    let sent = 0;
+    await Promise.allSettled(
+      targets.map(async (chatId) => {
+        try {
+          const res = await telegramDeliver("sendMessage", chatId, {
+            text: params.text,
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
+          });
+          if (res?.ok !== false) sent += 1;
+        } catch (e) {
+          logger.warn(`[rental-verify] staff note send failed for ${chatId} (rental ${params.rentalId}):`, e);
+        }
+      }),
+    );
+    return sent;
+  } catch (e) {
+    logger.warn("[rental-verify] ccVerificationNoteToCrewStaff failed (non-fatal):", e);
+    return 0;
+  }
 }
 
 // ── Callback handling (Telegram buttons) ─────────────────────────────────────
@@ -841,11 +964,15 @@ export async function handleRentalVerifyCallback(params: {
     // parallel writer won the race we re-read and re-apply against the fresh
     // row — the state machine is idempotent, so the loser converges to
     // «verified» instead of clobbering it.
+    // Task 118: crew staff (owner/admin/co_owner of the CREW) act as «admin» —
+    // an admin ✅ verifies instantly, an admin ⚠️ disputes + opens the editor.
     let current_ = current;
+    const staffChatIds = await loadCrewStaffChatIds(current_.crew_slug || null);
     let result = applyVerificationAction(current_, {
       action: ok ? "confirm" : "dispute",
       chatId: String(params.chatId),
       nowIso: new Date().toISOString(),
+      adminChatIds: staffChatIds,
     });
     if (!result.row) {
       await answerCallback(params.callbackQueryId, result.error || "Действие недоступно.");
@@ -890,6 +1017,7 @@ export async function handleRentalVerifyCallback(params: {
         action: ok ? "confirm" : "dispute",
         chatId: String(params.chatId),
         nowIso: new Date().toISOString(),
+        adminChatIds: staffChatIds,
       });
       if (!result.row) {
         await answerCallback(params.callbackQueryId, result.error || "Действие недоступно.");
@@ -927,16 +1055,36 @@ export async function handleRentalVerifyCallback(params: {
 
     if (result.effect === "verified") {
       await answerCallback(params.callbackQueryId, "✅ Подтверждено — спасибо!");
+      // Task 118: an admin ✅ is the TG equivalent of the drawer's manual
+      // owner-tier confirm — stamp WHO verified into the negotiation jsonb
+      // (audit trail) and word the done-text accordingly.
+      const isAdminVerify = result.actor === "admin";
+      if (isAdminVerify) {
+        try {
+          const negoNow = parseNegotiation((current_ as any).negotiation);
+          await supabaseAdmin
+            .from("rental_verifications")
+            .update({
+              negotiation: { ...negoNow, adminVerified: { by: String(params.chatId), at: new Date().toISOString() } },
+              updated_at: new Date().toISOString(),
+            })
+            .eq("rental_id", rentalId);
+        } catch (stampErr) {
+          logger.warn(`[rental-verify] adminVerified stamp failed for ${rentalId} (non-fatal):`, stampErr);
+        }
+      }
       // Task 117: fresh operator score AFTER this сверка landed — the piggy
       // bank grew right now, show it (+this commission) instead of a stale
       // number. Falls back to «без счёта» on any failure (never blocks).
       const freshScore = await loadOperatorVerifiedScore(current_.operator_chat_id).catch(() => null);
       const { amount: confirmedAmount } = commissionOf(current_);
       const doneText = [
-        `🤝 <b>Расчёт подтверждён обеими сторонами</b>`,
+        isAdminVerify ? `🤝 <b>Расчёт подтверждён администратором</b>` : `🤝 <b>Расчёт подтверждён обеими сторонами</b>`,
         ``,
         `🛵 ${escapeVerifyHtml(snapshot?.bikeName || "аренда")} · комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}`,
-        `Аренда помечена как <b>проверенная</b> ✅ — в конце месяца она уже не требует разбора.`,
+        isAdminVerify
+          ? `Сверка закрыта администратором экипажа ${escapeVerifyHtml(labelFromUsersMap(usersMap, String(params.chatId)))} — аренда помечена как <b>проверенная</b> ✅.`
+          : `Аренда помечена как <b>проверенная</b> ✅ — в конце месяца она уже не требует разбора.`,
       ].join("\n");
       // Task 106: when the row carries an AGREED (corrected) split, both
       // parties get the honest final numbers instead of the frozen ones.
@@ -957,13 +1105,21 @@ export async function handleRentalVerifyCallback(params: {
       // Task 107: every «verified» DM now carries the payout-hub entry —
       // the money game continues after the confirm (see the payout counter).
       const payoutDoneKb = [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]];
-      for (const chatId of [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])]) {
+      const verifiedRecipients = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
+      for (const chatId of verifiedRecipients) {
         try {
           await sendComplexMessage(chatId, doneFinal, payoutDoneKb, { parseMode: "HTML", keyboardType: "inline" });
         } catch {
           /* non-fatal */
         }
       }
+      // Task 118: staff (who were not parties) see the outcome too — plain note.
+      await ccVerificationNoteToCrewStaff({
+        crewSlug: current.crew_slug || null,
+        rentalId,
+        text: doneFinal,
+        exclude: [...verifiedRecipients, isAdminVerify ? String(params.chatId) : ""],
+      });
       await grantVerificationAchievements(current_, { speedy: isSpeedyConfirm(current_) });
       await grantNegotiationAchievements(current_);
       return true;
@@ -975,10 +1131,11 @@ export async function handleRentalVerifyCallback(params: {
       const disputeText = [
         `⚠️ <b>Расчёт оспорен</b>`,
         ``,
-        `${escapeVerifyHtml(actorLabel)} оспорил сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} (комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
+        `${escapeVerifyHtml(actorLabel)}${result.actor === "admin" ? " (администратор экипажа)" : ""} оспорил сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} (комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
         `Аренда помечена как «спор» в ЗП-списках — разберитесь лично и закройте вопрос до конца месяца.`,
       ].join("\n");
-      for (const chatId of [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])]) {
+      const disputeRecipients = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
+      for (const chatId of disputeRecipients) {
         if (chatId === String(params.chatId)) continue;
         try {
           await sendComplexMessage(chatId, disputeText, [], { parseMode: "HTML" });
@@ -986,10 +1143,18 @@ export async function handleRentalVerifyCallback(params: {
           /* non-fatal */
         }
       }
+      // Task 118: staff see the dispute too — plain note (never blocks).
+      await ccVerificationNoteToCrewStaff({
+        crewSlug: current.crew_slug || null,
+        rentalId,
+        text: disputeText,
+        exclude: [...disputeRecipients, String(params.chatId)],
+      });
       // Task 106: the dispute is no longer a dead end — the disputant gets a
       // live split editor right away (two-party rows only; degrade silently
-      // when the negotiation column is not applied yet).
-      await openDisputeEditorAfterDispute(rentalId, current_, String(params.chatId), result.actor as "operator" | "owner");
+      // when the negotiation column is not applied yet). Task 118: admins
+      // (crew staff) get the same editor and join as a third voice.
+      await openDisputeEditorAfterDispute(rentalId, current_, String(params.chatId), result.actor as "operator" | "owner" | "admin");
       return true;
     }
 
@@ -1074,12 +1239,13 @@ async function renderEditorMessage(
  * After a dispute lands, open the split editor for the disputant (new DM).
  * Pure negotiation — the row was already written by the caller; here we only
  * attach a draft so the first render shows the frozen numbers.
+ * Task 118: the disputant may be a crew admin (role «admin») — same editor.
  */
 async function openDisputeEditorAfterDispute(
   rentalId: string,
   row: RentalVerificationRow,
   chatId: string,
-  role: "operator" | "owner",
+  role: "operator" | "owner" | "admin",
 ): Promise<void> {
   try {
     const singleParty = !row.operator_chat_id || row.operator_chat_id === row.owner_chat_id;
@@ -1148,7 +1314,10 @@ export async function handleRentalVerifyProposalCallback(params: {
     }
     const current = row as RentalVerificationRow;
     const chatId = String(params.chatId);
-    const role = partyRole(current, chatId);
+    // Task 118: parties act as operator/owner; crew staff (owner/admin/co_owner
+    // of the crew) act as «admin» — the editor, proposals and answers all work.
+    const staffChatIds = await loadCrewStaffChatIds(current.crew_slug || null);
+    const role = resolveVerificationRole(current, chatId, staffChatIds);
     if (!role) {
       await answerCallback(params.callbackQueryId, "Вы не участник сверки по этой аренде.");
       return true;
@@ -1160,13 +1329,16 @@ export async function handleRentalVerifyProposalCallback(params: {
     }
     const original = snapshotSplitOf(current.snapshot as Partial<RentalVerificationSnapshot>);
     let nego = parseNegotiation((current as any).negotiation);
-    const usersMap = await loadUsersMap([current.operator_chat_id, current.owner_chat_id]);
+    const usersMap = await loadUsersMap([current.operator_chat_id, current.owner_chat_id, chatId]);
     const actorLabel = labelFromUsersMap(usersMap, chatId);
 
     // Draft guard: view/part/adjust silently (re)create the actor's draft.
+    // Task 118: a fresh editor for the PROPOSER prefills from his own open
+    // proposal (the edit-after-send loop), everyone else starts from frozen.
     const ensureDraft = (): void => {
       if (!nego.draft || nego.draft.by !== chatId) {
-        nego = startDraft(nego, chatId, role, original, nego.draft?.by !== chatId ? undefined : nego.open?.split);
+        const prefill = nego.open && nego.open.by === chatId ? nego.open.split : undefined;
+        nego = startDraft(nego, chatId, role, original, prefill);
       }
     };
 
@@ -1265,7 +1437,7 @@ export async function handleRentalVerifyProposalCallback(params: {
         await renderEditorMessage(chatId, params.messageId, [
           `✍️ <b>Комментарий к предложению</b>`,
           ``,
-          `Напишите его следующим сообщением (до 300 символов) — он уйдёт второй стороне вместе с числами.`,
+          `Напишите его следующим сообщением (до 600 символов) — он уйдёт второй стороне вместе с числами.`,
           ``,
           `«cancel» — отменить ввод.`,
         ].join("\n"), [[{ text: "⬅️ К частям", callback_data: `vrfp_v_${rentalId}` }]]);
@@ -1286,9 +1458,17 @@ export async function handleRentalVerifyProposalCallback(params: {
             ? {}
             : { status: "disputed", disputed_by: chatId, dispute_reason: "предложена корректировка расчёта" };
         if (!(await saveNego(res.state, extraStatus))) return true;
-        const otherChatId = otherPartyChatId(current, chatId);
-        await answerCallback(params.callbackQueryId, "📤 Предложение отправлено");
-        // Replace the editor with a «sent» stub.
+        // Task 118: an ADMIN proposal goes to BOTH parties (there is no single
+        // «other side» for crew staff); a party proposal goes to the other party.
+        const isReplace = !!nego.open && nego.open.by === chatId;
+        const proposalTargets = (
+          role === "admin"
+            ? [current.operator_chat_id, current.owner_chat_id]
+            : [otherPartyChatId(current, chatId)]
+        ).filter(Boolean) as string[];
+        await answerCallback(params.callbackQueryId, isReplace ? "✏️ Предложение обновлено" : "📤 Предложение отправлено");
+        // Replace the editor with a «sent» stub — now WITH buttons (the boss
+        // tested: after sending, buttons vanished and he could not edit again).
         await renderEditorMessage(chatId, params.messageId, [
           `📤 <b>Предложение отправлено</b> ${escapeVerifyHtml(actorLabel)}`,
           ``,
@@ -1299,10 +1479,14 @@ export async function handleRentalVerifyProposalCallback(params: {
             comment: res.state.open?.comment,
           }),
           ``,
-          `Ждём ответ второй стороны: ✅ согласиться / ⚠️ предложить своё / ❌ отклонить.`,
-        ].join("\n"), []);
-        if (otherChatId) {
-          const proposal = res.state.open as OpenProposal;
+          role === "admin"
+            ? `Ждём ответ оператора и владельца: ✅ согласиться / ⚠️ предложить своё / ❌ отклонить.`
+            : `Ждём ответ второй стороны: ✅ согласиться / ⚠️ предложить своё / ❌ отклонить.`,
+          `Числа можно поправить («✏️ Изменить») или отозвать предложение («↩️ Отозвать»).`,
+        ].join("\n"), proposalSentKeyboard(rentalId));
+        const proposal = res.state.open as OpenProposal;
+        for (const otherChatId of [...new Set(proposalTargets)]) {
+          if (otherChatId === chatId) continue;
           try {
             await sendComplexMessage(
               otherChatId,
@@ -1319,6 +1503,17 @@ export async function handleRentalVerifyProposalCallback(params: {
             /* non-fatal */
           }
         }
+        // Task 118: staff watch the negotiation (plain note, deduped).
+        await ccVerificationNoteToCrewStaff({
+          crewSlug: current.crew_slug || null,
+          rentalId,
+          text: [
+            `⚖️ ${escapeVerifyHtml(actorLabel)}${role === "admin" ? " (админ)" : ""} предложил(а) скорректировать расчёт по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}:`,
+            `📊 Итог оператору: ${formatRubVerify(splitTotal(original))} → <b>${formatRubVerify(splitTotal(proposal.split))}</b>`,
+            proposal.comment ? `✍️ ${escapeVerifyHtml(proposal.comment)}` : "",
+          ].filter(Boolean).join("\n"),
+          exclude: [chatId, ...proposalTargets],
+        });
         return true;
       }
 
@@ -1349,14 +1544,16 @@ export async function handleRentalVerifyProposalCallback(params: {
           await answerCallback(params.callbackQueryId, confirm.error || "Подтверждение недоступно.");
           return true;
         }
+        // Narrow once — closures below (remaining-party filter) must see non-null.
+        const confirmRow = confirm.row;
         const { data: written, error: upErr } = await supabaseAdmin
           .from("rental_verifications")
           .update({
             negotiation: acc.state,
-            status: confirm.row.status,
-            operator_confirmed_at: confirm.row.operator_confirmed_at,
-            owner_confirmed_at: confirm.row.owner_confirmed_at,
-            verified_at: confirm.row.verified_at,
+            status: confirmRow.status,
+            operator_confirmed_at: confirmRow.operator_confirmed_at,
+            owner_confirmed_at: confirmRow.owner_confirmed_at,
+            verified_at: confirmRow.verified_at,
             updated_at: new Date().toISOString(),
           })
           .eq("rental_id", rentalId)
@@ -1383,7 +1580,8 @@ export async function handleRentalVerifyProposalCallback(params: {
             proposerLabel: labelFromUsersMap(usersMap, proposerChatId),
             acceptorLabel: actorLabel,
           });
-          for (const c of [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])]) {
+          const doneRecipients = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
+          for (const c of doneRecipients) {
             try {
               await sendComplexMessage(c, done, [[{ text: "💰 Мои выплаты", callback_data: "payo_hub_0" }]], {
                 parseMode: "HTML",
@@ -1393,23 +1591,56 @@ export async function handleRentalVerifyProposalCallback(params: {
               /* non-fatal */
             }
           }
+          // Task 118: staff see the closed deal too (an admin acceptor gets no
+          // DM — he pressed the button — so the note is his visibility).
+          await ccVerificationNoteToCrewStaff({
+            crewSlug: current.crew_slug || null,
+            rentalId,
+            text: done,
+            exclude: [...doneRecipients, role === "admin" ? chatId : ""],
+          });
           await grantVerificationAchievements({ ...current, ...confirm.row }, { speedy: isSpeedyConfirm(current) });
           await grantNegotiationAchievements({ ...current, ...confirm.row, negotiation: acc.state } as RentalVerificationRow);
         } else {
-          // wait_other_party — the proposer still owes his ✅ on the NEW numbers.
+          // wait_other_party — whoever still owes a ✅ gets the nudge.
+          // Task 118: with an ADMIN proposer the remaining debtor is the
+          // unconfirmed PARTY (the admin never owes a confirm), so compute
+          // remaining from the confirm timestamps instead of guessing the
+          // proposer.
           await answerCallback(params.callbackQueryId, "✅ Согласились — ждём подтверждение второй стороны.");
-          if (proposerChatId) {
+          const remaining = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean).map(String))]
+            .filter((id) => id !== chatId)
+            .filter((id) =>
+              String(id) === String(current.operator_chat_id)
+                ? !confirmRow.operator_confirmed_at
+                : !confirmRow.owner_confirmed_at,
+            );
+          for (const target of remaining) {
             const nudge = [
-              `✅ ${escapeVerifyHtml(actorLabel)} согласился с вашими числами по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}:`,
+              `✅ ${escapeVerifyHtml(actorLabel)} согласился с числами по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}:`,
               `📊 Итог оператору: <b>${formatRubVerify(splitTotal(acc.state.agreed!.split))}</b>`,
               ``,
               `Осталось ваше подтверждение:`,
             ].join("\n");
             try {
-              await sendComplexMessage(proposerChatId, nudge, verificationKeyboard(rentalId), {
+              await sendComplexMessage(target, nudge, verificationKeyboard(rentalId), {
                 parseMode: "HTML",
                 keyboardType: "inline",
               });
+            } catch {
+              /* non-fatal */
+            }
+          }
+          // The proposer (if not among the remaining and not the acceptor)
+          // still wants to know his numbers were accepted.
+          if (proposerChatId && !remaining.includes(String(proposerChatId)) && proposerChatId !== chatId) {
+            try {
+              await sendComplexMessage(
+                proposerChatId,
+                `✅ ${escapeVerifyHtml(actorLabel)} согласился с вашими числами по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}: 📊 ${formatRubVerify(splitTotal(acc.state.agreed!.split))}. Ждём финальное подтверждение.`,
+                [],
+                { parseMode: "HTML" },
+              );
             } catch {
               /* non-fatal */
             }
@@ -1433,8 +1664,48 @@ export async function handleRentalVerifyProposalCallback(params: {
               proposer,
               [
                 `❌ ${escapeVerifyHtml(actorLabel)} отклонил предложение по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}.`,
-                `Расчёт остаётся в статусе «спор» — сверьтесь лично; владелец может закрыть спор вручную в аналитике.`,
+                `Расчёт остаётся в статусе «спор» — предложите свои числа или сверьтесь лично; владелец может закрыть спор вручную в аналитике.`,
               ].join("\n"),
+              proposalSentKeyboard(rentalId),
+              { parseMode: "HTML", keyboardType: "inline" },
+            );
+          } catch {
+            /* non-fatal */
+          }
+        }
+        // Task 118: staff watch the negotiation (plain note, deduped).
+        await ccVerificationNoteToCrewStaff({
+          crewSlug: current.crew_slug || null,
+          rentalId,
+          text: `❌ ${escapeVerifyHtml(actorLabel)} отклонил предложение по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")} — расчёт остаётся в статусе «спор».`,
+          exclude: [chatId, proposer],
+        });
+        return true;
+      }
+
+      case "withdraw": {
+        // Task 118: the proposer takes their pending proposal back — one of
+        // the buttons on the «sent» stub («↩️ Отозвать»).
+        const wd = withdrawOpenProposal(nego, { chatId, role, nowIso: new Date().toISOString() });
+        if (!wd.ok) {
+          await answerCallback(params.callbackQueryId, wd.error || "Нельзя отозвать.");
+          return true;
+        }
+        if (!(await saveNego(wd.state))) return true;
+        await answerCallback(params.callbackQueryId, "↩️ Предложение отозвано.");
+        const proposal = nego.open as OpenProposal | null;
+        await renderEditorMessage(chatId, params.messageId, [
+          `↩️ <b>Предложение отозвано</b> ${escapeVerifyHtml(actorLabel)}`,
+          ``,
+          `Расчёт остаётся в статусе «спор» — можно предложить новые числа или подтвердить как есть.`,
+        ].join("\n"), disputeEditorKeyboard(rentalId, proposal?.split || original, original));
+        const targets = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
+        for (const otherChatId of targets) {
+          if (otherChatId === chatId) continue;
+          try {
+            await sendComplexMessage(
+              otherChatId,
+              `↩️ ${escapeVerifyHtml(actorLabel)}${role === "admin" ? " (админ)" : ""} отозвал предложение по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")} — расчёт остаётся в статусе «спор».`,
               [],
               { parseMode: "HTML" },
             );
@@ -1442,6 +1713,12 @@ export async function handleRentalVerifyProposalCallback(params: {
             /* non-fatal */
           }
         }
+        await ccVerificationNoteToCrewStaff({
+          crewSlug: current.crew_slug || null,
+          rentalId,
+          text: `↩️ ${escapeVerifyHtml(actorLabel)}${role === "admin" ? " (админ)" : ""} отозвал предложение по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}.`,
+          exclude: [chatId, ...targets],
+        });
         return true;
       }
 
@@ -1521,12 +1798,15 @@ export async function handleRentalVerifyCommentText(params: {
     if (error && !isMissingRelationError(error)) throw error;
     if (!row) return true;
     const current = row as RentalVerificationRow;
-    const role = partyRole(current, String(params.userId));
+    // Task 118: crew staff (admins) can also draft comments on their proposals.
+    const staffChatIds = await loadCrewStaffChatIds(current.crew_slug || null);
+    const role = resolveVerificationRole(current, String(params.userId), staffChatIds);
     if (!role) return true;
     const original = snapshotSplitOf(current.snapshot as Partial<RentalVerificationSnapshot>);
     let nego = parseNegotiation((current as any).negotiation);
     if (!nego.draft || nego.draft.by !== String(params.userId)) {
-      nego = startDraft(nego, String(params.userId), role, original);
+      const prefill = nego.open && nego.open.by === String(params.userId) ? nego.open.split : undefined;
+      nego = startDraft(nego, String(params.userId), role, original, prefill);
     }
     if (text.toLowerCase() === "cancel" || text === "/cancel") {
       // Cancel the input only — keep whatever draft existed.
