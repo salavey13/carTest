@@ -225,7 +225,7 @@ export async function getMyWorkDayAction(params: {
         fallbackTotalCost: price,
       });
       const gearDays = effectiveGearDays(stdDetail);
-      const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays);
+      const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays, stdDetail.hours); // Task 121: <24h → client gear price halves too (эталон = what the client should pay)
       const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
       const salary = computeRentalSalary({
         config: salaryConfig,

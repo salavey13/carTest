@@ -234,7 +234,7 @@ export async function computeCategoryBonuses(params: {
       fallbackTotalCost: price,
     });
     const gearDays = effectiveGearDays(stdDetail);
-    const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays);
+    const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays, stdDetail.hours); // Task 121: <24h → client gear price halves too (эталон = what the client should pay)
     const salary = computeRentalSalary({
       config,
       rentalCategory: categories.rental,

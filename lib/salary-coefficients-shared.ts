@@ -346,7 +346,10 @@ export function countEquipmentUnits(eq: RentalEquipment | null | undefined): num
  * Per-unit «эталонная» price lines for the verification DM formula block.
  * MUST stay digit-equal with equipmentStandardCost (lib/salary-coefficients.ts):
  * helmets 1000, gloves 500, everything else 500, charger free/absent.
- * Each line = one merged group (e.g. «2 шлема — 2 000 ₽»).
+ * Task 121 (boss 2026-10-22): a rental window < 24h HALVES the client gear
+ * price right away (шлем 500, всё остальное 250) — pass `hours` from the same
+ * stdDetail the эталон uses so the lines stay digit-equal with the cost.
+ * Each line = one merged group (e.g. «2 шлема — 1 000 ₽» when halved).
  */
 export interface EquipmentStandardLine {
   label: string;
@@ -383,13 +386,19 @@ function pluralRu(n: number, one: string, few: string, many: string): string {
   return many;
 }
 
-export function equipmentStandardLines(eq: RentalEquipment | null | undefined): EquipmentStandardLine[] {
+export function equipmentStandardLines(
+  eq: RentalEquipment | null | undefined,
+  hours?: number | null,
+): EquipmentStandardLine[] {
   if (!eq) return [];
+  // Task 121: <24h → the CLIENT gear price halves immediately (шлем 1000→500,
+  // остальное 500→250). Same rule the эталон cost follows below.
+  const shortFactor = isShortRentalHours(hours) ? 0.5 : 1;
   const lines: EquipmentStandardLine[] = [];
   const push = (key: string, units: number) => {
     const n = Math.max(0, Number(units) || 0);
     if (!n) return;
-    const price = GEAR_STD_PRICE[key];
+    const price = GEAR_STD_PRICE[key] * shortFactor;
     const one = GEAR_STD_LABEL_ONE[key];
     // «пара …» labels are already plural-shaped — pluralize only the numeral
     // word (пара/пары/пар) for them; everything else uses noun plurals.
@@ -464,9 +473,19 @@ export function gearDayFactor(days: number): number {
  * (Pure + client-safe: lives here so tests and the admin preview reuse ONE
  * canon; the server module re-exports it.)
  */
-export function equipmentStandardCost(eq: RentalEquipment | null | undefined, days = 1): number {
+export function equipmentStandardCost(
+  eq: RentalEquipment | null | undefined,
+  days = 1,
+  hours?: number | null,
+): number {
   if (!eq) return 0;
-  const factor = gearDayFactor(days);
+  // Task 121 (boss 2026-10-22): a rental window < 24h halves the CLIENT gear
+  // price right away (шлем 1000→500, остальное 500→250) — the эталон follows
+  // the client rule; the operator's commission side already halves via
+  // computeRentalSalary(rentalHours). Multi-day windows (days ≥ 2) imply
+  // hours ≥ 24, so the two factors never stack.
+  const shortFactor = isShortRentalHours(hours) ? 0.5 : 1;
+  const factor = gearDayFactor(days) * shortFactor;
   let c = 0;
   if (Number(eq.helmets) > 0) c += Number(eq.helmets) * 1000 * factor;
   if (Number(eq.gloves) > 0) c += Number(eq.gloves) * 500 * factor;

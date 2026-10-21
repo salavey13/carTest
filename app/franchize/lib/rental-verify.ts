@@ -199,7 +199,10 @@ export async function computeRentalVerificationSnapshot(params: {
   // the operator's commission ladder (200 ₽/ед day 1, 100 ₽/ед days 2+).
   // Bikes have NO taper: ladder price × days, flat ₽/аренда bonus.
   const gearDays = effectiveGearDays({ days: stdDetail.days, hours: stdDetail.hours });
-  const gearStandardCost = equipmentStandardCost(eq, gearDays);
+  // Task 121: hours ride along — a <24h window halves the CLIENT gear price
+  // too (шлем 1000→500, остальное 500→250), so эталон matches what the
+  // client actually should pay and the markup line stays honest.
+  const gearStandardCost = equipmentStandardCost(eq, gearDays, stdDetail.hours);
   const stdPrice = stdDetail.price + gearStandardCost;
   const equipmentUnits = countEquipmentUnits(eq);
   // Task 120 (boss): rentals shorter than 24 hours halve the operator's
@@ -220,7 +223,7 @@ export async function computeRentalVerificationSnapshot(params: {
 
   // ── Task 117: freeze the formula the DM shows («откуда цифры») ──
   // Digit-equal with the salary math above: same baseline, same config.
-  const gearLines = equipmentStandardLines(eq).map((l) => `${l.label} — ${l.sum} ₽`);
+  const gearLines = equipmentStandardLines(eq, stdDetail.hours).map((l) => `${l.label} — ${l.sum} ₽`);
   const markup = Math.max(0, price - stdPrice);
   // Task 118: pre-format the day-ladder lines (plural-safe labels frozen here,
   // the pure formatter only prints what it is given).

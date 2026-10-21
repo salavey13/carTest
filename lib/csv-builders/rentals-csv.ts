@@ -382,7 +382,7 @@ export async function buildRentalsCsv(
       fallbackTotalCost: price,
     });
     const gearDays = effectiveGearDays(stdDetail);
-    const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays);
+    const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays, stdDetail.hours); // Task 121: <24h → client gear price halves too (эталон = what the client should pay)
     const salary = computeRentalSalary({
       config: salaryConfig,
       rentalCategory: categories.rental,

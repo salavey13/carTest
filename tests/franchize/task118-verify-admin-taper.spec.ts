@@ -415,7 +415,8 @@ describe("task118 · wiring pins", () => {
   it("snapshot freezes the day-ladder formula pieces", () => {
     const snap = verifyTs.slice(verifyTs.indexOf("export async function computeRentalVerificationSnapshot"));
     expect(snap).toContain("effectiveGearDays({ days: stdDetail.days, hours: stdDetail.hours })");
-    expect(snap).toContain("equipmentStandardCost(eq, gearDays)");
+    // Task 121: hours ride along — <24h halves the CLIENT gear price in the эталон
+    expect(snap).toContain("equipmentStandardCost(eq, gearDays, stdDetail.hours)");
     expect(snap).toContain("equipmentDays: gearDays");
     expect(snap).toContain("buildGearDaysLine(eq, gearDays, gearStandardCost)");
     expect(snap).toContain("buildEquipmentCommLine(");
