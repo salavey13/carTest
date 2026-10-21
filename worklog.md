@@ -1067,3 +1067,19 @@ Work Log:
 Stage Summary:
 - QuickAdmin «Карточки» now honestly supports create (auto-expanded new card) + edit + delete for both Промо-баннеры and Анонсы tabs; boss note: prod (rental.vip-bike.ru) may still serve an older build — redeploy production to see it (same story as startapp=wheel from task 114).
 - vip-bike live: wheel is the top ad card (prio 96) and sits in the hamburger menu 3rd; hydration SQL + idempotent script committed for reproducibility.
+
+---
+Task ID: 116-wheel-deeplink-both-formats
+Agent: main (Claude)
+Task: boss 2026-10-21 — clarify: does startapp=wheel default to vip-bike? can deeplinks route to OTHER crews' wheel pages (e.g. startapp=nn-mototeh-nn_wheel)?
+
+Work Log:
+- Verified in code (hooks/use-start-param-target.ts): bare «wheel»/«wheel_of_fortune»/«fortune» → /franchize/vip-bike/wheel (START_PARAM_PAGE_MAP, главная витрина). Per-crew wheel deeplinks existed since 2a130ce as PREFIX form wheel_<slug> (static fast path, no auth wait, slug regex [a-z0-9-]{1,64} lowercase-only).
+- Boss's suffix example nn-mototeh-nn_wheel was NOT recognized → fell to router's final fallback /${param} → 404.
+- Added suffix branch <slug>_wheel to computeStaticFastTarget (same validation as prefix form; slugs never contain underscores → suffix unambiguous; wall-params never end with _wheel → no grammar conflicts). Now BOTH wheel_<slug> and <slug>_wheel work.
+- E2E: /franchize/nn-mototeh-nn/wheel renders 200 on dev vs prod Supabase (crew-agnostic wheel confirmed for a second crew, themed header/content).
+- Tests: startapp-routing-regression +2 (suffix round-trip via buildTelegramAppLink, hostile/empty slug rejection, wheel_wheel precedence) → 81/81 across 4 routing specs ✓.
+
+Stage Summary:
+- startapp=wheel → vip-bike (да, дефолт); startapp=wheel_nn-mototeh-nn И startapp=nn-mototeh-nn_wheel → /franchize/nn-mototeh-nn/wheel. Link format for posts: https://t.me/oneBikePlsBot/app?startapp=<any of the three forms>.
+- Не забыть: prod rental.vip-bike.ru всё ещё отстаёт от main (task 114 note) — redeploy production, чтобы suffix-форма и остальные фиксы доехали.

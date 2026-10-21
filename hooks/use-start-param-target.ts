@@ -344,6 +344,20 @@ export function computeStaticFastTarget(param: string): string | null {
     return null;
   }
 
+  // <slug>_wheel — суффикс-форма (task 116, boss 2026-10-21): тот же колесный
+  // deeplink, но слаг ПЕРЕД словом («nn-mototeh-nn_wheel»). Босс в постах
+  // интуитивно пишет слаг первым — теперь оба порядка валидны. Слаги franchize
+  // не содержат подчёркиваний (normalizeCrewSlug → [a-z0-9-]), поэтому суффикс
+  // однозначен: всё до «_wheel» — слаг. Валидация идентична префиксной форме:
+  // [a-z0-9-]{1,64}, lowercase-only (wheel_VIP-Bike не резолвится — тот же
+  // boss review 2026-10-11). Хост-формы (post_<id>_<slug> и т.п.) не
+  // заканчиваются на «_wheel», конфликтов с wall-грамматикой нет.
+  if (param.endsWith("_wheel")) {
+    const slug = param.slice(0, -"_wheel".length).trim();
+    if (slug && /^[a-z0-9-]{1,64}$/.test(slug)) return `/franchize/${slug}/wheel`;
+    return null;
+  }
+
   // viz_<id> — god-mode sandbox sim.
   if (param.startsWith("viz_")) {
     const simId = param.substring(4);

@@ -112,6 +112,28 @@ describe("wheel-of-fortune deeplinks (boss 2026-10-11)", () => {
     expect(computeStaticFastTarget("fortune")).toBe("/franchize/vip-bike/wheel");
   });
 
+  it("task 116: <slug>_wheel suffix form (boss format) routes to the crew wheel too", () => {
+    // Босс спрашивает 2026-10-21: «startapp=nn-mototeh-nn_wheel will route to
+    // crew nn-mototeh-nn wheel page, right?» — теперь ДА, оба порядка слаг/слово.
+    expect(computeStaticFastTarget("nn-mototeh-nn_wheel")).toBe("/franchize/nn-mototeh-nn/wheel");
+    expect(computeStaticFastTarget("vip-bike_wheel")).toBe("/franchize/vip-bike/wheel");
+    // Round-trip через t.me-ссылку: builder → startapp → router.
+    const url = buildTelegramAppLink("oneBikePlsBot", "nn-mototeh-nn_wheel");
+    expect(url).toBe("https://t.me/oneBikePlsBot/app?startapp=nn-mototeh-nn_wheel");
+    expect(computeStaticFastTarget(url.split("startapp=")[1])).toBe("/franchize/nn-mototeh-nn/wheel");
+  });
+
+  it("task 116: suffix form rejects empty/hostile slugs like the prefix form", () => {
+    expect(computeStaticFastTarget("_wheel")).toBeNull();
+    // Подчёркивание в слаг-части не входит в грамматику [a-z0-9-] —
+    // такой параметр уходит в gated-путь (там свой fallback), не 500.
+    expect(computeStaticFastTarget("bad_slug_wheel")).toBeNull();
+    expect(computeStaticFastTarget("Привет_wheel")).toBeNull();
+    // wheel_<slug> остаётся на префиксной ветке: wheel_wheel трактуется как
+    // префикс-форма со слагом «wheel», суффиксная ветка его не видит.
+    expect(computeStaticFastTarget("wheel_wheel")).toBe("/franchize/wheel/wheel");
+  });
+
   it("wheel_ rejects empty and hostile slugs (falls through to gated path)", () => {
     expect(computeStaticFastTarget("wheel_")).toBeNull();
     // Подчёркивание внутри слага не входит в грамматику [a-z0-9-].
