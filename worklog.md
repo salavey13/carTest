@@ -1018,3 +1018,18 @@ Work Log:
 Stage Summary:
 - Ретро-импорт доведён до конца: 24 retro_backfill_v2 аренды, все документы в storage связаны с записями, дубли удалены, май/июнь больше не «rooky» (10/9), сезон по деньгам ~+186 000 ₽ к состоянию task113.
 - Lightbox fix: fix(map-riders) commit в этом же пуше.
+
+---
+Task ID: 111b-vipbike-post-to-djorudjov
+Agent: main (Claude)
+Task: vip-bike post for today (weather + wheel-of-fortune deeplink + picture) → send draft to @DJORUDJOV with map-riders deeplink so he creates the post there.
+
+Work Log:
+- Deeplinks verified in use-start-param-target.ts: startapp=wheel → /franchize/vip-bike/vip-bike/wheel (промокоды 1000/2000/5000 ₽ / 15%), startapp=mapriders_vip-bike → /franchize/vip-bike/map-riders.
+- Weather 21.10 NN: +10..+12°, солнце, без осадков → текст «последние тёплые дни сезона».
+- Picture: z-ai image gen 864x1152 (autumn riverside rider, cable bridge NN vibes) → JPG (bridge sends .png as document) → wallpix/posts/2026-10-21-vipbike-ride.jpg (public URL).
+- Delivery: POST /api/codex-bridge/callback (x-codex-bridge-secret) → telegramChatId=7813830016 (@DJORUDJOV, users.user_id) — 200 ok, telegram ok:true sentImages:1 (slack echo C0AFHM0ANNL). Caption = инструкция + готовый текст поста с wheel-диплинком.
+- Script: scripts/…send_djorudjov_post.py (local scripts dir, not committed).
+
+Stage Summary:
+- Post draft delivered to djorudjov: publish via mapriders_vip-bike deeplink; post includes wheel promo deeplink.
