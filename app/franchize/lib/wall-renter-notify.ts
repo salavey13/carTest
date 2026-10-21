@@ -43,6 +43,7 @@ import { logger } from "@/lib/logger";
 import {
   buildWallPostNotifyHtml,
   buildWallBroadcastCreatorHtml,
+  buildWallBroadcastStatsHtml,
   buildWallRentButton,
   wallPhotoPublicUrl,
   WallPostNotifyBike,
@@ -102,6 +103,11 @@ export interface WallRenterNotifyJob {
   /** Копия автору («что было разослано») ушла — не дублируем на кронах. */
   creator_notified?: boolean;
   /**
+   * Финальная сводка («рассылка завершена», boss 2026-10-21) ушла автору —
+   * ставится в ТОЙ ЖЕ CAS-записи, что переводит job в done.
+   */
+  creator_stats_notified?: boolean;
+  /**
    * Single-flight claim (robustness pack 2026-10-02): токен активного прогона.
    * Только владелец токена пишет ledger (CAS по metadata->notify_job->>run_token)
    * — параллельные kick/крон не дублируют доставку.
@@ -133,6 +139,7 @@ export function parseNotifyJob(metadata: unknown): WallRenterNotifyJob | null {
     failed: typeof j.failed === "number" && Number.isFinite(j.failed) ? j.failed : 0,
     error: typeof j.error === "string" ? j.error : null,
     creator_notified: j.creator_notified === true,
+    creator_stats_notified: j.creator_stats_notified === true,
     run_token: typeof j.run_token === "string" && j.run_token ? j.run_token : null,
     run_started_at: typeof j.run_started_at === "string" ? j.run_started_at : null,
   };
@@ -162,6 +169,13 @@ export function pendingRecipients(
     out.push(id);
   }
   return out;
+}
+
+/** Человекочитаемая расшифровка сегмента для финальной сводки автору. */
+export function wallRenterAudienceLabel(audience: WallNotifyAudience): string {
+  if (audience === "recent") return "арендаторы последних 30 дней";
+  if (audience === "past") return "прошлые арендаторы (31–180 дней)";
+  return "все арендаторы экипажа";
 }
 
 // ── audience resolver ────────────────────────────────────────────────────────
@@ -531,6 +545,23 @@ export async function processWallRenterNotifyJob(
     }
 
     if (pending.length === 0) {
+      // BOSS 2026-10-21: финальная сводка уходит и когда рассылать нечего —
+      // автор получает явное «завершено, 0 получателей» вместо тишины.
+      if (!myJob.creator_stats_notified) {
+        try {
+          const emptyStatsText = buildWallBroadcastStatsHtml({
+            body: post.body,
+            audienceLabel: wallRenterAudienceLabel(myJob.audience),
+            sent: myJob.sent,
+            failed: myJob.failed,
+            durationS: job.created_at ? Math.max(0, (Date.now() - Date.parse(job.created_at)) / 1000) : undefined,
+          });
+          const statsRes = await deliverWallPostNotify(post.author_id, emptyStatsText, null, null);
+          if (statsRes.ok) myJob.creator_stats_notified = true;
+        } catch (statsError) {
+          logger.warn("[wall-renter-notify] creator empty-stats delivery crashed", statsError);
+        }
+      }
       await writeNotifyJob(postId, { ...myJob, status: "done", finished_at: new Date().toISOString() }, { expectRunToken: runToken });
       return { ...run, ok: true, sent: myJob.sent, failed: myJob.failed, remaining: 0 };
     }
@@ -540,6 +571,11 @@ export async function processWallRenterNotifyJob(
     const sentLedger = [...myJob.sent_user_ids];
     let sent = myJob.sent;
     let failed = myJob.failed;
+    // BOSS 2026-10-21: провалы этого прогона ретраим ОДИН раз в конце (бюджет
+    // permitting) — транзиентные сбои сети/429 не должны навсегда съедать
+    // счётчик «доставлено». Ретраятся только НЕ вошедшие в ledger чаты
+    // (exactly-once не нарушается), финальная сводка считает уже после ретрая.
+    let failedThisRun: string[] = [];
     for (let i = 0; i < pending.length; i += RENTER_NOTIFY_BATCH_SIZE) {
       if (Date.now() - startedAt > timeBudgetMs) {
         // Бюджет исчерпан — статус 'running', ledger уже в metadata: следующий
@@ -559,7 +595,12 @@ export async function processWallRenterNotifyJob(
         if (r.status === "fulfilled" && r.value.res.ok) {
           delivered.push(r.value.chatId);
           sent += 1;
+        } else if (r.status === "fulfilled") {
+          failed += 1;
+          failedThisRun.push(r.value.chatId);
         } else {
+          // allSettled rejection: chatId недоступен из rejected-результата —
+          // считаем провалом без ретрая (не бросает по контракту deliver).
           failed += 1;
         }
       }
@@ -588,6 +629,77 @@ export async function processWallRenterNotifyJob(
       }
       if (i + RENTER_NOTIFY_BATCH_SIZE < pending.length) {
         await new Promise((resolve) => setTimeout(resolve, RENTER_NOTIFY_BATCH_PAUSE_MS));
+      }
+    }
+
+    // ── один ретрай провалов этого прогона (пока бюджет жив) ──
+    if (failedThisRun.length > 0 && Date.now() - startedAt < timeBudgetMs) {
+      logger.info("[wall-renter-notify] retrying failed recipients once", {
+        postId,
+        count: failedThisRun.length,
+      });
+      for (let i = 0; i < failedThisRun.length; i += RENTER_NOTIFY_BATCH_SIZE) {
+        if (Date.now() - startedAt > timeBudgetMs) break;
+        const batch = failedThisRun.slice(i, i + RENTER_NOTIFY_BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (chatId) => ({
+            chatId,
+            res: await deliverWallPostNotify(chatId, text, replyMarkup, coverPhotoUrl),
+          })),
+        );
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value.res.ok) {
+            sentLedger.push(r.value.chatId);
+            sent += 1;
+            failed -= 1;
+          }
+        }
+        if (i + RENTER_NOTIFY_BATCH_SIZE < failedThisRun.length) {
+          await new Promise((resolve) => setTimeout(resolve, RENTER_NOTIFY_BATCH_PAUSE_MS));
+        }
+      }
+      const retriedStored = await writeNotifyJob(
+        postId,
+        { ...myJob, status: "running", sent_user_ids: sentLedger, sent, failed },
+        { expectRunToken: runToken },
+      );
+      if (!retriedStored) {
+        logger.warn("[wall-renter-notify] lost claim during retry pass — stopping", { postId, sent, failed });
+        return {
+          ...run,
+          ok: false,
+          status: "running",
+          sent,
+          failed,
+          remaining: 0,
+          error: "lost fanout claim",
+        };
+      }
+    }
+
+    // ── финальная сводка АВТОРУ («рассылка завершена») — boss 2026-10-21 ──
+    // Уходит ДО перевода job в done: флаг creator_stats_notified пишется той
+    // же CAS-записью, что и done, поэтому дублей от кронов/kick не будет.
+    if (!myJob.creator_stats_notified) {
+      try {
+        const statsText = buildWallBroadcastStatsHtml({
+          body: post.body,
+          audienceLabel: wallRenterAudienceLabel(myJob.audience),
+          // Честный финал: длина exactly-once ledger (после ретрая).
+          sent: sentLedger.length,
+          failed: Math.max(0, failed),
+          durationS: job.created_at ? Math.max(0, (Date.now() - Date.parse(job.created_at)) / 1000) : undefined,
+        });
+        const statsRes = await deliverWallPostNotify(post.author_id, statsText, null, null);
+        if (statsRes.ok) {
+          myJob.creator_stats_notified = true;
+        } else {
+          logger.warn("[wall-renter-notify] creator stats delivery failed (job still finishes)", {
+            error: statsRes.error,
+          });
+        }
+      } catch (statsError) {
+        logger.warn("[wall-renter-notify] creator stats delivery crashed", statsError);
       }
     }
 

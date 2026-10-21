@@ -61,7 +61,8 @@ const COLORS = {
   teal: { fill: "#14B8A6", text: "#042F2E" },
 } as const;
 
-/** 12 секторов по 30°. Сумма весов = 100. */
+/** 12 секторов по 30°. Вес относительный: сумма 112 → например «Мимо»-a = 8/112 ≈ 7%.
+ *  Codereview 2026-10-21: раньше комментарий врал про «сумма = 100». */
 export const WHEEL_SEGMENTS: WheelSegment[] = [
   { id: "w1000-a", label: "1 000 ₽", sublabel: "скидка", color: COLORS.green.fill, textColor: COLORS.green.text, kind: "promo", promoCode: "WHEEL1000", weight: 20 },
   { id: "miss-a", label: "Мимо", color: COLORS.slate.fill, textColor: COLORS.slate.text, kind: "miss", weight: 8 },

@@ -1033,3 +1033,19 @@ Work Log:
 
 Stage Summary:
 - Post draft delivered to djorudjov: publish via mapriders_vip-bike deeplink; post includes wheel promo deeplink.
+
+---
+Task ID: 114-wheel-codereview-broadcast-stats
+Agent: main (Claude)
+Task: boss 2026-10-21 — codereview wheel of fortune; doublecheck «startapp=wheel seems not working»; see broadcast stats for the created post; final stats notification to post creator after fanout finishes.
+
+Work Log:
+- Broadcast stats (today's post 78d6c48f, author DJORUDJOV 7813830016): notify_job status=done, audience=past, sent=27, failed=4, finished 13:44:03 (≈21с), ledger=27 — pulled from crew_posts.metadata via PostgREST.
+- startapp=wheel ROOT CAUSE: end-to-end repro with agent-browser. Main + preview (v0-car-test.vercel.app/?tgWebAppStartParam=wheel) route correctly → /franchize/vip-bike/wheel (page renders). But rental.vip-bike.ru (the PROD host behind the bot's mini app) routes ?tgWebAppStartParam=wheel → /wheel → 404, и wheel_vip-bike → /wheel_vip-bike 404, при том что mapriders_vip-bike работает. Значит prod-билд знает mapriders_ fast-path (28f0c3a) но НЕ знает wheel-записи START_PARAM_PAGE_MAP (2a130ce, тот же день позже) — prod отстаёт от main; unknown-param fallback `/${param}` превращает wheel в /wheel. t.me/oneBikePlsBot/app валиден («Open App»). FIX = перевыпустить production deployment (заодно подхватятся фикс лайтбокса f16f2a4 и остальное).
+- Broadcast final stats notification (boss ask): community-wall.ts + buildWallBroadcastStatsHtml (✅ Рассылка завершена — доставлено N, не доставлено M, аудитория, ⏱ длительность, превью) + formatBroadcastDuration; pre-copy header честно переименован в «Начата рассылка…». wall-renter-notify.ts: флаг creator_stats_notified (пишется той же CAS-записью, что status=done — дублей от кронов нет), сводка уходит и на пустой аудитории; failed-получатели прогона ретраятся ОДИН раз в конце (бюджет permitting, only not-in-ledger — exactly-once сохранён).
+- Wheel codereview: pick-before-animation / server-side promo revalidation / anon no-op / dedupe+eviction / cooldown-on-start / unmount-safe timer — ок. Найдено: (1) комментарий «сумма весов = 100» врал (реально 112) — исправлен; (2) claimWheelWinNotifySlot сжигает слот даже при неудавшейся доставке (at-most-once/сутки на инстанс) — задокументировано, не меняем; (3) «В корзину с промокодом» в DM ведёт на WEB-URL (не t.me deeplink) — UX-заметка; (4) scripts/wheel-challenge-post.mjs хардкодит service_role ключ — заменить на env-only (гигиена).
+- Tests: wall-renter-notify.spec.ts +6 (stats HTML, plural forms, duration, audience labels, CAS-flag порядок done, in-run retry); 62/62 ✓; wheel-promo + winner-notify + startapp-routing + community-wall + robustness 140 ✓; tsc --noEmit: 0 ошибок (с и без правок).
+
+Stage Summary:
+- Creator теперь получает ДВЕ нотификации: «рассылка начата (аудитория N)» перед fanout и «✅ завершено: доставлено X / не доставлено Y» после; счётчик доставленных честный (ledger + один in-run ретрай провалов).
+- startapp=wheel в коде корректен — баг живёт в устаревшем prod-деплое rental.vip-bike.ru; нужно redeploy production.

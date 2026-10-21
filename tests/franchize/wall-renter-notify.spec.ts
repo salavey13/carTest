@@ -64,10 +64,13 @@ import {
   WALL_RENTER_AUDIENCES,
   parseNotifyJob,
   pendingRecipients,
+  wallRenterAudienceLabel,
 } from "@/app/franchize/lib/wall-renter-notify";
 import { buildSuggestedYandexReview, summarizeRide } from "@/app/franchize/lib/ride-share-notify";
 import {
   buildWallBroadcastCreatorHtml,
+  buildWallBroadcastStatsHtml,
+  formatBroadcastDuration,
   buildWallRentButton,
   bikeRentButtonLabel,
 } from "@/app/franchize/lib/community-wall";
@@ -587,7 +590,7 @@ describe("creator broadcast copy («be aware what was broadcasted»)", () => {
       hasStats: false,
       recipients: 28,
     });
-    expect(html).toContain("📤 <b>Ваш пост разослан прошлым арендаторам экипажа</b>");
+    expect(html).toContain("📤 <b>Начата рассылка поста прошлым арендаторам экипажа</b>");
     expect(html).toContain("👥 28 получателей");
     expect(html).toContain("💬 «Каталог пополнен»");
     expect(html).toContain("📷 3 фото");
@@ -626,6 +629,89 @@ describe("creator broadcast copy («be aware what was broadcasted»)", () => {
       },
     });
     expect(legacy?.creator_notified).toBe(false);
+  });
+});
+
+describe("creator broadcast FINISHED stats (boss 2026-10-21: amount of notified renters)", () => {
+  it("stats HTML leads with the completion header + exact delivered counter", () => {
+    const html = buildWallBroadcastStatsHtml({
+      body: "Каталог пополнен",
+      audienceLabel: "прошлые арендаторы (31–180 дней)",
+      sent: 27,
+      failed: 4,
+      durationS: 21,
+    });
+    expect(html).toContain("✅ <b>Рассылка поста завершена</b>");
+    expect(html).toContain("📤 Доставлено: <b>27</b> получателей");
+    expect(html).toContain("⚠️ Не доставлено: 4 (Telegram отклонил доставку)");
+    expect(html).toContain("👥 Аудитория: прошлые арендаторы (31–180 дней)");
+    expect(html).toContain("⏱ Заняла 21 с");
+    expect(html).toContain("💬 «Каталог пополнен»");
+    // no author line — it goes to the author himself
+    expect(html).not.toContain("👤");
+  });
+
+  it("zero failures hide the warning line; singular/plural ru forms", () => {
+    const clean = buildWallBroadcastStatsHtml({ body: "", audienceLabel: "все арендаторы экипажа", sent: 1, failed: 0 });
+    expect(clean).toContain("📤 Доставлено: <b>1</b> получатель");
+    expect(clean).not.toContain("Не доставлено");
+    expect(buildWallBroadcastStatsHtml({ body: "", audienceLabel: "", sent: 3, failed: 0 })).toContain(
+      "📤 Доставлено: <b>3</b> получателя",
+    );
+    // no audience line when label empty; no duration line when undefined
+    expect(buildWallBroadcastStatsHtml({ body: "", audienceLabel: "", sent: 0, failed: 0 })).not.toContain("Аудитория");
+    expect(buildWallBroadcastStatsHtml({ body: "", audienceLabel: "", sent: 0, failed: 0 })).not.toContain("⏱");
+  });
+
+  it("duration formats «48 с» / «2 мин» / «2 мин 5 с»", () => {
+    expect(formatBroadcastDuration(48)).toBe("48 с");
+    expect(formatBroadcastDuration(120)).toBe("2 мин");
+    expect(formatBroadcastDuration(125)).toBe("2 мин 5 с");
+    expect(formatBroadcastDuration(-3)).toBe("0 с");
+  });
+
+  it("audience label maps all three segments", () => {
+    expect(wallRenterAudienceLabel("recent")).toContain("последних 30 дней");
+    expect(wallRenterAudienceLabel("past")).toContain("31–180");
+    expect(wallRenterAudienceLabel("all")).toContain("все арендаторы");
+  });
+
+  it("fanout persists the final stats flag in the SAME CAS write that flips done (no cron duplicates)", () => {
+    const src = read(LIB);
+    expect(src).toContain("creator_stats_notified?: boolean");
+    expect(src).toContain("buildWallBroadcastStatsHtml");
+    expect(src).toContain("wallRenterAudienceLabel(myJob.audience)");
+    // stats are delivered BEFORE the final done-write (flag rides along with done)
+    const statsIdx = src.indexOf("creator_stats_notified = true");
+    const doneIdx = src.indexOf('status: "done",\n        sent_user_ids: sentLedger');
+    expect(statsIdx).toBeGreaterThan(-1);
+    expect(doneIdx).toBeGreaterThan(statsIdx);
+    // empty-audience path also closes the loop with an explicit «завершено» message
+    expect(src).toContain("creator empty-stats delivery crashed");
+    // legacy job parses with the new flag defaulted false
+    const legacy = parseNotifyJob({
+      notify_job: {
+        status: "done",
+        audience: "past",
+        requested_by: "user-1",
+        created_at: "2026-10-21T13:43:00Z",
+        finished_at: "2026-10-21T13:44:03Z",
+        sent_user_ids: ["a", "b"],
+        sent: 2,
+        failed: 0,
+        error: null,
+      },
+    });
+    expect(legacy?.creator_stats_notified).toBe(false);
+    expect(legacy?.sent).toBe(2);
+  });
+
+  it("transient failures get ONE in-run retry before the final counters are reported", () => {
+    const src = read(LIB);
+    expect(src).toContain("retrying failed recipients once");
+    expect(src).toContain("let failedThisRun: string[] = []");
+    // retry reuses the same deliver + budget guard
+    expect(src).toContain("failedThisRun.length > 0 && Date.now() - startedAt < timeBudgetMs");
   });
 });
 

@@ -848,8 +848,12 @@ export interface WallBroadcastCreatorInfo {
  * аудитории вместо имени автора. Pure, unit-tested.
  */
 export function buildWallBroadcastCreatorHtml(info: WallBroadcastCreatorInfo): string {
+  // BOSS 2026-10-21: копия автору уходит ДВАЖДЫ — «рассылка начата» (перед
+  // fanout, счётчик аудитории) и «рассылка завершена» (финальные счётчики
+  // доставки, buildWallBroadcastStatsHtml). Заголовок здесь — начало
+  // процесса, чтобы два сообщения не претендовали на одно и то же.
   const lines: string[] = [
-    "📤 <b>Ваш пост разослан прошлым арендаторам экипажа</b>",
+    "📤 <b>Начата рассылка поста прошлым арендаторам экипажа</b>",
     `👥 ${info.recipients} ${pluralRu(info.recipients, ["получатель", "получателя", "получателей"])}${
       (info.failed ?? 0) > 0 ? ` · ${info.failed} не доставлено` : ""
     }`,
@@ -864,6 +868,55 @@ export function buildWallBroadcastCreatorHtml(info: WallBroadcastCreatorInfo): s
     lines.push(`🏍 ${info.bikeTitles.map(escapeTelegramHtml).join(", ")}`);
   }
   if (info.hasStats) lines.push(`📊 делится статистикой поездок`);
+  return lines.join("\n");
+}
+
+// ── creator broadcast FINISHED stats («сколько реально доставлено») ──────────
+
+export interface WallBroadcastStatsInfo {
+  body: string;
+  /** Человеческая расшифровка сегмента аудитории («прошлым арендаторам…»). */
+  audienceLabel: string;
+  /** Финальное число доставленных (длина exactly-once ledger). */
+  sent: number;
+  /** Сколько получателей доставить не удалось (финально). */
+  failed: number;
+  /** Секунды от постановки job до финиша (optional, для ⏱-строки). */
+  durationS?: number;
+}
+
+/** «1 мин 5 с» / «48 с» для строки ⏱. Pure. */
+export function formatBroadcastDuration(durationS: number): string {
+  const total = Math.max(0, Math.round(durationS));
+  if (total < 60) return `${total} с`;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return seconds > 0 ? `${minutes} мин ${seconds} с` : `${minutes} мин`;
+}
+
+/**
+ * Финальная сводка автору ПОСЛЕ завершения fanout'а — boss 2026-10-21:
+ * «share stats as separate notification to post creator about amount of
+ * notified renters after broadcast is finished». Шлётся ровно один раз на job
+ * (флаг creator_stats_notified в ledger) в момент перевода job в done.
+ * Pure, unit-tested.
+ */
+export function buildWallBroadcastStatsHtml(info: WallBroadcastStatsInfo): string {
+  const lines: string[] = [
+    "✅ <b>Рассылка поста завершена</b>",
+    `📤 Доставлено: <b>${info.sent}</b> ${pluralRu(info.sent, ["получатель", "получателя", "получателей"])}`,
+  ];
+  if (info.failed > 0) {
+    lines.push(`⚠️ Не доставлено: ${info.failed} (Telegram отклонил доставку)`);
+  }
+  if (info.audienceLabel) {
+    lines.push(`👥 Аудитория: ${escapeTelegramHtml(info.audienceLabel)}`);
+  }
+  if (typeof info.durationS === "number" && Number.isFinite(info.durationS)) {
+    lines.push(`⏱ Заняла ${formatBroadcastDuration(info.durationS)}`);
+  }
+  const preview = buildWallPostPreview(info.body);
+  if (preview) lines.push("", `💬 «${escapeTelegramHtml(preview)}»`);
   return lines.join("\n");
 }
 
