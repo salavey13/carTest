@@ -85,6 +85,16 @@ export function MapPhotoLightbox({ photo, onClose }: { photo: MapPhotoLightboxDa
       aria-modal="true"
       aria-label={photo.caption || "Фото точки"}
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      // BOSS 2026-10-21 fix: body can carry a STUCK inline `pointer-events: none`
+      // (a Radix DismissableLayer with disableOutsidePointerEvents that mounted
+      // during an error path and never restored it — DismissableLayer sets
+      // body.style.pointerEvents='none' and restores it only on a clean unmount).
+      // The portal inherits that and became click-transparent: clicks fell
+      // through to the map below, and the ✕ button could not be clicked (PC).
+      // Radix itself re-enables interaction exactly like this on its overlays
+      // (DialogOverlay: style={{pointerEvents:'auto'}}) — pointer-events is an
+      // inherited property, so setting it here restores the whole subtree.
+      style={{ pointerEvents: "auto" }}
       onClick={onClose}
       onKeyDown={(event) => {
         // Единственная фокусируемая цель + aria-modal: Tab зацикливаем на

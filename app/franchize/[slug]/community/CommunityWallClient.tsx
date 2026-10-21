@@ -2374,7 +2374,11 @@ function PhotoLightbox({ photos, index, onClose, onIndexChange }: PhotoLightboxP
       ref={dialogRef}
       tabIndex={-1}
       className="fixed inset-0 z-[100] flex h-[100dvh] flex-col bg-black/95 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] outline-none"
-      style={{ touchAction: "none" }}
+      // BOSS 2026-10-21 fix: same as MapPhotoLightbox — a stuck inline body
+      // `pointer-events: none` (Radix DismissableLayer leak) made this portaled
+      // overlay click-transparent (✕ unclickable on PC, taps fell through).
+      // pointer-events is inherited → re-enable it for the whole subtree here.
+      style={{ touchAction: "none", pointerEvents: "auto" }}
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр фото"

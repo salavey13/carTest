@@ -1011,7 +1011,14 @@ function ReplayFullscreen({
   const currentTime = current?.capturedAt ? new Date(current.capturedAt).toLocaleString("ru-RU") : "—";
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-black/95 p-4 text-white" role="dialog" aria-modal="true" aria-label="Полноэкранный replay маршрута">
+    <div
+      className="fixed inset-0 z-[90] flex flex-col bg-black/95 p-4 text-white"
+      // BOSS 2026-10-21: same stuck-body pointer-events guard as MapPhotoLightbox
+      style={{ pointerEvents: "auto" }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Полноэкранный replay маршрута"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-wide text-emerald-200/80">Route replay cockpit</div>
