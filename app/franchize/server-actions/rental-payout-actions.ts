@@ -94,6 +94,8 @@ export async function markCrewPayoutAction(params: {
   slug: string;
   rentalId: string;
   mark: boolean;
+  /** Task 120 — optional transfer note written into the копилка journal. */
+  note?: string | null;
 }): Promise<ActionResponse<{ ok: boolean; error?: string }>> {
   try {
     const access = await verifyCrewAccess(params.slug);
@@ -103,10 +105,13 @@ export async function markCrewPayoutAction(params: {
     if (access.isOwner !== true) {
       return { success: false, error: "Отмечать выплаты может владелец или администратор экипажа." };
     }
+    const note =
+      typeof params.note === "string" && params.note.trim() ? params.note.trim().slice(0, 200) : null;
     const res = await stampRentalPayout({
       rentalId: params.rentalId,
       chatId: access.actorUserId,
       mark: params.mark === true,
+      note,
     });
     if (!res.ok) {
       // Row-level refusals (not verified / no rights) surface verbatim —

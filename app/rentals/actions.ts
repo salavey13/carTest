@@ -772,25 +772,15 @@ export async function initiateTelegramRentalPhotoUpload(
             return { success: false, error: 'Только арендатор может отправлять фото.' };
         }
 
-        if (photoType === 'start' && !['pending_confirmation', 'confirmed'].includes(rental.status)) {
-            // Allow 'active' status too if within ±2 hours of agreed_start_date.
-            // Operator might have flipped to active at handoff but still wants to
-            // capture pre-rental photos (passport, odometer, damage).
-            // Window is ±2h to account for timezone mismatches (UTC vs MSK).
-            if (rental.status === 'active' && rental.agreed_start_date) {
-                const startTime = new Date(rental.agreed_start_date).getTime();
-                const now = Date.now();
-                const TWO_HOURS = 2 * 60 * 60 * 1000;
-                if (Math.abs(now - startTime) >= TWO_HOURS) {
-                    return { success: false, error: 'Фото ДО доступно только до выдачи или в течение 2 часов после начала аренды.' };
-                }
-            } else {
-                return { success: false, error: 'Фото ДО доступно только до подтверждения получения.' };
-            }
+        // Task 120 (boss): the 2h window is ditched — «ДО» photos are allowed
+        // at ANY time (pending_confirmation / confirmed / active / completed).
+        if (photoType === 'start' && ['cancelled'].includes(rental.status)) {
+            return { success: false, error: 'Аренда отменена — фото недоступны.' };
         }
 
-        if (photoType === 'end' && rental.status !== 'active') {
-            return { success: false, error: 'Фото ПОСЛЕ доступно только для активной аренды.' };
+        // «ПОСЛЕ» photos: active or completed (retro-adding return photos OK).
+        if (photoType === 'end' && !['active', 'completed'].includes(rental.status)) {
+            return { success: false, error: 'Фото ПОСЛЕ доступно для активной или закрытой аренды.' };
         }
 
         const { error: upsertError } = await supabaseAdmin.from('user_states').upsert({

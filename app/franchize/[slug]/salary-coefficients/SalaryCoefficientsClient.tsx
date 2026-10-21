@@ -125,6 +125,8 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
   const [previewEquipUnits, setPreviewEquipUnits] = useState(1);
   const [previewDays, setPreviewDays] = useState(3);
   const [previewPrice, setPreviewPrice] = useState(12000);
+  // Task 120: «аренда меньше суток — комиссия пополам» — preview toggle.
+  const [previewShort, setPreviewShort] = useState(false);
 
   // Bike search
   const [bikeSearch, setBikeSearch] = useState("");
@@ -289,13 +291,15 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
       standardPrice: Math.round(previewPrice * 0.9),
       // Task 118: gear commission tapers after day 1 (200 → 100 ₽/ед/сут).
       equipmentDays: days,
+      // Task 120: «почасовая» toggle → a 3-hour window halves the commission.
+      rentalHours: previewShort ? 3 : 24,
     });
     const sale = computeSaleSalary({
       config,
       saleCategory: previewBike.saleCategory,
     });
     return { salary, sale, days };
-  }, [previewBike, config, previewEquipUnits, previewDays, previewPrice]);
+  }, [previewBike, config, previewEquipUnits, previewDays, previewPrice, previewShort]);
 
   const filteredBikes = useMemo(() => {
     const q = bikeSearch.trim().toLowerCase();
@@ -401,6 +405,15 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
                 className={franchizeOperatorInputClassName}
                 style={franchizeOperatorInputStyle}
               />
+              <label className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[11px]" style={{ color: previewShort ? T.accent : T.textFaint }}>
+                <input
+                  type="checkbox"
+                  checked={previewShort}
+                  onChange={(e) => setPreviewShort(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-current"
+                />
+                почасовая &lt; 24 ч
+              </label>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium" style={{ color: T.textMuted }}>Цена аренды, ₽</label>
@@ -436,17 +449,23 @@ export function SalaryCoefficientsClient({ slug, crew }: SalaryCoefficientsClien
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: T.textMuted }}>
-                <span>База: {rub(previewBreakdown.salary.base)}</span>
+                <span>
+                  База: {rub(previewBreakdown.salary.base)}
+                  {previewBreakdown.salary.shortRental ? " (половина от полной — аренда < 24 ч)" : ""}
+                </span>
                 <span>
                   Экип: {previewBreakdown.days > 1
                     ? `${previewEquipUnits} ед. × ${previewBreakdown.days} сут (${config.equipmentRentalUnit}+${config.equipmentRentalUnitFollowup}×${previewBreakdown.days - 1}) = ${rub(previewBreakdown.salary.equipment)}`
-                    : `${previewEquipUnits} × ${rub(config.equipmentRentalUnit)} = ${rub(previewBreakdown.salary.equipment)}`}
+                    : `${previewEquipUnits} × ${rub(previewBreakdown.salary.shortRental ? Math.round(config.equipmentRentalUnit / 2) : config.equipmentRentalUnit)} = ${rub(previewBreakdown.salary.equipment)}`}
                 </span>
                 <span>
                   Оверпрайс {config.overpricePercent}%: {rub(previewBreakdown.salary.overprice)}
                 </span>
                 <span>Продажа этой техники: {rub(previewBreakdown.sale.total)}</span>
               </div>
+              <p className="mt-2 text-[11px]" style={{ color: T.textFaint }}>
+                Правило: аренда короче 24 часов — комиссия пополам (мот и экип за единицу); экип со 2-х суток — половина коэффициента.
+              </p>
             </div>
           )}
         </FranchizeOperatorPanel>

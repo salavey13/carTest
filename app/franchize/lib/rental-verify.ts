@@ -202,6 +202,9 @@ export async function computeRentalVerificationSnapshot(params: {
   const gearStandardCost = equipmentStandardCost(eq, gearDays);
   const stdPrice = stdDetail.price + gearStandardCost;
   const equipmentUnits = countEquipmentUnits(eq);
+  // Task 120 (boss): rentals shorter than 24 hours halve the operator's
+  // commission (мот 1 000→500 · экип 200→100/ед). The hours come from the
+  // same stdDetail the эталон uses — one canon, the DM formula stays honest.
   const salary = computeRentalSalary({
     config,
     rentalCategory: categories.rental,
@@ -209,6 +212,7 @@ export async function computeRentalVerificationSnapshot(params: {
     totalCost: price,
     standardPrice: stdPrice,
     equipmentDays: gearDays,
+    rentalHours: stdDetail.hours,
   });
 
   const freeze = meta.pickup_freeze as Record<string, unknown> | undefined;
@@ -296,6 +300,7 @@ export async function computeRentalVerificationSnapshot(params: {
       gearDaysLabel,
       gearDaysLine,
       equipCommLine,
+      shortRental: salary.shortRental === true,
       standardTotal: stdPrice,
       clientTotal: price,
       markup,
@@ -751,7 +756,7 @@ export async function ccVerificationToCrewStaff(params: {
     params.summary,
     "",
     withKeyboard
-      ? "📋 Копия для команды — кнопки ✅/⚠️ работают у оператора, владельца и админов экипажа (админ ✅ подтверждает сверку сразу)."
+      ? "📋 Копия для команды — кнопки ✅/⚠️ работают у оператора, владельца и админов экипажа (админ ✅ фиксирует отметку администрации — финальное подтверждение всегда за владельцем)."
       : "📋 Копия для команды — кнопки ✅/⚠️ у оператора и владельца.",
     "Подтвердить сверку вручную можно в приложении: аналитика аренд → карточка аренды.",
   ].join("\n");
@@ -1055,9 +1060,9 @@ export async function handleRentalVerifyCallback(params: {
 
     if (result.effect === "verified") {
       await answerCallback(params.callbackQueryId, "✅ Подтверждено — спасибо!");
-      // Task 118: an admin ✅ is the TG equivalent of the drawer's manual
-      // owner-tier confirm — stamp WHO verified into the negotiation jsonb
-      // (audit trail) and word the done-text accordingly.
+      // Task 118/120: an admin ✅ (when it CLOSES the row — the owner party
+      // has already confirmed) stamps WHO closed it into the negotiation
+      // jsonb (audit trail) and word the done-text accordingly.
       const isAdminVerify = result.actor === "admin";
       if (isAdminVerify) {
         try {
@@ -1079,11 +1084,11 @@ export async function handleRentalVerifyCallback(params: {
       const freshScore = await loadOperatorVerifiedScore(current_.operator_chat_id).catch(() => null);
       const { amount: confirmedAmount } = commissionOf(current_);
       const doneText = [
-        isAdminVerify ? `🤝 <b>Расчёт подтверждён администратором</b>` : `🤝 <b>Расчёт подтверждён обеими сторонами</b>`,
+        isAdminVerify ? `🤝 <b>Расчёт подтверждён владельцем и администрацией</b>` : `🤝 <b>Расчёт подтверждён обеими сторонами</b>`,
         ``,
         `🛵 ${escapeVerifyHtml(snapshot?.bikeName || "аренда")} · комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}`,
         isAdminVerify
-          ? `Сверка закрыта администратором экипажа ${escapeVerifyHtml(labelFromUsersMap(usersMap, String(params.chatId)))} — аренда помечена как <b>проверенная</b> ✅.`
+          ? `Владелец подтвердил, админ экипажа ${escapeVerifyHtml(labelFromUsersMap(usersMap, String(params.chatId)))} закрыл сверку — аренда помечена как <b>проверенная</b> ✅.`
           : `Аренда помечена как <b>проверенная</b> ✅ — в конце месяца она уже не требует разбора.`,
       ].join("\n");
       // Task 106: when the row carries an AGREED (corrected) split, both
@@ -1155,6 +1160,51 @@ export async function handleRentalVerifyCallback(params: {
       // when the negotiation column is not applied yet). Task 118: admins
       // (crew staff) get the same editor and join as a third voice.
       await openDisputeEditorAfterDispute(rentalId, current_, String(params.chatId), result.actor as "operator" | "owner" | "admin");
+      return true;
+    }
+
+    // Task 120: admin ✅ recorded but NOT final — the crew owner's
+    // confirmation is always mandatory. Nudge the owner party with a fresh
+    // keyboard and tell the staff what the state now is.
+    if (result.effect === "admin_awaiting_owner") {
+      await answerCallback(params.callbackQueryId, "🛡 Отмечено — теперь нужно ✅ владельца.");
+      const adminLabel = labelFromUsersMap(usersMap, String(params.chatId));
+      try {
+        const negoNow = parseNegotiation((current_ as any).negotiation);
+        await supabaseAdmin
+          .from("rental_verifications")
+          .update({
+            negotiation: { ...negoNow, adminVerified: { by: String(params.chatId), at: new Date().toISOString() } },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("rental_id", rentalId);
+      } catch (stampErr) {
+        logger.warn(`[rental-verify] adminVerified (awaiting) stamp failed for ${rentalId} (non-fatal):`, stampErr);
+      }
+      const ownerChatId = current_.owner_chat_id ? String(current_.owner_chat_id) : null;
+      if (ownerChatId && ownerChatId !== String(params.chatId)) {
+        const nudge = [
+          `🛡 <b>Администрация сверила расчёт</b>`,
+          ``,
+          `${escapeVerifyHtml(adminLabel)} (админ экипажа) подтвердил сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} (комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
+          `Финальное подтверждение всегда за владельцем — осталось ваше ✅:`,
+        ].join("\n");
+        try {
+          await sendComplexMessage(ownerChatId, nudge, verificationKeyboard(rentalId), {
+            parseMode: "HTML",
+            keyboardType: "inline",
+          });
+        } catch {
+          /* non-fatal */
+        }
+      }
+      // Staff visibility (the admin tapper + parties already know).
+      await ccVerificationNoteToCrewStaff({
+        crewSlug: current_.crew_slug || null,
+        rentalId,
+        text: `🛡 ${escapeVerifyHtml(adminLabel)} (админ) подтвердил сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} — ждём подтверждение владельца (комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
+        exclude: [ownerChatId || "", String(params.chatId)],
+      });
       return true;
     }
 

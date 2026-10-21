@@ -234,6 +234,7 @@ export async function getMyWorkDayAction(params: {
         totalCost: price,
         standardPrice: stdPrice,
         equipmentDays: gearDays,
+        rentalHours: stdDetail.hours, // Task 120: <24h → commission halved
       });
 
       rentalsRevenue += price;

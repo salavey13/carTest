@@ -221,11 +221,11 @@ export function MyEarningsPanel({
   }, [slug]);
 
   const handleMarkPayout = useCallback(
-    async (rentalId: string, mark: boolean) => {
+    async (rentalId: string, mark: boolean, note?: string) => {
       if (markingIds.has(rentalId)) return;
       setMarkingIds((prev) => new Set(prev).add(rentalId));
       try {
-        const res = await markCrewPayoutAction({ slug, rentalId, mark });
+        const res = await markCrewPayoutAction({ slug, rentalId, mark, note: note || null });
         if (res.success && res.data?.ok) {
           setLedgerNotice(mark ? "Выплата записана в копилку команды 💰" : "Возвращено в ожидание ↩️");
           await fetchLedger(); // refetch — the row must SHOW its new state
@@ -1260,10 +1260,19 @@ function CrewPayoutLedgerModal({
   error: string | null;
   notice: string | null;
   markingIds: Set<string>;
-  onMark: (rentalId: string, mark: boolean) => void;
+  onMark: (rentalId: string, mark: boolean, note?: string) => void;
   onRetry: () => void;
   T: CrewTokens;
 }) {
+  // Task 120: the transfer note editor — «💸 Выплачено» opens an inline
+  // input (нал / перевод на карту *1234…) and the note lands in the копилка
+  // journal together with the stamp.
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const closeNoteEditor = () => {
+    setNoteFor(null);
+    setNoteDraft("");
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -1363,25 +1372,80 @@ function CrewPayoutLedgerModal({
                 ) : (
                   <div className="space-y-1.5">
                     {ledger.unpaid.map((e) => (
-                      <div key={e.rentalId} className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 6%, transparent)" }}>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium" style={{ color: T.text }}>
-                            {e.bikeName} · {e.dateLabel}
-                            {e.adjusted ? " · скорректирована" : ""}
-                          </p>
-                          <p className="text-[10px]" style={{ color: T.textMuted }}>{e.operatorLabel}</p>
+                      <div key={e.rentalId} style={{ backgroundColor: "color-mix(in srgb, var(--franchize-shell-accent) 6%, transparent)" }} className="rounded px-2 py-1.5 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium" style={{ color: T.text }}>
+                              {e.bikeName} · {e.dateLabel}
+                              {e.adjusted ? " · скорректирована" : ""}
+                            </p>
+                            <p className="text-[10px]" style={{ color: T.textMuted }}>{e.operatorLabel}</p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="font-mono font-bold tabular-nums" style={{ color: T.accent }}>{formatCurrency(e.amount)}</span>
+                            <button
+                              onClick={() => {
+                                setNoteFor(noteFor === e.rentalId ? null : e.rentalId);
+                                setNoteDraft("");
+                              }}
+                              disabled={markingIds.has(e.rentalId)}
+                              className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:opacity-85 disabled:opacity-50"
+                              style={{ backgroundColor: T.accent, color: T.accentContrast }}
+                            >
+                              {markingIds.has(e.rentalId) ? "..." : "💸 Выплачено"}
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className="font-mono font-bold tabular-nums" style={{ color: T.accent }}>{formatCurrency(e.amount)}</span>
-                          <button
-                            onClick={() => onMark(e.rentalId, true)}
-                            disabled={markingIds.has(e.rentalId)}
-                            className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:opacity-85 disabled:opacity-50"
-                            style={{ backgroundColor: T.accent, color: T.accentContrast }}
-                          >
-                            {markingIds.has(e.rentalId) ? "..." : "💸 Выплачено"}
-                          </button>
-                        </div>
+                        {noteFor === e.rentalId && (
+                          <div className="mt-2 flex flex-col gap-1.5">
+                            <input
+                              autoFocus
+                              value={noteDraft}
+                              onChange={(ev) => setNoteDraft(ev.target.value)}
+                              maxLength={200}
+                              placeholder="Заметка: нал / перевод на карту *1234… (необязательно)"
+                              className="w-full rounded border px-2 py-1.5 text-[11px] outline-none"
+                              style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated, color: T.text }}
+                              onKeyDown={(ev) => {
+                                if (ev.key === "Enter") {
+                                  onMark(e.rentalId, true, noteDraft.trim() || undefined);
+                                  closeNoteEditor();
+                                }
+                              }}
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => {
+                                  onMark(e.rentalId, true, noteDraft.trim() || undefined);
+                                  closeNoteEditor();
+                                }}
+                                disabled={markingIds.has(e.rentalId)}
+                                className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:opacity-85 disabled:opacity-50"
+                                style={{ backgroundColor: "#10b981", color: "#ffffff" }}
+                              >
+                                💸 Записать выплату
+                              </button>
+                              <button
+                                onClick={() => {
+                                  onMark(e.rentalId, true);
+                                  closeNoteEditor();
+                                }}
+                                disabled={markingIds.has(e.rentalId)}
+                                className="rounded-full px-2.5 py-1 text-[10px] font-semibold transition hover:opacity-85 disabled:opacity-50"
+                                style={{ border: `1px solid ${T.borderSoft}`, color: T.textMuted }}
+                              >
+                                Без заметки
+                              </button>
+                              <button
+                                onClick={closeNoteEditor}
+                                className="rounded-full px-2.5 py-1 text-[10px] transition hover:opacity-85"
+                                style={{ color: T.textMuted }}
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1404,6 +1468,7 @@ function CrewPayoutLedgerModal({
                           <p className="text-[10px]" style={{ color: T.textMuted }}>
                             {e.markedAt ? new Date(e.markedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
                             {e.markedByLabel ? ` · отметил ${e.markedByLabel}` : ""}
+                            {e.note ? ` · 📝 ${e.note}` : ""}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">

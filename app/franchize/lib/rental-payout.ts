@@ -63,6 +63,10 @@ import {
   type PayoutSourceRow,
 } from "./rental-payout-core";
 
+// Task 120: the action layer imports this type from THIS module (one import
+// path) — the plain import above is not a re-export, so spell it out.
+export type { CrewPayoutLedgerView };
+
 const PAYOUT_SQL_HINT = "примените SQL: docs/crewDocs/rental-verifications-payout-2026-10-18.sql";
 
 // ── Graceful column access (same pattern as negotiation, task 106) ───────────

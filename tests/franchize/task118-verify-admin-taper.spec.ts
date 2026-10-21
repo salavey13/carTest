@@ -6,8 +6,9 @@
 //      the crew, and buttons seem shown to crew owner/operator only — show
 //      buttons to admin as well»
 //        → crew staff (crew owner + admins/co_owner) act as role «admin»:
-//          same ✅/⚠️ keyboard on their copy, admin ✅ verifies instantly
-//          (the TG twin of the drawer's owner-tier manual confirm), admin ⚠️
+//          same ✅/⚠️ keyboard on their copy; task 120: admin ✅ is NOT final —
+//          it records the endorsement and waits for the OWNER party (owner's
+//          confirmation is a must always), admin ⚠️
 //          opens the same dispute editor.
 //
 //   2. «after i sent my suggestion buttons disappeared, so i can't edit again»
@@ -62,9 +63,9 @@ const ROW_BASE = {
   rental_id: "r-118",
   crew_id: "crew-1",
   crew_slug: "vip-bike",
-  operator_chat_id: "7813830016", // DJORUDJOV
-  owner_chat_id: "356282674", // I_O_S_NN
-  requested_by: "7813830016",
+  operator_chat_id: "100200300", // synthetic operator fixture
+  owner_chat_id: "400500600", // synthetic owner fixture
+  requested_by: "100200300",
   requested_at: "2026-10-21T10:00:00Z",
   status: "pending" as const,
   operator_confirmed_at: null,
@@ -76,7 +77,7 @@ const ROW_BASE = {
   source: "modal-close",
 };
 
-const ADMIN_PAUL = "413553377"; // @salavey13 — vip-bike crew admin
+const ADMIN_PAUL = "413120000"; // synthetic crew-admin
 
 function row(overrides: Partial<RentalVerificationRow> = {}): RentalVerificationRow {
   return { ...ROW_BASE, ...overrides } as RentalVerificationRow;
@@ -158,35 +159,48 @@ describe("task118 · equipment day-taper canon", () => {
 
 describe("task118 · admin buttons in the verification machine", () => {
   it("resolveVerificationRole: parties win, crew staff → admin, foreign → null", () => {
-    const staff = [ADMIN_PAUL, "356282674"];
-    expect(resolveVerificationRole(ROW_BASE, "7813830016", staff)).toBe("operator");
+    const staff = [ADMIN_PAUL, "400500600"];
+    expect(resolveVerificationRole(ROW_BASE, "100200300", staff)).toBe("operator");
     // The crew owner is ALSO the rental owner — party role wins (more specific).
-    expect(resolveVerificationRole(ROW_BASE, "356282674", staff)).toBe("owner");
+    expect(resolveVerificationRole(ROW_BASE, "400500600", staff)).toBe("owner");
     expect(resolveVerificationRole(ROW_BASE, ADMIN_PAUL, staff)).toBe("admin");
     expect(resolveVerificationRole(ROW_BASE, "999", staff)).toBeNull();
     // No staff list → admins are just foreign chats (legacy behavior).
     expect(resolveVerificationRole(ROW_BASE, ADMIN_PAUL, [])).toBeNull();
   });
 
-  it("admin ✅ verifies instantly (the TG twin of the drawer manual confirm)", () => {
+  it("admin ✅ is NOT final — the row waits for the owner party (task 120)", () => {
     const res = applyVerificationAction(row(), {
       action: "confirm",
       chatId: ADMIN_PAUL,
       nowIso: "t1",
       adminChatIds: [ADMIN_PAUL],
     });
-    expect(res.effect).toBe("verified");
+    expect(res.effect).toBe("admin_awaiting_owner");
     expect(res.actor).toBe("admin");
-    expect(res.row!.status).toBe("verified");
-    expect(res.row!.verified_at).toBe("t1");
-    // ...even a DISPUTED row closes (the boss settles offline deals from TG).
+    expect(res.row!.status).toBe("pending"); // status unchanged — owner still owes the ✅
+    // ...a DISPUTED row also just records the endorsement (owner must still confirm).
     const disputed = applyVerificationAction(row({ status: "disputed" as const }), {
       action: "confirm",
       chatId: ADMIN_PAUL,
       nowIso: "t1",
       adminChatIds: [ADMIN_PAUL],
     });
-    expect(disputed.effect).toBe("verified");
+    expect(disputed.effect).toBe("admin_awaiting_owner");
+  });
+
+  it("admin ✅ closes the row ONLY when the owner party already confirmed (task 120)", () => {
+    const ownerFirst = applyVerificationAction(row(), { action: "confirm", chatId: "400500600", nowIso: "t1" });
+    expect(ownerFirst.effect).toBe("wait_other_party"); // owner ✅ recorded, operator pending
+    const adminCloses = applyVerificationAction(ownerFirst.row!, {
+      action: "confirm",
+      chatId: ADMIN_PAUL,
+      nowIso: "t2",
+      adminChatIds: [ADMIN_PAUL],
+    });
+    expect(adminCloses.effect).toBe("verified");
+    expect(adminCloses.row!.status).toBe("verified");
+    expect(adminCloses.row!.owner_confirmed_at).toBe("t1"); // the owner's own signature
   });
 
   it("admin ⚠️ disputes → the same editor opens; foreign chats still bounce", () => {
@@ -212,14 +226,14 @@ describe("task118 · admin buttons in the verification machine", () => {
   });
 
   it("party flow untouched (operator → wait_other_party; double ✅ → verified)", () => {
-    const first = applyVerificationAction(row(), { action: "confirm", chatId: "7813830016", nowIso: "t1" });
+    const first = applyVerificationAction(row(), { action: "confirm", chatId: "100200300", nowIso: "t1" });
     expect(first.effect).toBe("wait_other_party");
-    const second = applyVerificationAction(first.row!, { action: "confirm", chatId: "356282674", nowIso: "t2" });
+    const second = applyVerificationAction(first.row!, { action: "confirm", chatId: "400500600", nowIso: "t2" });
     expect(second.effect).toBe("verified");
     // Admin list present does not change party semantics.
     const withStaff = applyVerificationAction(row(), {
       action: "confirm",
-      chatId: "7813830016",
+      chatId: "100200300",
       nowIso: "t1",
       adminChatIds: [ADMIN_PAUL],
     });
@@ -244,10 +258,10 @@ describe("task118 · proposal sent stub is no longer a dead end", () => {
   });
 
   it("send → edit → send replaces the author's own proposal; the comment cap is 600", () => {
-    let nego = startDraft(parseNegotiation({}), "7813830016", "operator", snapshotSplitOf(null));
+    let nego = startDraft(parseNegotiation({}), "100200300", "operator", snapshotSplitOf(null));
     nego = setDraftSplit(nego, applySplitDelta(snapshotSplitOf(null), "base", 100));
     const sent = sendProposalFromDraft(nego, {
-      chatId: "7813830016",
+      chatId: "100200300",
       role: "operator",
       nowIso: "t0",
       original: snapshotSplitOf(null),
@@ -281,7 +295,7 @@ describe("task118 · DM formula shows the day ladder", () => {
       damageNotes: null,
       returnNotes: null,
       penalty: null,
-      attribution: { source: "request", createdByChatId: "7813830016", handedByChatId: null, returnedByChatId: null },
+      attribution: { source: "request", createdByChatId: "100200300", handedByChatId: null, returnedByChatId: null },
       requestedAtIso: "2026-10-21T10:00:00Z",
       rentalWindow: { startIso: "2026-10-17T10:00:00Z", endIso: "2026-10-20T10:00:00Z", hours: 72, days: 3, durationLabel: "3 суток" },
       formula: {
@@ -309,8 +323,8 @@ describe("task118 · DM formula shows the day ladder", () => {
     }) as unknown as RentalVerificationSnapshot;
 
   const usersMap = new Map([
-    ["7813830016", { username: "DJORUDJOV" }],
-    ["356282674", { username: "I_O_S_NN" }],
+    ["100200300", { username: "DJORUDJOV" }],
+    ["400500600", { username: "I_O_S_NN" }],
   ]);
 
   it("rich DM prints the gear day ladder, the commission ladder and the followup legend", () => {
@@ -319,8 +333,8 @@ describe("task118 · DM formula shows the day ladder", () => {
         crewName: "VIP_BIKE",
         snapshot: snap(),
         usersMap,
-        operatorChatId: "7813830016",
-        ownerChatId: "356282674",
+        operatorChatId: "100200300",
+        ownerChatId: "400500600",
         statusNote: "test",
       }),
     );
@@ -338,8 +352,8 @@ describe("task118 · DM formula shows the day ladder", () => {
         crewName: "VIP_BIKE",
         snapshot: snap({ gearDays: undefined, equipFollowupUnit: undefined, gearDaysLabel: undefined, gearDaysLine: undefined, equipCommLine: undefined, gearStandard: 1500, standardTotal: 34500, markup: 11500 }),
         usersMap,
-        operatorChatId: "7813830016",
-        ownerChatId: "356282674",
+        operatorChatId: "100200300",
+        ownerChatId: "400500600",
         statusNote: "test",
       }),
     );

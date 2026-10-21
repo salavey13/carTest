@@ -242,6 +242,7 @@ export async function computeCategoryBonuses(params: {
       totalCost: price,
       standardPrice: stdPrice,
       equipmentDays: gearDays,
+      rentalHours: stdDetail.hours, // Task 120: <24h → commission halved
     });
     rentalTotal += salary.total;
     const label = RENTAL_CATEGORY_LABELS[categories.rental];

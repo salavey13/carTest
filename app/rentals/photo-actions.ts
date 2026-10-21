@@ -181,52 +181,26 @@ async function validateUpload(
     return { ok: false, error: "Аренда не найдена." };
   }
 
-  // Status check: start photos before pickup OR within ±2 hours of start;
-  // end photos only when active.
-  // Allow ДО photos for active rentals within ±2 hours of agreed_start_date.
-  // Window is ±2h (not ±1h) to account for timezone mismatches (UTC vs MSK)
-  // and operator delays during handoff.
+  // Task 120 (boss 2026-10-21): the old ±2h / ±1h windows are GONE —
+  // «allow to add photos before/after at any time, ditch this check».
+  // Start photos: any real rental stage (pre-confirmation → completed), so a
+  // rental activated hours ago still accepts the missing «ДО» shots.
+  // End photos: active AND completed (retro-adding return photos is fine too).
+  // Only cancelled rentals are rejected; role checks follow below.
   if (photoType === "start") {
-    const allowedStatuses = ["pending_confirmation", "confirmed"];
-    // Also allow 'active' if within ±2 hours of agreed_start_date
-    if (rental.status === "active" && rental.agreed_start_date) {
-      const startTime = new Date(rental.agreed_start_date).getTime();
-      const now = Date.now();
-      const TWO_HOURS = 2 * 60 * 60 * 1000;
-      if (Math.abs(now - startTime) < TWO_HOURS) {
-        allowedStatuses.push("active");
-      }
-    }
+    const allowedStatuses = ["pending_confirmation", "confirmed", "active", "completed"];
     if (!allowedStatuses.includes(rental.status)) {
       return {
         ok: false,
-        error: "Фото ДО можно добавить только до выдачи или в течение 2 часов после начала аренды.",
+        error: "Фото ДО недоступно для этой аренды (аренда отменена или не найдена).",
       };
     }
   } else {
-    // ПОСЛЕ photos: allowed when status='active', OR when status='completed'
-    // within 1 hour of closure (similar to ДО photos for active within 1h of start).
-    // Operator might have closed the rental but still wants to add return photos.
-    const allowedEndStatuses = ["active"];
-    if (rental.status === "completed") {
-      // Check if closure was less than 1 hour ago
-      // Closure timestamp is in metadata.return_confirmed_at or metadata.closure_data.return_confirmed_at
-      const closureTs = (rental as any).metadata?.return_confirmed_at
-        || (rental as any).metadata?.closure_data?.return_confirmed_at
-        || (rental as any).updated_at;
-      if (closureTs) {
-        const closureTime = new Date(closureTs).getTime();
-        const now = Date.now();
-        const ONE_HOUR = 60 * 60 * 1000;
-        if (now - closureTime < ONE_HOUR) {
-          allowedEndStatuses.push("completed");
-        }
-      }
-    }
+    const allowedEndStatuses = ["active", "completed"];
     if (!allowedEndStatuses.includes(rental.status)) {
       return {
         ok: false,
-        error: "Фото ПОСЛЕ можно добавить только для активной аренды или в течение часа после закрытия.",
+        error: "Фото ПОСЛЕ недоступно для этой аренды (аренда отменена или ещё не активна).",
       };
     }
   }

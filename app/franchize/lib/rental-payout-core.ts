@@ -93,6 +93,8 @@ export interface PayoutItem {
   paid: boolean;
   markedAt: string | null;
   markedBy: string | null;
+  /** Task 120 — the owner's note written when stamping the payout («перевёл на карту»). */
+  markedNote: string | null;
   verifiedAt: string | null;
   requestedAt: string | null;
   /** dd.MM label of the money date (verified, else requested). */
@@ -206,6 +208,7 @@ export function buildPayoutItem(row: PayoutSourceRow, viewerChatId: string): Pay
     paid: op?.marked === true,
     markedAt: op?.marked === true ? op.at || null : null,
     markedBy: op?.marked === true ? op.by || null : null,
+    markedNote: op?.marked === true ? (typeof op.note === "string" && op.note.trim() ? op.note.trim() : null) : null,
     verifiedAt: row.verified_at || null,
     requestedAt: row.requested_at || null,
     dateLabel: isoToDateLabel(moneyIso),
@@ -497,6 +500,8 @@ export function formatPayoutCard(params: {
   );
   if (item.adjusted) lines.push(`⚖️ Числа скорректированы сделкой по сверке`);
   if (item.paid && item.markedAt) lines.push(`💸 Отмечено выплаченным: ${isoToDateLabel(item.markedAt)}`);
+  // Task 120: the owner's transfer note travels with the money everywhere.
+  if (item.paid && item.markedNote) lines.push(`📝 ${escapeVerifyHtml(item.markedNote)}`);
   if (item.status === "verified" && !item.paid) {
     lines.push(``, `Деньги переданы? Жмите «💸 Отметить выплаченной» — аренда уйдёт из «К выплате».`);
   }
@@ -608,6 +613,8 @@ export interface CrewPayoutLedgerEntry {
   /** ISO of the payout stamp (paid rows) — null for unpaid. */
   markedAt: string | null;
   markedByLabel: string | null;
+  /** Task 120 — the note the owner wrote when stamping the payout. */
+  note: string | null;
   adjusted: boolean;
 }
 
@@ -679,6 +686,10 @@ export function buildCrewPayoutLedger(
       dateLabel: isoToDateLabel(moneyIso),
       markedAt: paid ? payout.operator?.at || null : null,
       markedByLabel: paid ? params.labelOf(payout.operator?.by) : null,
+      note:
+        paid && typeof payout.operator?.note === "string" && payout.operator.note.trim()
+          ? payout.operator.note.trim()
+          : null,
       adjusted,
     };
 

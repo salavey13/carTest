@@ -562,6 +562,26 @@ export interface RentalSalaryBreakdown {
   /** overprice bonus (percent × markup above standard price) */
   overprice: number;
   total: number;
+  /**
+   * Task 120 — true when the rental window was shorter than 24h: the base AND
+   * the per-unit equipment commission were halved (мот 1 000→500 · экип 200→100).
+   */
+  shortRental: boolean;
+}
+
+/**
+ * Task 120 (boss 2026-10-21): a rental SHORTER than 24 hours halves the
+ * operator's commission — «kinda in case rental is less then 24 hours then
+ * comission for rental itself is not 1000 but 500 for mid bikes (750 instead
+ * of 1500 for high-tier bikes, and 250 instead of 500 for low tier bikes),
+ * and 100rub bonus instead of 200 for each equipment item». Applied to the
+ * bike base AND the per-unit gear commission; the onценка (markup %) is NOT
+ * halved (the boss enumerated only the flat parts). Unknown duration (hours
+ * = 0) keeps the full commission — half only when we KNOW it was short.
+ */
+export function isShortRentalHours(hours: number | null | undefined): boolean {
+  const h = Number(hours);
+  return Number.isFinite(h) && h > 0 && h < 24;
 }
 
 /**
@@ -571,6 +591,8 @@ export interface RentalSalaryBreakdown {
  * Task 118: `equipmentDays` — charged gear days (1st day pays the full unit
  * coefficient, each following day the followup coefficient). Omitted → 1 day
  * (the legacy flat per-unit behavior), so old callers keep their numbers.
+ * Task 120: `rentalHours` — the rental window; when it is (0, 24) the base
+ * and the per-unit equipment commission are halved. Omitted/unknown → full.
  */
 export function computeRentalSalary(params: {
   config: SalaryConfig;
@@ -580,12 +602,18 @@ export function computeRentalSalary(params: {
   standardPrice: number;
   /** Charged gear days (≥1). Hourly/unknown windows bill gear as 1 day. */
   equipmentDays?: number;
+  /** Rental window in hours (from standardRentalPriceDetailed). */
+  rentalHours?: number | null;
 }): RentalSalaryBreakdown {
   const { config, rentalCategory, equipmentUnits, totalCost, standardPrice } = params;
-  const base = config.rental[rentalCategory] ?? 0;
+  const shortRental = isShortRentalHours(params.rentalHours);
+  const half = (n: number) => Math.round(n / 2);
+  const baseFull = config.rental[rentalCategory] ?? 0;
+  const base = shortRental ? half(baseFull) : baseFull;
   const gearDays = Math.max(1, Math.floor(Number(params.equipmentDays) || 1));
   const followup = Math.max(0, Math.round(Number(config.equipmentRentalUnitFollowup) || 0));
-  const perUnit = Math.round(Number(config.equipmentRentalUnit) || 0) + (gearDays - 1) * followup;
+  const perUnitFull = Math.round(Number(config.equipmentRentalUnit) || 0) + (gearDays - 1) * followup;
+  const perUnit = shortRental ? half(perUnitFull) : perUnitFull;
   const equipment = equipmentUnits * perUnit;
   const markup = Math.max(0, (Number(totalCost) || 0) - (Number(standardPrice) || 0));
   const overprice = Math.round((markup * config.overpricePercent) / 100);
@@ -594,6 +622,7 @@ export function computeRentalSalary(params: {
     equipment,
     overprice,
     total: base + equipment + overprice,
+    shortRental,
   };
 }
 

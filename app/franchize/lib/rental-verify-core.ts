@@ -116,6 +116,8 @@ export interface RentalVerificationSnapshot {
     gearDaysLine?: string | null;
     /** Task 118 — «(200 + 100 + 100) × 3 ед.» frozen at request time. */
     equipCommLine?: string | null;
+    /** Task 120 — true when the window was <24h: base and gear commission halved. */
+    shortRental?: boolean;
     /** bikeStandard + gearStandard. */
     standardTotal: number;
     /** What the client actually paid (rentals.total_cost). */
@@ -155,7 +157,9 @@ export type VerificationEffect =
   | "noop"
   | "wait_other_party"
   | "verified"
-  | "disputed";
+  | "disputed"
+  /** Task 120: admin ✅ recorded — the row now waits for the crew owner. */
+  | "admin_awaiting_owner";
 
 /** Who acted on a verification — «admin» = crew staff (owner/admin/co_owner of the CREW). */
 export type VerificationActor = "operator" | "owner" | "admin";
@@ -174,14 +178,19 @@ export interface ApplyActionResult {
 /**
  * Transition rules (money-sensitive, deliberately conservative):
  *   • The two recorded parties may always act.
- *   • Task 118 (boss: «show buttons to admin as well»): crew staff (owner /
- *     admin / co_owner of the CREW, passed via adminChatIds) get the same
- *     buttons. An admin ✅ VERIFIES immediately (the TG equivalent of the
- *     drawer's manual owner-tier confirm); an admin ⚠️ opens the same
- *     dispute editor and joins the negotiation as a third voice.
+ *   • Task 118: crew staff (owner / admin / co_owner of the CREW, passed via
+ *     adminChatIds) get the same ✅/⚠️ buttons. Task 120 (boss: «make admin
+ *     confirmation not final — it as well should wait for crew owner's
+ *     confirmation as well; owner's confirmation is a must always»): an
+ *     admin ✅ is NOT final — it records the supervisor's endorsement and
+ *     the row keeps waiting for the OWNER party. Only when the owner party
+ *     has ALREADY confirmed may the admin tap close the row (the mandatory
+ *     owner signature is then present). An admin ⚠️ opens the same dispute
+ *     editor and joins the negotiation as a third voice.
  *   • «Оспорить» is available to both parties until VERIFIED and always wins —
- *     a doubt stops the verification (manual reconciliation follows; an owner
- *     can still final-verify via the admin ✅ after an offline talk).
+ *     a doubt stops the verification (manual reconciliation follows; the
+ *     owner can still final-verify via his own ✅ or the drawer's manual
+ *     owner-tier confirm).
  *   • When operator === owner (or operator is null), the owner's single
  *     confirm verifies immediately — there is no second human.
  *   • Re-confirming an already-confirmed side is a no-op (idempotent taps).
@@ -211,14 +220,21 @@ export function applyVerificationAction(
     };
   }
 
-  // ── Task 118: crew staff — supervisor override ──
+  // ── Task 118 + Task 120: crew staff — supervisor endorsement ──
+  // The admin ✅ is NOT a replacement for the owner's signature: when the
+  // owner party has not confirmed yet, the row keeps its status and waits
+  // for the owner (the handler nudges him). Only an owner-confirmed row may
+  // be closed by the admin tap.
   if (role === "admin") {
     if (params.action === "confirm") {
-      return {
-        row: { ...row, status: "verified", verified_at: params.nowIso },
-        effect: "verified",
-        actor: "admin",
-      };
+      if (row.owner_confirmed_at) {
+        return {
+          row: { ...row, status: "verified", verified_at: params.nowIso },
+          effect: "verified",
+          actor: "admin",
+        };
+      }
+      return { row, effect: "admin_awaiting_owner", actor: "admin" };
     }
     return {
       row: {
@@ -464,8 +480,15 @@ export function formatVerificationSummary(params: {
     lines.push(
       `  📜 коэф.: мот ${formatRubVerify(f.baseCoef)}/аренда · экип ${formatRubVerify(f.equipmentUnitCoef)}/ед${followupNote} · наценка ${f.overpricePercent}%`,
     );
+    // Task 120: the short-rental rule is part of the legend — the halved
+    // numbers in the breakdown above must be explainable from the DM alone.
+    if (f.shortRental) {
+      lines.push(
+        `  ↳ аренда < 24 ч — комиссия пополам: мот ${formatRubVerify(f.baseCoef)} → ${formatRubVerify(Math.round(f.baseCoef / 2))} · экип ${formatRubVerify(f.equipmentUnitCoef)} → ${formatRubVerify(Math.round(f.equipmentUnitCoef / 2))}/ед`,
+      );
+    }
     lines.push(
-      `  ℹ️ экип клиенту: 1-е сутки полная цена, дальше — половина; мот: тариф зависит от длительности, комиссия — фикс за аренду`,
+      `  ℹ️ экип клиенту: 1-е сутки полная цена, дальше — половина; мот: тариф зависит от длительности, комиссия — фикс за аренду${f.shortRental ? "; аренда меньше суток — комиссия пополам" : ""}`,
     );
   }
 

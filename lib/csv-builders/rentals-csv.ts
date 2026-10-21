@@ -390,6 +390,7 @@ export async function buildRentalsCsv(
       totalCost: price,
       standardPrice: stdPrice,
       equipmentDays: gearDays,
+      rentalHours: stdDetail.hours, // Task 120: <24h → commission halved
     });
     const salaryStr = String(salary.total);
     blockRentals.salary += salary.total;
