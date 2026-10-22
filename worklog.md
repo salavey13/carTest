@@ -1137,3 +1137,17 @@ Work Log:
 
 Stage Summary:
 - public/salavey13.html задеплоен в репо → после Vercel-деплоя доступен на vip-bike.ru/salavey13.html; для полного паритета с orudjov-x-vlad (vip-bike.ru/salavey13 без .html) — залить файл на nginx-сервер тем же способом, каким залит orudjov-x-vlad.
+
+---
+Task ID: 111-size-guard-100mb
+Agent: main (Claude)
+Task: user hit "38 MB > 25 MB" rejection on photo upload — allow big files and compress them properly.
+
+Work Log:
+- Raised pre-compression guard 25→100 MB in lib/client-image-compress.ts (MAX_INPUT_FILE_SIZE + RU message), PhotoUploadButton text, and the 4 server safety nets (photo-actions.ts, wall/storage/meetup routes). Clients compress first — real uploads stay ~300 KB, so server guards are pure sharp protection.
+- Added drawResizedToCanvas(): progressive halving (≤6 steps, imageSmoothingQuality=high) instead of single drawImage 48MP→1400px — kills aliasing on huge sources.
+- Specs: heic spec re-asserts 100 MB + halving; photo-actions spec 101 MB rejection; map-meetup spec 100 MB guard. 189 tests passed; eslint 0 warnings; franchize slice typecheck PASS.
+- Committed f09b9cb → rebased → pushed as 9a9c391.
+
+Stage Summary:
+- 30-90 MB photos (48/200 MP modes, TG forwards) now decode → downscale → ship as ~200-500 KB JPEG on every compressed surface.
