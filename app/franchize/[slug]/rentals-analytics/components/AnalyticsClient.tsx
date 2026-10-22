@@ -16,9 +16,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
 import {
-  adminVerifyRentalAction,
   bulkVerifyFineAction,
-  resendVerificationDmsAction,
 } from "@/app/franchize/server-actions/rental-verify-actions";
 import { startSeasonVerificationRound } from "@/app/franchize/server-actions/season-stats";
 import type { ThemeTokens } from "../hooks/useTheme";
@@ -137,18 +135,13 @@ export function AnalyticsClient({
   //   verifiedOverrides — optimistic stamps after a manual owner confirm from
   //               the drawer; the refetch (onDataRefresh) brings the
   //               authoritative state, the override just removes the flicker.
-  //   verifyPending/verifyFailed — drawer button states (money surface: a
-  //               failed confirm must be VISIBLE, never silent).
+  // Task 126: the drawer's сверка card owns its own pending/fail state —
+  // the parent keeps only the optimistic verified stamps from the BULK fine
+  // confirm (the card refetches via onChanged after manual actions).
   const [verFilter, setVerFilter] = useState<VerificationListFilter>("all");
   const [verifiedOverrides, setVerifiedOverrides] = useState<Record<string, true>>({});
-  const [verifyPending, setVerifyPending] = useState(false);
-  const [verifyFailed, setVerifyFailed] = useState(false);
   // VF-FIX 2026-10-18: bulk FINE confirm (month of the viewed day) in flight.
   const [bulkFinePending, setBulkFinePending] = useState(false);
-  // Task 105: (re)send verification DMs from the drawer (no confirm dialog —
-  // it does not mutate money state; it creates the row when missing + DMs).
-  const [resendPending, setResendPending] = useState(false);
-  const [resendFailed, setResendFailed] = useState(false);
   // Сезон-2026: bulk «раунд сверки» прямо из списка (owner-tier на сервере).
   const [roundPending, setRoundPending] = useState(false);
 
@@ -427,81 +420,6 @@ export function AnalyticsClient({
       toast.error(err?.message || "Ошибка сети");
     } finally {
       setActionPending(false);
-    }
-  };
-
-  // Task 103: manual owner confirm of the operator+owner commission check
-  // («both agreed in person» semantics — the SAME adminVerifyRentalAction that
-  // MyEarningsPanel uses; it re-verifies the owner-tier role server-side and
-  // funnels through the canonical state machine). Money surface → explicit
-  // confirm dialog, visible failure flag, optimistic ✅ stamp + refetch.
-  const handleVerifyRental = async () => {
-    if (!selectedRentalId || verifyPending) return;
-    if (!actorUserId) {
-      toast.error("Не удалось определить пользователя — обновите страницу и попробуйте снова.");
-      return;
-    }
-    const rental = selectedRental;
-    const disputed = rental?.verificationStatus === "disputed";
-    const ok = window.confirm(
-      disputed
-        ? "Закрыть спор и пометить сверку подтверждённой?\n\nИспользуйте только после личного разбора с оператором — обе стороны получат отметку «проверено»."
-        : "Подтвердить сверку по этой аренде?\n\nАренда будет помечена «проверено» для оператора и владельца (используйте после личной сверки).",
-    );
-    if (!ok) return;
-
-    setVerifyPending(true);
-    setVerifyFailed(false);
-    try {
-      const res = await adminVerifyRentalAction({ slug: initialSlug, rentalId: selectedRentalId });
-      if (res.success) {
-        setVerifiedOverrides((prev) => ({ ...prev, [selectedRentalId]: true }));
-        toast.success(disputed ? "Спор закрыт — сверка подтверждена ✅" : "Сверка подтверждена ✅");
-        onDataRefresh?.();
-      } else {
-        setVerifyFailed(true);
-        toast.error(res.error || "Не удалось подтвердить сверку");
-      }
-    } catch {
-      setVerifyFailed(true);
-      toast.error("Не удалось подтвердить сверку");
-    } finally {
-      setVerifyPending(false);
-    }
-  };
-
-  // Task 105: (re)send the verification summary + ✅/⚠️ keyboard to both
-  // parties. Creates the verification row on the fly for rentals closed
-  // before the awaited-trigger fix (bd948bd0: void → lambda frozen → 0 rows).
-  const handleResendDms = async () => {
-    if (!selectedRentalId || resendPending) return;
-    setResendPending(true);
-    setResendFailed(false);
-    try {
-      const res = await resendVerificationDmsAction({ slug: initialSlug, rentalId: selectedRentalId });
-      if (res.success) {
-        // boss 2026-10-20: honest delivery report — the parties are operator +
-        // owner, so the presser usually gets only the actor proof copy; the
-        // toast must say exactly who was reached and who failed.
-        const sent = res.data?.sentTo?.length ?? 0;
-        const failed = res.data?.failed ?? [];
-        const copied = res.data?.actorCopied === true;
-        const failNote = failed.length
-          ? ` ⚠️ Не доставлено: ${failed.map((f) => f.chatId).join(", ")}`
-          : "";
-        toast.success(
-          `${res.data?.created ? "Сверка создана и отправлена" : "Сверка отправлена в Telegram"} (${sent} получено${copied ? " + копия вам" : ""}) ✅${failNote}`,
-        );
-        if (res.data?.created) onDataRefresh?.();
-      } else {
-        setResendFailed(true);
-        toast.error(res.error || "Не удалось отправить сверку");
-      }
-    } catch {
-      setResendFailed(true);
-      toast.error("Не удалось отправить сверку");
-    } finally {
-      setResendPending(false);
     }
   };
 
@@ -826,13 +744,8 @@ export function AnalyticsClient({
                   T={T}
                   onAction={handleRentalAction}
                   onClose={closeDrawer}
+                  onChanged={onDataRefresh}
                   canVerify={viewerIsOwnerTier}
-                  verifyPending={verifyPending}
-                  verifyFailed={verifyFailed}
-                  onVerifyRental={handleVerifyRental}
-                  onResendDms={handleResendDms}
-                  resendPending={resendPending}
-                  resendFailed={resendFailed}
                 />
               )}
               {activeTab === "sales" && selectedSale && (
@@ -880,13 +793,8 @@ export function AnalyticsClient({
               onClose={closeDrawer}
               crewSlug={initialSlug}
               asSheetChild
+              onChanged={onDataRefresh}
               canVerify={viewerIsOwnerTier}
-              verifyPending={verifyPending}
-              verifyFailed={verifyFailed}
-              onVerifyRental={handleVerifyRental}
-              onResendDms={handleResendDms}
-              resendPending={resendPending}
-              resendFailed={resendFailed}
             />
           )}
           {activeTab === "sales" && selectedSale && (
@@ -928,26 +836,18 @@ function RentalDetailDrawerInline({
   T,
   onAction,
   onClose,
+  onChanged,
   canVerify,
-  verifyPending,
-  verifyFailed,
-  onVerifyRental,
-  onResendDms,
-  resendPending,
-  resendFailed,
 }: {
   rental: DrawerRentalRow;
   crewSlug: string;
   T: ThemeTokens;
   onAction: (a: DrawerAction) => void;
   onClose: () => void;
+  /** Task 126: the сверка card owns its actions; parent just refetches. */
+  onChanged?: () => void;
+  /** Owner-tier gate for the card's manual confirm (server re-checks). */
   canVerify?: boolean;
-  verifyPending?: boolean;
-  verifyFailed?: boolean;
-  onVerifyRental?: () => void;
-  onResendDms?: () => void;
-  resendPending?: boolean;
-  resendFailed?: boolean;
 }) {
   return (
     <RentalDetailDrawer
@@ -957,13 +857,8 @@ function RentalDetailDrawerInline({
       onClose={onClose}
       crewSlug={crewSlug}
       asSheetChild
+      onChanged={onChanged}
       canVerify={canVerify}
-      verifyPending={verifyPending}
-      verifyFailed={verifyFailed}
-      onVerifyRental={onVerifyRental}
-      onResendDms={onResendDms}
-      resendPending={resendPending}
-      resendFailed={resendFailed}
     />
   );
 }

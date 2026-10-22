@@ -159,6 +159,9 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     verificationStatus: item.verificationStatus ?? null,
     verificationProposalOpen: item.verificationProposalOpen === true,
     verificationAdjusted: item.verificationAdjusted === true,
+    // Task 126: frozen commission numbers — the drawer's «Сверка комиссии» card.
+    verificationCommission: item.verificationCommission ?? null,
+    verificationAgreedSplit: item.verificationAgreedSplit ?? null,
   };
 }
 

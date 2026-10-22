@@ -1331,6 +1331,38 @@ export function formatDealDoneText(params: {
 
 // ── Month-end tally (pure) ───────────────────────────────────────────────────
 
+/**
+ * Task 126 — the FROZEN commission numbers, read straight out of the
+ * verification snapshot (same digits the сверка DM showed both parties).
+ * Nulls are honest: pre-task117 rows carry no formula, some rows carry no
+ * numbers at all (created before the snapshot grew money fields).
+ */
+export interface VerificationCommissionBrief {
+  base: number | null;
+  equipment: number | null;
+  overprice: number | null;
+  /** base + equipment + overprice — the operator's commission total. */
+  total: number | null;
+  /** What the client paid (rentals.total_cost at freeze time). */
+  totalCost: number | null;
+  categoryLabel?: string | null;
+  equipmentUnits?: number | null;
+  /** Task 117 formula block («откуда цифры») — null on pre-task117 rows. */
+  formula?: {
+    fallback?: boolean;
+    bikeStandard?: number;
+    gearStandard?: number;
+    standardTotal?: number;
+    clientTotal?: number;
+    markup?: number;
+    baseCoef?: number;
+    equipmentUnitCoef?: number;
+    overpricePercent?: number;
+    shortRental?: boolean;
+    bikeTierLabel?: string | null;
+  } | null;
+}
+
 export interface VerificationBrief {
   status: RentalVerificationStatus;
   operatorChatId: string | null;
@@ -1341,6 +1373,8 @@ export interface VerificationBrief {
   agreedSplit?: SplitParts | null;
   /** Task 114: audit grade + notes — WHY a row is almost/sus, for the drawer. */
   audit?: { grade?: string; notes?: string[] } | null;
+  /** Task 126: frozen commission numbers — the «Сверка комиссии» card data. */
+  commission?: VerificationCommissionBrief | null;
 }
 
 /**

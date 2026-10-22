@@ -217,8 +217,12 @@ interface DrawerPrimaryActionsProps {
 }
 
 export function DrawerPrimaryActions({ actions, onAction, T }: DrawerPrimaryActionsProps) {
+  // Task 126 (codereview #6): a single action tile («Открыть аренду» on a
+  // completed row) must span the full row, not sit at ¼ width.
+  const gridCls =
+    actions.length === 1 ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3 md:grid-cols-4";
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className={gridCls}>
       {actions.map((b) => {
         const Icon = b.icon;
         return (

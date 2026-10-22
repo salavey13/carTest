@@ -2,6 +2,11 @@
 // Mirrors the patterns from leads-constants.ts but scoped to the analytics
 // operational dashboard (rentals / sales / services).
 
+import type {
+  SplitParts,
+  VerificationCommissionBrief,
+} from "@/app/franchize/lib/rental-verify-core";
+
 export type AnalyticsTab = "rentals" | "sales" | "services";
 
 export type RentalStatus =
@@ -74,6 +79,11 @@ export interface AnalyticsRentalRow {
   /** Task 114: audit grade + notes from snapshot.audit — WHY a row is
    *  almost/sus (paper-vs-books, missing odometer, …). null = not graded. */
   verificationAudit?: { grade?: string; notes?: string[] } | null;
+  /** Task 126: frozen commission numbers (verification snapshot) — the
+   *  «Сверка комиссии» card data. null = no row / pre-money row. */
+  verificationCommission?: VerificationCommissionBrief | null;
+  /** Task 126: negotiated split after an accepted proposal (сверка card). */
+  verificationAgreedSplit?: SplitParts | null;
 }
 
 export interface AnalyticsSaleRow {

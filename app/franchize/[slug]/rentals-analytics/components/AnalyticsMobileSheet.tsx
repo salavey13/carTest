@@ -41,7 +41,6 @@ import {
   useAnimationControls,
   useDragControls,
 } from "framer-motion";
-import { X } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { useViewportHeightPx } from "../hooks/useViewportHeightPx";
 
@@ -191,30 +190,20 @@ export function AnalyticsMobileSheet({
             }}
           >
             {/* Drag handle — full-width gesture surface so the user can
-                start a swipe anywhere on the top bar. Only the decorative
-                pill is aria-hidden; the close button stays accessible. */}
+                start a swipe anywhere on the top bar. Task 126: the legacy
+                close X here is REMOVED — it sat exactly in the TG WebApp's
+                native top-right corner (overlapped by the system buttons) and
+                duplicated the drawer header's own «Закрыть панель» button.
+                Closing: swipe down, backdrop tap, Esc, or the header X. */}
             <div
               onPointerDown={(e) => dragControls.start(e)}
-              className="flex shrink-0 cursor-grab touch-none items-center justify-between gap-2 px-4 pb-1.5 pt-2.5 active:cursor-grabbing"
+              className="flex shrink-0 cursor-grab touch-none items-center px-4 pb-1.5 pt-2.5 active:cursor-grabbing"
             >
               <div
                 className="h-1.5 w-10 rounded-full"
                 style={{ backgroundColor: T.textFaint }}
                 aria-hidden
               />
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Закрыть"
-                className="rounded-lg p-2 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
-                style={{
-                  color: T.textMuted,
-                  minHeight: "40px",
-                  minWidth: "40px",
-                }}
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
 
             {title && (

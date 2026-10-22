@@ -275,11 +275,13 @@ describe("task114: every new verification row is graded + svc/equipment stay out
     expect(s).toContain("verificationAudit: verificationMap.get(item.rental_id)?.audit ?? null,");
   });
 
-  it("drawer shows the audit grade chip + visible notes (not hover-only)", () => {
-    const s = src("app/franchize/[slug]/rentals-analytics/components/RentalDetailDrawer.tsx");
-    expect(s).toContain("audit: sus");
-    expect(s).toContain("audit: почти ок");
-    expect(s).toMatch(/verificationAudit!\.notes!\.map/);
+  it("drawer shows the audit verdict via the сверка card (task 126) — visible, not hover-only", () => {
+    const drawer = src("app/franchize/[slug]/rentals-analytics/components/RentalDetailDrawer.tsx");
+    expect(drawer).toContain("audit={rental.verificationAudit}");
+    const card = src("app/franchize/components/CommissionVerificationCard.tsx");
+    expect(card).toContain("аудит: расхождение");
+    expect(card).toContain("аудит: почти ок");
+    expect(card).toMatch(/audit\.notes!\.map/);
   });
 
   it("cards prefix sus/almost on the verification chip", () => {

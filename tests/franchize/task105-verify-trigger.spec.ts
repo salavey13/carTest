@@ -70,13 +70,15 @@ describe("task105 · verification trigger survives the serverless invocation", (
     expect(fn).toMatch(/update\(\{ operator_chat_id: healed \}\)/);
   });
 
-  it("drawer exposes the resend button wired to the action", () => {
+  it("drawer exposes the resend affordance (task 126: via the сверка card)", () => {
     const drawer = src("app/franchize/[slug]/rentals-analytics/components/RentalDetailDrawer.tsx");
-    expect(drawer).toContain("onResendDms");
-    expect(drawer).toContain("выслать сверку в TG");
-    const client = src("app/franchize/[slug]/rentals-analytics/components/AnalyticsClient.tsx");
-    expect(client).toContain("handleResendDms");
-    expect(client).toContain("resendVerificationDmsAction({ slug: initialSlug, rentalId: selectedRentalId })");
+    expect(drawer).toContain("CommissionVerificationCard");
+    expect(drawer).toContain("onChanged");
+    // the card owns the actions: same server actions, honest labels
+    const card = src("app/franchize/components/CommissionVerificationCard.tsx");
+    expect(card).toContain("resendVerificationDmsAction({ slug, rentalId })");
+    expect(card).toContain("Завести сверку в TG");
+    expect(card).toContain("Выслать сверку");
   });
 });
 

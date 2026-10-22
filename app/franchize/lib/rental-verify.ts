@@ -112,6 +112,7 @@ import {
   type StreakRow,
   type VerificationActor,
   type VerificationBrief,
+  type VerificationCommissionBrief,
 } from "./rental-verify-core";
 
 // Re-export the pure surface so consumers (webhook wrapper, server actions,
@@ -156,6 +157,7 @@ export type {
   SplitPartKey,
   SplitParts,
   VerificationBrief,
+  VerificationCommissionBrief,
   VerificationEffect,
 } from "./rental-verify-core";
 
@@ -2472,8 +2474,19 @@ export async function getVerificationStatusMap(rentalIds: string[]): Promise<Map
     // Task 114: audit:snapshot->audit rides along (PostgREST jsonb key pick —
     // avoids dragging full snapshots) so the drawer can show WHY a row is
     // almost/sus without another query.
-    const COLS_WITH_NEGO = "rental_id, status, operator_chat_id, owner_chat_id, negotiation, audit:snapshot->audit";
-    const COLS_PLAIN = "rental_id, status, operator_chat_id, owner_chat_id, audit:snapshot->audit";
+    // Task 126: the FROZEN commission numbers ride along the same way — the
+    // «Сверка комиссии» card shows the exact digits the DM froze, with zero
+    // extra queries. All picks degrade to null on pre-money rows.
+    const COLS_WITH_NEGO =
+      "rental_id, status, operator_chat_id, owner_chat_id, negotiation, audit:snapshot->audit, " +
+      "com_base:snapshot->base, com_equip:snapshot->equipment, com_over:snapshot->overprice, " +
+      "com_total:snapshot->total, com_client:snapshot->totalCost, com_cat:snapshot->rentalCategoryLabel, " +
+      "com_units:snapshot->equipmentUnits, com_formula:snapshot->formula";
+    const COLS_PLAIN =
+      "rental_id, status, operator_chat_id, owner_chat_id, audit:snapshot->audit, " +
+      "com_base:snapshot->base, com_equip:snapshot->equipment, com_over:snapshot->overprice, " +
+      "com_total:snapshot->total, com_client:snapshot->totalCost, com_cat:snapshot->rentalCategoryLabel, " +
+      "com_units:snapshot->equipmentUnits, com_formula:snapshot->formula";
     const CHUNK = 200;
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK);
@@ -2494,12 +2507,37 @@ export async function getVerificationStatusMap(rentalIds: string[]): Promise<Map
       for (const row of rows || []) {
         const nego = row.negotiation !== undefined ? parseNegotiation(row.negotiation) : null;
         const audit = (row.audit ?? null) as { grade?: string; notes?: string[] } | null;
+        // Task 126: reassemble the commission brief from the jsonb picks.
+        // A row counts as «has numbers» when any money field survived —
+        // otherwise commission stays undefined (the card shows its empty state).
+        const numOrNull = (v: unknown): number | null => {
+          if (v == null) return null;
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+        const commission = (() => {
+          if (row.com_base == null && row.com_total == null && row.com_equip == null) return null;
+          return {
+            base: numOrNull(row.com_base),
+            equipment: numOrNull(row.com_equip),
+            overprice: numOrNull(row.com_over),
+            total: numOrNull(row.com_total),
+            totalCost: numOrNull(row.com_client),
+            categoryLabel: typeof row.com_cat === "string" ? row.com_cat : null,
+            equipmentUnits: numOrNull(row.com_units),
+            formula:
+              row.com_formula && typeof row.com_formula === "object"
+                ? (row.com_formula as VerificationCommissionBrief["formula"])
+                : null,
+          };
+        })();
         map.set(String(row.rental_id), {
           status: row.status,
           operatorChatId: row.operator_chat_id,
           ownerChatId: row.owner_chat_id,
           ...(nego ? { proposalOpen: !!nego.open, agreedSplit: nego.agreed ? nego.agreed.split : null } : {}),
           ...(audit && typeof audit === "object" ? { audit } : {}),
+          ...(commission ? { commission } : {}),
         });
       }
     }

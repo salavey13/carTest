@@ -197,6 +197,7 @@ function isNumericLike(s: string): boolean {
 // The «Верификация» column (АРЕНДЫ block) renders colored + the whole row
 // gets a light tint, so the operator's eye lands on what is still unverified.
 type VerTone = "verified" | "disputed" | "waiting" | null;
+type VerFilterKey = "all" | Exclude<VerTone, null> | "none";
 function verificationToneOf(label: string): VerTone {
   const s = (label || "").toLowerCase();
   if (!s.trim()) return null;
@@ -235,6 +236,10 @@ export function ExportCsvModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  // Task 126 — «что не сверено» одним тапом: фильтр по колонке «Верификация»
+  // (АРЕНДЫ блок). Chips double as the legend for the row tints. «none» =
+  // пустая ячейка — аренды, по которым сверка ещё не заводилась.
+  const [verFilter, setVerFilter] = useState<VerFilterKey>("all");
 
   const loadTable = useCallback(async () => {
     if (!fetchCsvText || !from || !to || from > to) return;
@@ -263,6 +268,7 @@ export function ExportCsvModal({
       setDownloading(false);
       setSending(false);
       setQuery("");
+      setVerFilter("all");
     }
   }, [isOpen]);
 
@@ -321,6 +327,33 @@ export function ExportCsvModal({
   const parsedSections = parseCsvSections(rows);
   const isSectioned = variant === "rentals" && !parsedSections.legacy && parsedSections.sections.length > 0;
 
+  // Task 126 — verification filter: counts from the UNFILTERED rentals block
+  // (the chips are also the legend — they answer «сколько чего»), applied
+  // only to the АРЕНДЫ rows; other blocks keep every row.
+  const verCol = SECTION_COLS.rentals.verification ?? 24;
+  const rentalsSectionRaw = isSectioned
+    ? parsedSections.sections.find((s) => s.key === "rentals")
+    : undefined;
+  const verCounts = (() => {
+    const c = { all: 0, verified: 0, waiting: 0, disputed: 0, none: 0 };
+    for (const r of rentalsSectionRaw?.data ?? []) {
+      c.all += 1;
+      const tone = verificationToneOf(r[verCol] || "");
+      if (tone) c[tone] += 1;
+      else c.none += 1;
+    }
+    return c;
+  })();
+  const applyVerFilter = (s: ParsedCsvSection): ParsedCsvSection => {
+    if (verFilter === "all" || s.key !== "rentals") return s;
+    return {
+      ...s,
+      data: s.data.filter((r) => (verificationToneOf(r[verCol] || "") ?? "none") === verFilter),
+      // Filtered sums would not match the full-period СВОДКА block — hide them.
+      totals: null,
+    };
+  };
+
   const q = query.trim().toLowerCase();
   const applyFilter = (s: ParsedCsvSection): ParsedCsvSection => {
     if (!q) return s;
@@ -335,7 +368,7 @@ export function ExportCsvModal({
   // Empty blocks (no data this period) are hidden entirely — the СВОДКА
   // block still reports their zero totals.
   const visibleSections = isSectioned
-    ? parsedSections.sections.map(applyFilter).filter((s) => s.data.length > 0)
+    ? parsedSections.sections.map(applyFilter).map(applyVerFilter).filter((s) => s.data.length > 0)
     : [];
 
   // Totals-card sums per block (client-side over the loaded rows — mirrors
@@ -638,6 +671,56 @@ export function ExportCsvModal({
                 small
               />
             )}
+          </div>
+        )}
+
+        {/* ── Сверка filter chips (Task 126) — legend + one-tap «что не сверено» ── */}
+        {!loading && !error && isSectioned && (rentalsSectionRaw?.data.length ?? 0) > 0 && (
+          <div
+            className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2"
+            style={{ borderColor: T.border, backgroundColor: T.bg }}
+            role="group"
+            aria-label="Фильтр по сверке"
+          >
+            <span className="mr-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: T.textMuted }}>
+              Сверка:
+            </span>
+            {([
+              { key: "all" as const, label: "Все", count: verCounts.all, fg: T.text, bg: "transparent" },
+              { key: "verified" as const, label: "✅ сверены", count: verCounts.verified, fg: VER_TONE_FG.verified, bg: VER_TONE_BG.verified },
+              { key: "waiting" as const, label: "⏳ ждут", count: verCounts.waiting, fg: VER_TONE_FG.waiting, bg: VER_TONE_BG.waiting },
+              { key: "disputed" as const, label: "⚠️ споры", count: verCounts.disputed, fg: VER_TONE_FG.disputed, bg: VER_TONE_BG.disputed },
+              { key: "none" as const, label: "➕ без сверки", count: verCounts.none, fg: T.textMuted, bg: T.bgElevated },
+            ]).map((chip) => {
+              const active = verFilter === chip.key;
+              const dim = chip.count === 0;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setVerFilter(chip.key)}
+                  aria-pressed={active}
+                  disabled={dim && !active}
+                  className="inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-45"
+                  style={{
+                    borderColor: active ? chip.fg : T.border,
+                    backgroundColor: active ? (chip.key === "all" ? T.bgElevated : chip.bg) : "transparent",
+                    color: chip.fg,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                  title={
+                    chip.key === "all"
+                      ? "Показать все аренды периода"
+                      : chip.key === "none"
+                        ? "Аренды без сверки — по ним комиссия ещё не подтверждалась"
+                        : `Только строки: ${chip.label}`
+                  }
+                >
+                  {chip.label}
+                  <span className="opacity-80">{chip.count}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

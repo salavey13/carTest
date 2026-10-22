@@ -66,17 +66,20 @@ describe("task116 · Task A: modal close fires the verification chain", () => {
   });
 });
 
-// ── Task C: drawer initiate/resend button ────────────────────────────────────
+// ── Task C: initiate/resend (task 126: the сверка card owns it) ─────────────
 
 describe("task116 · Task C: drawer initiate-or-resend", () => {
-  it("the button renders for completed non-verified rentals (rowless included) at owner-tier", () => {
-    expect(drawerSrc).toContain('canVerify && rental.status === "completed" && ver !== "verified" && onResendDms');
+  it("the card renders for closed rentals; the drawer passes the owner-tier gate", () => {
+    expect(drawerSrc).toContain("rentalStatus={rental.status}");
+    expect(drawerSrc).toMatch(/canVerify=\{canVerify\}|canVerify=\{viewerIsOwnerTier\}/);
+    expect(drawerSrc).toContain("canVerify?: boolean");
   });
 
   it("the label says what the tap does: initiate (no row) vs resend (row exists)", () => {
-    expect(drawerSrc).toContain('"➕ завести сверку и выслать в TG"');
-    expect(drawerSrc).toContain('"📤 выслать сверку в TG"');
-    expect(drawerSrc).toContain("ver === null");
+    const card = src("app/franchize/components/CommissionVerificationCard.tsx");
+    expect(card).toContain('"Завести сверку в TG"');
+    expect(card).toContain('"Выслать сверку"');
+    expect(card).toContain('cardStatus === "none"');
   });
 
   it("the server action still creates the missing row + staff cc (loadOrCreateVerificationRow)", () => {

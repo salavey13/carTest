@@ -40,11 +40,13 @@ import {
   X,
   CheckCircle2,
   Briefcase,
+  CalendarDays,
   ClipboardCheck,
   StickyNote,
   History as HistoryIcon,
   ExternalLink,
   Package,
+  Wallet,
   ArrowRight,
 } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
@@ -86,6 +88,8 @@ import {
 // iter25: shared moto/gear + company/partner split (pure, client-safe)
 import { computePartnerSplit } from "@/app/franchize/lib/rental-price-split";
 import { DepositSection } from "./DepositSection";
+// Task 126: the transparent commission math + verify/resend quick actions.
+import { CommissionVerificationCard } from "@/app/franchize/components/CommissionVerificationCard";
 
 interface RentalDetailDrawerProps {
   rental: DrawerRentalRow;
@@ -100,24 +104,14 @@ interface RentalDetailDrawerProps {
    *  Optional to keep every existing call site compiling; when absent the
    *  deposit fetch falls back to the metadata-only view (old behavior). */
   crewSlug?: string;
-  // ── Task 103: on-the-fly verification affordance ──
-  /** Viewer passes the owner-tier gate (owner/admin/co_owner) — shows the
-   *  manual «✓ подтвердить сверку» / «✓ закрыть спор» button for COMPLETED
-   *  rentals that are not verified yet (incl. the backfill case with no row).
-   *  The server action re-checks the role and funnels through the same
-   *  state machine as the Telegram buttons. */
+  // ── Task 126: сверка комиссии ──
+  /** Verification state + frozen commission numbers ride on the row
+   *  (getVerificationStatusMap picks). The card owns its actions; the parent
+   *  only refetches when a mutation lands. */
+  onChanged?: () => void;
+  /** Owner-tier gate for the card's manual «✓ подтвердить» button (the
+   *  server action re-checks the role — this only hides the affordance). */
   canVerify?: boolean;
-  /** Verify request in flight (parent-owned so the whole tree stays consistent). */
-  verifyPending?: boolean;
-  /** Last attempt failed — inline «✕ не сохранилось» flag (never silent). */
-  verifyFailed?: boolean;
-  /** Trigger the owner-side manual confirm. */
-  onVerifyRental?: () => void;
-  /** Task 105: (re)send the verification DMs to operator+owner — creates the
-   *  row from current data when missing (bd948bd0 backfill), re-DMs otherwise. */
-  onResendDms?: () => void;
-  resendPending?: boolean;
-  resendFailed?: boolean;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
@@ -157,13 +151,8 @@ export function RentalDetailDrawer({
   T,
   asSheetChild = false,
   crewSlug,
+  onChanged,
   canVerify = false,
-  verifyPending = false,
-  verifyFailed = false,
-  onVerifyRental,
-  onResendDms,
-  resendPending = false,
-  resendFailed = false,
 }: RentalDetailDrawerProps) {
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newNote, setNewNote] = useState("");
@@ -201,26 +190,10 @@ export function RentalDetailDrawer({
   useEffect(() => { void loadDepositSummary(); }, [loadDepositSummary]);
 
   const statusMeta = getRentalStatusMeta(rental.status);
-  // Task 102: verification chip — same mapping as AnalyticsRentalCard.
+  // Task 102: verification state rides on the row; the status CHIP itself
+  // lives in the «Сверка комиссии» card below (task 126 moved it there —
+  // one source of truth, no duplicated chips).
   const ver = rental.verificationStatus ?? null;
-  // Task 106: same negotiation variants as the card (adjusted verified / open
-  // proposal). DrawerRentalRow may predate the new fields — optional chaining.
-  const verMeta =
-    ver === "verified"
-      ? (rental.verificationAdjusted
-          ? { color: "#22c55e", label: "✅ сверена · скорректирована" }
-          : { color: "#22c55e", label: "✅ сверена" })
-      : ver === "disputed"
-        ? (rental.verificationProposalOpen
-            ? { color: "#f97316", label: "📤 предложение отправлено" }
-            : { color: "#ef4444", label: "⚠️ спор сверки" })
-        : ver === "operator_confirmed"
-          ? { color: "#f59e0b", label: "⏳ ждёт владельца" }
-          : ver === "owner_confirmed"
-            ? { color: "#f59e0b", label: "⏳ ждёт оператора" }
-            : ver === "pending"
-              ? { color: "#f59e0b", label: "⏳ сверка" }
-              : null;
   const bikeTitle = getRentalBikeTitle(rental);
   // iter32: gear rentals get their subject from the gear snapshot —
   // «Шлем LS2», «Шлем + ещё 2» instead of a fake bike title.
@@ -288,27 +261,37 @@ export function RentalDetailDrawer({
     return null; // partial — neither fully returned nor fully held
   })();
 
-  // Primary actions (Section 2)
+  // Primary actions (Section 2). Task 126 overhaul: dead buttons don't render —
+  // completed and cancelled rows cannot be activated/completed/cancelled
+  // again, so the row collapses to the single honest action («Открыть аренду»).
   const primaryActions: PrimaryAction[] = [
-    { icon: CheckCircle2, label: "Активировать", action: "activate", color: "#22c55e" },
-    { icon: CheckCircle2, label: "Завершить",    action: "complete", color: "#3b82f6" },
-    { icon: X,            label: "Отменить",     action: "cancel",   color: "#ef4444" },
+    ...(rental.status === "cancelled" || rental.status === "completed"
+      ? []
+      : [
+          { icon: CheckCircle2, label: "Активировать", action: "activate", color: "#22c55e" },
+          { icon: CheckCircle2, label: "Завершить",    action: "complete", color: "#3b82f6" },
+          { icon: X,            label: "Отменить",     action: "cancel",   color: "#ef4444" },
+        ]),
     { icon: ExternalLink, label: "Открыть",      action: "open_rental", color: "#8b5cf6" },
   ];
 
-  // Info grid (Section 4)
-  // FIX (F11): «Экипаж» tile removed (we are already inside the crew context);
-  // operator shows a resolved username instead of a raw chat id.
-  const infoItems: InfoTile[] = [
+  // Info grid — Task 126: the flat 15-tile wall is GONE. Tiles are grouped
+  // into two honest sections («Аренда» — who/when, «Деньги» — what was paid),
+  // each rendered as its own collapsible DrawerSection below.
+  const rentalInfoItems: InfoTile[] = [
     // iter32: standalone gear rows are not bikes — name the tile honestly
     { label: isGearRental ? "Снаряжение" : "Байк", value: isGearRental ? subjectTitle : bikeTitle },
     { label: "Арендатор",       value: renterName },
     { label: "Телефон",         value: phone || "—", copyable: !!phone },
     { label: "Статус",          value: statusMeta.label, tone: statusMeta.color === "#22c55e" ? "good" : statusMeta.color === "#ef4444" ? "danger" : "neutral" },
-    { label: "Оплата",          value: paymentSplit.text || rental.payment_status || "—" },
     { label: "Начало",          value: formatDateTime(rental.agreed_start_date || rental.requested_start_date) },
     { label: "Конец",           value: formatDateTime(rental.agreed_end_date || rental.requested_end_date) },
+    { label: "Оператор",        value: rental.operatorName || "—" },
+    { label: "Создана",         value: formatDateTime(rental.created_at) },
+  ];
+  const moneyInfoItems: InfoTile[] = [
     { label: "Стоимость",       value: formatRubles(cost) },
+    { label: "Оплата",          value: paymentSplit.text || rental.payment_status || "—" },
     // iter25: moto / gear split of the total (exact when persisted at
     // creation, "~" marks the unit-price estimate for legacy rows)
     {
@@ -335,13 +318,11 @@ export function RentalDetailDrawer({
           ? `${formatRubles(deposit.amount)}${depositDestinationLabel ? ` · ${depositDestinationLabel}` : ""}${depositReturnedFromEntries === true ? " · возвращен" : depositReturnedFromEntries === false ? " · у держателя" : ""}`
           : "не записан",
     },
-    { label: "Оператор",        value: rental.operatorName || "—" },
     // iter20: partner-owner tile for subrented bikes (50/50 revenue split) —
     // resolved server-side from cars.specs.subrenter_chat_id.
     ...(rental.subrenterLabel
       ? [{ label: "Субарендатор", value: rental.subrenterLabel }]
       : []),
-    { label: "Создана",         value: formatDateTime(rental.created_at) },
   ];
 
   // Filtered todos (Section 6)
@@ -426,110 +407,7 @@ export function RentalDetailDrawer({
               >
                 {formatRubles(cost)}
               </span>
-              {/* Task 102: operator+owner commission verification chip — the
-                  money-reconciliation state, same semantics as the card. */}
-              {verMeta && (
-                <span
-                  className="rounded-full px-3 py-1 text-[11px] font-medium"
-                  style={{ background: `${verMeta.color}1a`, color: verMeta.color }}
-                  title="Сверка расчёта: оператор + владелец подтверждают комиссию сразу после закрытия аренды"
-                >
-                  {verMeta.label}
-                </span>
-              )}
-              {/* Task 114: audit grade — WHY a row is almost/sus (paper-vs-books,
-                  missing odometer, …). Computed at verification request time and
-                  on the backfill; «fine» stays silent to avoid chip noise. */}
-              {ver && ver !== "verified" && rental.verificationAudit?.grade && rental.verificationAudit.grade !== "fine" && (
-                <span
-                  className="rounded-full px-3 py-1 text-[11px] font-medium"
-                  style={{
-                    background: rental.verificationAudit.grade === "sus" ? "#ef44441a" : "#f59e0b1a",
-                    color: rental.verificationAudit.grade === "sus" ? "#ef4444" : "#f59e0b",
-                  }}
-                  title={(rental.verificationAudit.notes || []).join("\n") || "Замечаний нет"}
-                >
-                  {rental.verificationAudit.grade === "sus" ? "🚨 audit: sus" : "👀 audit: почти ок"}
-                </span>
-              )}
-              {/* Task 103: owner-tier manual confirm — closes the loop from the
-                  analytics page (backfill of pre-feature rentals, dispute
-                  resolution after an offline talk). Completed rentals only,
-                  verified rows excluded; server action re-gates the role. */}
-              {canVerify && rental.status === "completed" && ver !== "verified" && onVerifyRental && (
-                verifyFailed ? (
-                  <span
-                    className="rounded-full px-3 py-1 text-[11px] font-semibold"
-                    style={{ background: "#ef44441a", color: "#ef4444" }}
-                    title="Не удалось сохранить подтверждение — попробуйте ещё раз"
-                  >
-                    ✕ не сохранилось
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onVerifyRental}
-                    disabled={verifyPending}
-                    className="cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
-                    style={{ background: "#22c55e1f", color: "#22c55e" }}
-                    title={
-                      ver === "disputed"
-                        ? "Закрыть спор после личного разбора — обе стороны получат отметку «проверено»"
-                        : "Подтвердить расчёт вручную (после личной сверки с оператором)"
-                    }
-                  >
-                    {verifyPending ? "…" : ver === "disputed" ? "✓ закрыть спор" : "✓ подтвердить сверку"}
-                  </button>
-                )
-              )}
-              {/* Task 105 / Task C: initiate-or-resend the verification summary
-                  + ✅/⚠️ keyboard to operator+owner in Telegram. When the rental
-                  has NO verification row yet (closed pre-system / row cleaned),
-                  the label honestly says «завести» — the tap CREATES the сверка
-                  (loadOrCreateVerificationRow + staff cc), not just re-sends. */}
-              {canVerify && rental.status === "completed" && ver !== "verified" && onResendDms && (
-                resendFailed ? (
-                  <span
-                    className="rounded-full px-3 py-1 text-[11px] font-semibold"
-                    style={{ background: "#ef44441a", color: "#ef4444" }}
-                    title="Не удалось отправить — попробуйте ещё раз"
-                  >
-                    ✕ не отправилось
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onResendDms}
-                    disabled={resendPending}
-                    className="cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
-                    style={{ background: "#8b5cf61f", color: "#a78bfa" }}
-                    title={
-                      ver === null
-                        ? "Сверки ещё нет — завести её и выслать сводку с кнопками ✅/⚠️ оператору и владельцу в Telegram"
-                        : "Выслать сводку сверки с кнопками ✅/⚠️ оператору и владельцу в Telegram (если сообщение потерялось)"
-                    }
-                  >
-                    {resendPending ? "…" : ver === null ? "➕ завести сверку и выслать в TG" : "📤 выслать сверку в TG"}
-                  </button>
-                )
-              )}
             </div>
-
-            {/* Task 114: visible audit notes — the reasons must not hide behind
-                a hover tooltip (Paul reads these on the phone). */}
-            {ver && ver !== "verified" && (rental.verificationAudit?.notes?.length ?? 0) > 0 && (
-              <ul className="mt-2.5 space-y-1 pl-1">
-                {rental.verificationAudit!.notes!.map((n, i) => (
-                  <li
-                    key={i}
-                    className="text-[11px] leading-snug"
-                    style={{ color: rental.verificationAudit?.grade === "sus" ? "#ef4444" : "#f59e0b" }}
-                  >
-                    • {n}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </div>
         <button
@@ -547,23 +425,53 @@ export function RentalDetailDrawer({
         </button>
       </div>
 
-      {/* 2. Primary actions */}
+      {/* 1b. Сверка комиссии — Task 126: the transparent math + quick actions,
+          FIRST section: on a closed rental this is what the reader came for.
+          The card owns its actions (server actions re-gate the owner role). */}
       <div className="mt-5">
-        <DrawerPrimaryActions
-          actions={primaryActions}
-          onAction={(a) => onAction(a as DrawerAction)}
+        <CommissionVerificationCard
+          slug={crewSlug || ""}
+          rentalId={rental.rental_id}
+          rentalStatus={rental.status}
+          commission={rental.verificationCommission}
+          verificationStatus={ver}
+          agreedSplit={rental.verificationAgreedSplit}
+          proposalOpen={rental.verificationProposalOpen}
+          audit={rental.verificationAudit}
+          canVerify={canVerify}
+          onChanged={onChanged}
           T={T}
         />
       </div>
+
+      {/* 2. Primary actions — Task 126: dead buttons don't render (see
+          primaryActions); completed rows collapse to «Открыть аренду» alone */}
+      {primaryActions.length > 0 && (
+        <div className="mt-5">
+          <DrawerPrimaryActions
+            actions={primaryActions}
+            onAction={(a) => onAction(a as DrawerAction)}
+            T={T}
+          />
+        </div>
+      )}
 
       {/* 3. SLA overview */}
       <div className="mt-5">
         <DrawerSlaOverview signals={sla} T={T} />
       </div>
 
-      {/* 4. Info grid */}
+      {/* 4. Info — Task 126: the flat tile wall split into two honest sections:
+          «Аренда» (who/when) + «Деньги» (what was paid). Both collapsible. */}
       <div className="mt-5">
-        <DrawerInfoGrid items={infoItems} T={T} />
+        <DrawerSection title="Аренда" icon={CalendarDays} T={T}>
+          <DrawerInfoGrid items={rentalInfoItems} T={T} />
+        </DrawerSection>
+      </div>
+      <div className="mt-4">
+        <DrawerSection title="Деньги" icon={Wallet} T={T}>
+          <DrawerInfoGrid items={moneyInfoItems} T={T} />
+        </DrawerSection>
       </div>
 
       {/* 4b. Gear panel (iter32) — the single surface for everything gear:

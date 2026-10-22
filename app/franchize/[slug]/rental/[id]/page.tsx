@@ -23,7 +23,11 @@ import { CrewHeader } from "../../../components/CrewHeader";
 import { FranchizeErrorBoundary } from "../../../components/ErrorBoundary";
 import { DisplayModeProvider } from "../../../components/DisplayModeContext";
 import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRentalLifecycleActions";
-import { VerificationResendButton } from "../../../components/VerificationResendButton";
+// Task 126: the full «Сверка комиссии» card (frozen math + quick actions)
+// replaces the bare resend strip on the rental page.
+import { CommissionVerificationCard } from "../../../components/CommissionVerificationCard";
+import { getVerificationStatusMap } from "../../../lib/rental-verify";
+import { verifyCrewAccess } from "../../../server-actions/shared/auth-helpers";
 // goodmorning-polish: removed FranchizePageShell import — replaced with plain <div>
 // to avoid backdrop-blur breaking position:fixed on QuickActionBar + excessive padding.
 import { FranchizeRentalDocumentsPanel } from "../../../components/FranchizeRentalDocumentsPanel";
@@ -281,6 +285,29 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
     ? await getRentalPageTodos(id, crew.id, { bootstrap: Boolean(viewerActorId) }).catch(() => null)
     : null;
   const rentalTodosData = rentalPageTodos?.success ? (rentalPageTodos.data ?? []) : [];
+
+  // Task 126: verification brief for the «Сверка комиссии» card — status +
+  // frozen commission numbers + audit. CODE REVIEW FIX #2: the client-side
+  // FranchizeRentalRoleGuard only HIDES rendering — props of hidden children
+  // still ride into the RSC flight payload. The brief (operator's commission
+  // breakdown + audit) must therefore be fetched ONLY for crew staff, and
+  // never embedded for renters/guests. verifyCrewAccess resolves the role
+  // server-side from the same actor cookie the client guard uses.
+  let verAccess: Awaited<ReturnType<typeof verifyCrewAccess>> | null = null;
+  if (rental.found && status === "completed") {
+    try {
+      verAccess = await verifyCrewAccess(resolvedSlug);
+    } catch {
+      verAccess = null;
+    }
+  }
+  const isCrewStaff = verAccess?.allowed === true;
+  const verBrief = rental.found && isCrewStaff
+    ? (await getVerificationStatusMap([rental.rentalId]).catch((e) => {
+        console.warn("[rental page] verification brief fetch failed (non-fatal):", e);
+        return null;
+      }))?.get(rental.rentalId) ?? null
+    : null;
 
   return (
     <main className="min-h-screen" style={surface.page}>
@@ -816,10 +843,12 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </div>
         </FranchizeRentalRoleGuard>
 
-        {/* Сверка расчёта — ручной запуск по закрытой аренде (owner-tier).
-            Дублирует entry points сверки: страница аренды теперь тоже может
-            инициировать раунд «✅/⚠️» без похода в аналитику. */}
-        {status === "completed" && (
+        {/* Сверка комиссии — Task 126: the transparent frozen math (the same
+            digits the Telegram DM carried) + the verification state + quick
+            actions (подтвердить / выслать), right on the rental page. The
+            card owns its actions; server actions re-gate the owner role.
+            Legacy bare «🤝 Сверка расчёта» strip is REPLACED by this card. */}
+        {status === "completed" && isCrewStaff && (
           <FranchizeRentalRoleGuard
             allowedRoles={["operator", "admin", "owner"]}
             ownerId={rental.ownerId}
@@ -829,17 +858,28 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             crewId={crew.id}
             crewSlug={resolvedSlug}
           >
-            <section className="rounded-2xl border p-3 flex flex-wrap items-center gap-2" style={surface.subtleCard}>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold" style={{ color: textPrimary }}>🤝 Сверка расчёта</p>
-                <p className="text-[11px]" style={{ color: textSecondary }}>
-                  Оператор и владелец получат личные сообщения с кнопками ✅/⚠️ по этой аренде.
-                </p>
-              </div>
-              <div className="ml-auto">
-                <VerificationResendButton slug={resolvedSlug} rentalId={rental.rentalId} />
-              </div>
-            </section>
+            <CommissionVerificationCard
+              slug={resolvedSlug}
+              rentalId={rental.rentalId}
+              rentalStatus={status}
+              commission={verBrief?.commission ?? null}
+              verificationStatus={verBrief?.status ?? null}
+              agreedSplit={verBrief?.agreedSplit ?? null}
+              proposalOpen={verBrief?.proposalOpen === true}
+              audit={verBrief?.audit ?? null}
+              canVerify={verAccess?.isOwner === true}
+              T={{
+                bg: "transparent",
+                bgCard: isAuto ? "var(--franchize-bg-card, #1a1a1a)" : (p?.bgCard || "#1a1a1a"),
+                bgElevated: isAuto ? "var(--franchize-bg-base, #232323)" : (p?.bgBase || "#232323"),
+                border: borderSoft,
+                borderSoft,
+                text: textPrimary,
+                textMuted: textSecondary,
+                textFaint: textSecondary,
+                accent: accent,
+              }}
+            />
           </FranchizeRentalRoleGuard>
         )}
 

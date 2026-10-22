@@ -3,6 +3,10 @@
 
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { z } from "zod";
+import type {
+  SplitParts,
+  VerificationCommissionBrief,
+} from "@/app/franchize/lib/rental-verify-core";
 // v3 polish: centralized notification template builders (with HTML escaping + status-aware emojis)
 import {
   buildRentalStatusChangeMessage,
@@ -84,6 +88,10 @@ export interface RentalDashboardItem {
   verificationProposalOpen?: boolean;
   /** Task 106: the row was verified with a NEGOTIATED (corrected) split. */
   verificationAdjusted?: boolean;
+  /** Task 126: frozen commission numbers (snapshot) — the сверка card data. */
+  verificationCommission?: VerificationCommissionBrief | null;
+  /** Task 126: negotiated split after an accepted proposal (сверка card). */
+  verificationAgreedSplit?: SplitParts | null;
   // Resolved operator display name (username/full_name from public.users)
   operatorName?: string | null;
   // iter20: resolved partner-owner label ("@username · Full Name") for
@@ -800,6 +808,8 @@ export async function getRentalsDashboard(input: {
             verificationProposalOpen: verificationMap.get(item.rental_id)?.proposalOpen === true,
             verificationAdjusted: !!verificationMap.get(item.rental_id)?.agreedSplit,
             verificationAudit: verificationMap.get(item.rental_id)?.audit ?? null,
+            verificationCommission: verificationMap.get(item.rental_id)?.commission ?? null,
+            verificationAgreedSplit: verificationMap.get(item.rental_id)?.agreedSplit ?? null,
           }));
         } catch (verErr) {
           console.warn("[rentals-dashboard] verification enrich failed (non-fatal):", verErr);
