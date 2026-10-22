@@ -13,6 +13,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { uploadSingleImage } from '@/app/rentals/actions';
+// HEIC-2026-10: shared client compressor — resizes AND converts HEIC/HEIF
+// (iPhone default) to JPEG before the raw server upload, which would
+// otherwise store an undisplayable .heic in the `rentals` bucket.
+import { reduceImageResolution } from '@/lib/client-image-compress';
 
 type Rental = Database['public']['Tables']['rentals']['Row'] & {
     vehicle: Database['public']['Tables']['cars']['Row'] | null;
@@ -49,13 +53,26 @@ const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string)
         if (!file) return;
         setIsUploading(true);
 
-        const formData = new FormData();
-        formData.append("bucketName", "rentals");
-        formData.append("file", file);
+        const toastId = toast.loading(`Обработка ${file.name}...`);
 
-        const toastId = toast.loading(`Загрузка ${file.name}...`);
-        
         try {
+            // Client-side compress (1400px / q0.70) + HEIC → JPEG conversion.
+            // Previously the raw file went straight to uploadSingleImage: HEIC
+            // landed in the bucket as an undisplayable file, and 10-12 MB
+            // originals burned mobile upload time.
+            const compressedBlob = await reduceImageResolution(file);
+            const compressedFile = new File(
+                [compressedBlob],
+                file.name.replace(/\.[^.]+$/, '.jpg'),
+                { type: 'image/jpeg' },
+            );
+
+            toast.loading(`Загрузка ${compressedFile.name}...`, { id: toastId });
+
+            const formData = new FormData();
+            formData.append("bucketName", "rentals");
+            formData.append("file", compressedFile);
+
             const result = await uploadSingleImage(formData);
             if (result.success && result.url) {
                 toast.success("Файл успешно загружен!", { id: toastId });
@@ -75,7 +92,7 @@ const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string)
             <Input 
                 id="photo-upload" 
                 type="file" 
-                accept="image/*" 
+                accept="image/*,.heic,.heif" 
                 capture="environment" 
                 onChange={handleFileChange} 
                 className="input-cyber" 

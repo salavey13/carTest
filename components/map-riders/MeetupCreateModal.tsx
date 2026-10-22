@@ -111,7 +111,8 @@ export function MeetupCreateModal({
 
   const pickPhoto = async (file: File | undefined | null) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+    if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif|hif)$/i.test(file.name)) {
+      // HEIC-фото с Android часто приходят с пустым file.type — проверяем и расширение
       toast.error("Это не похоже на фото — выбери изображение");
       return;
     }
@@ -186,7 +187,7 @@ export function MeetupCreateModal({
           <input
             ref={photoInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             className="hidden"
             onChange={(e) => {
               void pickPhoto(e.target.files?.[0]);

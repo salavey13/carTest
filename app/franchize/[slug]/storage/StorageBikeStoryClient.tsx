@@ -519,7 +519,7 @@ function MoveButton({
       {open ? (
         <div className="mt-2 w-full space-y-2 rounded-xl border p-2.5" style={{ borderColor: T.borderSoft, backgroundColor: T.bgElevated }}>
           <StoragePhotoStrip photos={upload.photos} onRemove={upload.removePhoto} onAdd={() => fileRef.current?.click()} T={T} />
-          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
           <input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -1037,7 +1037,7 @@ function PhotoFixationControl({
       {open ? (
         <div className="mt-2 space-y-2">
           <StoragePhotoStrip photos={upload.photos} onRemove={upload.removePhoto} onAdd={() => fileRef.current?.click()} T={T} />
-          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
           <input
             value={caption}
             onChange={(e) => setCaption(e.target.value)}

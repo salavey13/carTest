@@ -2,6 +2,17 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
+// Shared client compressor (lib/client-image-compress.ts) — handles HEIC/HEIF
+// via heic2any fallback on browsers without native HEIC decode (HEIC-2026-10).
+import { reduceImageResolution, MAX_INPUT_FILE_SIZE } from "@/lib/client-image-compress";
+
+/** HEIC files from Android often arrive with empty MIME — accept by extension too. */
+function looksLikeImage(file: File): boolean {
+  return (
+    file.type.startsWith("image/") ||
+    /\.(jpe?g|png|webp|heic|heif|hif|gif|bmp)$/i.test(file.name)
+  );
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -25,58 +36,6 @@ interface PhotoUploadButtonProps {
   onSuccess?: () => void;
 }
 
-/**
- * Уменьшает разрешение изображения (client-side).
- * Максимальный размер: 1920px по большей стороне.
- * Качество JPEG: 85%.
- */
-async function reduceImageResolution(file: File, maxSize = 1920): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) {
-      reject(new Error("Canvas context not available"));
-      return;
-    }
-
-    img.onload = () => {
-      let { width, height } = img;
-
-      // Уменьшаем если больше maxSize
-      if (width > maxSize || height > maxSize) {
-        if (width > height) {
-          height = Math.round((height * maxSize) / width);
-          width = maxSize;
-        } else {
-          width = Math.round((width * maxSize) / height);
-          height = maxSize;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error("Failed to create blob"));
-          }
-        },
-        "image/jpeg",
-        0.85
-      );
-    };
-
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
 export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: PhotoUploadButtonProps) {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -86,14 +45,15 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Валидация
-    if (!file.type.startsWith("image/")) {
+    // Валидация (HEIC-фото с Android часто приходят с пустым file.type —
+    // поэтому проверяем ещё и расширение)
+    if (!looksLikeImage(file)) {
       setMessage({ type: "error", text: "Пожалуйста, выберите изображение" });
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setMessage({ type: "error", text: "Файл слишком большой (макс. 10 МБ)" });
+    if (file.size > MAX_INPUT_FILE_SIZE) {
+      setMessage({ type: "error", text: "Файл слишком большой (макс. 25 МБ до сжатия)" });
       return;
     }
 
@@ -101,8 +61,9 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
     setMessage(null);
 
     try {
-      // 1. Уменьшаем разрешение
-      const reducedBlob = await reduceImageResolution(file);
+      // 1. Уменьшаем разрешение (1920px / q0.85 — прежние параметры OCR-флоу;
+      // HEIC конвертируется в JPEG внутри общей утилиты)
+      const reducedBlob = await reduceImageResolution(file, { maxSize: 1920, quality: 0.85 });
 
       // 2. Загружаем в Supabase Storage (docpix bucket)
       const storagePath = `${rentalId}/${docType}.jpg`;
@@ -168,7 +129,7 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         capture="environment" // Камера на мобильных
         onChange={handleFileSelect}
         disabled={uploading}

@@ -1702,7 +1702,7 @@ export function CommunityWallClient({ slug, crewName, botUsername, deeplinkBotUs
                 <input
                   ref={photoInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   multiple
                   className="hidden"
                   onChange={(e) => {

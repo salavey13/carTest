@@ -711,7 +711,7 @@ function StorageBikeCard({
               {STORAGE_STATUS_META[moveTarget].emoji} {MOVE_BUTTON_LABELS[moveTarget]} — фотофиксация
             </p>
             <StoragePhotoStrip photos={upload.photos} onRemove={upload.removePhoto} onAdd={() => fileRef.current?.click()} T={T} />
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void addMoveFiles(e.target.files); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(e) => { void addMoveFiles(e.target.files); e.target.value = ""; }} />
             <input
               value={moveMessage}
               onChange={(e) => setMoveMessage(e.target.value)}

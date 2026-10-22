@@ -722,7 +722,7 @@ function PhotoColumn({
           <input
             id={fileInputId}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
             multiple
             className="hidden"
             onChange={(e) => {

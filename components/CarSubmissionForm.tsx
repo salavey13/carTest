@@ -665,7 +665,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
               <label htmlFor={`file-${formId}`} className="btn input-cyber cursor-pointer p-2 border border-border rounded-md flex items-center">
               <VibeContentRenderer content="::FaUpload::" />&nbsp;Upload
             </label>
-            <input id={`file-${formId}`} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+            <input id={`file-${formId}`} type="file" accept="image/*,.heic,.heif" onChange={handleImageChange} className="hidden" />
             </div>
           </div>
         </div>
