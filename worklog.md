@@ -1121,3 +1121,19 @@ Work Log:
 Stage Summary:
 - HEIC (iPhone default) photos now upload successfully from every browser across all compressed upload surfaces; payload becomes .jpg + image/jpeg before hitting server pipelines.
 - Known limits: heic2any converts only still images (no HEIC bursts/multi-image in first pass — takes first frame); corrupt HEIC surfaces a clear RU toast advising screenshot/JPG.
+
+---
+Task ID: 127-sly13-landing
+Agent: Z.ai (IM session)
+Task: «Сделай как https://vip-bike.ru/orudjov-x-vlad ток про salavey13» — клон лендинга LEORUS (orudjov-x-vlad) про salavey13.
+
+Work Log:
+- Дисс: orudjov-x-vlad — standalone single-file HTML (2.3 МБ, nginx/Ubuntu, НЕ в репо): тёмная клубная эстетика, токены bg #0A0612 / cyan #00F0FF / magenta #FF2D9B / violet #8338EC, шрифты Unbounded + Manrope + JetBrains Mono, секции 01-07 (дуэт/направления/портфолио/партнёр/процесс/заявка/контакты), орбы+сканлайны+тикер.
+- public/salavey13.html — новый одностраничник в той же дизайн-системе, 86 КБ, без внешних картинок (CSS-арт монограммы вместо фото). Контент из repo-фактов: сезон-2026 (308 аренд, 31 ДКП ≈13 млн ₽, оборот ≈16,5 млн ₽, аудит октября), услуги sly13 (запуск 25/60к, vibe-сессии 5/7к, обучение 3к/ч, сопровождение 15к/мес), пайплайн (moto-selection, georg-electro, nn-mototeh-nn, djorudjov), oneBikePlsBot/oneSitePls.
+- Секции: hero (SLY|13 градиент, статы 308/4/16,5 млн, тикер) → 01 Разработчик (salavey13 + VIP BIKE боевой экипаж) → 02 Направления (4 карточки услуг с ценами) → 03 Кейсы (грид 6-col: VIP BIKE big LIVE + 5 экипажей + аналитика сезона + oneSitePls) → 04 Платформа (Не демо. Боевой софт.) → 05 Процесс (4 шага) → 06 Заявка (форма: имя/tg/задача/бюджет → копит текст в буфер и открывает t.me/SALAVEY13) → 07 Контакты (4 тайла) + футер.
+- Форма — статическая без бэкенда: success-текст + clipboard + Telegram. Исправлен баг display:flex vs [hidden] (успех-блок был виден по умолчанию).
+- Проверено скриншотами headless (desktop 1440 + mobile 390): hero, био, услуги, кейсы, платформа, процесс, форма, контакты, футер — вёрстка чистая, теги сбалансированы.
+- Файл для nginx-сервера (как orudjov-x-vlad): /home/z/my-project/download/salavey13.html — положить рядом с файлом orudjov-x-vlad, будет vip-bike.ru/salavey13.
+
+Stage Summary:
+- public/salavey13.html задеплоен в репо → после Vercel-деплоя доступен на vip-bike.ru/salavey13.html; для полного паритета с orudjov-x-vlad (vip-bike.ru/salavey13 без .html) — залить файл на nginx-сервер тем же способом, каким залит orudjov-x-vlad.

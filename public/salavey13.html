@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0A0612" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='26' fill='%230A0612'/%3E%3Ctext x='60' y='80' font-family='Arial Black, Arial, sans-serif' font-size='54' font-weight='900' fill='%2300F0FF' text-anchor='middle'%3ES13%3C/text%3E%3C/svg%3E" />
+  <title>SLY13 — платформы для живого проката · salavey13</title>
+  <meta name="description" content="SLY13 — платформа франшиз проката от salavey13. Софт, который каждый день работает на живом прокате VIP BIKE: 308 аренд за сезон. Запуск экипажей под ключ, vibe-сессии, обучение админов, сопровождение. Нижний Новгород." />
+  <meta property="og:title" content="SLY13 — платформы для живого проката · salavey13" />
+  <meta property="og:description" content="Софт, который работает на живом бизнесе: 308 аренд за сезон-2026. Запуск экипажей проката под ключ за 2 дня." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" />
+  <style>
+/* =============================================================
+   SLY13 — Landing (платформы для живого проката · salavey13)
+   Тёмная клубная эстетика, неоновые акценты
+   Версия: 20261022a
+   ============================================================= */
+
+/* =============================================================
+   1. TOKENS
+   ============================================================= */
+:root {
+  /* Surface */
+  --bg: #0A0612;
+  --bg-card: #15101F;
+  --bg-card-2: #1C1530;
+  --bg-deep: #050309;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.18);
+
+  /* Accents */
+  --cyan: #00F0FF;
+  --cyan-soft: rgba(0, 240, 255, 0.18);
+  --cyan-glow: rgba(0, 240, 255, 0.45);
+  --magenta: #FF2D9B;
+  --magenta-soft: rgba(255, 45, 155, 0.18);
+  --magenta-glow: rgba(255, 45, 155, 0.45);
+  --violet: #8338EC;
+  --violet-soft: rgba(131, 56, 236, 0.22);
+  --violet-glow: rgba(131, 56, 236, 0.45);
+
+  /* Text */
+  --text: #F5F2FF;
+  --text-mute: #9B92B0;
+  --text-faint: #6A617D;
+
+  /* Brand mint для логотипа VIP BIKE (НЕ доминирующий) */
+  --mint: #1CE6D4;
+
+  /* Gradients */
+  --grad-cyan: linear-gradient(135deg, #00F0FF 0%, #8338EC 100%);
+  --grad-magenta: linear-gradient(135deg, #FF2D9B 0%, #8338EC 100%);
+  --grad-mixed: linear-gradient(100deg, #00F0FF 0%, #8338EC 55%, #FF2D9B 100%);
+
+  /* Typography */
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Geometry */
+  --container: 1240px;
+  --gutter: 24px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* Motion */
+  --t-fast: 0.2s ease;
+  --t-med: 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* =============================================================
+   2. BASE
+   ============================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; overflow-x: hidden; scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body.no-scroll { overflow: hidden; }
+img, svg { display: block; }
+a { color: inherit; text-decoration: none; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+h1, h2, h3, h4, p { margin: 0; padding: 0; }
+button { font: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+input, select, textarea { font: inherit; color: inherit; }
+::selection { background: var(--cyan); color: var(--bg); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 4px; }
+
+.container { max-width: var(--container); margin: 0 auto; padding: 0 var(--gutter); position: relative; }
+.section { padding: 100px 0; position: relative; }
+
+/* =============================================================
+   3. BUTTONS
+   ============================================================= */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 24px;
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  border-radius: var(--r-pill); border: 1px solid transparent;
+  transition: transform var(--t-fast), box-shadow var(--t-fast), background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  cursor: pointer; text-align: left;
+}
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.btn--primary { background: var(--text); color: var(--bg); box-shadow: 0 8px 32px rgba(0, 240, 255, 0.18); }
+.btn--primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px var(--cyan-glow); background: var(--cyan); }
+.btn--ghost { background: transparent; color: var(--text); border-color: var(--line-strong); }
+.btn--ghost:hover { border-color: var(--cyan); color: var(--cyan); transform: translateY(-2px); }
+.btn--big { padding: 18px 32px; font-size: 14px; width: 100%; justify-content: space-between; }
+
+/* =============================================================
+   4. NAV
+   ============================================================= */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(10, 6, 18, 0);
+  backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0);
+  border-bottom: 1px solid transparent;
+  transition: background var(--t-med), border-color var(--t-med), backdrop-filter var(--t-med);
+}
+.nav.is-scrolled {
+  background: rgba(10, 6, 18, 0.78);
+  backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-bottom-color: var(--line);
+}
+.nav__inner { max-width: var(--container); margin: 0 auto; padding: 14px var(--gutter); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.nav__brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 0 0 auto; }
+.nav__x {
+  width: 38px; height: 38px;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px;
+  display: grid; place-items: center; position: relative; flex-shrink: 0;
+}
+.nav__x-mark {
+  font-family: var(--font-mono); font-weight: 700; font-size: 13px; line-height: 1;
+  background: var(--grad-mixed); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent; letter-spacing: -0.04em;
+}
+.nav__brand-text { display: flex; flex-direction: column; min-width: 0; }
+.nav__brand-name { font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: 0.02em; line-height: 1; white-space: nowrap; }
+.nav__brand-sub { font-family: var(--font-mono); font-size: 9px; color: var(--text-mute); letter-spacing: 0.2em; text-transform: uppercase; margin-top: 5px; white-space: nowrap; }
+.nav__links { display: flex; gap: 28px; align-items: center; }
+.nav__links a { font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--text-mute); position: relative; padding: 6px 0; }
+.nav__links a::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: var(--grad-cyan); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--t-fast);
+}
+.nav__links a:hover { color: var(--text); }
+.nav__links a:hover::after { transform: scaleX(1); }
+.nav__cta {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px;
+  background: var(--cyan); color: var(--bg); border-radius: var(--r-pill);
+  font-family: var(--font-display); font-weight: 800; font-size: 12px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  transition: transform var(--t-fast), box-shadow var(--t-fast); flex-shrink: 0;
+}
+.nav__cta:hover { transform: translateY(-2px); box-shadow: 0 8px 28px var(--cyan-glow); }
+.nav__cta-arr { width: 14px; height: 14px; }
+.nav__burger {
+  display: none; width: 40px; height: 40px;
+  flex-direction: column; justify-content: center; align-items: center; gap: 4px;
+  border-radius: 8px; background: var(--bg-card); border: 1px solid var(--line);
+}
+.nav__burger span { display: block; width: 18px; height: 1.5px; background: var(--text); transition: transform var(--t-fast), opacity var(--t-fast); }
+.nav__burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+.nav__burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.nav__burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
+.nav__mobile {
+  display: none; position: fixed; top: 70px; left: 0; right: 0; z-index: 99;
+  background: rgba(10, 6, 18, 0.96);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--line);
+  padding: 18px var(--gutter) 28px; flex-direction: column; gap: 14px;
+}
+.nav__mobile:not([hidden]) { display: flex; }
+.nav__mobile a { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.02em; padding: 6px 0; color: var(--text); }
+.nav__mobile-cta { background: var(--cyan); color: var(--bg) !important; border-radius: var(--r-pill); padding: 14px 24px !important; margin-top: 8px; text-align: center; }
+
+/* =============================================================
+   5. HERO
+   ============================================================= */
+.hero { position: relative; padding: 120px 0 0; overflow: hidden; isolation: isolate; }
+.hero__bg { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.hero__grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 30%, transparent 75%);
+}
+.hero__orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.55; animation: orbFloat 14s ease-in-out infinite; }
+.hero__orb--1 { top: -100px; right: -80px; width: 360px; height: 360px; background: var(--magenta); animation-delay: 0s; }
+.hero__orb--2 { bottom: 20%; left: -120px; width: 320px; height: 320px; background: var(--cyan); opacity: 0.4; animation-delay: -5s; }
+.hero__orb--3 { top: 40%; right: 30%; width: 280px; height: 280px; background: var(--violet); opacity: 0.45; animation-delay: -9s; }
+.hero__scan {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0, transparent 3px, rgba(255, 255, 255, 0.012) 3px, rgba(255, 255, 255, 0.012) 4px);
+  pointer-events: none;
+}
+.hero__inner { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 32px; padding-top: 40px; padding-bottom: 60px; }
+.hero__top { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero__chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-pill);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-mute); white-space: nowrap;
+}
+.hero__chip-dot { width: 7px; height: 7px; background: var(--cyan); border-radius: 50%; box-shadow: 0 0 12px var(--cyan); animation: pulse 1.6s ease-in-out infinite; flex-shrink: 0; }
+.hero__chip--ghost { background: transparent; color: var(--text-mute); }
+.hero__chip-line { width: 14px; height: 1px; background: var(--magenta); display: inline-block; }
+.hero__title {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: clamp(56px, 12vw, 160px);
+  line-height: 0.9; letter-spacing: -0.04em; color: var(--text);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.18em;
+}
+.hero__title-line { display: inline-block; }
+.hero__title-line--alt { background: var(--grad-cyan); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.hero__title-tag {
+  width: 100%; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(20px, 4.2vw, 48px); line-height: 1.05; letter-spacing: -0.02em;
+  color: var(--text-mute); margin-top: 16px;
+}
+.hero__title-tag::before { content: '— '; color: var(--magenta); }
+.hero__sub { font-family: var(--font-body); font-size: clamp(15px, 2.1vw, 19px); line-height: 1.55; color: var(--text-mute); max-width: 640px; }
+.hero__sub b { color: var(--text); font-weight: 700; }
+.hero__cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.hero__stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 24px 0;
+}
+.hero__stats li { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 0 4px; border-right: 1px solid var(--line); }
+.hero__stats li:last-child { border-right: none; }
+.hero__stat-num {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: clamp(22px, 4vw, 36px); line-height: 1; letter-spacing: -0.02em;
+  background: var(--grad-mixed); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.hero__stat-lbl { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); letter-spacing: 0.06em; line-height: 1.4; }
+.hero__ticker {
+  position: relative; z-index: 1; margin-top: 12px;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: var(--bg-card); padding: 14px 0; overflow: hidden;
+}
+.hero__ticker-track {
+  display: inline-flex; align-items: center; gap: 28px; white-space: nowrap;
+  animation: tickerScroll 40s linear infinite;
+  font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: 0.02em;
+  color: var(--text-mute); padding-left: 28px;
+}
+.hero__ticker-track .dot { width: 6px; height: 6px; background: var(--magenta); border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+/* =============================================================
+   6. SECTION HEADS
+   ============================================================= */
+.sec-head { margin-bottom: 56px; max-width: 800px; }
+.sec-head--row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; max-width: 100%; }
+.sec-head__eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--cyan); margin-bottom: 18px;
+}
+.sec-head__eyebrow::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--cyan); }
+.sec-head__title {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: clamp(32px, 5.4vw, 64px); line-height: 1.0; letter-spacing: -0.03em;
+  color: var(--text); margin-bottom: 16px;
+}
+.sec-head__title em { font-style: normal; background: var(--grad-cyan); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.sec-head__sub { font-family: var(--font-body); font-size: 17px; line-height: 1.55; color: var(--text-mute); max-width: 640px; }
+.sec-head__sub--side { max-width: 360px; margin-bottom: 8px; }
+
+/* =============================================================
+   7. BIO (01 / РАЗРАБОТЧИК) — двухкарточная сетка
+   ============================================================= */
+.bio { background: var(--bg-deep); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.bio__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.bio-card {
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-xl);
+  overflow: hidden; display: flex; flex-direction: column;
+  transition: transform var(--t-med), border-color var(--t-med), box-shadow var(--t-med);
+}
+.bio-card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
+.bio-card--dev:hover { border-color: var(--cyan); box-shadow: 0 24px 60px var(--cyan-soft); }
+.bio-card--crew:hover { border-color: var(--magenta); box-shadow: 0 24px 60px var(--magenta-soft); }
+.bio-card__media {
+  aspect-ratio: 16 / 7; position: relative; overflow: hidden;
+  display: grid; place-items: center;
+}
+.bio-card__media--dev {
+  background:
+    radial-gradient(ellipse 60% 90% at 20% 20%, var(--cyan-soft), transparent 60%),
+    radial-gradient(ellipse 50% 80% at 85% 70%, var(--violet-soft), transparent 60%),
+    linear-gradient(160deg, #141026 0%, #0A0612 100%);
+}
+.bio-card__media--crew {
+  background:
+    radial-gradient(ellipse 60% 90% at 80% 20%, var(--magenta-soft), transparent 60%),
+    radial-gradient(ellipse 50% 80% at 15% 75%, var(--violet-soft), transparent 60%),
+    linear-gradient(200deg, #1A0F1C 0%, #0A0612 100%);
+}
+.bio-card__media::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0, transparent 3px, rgba(255,255,255,0.014) 3px, rgba(255,255,255,0.014) 4px);
+}
+.bio-card__monogram {
+  font-family: var(--font-display); font-weight: 900; font-size: clamp(64px, 9vw, 120px);
+  letter-spacing: -0.02em; line-height: 1;
+  color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, 0.16);
+  user-select: none;
+}
+.bio-card--dev .bio-card__monogram { -webkit-text-stroke-color: rgba(0, 240, 255, 0.35); text-shadow: 0 0 60px var(--cyan-glow); }
+.bio-card--crew .bio-card__monogram { -webkit-text-stroke-color: rgba(255, 45, 155, 0.35); text-shadow: 0 0 60px var(--magenta-glow); }
+.bio-card__badge {
+  position: absolute; top: 16px; right: 16px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: rgba(5, 3, 9, 0.6); color: var(--text-mute);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bio-card--dev .bio-card__badge { color: var(--cyan); border-color: var(--cyan-soft); }
+.bio-card--crew .bio-card__badge { color: var(--magenta); border-color: var(--magenta-soft); }
+.bio-card__body { padding: 28px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.bio-card__head { display: flex; flex-direction: column; gap: 6px; }
+.bio-card__role { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-mute); }
+.bio-card--dev .bio-card__role { color: var(--cyan); }
+.bio-card--crew .bio-card__role { color: var(--magenta); }
+.bio-card__name { font-family: var(--font-display); font-weight: 900; font-size: 30px; line-height: 1; letter-spacing: -0.02em; color: var(--text); }
+.bio-card__desc { font-family: var(--font-body); font-size: 15px; line-height: 1.6; color: var(--text-mute); }
+.bio-card__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.bio-card__tags li {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 5px 10px; background: var(--bg-card-2); border: 1px solid var(--line); border-radius: var(--r-pill);
+  color: var(--text-mute);
+}
+.bio-card__contacts { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 18px; border-top: 1px solid var(--line); }
+.bio-card__contact { display: flex; align-items: center; gap: 10px; font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--text); padding: 6px 0; transition: color var(--t-fast); }
+.bio-card__contact svg { width: 16px; height: 16px; flex-shrink: 0; }
+.bio-card--dev .bio-card__contact:hover { color: var(--cyan); }
+.bio-card--crew .bio-card__contact:hover { color: var(--magenta); }
+
+/* =============================================================
+   8. DIRECTIONS (02 / НАПРАВЛЕНИЯ)
+   ============================================================= */
+.dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.dir-card {
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 32px; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 18px;
+  transition: transform var(--t-med), border-color var(--t-med);
+}
+.dir-card::before {
+  content: ''; position: absolute; top: -100px; right: -100px; width: 240px; height: 240px;
+  border-radius: 50%; filter: blur(60px); opacity: 0.25; z-index: 0;
+  transition: opacity var(--t-med);
+}
+.dir-card:hover { transform: translateY(-4px); }
+.dir-card:hover::before { opacity: 0.45; }
+.dir-card > * { position: relative; z-index: 1; }
+.dir-card--launch::before { background: var(--cyan); }
+.dir-card--launch:hover { border-color: var(--cyan); }
+.dir-card--vibe::before { background: var(--magenta); }
+.dir-card--vibe:hover { border-color: var(--magenta); }
+.dir-card--edu::before { background: var(--violet); }
+.dir-card--edu:hover { border-color: var(--violet); }
+.dir-card--care::before { background: var(--mint); }
+.dir-card--care:hover { border-color: var(--mint); }
+.dir-card__num { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: var(--text-faint); }
+.dir-card__icon {
+  width: 56px; height: 56px; display: grid; place-items: center;
+  border-radius: var(--r-md); background: var(--bg-card-2); border: 1px solid var(--line);
+}
+.dir-card__icon svg { width: 28px; height: 28px; }
+.dir-card--launch .dir-card__icon { color: var(--cyan); border-color: var(--cyan-soft); }
+.dir-card--vibe .dir-card__icon { color: var(--magenta); border-color: var(--magenta-soft); }
+.dir-card--edu .dir-card__icon { color: var(--violet); border-color: var(--violet-soft); }
+.dir-card--care .dir-card__icon { color: var(--mint); border-color: rgba(28, 230, 212, 0.22); }
+.dir-card__title { font-family: var(--font-display); font-weight: 900; font-size: clamp(22px, 2.6vw, 30px); line-height: 1.05; letter-spacing: -0.02em; color: var(--text); }
+.dir-card__desc { font-family: var(--font-body); font-size: 15px; line-height: 1.55; color: var(--text-mute); max-width: 460px; }
+.dir-card__list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.dir-card__list li {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; min-width: 0;
+}
+.dir-card__list li span { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); letter-spacing: 0.08em; text-transform: uppercase; flex-shrink: 0; }
+.dir-card__list li strong { font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: -0.01em; color: var(--text); text-align: right; }
+.dir-card--launch .dir-card__list li strong { color: var(--cyan); }
+.dir-card--vibe .dir-card__list li strong { color: var(--magenta); }
+.dir-card--edu .dir-card__list li strong { color: var(--violet); }
+.dir-card--care .dir-card__list li strong { color: var(--mint); }
+.dir-card__more {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: auto;
+  font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text); transition: color var(--t-fast), gap var(--t-fast);
+}
+.dir-card__more svg { width: 16px; height: 16px; }
+.dir-card--launch .dir-card__more:hover { color: var(--cyan); gap: 12px; }
+.dir-card--vibe .dir-card__more:hover { color: var(--magenta); gap: 12px; }
+.dir-card--edu .dir-card__more:hover { color: var(--violet); gap: 12px; }
+.dir-card--care .dir-card__more:hover { color: var(--mint); gap: 12px; }
+
+/* =============================================================
+   9. PORTFOLIO (03 / КЕЙСЫ)
+   ============================================================= */
+.port-grid { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 180px; gap: 14px; }
+.port-card {
+  position: relative; overflow: hidden; border-radius: var(--r-lg);
+  border: 1px solid var(--line); background: var(--bg-card);
+  display: grid; place-items: center;
+  transition: transform var(--t-med), border-color var(--t-med), box-shadow var(--t-med);
+}
+.port-card--big { grid-column: span 4; grid-row: span 2; }
+.port-card--wide { grid-column: span 3; }
+.port-card--half { grid-column: span 2; }
+.port-card:hover { transform: translateY(-3px); }
+.port-card--magenta:hover { border-color: var(--magenta); box-shadow: 0 20px 50px var(--magenta-soft); }
+.port-card--cyan:hover { border-color: var(--cyan); box-shadow: 0 20px 50px var(--cyan-soft); }
+.port-card--violet:hover { border-color: var(--violet); box-shadow: 0 20px 50px var(--violet-soft); }
+.port-card--mint:hover { border-color: var(--mint); box-shadow: 0 20px 50px rgba(28, 230, 212, 0.2); }
+.port-card__media { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+.port-card__media::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0, transparent 3px, rgba(255,255,255,0.012) 3px, rgba(255,255,255,0.012) 4px);
+}
+.port-card__bg { font-family: var(--font-display); font-weight: 900; font-size: clamp(90px, 14vw, 200px); line-height: 1; color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,0.1); user-select: none; }
+.port-card--magenta .port-card__media { background: radial-gradient(ellipse 70% 100% at 75% 25%, var(--magenta-soft), transparent 65%), linear-gradient(160deg, #1C1022 0%, #0A0612 100%); }
+.port-card--magenta .port-card__bg { -webkit-text-stroke-color: rgba(255, 45, 155, 0.22); }
+.port-card--cyan .port-card__media { background: radial-gradient(ellipse 70% 100% at 25% 25%, var(--cyan-soft), transparent 65%), linear-gradient(200deg, #0E1524 0%, #0A0612 100%); }
+.port-card--cyan .port-card__bg { -webkit-text-stroke-color: rgba(0, 240, 255, 0.22); }
+.port-card--violet .port-card__media { background: radial-gradient(ellipse 70% 100% at 60% 30%, var(--violet-soft), transparent 65%), linear-gradient(140deg, #140F26 0%, #0A0612 100%); }
+.port-card--violet .port-card__bg { -webkit-text-stroke-color: rgba(131, 56, 236, 0.3); }
+.port-card--mint .port-card__media { background: radial-gradient(ellipse 70% 100% at 30% 30%, rgba(28, 230, 212, 0.16), transparent 65%), linear-gradient(220deg, #0B1A1C 0%, #0A0612 100%); }
+.port-card--mint .port-card__bg { -webkit-text-stroke-color: rgba(28, 230, 212, 0.24); }
+.port-card__overlay {
+  position: absolute; inset: 0; padding: 22px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: linear-gradient(180deg, transparent 30%, rgba(10, 6, 18, 0.92) 100%);
+}
+.port-card__year { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 8px; }
+.port-card--magenta .port-card__year { color: var(--magenta); }
+.port-card--cyan .port-card__year { color: var(--cyan); }
+.port-card--violet .port-card__year { color: var(--violet); }
+.port-card--mint .port-card__year { color: var(--mint); }
+.port-card__title { font-family: var(--font-display); font-weight: 900; font-size: clamp(20px, 2.4vw, 28px); line-height: 1.05; letter-spacing: -0.02em; color: var(--text); margin-bottom: 6px; }
+.port-card__meta { font-family: var(--font-body); font-size: 13px; line-height: 1.4; color: var(--text-mute); max-width: 520px; }
+.port-card__tag {
+  position: absolute; top: 16px; right: 16px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 6px 12px; border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: rgba(5, 3, 9, 0.6); color: var(--text-mute);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.port-card--magenta .port-card__tag { color: var(--magenta); border-color: var(--magenta-soft); }
+.port-card--cyan .port-card__tag { color: var(--cyan); border-color: var(--cyan-soft); }
+.port-card--violet .port-card__tag { color: var(--violet); border-color: var(--violet-soft); }
+.port-card--mint .port-card__tag { color: var(--mint); border-color: rgba(28, 230, 212, 0.25); }
+.port-card--live .port-card__tag::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--magenta); box-shadow: 0 0 10px var(--magenta); margin-right: 7px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
+
+/* =============================================================
+   10. PLATFORM (04 / ПЛАТФОРМА)
+   ============================================================= */
+.platform { background: var(--bg); }
+.platform-card {
+  display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: center;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 48px; position: relative; overflow: hidden; isolation: isolate;
+}
+.platform-card::before {
+  content: ''; position: absolute; top: -50%; right: -10%; width: 400px; height: 400px;
+  background: var(--cyan); opacity: 0.08; filter: blur(80px); z-index: -1;
+}
+.platform-card__left { display: flex; flex-direction: column; gap: 16px; }
+.platform-card__eyebrow { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--cyan); }
+.platform-card__title { font-family: var(--font-display); font-weight: 900; font-size: clamp(28px, 3.6vw, 44px); line-height: 1.05; letter-spacing: -0.02em; color: var(--text); }
+.platform-card__desc { font-family: var(--font-body); font-size: 16px; line-height: 1.6; color: var(--text-mute); max-width: 560px; }
+.platform-card__chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.platform-card__chips li {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 7px 12px; border-radius: var(--r-pill); background: var(--bg-card-2); border: 1px solid var(--line); color: var(--text-mute);
+}
+.platform-card__btn { margin-top: 10px; align-self: flex-start; }
+.platform-card__right { display: grid; place-items: center; gap: 14px; }
+.platform-card__logo {
+  width: 240px; height: 240px; max-width: 100%;
+  background: var(--bg-deep); border: 1px solid var(--line); border-radius: var(--r-lg);
+  display: grid; place-items: center; position: relative; overflow: hidden;
+}
+.platform-card__logo::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 70% 70% at 50% 40%, var(--cyan-soft), transparent 70%);
+}
+.platform-card__logo-mark {
+  font-family: var(--font-display); font-weight: 900; font-size: 72px; letter-spacing: -0.02em;
+  background: var(--grad-cyan); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.platform-card__logo-sub { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint); position: relative; }
+.platform-card__href { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-mute); text-align: center; }
+.platform-card__href:hover { color: var(--cyan); }
+
+/* =============================================================
+   11. PROCESS (05 / ПРОЦЕСС)
+   ============================================================= */
+.proc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.proc-step {
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 32px 28px; display: flex; flex-direction: column; gap: 14px; position: relative;
+  transition: transform var(--t-med), border-color var(--t-med);
+}
+.proc-step:hover { transform: translateY(-4px); border-color: var(--line-strong); }
+.proc-step:hover .proc-step__num { color: var(--cyan); }
+.proc-step__num { font-family: var(--font-display); font-weight: 900; font-size: 40px; line-height: 1; letter-spacing: -0.02em; color: var(--text-faint); transition: color var(--t-med); }
+.proc-step__title { font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 1.1; letter-spacing: -0.01em; color: var(--text); }
+.proc-step__desc { font-family: var(--font-body); font-size: 14px; line-height: 1.55; color: var(--text-mute); }
+
+/* =============================================================
+   12. CTA / FORM (06 / ЗАЯВКА)
+   ============================================================= */
+.cta-card {
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 56px; position: relative; overflow: hidden; isolation: isolate;
+}
+.cta-card::before {
+  content: ''; position: absolute; top: -200px; right: -200px; width: 500px; height: 500px;
+  background: var(--magenta); opacity: 0.15; filter: blur(100px); z-index: -1;
+}
+.cta-card::after {
+  content: ''; position: absolute; bottom: -200px; left: -200px; width: 500px; height: 500px;
+  background: var(--cyan); opacity: 0.12; filter: blur(100px); z-index: -1;
+}
+.cta-card__head { margin-bottom: 36px; max-width: 640px; }
+.cta-card__eyebrow { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--cyan); margin-bottom: 16px; display: inline-flex; align-items: center; gap: 10px; }
+.cta-card__eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--cyan); display: inline-block; }
+.cta-card__title { font-family: var(--font-display); font-weight: 900; font-size: clamp(32px, 4.4vw, 56px); line-height: 1.0; letter-spacing: -0.03em; color: var(--text); margin-bottom: 14px; }
+.cta-card__sub { font-family: var(--font-body); font-size: 16px; line-height: 1.55; color: var(--text-mute); }
+.cta-form { display: flex; flex-direction: column; gap: 16px; }
+.cta-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.cta-form__field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cta-form__field--full { grid-column: 1 / -1; }
+.cta-form__lbl { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-mute); }
+.cta-form__field input, .cta-form__field select, .cta-form__field textarea {
+  background: var(--bg-deep); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 14px 16px; font-family: var(--font-body); font-size: 15px; color: var(--text);
+  transition: border-color var(--t-fast), background var(--t-fast);
+  width: 100%;
+}
+.cta-form__field select {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3 6l5 5 5-5' fill='none' stroke='%239B92B0' stroke-width='1.5'/></svg>");
+  background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;
+}
+.cta-form__field textarea { resize: vertical; min-height: 80px; }
+.cta-form__field input:focus, .cta-form__field select:focus, .cta-form__field textarea:focus { outline: none; border-color: var(--cyan); background: var(--bg-card); }
+.cta-form__field input::placeholder, .cta-form__field textarea::placeholder { color: var(--text-faint); }
+.cta-form__bottom { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+.cta-form__note { font-family: var(--font-body); font-size: 12px; color: var(--text-faint); line-height: 1.4; max-width: 380px; }
+.cta-form__success[hidden] { display: none; }
+.cta-form__success {
+  display: flex; align-items: center; gap: 12px; margin-top: 16px;
+  padding: 18px 22px; background: var(--cyan-soft); border: 1px solid var(--cyan); border-radius: var(--r-md);
+  font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--text);
+}
+.cta-form__success svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--cyan); }
+
+/* =============================================================
+   13. CONTACTS (07 / КОНТАКТЫ)
+   ============================================================= */
+.contacts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.contact-tile {
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 28px 24px; display: flex; flex-direction: column; gap: 18px;
+  transition: transform var(--t-med), border-color var(--t-med);
+}
+.contact-tile:hover { transform: translateY(-3px); }
+.contact-tile--dev:hover { border-color: var(--cyan); }
+.contact-tile--crew:hover { border-color: var(--magenta); }
+.contact-tile--bot:hover { border-color: var(--violet); }
+.contact-tile--place:hover { border-color: var(--mint); }
+.contact-tile__head { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.contact-tile__initials {
+  width: 48px; height: 48px; display: grid; place-items: center; flex-shrink: 0;
+  background: var(--bg-card-2); border: 1px solid var(--line); border-radius: var(--r-md);
+  font-family: var(--font-display); font-weight: 800; font-size: 14px;
+}
+.contact-tile--dev .contact-tile__initials { color: var(--cyan); border-color: var(--cyan-soft); }
+.contact-tile--crew .contact-tile__initials { color: var(--magenta); border-color: var(--magenta-soft); }
+.contact-tile--bot .contact-tile__initials { color: var(--violet); border-color: var(--violet-soft); }
+.contact-tile--place .contact-tile__initials { color: var(--mint); border-color: rgba(28, 230, 212, 0.22); }
+.contact-tile__role { display: block; font-family: var(--font-display); font-weight: 800; font-size: 15px; line-height: 1.1; color: var(--text); margin-bottom: 4px; }
+.contact-tile__sub { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute); }
+.contact-tile__main { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 15px; line-height: 1.2; color: var(--text); transition: color var(--t-fast); }
+.contact-tile__main svg { width: 16px; height: 16px; flex-shrink: 0; }
+.contact-tile--dev .contact-tile__main:hover { color: var(--cyan); }
+.contact-tile--crew .contact-tile__main:hover { color: var(--magenta); }
+.contact-tile--bot .contact-tile__main:hover { color: var(--violet); }
+.contact-tile--place .contact-tile__main:hover { color: var(--mint); }
+.contact-tile__links { display: flex; flex-wrap: wrap; gap: 8px 16px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-top: auto; }
+.contact-tile__links a { color: var(--text-mute); transition: color var(--t-fast); }
+.contact-tile__links a:hover { color: var(--text); }
+
+/* =============================================================
+   14. FOOTER
+   ============================================================= */
+.footer { background: var(--bg); border-top: 1px solid var(--line); padding: 56px 0 28px; color: var(--text-mute); }
+.footer__top { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; padding-bottom: 32px; border-bottom: 1px solid var(--line); }
+.footer__brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.footer__x {
+  width: 48px; height: 48px; display: grid; place-items: center; flex-shrink: 0;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px;
+  font-family: var(--font-mono); font-weight: 700; font-size: 15px;
+  background-clip: padding-box;
+}
+.footer__x-mark { background: var(--grad-mixed); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+.footer__name { display: block; font-family: var(--font-display); font-weight: 900; font-size: 20px; line-height: 1; letter-spacing: 0.01em; color: var(--text); }
+.footer__sub { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-mute); margin-top: 6px; }
+.footer__cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.footer__col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.footer__col-head { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 4px; }
+.footer__col a, .footer__col span { font-family: var(--font-body); font-size: 14px; color: var(--text-mute); line-height: 1.4; }
+.footer__col a:hover { color: var(--text); }
+.footer__bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 24px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; }
+.footer__bottom a { color: var(--mint); }
+.footer__bottom a:hover { color: var(--text); }
+
+/* =============================================================
+   15. KEYFRAMES
+   ============================================================= */
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 30px) scale(0.95); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes tickerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* =============================================================
+   16. RESPONSIVE
+   ============================================================= */
+@media (max-width: 1100px) {
+  .port-grid { grid-template-columns: repeat(4, 1fr); }
+  .port-card--big { grid-column: span 4; }
+  .port-card--half { grid-column: span 2; }
+  .port-card--wide { grid-column: span 4; }
+}
+@media (max-width: 920px) {
+  .section { padding: 72px 0; }
+  .nav__links, .nav__cta { display: none; }
+  .nav__burger { display: flex; }
+  .bio__grid { grid-template-columns: 1fr; }
+  .dir-grid { grid-template-columns: 1fr; }
+  .proc-grid { grid-template-columns: repeat(2, 1fr); }
+  .contacts-grid { grid-template-columns: repeat(2, 1fr); }
+  .platform-card { grid-template-columns: 1fr; padding: 36px 28px; }
+  .platform-card__right { padding: 8px 0 0; }
+  .cta-card { padding: 40px 28px; }
+  .footer__top { grid-template-columns: 1fr; gap: 28px; }
+}
+@media (max-width: 720px) {
+  .hero { padding-top: 96px; }
+  .hero__inner { padding-top: 24px; padding-bottom: 40px; }
+  .hero__stats { grid-template-columns: 1fr; gap: 16px; }
+  .hero__stats li { border-right: none; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+  .hero__stats li:last-child { border-bottom: none; padding-bottom: 0; }
+  .hero__ticker-track { font-size: 14px; }
+  .hero__cta-row .btn { width: 100%; justify-content: space-between; }
+  .port-grid { grid-template-columns: 1fr; grid-auto-rows: 160px; }
+  .port-card--big, .port-card--half, .port-card--wide { grid-column: span 1; grid-row: span 1; }
+  .port-card--big { min-height: 260px; }
+  .proc-grid { grid-template-columns: 1fr; }
+  .contacts-grid { grid-template-columns: 1fr; }
+  .cta-form__row { grid-template-columns: 1fr; }
+  .cta-card { padding: 32px 20px; }
+  .bio-card__body { padding: 22px 20px; }
+  .footer__cols { grid-template-columns: 1fr; }
+  .footer__bottom { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  html { scroll-behavior: auto; }
+}
+  </style>
+</head>
+<body>
+
+<!-- ================= NAV ================= -->
+<header class="nav" id="nav">
+  <div class="nav__inner">
+    <a class="nav__brand" href="#top" aria-label="SLY13 — на главную">
+      <span class="nav__x"><span class="nav__x-mark">S13</span></span>
+      <span class="nav__brand-text">
+        <span class="nav__brand-name">SLY13</span>
+        <span class="nav__brand-sub">Софт для живого проката · НН</span>
+      </span>
+    </a>
+    <nav class="nav__links" aria-label="Главное меню">
+      <a href="#bio">О себе</a>
+      <a href="#services">Услуги</a>
+      <a href="#portfolio">Кейсы</a>
+      <a href="#platform">Платформа</a>
+      <a href="#process">Процесс</a>
+      <a href="#contacts">Контакты</a>
+    </nav>
+    <a class="nav__cta" href="#cta">
+      Обсудить проект
+      <svg class="nav__cta-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <button class="nav__burger" data-burger aria-label="Открыть меню" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+<div class="nav__mobile" data-mobile-menu hidden>
+  <a href="#bio">О себе</a>
+  <a href="#services">Услуги</a>
+  <a href="#portfolio">Кейсы</a>
+  <a href="#platform">Платформа</a>
+  <a href="#process">Процесс</a>
+  <a href="#contacts">Контакты</a>
+  <a class="nav__mobile-cta" href="#cta">Обсудить проект</a>
+</div>
+
+<main id="top">
+
+  <!-- ================= HERO ================= -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero__bg">
+      <div class="hero__grid"></div>
+      <div class="hero__orb hero__orb--1"></div>
+      <div class="hero__orb hero__orb--2"></div>
+      <div class="hero__orb hero__orb--3"></div>
+      <div class="hero__scan"></div>
+    </div>
+    <div class="container hero__inner">
+      <div class="hero__top">
+        <span class="hero__chip"><span class="hero__chip-dot"></span>Платформа франшиз проката · Нижний Новгород</span>
+        <span class="hero__chip hero__chip--ghost"><span class="hero__chip-line"></span>VIP BIKE уже на платформе</span>
+      </div>
+      <h1 class="hero__title" id="hero-title">
+        <span class="hero__title-line">SLY</span><span class="hero__title-line hero__title-line--alt">13</span>
+        <span class="hero__title-tag">софт, который работает на живом прокате.</span>
+      </h1>
+      <p class="hero__sub">
+        Пишу платформу, на которой каждый день крутится прокат электробайков <b>VIP BIKE</b>:
+        заказы из Telegram Mini App, договоры DOCX с OCR паспорта и ВУ, депозиты, касса, смены и зарплаты.
+        Сначала софт вывел свой экипаж на <b>308 аренд за сезон</b> — теперь запускаю на нём другие экипажи.
+      </p>
+      <div class="hero__cta-row">
+        <a class="btn btn--primary" href="#cta">
+          Обсудить проект
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn--ghost" href="#portfolio">
+          Смотреть кейсы
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+        </a>
+      </div>
+      <ul class="hero__stats">
+        <li>
+          <span class="hero__stat-num">308</span>
+          <span class="hero__stat-lbl">аренд за сезон-2026<br>май → октябрь, боевой экипаж</span>
+        </li>
+        <li>
+          <span class="hero__stat-num">4</span>
+          <span class="hero__stat-lbl">экипажа на витрине<br>+ пайплайн на подходе</span>
+        </li>
+        <li>
+          <span class="hero__stat-num">≈ 16,5 млн ₽</span>
+          <span class="hero__stat-lbl">оборот кассы за сезон<br>считается в один экран</span>
+        </li>
+      </ul>
+    </div>
+    <div class="hero__ticker" aria-hidden="true">
+      <div class="hero__ticker-track">
+        <span>VIP BIKE · боевой экипаж</span><span class="dot"></span>
+        <span>TELEGRAM MINI APP</span><span class="dot"></span>
+        <span>308 аренд за сезон</span><span class="dot"></span>
+        <span>ФРАНШИЗЫ ПОД КЛЮЧ</span><span class="dot"></span>
+        <span>NEXT.JS + SUPABASE</span><span class="dot"></span>
+        <span>OCR ДОГОВОРЫ</span><span class="dot"></span>
+        <span>КАССА И ЗАРПЛАТЫ</span><span class="dot"></span>
+        <span>ONEBIKEPLSBOT</span><span class="dot"></span>
+        <span>VIP BIKE · боевой экипаж</span><span class="dot"></span>
+        <span>TELEGRAM MINI APP</span><span class="dot"></span>
+        <span>308 аренд за сезон</span><span class="dot"></span>
+        <span>ФРАНШИЗЫ ПОД КЛЮЧ</span><span class="dot"></span>
+        <span>NEXT.JS + SUPABASE</span><span class="dot"></span>
+        <span>OCR ДОГОВОРЫ</span><span class="dot"></span>
+        <span>КАССА И ЗАРПЛАТЫ</span><span class="dot"></span>
+        <span>ONEBIKEPLSBOT</span><span class="dot"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 01 / РАЗРАБОТЧИК ================= -->
+  <section class="bio section" id="bio" aria-labelledby="bio-title">
+    <div class="container">
+      <div class="sec-head">
+        <p class="sec-head__eyebrow">01 / Разработчик</p>
+        <h2 class="sec-head__title" id="bio-title">Один за экраном.<br><em>Вся система на месте.</em></h2>
+        <p class="sec-head__sub">
+          salavey13 — разработчик, который сам живёт на своём софте. Платформа SLY13 сначала вывела
+          собственный прокат на 308 аренд за сезон — и только потом стала продаваться другим экипажам.
+          Никаких презентаций в вакууме: всё, что вы видите, работает прямо сейчас.
+        </p>
+      </div>
+      <div class="bio__grid">
+        <article class="bio-card bio-card--dev">
+          <div class="bio-card__media bio-card__media--dev">
+            <span class="bio-card__monogram">S13</span>
+            <span class="bio-card__badge">Dev · Founder</span>
+          </div>
+          <div class="bio-card__body">
+            <div class="bio-card__head">
+              <span class="bio-card__role">Разработчик · Основатель SLY13</span>
+              <h3 class="bio-card__name">salavey13</h3>
+            </div>
+            <p class="bio-card__desc">
+              Строю платформу франшиз проката изнутри живого бизнеса. Один контур: от заказа в каталоге
+              до зарплаты оператора — Next.js, Supabase, Telegram Mini App и боты. Люблю, когда цифры
+              сходятся до копейки: сверка, комиссии и депозиты считаются автоматически, а не в тетрадке.
+            </p>
+            <ul class="bio-card__tags">
+              <li>Next.js</li>
+              <li>Supabase</li>
+              <li>Telegram Mini App</li>
+              <li>OCR документов</li>
+              <li>Боты заказов</li>
+            </ul>
+            <div class="bio-card__contacts">
+              <a class="bio-card__contact" href="https://t.me/SALAVEY13" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.6c.2-1-.7-1.8-1.6-1.4L2.7 10.1c-1 .4-1 1.9.1 2.2l4.4 1.4 1.7 5.4c.3.9 1.4 1.1 2 .4l2.5-2.6 4.5 3.3c.8.6 2 .2 2.2-.8l1.8-14.8z"/></svg>
+                t.me/SALAVEY13
+              </a>
+              <a class="bio-card__contact" href="mailto:salavey13@gmail.com">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>
+                salavey13@gmail.com
+              </a>
+            </div>
+          </div>
+        </article>
+        <article class="bio-card bio-card--crew">
+          <div class="bio-card__media bio-card__media--crew">
+            <span class="bio-card__monogram">VB</span>
+            <span class="bio-card__badge">Live · Сезон-2026</span>
+          </div>
+          <div class="bio-card__body">
+            <div class="bio-card__head">
+              <span class="bio-card__role">Боевой экипаж · Первый клиент</span>
+              <h3 class="bio-card__name">VIP BIKE</h3>
+            </div>
+            <p class="bio-card__desc">
+              Прокат электробайков в Нижнем Новгороде. Весь сезон-2026 идёт через платформу:
+              заказы из Mini App, договоры с OCR паспорта и ВУ, депозиты, касса, смены и зарплаты
+              операторов. Ни одна цифра не нарисована — всё считается из базы на странице «Сезон-2026».
+            </p>
+            <ul class="bio-card__tags">
+              <li>308 аренд</li>
+              <li>31 ДКП · ≈ 13 млн ₽</li>
+              <li>Аудит октября: 154 аренды</li>
+              <li>18 депозитов возвращено</li>
+            </ul>
+            <div class="bio-card__contacts">
+              <a class="bio-card__contact" href="https://vip-bike.ru/franchize/vip-bike" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                vip-bike.ru/franchize/vip-bike
+              </a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 02 / НАПРАВЛЕНИЯ ================= -->
+  <section class="section" id="services" aria-labelledby="dir-title">
+    <div class="container">
+      <div class="sec-head">
+        <p class="sec-head__eyebrow">02 / Направления</p>
+        <h2 class="sec-head__title" id="dir-title">Что я делаю.<br><em>С пользой.</em></h2>
+        <p class="sec-head__sub">
+          Четыре формата работы — от запуска экипажа под ключ до регулярного сопровождения.
+          Цены фиксированные, сроки короткие: витрина начинает принимать заказы за два дня.
+        </p>
+      </div>
+      <div class="dir-grid">
+        <article class="dir-card dir-card--launch">
+          <span class="dir-card__num">01</span>
+          <div class="dir-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+          </div>
+          <h3 class="dir-card__title">Запуск экипажа под ключ</h3>
+          <p class="dir-card__desc">
+            Витрина, которая сразу работает: брендинг, каталог, корзина, админка и Telegram-бот.
+            Вы приходите с бизнесом — уходите с готовым цифровым экипажем.
+          </p>
+          <ul class="dir-card__list">
+            <li><span>«Базовый»</span><strong>25 000 ₽</strong></li>
+            <li><span>«Под ключ»</span><strong>60 000 ₽</strong></li>
+            <li><span>Срок</span><strong>от 2 дней</strong></li>
+            <li><span>Обучение</span><strong>2 админа включены</strong></li>
+          </ul>
+          <a class="dir-card__more" href="#cta">
+            Поднять экипаж
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+        <article class="dir-card dir-card--vibe">
+          <span class="dir-card__num">02</span>
+          <div class="dir-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <h3 class="dir-card__title">Vibe-сессии</h3>
+          <p class="dir-card__desc">
+            Онлайн-разбор вашего бизнеса: где теряются деньги, какие процессы автоматизировать первыми
+            и как выглядит цифровизация именно вашего проката.
+          </p>
+          <ul class="dir-card__list">
+            <li><span>«Аудит»</span><strong>5 000 ₽ · 1,5 ч</strong></li>
+            <li><span>«Проектирование»</span><strong>7 000 ₽ · 2 ч</strong></li>
+            <li><span>На выходе</span><strong>готовый roadmap</strong></li>
+            <li><span>Формат</span><strong>онлайн</strong></li>
+          </ul>
+          <a class="dir-card__more" href="#cta">
+            Разобрать бизнес
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+        <article class="dir-card dir-card--edu">
+          <span class="dir-card__num">03</span>
+          <div class="dir-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><path d="M22 10v6"/></svg>
+          </div>
+          <h3 class="dir-card__title">Обучение админов</h3>
+          <p class="dir-card__desc">
+            Индивидуально для вашего экипажа: товары, заказы, аналитика, пользователи —
+            довожу админа до уверенной самостоятельности.
+          </p>
+          <ul class="dir-card__list">
+            <li><span>Час</span><strong>3 000 ₽</strong></li>
+            <li><span>Пакет 5 часов</span><strong>12 000 ₽</strong></li>
+            <li><span>Программа</span><strong>под ваш экипаж</strong></li>
+            <li><span>Результат</span><strong>самостоятельный админ</strong></li>
+          </ul>
+          <a class="dir-card__more" href="#cta">
+            Назначить занятие
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+        <article class="dir-card dir-card--care">
+          <span class="dir-card__num">04</span>
+          <div class="dir-card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <h3 class="dir-card__title">Сопровождение</h3>
+          <p class="dir-card__desc">
+            Апдейты, новые фичи, помощь админу и Telegram-саппорт. Ваш экипаж не остаётся
+            один на один с софтом — платформа растёт вместе с прокатом.
+          </p>
+          <ul class="dir-card__list">
+            <li><span>Месяц</span><strong>15 000 ₽</strong></li>
+            <li><span>Саппорт</span><strong>ежедневно 9:00–23:00</strong></li>
+            <li><span>Апдейты</span><strong>постоянно</strong></li>
+            <li><span>Фичи</span><strong>под ваши задачи</strong></li>
+          </ul>
+          <a class="dir-card__more" href="#cta">
+            Взять на поддержку
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 03 / КЕЙСЫ ================= -->
+  <section class="section" id="portfolio" aria-labelledby="port-title" style="background: var(--bg-deep); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+    <div class="container">
+      <div class="sec-head">
+        <p class="sec-head__eyebrow">03 / Кейсы</p>
+        <h2 class="sec-head__title" id="port-title">Что уже<br><em>работает.</em></h2>
+        <p class="sec-head__sub">
+          Экипажи и продукты, которые живут на платформе прямо сейчас. Боевой экипаж — в проде,
+          остальные — на витрине в пайплайне запуска.
+        </p>
+      </div>
+      <div class="port-grid">
+        <a class="port-card port-card--big port-card--magenta port-card--live" href="https://vip-bike.ru/franchize/vip-bike" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">VB</span></div>
+          <span class="port-card__tag">Live</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Сезон-2026</span>
+            <h3 class="port-card__title">VIP BIKE</h3>
+            <p class="port-card__meta">Прокат электробайков · НН. 308 аренд за сезон · 31 ДКП ≈ 13 млн ₽ · оборот кассы ≈ 16,5 млн ₽. Заказы из Mini App, OCR-договоры, депозиты, касса и зарплаты — всё в одном контуре.</p>
+          </div>
+        </a>
+        <a class="port-card port-card--half port-card--cyan" href="https://vip-bike.ru/franchize/moto-selection" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">MS</span></div>
+          <span class="port-card__tag">Запущен</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Экипаж</span>
+            <h3 class="port-card__title">moto-selection</h3>
+            <p class="port-card__meta">Мотосервис · 8 услуг · свой owner</p>
+          </div>
+        </a>
+        <a class="port-card port-card--half port-card--violet" href="https://vip-bike.ru/franchize/georg-electro" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">GE</span></div>
+          <span class="port-card__tag">В пайплайне</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Экипаж</span>
+            <h3 class="port-card__title">georg-electro</h3>
+            <p class="port-card__meta">Диагностика электро-систем</p>
+          </div>
+        </a>
+        <a class="port-card port-card--half port-card--cyan" href="https://vip-bike.ru/franchize/nn-mototeh-nn" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">NN</span></div>
+          <span class="port-card__tag">В пайплайне</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Экипаж</span>
+            <h3 class="port-card__title">nn-mototeh-nn</h3>
+            <p class="port-card__meta">Мототехника NN · колесо фортуны e2e</p>
+          </div>
+        </a>
+        <a class="port-card port-card--half port-card--magenta" href="https://t.me/SALAVEY13" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">DJ</span></div>
+          <span class="port-card__tag">В пайплайне</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Экипаж</span>
+            <h3 class="port-card__title">djorudjov</h3>
+            <p class="port-card__meta">Контент и рассылки экипажа</p>
+          </div>
+        </a>
+        <a class="port-card port-card--half port-card--violet" href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">B0T</span></div>
+          <span class="port-card__tag">Core</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Продукт</span>
+            <h3 class="port-card__title">oneBikePlsBot</h3>
+            <p class="port-card__meta">Заказы из Telegram · XTR-платежи · Mini App</p>
+          </div>
+        </a>
+        <a class="port-card port-card--wide port-card--cyan" href="https://vip-bike.ru/franchize/vip-bike/analytics" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">10→109</span></div>
+          <span class="port-card__tag">Data</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Аналитика</span>
+            <h3 class="port-card__title">Сезон-2026 в цифрах</h3>
+            <p class="port-card__meta">10 аренд в мае → 109 в сентябре · ретро-импорт 145 договоров · аудит октября вернул 18 потерянных депозитов в книги.</p>
+          </div>
+        </a>
+        <a class="port-card port-card--wide port-card--mint" href="https://vip-bike.ru/franchize/sly13" target="_blank" rel="noopener">
+          <div class="port-card__media"><span class="port-card__bg">1SP</span></div>
+          <span class="port-card__tag">Core</span>
+          <div class="port-card__overlay">
+            <span class="port-card__year">Продукт</span>
+            <h3 class="port-card__title">oneSitePls</h3>
+            <p class="port-card__meta">Витрина экипажа за 30 секунд: брендинг, каталог, QR-код и бот на старте. Открытое создание франшиз.</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 04 / ПЛАТФОРМА ================= -->
+  <section class="platform section" id="platform" aria-labelledby="platform-title">
+    <div class="container">
+      <div class="platform-card">
+        <div class="platform-card__left">
+          <p class="platform-card__eyebrow">04 / Платформа</p>
+          <h2 class="platform-card__title" id="platform-title">Не демо.<br>Боевой софт.</h2>
+          <p class="platform-card__desc">
+            SLY13 — платформа франшиз проката, выросшая из боевого экипажа VIP BIKE.
+            Каталог и корзина, заказы из Telegram Mini App, договоры DOCX с OCR, депозиты,
+            касса с проводками, смены и зарплаты — в одном контуре. Сначала софт зарабатывает
+            на своём прокате — и только потом продаётся другим экипажам.
+          </p>
+          <ul class="platform-card__chips">
+            <li>Демо-режим новых фич</li>
+            <li>Песочница franchize-формата</li>
+            <li>Создание экипажа за 30 секунд</li>
+          </ul>
+          <a class="btn btn--ghost-ink btn platform-card__btn" href="https://vip-bike.ru/franchize/sly13" target="_blank" rel="noopener" style="background: var(--bg-card-2); border: 1px solid var(--line);">
+            Открыть витрину
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg>
+          </a>
+        </div>
+        <div class="platform-card__right">
+          <div class="platform-card__logo">
+            <span class="platform-card__logo-mark">S13</span>
+          </div>
+          <a class="platform-card__href" href="https://vip-bike.ru/franchize/sly13" target="_blank" rel="noopener">vip-bike.ru/franchize/sly13</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 05 / ПРОЦЕСС ================= -->
+  <section class="section" id="process" aria-labelledby="proc-title" style="background: var(--bg-deep); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+    <div class="container">
+      <div class="sec-head">
+        <p class="sec-head__eyebrow">05 / Процесс</p>
+        <h2 class="sec-head__title" id="proc-title">Как идёт<br><em>запуск.</em></h2>
+        <p class="sec-head__sub">
+          Четыре шага от заявки до работающего экипажа. Без сюрпризов, без вечных интеграций,
+          без пропавших дней.
+        </p>
+      </div>
+      <ol class="proc-grid">
+        <li class="proc-step">
+          <span class="proc-step__num">01</span>
+          <h3 class="proc-step__title">Заявка</h3>
+          <p class="proc-step__desc">Напишите в Telegram. 10 минут — и я уже думаю, как собрать ваш экипаж.</p>
+        </li>
+        <li class="proc-step">
+          <span class="proc-step__num">02</span>
+          <h3 class="proc-step__title">Бриф</h3>
+          <p class="proc-step__desc">Звонок или встреча. Каталог, процессы, роли, бюджет — фиксируем картину целиком.</p>
+        </li>
+        <li class="proc-step">
+          <span class="proc-step__num">03</span>
+          <h3 class="proc-step__title">Запуск</h3>
+          <p class="proc-step__desc">Брендинг, каталог, корзина, админка, бот. От двух дней — и вы принимаете заказы.</p>
+        </li>
+        <li class="proc-step">
+          <span class="proc-step__num">04</span>
+          <h3 class="proc-step__title">Рост</h3>
+          <p class="proc-step__desc">Обучение админов, сверка денег, новые фичи. Софт растёт вместе с прокатом.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ================= 06 / ЗАЯВКА ================= -->
+  <section class="section" id="cta" aria-labelledby="cta-title">
+    <div class="container">
+      <div class="cta-card">
+        <div class="cta-card__head">
+          <p class="cta-card__eyebrow">06 / Заявка</p>
+          <h2 class="cta-card__title" id="cta-title">Обсудим ваш<br>экипаж?</h2>
+          <p class="cta-card__sub">
+            Оставьте короткую заявку — она соберётся в готовый текст и откроется в Telegram.
+            Отвечаю каждый день с 9:00 до 23:00.
+          </p>
+        </div>
+        <form class="cta-form" data-form novalidate>
+          <div class="cta-form__row">
+            <label class="cta-form__field">
+              <span class="cta-form__lbl">Имя</span>
+              <input type="text" name="name" placeholder="Как к вам обращаться" required />
+            </label>
+            <label class="cta-form__field">
+              <span class="cta-form__lbl">Telegram</span>
+              <input type="text" name="tg" placeholder="@ваш_ник" required />
+            </label>
+          </div>
+          <div class="cta-form__row">
+            <label class="cta-form__field">
+              <span class="cta-form__lbl">Задача</span>
+              <select name="task" required>
+                <option value="" selected disabled>Выберите задачу</option>
+                <option>Запуск экипажа «Базовый» · 25 000 ₽</option>
+                <option>Запуск экипажа «Под ключ» · 60 000 ₽</option>
+                <option>Vibe-сессия «Аудит» · 5 000 ₽</option>
+                <option>Vibe-сессия «Проектирование» · 7 000 ₽</option>
+                <option>Обучение админов · 3 000 ₽/час</option>
+                <option>Сопровождение · 15 000 ₽/мес</option>
+                <option>Другое</option>
+              </select>
+            </label>
+            <label class="cta-form__field">
+              <span class="cta-form__lbl">Бюджет</span>
+              <select name="budget" required>
+                <option value="" selected disabled>Выберите бюджет</option>
+                <option>до 25 000 ₽</option>
+                <option>25 000 — 60 000 ₽</option>
+                <option>60 000 — 150 000 ₽</option>
+                <option>от 150 000 ₽</option>
+                <option>Пока присматриваюсь</option>
+              </select>
+            </label>
+          </div>
+          <label class="cta-form__field cta-form__field--full">
+            <span class="cta-form__lbl">Кратко о задаче</span>
+            <textarea name="about" placeholder="Что за бизнес, что уже есть, что нужно на выходе"></textarea>
+          </label>
+          <div class="cta-form__bottom">
+            <button class="btn btn--primary btn--big" type="submit" style="width: auto;">
+              Отправить заявку
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+            <p class="cta-form__note">
+              Нажимая кнопку, вы соглашаетесь на обработку персональных данных.
+              Заявка откроется в Telegram — так быстрее всего.
+            </p>
+          </div>
+          <div class="cta-form__success" data-success hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+            Заявка скопирована в буфер. Telegram открыт — вставьте текст и отправьте. Отвечу в течение часа.
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 07 / КОНТАКТЫ ================= -->
+  <section class="section" id="contacts" aria-labelledby="contacts-title" style="padding-top: 0;">
+    <div class="container">
+      <div class="sec-head">
+        <p class="sec-head__eyebrow">07 / Контакты</p>
+        <h2 class="sec-head__title" id="contacts-title">Пишите, пишите —<br><em>и тестируйте.</em></h2>
+        <p class="sec-head__sub">
+          Витрины открыты: всё, что вы видите в кейсах, работает прямо сейчас.
+          Заходите, тыкайте, ломайте.
+        </p>
+      </div>
+      <div class="contacts-grid">
+        <div class="contact-tile contact-tile--dev">
+          <div class="contact-tile__head">
+            <span class="contact-tile__initials">S13</span>
+            <span>
+              <span class="contact-tile__role">salavey13</span>
+              <span class="contact-tile__sub">Разработчик · SLY13</span>
+            </span>
+          </div>
+          <a class="contact-tile__main" href="https://t.me/SALAVEY13" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.6c.2-1-.7-1.8-1.6-1.4L2.7 10.1c-1 .4-1 1.9.1 2.2l4.4 1.4 1.7 5.4c.3.9 1.4 1.1 2 .4l2.5-2.6 4.5 3.3c.8.6 2 .2 2.2-.8l1.8-14.8z"/></svg>
+            t.me/SALAVEY13
+          </a>
+          <div class="contact-tile__links">
+            <a href="https://t.me/SALAVEY13" target="_blank" rel="noopener">Написать →</a>
+            <a href="mailto:salavey13@gmail.com">salavey13@gmail.com</a>
+          </div>
+        </div>
+        <div class="contact-tile contact-tile--crew">
+          <div class="contact-tile__head">
+            <span class="contact-tile__initials">VB</span>
+            <span>
+              <span class="contact-tile__role">VIP BIKE</span>
+              <span class="contact-tile__sub">Боевой экипаж · НН</span>
+            </span>
+          </div>
+          <a class="contact-tile__main" href="https://vip-bike.ru/franchize/vip-bike" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            vip-bike.ru
+          </a>
+          <div class="contact-tile__links">
+            <a href="https://vip-bike.ru/franchize/vip-bike" target="_blank" rel="noopener">Смотреть экипаж →</a>
+          </div>
+        </div>
+        <div class="contact-tile contact-tile--bot">
+          <div class="contact-tile__head">
+            <span class="contact-tile__initials">B0T</span>
+            <span>
+              <span class="contact-tile__role">oneBikePlsBot</span>
+              <span class="contact-tile__sub">Бот заказов · XTR</span>
+            </span>
+          </div>
+          <a class="contact-tile__main" href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.6c.2-1-.7-1.8-1.6-1.4L2.7 10.1c-1 .4-1 1.9.1 2.2l4.4 1.4 1.7 5.4c.3.9 1.4 1.1 2 .4l2.5-2.6 4.5 3.3c.8.6 2 .2 2.2-.8l1.8-14.8z"/></svg>
+            t.me/oneBikePlsBot
+          </a>
+          <div class="contact-tile__links">
+            <a href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener">Открыть бота →</a>
+          </div>
+        </div>
+        <div class="contact-tile contact-tile--place">
+          <div class="contact-tile__head">
+            <span class="contact-tile__initials">L</span>
+            <span>
+              <span class="contact-tile__role">VIP BIKE ELECTRO</span>
+              <span class="contact-tile__sub">Площадка · магазин</span>
+            </span>
+          </div>
+          <a class="contact-tile__main" href="https://vip-bike.ru" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            пл. Комсомольская, 2 · НН
+          </a>
+          <div class="contact-tile__links">
+            <a href="https://vip-bike.ru" target="_blank" rel="noopener">vip-bike.ru →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <span class="footer__x"><span class="footer__x-mark">S13</span></span>
+        <span>
+          <span class="footer__name">SLY13</span>
+          <span class="footer__sub">Софт для живого проката · НН</span>
+        </span>
+      </div>
+      <div class="footer__cols">
+        <div class="footer__col">
+          <span class="footer__col-head">Навигация</span>
+          <a href="#bio">О себе</a>
+          <a href="#services">Услуги</a>
+          <a href="#portfolio">Кейсы</a>
+          <a href="#process">Процесс</a>
+        </div>
+        <div class="footer__col">
+          <span class="footer__col-head">Связь</span>
+          <a href="https://t.me/SALAVEY13" target="_blank" rel="noopener">Telegram · @SALAVEY13</a>
+          <a href="mailto:salavey13@gmail.com">salavey13@gmail.com</a>
+          <a href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener">Бот · oneBikePlsBot</a>
+        </div>
+        <div class="footer__col">
+          <span class="footer__col-head">Витрины</span>
+          <a href="https://vip-bike.ru/franchize/vip-bike" target="_blank" rel="noopener">VIP BIKE · боевой экипаж</a>
+          <a href="https://vip-bike.ru/franchize/sly13" target="_blank" rel="noopener">SLY13 · витрина платформы</a>
+          <a href="https://vip-bike.ru" target="_blank" rel="noopener">VIP BIKE ELECTRO</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© <span data-year>2026</span> salavey13 · SLY13 — платформа франшиз проката · Нижний Новгород</span>
+      <span>Сделано: <a href="https://t.me/SALAVEY13" target="_blank" rel="noopener">@SALAVEY13</a></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // sticky nav state
+  (function () {
+    var nav = document.getElementById('nav');
+    function onScroll() {
+      if (!nav) return;
+      if (window.scrollY > 12) nav.classList.add('is-scrolled');
+      else nav.classList.remove('is-scrolled');
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+
+  // mobile burger
+  (function () {
+    var burger = document.querySelector('[data-burger]');
+    var menu = document.querySelector('[data-mobile-menu]');
+    if (!burger || !menu) return;
+    burger.addEventListener('click', function () {
+      var open = burger.getAttribute('aria-expanded') === 'true';
+      burger.setAttribute('aria-expanded', open ? 'false' : 'true');
+      menu.hidden = open;
+      document.body.classList.toggle('no-scroll', !open);
+    });
+    menu.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        burger.setAttribute('aria-expanded', 'false');
+        menu.hidden = true;
+        document.body.classList.remove('no-scroll');
+      });
+    });
+  })();
+
+  // form -> telegram
+  (function () {
+    var form = document.querySelector('[data-form]');
+    if (!form) return;
+    var success = form.querySelector('[data-success]');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      var f = new FormData(form);
+      var lines = [
+        'Заявка с лендинга SLY13 (salavey13)',
+        'Имя: ' + (f.get('name') || '—'),
+        'Telegram: ' + (f.get('tg') || '—'),
+        'Задача: ' + (f.get('task') || '—'),
+        'Бюджет: ' + (f.get('budget') || '—'),
+        'О задаче: ' + (f.get('about') || '—')
+      ];
+      var text = lines.join('\n');
+      try { navigator.clipboard.writeText(text); } catch (err) {}
+      window.open('https://t.me/SALAVEY13', '_blank', 'noopener');
+      if (success) success.hidden = false;
+      form.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+        if (el.type !== 'submit') el.disabled = true;
+      });
+    });
+  })();
+
+  // current year
+  (function () {
+    var el = document.querySelector('[data-year]');
+    if (el) el.textContent = String(new Date().getFullYear());
+  })();
+</script>
+</body>
+</html>
