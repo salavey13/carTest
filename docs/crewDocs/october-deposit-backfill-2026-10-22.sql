@@ -18,7 +18,23 @@
 -- October audit re-flows: sus → almost/fine on recompute.
 --
 -- Двухшагово: сначала SELECT (dry-run) — сверить список, потом UPDATE.
+--
+-- TYPE SAFETY (fixed 2026-10-22, err 42804): deposits live as TEXT in
+-- private.rental_contract_artifacts.deposit_rub — the contract builder prints
+-- human strings ("20 000", "20 000 ₽", legacy "не указан"), see
+-- deposit-rail.ts / actions-runtime.ts which parse it with [^\d] strip.
+-- So every numeric comparison/assignment goes through money_to_num():
+-- digits-only strip (same parser as the app: deposit-rail.ts / actions-runtime.ts
+-- use replace(/[^\d]/g, "")) → '' → NULL → 0, so it can never throw on
+-- "не указан" / "20 000 ₽". public.rentals.deposit_amount is numeric
+-- (migration 20260726000001) — no cast needed there.
 -- =====================================================================
+
+CREATE OR REPLACE FUNCTION private.money_to_num(t text)
+RETURNS numeric LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(NULLIF(regexp_replace(t, '[^0-9]', '', 'g'), '')::numeric, 0);
+$$;
+-- (drop after the backfill: DROP FUNCTION private.money_to_num(text);)
 
 -- ── 1. DRY RUN — what would change ──────────────────────────────────────
 WITH candidates AS (
@@ -34,14 +50,17 @@ WITH candidates AS (
   WHERE r.metadata->>'source' = 'doc_command'
     AND r.created_at < '2026-09-15T00:00:00+03:00'   -- pre-iter21 mirror
     AND COALESCE(r.deposit_amount, 0) = 0            -- books lost the deposit
-    AND COALESCE(a.deposit_rub, 0) > 0               -- paper HAS a deposit
+    AND private.money_to_num(a.deposit_rub) > 0      -- paper HAS a deposit (TEXT col → num)
     AND COALESCE(a.sts_pledge_used, false) = false   -- СТС-pledge = no cash deposit by design
     AND r.status IN ('completed', 'confirmed')
     AND NOT EXISTS (                                 -- don't touch if deposit entries exist
       SELECT 1 FROM public.deposit_entries de WHERE de.rental_id = r.rental_id
     )
 )
-SELECT rental_id, created_at::date AS created, total_cost, paper_deposit, paper_total
+SELECT rental_id, created_at::date AS created, total_cost,
+       paper_deposit,                                        -- raw paper string, e.g. "20 000 ₽"
+       private.money_to_num(paper_deposit) AS paper_deposit_num,
+       paper_total
 FROM candidates
 ORDER BY created;
 
@@ -51,13 +70,13 @@ ORDER BY created;
 WITH candidates AS (
   SELECT
     r.rental_id,
-    a.deposit_rub AS paper_deposit
+    private.money_to_num(a.deposit_rub) AS paper_deposit_num
   FROM public.rentals r
   JOIN private.rental_contract_artifacts a ON a.rental_id = r.rental_id
   WHERE r.metadata->>'source' = 'doc_command'
     AND r.created_at < '2026-09-15T00:00:00+03:00'
     AND COALESCE(r.deposit_amount, 0) = 0
-    AND COALESCE(a.deposit_rub, 0) > 0
+    AND private.money_to_num(a.deposit_rub) > 0
     AND COALESCE(a.sts_pledge_used, false) = false
     AND r.status IN ('completed', 'confirmed')
     AND NOT EXISTS (
@@ -65,7 +84,7 @@ WITH candidates AS (
     )
 )
 UPDATE public.rentals r
-SET deposit_amount = c.paper_deposit,
+SET deposit_amount = c.paper_deposit_num,     -- numeric → numeric, no 42804
     deposit_method = 'cash',              -- legacy /doc flow collected cash (default, matches insertDepositEntries)
     deposit_collected_at = r.created_at,  -- honest approximation: collection moment = doc creation
     updated_at = now()
@@ -80,4 +99,7 @@ WHERE r.rental_id = c.rental_id
 -- almost by the new C4 tolerance (max(500 ₽, 5%)) — code deployed 2026-10-22.
 -- NOTE: deposit_returned stays NULL on purpose — C6 will flag
 -- «залог не помечен возвращённым» so the operator ticks it consciously.
+--
+-- CLEANUP (optional, after happy verify):
+--   DROP FUNCTION IF EXISTS private.money_to_num(text);
 -- =====================================================================
