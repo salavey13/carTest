@@ -110,9 +110,10 @@ export async function POST(request: NextRequest) {
   if (!ALLOWED_TYPES.has(file.type)) {
     return NextResponse.json({ success: false, error: "Поддерживаются только фото (JPEG/PNG/WebP)" }, { status: 415 });
   }
-  // Hard client-side ceiling before sharp (a 50 MB upload would stall the lambda).
-  if (file.size > 25 * 1024 * 1024) {
-    return NextResponse.json({ success: false, error: "Фото слишком большое (максимум 25 МБ)" }, { status: 413 });
+  // Hard client-side ceiling before sharp (a 150 MB upload would stall the lambda).
+  // 2026-10b: 25 → 100 MB — clients compress first, real uploads arrive ~100 KB.
+  if (file.size > 100 * 1024 * 1024) {
+    return NextResponse.json({ success: false, error: "Фото слишком большое (максимум 100 МБ)" }, { status: 413 });
   }
 
   const isCrewMember = await assertCrewMembership(userId, crewSlug);

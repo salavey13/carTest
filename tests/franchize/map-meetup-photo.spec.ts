@@ -107,7 +107,8 @@ describe("meetup-photo-upload route", () => {
 
   it("rejects non-image and oversized uploads before sharp", () => {
     expect(src).toMatch(/ALLOWED_TYPES\.has\(file\.type\)/);
-    expect(src).toMatch(/25 \* 1024 \* 1024/);
+    // 2026-10b: 25 → 100 MB (clients compress first — guard is a sharp safety net)
+    expect(src).toMatch(/100 \* 1024 \* 1024/);
   });
 });
 

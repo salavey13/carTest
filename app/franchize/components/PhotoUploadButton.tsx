@@ -53,7 +53,7 @@ export function PhotoUploadButton({ docType, rentalId, chatId, onSuccess }: Phot
     }
 
     if (file.size > MAX_INPUT_FILE_SIZE) {
-      setMessage({ type: "error", text: "Файл слишком большой (макс. 25 МБ до сжатия)" });
+      setMessage({ type: "error", text: "Файл слишком большой (макс. 100 МБ до сжатия)" });
       return;
     }
 

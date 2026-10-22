@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
     }
-    if (file.size > 25 * 1024 * 1024) {
-      return NextResponse.json({ error: "Файл слишком большой (макс. 25 МБ до сжатия)." }, { status: 400 });
+    if (file.size > 100 * 1024 * 1024) {
+      return NextResponse.json({ error: "Файл слишком большой (макс. 100 МБ до сжатия)." }, { status: 400 });
     }
 
     // ── Write scope: the wall is for crew staff + riders (same as posting) ──

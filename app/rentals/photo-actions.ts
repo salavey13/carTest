@@ -273,13 +273,13 @@ export async function uploadRentalPhoto(
     return { success: false, error: "rentalId and file are required." };
   }
 
-  // Pre-compression size guard — I4 enhancement: raised from 10 MB → 25 MB
-  // because modern phones (especially iPhones with HEIC) produce 10-12 MB photos.
-  // The sharp compression pipeline handles them fine.
-  if (file.length > 25 * 1024 * 1024) {
+  // Pre-compression size guard — I4: 10 MB → 25 MB; 2026-10b: 25 MB → 100 MB
+  // (48/200 MP camera modes produce 30-90 MB photos). Clients compress
+  // first, so real uploads arrive ~300 KB — this is a safety net for sharp.
+  if (file.length > 100 * 1024 * 1024) {
     return {
       success: false,
-      error: `Файл слишком большой (${Math.round(file.length / 1024 / 1024)} МБ, макс. 25 МБ до сжатия).`,
+      error: `Файл слишком большой (${Math.round(file.length / 1024 / 1024)} МБ, макс. 100 МБ до сжатия).`,
     };
   }
 

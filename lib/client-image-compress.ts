@@ -29,7 +29,10 @@
 //
 // I4 enhancement: input limit raised from 10 MB → 25 MB (modern phones produce
 // 10-12 MB HEIC/JPEG photos). The client-side compression brings them down to
-// ~200-400 KB before upload, so the 25 MB limit is just the pre-compression guard.
+// ~200-400 KB before upload, so the limit is just the pre-compression guard.
+// 2026-10b: raised 25 MB → 100 MB — 48/200 MP camera modes and Telegram
+// forwards produce 30-90 MB photos; the canvas pipeline compresses them fine,
+// rejecting a 38 MB shot the app can shrink to 300 KB made no sense.
 //
 // HEIC-2026-10: iPhone photos default to HEIC. Every upload surface used to
 // hard-fail on non-Safari browsers with "Failed to load image" because <img>
@@ -44,8 +47,8 @@ export interface CompressImageOptions {
   quality?: number;
 }
 
-/** Max input file size before compression (25 MB — raised from 10 MB in I4). */
-export const MAX_INPUT_FILE_SIZE = 25 * 1024 * 1024;
+/** Max input file size before compression (100 MB — 10→25 in I4, 25→100 in 2026-10b). */
+export const MAX_INPUT_FILE_SIZE = 100 * 1024 * 1024;
 
 /** Quality for the heic2any HEIC → JPEG pass (kept high — the canvas resize pass re-compresses after). */
 const HEIC_TO_JPEG_QUALITY = 0.92;
@@ -145,11 +148,56 @@ function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number): Promise<B
 }
 
 /**
+ * Draw the source image scaled to (targetW × targetH) with progressive
+ * halving. A single drawImage from a 48 MP source (8000+ px) down to 1400 px
+ * aliases badly — each halving step with high-quality smoothing preserves far
+ * more detail. Aspect is preserved by construction (halving shrinks both
+ * dimensions equally), so the final exact-size draw introduces no distortion.
+ */
+function drawResizedToCanvas(img: HTMLImageElement, targetW: number, targetH: number): HTMLCanvasElement {
+  let source: CanvasImageSource = img;
+  let srcW = img.naturalWidth || img.width;
+  let srcH = img.naturalHeight || img.height;
+
+  // Halve while either dimension is still > 2× its target (cap: 6 steps = 64×)
+  for (let step = 0; (srcW > targetW * 2 || srcH > targetH * 2) && step < 6; step++) {
+    const nextW = Math.max(1, Math.floor(srcW / 2));
+    const nextH = Math.max(1, Math.floor(srcH / 2));
+    const tmp = document.createElement("canvas");
+    const tctx = tmp.getContext("2d");
+    if (!tctx) break;
+    tmp.width = nextW;
+    tmp.height = nextH;
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = "high";
+    tctx.drawImage(source, 0, 0, nextW, nextH);
+    source = tmp;
+    srcW = nextW;
+    srcH = nextH;
+  }
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas context not available");
+  }
+  canvas.width = targetW;
+  canvas.height = targetH;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, targetW, targetH);
+  return canvas;
+}
+
+/**
  * Compress an image File client-side to a JPEG Blob.
- * Rejects if the file is > 25 MB (input guard, not compression output).
+ * Rejects if the file is > 100 MB (input guard, not compression output).
  *
  * I4 enhancement: limit raised from 10 MB → 25 MB because modern phones
  * (especially iPhones with HEIC) produce 10-12 MB photos.
+ * 2026-10b: 25 MB → 100 MB — 48/200 MP modes and Telegram forwards produce
+ * 30-90 MB photos; they decode, get progressively downscaled and ship as a
+ * ~200-500 KB JPEG. A 38 MB photo must not be a dead end.
  *
  * HEIC-2026-10: HEIC/HEIF inputs are transparently converted to JPEG (see
  * convertHeicToJpeg) when the browser cannot decode them natively — the
@@ -162,9 +210,9 @@ export async function reduceImageResolution(
   const maxSize = options.maxSize ?? 1400;
   const quality = options.quality ?? 0.70;
 
-  // Input size guard — reject anything > 25 MB before even reading
+  // Input size guard — reject anything > 100 MB before even reading
   if (file.size > MAX_INPUT_FILE_SIZE) {
-    throw new Error(`Файл слишком большой (${Math.round(file.size / 1024 / 1024)} МБ, макс. 25 МБ до сжатия).`);
+    throw new Error(`Файл слишком большой (${Math.round(file.size / 1024 / 1024)} МБ, макс. 100 МБ до сжатия).`);
   }
 
   let source: Blob | File = file;
@@ -199,15 +247,7 @@ export async function reduceImageResolution(
     }
   }
 
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Canvas context not available");
-  }
-
-  canvas.width = width;
-  canvas.height = height;
-  ctx.drawImage(img, 0, 0, width, height);
+  const canvas = drawResizedToCanvas(img, width, height);
 
   // Release the decoded bitmap before the (possibly slow) encode step
   img.src = "";

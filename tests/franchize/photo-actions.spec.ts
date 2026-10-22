@@ -110,9 +110,9 @@ describe("uploadRentalPhoto — pure logic tests", () => {
     expect(result.error).toContain("required");
   });
 
-  it("rejects file > 25 MB before compression", async () => {
-    // I4: limit raised 10 MB → 25 MB (modern phones produce 10-12 MB photos)
-    const largeFile = Buffer.alloc(26 * 1024 * 1024); // 26 MB
+  it("rejects file > 100 MB before compression", async () => {
+    // I4: 10 → 25 MB; 2026-10b: 25 → 100 MB (48/200 MP shots reach 30-90 MB)
+    const largeFile = Buffer.alloc(101 * 1024 * 1024); // 101 MB
     const result = await uploadRentalPhoto({
       rentalId: "test-rental",
       photoType: "start",

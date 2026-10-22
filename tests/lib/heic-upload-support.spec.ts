@@ -81,9 +81,15 @@ describe("isHeicFile — layered detection (magic bytes → MIME → extension)"
 describe("shared compressor keeps its public contract", () => {
   const lib = read("lib/client-image-compress.ts");
 
-  it("input guard stays at 25 MB (I4)", () => {
-    expect(MAX_INPUT_FILE_SIZE).toBe(25 * 1024 * 1024);
-    expect(lib).toContain("25 МБ до сжатия");
+  it("input guard sits at 100 MB (I4 raised 10→25; 2026-10b raised 25→100 — 38 MP+ shots must compress, not die)", () => {
+    expect(MAX_INPUT_FILE_SIZE).toBe(100 * 1024 * 1024);
+    expect(lib).toContain("100 МБ до сжатия");
+  });
+
+  it("huge sources are downscaled progressively (no single-step 48MP→1400px aliasing)", () => {
+    expect(lib).toContain("drawResizedToCanvas");
+    expect(lib).toContain('imageSmoothingQuality = "high"');
+    expect(lib).toContain("srcW > targetW * 2 || srcH > targetH * 2");
   });
 
   it("lazily imports heic2any (chunk fetched only on the HEIC fallback path)", () => {
