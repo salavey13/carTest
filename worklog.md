@@ -1101,3 +1101,23 @@ Work Log:
 Stage Summary:
 - startapp=wheel → vip-bike (да, дефолт); startapp=wheel_nn-mototeh-nn И startapp=nn-mototeh-nn_wheel → /franchize/nn-mototeh-nn/wheel. Link format for posts: https://t.me/oneBikePlsBot/app?startapp=<any of the three forms>.
 - Не забыть: prod rental.vip-bike.ru всё ещё отстаёт от main (task 114 note) — redeploy production, чтобы suffix-форма и остальные фиксы доехали.
+
+---
+Task ID: 110-heic-upload-support
+Agent: main (Claude)
+Task: HEIC/HEIF upload support — convert to JPEG on the fly in all client-compressed image upload surfaces (rental before/after photos, doc OCR, wall, storage, meetups, car form).
+
+Work Log:
+- Root cause: lib/client-image-compress.ts decoded via <img> — HEIC decodes natively only in Safari; Chrome/Android/Firefox/Windows hard-failed with "Failed to load image". PhotoUploadButton also carried a stale local copy of the compressor.
+- lib/client-image-compress.ts: added layered HEIC detection (ISO-BMFF ftyp magic brands heic/heix/hevc/.../mif1/msf1 → MIME image/heic|heif → extension .heic/.heif/.hif) + convertHeicToJpeg() via lazy import("heic2any") (libheif wasm chunk fetched only on fallback path; Safari never downloads it). Contract: reduceImageResolution() always resolves to JPEG — original HEIC never returned (CR "bigger-file" fix gated on !heicConverted).
+- PhotoUploadButton.tsx: local reduceImageResolution removed → shared lib (1920/q0.85 kept); validation accepts empty-MIME HEIC by extension; guard 10→25 MB.
+- app/rentals/[id]/page.tsx PhotoUploader: now compresses (1400/q0.70) + converts before uploadSingleImage — was raw upload (undisplayable .heic in public rentals bucket, no resize).
+- accept="image/*,.heic,.heif" (or +image/heif) on 8 inputs: rental gallery, rental page, doc OCR, wall composer, storage story ×2, storage wall, meetup modal, car form. Meetup modal validation relaxed for empty MIME.
+- npm dep: heic2any 0.0.4 (types bundled). Server routes untouched — clients now always send JPEG.
+- Tests: new tests/lib/heic-upload-support.spec.ts (magic-byte unit tests via jsdom File + wiring assertions); 7 spec files green — 188 passed.
+- Checks: typecheck:franchize slice PASS; targeted tsc on changed files → zero errors in changed files (only pre-existing debt: CarSubmissionForm:204 'id' confirmed on base via stash); eslint --max-warnings=0 clean on all changed files.
+- Committed + pushed: eeda2e6 (repo moved to salavey13/carTest, push OK after rebase).
+
+Stage Summary:
+- HEIC (iPhone default) photos now upload successfully from every browser across all compressed upload surfaces; payload becomes .jpg + image/jpeg before hitting server pipelines.
+- Known limits: heic2any converts only still images (no HEIC bursts/multi-image in first pass — takes first frame); corrupt HEIC surfaces a clear RU toast advising screenshot/JPG.
