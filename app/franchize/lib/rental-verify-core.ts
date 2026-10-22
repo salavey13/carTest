@@ -761,6 +761,51 @@ export function verifyProgressLine(verifiedCount: number): string | null {
   return null;
 }
 
+// ── Task 124 — the no-problemo STREAK (boss: «crank it to 13») ───────────────
+//
+// A row is streak-clean when its frozen snapshot carries
+// reasonability.mode === "no_problemo" (task 123: расчёт сошёлся, депозит
+// возвращён, без ущерба и штрафов). The streak = how many NEWEST verified
+// rows in a row are clean. Anything else — normal mode, missing reasonability
+// (old pre-task123 rows: unknown ≠ clean), disputed history — stops the walk.
+//
+// The 13-streak achievement («🕶️ 13 no problemo подряд») is granted in
+// grantVerificationAchievements; this pure half is unit-testable and shared
+// with the done-DM streak line.
+
+/** Minimal row shape the streak walk needs (newest-first order is the caller's job). */
+export interface StreakRow {
+  snapshot?: { reasonability?: { mode?: string | null } | null } | null;
+}
+
+/**
+ * Count consecutive newest-first clean rows. `rows[0]` = the most recent
+ * verified сверка. Returns 0 when the newest row isn't clean.
+ */
+export function computeNoProblemoStreak(rows: Array<StreakRow | null | undefined>): number {
+  let streak = 0;
+  for (const row of rows) {
+    const mode = row?.snapshot?.reasonability?.mode;
+    if (mode !== "no_problemo") break;
+    streak += 1;
+  }
+  return streak;
+}
+
+/**
+ * 🕶️ The streak line for the done-DM. Quiet below 3 (a fresh account would
+ * otherwise see noise on every first confirm); from 3 it counts up; at 13 it
+ * celebrates and keeps counting (14, 15…) — the flex never expires.
+ */
+export function streakProgressLine(streak: number): string | null {
+  const s = Math.max(0, Math.trunc(streak) || 0);
+  if (s < 3) return null;
+  if (s < 13) {
+    return `🕶️ Стрик no problemo: ${s} подряд — до «13 no problemo подряд» ещё ${13 - s}`;
+  }
+  return `🕶️ ${s} no problemo подряд — стиль. Респект.`;
+}
+
 /** What the «⏭ Следующая сверка» pointer needs to phrase itself. */
 export interface NextUpInfo {
   bikeName: string;

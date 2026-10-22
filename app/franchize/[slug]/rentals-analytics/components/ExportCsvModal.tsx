@@ -155,6 +155,8 @@ interface SectionColCfg {
   notes?: number;
   subrenter?: number;
   photos?: number;
+  /** Task 124 — «Верификация» column (АРЕНДЫ only): colored + tints the row. */
+  verification?: number;
   /** Rental uuid column for the row tap-through (АРЕНДЫ only). */
   idCol: number;
 }
@@ -167,6 +169,7 @@ const SECTION_COLS: Record<CsvSectionKey, SectionColCfg> = {
     notes: 11,
     subrenter: 12,
     photos: 13,
+    verification: 24,
     idCol: 14,
   },
   equipment: { numeric: new Set([2]), date: new Set([0]), hide: new Set([6]), idCol: -1 },
@@ -189,6 +192,29 @@ function isNumericLike(s: string): boolean {
   const t = s.trim().replace(/\s+/g, "").replace(",", ".").replace(/[₽$€]/g, "");
   return t !== "" && !Number.isNaN(Number(t));
 }
+
+// ── Task 124 — verification status coloring (mirrors the XLSX converter) ────
+// The «Верификация» column (АРЕНДЫ block) renders colored + the whole row
+// gets a light tint, so the operator's eye lands on what is still unverified.
+type VerTone = "verified" | "disputed" | "waiting" | null;
+function verificationToneOf(label: string): VerTone {
+  const s = (label || "").toLowerCase();
+  if (!s.trim()) return null;
+  if (s.includes("спор")) return "disputed";
+  if (s.includes("подтверждено")) return "verified";
+  if (s.includes("ждёт") || s.includes("ожидает")) return "waiting";
+  return null;
+}
+const VER_TONE_BG: Record<Exclude<VerTone, null>, string> = {
+  verified: "#e7f6ec",
+  disputed: "#fde9e9",
+  waiting: "#fdf3e0",
+};
+const VER_TONE_FG: Record<Exclude<VerTone, null>, string> = {
+  verified: "#16a34a",
+  disputed: "#dc2626",
+  waiting: "#d97706",
+};
 
 export function ExportCsvModal({
   isOpen,
@@ -512,7 +538,9 @@ export function ExportCsvModal({
                   onClick={handleSendTelegram}
                   disabled={!isValid || sending || loading}
                   aria-label="Отправить в Telegram"
-                  title="Отправить CSV в Telegram"
+                  // Task 124 — verification highlight only exists in the rentals
+                  // variant (sales have no сверка column).
+                  title={variant === "rentals" ? "Отправить XLSX в Telegram (подсветка сверки)" : "Отправить XLSX в Telegram"}
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 disabled:opacity-50"
                   style={{
                     backgroundColor: "#22c55e",
@@ -533,8 +561,8 @@ export function ExportCsvModal({
                 type="button"
                 onClick={handleDownload}
                 disabled={!isValid || downloading || loading}
-                aria-label="Скачать видимые данные в CSV"
-                title="Скачать CSV"
+                aria-label="Скачать видимые данные в XLSX"
+                title={variant === "rentals" ? "Скачать XLSX (подсветка сверки)" : "Скачать XLSX"}
                 className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 disabled:opacity-50"
                 style={{ backgroundColor: "#3b82f6", color: "#ffffff", minHeight: "36px" }}
               >
@@ -953,16 +981,24 @@ function SectionTable({
               section.key === "rentals" && cfg.idCol >= 0 ? (r[cfg.idCol] || "").trim() : "";
             const rowClickable = !!rowRentalId && !!slug;
             const isGrandTotal = isSummary && (r[0] || "").trim().toUpperCase() === "ВСЕГО";
+            // Task 124 — verification tint for the whole АРЕНДЫ row.
+            const verTone =
+              section.key === "rentals" && cfg.verification != null
+                ? verificationToneOf(r[cfg.verification] || "")
+                : null;
+            const rowBg = verTone
+              ? VER_TONE_BG[verTone]
+              : isGrandTotal
+                ? T.bgElevated
+                : isAlt
+                  ? T.bgElevated
+                  : T.bgCard;
             return (
               <tr
                 key={ri}
                 className="transition-colors hover:brightness-95"
                 style={{
-                  backgroundColor: isGrandTotal
-                    ? T.bgElevated
-                    : isAlt
-                      ? T.bgElevated
-                      : T.bgCard,
+                  backgroundColor: rowBg,
                   ...(rowClickable ? { cursor: "pointer" } : {}),
                   ...(isGrandTotal ? { fontWeight: 700 } : {}),
                 }}
@@ -982,7 +1018,7 @@ function SectionTable({
                           borderColor: T.border,
                           padding: "0 0",
                           minWidth: "0.5rem",
-                          backgroundColor: isAlt ? T.bgElevated : T.bgCard,
+                          backgroundColor: rowBg,
                         }}
                       />
                     );
@@ -1010,17 +1046,16 @@ function SectionTable({
                         fontVariantNumeric: isNum ? "tabular-nums" : undefined,
                         ...(ci === cfg.subrenter && cell ? { color: "#f59e0b" } : {}),
                         ...(ci === cfg.photos && cell ? { color: "#22c55e", fontWeight: 600 } : {}),
+                        ...(ci === cfg.verification && verTone
+                          ? { color: VER_TONE_FG[verTone], fontWeight: 700 }
+                          : {}),
                         ...(ci === 0
                           ? {
                               position: "sticky",
                               left: 0,
                               zIndex: 10,
                               boxShadow: "2px 0 4px rgba(0,0,0,0.06)",
-                              backgroundColor: isGrandTotal
-                                ? T.bgElevated
-                                : isAlt
-                                  ? T.bgElevated
-                                  : T.bgCard,
+                              backgroundColor: rowBg,
                             }
                           : {}),
                       }}

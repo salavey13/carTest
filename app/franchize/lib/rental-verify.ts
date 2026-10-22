@@ -70,6 +70,7 @@ import {
   auditGradeLine,
   bikeTierLabelRu,
   clearDraft,
+  computeNoProblemoStreak,
   declineOpenProposal,
   disputeEditorKeyboard,
   escapeVerifyHtml,
@@ -94,6 +95,7 @@ import {
   snapshotSplitOf,
   splitTotal,
   startDraft,
+  streakProgressLine,
   verificationKeyboard,
   verificationSpeedLine,
   verificationStatusNote,
@@ -107,6 +109,7 @@ import {
   type RentalVerificationSnapshot,
   type RentalVerificationStatus,
   type SplitPartKey,
+  type StreakRow,
   type VerificationActor,
   type VerificationBrief,
 } from "./rental-verify-core";
@@ -438,6 +441,13 @@ export async function requestRentalVerification(params: {
   rentalId: string;
   actorChatId: string;
   source: string;
+  /**
+   * Task 124 — the closure modal's «✅ расчёт сходится» checkbox (checked by
+   * default). true → a calm «оператор сверил расчёт при закрытии» check rides
+   * in the snapshot; false → the row is forced to normal layout with an
+   * «оператор не согласился» warning so the second party looks twice.
+   */
+  operatorAgreed?: boolean;
 }): Promise<{ sent: boolean; reason?: string }> {
   try {
     // ── Fetch the closed rental + vehicle ──
@@ -576,6 +586,22 @@ export async function requestRentalVerification(params: {
         hasFormula: !!snapshot.formula && snapshot.formula.standardTotal > 0,
       });
       snapshot.reasonability = { ...reasonability, checkedAt: nowIso };
+      // Task 124 — the operator's «✅ расчёт сходится» vote from the closure
+      // modal. Agreement adds a check line (any layout); disagreement forces
+      // the rich layout with a warning line — the owner must look twice.
+      if (params.operatorAgreed === true) {
+        snapshot.reasonability = {
+          mode: snapshot.reasonability?.mode ?? "normal",
+          checks: [...(snapshot.reasonability?.checks || []), "оператор сверил расчёт при закрытии"],
+          checkedAt: nowIso,
+        };
+      } else if (params.operatorAgreed === false) {
+        snapshot.reasonability = {
+          mode: "normal",
+          checks: ["оператор снял отметку «расчёт ок» при закрытии — проверьте внимательнее"],
+          checkedAt: nowIso,
+        };
+      }
     } catch (reasonErr) {
       // Non-fatal: an ungraded layout just means the rich DM stays.
       logger.warn(`[rental-verify] reasonability failed for ${rental.rental_id} (non-fatal):`, reasonErr);
@@ -902,6 +928,10 @@ async function sendVerifiedDoneDms(params: {
       if (speedLine) parts.push(`\n\n${speedLine}`);
       const progress = verifyProgressLine(await countVerifiedFor(chatId).catch(() => 0));
       if (progress) parts.push(`\n${progress}`);
+      // Task 124 — the 🕶️ no-problemo streak rides with the celebration
+      // (quiet below 3; at 13 the «13 no problemo подряд» badge lands too).
+      const streakLine = streakProgressLine(await loadNoProblemoStreakFor(chatId).catch(() => 0));
+      if (streakLine) parts.push(`\n${streakLine}`);
       parts.push(`\n✨ ${warm}`);
       const next = await findNextVerificationFor({
         chatId,
@@ -2334,11 +2364,36 @@ function isSpeedyConfirm(row: RentalVerificationRow): boolean {
 // ── Achievements (gamified reconciliation) ───────────────────────────────────
 
 /**
+ * Task 124 — the party's current no-problemo streak: verified rows,
+ * newest-first (by verified_at; a verified row always has it set), walked
+ * while the frozen snapshot says no_problemo. Old pre-task123 rows without
+ * the reasonability block break the streak (unknown ≠ clean). Non-fatal.
+ */
+export async function loadNoProblemoStreakFor(chatId: string | null | undefined): Promise<number> {
+  const viewer = chatId ? String(chatId) : "";
+  if (!viewer) return 0;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("snapshot")
+      .eq("status", "verified")
+      .or(`operator_chat_id.eq.${viewer},owner_chat_id.eq.${viewer}`)
+      .order("verified_at", { ascending: false, nullsFirst: false })
+      .limit(100);
+    if (error) return 0;
+    return computeNoProblemoStreak((data || []) as StreakRow[]);
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Fired when a rental reaches «verified». Both confirming humans get credit:
  *   • rentalsVerified counter — ABSOLUTE SET from the DB (the shift.ts
  *     «731 смены» lesson: derived values are never incremented from stale
  *     totals);
  *   • verify_first / verify_10 / verify_50 / verify_100 thresholds;
+ *   • verify_streak_13 — 13 «no problemo» сверки in a row (task 124);
  *   • verify_speedy — both sides agreed within one hour of the request.
  */
 export async function grantVerificationAchievements(
@@ -2374,6 +2429,9 @@ export async function grantVerificationAchievements(
       if (verifiedCount >= 50) grants.push({ id: "verify_50", context: { verifiedCount } });
       // Task 123 (boss: «verify_100 tier») — the ladder continues.
       if (verifiedCount >= 100) grants.push({ id: "verify_100", context: { verifiedCount } });
+      // Task 124 (boss: «crank it to 13») — the no-problemo streak badge.
+      const streak = await loadNoProblemoStreakFor(chatId);
+      if (streak >= 13) grants.push({ id: "verify_streak_13", context: { streak } });
       if (opts.speedy) {
         grants.push({
           id: "verify_speedy",

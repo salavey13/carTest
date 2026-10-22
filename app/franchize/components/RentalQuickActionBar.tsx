@@ -82,9 +82,24 @@ export function RentalQuickActionBar({
 }: RentalQuickActionBarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Task 124 — the closure modal hides the bar while open: both are fixed
+  // z-50 and the bar paints OVER the modal's action row (later DOM order),
+  // pushing «Закрыть аренду» under the phone's native gestures. The modal
+  // dispatches the window event; the bar obeys. Decoupled on purpose — no
+  // prop drilling through the server page.
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Avoid hydration mismatch — only render after mount
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const onClosureModal = (e: Event) => {
+      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open === true;
+      setModalOpen(open);
+    };
+    window.addEventListener("rental-closure-modal", onClosureModal);
+    return () => window.removeEventListener("rental-closure-modal", onClosureModal);
+  }, []);
 
   // Persist collapsed state in sessionStorage so refresh respects the user's choice.
   // NOTE: We do NOT permanently dismiss — the FAB stays available so the operator
@@ -202,6 +217,10 @@ export function RentalQuickActionBar({
 
   // Now safe to early-return — hooks above have already been called unconditionally
   if (!mounted) return null;
+  // Task 124 — closure modal takes over the screen: bar steps aside entirely
+  // (both the expanded bar and the collapsed FAB — the FAB would overlap the
+  // modal's footer the same way).
+  if (modalOpen) return null;
 
   // Collapsed FAB — small floating action button.
   // goodmorning-polish: rounded-full + gap from screen edge (bottom-5 right-5 = 20px gap).

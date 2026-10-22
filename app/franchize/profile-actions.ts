@@ -572,6 +572,15 @@ function getCatalogBySlug(slug: string): FranchizeAchievementDefinition[] {
       category: "operations",
       triggerSources: ["rental:verified"],
     },
+    // Task 124 (boss: «crank it to 13») — the no-problemo STREAK. 13 clean
+    // сверки in a row (frozen snapshot reasonability.mode = no_problemo).
+    {
+      id: "verify_streak_13",
+      title: "🕶️ 13 no problemo подряд",
+      description: "13 сверок подряд — «no problemo»: расчёт сошёлся, депозит возвращён, без ущерба и штрафов. Чистая работа, без единого вопроса.",
+      category: "operations",
+      triggerSources: ["rental:verified"],
+    },
     // Task 106 (2026-10-18): negotiation «дил» badges — the dispute settle-
     // ment game. Granted when a rental reaches «verified» THROUGH an accepted
     // proposal (the pair corrected the split right in the chat and agreed).

@@ -36,6 +36,7 @@ import {
   type RentalVerificationRow,
 } from "@/app/franchize/lib/rental-verify";
 import { buildAuditStamp, computeRentalAuditGrade, computeVerificationReasonability } from "@/app/franchize/lib/rental-audit";
+import { buildClosureCommissionPreview, type ClosureCommissionPreview } from "@/app/franchize/lib/closure-commission";
 import { resolveRentalOperator, type ShiftLike } from "@/app/franchize/lib/operator-attribution";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
@@ -665,5 +666,34 @@ export async function bulkVerifyFineAction(params: {
   } catch (err: any) {
     logger.error("[rental-verify] bulkVerifyFineAction exception:", err);
     return errorResponse(handleError(err, "bulkVerifyFineAction"));
+  }
+}
+
+// ── Task 124 — commissions preview for the closure modal (lazy) ─────────────
+//
+// Codereview fix (C1): the preview used to be computed in the rental PAGE for
+// every viewer of an active rental — renters/guests got the наценка/комиссия
+// numbers serialized into the RSC payload even though the modal was
+// role-guarded client-side, and every view paid 3-4 Supabase reads. Now the
+// modal fetches it ONCE, on open, through this action:
+//   • actor resolved server-side (signed cookie via verifyCrewAccess);
+//   • crew-scoped: owner/admin/co_owner/active member only (the exact
+//     audience that can open the closure modal);
+//   • the math is the CANONICAL one — buildClosureCommissionPreview calls
+//     computeRentalVerificationSnapshot, the same builder the сверка DM
+//     freezes, so the modal and the DM can never disagree.
+export async function getClosureCommissionPreviewAction(params: {
+  slug: string;
+  rentalId: string;
+}): Promise<ActionResponse<ClosureCommissionPreview>> {
+  try {
+    const access = await verifyCrewAccess(params.slug);
+    if (!access.allowed) return { success: false, error: access.error };
+    const preview = await buildClosureCommissionPreview(params.rentalId, String(access.crewId || ""));
+    if (!preview) return { success: false, error: "Не удалось посчитать расчёт." };
+    return { success: true, data: preview };
+  } catch (err: any) {
+    logger.error("[rental-verify] getClosureCommissionPreviewAction exception:", err);
+    return errorResponse(handleError(err, "getClosureCommissionPreviewAction"));
   }
 }

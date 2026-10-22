@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
@@ -12,6 +12,12 @@ import {
 } from "@/app/rentals/actions";
 import { useRentalOdometerDraft } from "./RentalOdometerDraftContext";
 import { useKeyboardAwareOverlay } from "./useKeyboardAwareOverlay";
+// Task 124 — commissions summary in the closure modal. Lazily fetched ON OPEN
+// through a crew-gated server action (codereview fix: a page-level prop
+// leaked the наценка into renters' RSC payloads and paid queries on every
+// view). Type-only import — nothing server-side reaches the client bundle.
+import type { ClosureCommissionPreview } from "../lib/closure-commission";
+import { getClosureCommissionPreviewAction } from "../server-actions/rental-verify-actions";
 // Photo gallery import removed — gallery is only on the rental detail page, not in the closure modal
 
 // Task 47: "error boundary when closing active rent — Cannot read properties
@@ -190,6 +196,16 @@ export function FranchizeRentalLifecycleActions({
   const [closureDamageLevel, setClosureDamageLevel] = useState<"none" | "light" | "heavy">("none");
   const [closureDepositReturned, setClosureDepositReturned] = useState(true);
   const [closureReturnNotes, setClosureReturnNotes] = useState("");
+  // Task 124 — «✅ расчёт сходится» (checked by default: the operator agrees
+  // with the commissions summary at a glance; unchecking deliberately marks
+  // the сверка snapshot so the second party looks twice).
+  const [calcOk, setCalcOk] = useState(true);
+  // Task 124 (codereview fix) — the summary is LAZY: fetched once when the
+  // modal opens, through the crew-gated action. null while loading/failed —
+  // the block shows a loading hint, the operatorAgreed vote is only sent
+  // when the checkbox was actually rendered.
+  const [commissionPreview, setCommissionPreview] = useState<ClosureCommissionPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // 2026-09-28: the draft typed on the page (RentalOdometerInput autosave)
   // is the freshest client-side source for the prefill — the server prop
@@ -226,6 +242,22 @@ export function FranchizeRentalLifecycleActions({
   const abortOverlayRef = useRef<HTMLDivElement | null>(null);
   const { keyboardPx: closureKeyboardPx } = useKeyboardAwareOverlay(closureOverlayRef, closureModalOpen);
   const { keyboardPx: abortKeyboardPx } = useKeyboardAwareOverlay(abortOverlayRef, abortModalOpen);
+
+  // Task 124 — the floating quick bar (fixed, z-50, later in DOM) used to
+  // paint OVER the modal's bottom action row on mobile: the «Закрыть аренду»
+  // button sat underneath it, partially under the phone's native gestures
+  // too. The bar listens for this window event and hides itself while the
+  // modal is open (decoupled — no prop drilling through the server page).
+  useEffect(() => {
+    if (closureModalOpen) {
+      window.dispatchEvent(new CustomEvent("rental-closure-modal", { detail: { open: true } }));
+      return () => {
+        window.dispatchEvent(new CustomEvent("rental-closure-modal", { detail: { open: false } }));
+      };
+    }
+    return undefined;
+  }, [closureModalOpen]);
+
   // Themed CSS vars
   const lifecycleVars = useMemo(() => {
     if (isAuto) {
@@ -336,6 +368,25 @@ export function FranchizeRentalLifecycleActions({
                 setClosureDamageLevel("none");
                 setClosureDepositReturned(true);
                 setClosureReturnNotes("");
+                // Task 124 — «расчёт ок» re-checked every open (the summary
+                // may differ from the previous rental's; default = agree).
+                setCalcOk(true);
+                // Task 124 — lazy commissions summary: one fetch per open,
+                // non-fatal (null → the modal works without the block).
+                setCommissionPreview(null);
+                if (crewSlug) {
+                  setPreviewLoading(true);
+                  void (async () => {
+                    try {
+                      const res = await getClosureCommissionPreviewAction({ slug: crewSlug, rentalId });
+                      if (res.success && res.data) setCommissionPreview(res.data);
+                    } catch {
+                      /* block stays hidden */
+                    } finally {
+                      setPreviewLoading(false);
+                    }
+                  })();
+                }
                 // I2: reset penalty state too — don't carry over from previous rental
                 setClosurePenaltyAmount("");
                 setClosurePenaltyDestination("cash");
@@ -448,17 +499,22 @@ export function FranchizeRentalLifecycleActions({
           onClick={() => !isPending && setClosureModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-md rounded-t-2xl border p-5 sm:my-8 sm:rounded-2xl"
+            className="relative w-full max-w-md rounded-t-2xl border flex flex-col sm:my-8 sm:rounded-2xl"
             style={{
               backgroundColor: "var(--lifecycle-bg)",
               borderColor: "var(--lifecycle-border)",
               boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              // Task 124 height diet: the CARD no longer scrolls as a whole —
+              // the fields area scrolls, the action row is a fixed footer, so
+              // «Закрыть аренду» can never end up at the very bottom edge of
+              // the screen (under the quick bar / native gestures).
               maxHeight: `calc(100dvh - ${closureKeyboardPx > 0 ? closureKeyboardPx : 0}px - 1rem)`,
-              overflowY: "auto",
-              overscrollBehavior: "contain",
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-4 pb-2"
+            >
             <h3 id="closure-modal-title" className="text-lg font-bold mb-1" style={{ color: "var(--lifecycle-text)" }}>
               Подтвердить возврат
             </h3>
@@ -470,60 +526,50 @@ export function FranchizeRentalLifecycleActions({
                 "didn't appear" in the modal). */}
             {draftHint != null && (
               <p className="mb-3 rounded-lg px-2.5 py-1.5 text-[11px] font-medium" style={{ color: "var(--lifecycle-muted)", backgroundColor: "color-mix(in srgb, var(--lifecycle-accent) 8%, transparent)" }}>
-                📏 Подставлен черновик со страницы: {draftHint.toLocaleString("ru-RU")} км — при необходимости поправьте.
+                📏 Подставлен черновик со страницы: {draftHint.toLocaleString("ru-RU")} км — ввод на странице аренды.
               </p>
             )}
 
             <div className="space-y-3">
-              <label className="block">
-                <span className="text-xs font-semibold" style={{ color: "var(--lifecycle-muted)" }}>
-                  Финальный одометр (км)
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={closureOdometer}
-                  onChange={(e) => setClosureOdometer(e.target.value)}
-                  placeholder="например, 12345"
-                  disabled={isPending}
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  style={{
-                    backgroundColor: "var(--lifecycle-bg)",
-                    borderColor: "var(--lifecycle-border)",
-                    color: "var(--lifecycle-text)",
-                  }}
-                />
-                {/* 2026-09-11: end odometer is normally typed on the main rental
-                    page (live difference there) — the modal opens pre-filled.
-                    Live delta + rollback guard so the deposit deduction is
-                    obvious without mental math. */}
+              {/* Task 124 — the full odometer input lives on the rental page
+                  (with the live delta there); the modal keeps only a mini
+                  read-only line. Half the modal height won back. */}
+              <div
+                className="rounded-lg border px-3 py-2 text-xs"
+                style={{
+                  borderColor: "var(--lifecycle-border)",
+                  backgroundColor: "color-mix(in srgb, var(--lifecycle-accent) 5%, transparent)",
+                }}
+              >
                 {(() => {
                   const beforeNum = typeof odometerBefore === "number" ? odometerBefore : null;
                   const endNum = closureOdometer.trim() === "" ? null : Math.round(Number(closureOdometer));
-                  if (beforeNum == null && endNum == null) return null;
-                  if (endNum == null || Number.isNaN(endNum)) {
-                    return beforeNum != null ? (
-                      <span className="mt-1 block text-[11px]" style={{ color: "var(--lifecycle-muted)" }}>
-                        Выдача: {beforeNum.toLocaleString("ru-RU")} км — введите возврат, разница посчитается.
+                  const endValid = endNum != null && !Number.isNaN(endNum);
+                  if (!endValid) {
+                    return (
+                      <span style={{ color: "#f59e0b" }}>
+                        ⚠️ Одометр не указан — впишите «Одометр при возврате» на странице аренды (поле ниже по карточке).
                       </span>
-                    ) : null;
+                    );
                   }
-                  const delta = beforeNum != null ? endNum - beforeNum : null;
-                  const negative = delta != null && delta < 0;
+                  const delta = beforeNum != null ? endNum! - beforeNum : null;
                   return (
-                    <span
-                      className="mt-1 block text-[11px] font-semibold"
-                      style={{ color: negative ? "#ef4444" : "#22c55e" }}
-                    >
-                      {negative
-                        ? "Одометр меньше значения при выдаче — проверьте данные."
-                        : delta != null
-                          ? `Разница: ${delta.toLocaleString("ru-RU")} км за аренду.`
-                          : `Возврат: ${endNum.toLocaleString("ru-RU")} км.`}
+                    <span style={{ color: "var(--lifecycle-text)" }}>
+                      🛞 Одометр: <b>{endNum!.toLocaleString("ru-RU")} км</b>
+                      {beforeNum != null && (
+                        <>
+                          {" "}/ выдача {beforeNum.toLocaleString("ru-RU")} /{" "}
+                          <b style={{ color: delta != null && delta < 0 ? "#ef4444" : "#22c55e" }}>
+                            {delta != null && delta < 0
+                              ? "меньше выдачи — проверьте"
+                              : `+${delta!.toLocaleString("ru-RU")} км`}
+                          </b>
+                        </>
+                      )}
                     </span>
                   );
               })()}
-              </label>
+              </div>
 
               {/* Fix: show payment split from rental start — helps operator
                   understand how much was collected and in what form. */}
@@ -546,6 +592,109 @@ export function FranchizeRentalLifecycleActions({
                       {paymentSplit.cardDestination ? ` (${paymentSplit.cardDestination === "tbank" ? "Тинькофф" : "Сбербанк"})` : ""}
                     </span>
                   )}
+                </div>
+              )}
+
+              {previewLoading && !commissionPreview && (
+                <div
+                  className="rounded-lg border px-3 py-2 text-xs"
+                  style={{
+                    borderColor: "var(--lifecycle-border)",
+                    backgroundColor: "color-mix(in srgb, var(--lifecycle-accent) 5%, transparent)",
+                    color: "var(--lifecycle-muted)",
+                  }}
+                >
+                  🧮 Считаем расчёт сверки…
+                </div>
+              )}
+
+              {/* ── Task 124: commissions summary + «расчёт ок» checkbox ──
+                  The operator used to sign the closure BLIND: the сверка math
+                  appeared only after closure, in the Telegram DM. Now the same
+                  canonical numbers ride IN the modal (lazy-fetched once per
+                  open), with a pre-checked «расчёт сходится» — one glance,
+                  one tap, done. Unchecking marks the snapshot so the owner
+                  looks twice. */}
+              {commissionPreview && Number(commissionPreview.totalCost) > 0 && (
+                <div
+                  className="rounded-lg border p-3 space-y-1.5"
+                  style={{
+                    borderColor: "var(--lifecycle-border)",
+                    backgroundColor: "color-mix(in srgb, var(--lifecycle-accent) 6%, transparent)",
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold" style={{ color: "var(--lifecycle-text)" }}>
+                      🧮 Расчёт сверки
+                    </span>
+                    {commissionPreview.formula?.shortRental && (
+                      <span className="text-[10px] font-semibold" style={{ color: "#f59e0b" }}>
+                        до 24 ч — комиссия пополам
+                      </span>
+                    )}
+                  </div>
+                  {commissionPreview.formula && (
+                    <p className="text-xs leading-relaxed" style={{ color: "var(--lifecycle-muted)" }}>
+                      эталон: мот <b style={{ color: "var(--lifecycle-text)" }}>{Math.round(commissionPreview.formula.bikeStandard).toLocaleString("ru-RU")} ₽</b>
+                      {commissionPreview.formula.bikeTierLabel ? ` (${commissionPreview.formula.bikeTierLabel})` : ""}
+                      {" "}+ экип <b style={{ color: "var(--lifecycle-text)" }}>{Math.round(commissionPreview.formula.gearStandard).toLocaleString("ru-RU")} ₽</b>
+                      {" "}= <b style={{ color: "var(--lifecycle-text)" }}>{Math.round(commissionPreview.formula.standardTotal).toLocaleString("ru-RU")} ₽</b>
+                    </p>
+                  )}
+                  <p className="text-xs leading-relaxed" style={{ color: "var(--lifecycle-muted)" }}>
+                    чек <b style={{ color: "var(--lifecycle-text)" }}>{Math.round(commissionPreview.totalCost).toLocaleString("ru-RU")} ₽</b>
+                    {" "}+ наценка{" "}
+                    <b style={{ color: Number(commissionPreview.overprice) > 0 ? "#f59e0b" : "var(--lifecycle-text)" }}>
+                      {Math.round(commissionPreview.overprice).toLocaleString("ru-RU")} ₽
+                    </b>
+                    {" "}+ комиссия{" "}
+                    <b style={{ color: "#22c55e" }}>
+                      {Math.round(commissionPreview.total).toLocaleString("ru-RU")} ₽
+                    </b>
+                    {commissionPreview.formula ? (
+                      <> ({Math.round(commissionPreview.base).toLocaleString("ru-RU")} + {Math.round(commissionPreview.equipment).toLocaleString("ru-RU")} + {Math.round(commissionPreview.overprice).toLocaleString("ru-RU")})</>
+                    ) : null}
+                  </p>
+                  {commissionPreview.paper && (
+                    <p className="text-xs leading-relaxed" style={{ color: "var(--lifecycle-muted)" }}>
+                      📄 договор: <b style={{ color: "var(--lifecycle-text)" }}>{Math.round(commissionPreview.paper.totalSum).toLocaleString("ru-RU")} ₽</b>
+                      {" "}+ залог{" "}
+                      <b style={{ color: "var(--lifecycle-text)" }}>{Math.round(commissionPreview.paper.depositRub).toLocaleString("ru-RU")} ₽</b>
+                      {commissionPreview.paper.depositRub > 0 && Number(commissionPreview.depositBooks) === 0 && (
+                        <span style={{ color: "#f59e0b" }}> · в учёте залог 0 ₽</span>
+                      )}
+                      {commissionPreview.paper.depositRub > 0 &&
+                        Number(commissionPreview.depositBooks) > 0 &&
+                        Number(commissionPreview.depositBooks) !== commissionPreview.paper.depositRub && (
+                          <span style={{ color: "#f59e0b" }}>
+                            {" "}· в учёте {Math.round(commissionPreview.depositBooks).toLocaleString("ru-RU")} ₽
+                          </span>
+                        )}
+                    </p>
+                  )}
+                  <label
+                    className="flex items-start gap-2 cursor-pointer rounded-lg border px-2.5 py-2"
+                    style={{
+                      borderColor: calcOk ? "#22c55e66" : "#f59e0b99",
+                      backgroundColor: calcOk ? "#22c55e12" : "#f59e0b1a",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={calcOk}
+                      onChange={(e) => setCalcOk(e.target.checked)}
+                      disabled={isPending}
+                      className="h-4 w-4 mt-0.5"
+                    />
+                    <span className="text-xs" style={{ color: "var(--lifecycle-text)" }}>
+                      <b>Расчёт сходится</b> — сверка уйдёт владельцу автоматически
+                      {!calcOk && (
+                        <span className="block text-[11px]" style={{ color: "#f59e0b" }}>
+                          сверка уйдёт с пометкой «оператор не согласился» — владелец присмотрится
+                        </span>
+                      )}
+                    </span>
+                  </label>
                 </div>
               )}
 
@@ -725,8 +874,19 @@ export function FranchizeRentalLifecycleActions({
             {/* Photo gallery removed from closure modal (user request — modal
                 was too big, didn't fit screen height). Photos are managed on
                 the rental detail page itself, not in the closure modal. */}
+            </div>
 
-            <div className="mt-5 flex gap-2">
+            {/* Task 124 — fixed footer: always visible, out of the scroll flow,
+                safe-area aware. Combined with the quick-bar auto-hide (window
+                event) the «Закрыть аренду» button is reachable on ANY phone. */}
+            <div
+              className="flex gap-2 border-t px-5 pt-3"
+              style={{
+                borderColor: "var(--lifecycle-border)",
+                backgroundColor: "var(--lifecycle-bg)",
+                paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setClosureModalOpen(false)}
@@ -753,12 +913,17 @@ export function FranchizeRentalLifecycleActions({
                       ? parseInt(closurePenaltyAmount, 10)
                       : 0;
                     const result = await confirmVehicleReturn(rentalId, dbUser.user_id, {
-                      odometerAfter: closureOdometer ? parseInt(closureOdometer, 10) : null,
+                      odometerAfter: closureOdometer ? Math.round(Number(closureOdometer)) : null,
                       damageNotes: closureDamageLevel !== "none"
                         ? `[${closureDamageLevel === "heavy" ? "Серьёзные повреждения" : "Лёгкие повреждения"}] ${closureDamageNotes.trim()}`
                         : null,
                       depositReturned: closureDepositReturned,
                       returnNotes: closureReturnNotes.trim() || null,
+                      // Task 124 — the «расчёт сходится» vote travels into the
+                      // сверка snapshot (agreement line / disagreement flag).
+                      // Sent ONLY when the summary (and its checkbox) actually
+                      // rendered — no invisible agreement (codereview A2).
+                      operatorAgreed: commissionPreview ? calcOk : undefined,
                       // I2: penalty capture — only sent if amount > 0
                       ...(penaltyAmt > 0 ? {
                         penalty: {

@@ -1491,6 +1491,11 @@ export async function confirmVehicleReturn(
     damageNotes?: string | null;
     depositReturned?: boolean | null;
     returnNotes?: string | null;
+    // Task 124 — the closure modal's «✅ расчёт сходится» checkbox (checked
+    // by default). true = operator previewed the commissions summary and
+    // agreed; false = deliberately unchecked → the сверка snapshot carries a
+    // «оператор не согласился» warning and the owner looks twice.
+    operatorAgreed?: boolean;
     // I2: penalty capture — when operator withholds part of the deposit
     // (damage, missing fuel, etc.). Server action writes a `penalty` row
     // + a manual `deposit_returned` row matching the full collected amount
@@ -1748,6 +1753,7 @@ export async function confirmVehicleReturn(
                 rentalId,
                 actorChatId: userId,
                 source: "return_page",
+                operatorAgreed: closureData?.operatorAgreed,
             });
         } catch (verifyErr) {
             logger.warn(`[confirmVehicleReturn] Verification request failed (non-fatal):`, verifyErr);

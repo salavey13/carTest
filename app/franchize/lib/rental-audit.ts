@@ -116,6 +116,14 @@ export function computeRentalAuditGrade(input: RentalAuditInput): RentalAuditRes
 
   // C4 — contract artifact for /doc rentals, deposit-aware: the OLD template
   // printed total_sum = rent + deposit; the new one = rent only.
+  // Task 124 (October sus-разбор): 32 sus = 28 paper-vs-books. Of those, 18
+  // are pre-iter21 /doc rows (created before 2026-09-15) whose deposit never
+  // reached rentals.deposit_amount (SQL backfill fixes the books), and the
+  // rest carry small operational deltas baked into the paper number at print
+  // time (доставка / свой экип / правка цены после печати). A divergence
+  // within max(500 ₽, 5% of the paper) is operating noise → almost (the note
+  // still rides into the DM); a real gap stays sus. NB: note text must never
+  // contain a raw '<' — these strings travel into parse_mode=HTML Telegram DMs.
   if (meta.source === "doc_command" && total > 0) {
     if (!input.artifact) {
       sus("doc_command: нет rental_contract_artifacts (договор не записан)");
@@ -124,7 +132,15 @@ export function computeRentalAuditGrade(input: RentalAuditInput): RentalAuditRes
       const dep = num(input.depositAmount) || num(input.artifact.depositRub);
       const coherent = close(paper, total) || (dep > 0 && close(paper, total + dep));
       if (!coherent) {
-        sus(`договор на бумаге ${money(paper)} против книг ${money(total)} (депозит ${money(dep)}) — расхождение бумага/учёт`);
+        const tol = Math.max(500, Math.round(paper * 0.05));
+        const gapRent = Math.abs(paper - total);
+        const gapRentDep = dep > 0 ? Math.abs(paper - (total + dep)) : Infinity;
+        const gap = Math.round(Math.min(gapRent, gapRentDep));
+        if (gap <= tol) {
+          almost(`договор на бумаге ${money(paper)} против книг ${money(total)} (депозит ${money(dep)}) — расхождение ${money(gap)} в пределах допуска (доставка/правка цены после печати?)`);
+        } else {
+          sus(`договор на бумаге ${money(paper)} против книг ${money(total)} (депозит ${money(dep)}) — расхождение бумага/учёт`);
+        }
       }
     }
   }

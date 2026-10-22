@@ -434,8 +434,11 @@ export function AnalyticsClientV2({
         toast.error("Не удалось определить пользователя для экспорта");
         return;
       }
+      // Task 124 — the download is now a styled XLSX (banners/totals +
+      // verification-tinted rows). The CSV endpoint stays for the table preview.
       const csvApiUrl = buildCsvApiUrl(from, to);
-      const filename = `${initialSlug.trim()}-rentals-${from}-to-${to}.csv`;
+      const downloadApiUrl = `${csvApiUrl}&format=xlsx`;
+      const filename = `${initialSlug.trim()}-rentals-${from}-to-${to}.xlsx`;
       // Detect Telegram WebApp context (the SDK sets window.Telegram.WebApp).
       const tgWebApp =
         typeof window !== "undefined" &&
@@ -445,11 +448,11 @@ export function AnalyticsClientV2({
 
       try {
         // Always try the blob+anchor flow first (works on desktop + Android TG).
-        const resp = await fetch(csvApiUrl, {
+        const resp = await fetch(downloadApiUrl, {
           headers: { "x-telegram-user-id": actorUserId },
         });
         if (!resp.ok) {
-          toast.error("Ошибка экспорта CSV");
+          toast.error("Ошибка экспорта XLSX");
           return;
         }
         const blob = await resp.blob();
@@ -463,7 +466,7 @@ export function AnalyticsClientV2({
         URL.revokeObjectURL(url);
 
         if (!isTelegram) {
-          toast.success("CSV скачан");
+          toast.success("XLSX скачан");
           return;
         }
         // TG WebApp: the blob click may have been silently dropped by the
@@ -471,14 +474,14 @@ export function AnalyticsClientV2({
         // clipboard so the operator can open it in their system browser,
         // where Content-Disposition will trigger a real download.
         try {
-          const absoluteUrl = `${window.location.origin}${csvApiUrl}`;
+          const absoluteUrl = `${window.location.origin}${downloadApiUrl}`;
           await navigator.clipboard.writeText(absoluteUrl);
           toast.success(
-            "CSV подготовлен. Если файл не сохранился — ссылка скопирована, откройте её в браузере.",
+            "XLSX подготовлен. Если файл не сохранился — ссылка скопирована, откройте её в браузере.",
             { duration: 6000 },
           );
         } catch {
-          toast.success("CSV подготовлен");
+          toast.success("XLSX подготовлен");
         }
       } catch (error) {
         console.error("[AnalyticsV2] exportCsv:", error);
@@ -488,14 +491,14 @@ export function AnalyticsClientV2({
         // clipboard fallback above is the safer path).
         if (isTelegram && tgWebApp!.openLink) {
           try {
-            tgWebApp!.openLink!(`${window.location.origin}${csvApiUrl}`);
-            toast.info("Открываю CSV в браузере…");
+            tgWebApp!.openLink!(`${window.location.origin}${downloadApiUrl}`);
+            toast.info("Открываю XLSX в браузере…");
             return;
           } catch {
             // fall through to error toast
           }
         }
-        toast.error("Ошибка экспорта CSV");
+        toast.error("Ошибка экспорта XLSX");
       }
     },
     [getActorUserId, buildCsvApiUrl, initialSlug],
@@ -520,10 +523,12 @@ export function AnalyticsClientV2({
           to,
           actorUserId,
           variant: "rentals",
-          format: "csv",
+          // Task 124 — the bot sends the styled XLSX (verification rows
+          // tinted) — the Excel file answers «что не сверено» at a glance.
+          format: "xlsx",
         });
         if (!result.success) {
-          toast.error(result.error || "Не удалось отправить CSV в Telegram");
+          toast.error(result.error || "Не удалось отправить XLSX в Telegram");
           return;
         }
         const s = result.summary;
@@ -534,7 +539,7 @@ export function AnalyticsClientV2({
             { duration: 5000 },
           );
         } else {
-          toast.success("CSV отправлен в Telegram");
+          toast.success("XLSX отправлен в Telegram");
         }
       } catch (err) {
         console.error("[AnalyticsV2] sendCsvToTelegram:", err);

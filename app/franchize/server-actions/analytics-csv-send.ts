@@ -21,6 +21,7 @@
 import { sendTelegramDocument } from "@/app/actions";
 import { buildRentalsCsv } from "@/lib/csv-builders/rentals-csv";
 import { buildSalesCsv } from "@/lib/csv-builders/sales-csv";
+import { csvToXlsxBuffer } from "@/lib/csv-builders/csv-to-xlsx";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
@@ -58,126 +59,11 @@ export interface SendAnalyticsCsvResult {
   };
 }
 
-// ── Optional XLSX conversion (lazy-loaded so server cold-start doesn't pay
-// the ExcelJS cost unless the user actually requests XLSX). ──────────────────
-async function convertCsvToXlsx(csv: string, sheetName = "Sheet1"): Promise<Buffer> {
-  // ExcelJS is a CJS module — use dynamic import to avoid bundler issues.
-  const ExcelJS = await import("exceljs");
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet(sheetName);
-
-  // Parse the CSV (RFC-4180-lite) — same logic as the modal's parser.
-  const parseLine = (line: string): string[] => {
-    const out: string[] = [];
-    let i = 0;
-    let field = "";
-    let inQ = false;
-    while (i < line.length) {
-      const ch = line[i];
-      if (inQ) {
-        if (ch === '"') {
-          if (line[i + 1] === '"') { field += '"'; i += 2; continue; }
-          inQ = false; i++; continue;
-        }
-        field += ch; i++; continue;
-      }
-      if (ch === '"') { inQ = true; i++; continue; }
-      if (ch === ",") { out.push(field); field = ""; i++; continue; }
-      field += ch; i++;
-    }
-    out.push(field);
-    return out;
-  };
-
-  // Split lines (handle CRLF + LF + lone CR)
-  const lines: string[] = [];
-  let cur = "";
-  for (let i = 0; i < csv.length; i++) {
-    const ch = csv[i];
-    if (ch === "\r") {
-      lines.push(cur); cur = "";
-      if (csv[i + 1] === "\n") i++;
-      continue;
-    }
-    if (ch === "\n") { lines.push(cur); cur = ""; continue; }
-    cur += ch;
-  }
-  if (cur.length > 0) lines.push(cur);
-
-  // iter52: row classification for styling — block banner rows (single cell
-  // «АРЕНДЫ»/«ЭКИП»/«СЕРВИС»/«ПРОДАЖИ»/«СВОДКА») and «Итого …»/«ВСЕГО» rows
-  // get emphasized styling on top of the legacy first-row header treatment.
-  const BANNER_RE = /^(АРЕНДЫ|ЭКИП|СЕРВИС|ПРОДАЖИ|СВОДКА)/;
-  const TOTALS_RE = /^(Итого|ВСЕГО)/;
-  const classifyRow = (cells: string[]): "banner" | "totals" | "header" | "data" | "empty" => {
-    const nonEmpty = cells.filter((c) => c.trim() !== "");
-    if (nonEmpty.length === 0) return "empty";
-    if (nonEmpty.length === 1 && BANNER_RE.test(nonEmpty[0].trim())) return "banner";
-    // sales-csv puts «Итого:» in a middle cell → scan all cells.
-    if (cells.some((c) => TOTALS_RE.test(c.trim()))) return "totals";
-    return "data";
-  };
-
-  const parsedRows: { cells: string[]; kind: ReturnType<typeof classifyRow> }[] = [];
-  for (const line of lines) {
-    if (!line) continue;
-    const cells = parseLine(line);
-    const kind = classifyRow(cells);
-    if (kind === "empty") { parsedRows.push({ cells, kind }); continue; }
-    // Cast numeric strings to numbers so Excel formats them properly.
-    const row = cells.map((c) => {
-      const t = c.trim();
-      if (t === "") return "";
-      const n = Number(t.replace(/\s/g, "").replace(",", "."));
-      return Number.isFinite(n) && /^\d+([.,]\d+)?$/.test(t) ? n : c;
-    });
-    parsedRows.push({ cells: row, kind });
-  }
-
-  for (const { cells, kind } of parsedRows) {
-    ws.addRow(cells);
-  }
-
-  // Style the first row (legacy single-header sheets) + every block banner
-  // row (bold + accent fill); «Итого …» / «ВСЕГО» rows render bold.
-  const styled = (rowIndex: number, style: "header" | "banner" | "totals") => {
-    const row = ws.getRow(rowIndex);
-    row.eachCell((cell) => {
-      if (style === "totals") {
-        cell.font = { bold: true };
-        cell.border = { top: { style: "thin", color: { argb: "FF9CA3AF" } } };
-      } else {
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: style === "banner" ? "FF111827" : "FF3B82F6" },
-        };
-      }
-    });
-  };
-  parsedRows.forEach(({ kind }, idx) => {
-    const rowIndex = idx + 1;
-    if (kind === "banner") styled(rowIndex, "banner");
-    else if (kind === "totals") styled(rowIndex, "totals");
-  });
-  if (parsedRows.length > 0 && parsedRows[0].kind === "data") {
-    styled(1, "header");
-  }
-
-  // Auto-size columns (approximate by max cell length)
-  ws.columns.forEach((col) => {
-    let max = 10;
-    col.eachCell?.({ includeEmpty: false }, (cell) => {
-      const s = String(cell.value ?? "");
-      if (s.length > max) max = s.length;
-    });
-    col.width = Math.min(max + 2, 40);
-  });
-
-  const buf = await wb.xlsx.writeBuffer();
-  return Buffer.from(buf);
-}
+// ── XLSX conversion lives in lib/csv-builders/csv-to-xlsx.ts (task 124) ──
+// The converter moved out of this "use server" file so the browser download
+// route (rentals-csv-export?format=xlsx) shares ONE implementation — and so
+// a pure helper is not exposed as a callable server action. Task 124 added
+// verification-status coloring (tinted rows + bold colored status cell).
 
 export async function sendAnalyticsCsvToTelegram(
   params: SendAnalyticsCsvParams,
@@ -269,7 +155,7 @@ export async function sendAnalyticsCsvToTelegram(
 
     if (format === "xlsx") {
       try {
-        fileContent = await convertCsvToXlsx(built.csv, variant === "rentals" ? "Выгрузка" : "Продажи");
+        fileContent = await csvToXlsxBuffer(built.csv, variant === "rentals" ? "Выгрузка" : "Продажи");
         filename = `${baseFilename}.xlsx`;
         mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       } catch (xlsxErr) {

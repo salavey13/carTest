@@ -260,11 +260,20 @@ describe('iter52: analytics-csv-send block caption', () => {
   });
 
   it('XLSX conversion styles block banners + Итого/ВСЕГО rows', () => {
-    const s = src();
+    // Task 124: the converter moved to lib/csv-builders/csv-to-xlsx.ts (shared
+    // with the ?format=xlsx download route + verification coloring).
+    const s = read('lib/csv-builders/csv-to-xlsx.ts');
     expect(s).toContain('/^(АРЕНДЫ|ЭКИП|СЕРВИС|ПРОДАЖИ|СВОДКА)/');
     expect(s).toContain('/^(Итого|ВСЕГО)/');
     expect(s).toContain('styled(rowIndex, "banner")');
     expect(s).toContain('styled(rowIndex, "totals")');
+    // Task 124: verification coloring rides in the same converter…
+    expect(s).toContain('verificationToneOf');
+    expect(s).toContain('ROW_TINT');
+    // …and the send action delegates to it (no local copy left behind).
+    const send = read('app/franchize/server-actions/analytics-csv-send.ts');
+    expect(send).toContain('csvToXlsxBuffer');
+    expect(send).not.toContain('async function convertCsvToXlsx');
   });
 });
 

@@ -12,6 +12,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyCrewAccess } from "../_auth";
 import { buildRentalsCsv } from "@/lib/csv-builders/rentals-csv";
+import { csvToXlsxBuffer } from "@/lib/csv-builders/csv-to-xlsx";
+
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 // Reads request.url (searchParams) + cookies-based crew auth → must never be
 // statically prerendered (Vercel build fails with DYNAMIC_SERVER_USAGE otherwise).
@@ -24,6 +27,9 @@ export async function GET(request: NextRequest) {
     const slug = searchParams.get("slug") || "";
     const from = searchParams.get("from");
     const to = searchParams.get("to");
+    // Task 124 — ?format=xlsx returns a styled Excel workbook (banners,
+    // totals, verification-tinted rows) instead of the raw CSV.
+    const format = searchParams.get("format") === "xlsx" ? "xlsx" : "csv";
 
     if (!slug || !from || !to) {
       return NextResponse.json({ error: "slug, from, to are required" }, { status: 400 });
@@ -48,6 +54,17 @@ export async function GET(request: NextRequest) {
     if (auth.ok === false) return auth.response;
 
     const { csv, filename } = await buildRentalsCsv(slug, from, to);
+
+    if (format === "xlsx") {
+      const buf = await csvToXlsxBuffer(csv, "Выгрузка");
+      return new NextResponse(new Uint8Array(buf), {
+        status: 200,
+        headers: {
+          "Content-Type": XLSX_MIME,
+          "Content-Disposition": `attachment; filename="${filename.replace(/\.csv$/, ".xlsx")}"`,
+        },
+      });
+    }
 
     return new NextResponse(csv, {
       status: 200,
