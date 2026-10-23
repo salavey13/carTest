@@ -15,6 +15,18 @@
 // operator salary (ЗП аренды + ЗП продажи; gear & service pay no bonus).
 // Legacy flat sheets (sales variant, old exports) fall back to the original
 // single-grid rendering.
+//
+// Task 127 (2026-10-23, boss):
+//   1. Verification row tints are now THEME-PROOF: they mix the tone color
+//      into the theme's own card bg (color-mix) — light theme keeps its pastel
+//      rows, dark theme gets a DARK tint so white body text stays readable
+//      (the old hardcoded pastels washed out white text in dark).
+//   2. The whole modal panel clears the Telegram fullscreen native buttons
+//      (useTelegramContentSafeTop) — the header «x» no longer hides under
+//      them; closing always reachable.
+//   3. When ≥2 operators carry ЗП this period, a «ЗП по операторам» strip
+//      splits the commissions (who has how much of the total + %), and table
+//      rows get the operator's stable emoji marker (date cell + op cell).
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -22,6 +34,16 @@ import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera } from "lucide-react";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { toNumber } from "./lib/csv-money";
+// Task 127 — fullscreen TG native buttons (close/expand) overlay the top-right
+// corner; without this the header «x» sits right under them.
+import { useTelegramContentSafeTop } from "@/app/franchize/hooks/useTelegramContentSafeTop";
+// Task 127 — per-operator commission split + stable emoji identities.
+import {
+  buildOperatorSplit,
+  operatorIconOf,
+  operatorColorOf,
+  type OperatorSplitEntry,
+} from "./lib/operator-split";
 import {
   parseCsvSections,
   pluralBlocksRu,
@@ -44,6 +66,10 @@ interface ExportCsvModalProps {
   variant?: "rentals" | "sales";
   /** Crew slug — powers the rental-row tap-through (АРЕНДЫ block). */
   slug?: string;
+  /** Task 127 — dark theme ⇒ brighter verification tone text. Optional: when
+   *  the caller can't know (CSS-var themes) the light tones are kept — the
+   *  row tints stay theme-proof either way (they derive from the theme bg). */
+  isDark?: boolean;
 }
 
 function firstDayOfMonthIso(): string {
@@ -141,12 +167,16 @@ const SALES_NUMERIC_COLS = new Set([3]);
 const SALES_DATE_COLS = new Set([0]);
 
 // ── Block-section column kinds (iter52) ─────────────────────────────────────
-// Column indexes per block of the new sheet layout:
-//   АРЕНДЫ  (15): Дата, ЗП, Партнеру, Цена, Экип, Залог, Марка, Одо, Одо,
-//                 Время, Комментарий, Заметки, Субарендатор, Фото, ID
+// Column indexes per block of the new sheet layout (builder: rentals-csv.ts):
+//   АРЕНДЫ  (25): Дата, ЗП Аренда, Партнеру, Цена, Экип, Залог, Марка,
+//                 Пробег до, Пробег после, Время, Комментарий, Заметки,
+//                 Субарендатор, Фото, ID, ЗП техника, ЗП экип, ЗП наценка,
+//                 Экип флаги, Оператор создал, Оператор выдал, Оператор
+//                 принял, Оператор (ЗП), Атрибуция ЗП, Верификация
 //   ЭКИП     (7): Дата, Наименование, Цена, Выдал, Принял, Комментарий, ID
 //   СЕРВИС   (5): Дата, Услуга, Байк, Цена, ID
-//   ПРОДАЖИ  (6): Дата, ЗП Продажа, Наименование, Цена, Комментарий, ID
+//   ПРОДАЖИ  (8): Дата, ЗП Продажа, Наименование, Цена, Комментарий, ID,
+//                 Оператор (ЗП), Атрибуция ЗП
 //   СВОДКА   (5): Блок, Записей, Выручка, ЗП, Примечание
 interface SectionColCfg {
   numeric: Set<number>;
@@ -157,6 +187,9 @@ interface SectionColCfg {
   photos?: number;
   /** Task 124 — «Верификация» column (АРЕНДЫ only): colored + tints the row. */
   verification?: number;
+  /** Task 127 — «Оператор (ЗП)» column: powers the commission split + row
+   *  emoji markers (АРЕНДЫ col 22, ПРОДАЖИ col 6 in the new sheet layout). */
+  opCol?: number;
   /** Rental uuid column for the row tap-through (АРЕНДЫ only). */
   idCol: number;
 }
@@ -170,11 +203,12 @@ const SECTION_COLS: Record<CsvSectionKey, SectionColCfg> = {
     subrenter: 12,
     photos: 13,
     verification: 24,
+    opCol: 22,
     idCol: 14,
   },
   equipment: { numeric: new Set([2]), date: new Set([0]), hide: new Set([6]), idCol: -1 },
   service: { numeric: new Set([3]), date: new Set([0]), hide: new Set([4]), idCol: -1 },
-  sales: { numeric: new Set([1, 3]), date: new Set([0]), hide: new Set([5]), idCol: -1 },
+  sales: { numeric: new Set([1, 3]), date: new Set([0]), hide: new Set([5]), opCol: 6, idCol: -1 },
   summary: { numeric: new Set([1, 2, 3]), date: new Set(), hide: new Set(), idCol: -1 },
 };
 
@@ -206,16 +240,33 @@ function verificationToneOf(label: string): VerTone {
   if (s.includes("ждёт") || s.includes("ожидает")) return "waiting";
   return null;
 }
-const VER_TONE_BG: Record<Exclude<VerTone, null>, string> = {
-  verified: "#e7f6ec",
-  disputed: "#fde9e9",
-  waiting: "#fdf3e0",
-};
 const VER_TONE_FG: Record<Exclude<VerTone, null>, string> = {
   verified: "#16a34a",
   disputed: "#dc2626",
   waiting: "#d97706",
 };
+// Task 127 — dark theme reads better with brighter tone text (the light-theme
+// greens/reds are tuned for pastel-on-white and go muted on dark tints).
+const VER_TONE_FG_DARK: Record<Exclude<VerTone, null>, string> = {
+  verified: "#4ade80",
+  disputed: "#f87171",
+  waiting: "#fbbf24",
+};
+
+// Task 127 — THEME-PROOF row tints. The old hardcoded pastel hexes sit
+// on white and washed out in the dark theme: pastel bg + white body text ≈
+// white-on-white. Now the tint MIXES the tone color into the theme's own base:
+//   light (white card)  → the same familiar pastels as before (~13% over white);
+//   dark (near-black)   → a DARK tint — white body text stays readable.
+const VER_TONE_TINT_PCT: Record<Exclude<VerTone, null>, number> = {
+  verified: 14,
+  disputed: 13,
+  waiting: 12,
+};
+const verToneBg = (tone: Exclude<VerTone, null>, base: string): string =>
+  `color-mix(in srgb, ${VER_TONE_FG[tone]} ${VER_TONE_TINT_PCT[tone]}%, ${base})`;
+const verToneFg = (tone: Exclude<VerTone, null>, isDark?: boolean): string =>
+  isDark ? VER_TONE_FG_DARK[tone] : VER_TONE_FG[tone];
 
 export function ExportCsvModal({
   isOpen,
@@ -226,8 +277,14 @@ export function ExportCsvModal({
   T,
   variant = "rentals",
   slug,
+  isDark,
 }: ExportCsvModalProps) {
   const router = useRouter();
+  // Task 127 — px of the TG fullscreen native-buttons zone (exact measurement
+  // on Bot API 8.0+, the app-wide 54px comfort floor on mobile otherwise,
+  // 0 outside Telegram / on wide viewports). Pushes the header — and its
+  // top-right «x» — below the overlapped corner.
+  const tgSafeTop = useTelegramContentSafeTop();
   const [from, setFrom] = useState(firstDayOfMonthIso());
   const [to, setTo] = useState(todayIso());
   const [rows, setRows] = useState<string[][]>([]);
@@ -365,6 +422,7 @@ export function ExportCsvModal({
       totals: null,
     };
   };
+
   // Empty blocks (no data this period) are hidden entirely — the СВОДКА
   // block still reports their zero totals.
   const visibleSections = isSectioned
@@ -406,6 +464,35 @@ export function ExportCsvModal({
 
   const formatMoney = (n: number): string =>
     n.toLocaleString("ru-RU", { maximumFractionDigits: 0 });
+
+  // Task 127 — per-operator commission split. Grouped over the VISIBLE
+  // (filtered) sections — the same rows the totals tiles sum, so the pills
+  // never contradict the «Σ ЗП» tile. Rentals col 22 + sales col 6 carry the
+  // attribution printed by the builder (same chain as the profile math).
+  const opSplit: OperatorSplitEntry[] = (() => {
+    if (!isSectioned) return [];
+    const entries: { label: string; amount: number }[] = [];
+    for (const s of visibleSections) {
+      const cfg = SECTION_COLS[s.key];
+      // Only blocks that both pay and attribute ЗП (АРЕНДЫ, ПРОДАЖИ).
+      if (cfg.opCol == null || s.key === "summary") continue;
+      for (const r of s.data) {
+        const label = (r[cfg.opCol] || "").trim();
+        if (!label) continue;
+        entries.push({ label, amount: toNumber(r[1] || "") });
+      }
+    }
+    return buildOperatorSplit(entries, sumRentSalary + sumSalesSalary);
+  })();
+  // Split pills render only when the period actually has SEVERAL operators —
+  // with one operator the plain «Σ ЗП» tile already tells the whole story.
+  const showOpSplit = opSplit.length >= 2;
+  const opGrandTotal = sumRentSalary + sumSalesSalary;
+  const opAttributed = opSplit.reduce((acc, o) => acc + o.amount, 0);
+  const opUnattributed = Math.max(0, opGrandTotal - opAttributed);
+  // Row emoji markers ride with the split: with a single operator every row
+  // would wear the same icon — noise instead of information.
+  const showOpMarkers = showOpSplit;
 
   // ── Legacy single-grid values (sales variant / old flat sheets) ───────────
   const headerRow = rows[0] ?? [];
@@ -469,7 +556,13 @@ export function ExportCsvModal({
     >
       <div
         className="flex h-full w-full flex-col sm:h-auto sm:max-h-[88vh] sm:max-w-5xl border shadow-2xl overflow-hidden sm:rounded-2xl"
-        style={{ backgroundColor: T.bgCard, borderColor: T.border }}
+        // Task 127 — the panel starts BELOW the TG fullscreen native buttons:
+        // the header row (and its top-right «x») can no longer hide under them.
+        style={{
+          backgroundColor: T.bgCard,
+          borderColor: T.border,
+          ...(tgSafeTop > 0 ? { paddingTop: `${tgSafeTop}px` } : {}),
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header — title + close + date pickers + actions ────────────────── */}
@@ -674,6 +767,61 @@ export function ExportCsvModal({
           </div>
         )}
 
+        {/* ── ЗП по операторам (Task 127) — who has how much of the total ──────
+            Rendered only when ≥2 operators carry ЗП this period; with one
+            operator the «Σ ЗП» tile above already tells the whole story.
+            Empty-label rows are surfaced as «без атрибуции» so the pills
+            always reconcile against the tile. */}
+        {!loading && !error && showOpSplit && (
+          <div
+            className="border-b px-3 py-2"
+            style={{ borderColor: T.border, backgroundColor: T.bg }}
+            role="group"
+            aria-label="Комиссии по операторам"
+          >
+            <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2">
+              <span
+                className="text-[10px] font-medium uppercase tracking-wide"
+                style={{ color: T.textMuted }}
+              >
+                ЗП по операторам
+              </span>
+              <span className="text-[11px] font-bold tabular-nums" style={{ color: T.text }}>
+                {formatMoney(opGrandTotal)} ₽
+              </span>
+              {opUnattributed > 0.5 && (
+                <span className="text-[10px] tabular-nums" style={{ color: T.textMuted }}>
+                  · без атрибуции {formatMoney(opUnattributed)} ₽
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {opSplit.map((op) => (
+                <span
+                  key={op.label}
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${op.color} 45%, transparent)`,
+                    backgroundColor: `color-mix(in srgb, ${op.color} 14%, ${T.bgCard})`,
+                    color: T.text,
+                  }}
+                  title={`${op.label} — ${formatMoney(op.amount)} ₽ из ${formatMoney(opGrandTotal)} ₽`}
+                >
+                  <span aria-hidden>{op.icon}</span>
+                  <span
+                    className="max-w-[10rem] truncate"
+                    style={{ color: op.color }}
+                  >
+                    {op.label}
+                  </span>
+                  <span className="tabular-nums">{formatMoney(op.amount)} ₽</span>
+                  <span className="tabular-nums opacity-60">{Math.round(op.share * 100)}%</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Сверка filter chips (Task 126) — legend + one-tap «что не сверено» ── */}
         {!loading && !error && isSectioned && (rentalsSectionRaw?.data.length ?? 0) > 0 && (
           <div
@@ -687,9 +835,9 @@ export function ExportCsvModal({
             </span>
             {([
               { key: "all" as const, label: "Все", count: verCounts.all, fg: T.text, bg: "transparent" },
-              { key: "verified" as const, label: "✅ сверены", count: verCounts.verified, fg: VER_TONE_FG.verified, bg: VER_TONE_BG.verified },
-              { key: "waiting" as const, label: "⏳ ждут", count: verCounts.waiting, fg: VER_TONE_FG.waiting, bg: VER_TONE_BG.waiting },
-              { key: "disputed" as const, label: "⚠️ споры", count: verCounts.disputed, fg: VER_TONE_FG.disputed, bg: VER_TONE_BG.disputed },
+              { key: "verified" as const, label: "✅ сверены", count: verCounts.verified, fg: verToneFg("verified", isDark), bg: verToneBg("verified", T.bgElevated) },
+              { key: "waiting" as const, label: "⏳ ждут", count: verCounts.waiting, fg: verToneFg("waiting", isDark), bg: verToneBg("waiting", T.bgElevated) },
+              { key: "disputed" as const, label: "⚠️ споры", count: verCounts.disputed, fg: verToneFg("disputed", isDark), bg: verToneBg("disputed", T.bgElevated) },
               { key: "none" as const, label: "➕ без сверки", count: verCounts.none, fg: T.textMuted, bg: T.bgElevated },
             ]).map((chip) => {
               const active = verFilter === chip.key;
@@ -765,6 +913,8 @@ export function ExportCsvModal({
                     section={s}
                     T={T}
                     slug={slug}
+                    isDark={isDark}
+                    showOpMarkers={showOpMarkers}
                     onOpenRental={openRentalById}
                   />
                 ))}
@@ -999,11 +1149,15 @@ function SectionTable({
   section,
   T,
   slug,
+  isDark,
+  showOpMarkers = false,
   onOpenRental,
 }: {
   section: ParsedCsvSection;
   T: ThemeTokens;
   slug?: string;
+  isDark?: boolean;
+  showOpMarkers?: boolean;
   onOpenRental: (rentalId: string) => void;
 }) {
   const cfg = SECTION_COLS[section.key];
@@ -1064,13 +1218,21 @@ function SectionTable({
               section.key === "rentals" && cfg.idCol >= 0 ? (r[cfg.idCol] || "").trim() : "";
             const rowClickable = !!rowRentalId && !!slug;
             const isGrandTotal = isSummary && (r[0] || "").trim().toUpperCase() === "ВСЕГО";
-            // Task 124 — verification tint for the whole АРЕНДЫ row.
+            // Task 124 — verification tint for the whole АРЕНДЫ row (Task 127:
+            // the tint mixes into the THEME bg — dark theme gets a dark tint,
+            // white text stays readable).
             const verTone =
               section.key === "rentals" && cfg.verification != null
                 ? verificationToneOf(r[cfg.verification] || "")
                 : null;
+            // Task 127 — operator identity for this row (when the split is on).
+            const opLabel =
+              showOpMarkers && cfg.opCol != null ? (r[cfg.opCol] || "").trim() : "";
+            const opMeta = opLabel
+              ? { icon: operatorIconOf(opLabel), color: operatorColorOf(opLabel) }
+              : null;
             const rowBg = verTone
-              ? VER_TONE_BG[verTone]
+              ? verToneBg(verTone, T.bgCard)
               : isGrandTotal
                 ? T.bgElevated
                 : isAlt
@@ -1130,8 +1292,10 @@ function SectionTable({
                         ...(ci === cfg.subrenter && cell ? { color: "#f59e0b" } : {}),
                         ...(ci === cfg.photos && cell ? { color: "#22c55e", fontWeight: 600 } : {}),
                         ...(ci === cfg.verification && verTone
-                          ? { color: VER_TONE_FG[verTone], fontWeight: 700 }
+                          ? { color: verToneFg(verTone, isDark), fontWeight: 700 }
                           : {}),
+                        // Task 127 — the operator's label wears their color.
+                        ...(opMeta && ci === cfg.opCol ? { color: opMeta.color, fontWeight: 600 } : {}),
                         ...(ci === 0
                           ? {
                               position: "sticky",
@@ -1147,6 +1311,14 @@ function SectionTable({
                         <span className="inline-flex items-center gap-1">
                           <Camera className="h-3 w-3" aria-hidden />
                           {cell}
+                        </span>
+                      ) : opMeta && (ci === 0 || ci === cfg.opCol) ? (
+                        // Task 127 — crew-member marker: stable emoji on the
+                        // sticky date cell (always visible while scrolling)
+                        // and next to the name in «Оператор (ЗП)».
+                        <span className="inline-flex items-center gap-1">
+                          <span aria-hidden>{opMeta.icon}</span>
+                          {cell || "\u00A0"}
                         </span>
                       ) : (
                         cell || "\u00A0"

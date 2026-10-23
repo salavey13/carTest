@@ -85,6 +85,9 @@ interface AnalyticsClientProps {
    *  server action re-checks the role; this only hides the money button from
    *  tiers that can never use it. */
   viewerIsOwnerTier?: boolean;
+  /** Task 127: dark theme — brightens the verification tone text in the
+   *  table view modal (row tints are theme-proof regardless). */
+  isDark?: boolean;
 }
 
 export function AnalyticsClient({
@@ -108,6 +111,7 @@ export function AnalyticsClient({
   onSendCsvToTelegram,
   onDataRefresh,
   viewerIsOwnerTier = false,
+  isDark,
 }: AnalyticsClientProps) {
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
@@ -550,6 +554,7 @@ export function AnalyticsClient({
           variant="rentals"
           slug={initialSlug}
           T={T}
+          isDark={isDark}
         />
       )}
 

@@ -610,6 +610,9 @@ export function AnalyticsClientV2({
       onSendCsvToTelegram={sendCsvToTelegram}
       onDataRefresh={() => setReloadToken((t) => t + 1)}
       viewerIsOwnerTier={viewerIsOwnerTier}
+      // Task 127 — the resolved theme mode drives the verification tone text
+      // in the table view modal (brighter tones on dark).
+      isDark={!themeArgs.isLightTheme}
     />
   );
 }

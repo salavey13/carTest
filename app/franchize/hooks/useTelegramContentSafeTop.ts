@@ -43,6 +43,12 @@ const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 1023px)";
 type TgWebAppLike = {
   contentSafeAreaInset?: { top?: number } | null;
   isFullscreen?: boolean;
+  // Task 127 fix: the SDK event subscription lives on the SAME object, but the
+  // old `?? readWebApp()` fallback widened the union back to this plain shape,
+  // so `source?.onEvent?.(...)` was a TS2339. Declared here once — the
+  // intersection cast below stays as belt-and-suspenders for odd clients.
+  onEvent?: (event: string, cb: () => void) => void;
+  offEvent?: (event: string, cb: () => void) => void;
 };
 
 function readWebApp(): TgWebAppLike | undefined {

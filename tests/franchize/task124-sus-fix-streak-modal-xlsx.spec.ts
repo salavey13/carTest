@@ -269,7 +269,10 @@ describe("task124: analytics XLSX export", () => {
     const modal = read("app/franchize/[slug]/rentals-analytics/components/ExportCsvModal.tsx");
     expect(modal).toContain("verification: 24");
     expect(modal).toContain("verificationToneOf");
-    expect(modal).toContain("VER_TONE_BG");
+    // Task 127 renamed the hardcoded pastels to theme-derived tints
+    // (color-mix into the theme bg — dark theme no longer washes out).
+    expect(modal).toContain("verToneBg");
+    expect(modal).toContain("VER_TONE_TINT_PCT");
   });
 
   it("CSV column layout untouched (task101 pin still holds)", () => {
