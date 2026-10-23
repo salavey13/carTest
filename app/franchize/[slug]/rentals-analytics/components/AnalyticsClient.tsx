@@ -555,6 +555,7 @@ export function AnalyticsClient({
           slug={initialSlug}
           T={T}
           isDark={isDark}
+          canVerify={viewerIsOwnerTier}
         />
       )}
 

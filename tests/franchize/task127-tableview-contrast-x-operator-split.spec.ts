@@ -124,9 +124,10 @@ describe("task127 · ExportCsvModal operator split wiring", () => {
     expect(modal).toContain("opCol: 6,");
   });
 
-  it("split sums the ЗП column (col 1) over the VISIBLE sections only", () => {
+  it("split sums the ЗП column (col 1) over the PRE-op-filter sections (task128: pills stay tappable while filtered)", () => {
     expect(modal).toContain("entries.push({ label, amount: toNumber(r[1] || \"\") });");
-    expect(modal).toContain("buildOperatorSplit(entries, sumRentSalary + sumSalesSalary)");
+    expect(modal).toContain("return buildOperatorSplit(entries, opGrandTotal);");
+    expect(modal).toContain("const opGrandTotal = sumCell(rentPre, 1) + sumCell(salesPre, 1);");
   });
 
   it("pills render only when ≥2 operators share the period", () => {

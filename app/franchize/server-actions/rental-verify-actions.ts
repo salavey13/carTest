@@ -76,6 +76,19 @@ export async function adminVerifyRentalAction(params: {
     if (rentalError) throw rentalError;
     const rental = rentalRow as any;
     if (!rental) return { success: false, error: "Аренда не найдена." };
+    // Task 128 hardening: a сверка confirms the money of a CLOSED deal. The
+    // CommissionVerificationCard gates the button client-side (isClosed =
+    // completed) and the table-view quick-verify now reuses this action too —
+    // so the server enforces the same rule as the resend action below: the
+    // АРЕНДЫ CSV block also carries in-progress rows (the builder only
+    // excludes cancelled), and stamping a сверка on those would be fiction
+    // (task126 codereview #1 principle).
+    if (rental.status !== "completed") {
+      return {
+        success: false,
+        error: `Сверка заводится только по закрытым арендам (текущий статус: ${rental.status || "неизвестен"}).`,
+      };
+    }
 
     // ── Load or create the verification row (shared with the resend action) ──
     let row: RentalVerificationRow;
