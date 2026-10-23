@@ -38,8 +38,18 @@
 //      server action as the rental-page card) → optimistic «подтверждено»
 //      tint + a silent CSV refetch for the canonical label. The October
 //      never-verified sweep is now «filter ➕ без сверки → ✓ ✓ ✓».
+//
+// Task 129 (2026-10-24, boss: "yes i want:)"):
+//   «Подтвердить все видимые» — when BOTH the operator filter AND the
+//   «без сверки» chip are active, a bulk button appears next to the chips:
+//   ONE confirm for N visible rows, then the same owner-gated action runs
+//   per row (the server re-gates every call: owner tier + completed status
+//   + idempotent on already-verified). Honest by construction: the button
+//   counts exactly what is on screen, failures are counted per row and
+//   reported in one summary toast, ONE silent refetch canonicalises the
+//   labels (no N redundant CSV rebuilds).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera, Check } from "lucide-react";
@@ -245,6 +255,16 @@ function isNumericLike(s: string): boolean {
   return t !== "" && !Number.isNaN(Number(t));
 }
 
+// Task 129 — Russian plural for counts in the bulk confirm/labels
+// (1 аренда / 2 аренды / 5 аренд; 21 аренда…). Classic 3-form rule.
+function pluralRuNoun(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
 // ── Task 124 — verification status coloring (mirrors the XLSX converter) ────
 // The «Верификация» column (АРЕНДЫ block) renders colored + the whole row
 // gets a light tint, so the operator's eye lands on what is still unverified.
@@ -324,6 +344,14 @@ export function ExportCsvModal({
   // tint until the silent CSV refetch brings the canonical label).
   const [verifyingIds, setVerifyingIds] = useState<Set<string>>(() => new Set());
   const [justVerified, setJustVerified] = useState<Set<string>>(() => new Set());
+  // Task 129 — bulk «подтвердить все видимые» progress: {total, done} while
+  // the batch is running (button label counts up, per-row ✓ spinners ride the
+  // shared verifyingIds), null = idle. The loop keeps its own snapshot of the
+  // ids captured at confirm time — filter changes mid-run can't skew it.
+  const [bulkVerify, setBulkVerify] = useState<{ total: number; done: number } | null>(null);
+  // Belt-and-braces against a second batch racing the first (state batching
+  // alone leaves a one-tick window between the click and the re-render).
+  const bulkRunRef = useRef(false);
 
   const loadTable = useCallback(async (opts?: { silent?: boolean }) => {
     if (!fetchCsvText || !from || !to || from > to) return;
@@ -339,6 +367,11 @@ export function ExportCsvModal({
     try {
       const text = await fetchCsvText(from, to);
       setRows(parseCsv(text));
+      // Task 129 review fix — canonical data is on screen now: drop the session
+      // optimism so the row tints always follow the CSV label (not a stale
+      // just-verified stamp). A silent failure never reaches this line — the
+      // optimistic tint correctly survives a failed refetch.
+      setJustVerified((prev) => (prev.size > 0 ? new Set<string>() : prev));
     } catch (e) {
       // FIX (iter6): show the ACTUAL error next to the generic message so the
       // operator can tell a 500 from an offline device from a bad date range.
@@ -391,6 +424,78 @@ export function ExportCsvModal({
   // server action re-gates anyway — this is presentation only.
   const canQuickVerify = canVerify && variant === "rentals" && !!slug;
 
+  // Task 129 — «подтвердить все видимые»: ONE confirm, N rows. Available only
+  // when BOTH scoping filters are on — the operator pill narrows the blast
+  // radius to one crew member, the «без сверки» chip guarantees every visible
+  // АРЕНДЫ row is a verify candidate. The loop reuses the SAME per-row action
+  // (each call re-gates owner tier + completed status server-side and is
+  // idempotent on verified rows), so a stale row or an in-progress rental
+  // just fails its own count instead of poisoning the batch. Sequential keeps
+  // the DB gentle and the progress honest; ONE silent refetch at the end —
+  // per-row refetches would be N redundant CSV rebuilds.
+  // Deliberately a plain (non-hook) function: it reads bulkTargetIds, which is
+  // derived further down from the CURRENT visible rows — a fresh identity per
+  // render is exactly what keeps the confirm count honest.
+  const handleBulkVerify = async () => {
+    if (!slug || bulkRunRef.current || bulkVerify) return;
+    const ids = [...bulkTargetIds];
+    if (ids.length === 0) return;
+    const n = ids.length;
+    const dative = n % 10 === 1 && n % 100 !== 11 ? "аренде" : "арендам";
+    const ok = window.confirm(
+      `Подтвердить сверку сразу по ${n} ${dative} оператора «${effectiveOpFilter}»?\n\n` +
+        `Каждая видимая строка будет помечена «подтверждено» для оператора и владельца (используйте после личной сверки). ` +
+        `Незакрытые аренды сервер пропустит — по ним сверка не заводится.`,
+    );
+    if (!ok) return;
+    bulkRunRef.current = true;
+    let done = 0;
+    let failed = 0;
+    let firstError: string | null = null;
+    setBulkVerify({ total: n, done: 0 });
+    for (const rentalId of ids) {
+      setVerifyingIds((prev) => new Set(prev).add(rentalId));
+      try {
+        const res = await adminVerifyRentalAction({ slug, rentalId });
+        if (res.success) {
+          done += 1;
+          setJustVerified((prev) => new Set(prev).add(rentalId));
+        } else {
+          failed += 1;
+          firstError = firstError || res.error || null;
+        }
+      } catch {
+        failed += 1;
+      } finally {
+        setVerifyingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(rentalId);
+          return next;
+        });
+      }
+      setBulkVerify({ total: n, done: done + failed });
+    }
+    setBulkVerify(null);
+    if (failed === 0) {
+      toast.success(
+        `Сверка подтверждена: ${done} ${pluralRuNoun(done, "аренда", "аренды", "аренд")} ✅`,
+      );
+    } else if (done === 0) {
+      toast.error(
+        `Подтвердить не удалось (${n} ${pluralRuNoun(n, "строка", "строки", "строк")})${firstError ? ` — ${firstError}` : ""}`,
+      );
+    } else {
+      toast.warning(
+        `Сверено ${done} из ${n} · не удалось: ${failed}${firstError ? ` — ${firstError}` : ""}`,
+      );
+    }
+    // One canonical refetch for the whole batch; the optimistic tint bridges
+    // the gap (same contract as the single-row quick verify).
+    bulkRunRef.current = false;
+    setBulkVerify(null);
+    void loadTable({ silent: true });
+  };
+
   useEffect(() => {
     if (isOpen) {
       setFrom(firstDayOfMonthIso());
@@ -404,6 +509,11 @@ export function ExportCsvModal({
       setOpFilter(null);
       setVerifyingIds(new Set());
       setJustVerified(new Set());
+      // Task 129 review fix — a batch still running from BEFORE the close keeps
+      // going server-side (idempotent per row); a fresh open must allow a new
+      // batch instead of silently no-op-ing on the stale running flag.
+      bulkRunRef.current = false;
+      setBulkVerify(null);
     }
   }, [isOpen]);
 
@@ -545,10 +655,13 @@ export function ExportCsvModal({
     if (!effectiveOpFilter) return s;
     const cfg = SECTION_COLS[s.key];
     // Blocks without operator attribution (ЭКИП / СЕРВИС / СВОДКА) pass through.
-    if (cfg.opCol == null || s.key === "summary") return s;
+    // (task129 review fix — hoist to a local const: property narrowing doesn't
+    // survive into the filter closure, the bare `r[cfg.opCol]` was TS2538.)
+    const opIdx = cfg.opCol;
+    if (opIdx == null || s.key === "summary") return s;
     return {
       ...s,
-      data: s.data.filter((r) => (r[cfg.opCol] || "").trim() === effectiveOpFilter),
+      data: s.data.filter((r) => (r[opIdx] || "").trim() === effectiveOpFilter),
       // Filtered sums would not match the full-period СВОДКА block — hide them.
       totals: null,
     };
@@ -598,6 +711,23 @@ export function ExportCsvModal({
   // Row emoji markers ride with the split: with a single operator every row
   // would wear the same icon — noise instead of information.
   const showOpMarkers = showOpSplit;
+
+  // Task 129 — bulk-verify candidates: the VISIBLE АРЕНДЫ rows that can take
+  // a quick verify (uuid present; not verified — canonical or optimistic; not
+  // already in flight). Only meaningful when BOTH filters are on: the operator
+  // pill scopes it to one crew member, «без сверки» makes every visible row a
+  // candidate. recompute per render → the button count always matches screen.
+  const bulkScoped =
+    canQuickVerify && !!effectiveOpFilter && verFilter === "none" && !loading && !error;
+  const bulkTargetIds: string[] = bulkScoped
+    ? (rentSec?.data ?? [])
+        .map((r) => (r[SECTION_COLS.rentals.idCol] || "").trim())
+        .filter((id) => id && !justVerified.has(id) && !verifyingIds.has(id))
+    : [];
+  const bulkActive = bulkVerify !== null;
+  const showBulkVerify =
+    canQuickVerify && !!effectiveOpFilter && verFilter === "none" &&
+    (bulkActive || bulkTargetIds.length > 0);
 
   // ── Legacy single-grid values (sales variant / old flat sheets) ───────────
   const headerRow = rows[0] ?? [];
@@ -1007,6 +1137,37 @@ export function ExportCsvModal({
                 </button>
               );
             })}
+            {/* Task 129 — «подтвердить все видимые»: lives next to the chips
+                (that's where «без сверки» was tapped). One confirm covers all
+                visible rows; while running it counts up and per-row ✓ spinners
+                ride the shared verifyingIds.*/}
+            {showBulkVerify && (
+              <button
+                type="button"
+                onClick={() => void handleBulkVerify()}
+                disabled={bulkActive}
+                className="ml-auto inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition hover:opacity-90 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-70"
+                style={{
+                  backgroundColor: "#16a34a",
+                  color: "#ffffff",
+                  boxShadow: "0 1px 4px rgba(22, 163, 74, 0.35)",
+                }}
+                title={
+                  bulkActive
+                    ? `Идёт пакетное подтверждение (${bulkVerify.done}/${bulkVerify.total})`
+                    : `Одно подтверждение на все ${bulkTargetIds.length} видимых строк (оператор: ${effectiveOpFilter}) — по каждой сервер ещё раз проверит права и статус`
+                }
+              >
+                {bulkActive ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <Check className="h-3.5 w-3.5" aria-hidden />
+                )}
+                {bulkActive
+                  ? `Подтверждаю ${bulkVerify.done}/${bulkVerify.total}…`
+                  : `Подтвердить все видимые (${bulkTargetIds.length})`}
+              </button>
+            )}
           </div>
         )}
 
@@ -1492,7 +1653,11 @@ function SectionTable({
                                 if (onQuickVerify) void onQuickVerify(rowRentalId);
                               }}
                               aria-label="Подтвердить сверку"
-                              title="Подтвердить сверку (закрытая аренда; после личной сверки)"
+                              title={
+                                verTone === "disputed"
+                                  ? "Подтвердить сверку — снимет статус спора (после личного разбора с оператором)"
+                                  : "Подтвердить сверку (закрытая аренда; после личной сверки)"
+                              }
                               className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
                               style={{
                                 borderColor: `color-mix(in srgb, ${VER_TONE_FG.verified} 45%, transparent)`,

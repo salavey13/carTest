@@ -46,14 +46,16 @@ describe("task128 · operator filter (tap a pill → filter rows)", () => {
     expect(modal).toContain(
       'const visibleSections = preOpSections.map(applyOpFilter).filter((s) => s.data.length > 0);',
     );
+    // task129 review fix: opCol hoisted to a local const — property narrowing
+    // doesn't survive into the filter closure (the bare r[cfg.opCol] was TS2538)
     expect(modal).toContain(
-      'data: s.data.filter((r) => (r[cfg.opCol] || "").trim() === effectiveOpFilter),',
+      'data: s.data.filter((r) => (r[opIdx] || "").trim() === effectiveOpFilter),',
     );
   });
 
   it("only paying+attributed blocks are filtered (ЭКИП/СЕРВИС/СВОДКА pass through)", () => {
     expect(modal).toMatch(
-      /const applyOpFilter = \(s: ParsedCsvSection\): ParsedCsvSection => \{[\s\S]*?if \(cfg\.opCol == null \|\| s\.key === "summary"\) return s;/,
+      /const applyOpFilter = \(s: ParsedCsvSection\): ParsedCsvSection => \{[\s\S]*?if \(opIdx == null \|\| s\.key === "summary"\) return s;/,
     );
   });
 
