@@ -1,1 +1,3 @@
 "rental_id","vehicle_id","bike_make","bike_model","user_id","status","payment_status","start_date","end_date","duration_days","total_cost","deposit_amount","deposit_method","deposit_collected_at","deposit_returned","delivery_address","is_active_today","is_upcoming","created_at","crew_id"
+"df6e0946-f05b-4633-99de-004f9a39b8b8","the-meta-helmet","","","7813830016","completed","fully_paid","2026-10-18 14:00","2026-10-24 13:02","6.0","0","0","","","false","","true","","2026-10-18 13:36","2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
+"91df1f18-8760-4bc7-895c-69b994b21f1e","the-meta-helmet","","","7813830016","completed","fully_paid","2026-10-18 14:00","2026-10-24 13:02","6.0","0","0","","","false","","true","","2026-10-18 13:36","2d5fde70-1dd3-4f0d-8d72-66ccf6908746"
