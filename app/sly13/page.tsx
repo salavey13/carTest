@@ -114,7 +114,7 @@ export default async function Sly13Landing() {
   return (
     <div className="relative min-h-screen overflow-hidden" style={{ background: p.bgBase, color: p.textPrimary }}>
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative flex min-h-[88vh] items-center justify-center px-6 py-20 text-center">
+      <section className="relative flex min-h-[88vh] items-center justify-center overflow-hidden px-6 py-20 text-center">
         <div className="absolute inset-0">
           <Image
             src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg"
@@ -127,15 +127,32 @@ export default async function Sly13Landing() {
             className="absolute inset-0"
             style={{ background: `linear-gradient(to bottom, ${p.bgBase}cc, ${p.bgBase}99, ${p.bgBase})` }}
           />
+          {/* 2026-10-25 polish (task 134): accent radial glow behind the display
+              text — the hero photo alone left the upper third visually flat. */}
+          <div
+            className="absolute inset-0"
+            style={{ background: `radial-gradient(56% 52% at 50% 38%, ${p.accentMain}1f 0%, transparent 70%)` }}
+          />
         </div>
         <div className="relative z-10 max-w-4xl">
           <p
-            className="mx-auto mb-5 w-fit rounded-full px-4 py-1.5 text-xs uppercase tracking-[0.2em]"
+            className="mx-auto mb-5 flex w-fit items-center gap-2 rounded-full px-4 py-1.5 text-xs uppercase tracking-[0.2em]"
             style={{ border: `1px solid ${p.borderSoft}`, background: p.bgCard, color: p.textSecondary }}
           >
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: p.accentMain, boxShadow: `0 0 8px ${p.accentMain}` }}
+              aria-hidden
+            />
             личная витрина salavey13 · франшизы проката
           </p>
-          <h1 className="text-4xl font-bold md:text-6xl" style={{ color: p.accentMain }}>
+          {/* 2026-10-25 (task 134): solid accent → accent→hover gradient display,
+              tighter tracking, bigger on md+ (was text-4xl/md:text-6xl single-
+              color). Same brand weight, more shelf presence. */}
+          <h1
+            className="bg-clip-text text-5xl font-black tracking-tight text-transparent md:text-7xl"
+            style={{ backgroundImage: `linear-gradient(94deg, ${p.accentMain} 15%, ${p.accentMainHover} 85%)` }}
+          >
             SLY13
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg md:text-xl" style={{ color: p.textPrimary }}>
@@ -148,10 +165,15 @@ export default async function Sly13Landing() {
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             {/* каталог — дефолтная вкладка витрины экипажа, отдельного /catalog-роута нет */}
             <Link href="/franchize/sly13">
-              <Button style={{ background: p.accentMain, color: textOnAccent }}>Каталог услуг и запусков</Button>
+              <Button
+                className="transition-transform hover:-translate-y-0.5"
+                style={{ background: p.accentMain, color: textOnAccent }}
+              >
+                Каталог услуг и запусков
+              </Button>
             </Link>
             <a href="https://t.me/SALAVEY13" target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary">
+              <Button variant="secondary" className="transition-transform hover:-translate-y-0.5">
                 <FaTelegramPlane className="mr-2 inline" /> Написать в Telegram
               </Button>
             </a>
@@ -162,7 +184,10 @@ export default async function Sly13Landing() {
       <main className="mx-auto max-w-6xl space-y-20 px-6 pb-24">
         {/* ── 1. БОЕВОЙ КЛИЕНТ: сезон в цифрах ─────────────────────────────── */}
         <section id="proof">
-          <h2 className="text-2xl font-bold md:text-3xl">
+          {/* 2026-10-25 (task 134): globals.css даёт КАЖДОМУ h2 @apply text-foreground —
+              цвет зависит от темы (в light-схеме почти чёрный), на этой всегда
+              тёмной витрине это давало «тёмное на тёмном». Цвет из палитры — явно. */}
+          <h2 className="text-2xl font-bold md:text-3xl" style={{ color: p.textPrimary }}>
             Первый клиент — <span style={{ color: p.accentMain }}>боевой</span>, не синтетика
           </h2>
           <p className="mt-4 max-w-3xl text-base md:text-lg" style={{ color: p.textSecondary }}>
@@ -173,7 +198,11 @@ export default async function Sly13Landing() {
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {SEASON_STATS.map(({ icon: Icon, value, label, sub }) => (
-              <Card key={label} style={{ background: p.bgCard, borderColor: p.borderSoft }}>
+              <Card
+                key={label}
+                className="transition-transform duration-300 hover:-translate-y-1"
+                style={{ background: p.bgCard, borderColor: p.borderSoft }}
+              >
                 <CardContent className="pt-6">
                   <Icon className="mb-3 text-xl" style={{ color: p.accentMain }} />
                   <div className="text-2xl font-bold" style={{ color: p.textPrimary }}>{value}</div>
@@ -216,7 +245,7 @@ export default async function Sly13Landing() {
 
         {/* ── 2. СВЕРКА: считаем каждую копейку ───────────────────────────── */}
         <section id="audit">
-          <h2 className="text-2xl font-bold md:text-3xl">
+          <h2 className="text-2xl font-bold md:text-3xl" style={{ color: p.textPrimary }}>
             Считаем каждую копейку — <span style={{ color: p.accentMain }}>прямо сейчас</span>
           </h2>
           <p className="mt-4 max-w-3xl text-base md:text-lg" style={{ color: p.textSecondary }}>
@@ -248,7 +277,7 @@ export default async function Sly13Landing() {
 
         {/* ── 3. ЭКОНОМИКА ФРАНШИЗЫ ───────────────────────────────────────── */}
         <section id="vision">
-          <h2 className="text-2xl font-bold md:text-3xl">
+          <h2 className="text-2xl font-bold md:text-3xl" style={{ color: p.textPrimary }}>
             Экономика простая: <span style={{ color: p.accentMain }}>сначала заработать — потом продавать</span>
           </h2>
           <p className="mt-4 max-w-3xl text-base md:text-lg" style={{ color: p.textSecondary }}>
@@ -310,14 +339,18 @@ export default async function Sly13Landing() {
 
         {/* ── 4. УСЛУГИ ───────────────────────────────────────────────────── */}
         <section id="services">
-          <h2 className="text-2xl font-bold md:text-3xl">Услуги и запуск экипажей</h2>
+          <h2 className="text-2xl font-bold md:text-3xl" style={{ color: p.textPrimary }}>Услуги и запуск экипажей</h2>
           <p className="mt-4 max-w-3xl text-base md:text-lg" style={{ color: p.textSecondary }}>
             Продуктизированный список: от разовой сессии до полного запуска витрины под ключ.
             Актуальные цены и оформление заказа — в каталоге.
           </p>
           <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {SERVICES.map((s) => (
-              <Card key={s.title} style={{ background: p.bgCard, borderColor: p.borderSoft }}>
+              <Card
+                key={s.title}
+                className="transition-transform duration-300 hover:-translate-y-1"
+                style={{ background: p.bgCard, borderColor: p.borderSoft }}
+              >
                 <CardHeader>
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base">{s.title}</CardTitle>
@@ -352,7 +385,7 @@ export default async function Sly13Landing() {
           className="rounded-2xl px-6 py-12 text-center"
           style={{ background: p.bgCard, border: `1px solid ${p.borderSoft}` }}
         >
-          <h2 className="text-xl font-bold md:text-2xl">Есть прокат — нужна такая же витрина?</h2>
+          <h2 className="text-xl font-bold md:text-2xl" style={{ color: p.textPrimary }}>Есть прокат — нужна такая же витрина?</h2>
           <p className="mx-auto mt-3 max-w-xl text-sm md:text-base" style={{ color: p.textSecondary }}>
             Напишите: покажу живой экипаж изнутри, посчитаем запуск под ваш каталог и город.
           </p>
