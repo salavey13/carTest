@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   motion, AnimatePresence, useInView, useScroll, useTransform, useSpring, useMotionValue,
 } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -368,7 +370,7 @@ function ScrollProgressBar() {
 function MagneticButton({ children, href, primary = false, className = "", buttonClassName = "", style = {}, size = "lg" }: {
   children: React.ReactNode; href: string; primary?: boolean; className?: string; buttonClassName?: string; style?: React.CSSProperties; size?: "sm" | "lg" | "default";
 }) {
-  const ref = useRef<HTMLAnchorElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const handleMove = useCallback((e: React.MouseEvent) => {
     const el = ref.current; if (!el) return;
@@ -381,34 +383,79 @@ function MagneticButton({ children, href, primary = false, className = "", butto
   // which forced a FULL document reload on every landing → catalog tap. Each
   // reload remounted AppProvider → the whole Telegram auth roundtrip (and the
   // «Авторизация...» toast) reran — the user saw "authentication happening
-  // again" on every page change. router.push keeps it a client-side
-  // transition; external links keep native behavior (new tab).
-  const router = useRouter();
+  // again" on every page change.
+  //
+  // SPEED FIX (task131, 2026-10-24): router.push on a raw <a> had TWO costs
+  // left. (1) No prefetch — the catalog RSC payload was only fetched AFTER
+  // the tap, and the target route runs a dynamic server render, so the
+  // landing sat frozen for seconds. (2) No click feedback — the [slug]
+  // loading.tsx deliberately returns null (SPA transition polish), so there
+  // was ZERO visual response until the new page was fully rendered. Now:
+  // next/link keeps the client-side transition, adds viewport/idle prefetch
+  // of the payload (the tap swaps instantly), still renders a REAL <a> in
+  // the SSR HTML so a pre-hydration tap degrades to native navigation
+  // instead of doing nothing, and a small pending chip covers the residual
+  // gap. External links keep native behavior (new tab).
+  const pathname = usePathname();
+  const [navPending, setNavPending] = useState(false);
+  useEffect(() => {
+    setNavPending(false);
+  }, [pathname]);
+  const handleInternalNav = useCallback(() => {
+    setNavPending(true);
+    // Safety: if the transition stalls (404, error boundary), the chip
+    // must not stick forever. The pathname effect normally clears it first.
+    window.setTimeout(() => setNavPending(false), 8000);
+  }, []);
   const sizeClasses = size === "sm" ? "text-sm px-5 py-2" : "text-lg px-8 md:px-10 py-6";
+  const buttonNode = (
+    <Button size={size === "sm" ? "sm" : "lg"} variant={primary ? "default" : "outline"} className={`rounded-full font-bold transition-all hover:scale-[1.03] ${sizeClasses} ${buttonClassName}`} style={{ backgroundColor: primary ? "var(--vip-accent-main)" : "transparent", color: primary ? "var(--vip-bg-base)" : "var(--vip-accent-main)", borderColor: "var(--vip-accent-main)", boxShadow: primary ? `0 10px 30px color-mix(in srgb, var(--vip-accent-main) 30%, transparent)` : "none", ...style }}>
+      {children}
+    </Button>
+  );
   return (
-    <motion.a
-      ref={ref}
-      href={href}
-      onClick={
-        isInternal
-          ? (e) => {
-              e.preventDefault();
-              router.push(href);
-            }
-          : undefined
-      }
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
-      animate={{ x: pos.x, y: pos.y }}
-      transition={{ type: "spring", stiffness: 200, damping: 15 }}
-      target={isInternal ? undefined : "_blank"}
-      rel={isInternal ? undefined : "noopener noreferrer"}
-      className={`inline-block ${className}`}
-    >
-      <Button size={size === "sm" ? "sm" : "lg"} variant={primary ? "default" : "outline"} className={`rounded-full font-bold transition-all hover:scale-[1.03] ${sizeClasses} ${buttonClassName}`} style={{ backgroundColor: primary ? "var(--vip-accent-main)" : "transparent", color: primary ? "var(--vip-bg-base)" : "var(--vip-accent-main)", borderColor: "var(--vip-accent-main)", boxShadow: primary ? `0 10px 30px color-mix(in srgb, var(--vip-accent-main) 30%, transparent)` : "none", ...style }}>
-        {children}
-      </Button>
-    </motion.a>
+    <>
+      <motion.div
+        ref={ref}
+        onMouseMove={handleMove}
+        onMouseLeave={handleLeave}
+        animate={{ x: pos.x, y: pos.y }}
+        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+        className={`inline-block ${className}`}
+      >
+        {isInternal ? (
+          <Link
+            href={href}
+            prefetch={true}
+            onClick={handleInternalNav}
+          >
+            {buttonNode}
+          </Link>
+        ) : (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {buttonNode}
+          </a>
+        )}
+      </motion.div>
+      {/* Click feedback while the client-side transition is in flight —
+          the [slug] segment intentionally has a null loading.tsx, so this
+          is the only «the tap registered» signal. */}
+      {navPending && (
+        <div
+          className="fixed bottom-6 left-1/2 z-[120] flex -translate-x-1/2 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-xl"
+          style={{
+            backgroundColor: "var(--vip-bg-card)",
+            borderColor: "var(--vip-accent-main)",
+            color: "var(--vip-text-primary)",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--vip-accent-main)" }} aria-hidden />
+          Открываем каталог…
+        </div>
+      )}
+    </>
   );
 }
 

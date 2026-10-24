@@ -15,6 +15,20 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000";
 
+// task131 (2026-10-24): the reply now carries the PC link next to the
+// «пароль отправлен» line — the whole point of the command is opening
+// rental-analytics on a desktop browser (no TG auth — the emailed password
+// is the key). Same env fallback chain as /api/send-analytics-password so
+// the link in TG and the link in the email never disagree.
+function buildAnalyticsPcLink(slug: string): string {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_URL ||
+    `https://${process.env.VERCEL_URL || "your-app.vercel.app"}`;
+  return `${siteUrl}/franchize/${slug}/rentals-analytics`;
+}
+
 async function sendPasswordToEmail(crewId: string, slug: string, crewName: string): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await fetch(`${SITE_URL}/api/send-analytics-password`, {
@@ -96,7 +110,8 @@ export async function analyticsPassCommand(chatId: number, userId: number, usern
 
       if (emailResult.success) {
         results.push(
-          `✅ *${crewName}*: Пароль отправлен на эл. почту экипажа.`
+          `✅ *${crewName}*: Пароль отправлен на эл. почту экипажа.\n` +
+          `💻 PC (без TG-авторизации): ${buildAnalyticsPcLink(slug)}`
         );
       } else {
         results.push(

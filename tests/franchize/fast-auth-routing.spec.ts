@@ -98,11 +98,27 @@ describe("landing SPA linking", () => {
   it("MagneticButton routes internal hrefs client-side (no full reload)", () => {
     const page = read("app/page.tsx");
     expect(page).toContain("SPA LINKING FIX (2026-09-22)");
-    // internal CTA goes through router.push with preventDefault…
-    expect(page).toContain("router.push(href)");
-    // …and the mobile-menu catalog CTA does too…
+    // task131: internal CTA is a next/link with explicit prefetch —
+    // the catalog RSC payload is fetched on viewport/idle so the tap
+    // swaps instantly (router.push-without-prefetch is gone).
+    expect(page).toContain("SPEED FIX (task131, 2026-10-24)");
+    expect(page).toContain("prefetch={true}");
+    expect(page).toContain("<Link\n            href={href}");
+    // …and the mobile-menu catalog CTA still routes client-side…
     expect(page).toContain("router.push(CATALOG_HREF)");
     // …while keeping the anchor for middle-click/new-tab semantics.
     expect(page).toContain('href={href}');
+  });
+
+  it("MagneticButton shows a pending chip while the transition is in flight", () => {
+    const page = read("app/page.tsx");
+    // The [slug] loading.tsx returns null on purpose, so the origin side
+    // must give the tap its own feedback + clear it on pathname change.
+    expect(page).toContain("handleInternalNav");
+    expect(page).toContain("setNavPending(false);");
+    expect(page).toContain("Открываем каталог…");
+    // Pre-hydration taps must degrade to native navigation — Link renders
+    // a real <a> in the SSR HTML (no onClick preventDefault anymore).
+    expect(page).not.toContain("e.preventDefault();\n              router.push(href)");
   });
 });

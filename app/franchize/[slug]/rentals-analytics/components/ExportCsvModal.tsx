@@ -790,7 +790,7 @@ export function ExportCsvModal({
       aria-label="Просмотр таблицы и экспорт CSV"
     >
       <div
-        className="flex h-full w-full flex-col sm:h-auto sm:max-h-[88vh] sm:max-w-5xl border shadow-2xl overflow-hidden sm:rounded-2xl"
+        className="flex h-full w-full flex-col sm:h-auto sm:max-h-[88vh] sm:max-w-7xl border shadow-2xl overflow-hidden sm:rounded-2xl"
         // Task 127 — the panel starts BELOW the TG fullscreen native buttons:
         // the header row (and its top-right «x») can no longer hide under them.
         style={{
@@ -1236,7 +1236,7 @@ export function ExportCsvModal({
             </div>
           ) : (
             <table
-              className="w-full border-collapse text-left text-xs"
+              className="w-full border-collapse text-left text-xs sm:text-[13px]"
               style={{ color: T.text, minWidth: "max-content" }}
             >
               <thead className="sticky top-0 z-20">
@@ -1494,7 +1494,7 @@ function SectionTable({
       </div>
 
       <table
-        className="w-full border-collapse text-left text-xs"
+        className="w-full border-collapse text-left text-xs sm:text-[13px]"
         style={{ color: T.text, minWidth: "max-content" }}
       >
         <thead>
