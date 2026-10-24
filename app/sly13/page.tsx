@@ -146,7 +146,8 @@ export default async function Sly13Landing() {
             — не демо в вакууме, а софт, который каждый день работает на живом прокате электробайков в Нижнем Новгороде.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/franchize/sly13/catalog">
+            {/* каталог — дефолтная вкладка витрины экипажа, отдельного /catalog-роута нет */}
+            <Link href="/franchize/sly13">
               <Button style={{ background: p.accentMain, color: textOnAccent }}>Каталог услуг и запусков</Button>
             </Link>
             <a href="https://t.me/SALAVEY13" target="_blank" rel="noopener noreferrer">
@@ -338,7 +339,7 @@ export default async function Sly13Landing() {
             ))}
           </div>
           <div className="mt-8 text-center">
-            <Link href="/franchize/sly13/catalog">
+            <Link href="/franchize/sly13">
               <Button style={{ background: p.accentMain, color: textOnAccent }}>
                 <FaSearchDollar className="mr-2 inline" /> Открыть каталог
               </Button>
