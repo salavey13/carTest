@@ -10,6 +10,25 @@
 > не уничтожал журнал.
 
 ---
+Task ID: 12
+Agent: main (Super Z, IM session)
+Task: boss — «maybe sly13 is excluded from build?:)» + root page (инлайнит /vipbikerental — по факту standalone): до загрузки палитры vip-bike страница серая, цветные слова в заголовках — прозрачные (скрин bad) или цветные квадраты на smart TV (до загрузки темы и после).
+
+Work Log:
+- /sly13 404 на проде: причина подтверждена — .vercelignore явно исключал app/sly13/ (и pavele0903/) как «large standalone non-rental app dir». Деплои были зелёные, страница просто не собиралась. Из .vercelignore убран app/sly13/ (pavele0903 оставлен исключённым). b6ece525 проверен как ancestor деплоя 52f5999 через GitHub status API.
+- Root = app/page.tsx (1387 строк, standalone client; /vipbikerental чист). Дефекты: (1) все --vip-* переменные ставились только в useEffect → до гидрации grayscale, а gradient-clip заголовков с несуществующими vars давал невалидный градиент + WebkitTextFillColor:transparent → слово-призрак (скрин bad: «VIP BIKE» без RENTAL); (2) TV WebKit: красит text-fill-color:transparent, но не умеет background-clip:text → градиент заливает ВЕСЬ span = цветные квадраты; плюс 35 color-mix() сайтов на TV невалидны → прозрачные шапки/оверлеи/секции.
+- Фиксы: (a) в <head> layout добавлен SSR <style id="vip-landing-vars"> — дефолты всех 25 --vip-* переменных (dark gold = то, что лендинг форсит на первом визите) красятся на FIRST paint, серости больше нет; (b) класс .vip-accent-clip в globals.css: дефолт — сплошной акцент, градиент-клип только внутри @supports ((-webkit-)background-clip:text); GradientText и hero-слово RENTAL переведены на него; (c) 35 color-mix заменены на предвычисленные rgba-переменные (--vip-accent-a5..a40, --vip-base-a25..a95, --vip-card-a30/a40, --vip-partners-bg) и hex-alpha суффиксы для tier/social литералов (#22C55E66 — стиль уже использовался в файле); (d) инжектор пересчитывает все тинты на каждый theme через новые withAlpha()/blendHex().
+- Аудит: каждый var(--vip-*) в page.tsx имеет SSR-дефолт + runtime override (скрипт-проверка 25/25); python-скрипт замен с отчётом по паттернам: 35 замен, 0 осталось.
+- Checks: tsc 0 ошибок (page/layout), next lint чисто, dev E2E: root 200, vip-landing-vars в <head>, 0 bg-clip-text / WebkitTextFillColor / color-mix в отданном HTML, 9 vip-accent-clip спанов, /sly13 200.
+- Пуш 845ac18 → main; Vercel перевыпуск подхватит и /sly13, и фикс лендинга.
+
+Stage Summary:
+- Загадка 404 /sly13 закрыта: сборка исключала каталог целиком, а не «отставала».
+- Лендинг: первый кадр сразу в палитре; акцентные слова читаемы везде (TV — сплошной цвет, современные — градиент); color-mix на странице нет вовсе.
+
+---
+
+---
 Task ID: 11
 Agent: main (Super Z, IM session)
 Task: fix docs/crewDocs/october-deposit-backfill-2026-10-22.sql (Paul: «ERROR 42804: COALESCE types text and integer cannot be matched» at line 37) + check/enhance the salavey13 page from the parallel agent (boss: «vip-bike crew is kinda test-first-real client… stats for season… counting one operator's commissions… sell app installations to others — some crews are preprepared»).
