@@ -1476,13 +1476,26 @@ function SectionTable({
   const cfg = SECTION_COLS[section.key];
   const accent = SECTION_ACCENT[section.key];
   const isSummary = section.key === "summary";
+  // Task 132 — sticky two-tier header: banner + column row both stay visible
+  // while the section's rows scroll. The banner must have a DETERMINISTIC
+  // height (h-9 = 36px) because the thead sticks exactly below it (top-9).
+  // Dark theme tokens (bgElevated/bgCard) are translucent hex tints — sticky
+  // cells need an OPAQUE backing or scrolled rows bleed through, so both the
+  // banner and every th composite themselves over T.bg (the scroll
+  // container's own opaque background) via stacked background-image layers.
+  const bannerTint = `color-mix(in srgb, ${accent} 18%, ${T.bgElevated})`;
+  const thOpaqueBg = `linear-gradient(${T.bgElevated}, ${T.bgElevated}), linear-gradient(${T.bg}, ${T.bg})`;
 
   return (
     <section>
-      {/* Block banner */}
+      {/* Block banner — tier 1 of the sticky header (36px) */}
       <div
-        className="sticky top-0 z-20 flex items-center gap-2 rounded-t-lg px-3 py-2 text-xs font-bold uppercase tracking-wide"
-        style={{ backgroundColor: `color-mix(in srgb, ${accent} 18%, ${T.bgElevated})`, color: accent }}
+        className="sticky top-0 z-20 flex h-9 items-center gap-2 rounded-t-lg px-3 text-xs font-bold uppercase tracking-wide"
+        style={{
+          backgroundColor: bannerTint,
+          backgroundImage: `linear-gradient(${bannerTint}, ${bannerTint}), linear-gradient(${T.bg}, ${T.bg})`,
+          color: accent,
+        }}
       >
         {section.title}
         <span
@@ -1497,7 +1510,10 @@ function SectionTable({
         className="w-full border-collapse text-left text-xs sm:text-[13px]"
         style={{ color: T.text, minWidth: "max-content" }}
       >
-        <thead>
+        {/* Tier 2 of the sticky header — column names stick 36px below the
+            banner (top-9), inside the same scroll container. z-20 keeps the
+            row above body cells (their sticky first column is z-10). */}
+        <thead className="sticky top-9 z-20">
           <tr>
             {section.header.map((h, i) => (
               <th
@@ -1507,6 +1523,7 @@ function SectionTable({
                   borderColor: T.border,
                   color: T.textMuted,
                   backgroundColor: T.bgElevated,
+                  backgroundImage: thOpaqueBg,
                   textAlign: cfg.numeric.has(i) ? "right" : cfg.date.has(i) ? "center" : "left",
                   ...(i === 0
                     ? {
