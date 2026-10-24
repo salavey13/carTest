@@ -1202,3 +1202,18 @@ Work Log:
 Stage Summary:
 - sly13 services now have catalog cards: vibe-001 (аудит), vibe-002 (проектирование), setup-001/002 (запуск экипажа), edu-001/002 (обучение), mnt-001 (сопровождение).
 - Reusable: same two scripts can dress any crew's services (edit ITEMS + SUBJECTS).
+
+---
+Task ID: 135-moto-selection-images-sly13-notext
+Agent: main (Claude)
+Task: moto-selection services illustrated from /moto-selection landing copy + sly13 CJK-text images recreated.
+
+Work Log:
+- 8 moto-selection-svc-* rows had empty image_url. Catalog shows service cards aspect-square → image_1.jpg = 1080x1080 attention-crop + image_1_4x3.jpg 1080x810, mozjpeg q82 (61-174 KB).
+- Sources: 6 tildacdn photos from the /moto-selection landing (training→svc-01, pickUp→svc-02, hero→svc-05 аренда, storage→svc-06, detailing→svc-07, service→svc-08) + 2 generated photorealistic w/ #FF7522 accents (svc-03 эвакуация, svc-04 выездной осмотр — no photos on the original site).
+- sly13 audit: edu-002 (both) + mnt-001 landscape had Chinese hieroglyphs ("AI咨询…" / "高端AI咨询询服务卡" / "赛明克AI咨询服务卡") → regenerated no-text (text-hostile base, subjects kept), re-upserted + PATCHed. Backups: *.bad-text.png.
+- Verified 15/15: image_url + gallery[2], all URLs 200 image/*, specs (service/subtype/price) preserved.
+
+Stage Summary:
+- moto-selection = 2nd illustrated crew, first with real-photo cards; sly13 fully text-free.
+- Pipeline scripts committed: scripts/{dl-moto-landing-images.sh,gen-moto-selection-missing.sh,upload-moto-selection-service-images.mjs,gen-sly13-notext-fix.sh,upload-sly13-service-images.mjs,verify-service-images.mjs}. Same recipe fits vip-bike (44) — ~15 min per boss's estimate.
