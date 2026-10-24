@@ -653,8 +653,16 @@ export function ExportCsvModal({
     opFilter && opSplit.some((o) => o.label === opFilter) ? opFilter : null;
   const applyOpFilter = (s: ParsedCsvSection): ParsedCsvSection => {
     if (!effectiveOpFilter) return s;
+    // Task 133 — with an operator filter on, the СВОДКА block still showed
+    // FULL-period sums next to the filtered tables — the boss read that as
+    // «the filter did nothing». Its per-block numbers are unattributable
+    // (the summary has no operator column), so the honest move is to hide
+    // the block entirely while the filter is on (it returns on reset).
+    if (s.key === "summary") return { ...s, data: [], totals: null };
     const cfg = SECTION_COLS[s.key];
-    // Blocks without operator attribution (ЭКИП / СЕРВИС / СВОДКА) pass through.
+    // Blocks without operator attribution (ЭКИП / СЕРВИС) pass through —
+    // they have no «Оператор (ЗП)» column to filter by. СВОДКА is hidden
+    // above (full-period sums would contradict the filtered tables).
     // (task129 review fix — hoist to a local const: property narrowing doesn't
     // survive into the filter closure, the bare `r[cfg.opCol]` was TS2538.)
     const opIdx = cfg.opCol;
@@ -1487,7 +1495,13 @@ function SectionTable({
   const thOpaqueBg = `linear-gradient(${T.bgElevated}, ${T.bgElevated}), linear-gradient(${T.bg}, ${T.bg})`;
 
   return (
-    <section>
+    <section className="min-w-fit">
+      {/* min-w-fit (task 133): the table inside uses minWidth:max-content and
+          can be WIDER than the scroll container — without this the section
+          (and the sticky banner) stayed at container width, so scrolling
+          right exposed a bare gap between the banner strip and the thead.
+          Now the section stretches to the table's width and the banner
+          covers the table edge-to-edge while pinned. */}
       {/* Block banner — tier 1 of the sticky header (36px) */}
       <div
         className="sticky top-0 z-20 flex h-9 items-center gap-2 rounded-t-lg px-3 text-xs font-bold uppercase tracking-wide"

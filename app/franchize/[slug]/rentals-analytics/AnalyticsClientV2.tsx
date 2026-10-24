@@ -261,7 +261,40 @@ export function AnalyticsClientV2({
   const { dbUser, isLoading: authLoading } = useAppContext();
 
   // Auth state
+  // Task 133 — the password-auth owner id used to live ONLY in React state:
+  // any page reload (a Vercel redeploy mid-session, an accidental F5) wiped
+  // it, the viewer dropped back to the password gate, and owner-tier UI
+  // (quick-verify ✓ in the table rows) silently disappeared until re-entry.
+  // The id now also lives in sessionStorage — survives reloads within the
+  // tab, dies with the tab (no long-lived storage). Security unchanged:
+  // every server call re-gates via verifyPasswordAuthOwner(actor, owner),
+  // the stored id is the SAME value the password flow returned.
+  const analyticsPwStoreKey = `analytics-pw-owner:${initialSlug.trim()}`;
   const [passwordAuthOwnerId, setPasswordAuthOwnerId] = useState<string | null>(null);
+
+  // Restore the tab-scoped session once on mount (post-hydration — the
+  // server render and the first client render must agree on null).
+  useEffect(() => {
+    try {
+      const stored = window.sessionStorage.getItem(analyticsPwStoreKey);
+      if (stored) setPasswordAuthOwnerId(stored);
+    } catch {
+      // private mode / storage disabled — memory-only behaviour as before
+    }
+  }, [analyticsPwStoreKey]);
+
+  const handlePasswordAuthenticated = useCallback(
+    (ownerId: string | null) => {
+      setPasswordAuthOwnerId(ownerId);
+      try {
+        if (ownerId) window.sessionStorage.setItem(analyticsPwStoreKey, ownerId);
+        else window.sessionStorage.removeItem(analyticsPwStoreKey);
+      } catch {
+        // storage unavailable — state still drives this mount
+      }
+    },
+    [analyticsPwStoreKey],
+  );
   const shouldShowPassword = !authLoading && !dbUser && !passwordAuthOwnerId;
 
   // Data state
@@ -581,7 +614,7 @@ export function AnalyticsClientV2({
       <AnalyticsPasswordEntry
         crewName={crew.name}
         slug={initialSlug.trim()}
-        onAuthenticated={(ownerId) => setPasswordAuthOwnerId(ownerId)}
+        onAuthenticated={handlePasswordAuthenticated}
       />
     );
   }

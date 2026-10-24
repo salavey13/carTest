@@ -81,9 +81,22 @@ export function buildCommissionLines(c: VerificationCommissionBrief): Commission
   // The result — the three frozen parts, digit-equal to the DM. Absent
   // parts render as «—» (honest absence): the snapshot never lies.
   const parts = [c.base, c.equipment, c.overprice].map((v) => fmtRub(v)).join(" + ");
+  // Task 133 — the «экип» part is a LUMP for all units (2 ед. × 100 ₽ = 200),
+  // but the boss read it as PER-HELMET («шлем 200 вместо 100» — falcon-gt,
+  // 2026-10-22: 1 шлем + 1 перчатки, 2 часа → ставка 200/2 = 100/ед, итого
+  // как раз 200). Spell the per-unit math out so the number self-explains.
+  const equipHint = (() => {
+    const units = Math.max(0, Math.floor(Number(c.equipmentUnits) || 0));
+    const equip = Number(c.equipment) || 0;
+    if (units <= 0 || equip <= 0) return undefined;
+    const perUnit = Math.round(equip / units);
+    const base = `${units} ед. × ${fmtRub(perUnit)}/ед`;
+    return c.formula?.shortRental ? `${base} · аренда < 24 ч — ставка пополам` : base;
+  })();
   lines.push({
     label: "Комиссия оператора",
     value: `${parts} = ${fmtRub(c.total)}`,
+    hint: equipHint,
     strong: true,
   });
   return lines;
