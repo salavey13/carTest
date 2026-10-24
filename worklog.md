@@ -1170,3 +1170,19 @@ Work Log:
 
 Stage Summary:
 - 30-90 MB photos (48/200 MP modes, TG forwards) now decode → downscale → ship as ~200-500 KB JPEG on every compressed surface.
+
+---
+Task ID: 17-sly13-catalog-links
+Agent: main (Z.ai, IM session web-ebfeeaf7)
+Task: boss — fix links leading to catalog on /sly13: /franchize/sly13/catalog 404s, correct target is /franchize/sly13 (catalog is the default franchize view). Caution: parallel agent may have modified the page — merge carefully.
+
+Work Log:
+- Merge caution paid off: the page on main is the PARALLEL agent's 375-line version from 52f5999 (task 133) — NOT the b6ece525 version from task 11/15 (b6ece525 turned out to be a dangling commit, not an ancestor of main — the parallel lineage replaced it; its SQL money_to_num fix survived inside 52f5999, verified in docs/crewDocs/october-deposit-backfill-2026-10-22.sql). Worked strictly on top of the live version, zero content clobbered.
+- Root cause: no [slug]/catalog route exists under app/franchize/[slug]/ — and app/franchize/[slug]/page.tsx:29 defaults to the catalog tab (`isVipBikeRentalHost ? "rental" : "catalog"`), so /franchize/sly13 IS the catalog.
+- Fixed both CTAs in app/sly13/page.tsx: hero «Каталог услуг и запусков» (was L149) and services «Открыть каталог» (was L341) → /franchize/sly13 (+ comment why no /catalog subroute).
+- Link audit of the whole page: /franchize/vip-bike OK, /franchize/sly13/contacts OK (route exists), dynamic /franchize/${c.slug} OK, t.me external OK — only the two /catalog links were dead.
+- Verify: repo-wide rg — zero sly13/catalog refs left; typecheck:franchize slice PASS (16 pre-existing transitive debt files, sly13 not among them); eslint app/sly13/page.tsx 0 problems. (Full tsc --noEmit aborts OOM in this sandbox — exit 134, no TS diagnostics; scoped slice used instead.)
+- Committed → pull --rebase (no remote drift) → pushed 326c6c9 → main.
+
+Stage Summary:
+- /sly13 catalog CTAs now land on the live crew vitrina (/franchize/sly13) instead of a 404. Goes out with the next Vercel deploy (same one that ships the un-excluded /sly13 route itself).
