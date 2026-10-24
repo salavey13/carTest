@@ -1364,8 +1364,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         {/* margin math: pt-2.5/-mt-2.5 and pb-2.5/mb-3.5 keep the visual gaps
             IDENTICAL to the old pt-0/pb-1/mb-5 (24px below, 20px above), while
             the extra padding lives INSIDE the scrollport so glow/rings survive
-            the overflow clip. */}
-        <div className="-mt-2.5 mb-3.5 flex min-w-0 max-w-full gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30" role="group" aria-label="Быстрые фильтры каталога">
+            the overflow clip. 2026-10-25 (boss, crew-header balloon fix): the
+            horizontal axis got the same treatment — the first pill («Все» is
+            active by default) had its 8px tier glow and 4px focus ring painted
+            past the scrollport's left padding edge and clipped. -mx-3/px-3 give
+            12px of scrollport room on both sides; the parent's px-4 absorbs the
+            negative margins, so the pills' visual position is unchanged. */}
+        <div className="-mx-3 -mt-2.5 mb-3.5 flex gap-2 overflow-x-auto px-3 [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30" role="group" aria-label="Быстрые фильтры каталога">
           {QUICK_FILTERS.filter(f => {
             // In equipment mode, show equipment filters + "all"
             // In bike modes, show bike filters + "all"

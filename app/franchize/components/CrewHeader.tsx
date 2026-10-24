@@ -391,14 +391,22 @@ export function CrewHeader({
           className="-mx-4 mt-1 border-t px-4 pt-2"
           style={{ borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft }}
         >
-          {/* Clip-edge math (same recipe as CatalogClient quick filters): the
-              vertical padding lives INSIDE the scrollport so the active pill's
-              scale(1.05) and focus rings survive [overflow-y:clip]; -mt/-mb
-              compensate so the visual rhythm is pixel-identical to the old
-              pt-2/pb-1 layout. The custom 6px scrollbar replaces the global
-              8px one whose visible track used to sit right against the pill
-              bottoms and read as "clipped balloons". */}
-          <div className="mx-auto -mb-1.5 -mt-2.5 flex w-full max-w-7xl gap-2 overflow-x-auto [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30" role="tablist" aria-label="Навигация экипажа" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="mx-auto w-full max-w-7xl">
+            {/* Clip-edge math (same recipe as CatalogClient quick filters): the
+                vertical padding lives INSIDE the scrollport so the active pill's
+                scale(1.05) and focus rings survive [overflow-y:clip]; -mt/-mb
+                compensate so the visual rhythm is pixel-identical to the old
+                pt-2/pb-1 layout. The custom 6px scrollbar replaces the global
+                8px one whose visible track used to sit right against the pill
+                bottoms and read as "clipped balloons".
+                2026-10-25 (boss): the SAME math now covers the horizontal axis —
+                the first pill (highlighted on the catalog by default) had its
+                scale(1.05) left edge painted past the scrollport's left padding
+                edge and clipped. -mx-3/px-3 give the pill 12px of scrollport
+                room on both sides while the negative margins keep the pills
+                aligned with the header content above (centering moved to the
+                wrapper — mx-auto would fight -mx-3 on the scroller itself). */}
+            <div className="-mx-3 -mb-1.5 -mt-2.5 flex gap-2 overflow-x-auto px-3 [overflow-y:clip] [touch-action:pan-y_pan-x] overscroll-behavior-x-contain pb-2.5 pt-2.5 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track:bg-transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-thumb:hover]:bg-current/30" role="tablist" aria-label="Навигация экипажа" style={{ WebkitOverflowScrolling: 'touch' }}>
             {([
               { key: "rent" as const, label: tabLabels.rent, count: items?.filter(hasRentPrice).length ?? 0 },
               { key: "sale" as const, label: tabLabels.sale, count: items?.filter(hasSalePrice).length ?? 0 },
@@ -481,6 +489,7 @@ export function CrewHeader({
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       )}
