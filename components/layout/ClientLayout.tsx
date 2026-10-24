@@ -108,6 +108,18 @@ const THEME_CONFIG = {
     isTransparent: true,
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
+  // PATCH: moto-selection theme (2026-10-25) — standalone copy of the
+  // moto-selection.ru landing at /moto-selection. Renders its own black/orange
+  // nav + footer (same pattern as svarprofi/nnvolt): the platform chrome would
+  // clash with the biker brand the page is showcasing.
+  motoSelection: {
+    paths: ["/moto-selection"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -137,6 +149,9 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/nnvolt")) {
     return THEME_CONFIG.nnvolt;
+  }
+  if (pathname.startsWith("/moto-selection")) {
+    return THEME_CONFIG.motoSelection;
   }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;

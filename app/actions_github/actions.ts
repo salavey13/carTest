@@ -150,7 +150,7 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
       'app/bio30/','app/elon/','app/arbitrage-live-scanner/','app/arbitrage-notdummies/','app/arbitrage-test-agent/','app/arbitrage-explained/',
       'app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/',
       // Client-specific directories
-      'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/',
+      'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/','app/moto-selection/',
       // Standalone apps/features
       'app/about/','app/about_en/','app/advice-upload/','app/blogger/','app/botbusters/','app/buy-subscription/',
       'app/cartest/','app/cyber-garage/','app/cybervibe/','app/donate/','app/finance-literacy-memo/','app/game-plan/',
@@ -295,7 +295,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
       'app/bio30/','app/elon/','app/arbitrage-live-scanner/','app/arbitrage-notdummies/','app/arbitrage-test-agent/','app/arbitrage-explained/',
       'app/bullshitdetector/','app/csv-compare/','app/doc-verifier/','app/expmind/', 'app/topdf/components/steps',
       // Client-specific directories
-      'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/',
+      'app/pavele0903/','app/sly13/','app/svarprofi/','app/paddock/','app/greenbox/','app/moto-selection/',
       // Standalone apps/features
       'app/about/','app/about_en/','app/advice-upload/','app/blogger/','app/botbusters/','app/buy-subscription/',
       'app/cartest/','app/cyber-garage/','app/cybervibe/','app/donate/','app/finance-literacy-memo/','app/game-plan/',
