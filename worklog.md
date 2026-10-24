@@ -1186,3 +1186,19 @@ Work Log:
 
 Stage Summary:
 - /sly13 catalog CTAs now land on the live crew vitrina (/franchize/sly13) instead of a 404. Goes out with the next Vercel deploy (same one that ships the un-excluded /sly13 route itself).
+---
+Task ID: 112-sly13-service-images
+Agent: main (Claude)
+Task: generate artwork for sly13 crew's 7 service items (type=service), upload compressed to Supabase, assign in DB.
+
+Work Log:
+- Identified target: crew SLY13 (6be3846b) had 7 type=service items, ALL with empty image_url (no service item in the whole DB had images — sly13 sets the convention).
+- Service key recovered from /home/z/my-project/scripts/.sb_key (ref inmctohsodgdohamhzag).
+- Art direction: SLY13 CYBERVIBE brand — dark cyberpunk, neon cyan/violet, holographic UI, no text. 14 generations via z-ai CLI (portrait 768x1344 + landscape 1152x864 per item), resumable script scripts/gen-sly13-services.sh, 0 failures.
+- scripts/upload-sly13-service-images.mjs: sharp cover → image_1.jpg 720x1280 q82 mozjpeg (64-97 KB) + image_1_4x3.jpg 1080x810 (67-114 KB) → storage POST x-upsert → PATCH cars: image_url + specs.gallery=[2 urls], specs merge kept service/subtype/dailyPrice.
+- Verified: all 14 public URLs HTTP 200; all 7 rows show image_url + gallery=2 with specs intact; visual check of compressed card OK.
+- Originals kept in /home/z/my-project/download/sly13-services/<id>/{portrait,landscape}.png.
+
+Stage Summary:
+- sly13 services now have catalog cards: vibe-001 (аудит), vibe-002 (проектирование), setup-001/002 (запуск экипажа), edu-001/002 (обучение), mnt-001 (сопровождение).
+- Reusable: same two scripts can dress any crew's services (edit ITEMS + SUBJECTS).
