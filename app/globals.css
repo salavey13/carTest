@@ -1446,3 +1446,28 @@ path.mr-spot-popup {
 }
 
 
+
+/* ═══ VIP BIKE landing accent text — smart-TV-safe gradient words ═══
+   Problem (boss 2026-10-25, smart TV + slow first paint): titles used
+   `background-clip: text` + `text-transparent` with CSS vars. Before the
+   landing's palette vars existed the gradient was invalid → the colored
+   word rendered fully transparent; on TV WebKit without background-clip:
+   text support it painted the whole span box → colored squares.
+   Fix: solid accent color by default (always readable, zero deps), and the
+   gradient-clip upgrade only where the browser truly parses clip:text. */
+.vip-accent-clip {
+  color: var(--vip-accent-main, #FFD700);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .vip-accent-clip {
+    background-image: linear-gradient(
+      135deg,
+      var(--vip-accent-main, #FFD700),
+      var(--vip-accent-main-hover, #FFC125)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}

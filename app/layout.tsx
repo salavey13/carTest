@@ -88,6 +88,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/favicon.png"></link>
         {/* Updated msapplication-TileColor to match light theme background by default */}
         <meta name="msapplication-TileColor" content="hsl(220 25% 98%)"></meta>
+        {/* VIP BIKE landing palette at FIRST paint (boss 2026-10-25: grayscale
+            flash + invisible/colored-square accent words before hydration).
+            app/page.tsx used to set these vars only in a useEffect — until then
+            every var() was unset (grayscale) and the gradient-clip titles had an
+            invalid background (transparent word, or a colored square on TV
+            WebKit without background-clip:text). These are VIP_BIKE_THEMES.dark
+            defaults (what the landing forces on first visit anyway); the
+            landing's injector overrides them on mount and on light/dark toggle,
+            including the precomputed alpha tints that replaced color-mix()
+            (smart TVs don't support color-mix). Namespaced --vip-* — inert on
+            every other page. */}
+        <style
+          id="vip-landing-vars"
+          dangerouslySetInnerHTML={{
+            __html: `:root{--vip-bg-base:#0A0A0A;--vip-bg-card:#1A1A1A;--vip-accent-main:#FFD700;--vip-accent-main-hover:#FFC125;--vip-text-primary:#FFFAF0;--vip-text-secondary:#D4AF37;--vip-border-soft:#2A2A2A;--vip-badge-bg:rgba(255,215,0,0.08);--partner-logo-filter:brightness(0.92) contrast(1.05);--vip-accent-a5:rgba(255,215,0,0.05);--vip-accent-a8:rgba(255,215,0,0.08);--vip-accent-a10:rgba(255,215,0,0.1);--vip-accent-a15:rgba(255,215,0,0.15);--vip-accent-a20:rgba(255,215,0,0.2);--vip-accent-a25:rgba(255,215,0,0.25);--vip-accent-a30:rgba(255,215,0,0.3);--vip-accent-a40:rgba(255,215,0,0.4);--vip-base-a25:rgba(10,10,10,0.25);--vip-base-a50:rgba(10,10,10,0.5);--vip-base-a80:rgba(10,10,10,0.8);--vip-base-a85:rgba(10,10,10,0.85);--vip-base-a90:rgba(10,10,10,0.9);--vip-base-a92:rgba(10,10,10,0.92);--vip-base-a95:rgba(10,10,10,0.95);--vip-card-a30:rgba(26,26,26,0.3);--vip-card-a40:rgba(26,26,26,0.4);--vip-partners-bg:rgb(71,61,8)}`,
+          }}
+        />
         <Script
           id="theme-bootstrap-script"
           strategy="beforeInteractive"

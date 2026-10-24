@@ -292,11 +292,9 @@ const HOW_IT_WORKS_STEPS = [
 
 /* ══ Gradient text helper (reused across section headings) ══ */
 function GradientText({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(to right, var(--vip-accent-main), var(--vip-accent-main-hover))` }}>
-      {children}
-    </span>
-  );
+  // Solid accent by default; gradient-clip only where supported (see
+  // .vip-accent-clip in globals.css) — smart TVs painted colored squares here.
+  return <span className="vip-accent-clip">{children}</span>;
 }
 
 /* ══ SAFE SCROLL-REVEAL HOOK ══
@@ -409,7 +407,7 @@ function MagneticButton({ children, href, primary = false, className = "", butto
   }, []);
   const sizeClasses = size === "sm" ? "text-sm px-5 py-2" : "text-lg px-8 md:px-10 py-6";
   const buttonNode = (
-    <Button size={size === "sm" ? "sm" : "lg"} variant={primary ? "default" : "outline"} className={`rounded-full font-bold transition-all hover:scale-[1.03] ${sizeClasses} ${buttonClassName}`} style={{ backgroundColor: primary ? "var(--vip-accent-main)" : "transparent", color: primary ? "var(--vip-bg-base)" : "var(--vip-accent-main)", borderColor: "var(--vip-accent-main)", boxShadow: primary ? `0 10px 30px color-mix(in srgb, var(--vip-accent-main) 30%, transparent)` : "none", ...style }}>
+    <Button size={size === "sm" ? "sm" : "lg"} variant={primary ? "default" : "outline"} className={`rounded-full font-bold transition-all hover:scale-[1.03] ${sizeClasses} ${buttonClassName}`} style={{ backgroundColor: primary ? "var(--vip-accent-main)" : "transparent", color: primary ? "var(--vip-bg-base)" : "var(--vip-accent-main)", borderColor: "var(--vip-accent-main)", boxShadow: primary ? `0 10px 30px var(--vip-accent-a30)` : "none", ...style }}>
       {children}
     </Button>
   );
@@ -479,7 +477,7 @@ function AnimatedCounter({ value, suffix = "", decimals = 0 }: { value: number; 
 function MouseFollowGlow() {
   const x = useMotionValue(0), y = useMotionValue(0);
   const sx = useSpring(x, { stiffness: 50, damping: 20 }), sy = useSpring(y, { stiffness: 50, damping: 20 });
-  const background = useTransform([sx, sy], ([cx, cy]: number[]) => `radial-gradient(600px circle at ${cx}px ${cy}px, color-mix(in srgb, var(--vip-accent-main) 8%, transparent), transparent 70%)`);
+  const background = useTransform([sx, sy], ([cx, cy]: number[]) => `radial-gradient(600px circle at ${cx}px ${cy}px, var(--vip-accent-a8), transparent 70%)`);
   useEffect(() => {
     const handler = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
     window.addEventListener("mousemove", handler);
@@ -571,6 +569,23 @@ function FloatingSocialBar() {
 }
 
 /* ══ VIP BIKE THEME STYLE INJECTOR ══ */
+/* Hex → rgba() / hex-blend helpers: the page previously used color-mix()
+   for every tint — smart-TV WebKit doesn't support color-mix, so those
+   declarations were invalid → transparent overlays/headers/sections.
+   Precomputed rgba keeps the SAME colors on every browser. */
+const withAlpha = (hex: string, alpha: number): string => {
+  const raw = hex.replace("#", "");
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+};
+const blendHex = (hexA: string, hexB: string, ratio: number): string => {
+  const na = parseInt(hexA.replace("#", ""), 16);
+  const nb = parseInt(hexB.replace("#", ""), 16);
+  const mix = (sa: number, sb: number) => Math.round(sa * ratio + sb * (1 - ratio));
+  return `rgb(${mix((na >> 16) & 255, (nb >> 16) & 255)}, ${mix((na >> 8) & 255, (nb >> 8) & 255)}, ${mix(na & 255, nb & 255)})`;
+};
+
 function VipBikeThemeStyles() {
   const { resolvedTheme, setTheme } = useTheme();
   // Force dark theme on landing page (default), but allow user to toggle after
@@ -595,8 +610,25 @@ function VipBikeThemeStyles() {
     // Partner logos: in dark theme, invert+dim white-bg logos so they blend;
     // in light theme, keep logos as-is (they're designed for white backgrounds).
     root.style.setProperty("--partner-logo-filter", resolvedTheme === "dark" ? "brightness(0.92) contrast(1.05)" : "none");
-    // Hero badge bg: white in light theme, transparent accent-tint in dark theme
-    root.style.setProperty("--vip-badge-bg", resolvedTheme === "dark" ? "color-mix(in srgb, var(--vip-accent-main) 8%, transparent)" : "rgba(255, 255, 255, 0.85)");
+    // Hero badge bg: white in light theme, accent-tint in dark theme.
+    // color-mix() replaced with precomputed rgba — TV-safe.
+    root.style.setProperty("--vip-badge-bg", resolvedTheme === "dark" ? withAlpha(theme.accentMain, 0.08) : "rgba(255, 255, 255, 0.85)");
+    // Precomputed alpha tints (replace every color-mix use site) + the one
+    // opaque accent-over-border blend (partners section). SSR defaults for
+    // all of these live in the <style id="vip-landing-vars"> in layout head.
+    const ACCENT_ALPHAS: Array<[string, number]> = [["a5", 0.05], ["a8", 0.08], ["a10", 0.1], ["a15", 0.15], ["a20", 0.2], ["a25", 0.25], ["a30", 0.3], ["a40", 0.4]];
+    for (const [name, alpha] of ACCENT_ALPHAS) {
+      root.style.setProperty(`--vip-accent-${name}`, withAlpha(theme.accentMain, alpha));
+    }
+    const BASE_ALPHAS: Array<[string, number]> = [["a25", 0.25], ["a50", 0.5], ["a80", 0.8], ["a85", 0.85], ["a90", 0.9], ["a92", 0.92], ["a95", 0.95]];
+    for (const [name, alpha] of BASE_ALPHAS) {
+      root.style.setProperty(`--vip-base-${name}`, withAlpha(theme.bgBase, alpha));
+    }
+    const CARD_ALPHAS: Array<[string, number]> = [["a30", 0.3], ["a40", 0.4]];
+    for (const [name, alpha] of CARD_ALPHAS) {
+      root.style.setProperty(`--vip-card-${name}`, withAlpha(theme.bgCard, alpha));
+    }
+    root.style.setProperty("--vip-partners-bg", blendHex(theme.accentMain, theme.bgBase, 0.25));
     document.body.style.backgroundColor = theme.bgBase;
 
     // Track that user has a resolved theme (after initial dark-forced mount).
@@ -632,7 +664,7 @@ function FaqItem({ item, index }: { item: (typeof FAQ_ITEMS)[0]; index: number }
     <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }} transition={{ duration: everHidden && shown ? 0.5 : 0, delay: shown ? index * 0.05 : 0 }} className="rounded-2xl border overflow-hidden transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: open ? "var(--vip-accent-main)" : "var(--vip-border-soft)" }}>
       <button onClick={() => setOpen(!open)} className="w-full text-left p-5 md:p-6 flex items-start justify-between gap-4 cursor-pointer">
         <span className="text-base md:text-lg font-bold pr-2 leading-snug" style={{ color: "var(--vip-text-primary)" }}>{item.q}</span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.3 }} className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: open ? "var(--vip-accent-main)" : "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", color: open ? "var(--vip-bg-base)" : "var(--vip-accent-main)" }}>
+        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.3 }} className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: open ? "var(--vip-accent-main)" : "var(--vip-accent-a10)", color: open ? "var(--vip-bg-base)" : "var(--vip-accent-main)" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </motion.div>
       </button>
@@ -670,7 +702,7 @@ function InfoIcon({ className = "w-4 h-4" }: { className?: string }) {
 function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: number }) {
   const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>();
   return (
-    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px color-mix(in srgb, var(--vip-accent-main) 20%, transparent)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
+    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px var(--vip-accent-a20)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
       {tier.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>Хит</div>}
       <div className="text-center mb-6">
         <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)" }}>{tier.marker}</div>
@@ -701,7 +733,7 @@ function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: 
 function BikeTierCard({ tier, index }: { tier: (typeof BIKE_TIERS)[0]; index: number }) {
   const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>();
   return (
-    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `color-mix(in srgb, ${tier.accentColor} 40%, var(--vip-border-soft))`, boxShadow: `0 10px 40px color-mix(in srgb, ${tier.accentColor} 10%, transparent)` }}>
+    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-all duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: `${tier.accentColor}66`, boxShadow: `0 10px 40px ${tier.accentColor}1A` }}>
       <div className="flex items-center gap-4 mb-5">
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black leading-none flex-shrink-0" style={{ background: `linear-gradient(135deg, ${tier.accentColor}33, ${tier.accentColor}11)`, border: `1px solid ${tier.accentColor}55`, color: tier.accentColor }}>{tier.marker}</div>
         <div>
@@ -711,7 +743,7 @@ function BikeTierCard({ tier, index }: { tier: (typeof BIKE_TIERS)[0]; index: nu
       </div>
       <p className="text-base font-semibold mb-3" style={{ color: "var(--vip-text-primary)" }}>{tier.tagline}</p>
       <p className="text-sm leading-relaxed mb-5" style={{ color: "var(--vip-text-secondary)" }}>{tier.description}</p>
-      <div className="flex items-start gap-2 p-3 rounded-xl mb-6 text-sm font-medium" style={{ backgroundColor: `color-mix(in srgb, ${tier.accentColor} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${tier.accentColor} 25%, transparent)`, color: "var(--vip-text-primary)" }}>
+      <div className="flex items-start gap-2 p-3 rounded-xl mb-6 text-sm font-medium" style={{ backgroundColor: `${tier.accentColor}1A`, border: `1px solid ${tier.accentColor}40`, color: "var(--vip-text-primary)" }}>
         <LicenseIcon className="mt-0.5 h-4 w-4 shrink-0" />
         <span>{tier.licenseReq}</span>
       </div>
@@ -756,8 +788,8 @@ function CinematicHero() {
       <motion.div style={{ y: imageY, scale: imageScale }} className="absolute inset-0 z-0">
         <HeroImageCarousel images={HERO_IMAGES} alt="VIP Bike — аренда мотоциклов в Нижнем Новгороде" />
         {/* Lighter tint for better image visibility */}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 50%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 25%, transparent) 40%, var(--vip-bg-base) 95%)" }} />
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 35%, transparent 0%, color-mix(in srgb, var(--vip-bg-base) 50%, transparent) 100%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--vip-base-a50) 0%, var(--vip-base-a25) 40%, var(--vip-bg-base) 95%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 50% 35%, transparent 0%, var(--vip-base-a50) 100%)" }} />
       </motion.div>
 
       {/* Glow accents */}
@@ -777,7 +809,7 @@ function CinematicHero() {
         {/* Headline — CSS entrance (works without JS, see SCROLL_SNAP_CSS keyframes) */}
         <h2 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-4 leading-[0.95] tracking-tighter" style={{ color: "var(--vip-text-primary)" }}>
           {headlineWords.map((word, i) => (
-            <span key={i} className="vip-word-in inline-block mr-3 md:mr-4 last:mr-0" style={{ animationDelay: `${0.15 + i * 0.12}s`, backgroundImage: i === 2 ? "linear-gradient(135deg, var(--vip-accent-main), var(--vip-accent-main-hover))" : "none", WebkitBackgroundClip: i === 2 ? "text" : "unset", WebkitTextFillColor: i === 2 ? "transparent" : "var(--vip-text-primary)", backgroundClip: "text", transformOrigin: "bottom" }}>{word}</span>
+            <span key={i} className={`vip-word-in inline-block mr-3 md:mr-4 last:mr-0${i === 2 ? " vip-accent-clip" : ""}`} style={{ animationDelay: `${0.15 + i * 0.12}s`, color: i === 2 ? undefined : "var(--vip-text-primary)", transformOrigin: "bottom" }}>{word}</span>
           ))}
         </h2>
 
@@ -821,8 +853,8 @@ function CinematicHero() {
                 <div
                   className={`relative rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden ${social.id === "website" ? "w-full h-12 md:w-12 md:h-12" : "w-11 h-11 md:w-12 md:h-12"}`}
                   style={{
-                    backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 30%, transparent)",
-                    border: `1.5px solid color-mix(in srgb, ${social.color} 40%, transparent)`,
+                    backgroundColor: "var(--vip-card-a30)",
+                    border: `1.5px solid ${social.color}66`,
                     backdropFilter: "blur(12px)",
                     WebkitBackdropFilter: "blur(12px)",
                     ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}),
@@ -903,7 +935,7 @@ function CinematicFinaleSection({ children }: { children: React.ReactNode }) {
           aria-hidden
         />
         {/* Theme-adaptive overlay for text readability */}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 92%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 85%, transparent) 40%, color-mix(in srgb, var(--vip-bg-base) 95%, transparent) 100%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--vip-base-a92) 0%, var(--vip-base-a85) 40%, var(--vip-base-a95) 100%)" }} />
         {/* Accent glow */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: "var(--vip-accent-main)", opacity: 0.06 }} />
       </motion.div>
@@ -919,7 +951,7 @@ function CinematicFinaleSection({ children }: { children: React.ReactNode }) {
 function SectionHeader({ badge, title, highlight, subtitle }: { badge: string; title: string; highlight: string; subtitle?: string }) {
   return (
     <AnimatedSection className="text-center mb-16">
-      <Badge variant="outline" className="mb-4" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)" }}>{badge}</Badge>
+      <Badge variant="outline" className="mb-4" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "var(--vip-accent-a10)" }}>{badge}</Badge>
       <h3 className="text-3xl md:text-5xl font-black mb-4 tracking-tight" style={{ color: "var(--vip-text-primary)" }}>{title} <GradientText>{highlight}</GradientText></h3>
       {subtitle && <p className="text-lg max-w-2xl mx-auto" style={{ color: "var(--vip-text-secondary)" }}>{subtitle}</p>}
     </AnimatedSection>
@@ -952,7 +984,7 @@ export default function Home() {
         <FloatingSocialBar />
 
         {/* ─── HEADER ─── */}
-        <header className="sticky top-0 z-40 border-b backdrop-blur-xl" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "color-mix(in srgb, var(--vip-bg-base) 80%, transparent)" }}>
+        <header className="sticky top-0 z-40 border-b backdrop-blur-xl" style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "var(--vip-base-a80)" }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             {/* Desktop: logo on left + nav on right */}
             <div className="hidden md:flex items-center gap-3">
@@ -1016,7 +1048,7 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6">
                 {/* Beginner */}
                 <AnimatedSection delay={0}>
-                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #22C55E 40%, var(--vip-border-soft))" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "#22C55E66" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <HeroImageCarousel images={ELECTRIC_BIKE_IMAGES} alt="Электромотоциклы VIP Bike" loading="lazy" intervalMs={5000} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
@@ -1043,7 +1075,7 @@ export default function Home() {
 
                 {/* Intermediate */}
                 <AnimatedSection delay={0.15}>
-                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #F59E0B 40%, var(--vip-border-soft))" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "#F59E0B66" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <HeroImageCarousel images={PETROL_BIKE_IMAGES} alt="Бензиновые мотоциклы VIP Bike" loading="lazy" intervalMs={5400} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
@@ -1070,7 +1102,7 @@ export default function Home() {
 
                 {/* Pro */}
                 <AnimatedSection delay={0.3}>
-                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "color-mix(in srgb, #EF4444 40%, var(--vip-border-soft))" }}>
+                  <Card className="relative z-10 aspect-[9/21] overflow-hidden group transition-all duration-500 hover:-translate-y-2 hover:shadow-xl" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "#EF444466" }}>
                     <div className="absolute top-0 left-0 w-full overflow-hidden z-0" style={{ height: "76%" }}>
                       <HeroImageCarousel images={SHOWSTOPPER_BIKE_IMAGES} alt="Самые эффектные мотоциклы VIP Bike" loading="lazy" intervalMs={5800} />
                       <div className="absolute inset-0 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 85%)" }} />
@@ -1102,7 +1134,7 @@ export default function Home() {
           </section>
 
           {/* ─── HOW IT WORKS ─── */}
-          <section id="how" className="py-20 md:py-28 px-4 relative overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
+          <section id="how" className="py-20 md:py-28 px-4 relative overflow-hidden" style={{ backgroundColor: "var(--vip-card-a40)" }}>
             <div className="max-w-6xl mx-auto relative z-10">
               <SectionHeader badge="Как это работает" title="Выбери. Оставь заявку." highlight="Получи подтверждение." subtitle="Менеджер проверит модель и даты, затем сообщит условия аренды." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
@@ -1111,7 +1143,7 @@ export default function Home() {
                 {HOW_IT_WORKS_STEPS.map((step, idx) => (
                   <AnimatedSection key={step.n} delay={idx * 0.15} className="relative z-10">
                     <div className="flex flex-col items-center text-center">
-                      <div className="relative w-24 h-24 rounded-full flex items-center justify-center mb-5 transition-transform duration-300 hover:scale-110" style={{ backgroundColor: "var(--vip-bg-card)", backgroundImage: "linear-gradient(135deg, color-mix(in srgb, var(--vip-accent-main) 20%, transparent), color-mix(in srgb, var(--vip-accent-main) 5%, transparent))", border: "2px solid color-mix(in srgb, var(--vip-accent-main) 40%, transparent)", color: "var(--vip-accent-main)" }}>
+                      <div className="relative w-24 h-24 rounded-full flex items-center justify-center mb-5 transition-transform duration-300 hover:scale-110" style={{ backgroundColor: "var(--vip-bg-card)", backgroundImage: "linear-gradient(135deg, var(--vip-accent-a20), var(--vip-accent-a5))", border: "2px solid var(--vip-accent-a40)", color: "var(--vip-accent-main)" }}>
                         {step.icon}
                         <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>{step.n}</span>
                       </div>
@@ -1141,7 +1173,7 @@ export default function Home() {
           </section>
 
           {/* ─── ABOUT ─── */}
-          <section id="about" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
+          <section id="about" className="py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-card-a40)" }}>
             <div className="max-w-7xl mx-auto">
               <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="Электро и бензин с раздельным выбором и подтверждением условий." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1174,13 +1206,13 @@ export default function Home() {
           </section>
 
           {/* ─── CONTACTS ─── */}
-          <section id="contacts" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-bg-card) 40%, transparent)" }}>
+          <section id="contacts" className="py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-card-a40)" }}>
             <div className="max-w-4xl mx-auto">
               <SectionHeader badge="Контакты" title="Свяжись" highlight="с нами" subtitle="Всегда на связи — выбирай удобный способ" />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatedSection>
                   <a href={CONTACT_INFO.phoneHref} className="relative z-10 flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)" }}>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: "var(--vip-accent-a10)", border: "1px solid var(--vip-accent-a20)" }}>
                       <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-6 h-6" style={{ stroke: "var(--vip-accent-main)" }}><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     </div>
                     <div className="text-center">
@@ -1191,7 +1223,7 @@ export default function Home() {
                 </AnimatedSection>
                 <AnimatedSection delay={0.1}>
                   <a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="relative z-10 flex flex-col items-center gap-4 p-8 rounded-2xl border transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: "color-mix(in srgb, #26A5E4 10%, transparent)", border: "1px solid color-mix(in srgb, #26A5E4 20%, transparent)" }}>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: "#26A5E41A", border: "1px solid #26A5E433" }}>
                       <svg viewBox="0 0 24 24" fill="#26A5E4" className="w-6 h-6"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
                     </div>
                     <div className="text-center">
@@ -1202,7 +1234,7 @@ export default function Home() {
                 </AnimatedSection>
                 <AnimatedSection delay={0.2}>
                   <div className="relative z-10 flex flex-col items-center gap-4 p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--vip-accent-main) 20%, transparent)" }}>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "var(--vip-accent-a10)", border: "1px solid var(--vip-accent-a20)" }}>
                       <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" className="w-6 h-6" style={{ stroke: "var(--vip-accent-main)" }}><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </div>
                     <div className="text-center">
@@ -1216,7 +1248,7 @@ export default function Home() {
           </section>
 
           {/* ══ PARTNERS SECTION — strong accent-tinted background, logos not inverted ══ */}
-          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 25%, var(--vip-bg-base))" }}>
+          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-partners-bg)" }}>
             <div className="max-w-6xl mx-auto">
               <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1268,7 +1300,7 @@ export default function Home() {
           <section className="py-24 md:py-32 px-4 relative">
             <div className="max-w-4xl mx-auto text-center relative z-10">
               <AnimatedSection>
-                <Badge variant="outline" className="mb-6" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "color-mix(in srgb, var(--vip-accent-main) 10%, transparent)" }}>Готов к выезду?</Badge>
+                <Badge variant="outline" className="mb-6" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "var(--vip-accent-a10)" }}>Готов к выезду?</Badge>
                 <h3 className="text-4xl md:text-6xl font-black mb-6 leading-tight tracking-tight" style={{ color: "var(--vip-text-primary)" }}>Начни свой <GradientText>путь</GradientText> сегодня</h3>
                 <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>Выбери тип техники и модель, укажи даты — менеджер подтвердит доступность и условия.</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -1283,7 +1315,7 @@ export default function Home() {
           </section>
 
           {/* ─── FOOTER (inside cinematic finale; mobile gets own 100vh picture bg) ─── */}
-          <footer className="relative border-t mt-auto min-h-[calc(100vh-4rem)] md:min-h-0 overflow-hidden" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 20%, var(--vip-border-soft))" }}>
+          <footer className="relative border-t mt-auto min-h-[calc(100vh-4rem)] md:min-h-0 overflow-hidden" style={{ borderColor: "var(--vip-accent-a20)" }}>
           {/* Mobile-only picture background for footer (100vh) */}
           <div className="absolute inset-0 z-0 md:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1294,7 +1326,7 @@ export default function Home() {
               loading="lazy"
               aria-hidden
             />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, color-mix(in srgb, var(--vip-bg-base) 90%, transparent) 0%, color-mix(in srgb, var(--vip-bg-base) 85%, transparent) 50%, color-mix(in srgb, var(--vip-bg-base) 95%, transparent) 100%)" }} />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--vip-base-a90) 0%, var(--vip-base-a85) 50%, var(--vip-base-a95) 100%)" }} />
           </div>
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-14 md:py-20">
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
@@ -1348,7 +1380,7 @@ export default function Home() {
                 <h5 className="font-bold mb-4 uppercase text-xs tracking-widest" style={{ color: "var(--vip-text-secondary)" }}>Мы в соцсетях</h5>
                 <div className="flex flex-wrap gap-2 md:gap-3 md:flex-nowrap justify-center md:justify-start">
                   {SOCIAL_LINKS.map((social) => (
-                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className={`group relative ${social.id === "website" ? "w-full h-12 md:w-12 md:h-12" : "w-11 h-11"} md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0`} style={{ backgroundColor: `color-mix(in srgb, ${social.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${social.color} 30%, transparent)`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
+                    <a key={social.id} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className={`group relative ${social.id === "website" ? "w-full h-12 md:w-12 md:h-12" : "w-11 h-11"} md:rounded-full rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 flex-shrink-0`} style={{ backgroundColor: `${social.color}1F`, border: `1px solid ${social.color}4D`, ...(social.featured === "gold" ? { animation: "vip-gold-pulse 2.4s ease-in-out infinite" } : social.featured === "electric" ? { animation: "vip-electric-glow 5s linear infinite" } : {}) }}>
                       {social.featured === "gold" && (
                         <span className="pointer-events-none absolute inset-0 overflow-hidden md:rounded-full rounded-xl">
                           <span className="absolute top-0 left-0 w-1/2 h-full" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.85) 50%, transparent)", animation: "vip-gold-blic 2s ease-in-out infinite" }} />
@@ -1373,7 +1405,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "color-mix(in srgb, var(--vip-accent-main) 15%, var(--vip-border-soft))" }}>
+            <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderColor: "var(--vip-accent-a15)" }}>
               <p className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>&copy; {new Date().getFullYear()} VIP BIKE — аренда мотоциклов в Нижнем Новгороде</p>
               <span className="text-xs" style={{ color: "var(--vip-text-secondary)" }}>Приходи — садись — едь.</span>
             </div>
