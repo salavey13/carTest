@@ -25,9 +25,13 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ChevronRight,
+  Instagram,
+  Mail,
+  MessageCircle,
   Phone,
   Send,
   Truck,
+  Youtube,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -47,6 +51,11 @@ export const metadata: Metadata = {
 
 // ── Original tildacdn asset URLs (kept verbatim per boss request) ────────────
 const T = "https://static.tildacdn.com";
+// Эвакуация: сгенерированная обложка из каталога экипажа (task 135 присвоил
+// картинки всем 8 услугам moto-selection в public.cars) — на оригинале у
+// эвакуации фото нет, а у нас уже есть.
+const IMG_EVAC_CATALOG =
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/moto-selection-svc-03/image_1.jpg";
 const IMG = {
   hero: `${T}/tild3739-3737-4761-a335-353163363963/harley-davidson-ride.jpg`,
   training: `${T}/tild3634-3538-4336-b032-613630643439/xmoto-182-1-scaled-1.jpg`,
@@ -62,8 +71,11 @@ const IMG = {
 
 const BRAND = "#ff7522";
 
+// 7 городов — сверено с героем оригинала (ms.html, бегущая строка):
+// Москва присутствовала на оригинале, в витрине 134 её не было — добавлена.
 const CITIES = [
   "Нижний Новгород",
+  "Москва",
   "Санкт-Петербург",
   "Владимир",
   "Иваново",
@@ -79,10 +91,20 @@ const WHATSAPP_HREF = "https://wa.me/79875570444";
 const TELEGRAM_HREF = "https://t.me/romani14";
 const EMAIL = "moto-selection@yandex.ru";
 const SOURCE_SITE = "https://moto-selection.ru";
+// Гранд-труф с оригинала (ms.html / ms-history.html, 2026-10-25):
+const SOCIAL_INSTAGRAM = "https://instagram.com/moto.selection";
+const SOCIAL_YOUTUBE = "https://www.youtube.com/channel/UCS6_8H7BjW3AC-VHfUV0sYw";
+const SOCIAL_VK = "https://vk.com/id174435641";
+// отзывы оригинал ведёт в группу VK vip_bike (кнопка «ПОДРОБНЕЕ» в отзывах)
+const REVIEWS_VK_HREF = "https://vk.com/vip_bike";
+// партнёры: ссылки прямо с оригинала (кнопка АКАДЕМИЯ в шапке и блок партнёров)
+const ACADEMY_HREF = "https://school.academy.cr/vzroslye/#b890948";
+const ACADEMY_SITE = "https://academy.cr/";
+const BIKELAND_HREF = "https://bikeland.ru/";
+const HISTORY_HREF = "/moto-selection/history";
 
 // «наши услуги» — 6 карточек оригинала + ДОБАВЛЕННАЯ эвакуация (данные из
-// каталога экипажа на платформе). У эвакуации нет фото на оригинале —
-// фирменный оранжевый блок с иконкой.
+// каталога экипажа на платформе). Обложка эвакуации — из каталога (task 135).
 const SERVICES: {
   id: string;
   title: string;
@@ -137,9 +159,12 @@ const SERVICES: {
     anchor: "#detailing",
   },
   // ── ДОБАВЛЕННАЯ УСЛУГА (запрос босса «Add one more service section») ──
+  // Теперь и на оригинале есть эвакуация (блок в секции 02 с ценой от 3 500 ₽)
+  // — копия сходится. Картинка — обложка из каталога экипажа (task 135).
   {
     id: "evac",
     title: "Эвакуация и перевозка мототехники",
+    img: IMG_EVAC_CATALOG,
     price: "от 3 500 ₽",
     text: "Перевозим на своей оборудованной технике, сопровождаем в сервис или ГИБДД. Работаем 24/7.",
     anchor: "#evac",
@@ -165,6 +190,17 @@ const PRICES = [
       "Исследование и мониторинг предложений Нижнего Новгорода и Нижегородской области интересующей модели",
       "Осмотр неограниченного количества мотоциклов",
       "Полное сопровождение сделки и заключение договора Купли-Продажи",
+    ],
+  },
+  // Эвакуация — карточка цен с оригинала (ms.html, секция 02): verbatim.
+  {
+    tag: "эвакуация и перевозка",
+    price: "от 3 500 ₽",
+    title: "Эвакуация и перевозка",
+    bullets: [
+      "Перевозим на своей оборудованной технике",
+      "Сопровождение в Сервис / ГИБДД / При покупке",
+      "Работаем 24/7",
     ],
   },
   {
@@ -201,19 +237,28 @@ const DETAILING_STEPS = [
 ];
 
 const NAV_LINKS = [
+  { href: "#about", label: "О нас" },
   { href: "#services", label: "Услуги" },
   { href: "#prices", label: "Цены" },
-  { href: "#about", label: "О нас" },
+  { href: "#reviews", label: "Отзывы" },
   { href: "#partners", label: "Партнёры" },
   { href: "#contact", label: "Контакты" },
 ];
 
 export default function MotoSelectionLanding() {
   return (
-    <div className="min-h-screen bg-black text-white" style={{ ["--ms-accent" as string]: BRAND }}>
+    <div className="ms-root min-h-screen bg-black text-white" style={{ ["--ms-accent" as string]: BRAND }}>
       {/* smooth scroll for anchor nav; ken-burns + marquee for hero */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
         html { scroll-behavior: smooth; }
+        /* Шрифт оригинала — Montserrat 100..900 (ms.html head). Задан на корне
+           витрины и явно на заголовках: globals.css вешает на h1-h6 Archivo
+           Black, который шире и ломает выравнивание с оригиналом. */
+        .ms-root { font-family: 'Montserrat', 'Segoe UI', sans-serif; }
+        .ms-root h1, .ms-root h2, .ms-root h3, .ms-root h4, .ms-root h5, .ms-root h6 {
+          font-family: 'Montserrat', sans-serif;
+        }
         @keyframes ms-kenburns { 0% { transform: scale(1) translateY(0); } 100% { transform: scale(1.12) translateY(-1.5%); } }
         @keyframes ms-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         @media (prefers-reduced-motion: reduce) {
@@ -238,7 +283,27 @@ export default function MotoSelectionLanding() {
               </a>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* соцсети в шапке — как на оригинале (t228 rightside: Telegram,
+                Instagram + телефон); VK/YouTube живут в подвале */}
+            <a
+              href={TELEGRAM_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Telegram"
+              className="hidden text-white/50 transition hover:text-[var(--ms-accent)] md:inline-flex"
+            >
+              <Send className="h-4 w-4" aria-hidden />
+            </a>
+            <a
+              href={SOCIAL_INSTAGRAM}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="hidden text-white/50 transition hover:text-[var(--ms-accent)] md:inline-flex"
+            >
+              <Instagram className="h-4 w-4" aria-hidden />
+            </a>
             <a
               href={PHONE_HREF}
               className="hidden text-sm font-bold text-white transition hover:text-[var(--ms-accent)] sm:inline-flex sm:items-center sm:gap-1.5"
@@ -468,7 +533,7 @@ export default function MotoSelectionLanding() {
               ))}
             </ul>
             <a
-              href={WHATSAPP_HREF}
+              href={ACADEMY_HREF}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-8 inline-flex h-12 items-center justify-center rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
@@ -708,14 +773,14 @@ export default function MotoSelectionLanding() {
               </p>
             </div>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href={SOURCE_SITE}
-                target="_blank"
-                rel="noopener noreferrer"
+              {/* «ЧИТАТЬ НАШУ ИСТОРИЮ» на оригинале ведёт на подстраницу
+                  /history — на платформе её зеркалит /moto-selection/history */}
+              <Link
+                href={HISTORY_HREF}
                 className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
               >
                 Читать нашу историю
-              </a>
+              </Link>
               <a
                 href="#contact"
                 className="inline-flex h-12 items-center justify-center rounded-full border border-white/25 px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)] active:scale-95"
@@ -734,14 +799,26 @@ export default function MotoSelectionLanding() {
           <blockquote className="mx-auto mt-4 max-w-3xl text-xl font-bold leading-snug text-white/90 sm:text-2xl">
             «Мы уже помогли осуществить мечту людей по всей России»
           </blockquote>
-          <a
-            href={`${SOURCE_SITE}/#rec499409110`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-white/20 px-6 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)]"
-          >
-            Читать отзывы на moto-selection.ru
-          </a>
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-white/50">
+            Оставить свой комментарий можно нажав по кнопке «Читать другие отзывы»
+            и перейдя во ВКонтакте — как на оригинале.
+          </p>
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a
+              href={REVIEWS_VK_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-white/20 px-6 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)]"
+            >
+              Читать другие отзывы во ВКонтакте
+            </a>
+            <Link
+              href={HISTORY_HREF}
+              className="inline-flex h-11 items-center justify-center rounded-full border border-white/20 px-6 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)]"
+            >
+              История создания проекта
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -750,27 +827,54 @@ export default function MotoSelectionLanding() {
         <p className="text-center text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">
           наши партнеры
         </p>
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:mx-auto lg:max-w-3xl">
-          <div className="flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black p-6">
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <a
+            href={BIKELAND_HREF}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black p-6 transition hover:border-[var(--ms-accent)]/60"
+          >
             <Image
               src={IMG.partnerBikeland}
               alt="Байкленд — партнёр Moto.selection"
               width={300}
               height={300}
               sizes="(max-width: 640px) 100vw, 300px"
-              className="h-auto w-48 object-contain"
+              className="h-auto w-48 object-contain transition group-hover:scale-105"
             />
-          </div>
-          <div className="flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] p-6">
+          </a>
+          <a
+            href={ACADEMY_SITE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 transition hover:border-[var(--ms-accent)]/60"
+          >
             <Image
               src={IMG.academyLogo}
               alt="Академия — партнёр Moto.selection"
               width={300}
               height={268}
               sizes="(max-width: 640px) 100vw, 300px"
-              className="h-auto w-48 object-contain"
+              className="h-auto w-48 object-contain transition group-hover:scale-105"
             />
-          </div>
+          </a>
+          {/* Партнёрская витрина платформы: cross-link к /sly13 (босс:
+              «interlink us as partners in respective sections») */}
+          <Link
+            href="/sly13"
+            className="group flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center transition hover:border-[var(--ms-accent)]/60"
+          >
+            <span className="text-2xl font-black uppercase tracking-[0.14em] text-white">
+              SLY<span className="text-[var(--ms-accent)]">13</span>
+            </span>
+            <span className="text-xs leading-relaxed text-white/50">
+              платформа франшиз проката — витрина партнёров, работающих на одном софте
+            </span>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
+              Открыть витрину
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </span>
+          </Link>
         </div>
       </section>
 
@@ -833,14 +937,15 @@ export default function MotoSelectionLanding() {
             </Link>
             <Link
               href="/sly13"
-              className="group rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-white/30"
+              className="group rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-[var(--ms-accent)]/60"
             >
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">для своих</p>
-              <h3 className="mt-2 text-lg font-bold text-white">Витрина SLY13 — франшизы проката</h3>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">партнёры</p>
+              <h3 className="mt-2 text-lg font-bold text-white">Витрина SLY13 — платформа франшиз</h3>
               <p className="mt-2 text-sm leading-relaxed text-white/60">
-                Сайт экипажа работает на платформе salavey13: каталог, заказы, аналитика.
+                Мотосервис, прокат и витрины партнёров работают на одной платформе:
+                каталог, заказы, аналитика, договоры.
               </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-white/70">
+              <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-accent)]">
                 Посмотреть витрину
                 <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
               </span>
@@ -869,9 +974,34 @@ export default function MotoSelectionLanding() {
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li><a href={PHONE_HREF} className="transition hover:text-[var(--ms-accent)]">{PHONE_TEXT}</a></li>
               <li><a href={`mailto:${EMAIL}`} className="transition hover:text-[var(--ms-accent)]">{EMAIL}</a></li>
-              <li><a href={TELEGRAM_HREF} target="_blank" rel="noopener noreferrer" className="transition hover:text-[var(--ms-accent)]">Telegram</a></li>
-              <li><a href={WHATSAPP_HREF} target="_blank" rel="noopener noreferrer" className="transition hover:text-[var(--ms-accent)]">WhatsApp</a></li>
+              <li><a href={SOURCE_SITE} target="_blank" rel="noopener noreferrer" className="transition hover:text-[var(--ms-accent)]">moto-selection.ru</a></li>
+              <li><Link href={HISTORY_HREF} className="transition hover:text-[var(--ms-accent)]">История проекта</Link></li>
             </ul>
+            {/* «мы в соцсетях» — блок оригинала: Telegram, Mail, Phone, WhatsApp
+                + Instagram / YouTube / VK из иконок страницы */}
+            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">мы в соцсетях</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {[
+                { href: TELEGRAM_HREF, label: "Telegram", Icon: Send },
+                { href: SOCIAL_INSTAGRAM, label: "Instagram", Icon: Instagram },
+                { href: SOCIAL_YOUTUBE, label: "YouTube", Icon: Youtube },
+                { href: SOCIAL_VK, label: "VK", Icon: null },
+                { href: WHATSAPP_HREF, label: "WhatsApp", Icon: MessageCircle },
+                { href: `mailto:${EMAIL}`, label: "Mail", Icon: Mail },
+              ].map(({ href, label, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  aria-label={label}
+                  title={label}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-white/60 transition hover:border-[var(--ms-accent)]/60 hover:text-[var(--ms-accent)]"
+                >
+                  {Icon ? <Icon className="h-4 w-4" aria-hidden /> : <span className="text-[11px] font-black">VK</span>}
+                </a>
+              ))}
+            </div>
           </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">города</p>

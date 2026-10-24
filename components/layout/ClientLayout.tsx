@@ -120,6 +120,18 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
+  // PATCH: sly13 theme (2026-10-25, task 136) — standalone personal showroom
+  // at /sly13. Renders its own cyan/graphite nav + footer (svarprofi/
+  // nnvolt/motoSelection pattern): the default platform chrome would fight
+  // the personal-brand landing the boss keeps polishing.
+  sly13: {
+    paths: ["/sly13"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -152,6 +164,9 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/moto-selection")) {
     return THEME_CONFIG.motoSelection;
+  }
+  if (pathname.startsWith("/sly13")) {
+    return THEME_CONFIG.sly13;
   }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;
