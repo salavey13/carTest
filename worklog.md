@@ -1217,3 +1217,17 @@ Work Log:
 Stage Summary:
 - moto-selection = 2nd illustrated crew, first with real-photo cards; sly13 fully text-free.
 - Pipeline scripts committed: scripts/{dl-moto-landing-images.sh,gen-moto-selection-missing.sh,upload-moto-selection-service-images.mjs,gen-sly13-notext-fix.sh,upload-sly13-service-images.mjs,verify-service-images.mjs}. Same recipe fits vip-bike (44) — ~15 min per boss's estimate.
+
+---
+Task ID: 136-vipbike-48-talking-images
+Agent: main (Claude)
+Task: 48 vip-bike services illustrated with "talking" no-text images.
+
+Work Log:
+- 48 vip-bike-svc-* rows had no images. One hand-crafted "talking" subject per operation (what the service is = readable at a glance): chain lube, oil funnel, spark plug, brake pads, welding plow mount, fleet audit tablet, tick-mark clock (нормо-час) etc.
+- Style: dark premium workshop, cinematic photoreal, neon orange #FF7522 + violet glow; text-hostile base. gen-vipbike-services.sh resumable + 3 parallel workers; svc-001 clock-with-digits caught in audit and regenerated blank-face.
+- upload-vipbike-service-images.mjs: attention-crop 1080x1080 square (card) + 1080x810 4:3 (gallery), q82 → carpix upsert → PATCH image_url + specs.gallery (specs merged).
+- Verified 63/63 rows all crews: URLs 200 image/*, specs intact.
+
+Stage Summary:
+- vip-bike = 3rd illustrated crew; whole catalog's services now have images. Scripts: scripts/{gen-vipbike-services.sh,upload-vipbike-service-images.mjs,verify-service-images.mjs,inspect-vipbike.mjs}.

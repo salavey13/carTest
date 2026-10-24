@@ -8,7 +8,7 @@ const SB = 'https://inmctohsodgdohamhzag.supabase.co';
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 const r = await fetch(`${SB}/rest/v1/cars?select=id,model,image_url,specs&type=eq.service&order=id&limit=200`, { headers: H });
-const rows = (await r.json()).filter(x => /^(moto-selection|sly13)-/.test(x.id));
+const rows = (await r.json()).filter(x => /^(moto-selection|sly13|vip-bike)-/.test(x.id));
 
 let bad = 0;
 for (const it of rows) {
