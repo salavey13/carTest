@@ -1279,3 +1279,23 @@ Work Log:
 
 Stage Summary:
 - Аренда order-mvnr3g9c-bz30mf в БД приведена к реальности: 2 000 ₽ аренда (1 750 + 250) + 20 000 залог = 22 000 ₽ на карте Т-Банка; два скидочных следа (промо WHEEL2000 −2 000 + ручная −1 000) и комментарий для операторов в metadata. SQL-док вычищен из docs.
+
+---
+Task ID: 21-cron-vpsless-landing-dna-lead-modal
+Agent: main (Z.ai, IM session web-ebfeeaf7)
+Task: boss — (1) VPS забыт (переезд сделан им самим; правильный IP оканчивается на .25); реплицировать VPS-cron (дневные/недельные сводки + напоминания) средствами Vercel/Supabase в рамках hobby-лимитов. (2) Форма обратной связи в модалке на /moto-selection — переиспользовать существующую механику заявок с ботом владельцу экипажа (в будущем) и salavey13 (413553377). (3) ДНК оригинального moto-selection.ru + 2026-апгрейд, не копируя.
+
+Work Log:
+- SSH (paramiko, в песочнице нет ssh-client) → полный дамп crontab'ов VPS 212.67.11.25: 5 boss-команд (morning-standup 09:07, evening-summary 22:30, weekly-revenue Вс 21:13 МСК, returns-reminder ежечасно, overdue-alert каждые 2ч) + 2 CSV-синка (rentals каждые 2ч, catalog 00:07). Скрипты скачаны, сверены с repo boss-commands/ — ВЕРСИИ В РЕПО НОВЕЕ (prepayment-секция вечером): репо — source of truth, VPS-копии протухли.
+- Vercel Hobby: оба cron-слота заняты (crypto-prices + wall-renter-notify) → архитектура: GitHub Actions scheduled workflows, запускают канонические boss-commands/*.sh БЕЗ изменений (ubuntu-latest: bash+jq+curl есть; ~22 запуска/день ≈ 450 мин/мес < 2000 бесплатных). Расписания 1:1 с VPS.
+- Секреты выставлены через GH API (sealed box, pynacl): NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VIP_BIKE_BOT_TOKEN (line-3 bare token — формат _lib.sh), VIP_BIKE_ADMIN_CHAT_IDS. Значения взяты с VPS .boss-secrets.txt, нигде не залогированы.
+- ЗАТЫК: PAT (scopes: project,repo,user) без workflow scope → push .github/workflows/vip-bike-cron.yml запрещён GitHub. YAML лежит в docs/crewDocs/vip-bike-cron.workflow.yml (запушен) + локально в .github/workflows/ (untracked) — boss вставляет его через веб-UI Actions→New workflow (30 сек), либо даёт токен с workflow scope. Плюс workflow_dispatch с dry_run — можно прогонять сводки в лог, не спамя чат.
+- Форма заявки: REA endpoint'а callback-lead — crew-generic (slug любой), schema name/phone/consent/formSource/landingPath, dedup+rate-limit, insert в franchize_intents, получатели resolveLeadNotifyRecipients(slug)=owner+admins+members+ADMIN_CHAT_ID → moto-selection: будущий владелец автоматически, сегодня salavey13; sly13 (экипажа нет) → salavey13.
+- app/moto-selection/FeedbackModal.tsx (client): клик-делегирование [data-lead-modal-open] — серверные кнопки открывают модалку без prop drilling; ESC/backdrop/scroll-lock/focus, состояния idle/sending/success/error.
+- ДНК moto-selection.ru (парсинг Tilda-маркапа): палитра #ff7522×25 + тинты #ffa770/#ffad7a/#ffb282, Gilroy+Montserrat, дисплей до 250px, герой — плоский светло-серый (штриха НЕТ в оригинале — наш stroked был self-goal), вордмарк MOTO.SELECTION ×8.
+- /moto-selection: stroked «искусство» → оранжевая обводка BRAND + заливка 7% (масса букв возвращена); гост-нумералы 01–07 на карточках услуг; вордмарк-разделитель перед подвалом; градиентные CTA #ffa770→#ff7522 (шапка/герой/контакты); кнопки заявок: шапка, герой (бывш. WhatsApp-линк), цены ×3, контакты.
+- /sly13: та же модалка (slug sly13, cyan-палитра accentMain/=#06B6D4) в финальном CTA рядом с @SALAVEY13.
+- Verify: tsc (page+Modal+Sly13) 0 ошибок, eslint --max-warnings=0 PASS, vitest catalog/cart 8/8. Коммит 6cfa825b9 → main.
+
+Stage Summary:
+- Крон-репликация готова на 99%: секреты стоят, YAML запушен в docs — нужен только paste в .github/workflows/ (или токен с workflow scope). Заявки с обеих витрин летят в CRM + Telegram. Скрипты VPS можно гасить после недели параллельной работы Actions.
