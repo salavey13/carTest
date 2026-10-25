@@ -235,6 +235,33 @@ export function interactionRingStyle(theme: FranchizeTheme) {
   };
 }
 
+/**
+ * Focus highlight for catalog CARDS — must be painted on the <article>
+ * itself, never on the inner button. The previous recipe (the 2px
+ * box-shadow ring from interactionRingStyle on the button) lives inside
+ * the article's `overflow-hidden` + 1px border → on compliant engines it
+ * is clipped away ENTIRELY (verified live 2026-10-25: focused Falcon GT
+ * shows zero ring pixels on PC Chromium) while TV WebKit mis-clips the
+ * same shadow and LEAKS it as a 1-2px sliver along one edge — the boss's
+ * «lost focus highlighted card has too narrow highlight» and «rerode r1's
+ * card is incorrectly highlighted». An outline with a negative offset
+ * hugs the card silhouette from the inside, follows the rounded corners
+ * and can never be clipped by the card's own overflow. Not for generic
+ * inputs — those keep interactionRingStyle (no overflow-hidden around them).
+ */
+export function interactionCardFocusStyle(theme: FranchizeTheme): React.CSSProperties {
+  if (theme.isAuto) {
+    return {
+      outline: "2px solid color-mix(in srgb, var(--franchize-accent-main) 85%, transparent)",
+      outlineOffset: "-1px",
+    };
+  }
+  return {
+    outline: `2px solid ${withAlpha(theme.palette.accentMain, 0.85)}`,
+    outlineOffset: "-1px",
+  };
+}
+
 
 export function focusRingOutlineStyle(theme: FranchizeTheme) {
   if (theme.isAuto) {

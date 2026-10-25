@@ -72,15 +72,31 @@ describe("native picker dark icons · deterministic white fallback", () => {
     // both prefixed and unprefixed mask (Safari < 15.4 needs -webkit-)
     expect(supportsBlock).toContain("-webkit-mask: url(\"data:image/svg+xml");
     expect(supportsBlock).toContain("mask: url(\"data:image/svg+xml");
-    // calendar silhouette for dates, clock silhouette for time inputs
+    // calendar silhouette for dates, clock silhouette for time inputs —
+    // ×2 each since iter3 (boss: accent in LIGHT theme too): dark + light
     expect(supportsBlock).toContain(".fr-native-picker.fr-picker-dark[type=\"time\"]::-webkit-calendar-picker-indicator");
-    expect((supportsBlock.match(/%3Ccircle cx='12' cy='12' r='10'/g) ?? []).length).toBe(2);
-    expect((supportsBlock.match(/%3Crect x='3' y='4' width='18' height='18' rx='2'/g) ?? []).length).toBe(2);
+    expect(supportsBlock).toContain(".fr-native-picker.fr-picker-light[type=\"time\"]::-webkit-calendar-picker-indicator");
+    expect((supportsBlock.match(/%3Ccircle cx='12' cy='12' r='10'/g) ?? []).length).toBe(4);
+    expect((supportsBlock.match(/%3Crect x='3' y='4' width='18' height='18' rx='2'/g) ?? []).length).toBe(4);
   });
 
   it("accent mask scales with contain/center/no-repeat (no clipped or oversized glyph)", () => {
     const supportsBlock = css.slice(css.indexOf("@supports ((mask: none) or (-webkit-mask: none))"));
-    expect((supportsBlock.match(/center \/ contain no-repeat/g) ?? []).length).toBe(2);
+    expect((supportsBlock.match(/center \/ contain no-repeat/g) ?? []).length).toBe(4);
+  });
+
+  it("iter3: light theme gets the accent mask too, with dark-slate var fallback", () => {
+    const supportsBlock = css.slice(css.indexOf("@supports ((mask: none) or (-webkit-mask: none))"));
+    // anchor INSIDE the @supports block (the mask-less fallback rule above
+    // shares the same selector, so a plain selector indexOf would grab it)
+    const lightBlock = supportsBlock.slice(supportsBlock.indexOf(".fr-native-picker.fr-picker-light::-webkit-calendar-picker-indicator {\n    filter: none;"));
+    expect(lightBlock).toContain("background-color: var(--item-accent, #111827);");
+    expect(lightBlock).toContain("background-image: none;");
+    expect((lightBlock.match(/center \/ contain no-repeat/g) ?? []).length).toBe(2); // prefixed + unprefixed shorthand
+    // light mask-less fallback (black glyph) stays for old TV WebKit
+    expect(css).toContain(
+      ".fr-native-picker.fr-picker-light::-webkit-calendar-picker-indicator {\n  filter: brightness(0) opacity(0.75);\n}",
+    );
   });
 });
 

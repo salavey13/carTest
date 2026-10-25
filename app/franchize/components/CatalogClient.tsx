@@ -9,7 +9,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { toCategoryId } from "../lib/navigation";
 import type { FranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { shouldShowFloatingCart } from "../lib/route-cta-policy";
-import { catalogCardVariantStyles, crewPaletteForSurface, getContrastingGlowStyle, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
+import { catalogCardVariantStyles, crewPaletteForSurface, getContrastingGlowStyle, interactionCardFocusStyle, interactionRingStyle, readableTextOnColor, withAlpha } from "../lib/theme";
 import type { CatalogItemVM, FranchizeCrewVM } from "../actions";
 import { upsertFranchizeIntent } from "../actions";
 import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "../lib/catalog-utils";
@@ -404,14 +404,14 @@ function ComboOfferCard({
   displayMode,
   onOpen,
   focused,
-  ringStyle,
+  focusStyle,
 }: {
   item: CatalogItemVM;
   crew: FranchizeCrewVM;
   displayMode: string;
   onOpen: () => void;
   focused: boolean;
-  ringStyle: ReturnType<typeof interactionRingStyle>;
+  focusStyle: React.CSSProperties;
 }) {
   const rs = (item.rawSpecs ?? {}) as Record<string, unknown>;
   const sizes = Array.isArray(rs.sizes) ? (rs.sizes as string[]) : [];
@@ -429,7 +429,13 @@ function ComboOfferCard({
       data-catalog-item="true"
       data-combo-offer="true"
       className="group col-span-full overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)]"
-      style={catalogCardVariantStyles(crew.theme, crewPaletteSeed(item.id))}
+      style={{
+        ...catalogCardVariantStyles(crew.theme, crewPaletteSeed(item.id)),
+        // task 139 iter2: focus frame on the ARTICLE (outline, negative
+        // offset) — the button-level box-shadow ring was clipped by the
+        // article's overflow-hidden (invisible on PC, sliver-leak on TV).
+        ...(focused ? focusStyle : {}),
+      }}
     >
       <button
         type="button"
@@ -437,7 +443,6 @@ function ComboOfferCard({
         data-catalog-item-button="true"
         onClick={onOpen}
         className="flex w-full flex-col text-left sm:flex-row"
-        style={focused ? ringStyle : undefined}
       >
         {/* Image — horizontal layout on ≥sm: left pane, full-bleed on mobile */}
         <div className="relative w-full shrink-0 aspect-[16/9] sm:aspect-auto sm:w-2/5 sm:min-h-[15rem] lg:min-h-[17rem]">
@@ -1527,7 +1532,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               displayMode={displayMode}
                               onOpen={() => openItem(item)}
                               focused={focusedItemId === item.id}
-                              ringStyle={interactionRingStyle(crew.theme)}
+                              focusStyle={interactionCardFocusStyle(crew.theme)}
                             />
                           ))}
                         </div>
@@ -1565,7 +1570,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-carousel-card="true"
                       data-carousel-index={index}
                       className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[220px] sm:max-w-[240px]"
-                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+                      style={{
+                        ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
+                        // task 139 iter2: focus frame lives HERE (outline,
+                        // negative offset, radius-hugging) — never on the
+                        // button below: overflow-hidden clipped that ring to
+                        // nothing on PC and leaked a 1px sliver on TV.
+                        ...(focusedItemId === item.id ? interactionCardFocusStyle(crew.theme) : {}),
+                      }}
                     >
                       <button
                         type="button"
@@ -1575,7 +1587,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
-                        style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                         onPointerMove={(event) => {
                           if (event.pointerType === 'touch') return;
                           const rect = event.currentTarget.getBoundingClientRect();
@@ -1728,7 +1739,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       key={item.id}
                       data-catalog-item="true"
                       className="group overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)]"
-                      style={catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0))}
+                      style={{
+                        ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
+                        // task 139 iter2: same article-level focus frame as
+                        // the carousel card above (clipped-ring fix).
+                        ...(focusedItemId === item.id ? interactionCardFocusStyle(crew.theme) : {}),
+                      }}
                     >
                       <button
                         type="button"
@@ -1738,7 +1754,6 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         onClick={() => openItem(item)}
                         onFocus={() => setFocusedItemId(item.id)}
                         onBlur={() => setFocusedItemId((prev) => (prev === item.id ? null : prev))}
-                        style={focusedItemId === item.id ? interactionRingStyle(crew.theme) : undefined}
                       >
                         {/* ── Image area (9:16 for bikes, square for services) ── */}
                         <div className={`relative w-full ${isService ? 'aspect-square' : 'aspect-[9/16]'}`}>
