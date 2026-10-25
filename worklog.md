@@ -1247,3 +1247,20 @@ Work Log:
 
 Stage Summary:
 - «Время выдачи» now opens at the nearest flat hour of the renter's watch; operator sees round slots on the sheet. Ships on next Vercel deploy.
+
+---
+Task ID: 19-rental-two-discounts-wheel-notify-pickers
+Agent: main (Z.ai, IM session web-ebfeeaf7)
+Task: boss — (1) поправь аренду order-mvnr3g9c-bz30mf: прошлые правки неверны, был ещё промокод WHEEL2000; итог 2 000 (1750+250), залог 20k, 22k на карту Т-Банка; + комментарий (друг субарендатора, распоряжение сверху, честный выигрыш колеса, «фото до» и одометр добавил сам). (2) Улучшить колесо-фортуны уведомления (поздравлятельнее, ник арендатора). (3) Робастный time-picker в модалке (white-on-white у арендатора).
+
+Work Log:
+- РАЗОБРАЛ МАТЕМАТИКУ: 5000 (4750 байк + 250 экип) − 2000 WHEEL2000 − 1000 вручную = 2000. Прошлая правка (параллельный агент) учла только −1000 → неверные 4000/24000.
+- SQL docs/crewDocs/rental-order-mvnr3g9c-bz30mf-two-discounts-2026-10-25.sql: dry-run + идемпотентный UPDATE (total_cost 2000, metadata merge: discount_rub 3000 + promo/manual разбивка + price_correction + operator_comment + payment_note; bike_price правится только если хранился). ЗАПУСК — руками boss'ом в Supabase SQL editor (в песочнице нет service key).
+- Wheel notify: resolveWheelWinnerDisplayName() (initData tg → users.full_name → users.username → сырой chat id последним — из-за tg:null у cookie-сессий в сводку улетал сырой id); сводка «@nick · Имя» + поздравительный тон + подсказка про кассу; DM победителю — «Поздравляем!» + нудж «крути ещё через 24ч». Получатели и так были верные (победитель + owner/admin/co_owner + ADMIN_CHAT_ID).
+- Item.tsx: openNativePicker (showPicker на клик по всему полю, try/catch) на 7 нативных инпутов (аренда ×4, сервис-запись, тест-драйв ×2) + fr-native-picker/fr-picker-{light,dark} классы; globals.css: ::-webkit-calendar-picker-indicator принудительный контраст через filter (сломанные WebKit не могут white-on-white).
+- Spéc +8 тестов (резолвер имён ×5, сводка ник+имя, дедуп имени, «Ура!»).
+- REBASE CONFLICT: параллельный task 138 (TV-safe landing gradients) тоже аппендил globals.css — разрешил (оба блока сохранены, braces 306/306 balanced), ребейз прошёл, пуш 3b23457a4.
+- Verify: typecheck:franchize PASS, lint:target PASS, vitest 21 wheel + 52 regression PASS.
+
+Stage Summary:
+- Код в main (3b23457a4). SQL-правку аренды boss вставляет в Supabase SQL editor: dry-run → BEGIN…COMMIT → post-check (ожидает total_cost 2000, card_total 22000, bike_price 1750).
