@@ -48,8 +48,23 @@
 //   counts exactly what is on screen, failures are counted per row and
 //   reported in one summary toast, ONE silent refetch canonicalises the
 //   labels (no N redundant CSV rebuilds).
+//
+// Task 137 (2026-10-25, boss) — table view usability, round three:
+//   1. Sticky LEFT rail = Дата + Марка: the bike id column moves to display
+//      position 2 — «when + which bike» stays visible no matter how far
+//      right you scroll (the sheet is 25 columns wide).
+//   2. Sticky RIGHT rail = Оператор выдал / Оператор принял / Верификация:
+//      the activation/finalization columns move to the END, right before
+//      the owner-tier quick-verify column — all three pin to the right
+//      edge, so only the middle of the table scrolls.
+//   3. The modal goes FULLSCREEN on PC — the old max-w-7xl + 88vh box
+//      wasted the monitor's free real estate — and the table font drops
+//      to text-xs (13px → 12px) for density.
+//   Rails are MEASURED, not guessed: auto table layout sizes columns by
+//   content, so the offsets come from the rendered header row
+//   (getBoundingClientRect) via a ResizeObserver — see lib/table-rails.ts.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera, Check } from "lucide-react";
@@ -68,12 +83,32 @@ import {
   operatorColorOf,
   type OperatorSplitEntry,
 } from "./lib/operator-split";
+// Task 137 — display-order remap + measured sticky-rail offsets.
+import { computeRailOffsets, RENTALS_DISPLAY_ORDER } from "./lib/table-rails";
 import {
   parseCsvSections,
   pluralBlocksRu,
   type CsvSectionKey,
   type ParsedCsvSection,
 } from "@/lib/csv-builders/rentals-csv-sections";
+
+/** Task 137 — the sticky rails are a PC affordance: on a narrow scrollport
+ *  the two rails together (Дата+Марка ≈ 290px left, выдал+принял+Верификация
+ *  ≈ 600px right) would cover a 390px phone ENTIRELY. Below lg (1024px) the
+ *  table degrades to the classic single sticky date column. */
+function useMinWidth(px: number): boolean {
+  const [on, setOn] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(`(min-width: ${px}px)`).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${px}px)`);
+    const apply = () => setOn(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [px]);
+  return on;
+}
 
 interface ExportCsvModalProps {
   isOpen: boolean;
@@ -220,6 +255,14 @@ interface SectionColCfg {
   opCol?: number;
   /** Rental uuid column for the row tap-through (АРЕНДЫ only). */
   idCol: number;
+  /** Task 137 — display-order remap (DATA indexes; every cfg lookup above
+   *  stays in data space, only the render loop walks this order). */
+  order?: number[];
+  /** Task 137 — sticky rails: N leading display columns pin LEFT (date +
+   *  bike id), M trailing display columns pin RIGHT (activation/finalization
+   *  + verification). Defaults: 1 left (the date), 0 right. */
+  stickyLeft?: number;
+  stickyRight?: number;
 }
 
 const SECTION_COLS: Record<CsvSectionKey, SectionColCfg> = {
@@ -233,6 +276,13 @@ const SECTION_COLS: Record<CsvSectionKey, SectionColCfg> = {
     verification: 24,
     opCol: 22,
     idCol: 14,
+    // Task 137 — Марка (6) → display position 2, Оператор выдал (20) /
+    // принял (21) → the tail right before Верификация (24). Left rail pins
+    // «Дата + Марка», right rail pins «выдал / принял / верификация» — the
+    // middle scrolls, the context never leaves the screen.
+    order: RENTALS_DISPLAY_ORDER,
+    stickyLeft: 2,
+    stickyRight: 3,
   },
   equipment: { numeric: new Set([2]), date: new Set([0]), hide: new Set([6]), idCol: -1 },
   service: { numeric: new Set([3]), date: new Set([0]), hide: new Set([4]), idCol: -1 },
@@ -791,14 +841,17 @@ export function ExportCsvModal({
   // Line's `if (!isOpen) return null` guarantees client-only evaluation.
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4"
+      // Task 137 — fullscreen on PC too: the old sm padding + centering
+      // boxed the sheet at max-w-7xl/88vh and wasted the monitor. Mobile was
+      // always items-stretch — now PC matches it.
+      className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/60 backdrop-blur-sm"
       onClick={downloading || sending ? undefined : onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр таблицы и экспорт CSV"
     >
       <div
-        className="flex h-full w-full flex-col sm:h-auto sm:max-h-[88vh] sm:max-w-7xl border shadow-2xl overflow-hidden sm:rounded-2xl"
+        className="flex h-full w-full flex-col border shadow-2xl overflow-hidden"
         // Task 127 — the panel starts BELOW the TG fullscreen native buttons:
         // the header row (and its top-right «x») can no longer hide under them.
         style={{
@@ -1244,7 +1297,7 @@ export function ExportCsvModal({
             </div>
           ) : (
             <table
-              className="w-full border-collapse text-left text-xs sm:text-[13px]"
+              className="w-full border-collapse text-left text-xs"
               style={{ color: T.text, minWidth: "max-content" }}
             >
               <thead className="sticky top-0 z-20">
@@ -1494,6 +1547,93 @@ function SectionTable({
   const bannerTint = `color-mix(in srgb, ${accent} 18%, ${T.bgElevated})`;
   const thOpaqueBg = `linear-gradient(${T.bgElevated}, ${T.bgElevated}), linear-gradient(${T.bg}, ${T.bg})`;
 
+  // Task 137 — sticky RAILS. cfg.stickyLeft leading display columns pin
+  // left (Дата + Марка), cfg.stickyRight trailing ones pin right (выдал /
+  // принял / верификация); the middle scrolls under both. Auto table layout
+  // sizes columns by content, so the rail offsets are MEASURED from the
+  // rendered header row (getBoundingClientRect — fractional, no drift) and
+  // re-measured by a ResizeObserver on every width change (data reload,
+  // viewport resize, font swap). The callback-ref-into-state pattern re-runs
+  // the effect when the <table> (re)mounts — loading/error states swap the
+  // element out entirely.
+  const stickyLeftRaw = cfg.stickyLeft ?? 1;
+  const stickyRightRaw = cfg.stickyRight ?? 0;
+  const railsOn = useMinWidth(1024);
+  const stickyLeft = railsOn ? stickyLeftRaw : 1;
+  const stickyRight = railsOn ? stickyRightRaw : 0;
+  const displayIdxs = cfg.order
+    ? cfg.order.filter((i) => i < section.header.length)
+    : section.header.map((_, i) => i);
+  const colCount = displayIdxs.length;
+  const [tableEl, setTableEl] = useState<HTMLTableElement | null>(null);
+  const [rail, setRail] = useState<{ left: number[]; right: number[] }>({
+    left: [],
+    right: [],
+  });
+  useLayoutEffect(() => {
+    if (!tableEl) return;
+    const measure = () => {
+      const headRow = tableEl.rows?.[0];
+      if (!headRow || headRow.cells.length === 0) return;
+      const widths = Array.from(headRow.cells).map(
+        (c) => c.getBoundingClientRect().width,
+      );
+      const next = computeRailOffsets(widths, stickyLeft, stickyRight);
+      // no-op guard: a setState per RO tick would re-render forever
+      setRail((prev) =>
+        prev.left.length === next.left.length &&
+        prev.right.length === next.right.length &&
+        prev.left.every((v, i) => Math.abs(v - next.left[i]) < 0.5) &&
+        prev.right.every((v, i) => Math.abs(v - next.right[i]) < 0.5)
+          ? prev
+          : next,
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(tableEl);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [tableEl, stickyLeft, stickyRight]);
+
+  // Task 137 — one style factory for every rail cell (th/td/tfoot). Left rail
+  // casts its shadow to the RIGHT (content slides under from the right), the
+  // right rail mirrors it. The background is an OPAQUE composite: the row's
+  // own tint stacked over the scroll container's T.bg — dark-theme tokens are
+  // translucent, so without the second layer the cells sliding beneath would
+  // bleed through (same recipe as the task132 th fix).
+  const railCellStyle = (
+    di: number,
+    bg: string,
+    shadowIntensity: string,
+  ): React.CSSProperties => {
+    if (di < stickyLeft) {
+      return {
+        position: "sticky",
+        left: rail.left[di],
+        zIndex: 10,
+        boxShadow: `2px 0 4px rgba(0,0,0,${shadowIntensity})`,
+        backgroundColor: bg,
+        backgroundImage: `linear-gradient(${bg}, ${bg}), linear-gradient(${T.bg}, ${T.bg})`,
+      };
+    }
+    const ri = colCount - 1 - di;
+    if (ri >= 0 && ri < stickyRight) {
+      return {
+        position: "sticky",
+        right: rail.right[ri],
+        zIndex: 10,
+        boxShadow: `-2px 0 4px rgba(0,0,0,${shadowIntensity})`,
+        backgroundColor: bg,
+        backgroundImage: `linear-gradient(${bg}, ${bg}), linear-gradient(${T.bg}, ${T.bg})`,
+      };
+    }
+    return {};
+  };
+
   return (
     <section className="min-w-fit">
       {/* min-w-fit (task 133): the table inside uses minWidth:max-content and
@@ -1521,38 +1661,43 @@ function SectionTable({
       </div>
 
       <table
-        className="w-full border-collapse text-left text-xs sm:text-[13px]"
+        ref={setTableEl}
+        className="w-full border-collapse text-left text-xs"
         style={{ color: T.text, minWidth: "max-content" }}
       >
         {/* Tier 2 of the sticky header — column names stick 36px below the
             banner (top-9), inside the same scroll container. z-20 keeps the
-            row above body cells (their sticky first column is z-10). */}
+            row above body cells (their sticky rail columns are z-10).
+            Task 137 — the row walks cfg.order (display order), while every
+            cfg lookup stays in DATA space (dataIdx). */}
         <thead className="sticky top-9 z-20">
           <tr>
-            {section.header.map((h, i) => (
-              <th
-                key={i}
-                className="whitespace-nowrap border-b-2 border-r px-2.5 py-2 font-semibold"
-                style={{
-                  borderColor: T.border,
-                  color: T.textMuted,
-                  backgroundColor: T.bgElevated,
-                  backgroundImage: thOpaqueBg,
-                  textAlign: cfg.numeric.has(i) ? "right" : cfg.date.has(i) ? "center" : "left",
-                  ...(i === 0
-                    ? {
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 10,
-                        boxShadow: "2px 0 4px rgba(0,0,0,0.08)",
-                      }
-                    : {}),
-                  ...(cfg.hide.has(i) ? { minWidth: "0.5rem", padding: "0 0" } : {}),
-                }}
-              >
-                {cfg.hide.has(i) ? "" : h || "\u00A0"}
-              </th>
-            ))}
+            {displayIdxs.map((dataIdx, di) => {
+              const h = section.header[dataIdx] ?? "";
+              return (
+                <th
+                  key={dataIdx}
+                  className="whitespace-nowrap border-b-2 border-r px-2.5 py-2 font-semibold"
+                  style={{
+                    borderColor: T.border,
+                    color: T.textMuted,
+                    backgroundColor: T.bgElevated,
+                    backgroundImage: thOpaqueBg,
+                    textAlign: cfg.numeric.has(dataIdx)
+                      ? "right"
+                      : cfg.date.has(dataIdx)
+                        ? "center"
+                        : "left",
+                    ...(cfg.hide.has(dataIdx)
+                      ? { minWidth: "0.5rem", padding: "0 0" }
+                      : {}),
+                    ...railCellStyle(di, T.bgElevated, "0.08"),
+                  }}
+                >
+                  {cfg.hide.has(dataIdx) ? "" : h || "\u00A0"}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -1605,14 +1750,14 @@ function SectionTable({
                 onClick={rowClickable ? () => onOpenRental(rowRentalId) : undefined}
                 title={rowClickable ? "Открыть аренду" : undefined}
               >
-                {section.header.map((_, ci) => {
-                  const cell = r[ci] ?? "";
-                  const isNum = cfg.numeric.has(ci) && isNumericLike(cell);
-                  const isDate = cfg.date.has(ci);
-                  if (cfg.hide.has(ci)) {
+                {displayIdxs.map((dataIdx, di) => {
+                  const cell = r[dataIdx] ?? "";
+                  const isNum = cfg.numeric.has(dataIdx) && isNumericLike(cell);
+                  const isDate = cfg.date.has(dataIdx);
+                  if (cfg.hide.has(dataIdx)) {
                     return (
                       <td
-                        key={ci}
+                        key={dataIdx}
                         className="border-b border-r"
                         style={{
                           borderColor: T.border,
@@ -1625,44 +1770,39 @@ function SectionTable({
                   }
                   return (
                     <td
-                      key={ci}
+                      key={dataIdx}
                       className="border-b border-r px-2.5 py-1.5"
                       title={
-                        section.key === "rentals" && ci === cfg.photos && cell
+                        section.key === "rentals" && dataIdx === cfg.photos && cell
                           ? `${cell.split("+")[0]} фото при выдаче + ${cell.split("+")[1] ?? 0} при возврате`
                           : cell
                       }
                       style={{
                         borderColor: T.border,
                         textAlign: isNum ? "right" : isDate ? "center" : "left",
-                        whiteSpace: ci === cfg.notes ? "normal" : "nowrap",
+                        whiteSpace: dataIdx === cfg.notes ? "normal" : "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         maxWidth:
                           isDate ? "8rem"
-                          : ci === cfg.notes ? "16rem"
-                          : (ci === cfg.subrenter || ci === cfg.photos) ? "10rem"
+                          : dataIdx === cfg.notes ? "16rem"
+                          : (dataIdx === cfg.subrenter || dataIdx === cfg.photos) ? "10rem"
                           : undefined,
                         fontVariantNumeric: isNum ? "tabular-nums" : undefined,
-                        ...(ci === cfg.subrenter && cell ? { color: "#f59e0b" } : {}),
-                        ...(ci === cfg.photos && cell ? { color: "#22c55e", fontWeight: 600 } : {}),
-                        ...(ci === cfg.verification && verTone
+                        ...(dataIdx === cfg.subrenter && cell ? { color: "#f59e0b" } : {}),
+                        ...(dataIdx === cfg.photos && cell ? { color: "#22c55e", fontWeight: 600 } : {}),
+                        ...(dataIdx === cfg.verification && verTone
                           ? { color: verToneFg(verTone, isDark), fontWeight: 700 }
                           : {}),
                         // Task 127 — the operator's label wears their color.
-                        ...(opMeta && ci === cfg.opCol ? { color: opMeta.color, fontWeight: 600 } : {}),
-                        ...(ci === 0
-                          ? {
-                              position: "sticky",
-                              left: 0,
-                              zIndex: 10,
-                              boxShadow: "2px 0 4px rgba(0,0,0,0.06)",
-                              backgroundColor: rowBg,
-                            }
-                          : {}),
+                        ...(opMeta && dataIdx === cfg.opCol ? { color: opMeta.color, fontWeight: 600 } : {}),
+                        // Task 137 — sticky rails (left: Дата + Марка, right:
+                        // выдал / принял / Верификация) keep the row context
+                        // on screen; the middle scrolls beneath them.
+                        ...railCellStyle(di, rowBg, "0.06"),
                       }}
                     >
-                      {section.key === "rentals" && ci === cfg.verification && (showQuickVerify || verifyPending || forceVerified) ? (
+                      {section.key === "rentals" && dataIdx === cfg.verification && (showQuickVerify || verifyPending || forceVerified) ? (
                         // Task 128 — «Верификация» cell with the inline ✓.
                         <span className="inline-flex items-center gap-1.5">
                           <span
@@ -1704,12 +1844,12 @@ function SectionTable({
                             </button>
                           )}
                         </span>
-                      ) : section.key === "rentals" && ci === cfg.photos && cell ? (
+                      ) : section.key === "rentals" && dataIdx === cfg.photos && cell ? (
                         <span className="inline-flex items-center gap-1">
                           <Camera className="h-3 w-3" aria-hidden />
                           {cell}
                         </span>
-                      ) : opMeta && (ci === 0 || ci === cfg.opCol) ? (
+                      ) : opMeta && (di === 0 || dataIdx === cfg.opCol) ? (
                         // Task 127 — crew-member marker: stable emoji on the
                         // sticky date cell (always visible while scrolling)
                         // and next to the name in «Оператор (ЗП)».
@@ -1730,11 +1870,11 @@ function SectionTable({
         {section.totals && (
           <tfoot>
             <tr style={{ backgroundColor: T.bgElevated }}>
-              {section.header.map((_, ci) => {
-                if (cfg.hide.has(ci)) {
+              {displayIdxs.map((dataIdx, di) => {
+                if (cfg.hide.has(dataIdx)) {
                   return (
                     <td
-                      key={ci}
+                      key={dataIdx}
                       className="border-t-2 border-r"
                       style={{
                         borderColor: T.border,
@@ -1745,21 +1885,18 @@ function SectionTable({
                     />
                   );
                 }
-                const cell = section.totals![ci] ?? "";
-                const isNum = cfg.numeric.has(ci) && isNumericLike(cell);
+                const cell = section.totals![dataIdx] ?? "";
+                const isNum = cfg.numeric.has(dataIdx) && isNumericLike(cell);
                 return (
                   <td
-                    key={ci}
+                    key={dataIdx}
                     className="whitespace-nowrap border-t-2 border-r px-2.5 py-2.5 font-bold"
                     style={{
                       borderColor: T.border,
-                      textAlign: isNum ? "right" : cfg.date.has(ci) ? "center" : "left",
+                      textAlign: isNum ? "right" : cfg.date.has(dataIdx) ? "center" : "left",
                       fontVariantNumeric: isNum ? "tabular-nums" : undefined,
                       color: T.text,
-                      position: ci === 0 ? "sticky" : undefined,
-                      left: ci === 0 ? 0 : undefined,
-                      zIndex: ci === 0 ? 10 : undefined,
-                      boxShadow: ci === 0 ? "2px 0 4px rgba(0,0,0,0.06)" : undefined,
+                      ...railCellStyle(di, T.bgElevated, "0.06"),
                     }}
                   >
                     {cell || "\u00A0"}

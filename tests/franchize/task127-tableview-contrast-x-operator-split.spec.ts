@@ -141,7 +141,10 @@ describe("task127 · ExportCsvModal operator split wiring", () => {
 
   it("rows carry the operator marker on the sticky date cell + the op cell", () => {
     expect(modal).toContain("const opMeta = opLabel");
-    expect(modal).toContain("opMeta && (ci === 0 || ci === cfg.opCol)");
+    // task137 renamed the SectionTable loop vars (ci → di display / dataIdx
+    // data) for the sticky-rail remap — the marker still rides the date cell
+    // (display 0) and the «Оператор (ЗП)» cell.
+    expect(modal).toContain("opMeta && (di === 0 || dataIdx === cfg.opCol)");
     expect(modal).toContain("operatorIconOf(opLabel)");
     expect(modal).toContain("operatorColorOf(opLabel)");
   });

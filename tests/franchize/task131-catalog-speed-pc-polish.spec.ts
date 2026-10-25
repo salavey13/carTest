@@ -63,13 +63,21 @@ describe("table-view modal PC width + readability", () => {
     "app/franchize/[slug]/rentals-analytics/components/ExportCsvModal.tsx",
   );
 
-  it("opens at max-w-7xl on sm+ (was 5xl — the wide table stayed cramped)", () => {
-    expect(modal).toContain("sm:max-w-7xl");
+  // task137 superseded the max-w-7xl box: the modal is now FULLSCREEN on PC
+  // (no max-w at all) — the wide table gets every pixel of the monitor.
+  it("opens fullscreen on sm+ (task137: no max-w-7xl / 88vh box anymore)", () => {
+    expect(modal).not.toContain("sm:max-w-7xl");
     expect(modal).not.toContain("sm:max-w-5xl");
+    expect(modal).toContain(
+      "flex h-full w-full flex-col border shadow-2xl overflow-hidden",
+    );
   });
 
-  it("bumps the table font to 13px on sm+ (both flat and sectioned tables)", () => {
-    expect(modal.match(/text-xs sm:text-\[13px\]/g)?.length).toBe(2);
+  // task137 reverted the 13px bump to a denser 12px (text-xs everywhere) —
+  // fullscreen freed the space, compactness wins it back.
+  it("table font is text-xs on all viewports (both flat and sectioned tables)", () => {
+    expect(modal.match(/w-full border-collapse text-left text-xs"/g)?.length).toBe(2);
+    expect(modal).not.toContain("sm:text-[13px]");
   });
 });
 
