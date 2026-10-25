@@ -33,6 +33,7 @@ import {
   Truck,
   Youtube,
 } from "lucide-react";
+import FeedbackModal from "./FeedbackModal";
 
 export const metadata: Metadata = {
   title: "Moto.selection — высокое искусство мотосервиса | Нижний Новгород",
@@ -335,12 +336,14 @@ export default function MotoSelectionLanding() {
               <Phone className="h-4 w-4 text-[var(--ms-accent)]" aria-hidden />
               {PHONE_TEXT}
             </a>
-            <a
-              href="#contact"
-              className="inline-flex h-10 items-center rounded-full bg-[var(--ms-accent)] px-4 text-xs font-bold uppercase tracking-[0.1em] text-black transition hover:brightness-110 active:scale-95"
+            <button
+              type="button"
+              data-lead-modal-open
+              className="inline-flex h-10 items-center rounded-full px-4 text-xs font-black uppercase tracking-[0.1em] text-black transition hover:brightness-110 active:scale-95"
+              style={{ background: "linear-gradient(135deg, #ffa770 0%, #ff7522 65%)" }}
             >
               Заявка
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -395,14 +398,21 @@ export default function MotoSelectionLanding() {
               чёрная заливка / контурный штрих / оранжевый градиент.
               11vw на мобайле: globals.css вешает на h1 'Archivo Black' (широкая
               гарнитура) — при 13vw «МОТОСЕРВИСА» (11 глифов) резалась по правому
-              краю экрана. */}
+              краю экрана.
+
+              Итерация 2 (boss 2026-10-26: «stroked look weird»): полностью
+              прозрачная заливка + белый штрих на Archivo Black выедали узкие
+              стойки «И»/«С» — слово выглядело каркасным и рваным. Теперь у
+              контурного слоя фирменная оранжевая обводка (связка с палитрой,
+              читается на синем дыму) + едва заметная белая подложка (7%),
+              которая возвращает гличаме массу — штрих перестал «жрать» буквы. */}
           <h1 className="select-none text-[11vw] font-black uppercase leading-[0.92] tracking-tight sm:text-7xl lg:text-8xl">
             <span className="block text-white">Высокое</span>
             <span
               className="block"
               style={{
-                color: "transparent",
-                WebkitTextStroke: "2px rgba(255,255,255,0.85)",
+                color: "rgba(255,255,255,0.07)",
+                WebkitTextStroke: `2px ${BRAND}`,
               }}
             >
               искусство
@@ -442,15 +452,17 @@ export default function MotoSelectionLanding() {
             >
               Наши услуги
             </a>
-            <a
-              href={WHATSAPP_HREF}
-              target="_blank"
-              rel="noopener noreferrer"
+            {/* Заявка открывает модальную форму (feedback form оригинала,
+                механика — существующий callback-lead → CRM экипажа + бот
+                владельцу и salavey13); WhatsApp остаётся в контактах/подвале. */}
+            <button
+              type="button"
+              data-lead-modal-open
               className="inline-flex h-12 items-center justify-center gap-2 px-2 text-sm font-semibold text-white/70 transition hover:text-white sm:ml-2"
             >
               <Send className="h-4 w-4 text-[var(--ms-accent)]" aria-hidden />
               Оставить заявку
-            </a>
+            </button>
           </div>
         </div>
 
@@ -482,7 +494,7 @@ export default function MotoSelectionLanding() {
         </p>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map((s) => (
+          {SERVICES.map((s, svcIdx) => (
             <a
               key={s.id}
               href={s.anchor}
@@ -512,7 +524,16 @@ export default function MotoSelectionLanding() {
                   </span>
                 </div>
               )}
-              <div className="flex flex-1 flex-col p-5">
+              <div className="relative flex flex-1 flex-col p-5">
+                {/* ДНК оригинала: крупные порядковые числа на услугах
+                    (01–07 в Tilda-верстке) — гостовые нумералы в углу карточки,
+                    подсвечиваются акцентом при ховере. */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -bottom-1 right-3 select-none text-6xl font-black leading-none tracking-tighter text-white/[0.05] transition duration-300 group-hover:text-[var(--ms-accent)]/20"
+                >
+                  {String(svcIdx + 1).padStart(2, "0")}
+                </span>
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="text-base font-bold leading-snug text-white">{s.title}</h3>
                   {s.price && (
@@ -613,12 +634,13 @@ export default function MotoSelectionLanding() {
                   </li>
                 ))}
               </ul>
-              <a
-                href="#contact"
+              <button
+                type="button"
+                data-lead-modal-open
                 className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-white/20 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)] active:scale-95"
               >
                 Оставить заявку
-              </a>
+              </button>
             </div>
           ))}
         </div>
@@ -965,7 +987,18 @@ export default function MotoSelectionLanding() {
               Telegram, WhatsApp или звонок — ответим на вопросы по любой услуге, посчитаем
               хранение и подберём время. Работаем 24/7.
             </p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            {/* Форма заявки модалкой — как на оригинале (кнопки «ОСТАВИТЬ
+                ЗАЯВКУ» по всей странице открывают popup с Имя + Телефон).
+                Заявки летят в CRM экипажа и ботом — владельцу и salavey13. */}
+            <button
+              type="button"
+              data-lead-modal-open
+              className="mx-auto mt-8 flex h-14 w-full max-w-sm items-center justify-center rounded-2xl text-sm font-black uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+              style={{ background: "linear-gradient(135deg, #ffa770 0%, #ff7522 65%)" }}
+            >
+              Заполнить форму заявки
+            </button>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <a
                 href={TELEGRAM_HREF}
                 target="_blank"
@@ -1043,6 +1076,15 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
+      {/* ДНК оригинала: повторяющийся вордмарк-разделитель (на Tilda-странице
+          MOTO.SELECTION повторяется 8 раз — декоративные повторы бренда).
+          Здесь — один гигантский гост-текст перед подвалом. */}
+      <div className="select-none overflow-hidden border-t border-white/10 py-5" aria-hidden>
+        <p className="whitespace-nowrap text-center text-[13vw] font-black uppercase leading-none tracking-tight text-white/[0.04]">
+          Moto<span className="text-[var(--ms-accent)]/15">.</span>selection
+        </p>
+      </div>
+
       {/* ── FOOTER ──────────────────────────────────────────────────────── */}
       <footer className="border-t border-white/10 bg-black">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:grid-cols-3 sm:px-6">
@@ -1105,6 +1147,16 @@ export default function MotoSelectionLanding() {
           </div>
         </div>
       </footer>
+
+      {/* Модальная форма заявки (Имя + Телефон + согласие) →
+          /api/franchize/callback-lead → CRM экипажа moto-selection +
+          Telegram: владелец экипажа (когда появится) + salavey13. */}
+      <FeedbackModal
+        slug="moto-selection"
+        accent={{ brand: BRAND, brandSoft: "#ffa770" }}
+        formSource="ms-feedback-modal"
+        landingPath="/moto-selection"
+      />
     </div>
   );
 }

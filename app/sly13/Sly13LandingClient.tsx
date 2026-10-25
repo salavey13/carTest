@@ -32,6 +32,7 @@ import Link from "next/link";
 import { MotionConfig, motion, useScroll, useTransform, useInView, animate } from "framer-motion";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { FaTelegramPlane } from "react-icons/fa";
+import FeedbackModal from "@/app/moto-selection/FeedbackModal";
 
 type Palette = {
   bgBase: string;
@@ -1224,12 +1225,25 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               </Reveal>
               <Reveal delay={0.12}>
                 <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+                  {/* Форма заявки модалкой — та же механика, что на
+                      /moto-selection: существующий callback-lead endpoint,
+                      заявка летит в CRM + Telegram (ADMIN_CHAT_ID = salavey13;
+                      когда у sly13 появится экипаж/владелец — уведомления
+                      подхватятся автоматически из ростера экипажа). */}
+                  <button
+                    type="button"
+                    data-lead-modal-open
+                    className="inline-flex h-12 items-center justify-center rounded-full px-8 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+                    style={{ background: `linear-gradient(135deg, ${p.accentMainHover} 0%, ${p.accentMain} 65%)` }}
+                  >
+                    Оставить заявку
+                  </button>
                   <a
                     href="https://t.me/SALAVEY13"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-full px-8 text-sm font-bold uppercase tracking-[0.08em] transition hover:brightness-110 active:scale-95"
-                    style={{ background: p.accentMain, color: p.bgBase, boxShadow: `0 0 24px ${p.accentMain}44` }}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-full border px-8 text-sm font-bold uppercase tracking-[0.08em] transition hover:brightness-110 active:scale-95"
+                    style={{ borderColor: `${p.accentMain}66`, color: p.accentMain }}
                   >
                     <FaTelegramPlane className="mr-1 inline" aria-hidden /> @SALAVEY13
                   </a>
@@ -1317,6 +1331,16 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </p>
           </div>
         </footer>
+
+        {/* Модальная форма заявки → /api/franchize/callback-lead (slug sly13):
+            сегодня уведомление уходит на ADMIN_CHAT_ID (salavey13), завтра —
+            владельцу экипажа из ростера, без изменений кода. */}
+        <FeedbackModal
+          slug="sly13"
+          accent={{ brand: p.accentMain, brandSoft: p.accentMainHover }}
+          formSource="sly13-feedback-modal"
+          landingPath="/sly13"
+        />
       </div>
     </MotionConfig>
   );
