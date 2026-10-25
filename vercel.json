@@ -1,9 +1,5 @@
 {
   "functions": {
-    "app/api/fetch-crypto-prices/route.ts": {
-      "memory": 1024,
-      "maxDuration": 25
-    },
     "app/api/telegramWebhook/route.ts": {
       "maxDuration": 60
     },
@@ -13,12 +9,12 @@
   },
   "crons": [
     {
-      "path": "/api/fetch-crypto-prices",
-      "schedule": "0 0 * * *"
-    },
-    {
       "path": "/api/cron/wall-renter-notify",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-wallpix-staging",
+      "schedule": "30 3 * * *"
     }
   ],
   "routes": [
@@ -31,11 +27,6 @@
       "src": "/api/telegramWebhook",
       "methods": ["POST"],
       "dest": "/api/telegramWebhook/route"
-    },
-    {
-      "src": "/api/fetch-crypto-prices",
-      "methods": ["GET", "POST"],
-      "dest": "/api/fetch-crypto-prices/route"
     }
   ]
 }

@@ -1,0 +1,186 @@
+# .github/workflows/vip-bike-cron.yml
+#
+# VIP Bike cron — VPS-free replication (task: replace VPS crontab on
+# 212.67.11.25 with GitHub Actions scheduled workflows; Vercel Hobby has only
+# 2 cron slots, both already taken — so Actions is the scheduler).
+#
+# Runs the CANONICAL bash scripts from boss-commands/ unchanged (they are the
+# same scripts the VPS crontab executed — zero logic drift; tests/evening-
+# summary-prepayment.spec.ts even runs them via bash --dry-run). All schedules
+# preserved from the VPS crontab (UTC; MSK = UTC+3):
+#
+#   7 6 * * *                     → morning-standup.sh   (09:07 MSK daily)
+#   30 19 * * *                   → evening-summary.sh   (22:30 MSK daily)
+#   13 18 * * 0                   → weekly-revenue.sh    (Sun 21:13 MSK)
+#   7 6-18 * * *                  → returns-reminder.sh  (hourly 09:07–21:07 MSK)
+#   7 5,7,9,11,13,15,17,19 * * *  → overdue-alert.sh + rentals CSV sync
+#                                    (every 2h 08:07–22:07 MSK)
+#   7 21 * * *                    → catalog CSV sync     (00:07 MSK daily)
+#
+# Digests/notifications are silent-when-empty for the reminder jobs (same as
+# VPS). Secrets come from repo Actions secrets:
+#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+#   VIP_BIKE_BOT_TOKEN (bare token — line 3 of the runtime secrets file,
+#   exactly how boss-commands/_lib.sh parses it), VIP_BIKE_ADMIN_CHAT_IDS
+#   (comma-separated Telegram chat ids).
+#
+# NOTIFICATION MARKING: this scheduler sets CRON_SOURCE=GHA → every Telegram
+# notification produced here is prefixed "[GHA] " (boss-commands/_lib.sh
+# source_tag). Notifications from the legacy VPS crontab arrive untagged, so
+# parallel-week output can be diffed at a glance. Once VPS crons are retired,
+# the tag is our provenance marker.
+#
+# DEDUP STATE: returns-reminder / overdue-alert / watchdogs use an anti-spam
+# cooldown state file (/tmp/boss-alerts-state.json, 4–12h cooldowns). Runners
+# are ephemeral, so the file is persisted across runs via actions/cache with a
+# daily-rotating key (state auto-prunes 48h+ entries; ~1KB per day). Without
+# this, an hourly reminder would re-alert the same rental on every run instead
+# of once per 12h like on the VPS.
+#
+# CSV sync reuses the repo's own scripts (scripts/export_vip_bike_*.py +
+# scripts/push_*_csv.py, plain git push) — auth via the workflow GITHUB_TOKEN.
+#
+# Free-tier footprint: ~22 runs/day × ~40s ≈ 450 min/month (limit 2000).
+# NOTE: GitHub disables schedules after 60 days of repo inactivity — this repo
+# commits daily, so that safeguard never fires.
+
+name: VIP Bike Cron (digests + CSV sync)
+
+on:
+  schedule:
+    - cron: '7 6 * * *'
+    - cron: '30 19 * * *'
+    - cron: '13 18 * * 0'
+    - cron: '7 6-18 * * *'
+    - cron: '7 5,7,9,11,13,15,17,19 * * *'
+    - cron: '7 21 * * *'
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Job to run (empty = derive from the time slot)'
+        required: false
+        default: 'morning-standup'
+        type: choice
+        options:
+          - morning-standup
+          - evening-summary
+          - weekly-revenue
+          - returns-reminder
+          - overdue-alert-and-rentals-csv
+          - catalog-csv
+      dry_run:
+        description: 'Digest scripts: print instead of sending Telegram'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vip-bike-cron
+  cancel-in-progress: false
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Date stamp (daily-rotating cache key)
+        id: dstamp
+        run: echo "d=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      # Persist anti-spam dedup state across ephemeral runners. Daily key →
+      # old entries age out naturally; restore-keys falls back to the most
+      # recent day when today's entry doesn't exist yet (first run of the day).
+      - uses: actions/cache/restore@v4
+        with:
+          path: /tmp/boss-alerts-state.json
+          key: boss-alerts-${{ steps.dstamp.outputs.d }}
+          restore-keys: |
+            boss-alerts-
+
+      - name: Map schedule → job
+        id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SCRIPT: ${{ inputs.script }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_SCRIPT" ]]; then
+            echo "job=$INPUT_SCRIPT" >> "$GITHUB_OUTPUT"
+          else
+            case "$EVENT_SCHEDULE" in
+              '7 6 * * *')                      job='morning-standup' ;;
+              '30 19 * * *')                    job='evening-summary' ;;
+              '13 18 * * 0')                    job='weekly-revenue' ;;
+              '7 6-18 * * *')                   job='returns-reminder' ;;
+              '7 5,7,9,11,13,15,17,19 * * *')   job='overdue-alert-and-rentals-csv' ;;
+              '7 21 * * *')                     job='catalog-csv' ;;
+              *) echo "Unknown schedule: $EVENT_SCHEDULE" >&2; exit 1 ;;
+            esac
+            echo "job=$job" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebuild runtime secrets file (boss-commands/_lib.sh format)
+        env:
+          SB_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SB_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BOT_TOKEN: ${{ secrets.VIP_BIKE_BOT_TOKEN }}
+          ADMIN_IDS: ${{ secrets.VIP_BIKE_ADMIN_CHAT_IDS }}
+        run: |
+          set -euo pipefail
+          f="$RUNNER_TEMP/vip-bike-secrets.txt"
+          # _lib.sh parses key=value lines and reads the BARE bot token from line 3.
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=${SB_URL}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SB_KEY}"
+            echo "${BOT_TOKEN}"
+            echo "ADMIN_CHAT_ID=${ADMIN_IDS}"
+          } > "$f"
+          chmod 600 "$f"
+          echo "SECRETS_FILE=$f" >> "$GITHUB_ENV"
+
+      - name: Run job
+        env:
+          # CSV export scripts read the service key directly from env.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # Prefix every Telegram notification with "[GHA] " (vs untagged VPS).
+          CRON_SOURCE: GHA
+        run: |
+          set -euo pipefail
+          JOB="${{ steps.pick.outputs.job }}"
+          DRY=""
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
+            DRY="--dry-run"
+          fi
+          echo "=== VIP Bike cron: $JOB (dry_run=${DRY:-no}) $(date -u '+%F %T UTC') ==="
+          case "$JOB" in
+            overdue-alert-and-rentals-csv)
+              bash boss-commands/overdue-alert.sh $DRY
+              echo "--- rentals CSV sync ---"
+              python3 scripts/export_vip_bike_rentals.py
+              python3 scripts/push_rentals_csv.py
+              ;;
+            catalog-csv)
+              python3 scripts/export_vip_bike_csv.py
+              python3 scripts/push_catalog_csvs.py
+              ;;
+            *)
+              bash "boss-commands/${JOB}.sh" $DRY
+              ;;
+          esac
+          echo "=== done: $JOB ==="
+
+      # Save dedup state even if the job failed mid-way (alerts already
+      # recorded must not re-fire on the next run).
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/boss-alerts-state.json
+          key: boss-alerts-${{ steps.dstamp.outputs.d }}

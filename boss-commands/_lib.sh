@@ -84,11 +84,21 @@ mask_passport() {
   echo "XXXX…${last4}"
 }
 
+# ─── Source tag (GHA vs VPS) ────────────────────────────────────────────────
+# When CRON_SOURCE is set (e.g. CRON_SOURCE=GHA in the GitHub Actions cron
+# workflow), every outgoing notification is prefixed with "[GHA] ". This lets
+# boss tell apart notifications produced by the Actions scheduler from the
+# ones still produced by the legacy VPS crontab (212.67.11.25) during the
+# parallel-week cutover. VPS copies don't set the var → untagged (legacy).
+source_tag() {
+  [[ -n "${CRON_SOURCE:-}" ]] && echo "[${CRON_SOURCE}] " || echo ""
+}
+
 # ─── Telegram notification ───────────────────────────────────────────────────
 # Usage: send_telegram "message text" [parse_mode]
 # parse_mode: "HTML" (default) or "MarkdownV2" or "" (plain)
 send_telegram() {
-  local text="$1"
+  local text="$(source_tag)$1"
   local parse_mode="${2:-HTML}"
   local api_url="https://api.telegram.org/bot${BOT_TOKEN}/sendMessage"
 
@@ -391,7 +401,7 @@ resolve_lead_name() {
 # Send a Telegram message with inline keyboard buttons
 # Usage: send_telegram_keyboard "message" '[[{"text":"✅ Решено","callback_data":"ack:rental_abc"},{"text":"👁 Открыть","url":"https://t.me/..."}]]'
 send_telegram_keyboard() {
-  local text="$1"
+  local text="$(source_tag)$1"
   local keyboard="$2"
   local api_url="https://api.telegram.org/bot${BOT_TOKEN}/sendMessage"
 
@@ -409,5 +419,5 @@ export -f send_telegram log supabase_query html_escape
 export -f tg_deep_link web_url lead_link lead_web_url lead_segment_link lead_segment_web_url
 export -f rental_link rental_web_url analytics_link analytics_web_url
 export -f truncate_text format_top_n format_next_steps
-export -f already_alerted record_alert moscow_hhmm moscow_fmt moscow_today_start_utc moscow_today_end_utc resolve_lead_name send_telegram_keyboard
+export -f already_alerted record_alert moscow_hhmm moscow_fmt moscow_today_start_utc moscow_today_end_utc resolve_lead_name send_telegram_keyboard source_tag
 export ALERTS_STATE_FILE
