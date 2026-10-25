@@ -31,6 +31,7 @@ import {
 import {
   claimWheelWinNotifySlot,
   notifyWheelWinners,
+  resolveWheelWinnerDisplayName,
 } from "@/app/franchize/lib/wheel-winner-notify";
 
 const wheelWinNotifySchema = z.object({
@@ -82,9 +83,18 @@ export async function notifyFranchizeWheelWinnerAction(input: unknown): Promise<
       return { ok: true, notified: false, winnerNotified: false, crewNotifiedCount: 0 };
     }
 
-    // Свежий профиль из initData точнее, чем запись в users.
-    const winnerName = actor.tg?.fullName || actor.userId;
-    const winnerUsername = actor.tg?.username ?? null;
+    // Свежий профиль из initData точнее, чем запись в users — но cookie-сессии
+    // не несут tg-профиль вообще (resolveWallActor → tg: null), и в сводку
+    // улетал сырой chat id («525838009 выиграл…»). Boss 2026-10-25: добираем
+    // ник/имя из public.users, сырой id — самый последний фолбэк.
+    const { data: winnerProfile } = await supabaseAdmin
+      .from("users")
+      .select("username, full_name")
+      .eq("user_id", actor.userId)
+      .maybeSingle();
+    const display = resolveWheelWinnerDisplayName(actor.tg, winnerProfile, actor.userId);
+    const winnerName = display.name;
+    const winnerUsername = display.username;
 
     // owner + crew admin/co_owner (активные) + ADMIN_CHAT_ID — тот же состав,
     // что у lead-notify; победителя из списка убираем (self-DM не дублируем).

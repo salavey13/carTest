@@ -81,17 +81,48 @@ export interface WheelWinnerDmInfo {
   crewBrandName: string;
 }
 
+/** Ник/имя победителя из записи public.users (user_id → username/full_name). */
+export interface WheelWinnerProfile {
+  username?: string | null;
+  full_name?: string | null;
+}
+
+/**
+ * Лучшее человеческое имя победителя.
+ * Boss 2026-10-25: в сводку прилетал сырой «525838009 выиграл…» — cookie-
+ * сессии не несут tg-профиль (resolveWallActor → tg: null), а фолбэк был
+ * actor.userId. Цепочка: TG-имя из initData → full_name из users →
+ * username (ТГ или users) → и только в крайнем случае сырой chat id.
+ */
+export function resolveWheelWinnerDisplayName(
+  tg: { username: string | null; fullName: string | null } | null,
+  profile: WheelWinnerProfile | null | undefined,
+  userId: string,
+): { name: string; username: string | null } {
+  const username = tg?.username?.trim() || profile?.username?.trim() || null;
+  const name =
+    tg?.fullName?.trim() ||
+    profile?.full_name?.trim() ||
+    username ||
+    userId;
+  return { name, username };
+}
+
 /** DM победителю — промокод ОБЯЗАТЕЛЬНО в тексте (boss checklist). */
 export function buildWheelWinnerDmHtml(info: WheelWinnerDmInfo): string {
   const brand = escapeHtml(info.crewBrandName);
   const lines = [
-    `🎰 <b>Колесо фортуны ${brand} — твой выигрыш!</b>`,
+    `🎉 <b>Поздравляем! Колесо фортуны ${brand} выпало в твою пользу!</b>`,
     ``,
     `🏆 <b>${escapeHtml(info.prizeLabel)}</b>`,
     `🎟 Промокод: <code>${escapeHtml(info.promoCode)}</code>`,
   ];
   if (info.description) lines.push(`ℹ️ ${escapeHtml(info.description)}`);
-  lines.push(``, `Примени его в корзине — сервер проверит и применит скидку автоматически.`);
+  lines.push(
+    ``,
+    `Примени его в корзине — сервер проверит и применит скидку автоматически.`,
+    `Удача любит смелых — возвращайся через 24 часа и крути ещё! 🍀`,
+  );
   return lines.join("\n");
 }
 
@@ -105,12 +136,21 @@ export interface WheelCrewNotifyInfo {
 
 /** Сводка owner/админам: кто и что выиграл + промокод (boss checklist). */
 export function buildWheelCrewNotifyHtml(info: WheelCrewNotifyInfo): string {
-  const who = escapeHtml(info.winnerUsername ? `@${info.winnerUsername}` : info.winnerName);
+  const name = escapeHtml(info.winnerName);
+  // Boss 2026-10-25: «add nickname of renter if available» — ник + имя вместе,
+  // чтобы оператор сразу понял, КТО крутанул (ник в ТГ ≠ имя в договоре).
+  const who = info.winnerUsername
+    ? `@${escapeHtml(info.winnerUsername)}${
+        info.winnerName && info.winnerName !== info.winnerUsername ? ` · ${name}` : ""
+      }`
+    : name;
   return [
-    `🎁 <b>Колесо фортуны ${escapeHtml(info.crewBrandName)}</b>`,
+    `🎉 <b>Ура! Колесо фортуны ${escapeHtml(info.crewBrandName)} — новый победитель!</b>`,
     ``,
-    `${who} выиграл <b>${escapeHtml(info.prizeLabel)}</b>`,
+    `🍀 ${who} выигрывает <b>${escapeHtml(info.prizeLabel)}</b>`,
     `🎟 Промокод: <code>${escapeHtml(info.promoCode)}</code>`,
+    ``,
+    `Скидка применится в корзине автоматически — если это ваш будущий арендатор, учитывайте её в кассе этой аренды.`,
   ].join("\n");
 }
 

@@ -24,6 +24,7 @@ import {
   buildWheelCrewNotifyHtml,
   buildWheelWinnerDmHtml,
   claimWheelWinNotifySlot,
+  resolveWheelWinnerDisplayName,
   wheelWinNotifyDay,
   wheelWinNotifyKey,
   notifyWheelWinners,
@@ -107,6 +108,66 @@ describe("crew notify builder", () => {
     });
     expect(html).toContain("Ivan");
     expect(html).not.toContain("@");
+  });
+
+  it("boss 2026-10-25: shows nickname AND name together when both known", () => {
+    const html = buildWheelCrewNotifyHtml({
+      winnerName: "Сергей Затонский",
+      winnerUsername: "zaton_rides",
+      prizeLabel: "2 000 ₽",
+      promoCode: "WHEEL2000",
+      crewBrandName: "VIP BIKE",
+    });
+    expect(html).toContain("@zaton_rides · Сергей Затонский");
+    // поздравительный тон (boss: «congratulate more kinda»)
+    expect(html).toContain("Ура!");
+  });
+
+  it("does not duplicate the name when it equals the username", () => {
+    const html = buildWheelCrewNotifyHtml({
+      winnerName: "I_O_S_NN",
+      winnerUsername: "I_O_S_NN",
+      prizeLabel: "2 000 ₽",
+      promoCode: "WHEEL2000",
+      crewBrandName: "VIP BIKE",
+    });
+    expect(html).toContain("@I_O_S_NN");
+    expect(html).not.toContain("@I_O_S_NN · I_O_S_NN");
+  });
+});
+
+describe("winner display name resolution (boss 2026-10-25: «525838009 выиграл» too raw)", () => {
+  it("prefers the TG profile from initData", () => {
+    const resolved = resolveWheelWinnerDisplayName(
+      { username: "tg_rider", fullName: "Сергей Затонский" },
+      { username: "db_rider", full_name: "Из базы" },
+      "525838009",
+    );
+    expect(resolved).toEqual({ name: "Сергей Затонский", username: "tg_rider" });
+  });
+
+  it("cookie sessions (tg: null) fall back to the users profile full_name", () => {
+    const resolved = resolveWheelWinnerDisplayName(
+      null,
+      { username: "db_rider", full_name: "Сергей Затонский" },
+      "525838009",
+    );
+    expect(resolved).toEqual({ name: "Сергей Затонский", username: "db_rider" });
+  });
+
+  it("uses the DB username as the name when no full name is stored", () => {
+    const resolved = resolveWheelWinnerDisplayName(null, { username: "db_rider", full_name: null }, "525838009");
+    expect(resolved).toEqual({ name: "db_rider", username: "db_rider" });
+  });
+
+  it("last resort keeps the raw chat id (anonymous spin with no profile)", () => {
+    const resolved = resolveWheelWinnerDisplayName(null, null, "525838009");
+    expect(resolved).toEqual({ name: "525838009", username: null });
+  });
+
+  it("trims whitespace from the stored values", () => {
+    const resolved = resolveWheelWinnerDisplayName(null, { username: "  spaced  ", full_name: "  Имя  " }, "42");
+    expect(resolved).toEqual({ name: "Имя", username: "spaced" });
   });
 });
 

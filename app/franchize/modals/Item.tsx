@@ -212,6 +212,23 @@ function OptionChips({
   );
 }
 
+/**
+ * Открыть нативный пикер кликом по ВСЕМУ полю, а не только по крошечной
+ * стрелке-индикатору. Boss 2026-10-25: у арендатора на некоторых WebKit-
+ * сборках (смартфоны / ТВ-браузеры) стрелка white-on-white в светлой теме
+ * и фактически некликабельна. showPicker() требует user gesture — клик им
+ * и является; на движках без showPicker() остаётся нативное поведение поля.
+ */
+function openNativePicker(e: React.MouseEvent<HTMLInputElement>): void {
+  const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+  try {
+    el.showPicker?.();
+  } catch {
+    // Некоторые сборки бросают SecurityError вне «чистого» жеста — молча
+    // откатываемся к нативному поведению (инпут всё равно кликабелен).
+  }
+}
+
 /** Date + time pickers for rental start/end — this is the SINGLE
  *  source of truth for the rental window. The order page reads the
  *  values from the cart line and shows them passively, it does not
@@ -280,7 +297,8 @@ function RentalDatePickers({
             value={startDate}
             min={today}
             onChange={(e) => onStartChange(e.target.value)}
-            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            onClick={openNativePicker}
+            className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2`}
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Дата начала аренды"
           />
@@ -296,7 +314,8 @@ function RentalDatePickers({
             type="time"
             value={startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
-            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            onClick={openNativePicker}
+            className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2`}
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Время выдачи"
           />
@@ -313,7 +332,8 @@ function RentalDatePickers({
             value={endDate}
             min={endMin}
             onChange={(e) => onEndChange(e.target.value)}
-            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            onClick={openNativePicker}
+            className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2`}
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Дата возврата"
           />
@@ -329,7 +349,8 @@ function RentalDatePickers({
             type="time"
             value={endTime}
             onChange={(e) => onEndTimeChange(e.target.value)}
-            className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+            onClick={openNativePicker}
+            className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2`}
             style={{ ...baseInputStyle, colorScheme: T.isLight ? "light" : "dark" }}
             aria-label="Время возврата"
           />
@@ -2401,7 +2422,8 @@ export function ItemModal({
                   value={options.rentStartDate || todayISO()}
                   min={todayISO()}
                   onChange={(e) => onChangeOption("rentStartDate", e.target.value)}
-                  className="min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2"
+                  onClick={openNativePicker}
+                  className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} min-h-11 w-full rounded-lg border px-2.5 py-2 text-sm transition focus:outline-none focus:ring-2`}
                   style={{
                     backgroundColor: T.bgElevated,
                     borderColor: T.border,
@@ -2468,7 +2490,8 @@ export function ItemModal({
                           type="date"
                           value={testdriveDate}
                           onChange={(e) => setTestdriveDate(e.target.value)}
-                          className="rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]"
+                          onClick={openNativePicker}
+                          className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]`}
                           aria-label="Дата тест-драйва"
                         />
                       </label>
@@ -2478,7 +2501,8 @@ export function ItemModal({
                           type="time"
                           value={testdriveTime}
                           onChange={(e) => setTestdriveTime(e.target.value)}
-                          className="rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]"
+                          onClick={openNativePicker}
+                          className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]`}
                           aria-label="Время тест-драйва"
                         />
                       </label>

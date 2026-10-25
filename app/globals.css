@@ -1496,3 +1496,23 @@ path.mr-spot-popup {
     color: transparent;
   }
 }
+
+/* ── Native date/time picker robustness (boss 2026-10-25) ──────────────────
+   Some WebKit builds (smart TVs, older phones) paint the 📅/🕒 indicator
+   white even on LIGHT backgrounds — white-on-white, and the tiny glyph is
+   effectively unclickable. Belt & braces: force the icon color via filter
+   per theme instead of trusting `color-scheme` alone, make the whole field
+   show the pointer, and let Item.tsx call showPicker() on any click. */
+.fr-native-picker {
+  cursor: pointer;
+}
+.fr-native-picker::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.9;
+}
+.fr-native-picker.fr-picker-dark::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.4);
+}
+.fr-native-picker.fr-picker-light::-webkit-calendar-picker-indicator {
+  filter: brightness(0) opacity(0.75);
+}
