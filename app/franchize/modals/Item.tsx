@@ -48,7 +48,7 @@ import {
 } from "../lib/item-share";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
-import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime, addMinutesToHhMm, addMinutesToDateTime } from "@/app/franchize/lib/date-utils";
+import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime, addMinutesToHhMm, addMinutesToDateTime, nearestHourHhMm } from "@/app/franchize/lib/date-utils";
 import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
 import {
   reachVipBikeGoal,
@@ -112,9 +112,9 @@ interface ItemModalProps {
     rentStartDate?: string;
     /** Rental end date (ISO string yyyy-MM-dd) */
     rentEndDate?: string;
-    /** Rental start time (HH:mm) — defaults to "10:00" */
+    /** Rental start time (HH:mm) — defaults to the nearest full hour (now rounded up) */
     rentStartTime?: string;
-    /** Rental end time (HH:mm) — defaults to "10:00" */
+    /** Rental end time (HH:mm) — defaults to the nearest full hour (same as start) */
     rentEndTime?: string;
     /** Pre-selected additional items (jacket, boots, backpack, charger, gloves, net, bag). */
     extrasSelection?: AdditionalItemsSelection;
@@ -1328,8 +1328,12 @@ export function ItemModal({
   // Additional items: helmet count + gloves/net/bag/coat toggles
   const [extrasSelection, setExtrasSelection] = useState<AdditionalItemsSelection>({ helmet: 0 });
   const [priceCardExpanded, setPriceCardExpanded] = useState(false);
-  const [rentStartTime, setRentStartTime] = useState("10:00");
-  const [rentEndTime, setRentEndTime] = useState("10:00");
+  // 2026-10-25 (owner): «период аренды — время выдачи … defaults to 10am —
+  // please default it to nearest hour». Fallback state for flows where the
+  // parent didn't pre-fill times — same nearest-full-hour default as
+  // CatalogClient's selectedOptions (start === end → «1 day» semantics).
+  const [rentStartTime, setRentStartTime] = useState(nearestHourHhMm);
+  const [rentEndTime, setRentEndTime] = useState(nearestHourHhMm);
   // ── Test-drive MODE switch (2026-09-11) ──
   // When ON the modal simplifies: no equipment, free (0 ₽) — mirrors the
   // battle-tested bot /testdrive flow (10 minutes, deposit-free).

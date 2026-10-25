@@ -22,7 +22,7 @@ import { ItemModal, type FlowType } from "../modals/Item";
 import { useFranchizeCart } from "../hooks/useFranchizeCart";
 import { useFranchizeTheme } from "../hooks/useFranchizeTheme";
 import { useResolvedPalette } from "../lib/useResolvedPalette";
-import { todayISO, addMinutesToHhMm } from "../lib/date-utils";
+import { todayISO, addMinutesToHhMm, nearestHourHhMm } from "../lib/date-utils";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 import { localImageSrc, handleImageError } from "@/lib/image-fallback";
@@ -553,7 +553,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
   // `at` re-keys the overlay so back-to-back adds retrigger the animation.
   const [cartFlash, setCartFlash] = useState<{ label: string; kind: "cart" | "testdrive"; at: number } | null>(null);
   const { addItem } = useFranchizeCart(crew.slug || slug);
-  const [selectedOptions, setSelectedOptions] = useState({ package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: todayISO(), rentEndDate: todayISO(), rentStartTime: "10:00", rentEndTime: "10:00" });
+  // 2026-10-25 (owner): the rental window defaults — start/end time = NEAREST
+  // full hour (now rounded up), not a hardcoded 10:00. Lazy initializer so
+  // todayISO()/nearestHourHhMm() are computed once, and start === end keeps
+  // the existing «same datetime = 1 day minimum» pricing semantics.
+  const [selectedOptions, setSelectedOptions] = useState(() => {
+    const defaultHhMm = nearestHourHhMm();
+    return { package: "Базовый", duration: "1 день", perk: "Стандарт", auction: "Без аукциона", rentStartDate: todayISO(), rentEndDate: todayISO(), rentStartTime: defaultHhMm, rentEndTime: defaultHhMm };
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchCtaFocused, setSearchCtaFocused] = useState(false);
@@ -970,10 +977,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
     }, 100);
     // FIX (iter10): include the rental-window keys in the defaults so the
     // cart line ALWAYS carries dates + times, even when the renter keeps the
-    // modal defaults (10:00). Previously these keys were absent until the
+    // modal defaults. Previously these keys were absent until the
     // user actively touched a picker — combined with the zod schema stripping
     // unknown keys server-side, "untouched" rentals silently fell back to
     // 10:00 stored as UTC (→ 13:00 MSK).
+    // 2026-10-25 (owner): default time = nearest full hour (was 10:00).
+    const defaultHhMm = nearestHourHhMm();
     const defaultOptions = {
       package: "Базовый",
       duration: "1 день",
@@ -981,8 +990,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       auction: auctionTickOptions[0] ?? "Без аукциона",
       rentStartDate: todayISO(),
       rentEndDate: todayISO(),
-      rentStartTime: "10:00",
-      rentEndTime: "10:00",
+      rentStartTime: defaultHhMm,
+      rentEndTime: defaultHhMm,
     };
     setSelectedOptions(defaultOptions);
     void recordRentIntent(item, "viewed", { trigger: "catalog_card", options: defaultOptions });
@@ -999,6 +1008,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       if (!item) return;
 
       // Open modal with the item and pre-filled options
+      // 2026-10-25 (owner): missing-time fallback = nearest full hour (was 10:00).
+      const fallbackHhMm = nearestHourHhMm();
       setSelectedItem(item);
       setSelectedOptions({
         package: editContext.options.package ?? "Базовый",
@@ -1007,8 +1018,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         auction: editContext.options.auction ?? "Без аукциона",
         rentStartDate: editContext.options.rentStartDate ?? todayISO(),
         rentEndDate: editContext.options.rentEndDate ?? todayISO(),
-        rentStartTime: editContext.options.rentStartTime ?? "10:00",
-        rentEndTime: editContext.options.rentEndTime ?? "10:00",
+        rentStartTime: editContext.options.rentStartTime ?? fallbackHhMm,
+        rentEndTime: editContext.options.rentEndTime ?? fallbackHhMm,
       });
 
       // Clear the edit context
@@ -1028,6 +1039,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       setSelectedItem(target);
       // FIX (iter10): rental-window keys included (see openItem) so cart lines
       // always carry dates + times.
+      // 2026-10-25 (owner): default time = nearest full hour (was 10:00).
+      const defaultHhMm = nearestHourHhMm();
       const defaultOptions = {
         package: "Базовый",
         duration: "1 день",
@@ -1035,8 +1048,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         auction: auctionTickOptions[0] ?? "Без аукциона",
         rentStartDate: todayISO(),
         rentEndDate: todayISO(),
-        rentStartTime: "10:00",
-        rentEndTime: "10:00",
+        rentStartTime: defaultHhMm,
+        rentEndTime: defaultHhMm,
       };
       setSelectedOptions(defaultOptions);
       void recordRentIntentRef.current?.(target, "viewed", { trigger: "vehicle_query", options: defaultOptions });
@@ -1108,8 +1121,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       // always carry dates + times so the rental row gets real MSK timestamps.
       rentStartDate: searchParams.get("startDate") || todayISO(),
       rentEndDate: searchParams.get("endDate") || todayISO(),
-      rentStartTime: searchParams.get("startTime") || "10:00",
-      rentEndTime: searchParams.get("endTime") || "10:00",
+      // End falls back to the START value first — a URL with startTime but
+      // no endTime must not produce end < start (nearest-hour would drift).
+      rentStartTime: searchParams.get("startTime") || nearestHourHhMm(),
+      rentEndTime: searchParams.get("endTime") || searchParams.get("startTime") || nearestHourHhMm(),
       extrasSelection: Object.keys(extrasSelection).length > 0 ? extrasSelection : undefined,
     };
 

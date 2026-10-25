@@ -195,6 +195,25 @@ export function todayISO(): string {
 }
 
 /**
+ * Nearest full hour from NOW, rounded UP — «13:40» → "14:00", a sharp
+ * «13:00» stays "13:00". Clamped to "23:00" so «23:xx» never rolls past
+ * midnight: the preset start DATE is today, and a "00:00" pickup tomorrow
+ * would contradict it.
+ *
+ * Default «Время выдачи» for the catalog item modal (owner, 2026-10-25:
+ * «период аренды — время выдачи … defaults to 10am — please default it
+ * to nearest hour»). A pickup in the past is nonsense, so rounding is
+ * always UP; a flat hour also reads clean on the operator's sheet.
+ * Uses the browser's LOCAL clock — the renter compares against their own
+ * watch, and the picker inputs display local wall time.
+ */
+export function nearestHourHhMm(now: Date = new Date()): string {
+  const rolled = now.getMinutes() > 0;
+  const h = Math.min(now.getHours() + (rolled ? 1 : 0), 23);
+  return `${String(h).padStart(2, "0")}:00`;
+}
+
+/**
  * Add minutes to an «HH:MM» string, wrapping past midnight (23:55 + 10 → 00:05).
  * Returns "" for invalid input — callers render nothing in that case.
  * Used by the testdrive flow: ride end = picked start + 10 minutes.
