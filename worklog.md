@@ -1264,3 +1264,18 @@ Work Log:
 
 Stage Summary:
 - Код в main (3b23457a4). SQL-правку аренды boss вставляет в Supabase SQL editor: dry-run → BEGIN…COMMIT → post-check (ожидает total_cost 2000, card_total 22000, bike_price 1750).
+
+---
+Task ID: 20-rental-applied-sql-doc-retired
+Agent: main (Z.ai, IM session web-ebfeeaf7)
+Task: boss — «update rental yourself:) and ditch this sql from docs» — применить правку order-mvnr3g9c-bz30mf напрямую в Supabase (service key выдан) и удалить docs/crewDocs/rental-order-mvnr3g9c-bz30mf-two-discounts-2026-10-25.sql.
+
+Work Log:
+- Supabase PostgREST (service_role): GET rentals по metadata->>order_id — ровно 1 строка (rental_id 1a1c1b3c…), renter_name «Затонский Сергей», guard на deposit=20000. BEFORE подтвердил неверную прошлую правку: total_cost 4000, discount_rub 1000, payment_split.bank 24000.
+- PATCH по PK (script /home/z/my-project/scripts/fix-rental-two-discounts.mjs, dry-run → --apply): total_cost 2000; metadata merge — discount_rub 3000, promo_code WHEEL2000 (−2000), manual_discount_rub 1000 + reason, price_correction (5000→2000, 1750+250), operator_comment (друг субарендатора, распоряжение сверху, честный выигрыш колеса, «фото до» + одометр сам, оплачено 22 000 tbank, договор со старой суммой), payment_note, corrected_at/by. Плюс консистентность полей, которые SQL-док оставлял устаревшими: price_override_amount 4000→2000, payment_split.bank 24000→22000, price_adjustment {discount 3000, new_total 2000}.
+- bike_price/equipment_price в metadata НЕ хранились → сплит 1750+250 задокументирован в price_correction/operator_comment (как и предусматривал CASE в SQL-доке).
+- POST-CHECK перечитыванием: total_cost 2000, deposit 20000, card 22000, скидки −2000 промо + −1000 вручную, payment_split.bank 22000, комментарий на месте — все ожидания сошлись.
+- docs/crewDocs/rental-order-mvnr3g9c-bz30mf-two-discounts-2026-10-25.sql удалён (git rm) — правка применена, SQL-док больше не нужен. Код task 19 (wheel congrats + пикеры) проверен: в main, local == origin.
+
+Stage Summary:
+- Аренда order-mvnr3g9c-bz30mf в БД приведена к реальности: 2 000 ₽ аренда (1 750 + 250) + 20 000 залог = 22 000 ₽ на карте Т-Банка; два скидочных следа (промо WHEEL2000 −2 000 + ручная −1 000) и комментарий для операторов в metadata. SQL-док вычищен из docs.
