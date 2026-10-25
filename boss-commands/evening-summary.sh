@@ -3,7 +3,7 @@
 #
 # Boss command: evening-summary
 # Sends an end-of-day KPI digest: rentals/sales/services + shifts/equipment
-# + commissions from rentals VERIFIED today (payout-hub math) + prepayments.
+# + commissions from rentals CLOSED today (payout-hub math) + prepayments.
 # Designed to run at 21:00 Moscow daily.
 #
 # Output: Telegram message to ADMIN_CHAT_ID
@@ -259,10 +259,25 @@ PREPAY_SECTION=$(echo "$PREPAY_DATA" | jq -r '
   end
 ' 2>/dev/null || echo "")
 
-# ─── Verified-rental commissions (boss request: «besides salary for shift
-# hours — include commissions from verified rentals») ────────────────────────
-# rental_verifications rows that became VERIFIED inside the digest window
-# (verified_at in the MSK day). Amount mirrors the payout hub math EXACTLY
+# ─── Rental commissions CLOSED today (boss: «verified means rental is
+# finished, yes, and today was such day») ─────────────────────────────────────
+# rental_verifications rows whose REQUEST happened inside the digest window
+# (requested_at = closure + commission snapshot + the verify notification to
+# operator & owner — the «500+100» message). NOT verified_at.
+#
+# WHY (reality check 2026-10-26): the dual-confirm pipeline stalls. Of 131
+# rows only 3 ever reached «verified» — the owner (crew owner_id, a nominal
+# party) rarely taps the second ✅. Counting only verified rows hid real
+# money: on 2026-10-25 order-mvnr3g9c-bz30mf closed 17:18 MSK with commission
+# 600 ₽ (base 500 + equipment 100), the operator (salavey13) confirmed at
+# 17:20, the owner never did → status operator_confirmed → the digest
+# silently showed nothing. Now every non-disputed closure counts, and the
+# verify state is reported honestly in the header line:
+#   ✅ verified (both parties) · 👍 one of two confirmed · ⏳ waiting for both.
+# Disputed rows are excluded from the sum and flagged on a separate ⚠️ line
+# (money must not vanish silently, nor be counted while contested).
+#
+# Amount mirrors the payout hub math EXACTLY
 # (app/franchize/lib/rental-payout-core.ts commissionOf):
 #   1. negotiation.agreed.split (base+equipment+overprice) — a task-106 deal
 #      corrected the frozen split → agreed numbers win;
@@ -272,13 +287,18 @@ PREPAY_SECTION=$(echo "$PREPAY_DATA" | jq -r '
 #      (old/hand-made backfill rows without total).
 # paid = payout.operator.marked (the one-tap «выплачено» stamp) — shown as an
 # informational subtotal, rows count regardless of the stamp.
+#
+# NOTE on historical rows: the 2026-10-18 backfill stamped all its rows with
+# one requested_at (2026-10-18T22:45Z = 01:45 MSK Oct 19) — re-running a
+# backfill for those days will show that backfill batch in the Oct-19 digest.
+# Forward-looking closures get the true per-day timestamps.
 # Operator name: operator_chat_id, falling back to snapshot attribution
 # created_by (the same chain the сверка DM uses); resolved via users table.
 # Graceful degradation: if rental_verifications is not applied (42P01) the
 # query returns a PostgREST error object → non-array → empty section, the
 # digest renders exactly as before this block existed.
 VERIF_DATA=$(supabase_query "rental_verifications" \
-  "select=rental_id,operator_chat_id,owner_chat_id,verified_at,snapshot,negotiation,payout&crew_id=eq.${CREW_ID}&status=eq.verified&verified_at=gte.${START_UTC}&verified_at=lte.${END_UTC}&order=verified_at.asc&limit=200")
+  "select=rental_id,operator_chat_id,owner_chat_id,requested_at,status,snapshot,negotiation,payout&crew_id=eq.${CREW_ID}&requested_at=gte.${START_UTC}&requested_at=lte.${END_UTC}&order=requested_at.asc&limit=200")
 
 # Operator chat ids (with the attribution fallback) → users lookup for names.
 OPER_IDS=$(echo "$VERIF_DATA" | jq -r '
@@ -291,8 +311,13 @@ OPER_IDS=$(echo "$VERIF_DATA" | jq -r '
 
 USERS_DATA='[]'
 if [[ -n "$OPER_IDS" ]]; then
+  # OPER_IDS is newline-separated (jq .[] output); PostgREST in-filter needs a
+  # parenthesized CSV: user_id=in.(413553377,244736261). The old `${VAR// /,}`
+  # produced in.413553377 / kept raw newlines → PGRST100 → error object → []
+  # → every name degraded to «оператор …NNNN». paste builds proper CSV.
+  OPER_IDS_CSV=$(printf '%s\n' "$OPER_IDS" | paste -sd, -)
   USERS_DATA=$(supabase_query "users" \
-    "select=user_id,username,full_name&user_id=in.${OPER_IDS// /,}")
+    "select=user_id,username,full_name&user_id=in.(${OPER_IDS_CSV})")
 fi
 # Names payload must ALWAYS be a JSON array for --argjson (a PostgREST error
 # object here must not kill the whole section — names just fall back to ids).
@@ -318,23 +343,46 @@ COMMISSION_SECTION=$(echo "$VERIF_DATA" | jq -r --argjson users "$USERS_DATA" '
                    overprice: (($s.overprice // 0) | nonneg)} | split_total)
             end
         end;
+    # Verify-state mark: ✅ both parties confirmed · 👍 one of two · ⏳ none yet.
+    def mark:
+      if .status == "verified" then "✅"
+      elif .status == "operator_confirmed" or .status == "owner_confirmed" then "👍"
+      else "⏳" end;
     ($users | map({((.user_id // "") | tostring): ((.username // .full_name // ""))})
              | add // {}) as $names
+    | (map(select(.status == "disputed"))) as $disp
     | [.[]
+       | select(.status != "disputed")
        | ((.operator_chat_id // "") | tostring) as $oc
        | (((.snapshot // {}) | obj | (.attribution // {}) | obj
            | (.createdByChatId // "")) | tostring) as $attr
        | {op: (if ($oc | length) > 0 then $oc else $attr end),
           amt: commission,
-          paid: ((((.payout // {}) | obj | (.operator // {}) | obj | (.marked // false))) == true)}]
-    | map(select(.amt > 0))
-    | if length == 0 then ""
+          paid: ((((.payout // {}) | obj | (.operator // {}) | obj | (.marked // false))) == true),
+          st: mark}]
+    | map(select(.amt > 0)) as $rows
+    | if ($rows | length) == 0 and (($disp | length) == 0) then ""
       else
-        ([.[].amt] | add // 0 | round) as $total
-        | ([.[] | select(.paid) | .amt] | add // 0 | round) as $paid
+        ([($disp[] | commission)] | add // 0 | round) as $dispAmt
+        | ([($rows[] | select(.st == "✅"))] | length) as $okN
+        | ([($rows[] | select(.st == "👍"))] | length) as $halfN
+        | ([($rows[] | select(.st == "⏳"))] | length) as $waitN
+        | ([$rows[] | .amt] | add // 0 | round) as $total
+        | ([$rows[] | select(.paid) | .amt] | add // 0 | round) as $paid
+        | ([(if $okN > 0 then "✅ \($okN)" else "" end),
+          (if $halfN > 0 then "👍 \($halfN)" else "" end),
+          (if $waitN > 0 then "⏳ \($waitN)" else "" end)]
+         | map(select(length > 0)) | join(" · ")) as $marks
         | (group_by(.op) | map({op: .[0].op, amt: ([.[].amt] | add // 0), n: length})
            | sort_by(-.amt)) as $sorted
-        | (["Проверено: \(length) · комиссий: \($total) ₽\(if $paid > 0 then " · выплачено: \($paid) ₽" else "" end)"] +
+        | ([(if $total > 0
+             then "Комиссий: \($total) ₽\(if $marks != "" then " · \($marks)" else "" end)\(if $paid > 0 then " · выплачено: \($paid) ₽" else "" end)"
+             else "" end),
+           (if ($disp | length) > 0
+             then "⚠️ Спорных: \($disp | length) (на \($dispAmt) ₽) — вне итога"
+             else "" end)]
+         | map(select(length > 0))) as $head
+        | ($head +
            [$sorted[0:5][] |
              (.op | tostring) as $opid
              | (if $opid == "" then "Без оператора"
@@ -464,12 +512,13 @@ ${PREPAY_SECTION}
 "
 fi
 
-# Commissions block: only occupies message space when something became
-# verified today (an empty COMMISSION_SECTION collapses to the old layout).
+# Commissions block: only occupies message space when something was CLOSED
+# today (or a dispute needs flagging) — an empty COMMISSION_SECTION collapses
+# to the old layout.
 COMMISSION_BLOCK=""
 if [[ -n "$COMMISSION_SECTION" ]]; then
   COMMISSION_BLOCK="
-<b>💸 ЗП с аренд (проверено):</b>
+<b>💸 ЗП с аренд:</b>
 ${COMMISSION_SECTION}
 "
 fi
