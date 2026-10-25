@@ -2,15 +2,28 @@
 
 // /app/sly13/Sly13LandingClient.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// Клиентская часть витрины SLY13 (task 136). Палитра приходит с RSC-страницы
-// (с фолбэком), всё остальное — здесь: собственные nav+footer (chrome подавлен
-// через THEME_CONFIG.sly13), bento-сетки, framer-motion reveal-ы, счётчики,
-// параллакс фонов, spotlight-карточки, marquee, зерно.
+// Клиентская часть витрины SLY13 (task 136; 2026-10-25 — messaging overhaul).
+// Палитра приходит с RSC-страницы (с фолбэком), всё остальное — здесь:
+// собственные nav+footer (chrome подавлен через THEME_CONFIG.sly13),
+// bento-сетки, framer-motion reveal-ы, счётчики, параллакс фонов,
+// spotlight-карточки, marquee, зерно.
 //
-// «Crank it to 13» — набор трендов-2026: kinetic display type (solid/outline/
-// gradient), bento stats с count-up, scroll-parallax picture backgrounds,
-// spotlight hover, моно-акценты (JetBrains Mono), grain, marquee ticker,
-// reduced-motion уважается (MotionConfig + CSS media query).
+// 2026-10-25 (boss): «ditch 'stats of vip-bike' ... these numbers were not
+// actually intended for publication ... generalize 'the message' — focus on
+// variety of supported/tested features of my platform». Весь контент
+// переведён на публичное промо платформы (Каталог → CRM, PDF босса):
+//   · 6 контуров (витрина / лиды / аренда / деньги / команда / аналитика);
+//   · онбординг в 4 шага, freemium FREE/PRO;
+//   · двойная книга денег и зеркало выплат — без приватных цифр;
+//   · «один движок — любой бизнес»: вертикали от байков до катеров,
+//     moto-selection как живой пример услуг без аренды (+ deep links);
+//   · AI-воркер в каждом экипаже (лендинги и настройки — фразой в чате,
+//     «не бот для CRM — CRM для бота»).
+// Приватные цифры сезона vip-bike со страницы сняты (полный список запрещённых
+// строк пинит спека task138). «Crank it to 13» — тренды-2026 остаются:
+// kinetic display type (solid/outline/gradient), bento, scroll-parallax
+// picture backgrounds, spotlight hover, JetBrains Mono, grain, marquee,
+// reduced-motion.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
@@ -30,24 +43,87 @@ type Palette = {
   borderSoft: string;
 };
 
-// ── Данные витрины (те же проверенные цифры, что были в RSC в task 134) ─────
+// ── Данные витрины (публичное промо платформы — «Каталог → CRM») ────────────
 const SB = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix";
 const IMG = {
   hero: `${SB}/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg`,
-  audit: `${SB}/ducati-1199-panigale-2012/image_1.jpg`,
+  money: `${SB}/ducati-1199-panigale-2012/image_1.jpg`,
+  ai: `${SB}/ural-bobber/image_1.jpg`,
   cta: `${SB}/suzuki-vzr1800-boulevard-2006/image_1.jpg`,
   motoHero: "https://static.tildacdn.com/tild3739-3737-4761-a335-353163363963/harley-davidson-ride.jpg",
 };
 
-const SEASON_MONTHS = [
-  { m: "Май", n: 10 },
-  { m: "Июн", n: 9 },
-  { m: "Июл", n: 49 },
-  { m: "Авг", n: 83 },
-  { m: "Сен", n: 109 },
-  { m: "Окт", n: 31 },
+// Telegram Mini App deep links (boss 2026-10-25): партнёрский блок ведёт в
+// зимнее хранение и каталог услуг moto-selection через startapp-параметры.
+// Роутер — hooks/use-start-param-target.ts (storage_<slug> / crew_<slug>),
+// грамматика покрыта startapp-routing-regression.spec.ts.
+const TG_APP_BASE = "https://t.me/oneBikePlsBot/app?startapp=";
+const MS_TG_STORAGE = `${TG_APP_BASE}storage_moto-selection`;
+const MS_TG_CATALOG = `${TG_APP_BASE}crew_moto-selection`;
+const MS_WEB_CATALOG = "/franchize/moto-selection?mode=service";
+
+// Шесть контуров платформы — «Всё, что нужно арендному бизнесу, в одном
+// контуре» (промо PDF, раздел ПРОДУКТ · ОБЗОР).
+const CONTOURS = [
+  {
+    id: "vitrina",
+    title: "Витрина под своим именем",
+    text: "/franchize/<slug>: каталог с тарифами от часа до месяца, корзина, промокоды, отзывы.",
+  },
+  {
+    id: "lidy",
+    title: "Лиды и Авито",
+    text: "Заявки с сайта, коллбэк-форм и Авито — в одной очереди оператора, с источником и историей.",
+  },
+  {
+    id: "arenda",
+    title: "Аренда и документы",
+    text: "Договоры, залоги (наличные или СТС), чек-листы выдачи и приёмки — жизненный цикл целиком.",
+  },
+  {
+    id: "dengi",
+    title: "Деньги",
+    text: "Кошелёк владельца, двойная книга, автоматические зарплатные расчёты.",
+  },
+  {
+    id: "komanda",
+    title: "Команда и роли",
+    text: "owner / admin / оператор: каждый видит только своё. Рейтинг, ачивки, лидерборд.",
+  },
+  {
+    id: "analitika",
+    title: "Аналитика",
+    text: "Воронка лидов, скорость ответов, выгрузки CSV — цифры, а не ощущения.",
+  },
 ];
-const SEASON_MAX = Math.max(...SEASON_MONTHS.map((x) => x.n));
+
+// Онбординг: «четыре шага до первой сделки» (промо PDF, СТАРТ И РОСТ).
+const ONBOARDING = [
+  { n: 1, title: "Заведи экипаж", text: "slug и конфиг в UI: меню, палитра, контакты" },
+  { n: 2, title: "Пригласи команду", text: "инвайты и роли: owner / admin / оператор" },
+  { n: 3, title: "Залей каталог", text: "модели, фото и тарифы через админку или CSV" },
+  { n: 4, title: "Открой витрину", text: "/franchize/<slug> принимает заявки и оплату" },
+];
+
+// «Один движок — любой бизнес» (промо PDF, ТЕХНОЛОГИИ): вертикали мультиарендности.
+const VERTICALS = [
+  "Байки и мото",
+  "Авто",
+  "Квадроциклы",
+  "Велосипеды",
+  "Снаряжение",
+  "Инструмент",
+  "Катера и water-техника",
+  "Сервисы и работы",
+];
+
+// AI-воркер: демо-команды боту (промо PDF, ГЛАВНОЕ · АРХИТЕКТУРА).
+const AI_DEMOS = [
+  { cmd: "добавь в каталог U7 Pro — 249 000 ₽, три штуки", ack: "+ модель в каталоге · 3 ед." },
+  { cmd: "сдай Skyline Пете с пятницы по воскресенье", ack: "аренда #482 создана" },
+  { cmd: "подними цену на Kugoo до 900 ₽ в сутки", ack: "тариф обновлён" },
+  { cmd: "добавь в карточку клиента поле «залог»", ack: "витрина расширена · без кода" },
+];
 
 // Услуги sly13 — обложки из каталога экипажа (public.cars type=service,
 // task 135 присвоил image_1_4x3.jpg каждому). Цены/тексты — из сид-дока.
@@ -110,20 +186,23 @@ const PIPELINE_CREWS = [
 ];
 
 const TICKER = [
-  "запуск экипажей",
-  "telegram mini app",
-  "сверка и комиссии",
+  "залил каталог — получил CRM",
+  "витрина под своим именем",
+  "лиды и авито в одной очереди",
   "договоры docx + ocr",
-  "касса и депозиты",
-  "аналитика сезона",
-  "white-label витрины",
-  "брендинг и каталог",
+  "двойная книга денег",
+  "ai-ответы за секунды",
+  "вечерние сводки в 21:00",
+  "смены и зарплаты",
+  "мотопарк с историей",
+  "telegram mini app",
 ];
 
 const NAV_LINKS = [
-  { href: "#proof", label: "Цифры" },
-  { href: "#audit", label: "Сверка" },
-  { href: "#vision", label: "Экономика" },
+  { href: "#platform", label: "Платформа" },
+  { href: "#money", label: "Деньги" },
+  { href: "#any", label: "Сценарии" },
+  { href: "#ai", label: "AI" },
   { href: "#services", label: "Услуги" },
   { href: "#partners", label: "Партнёры" },
 ];
@@ -245,6 +324,7 @@ function ParallaxBg({
 // ── Основной компонент ──────────────────────────────────────────────────────
 export default function Sly13LandingClient({ palette: p }: { palette: Palette }) {
   const auditRef = useRef<HTMLElement>(null);
+  const aiRef = useRef<HTMLElement>(null);
   const ctaRef = useRef<HTMLElement>(null);
 
   return (
@@ -379,12 +459,14 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   style={{ background: p.accentMain, boxShadow: `0 0 8px ${p.accentMain}` }}
                   aria-hidden
                 />
-                личная витрина salavey13 · франшизы проката
+                личная витрина salavey13 · платформа франшиз
               </p>
             </Reveal>
 
             {/* kinetic display: solid / outline / gradient — трёхслойный заголовок,
-                соизмеримый с moto-selection, но в фирменном циане на графите */}
+                соизмеримый с moto-selection. 2026-10-25: сообщение обобщено —
+                платформа не только для байков (boss: «not only bike rentals,
+                but any rental, sale, service»). */}
             <h1 className="select-none font-black uppercase leading-[0.92] tracking-tight">
               <Reveal delay={0.05}>
                 <span className="block text-[17vw] text-white sm:text-8xl lg:text-9xl">SLY13</span>
@@ -398,18 +480,28 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 </span>
               </Reveal>
               <Reveal delay={0.25}>
+                {/* TV-safe gradient: class .landing-accent-clip из globals.css —
+                    сплошной акцент по умолчанию, градиент только внутри
+                    @supports (boss 2026-10-25: на ТВ акцентное слово красилось
+                    цветным квадратом — тот же класс бага, что на /vipbikerental). */}
                 <span
-                  className="block bg-clip-text text-transparent text-[9.4vw] sm:text-6xl lg:text-7xl"
-                  style={{ backgroundImage: `linear-gradient(94deg, ${p.accentMain} 12%, ${p.accentMainHover} 88%)` }}
+                  className="landing-accent-clip block text-[9.4vw] sm:text-6xl lg:text-7xl"
+                  style={{
+                    ["--accent-clip-from" as string]: p.accentMain,
+                    ["--accent-clip-to" as string]: p.accentMainHover,
+                  }}
                 >
-                  франшиз проката
+                  проката и сервисов
                 </span>
               </Reveal>
             </h1>
 
             <Reveal delay={0.35}>
               <p className="mx-auto mt-7 max-w-2xl text-base leading-relaxed sm:text-lg" style={{ color: p.textPrimary }}>
-                Выросла из боевого экипажа{" "}
+                Залил каталог — остальное достроит сама: витрина с корзиной и оплатой,
+                заявки из Авито и сайта, аренда с договорами и залогами, двойная книга
+                денег, смены и зарплаты команды. Тот самый «свой CRM», который обычно
+                заказывают у агентств за сотни тысяч. Обкатан на живом прокате{" "}
                 <Link
                   href="/franchize/vip-bike"
                   className="underline decoration-dotted underline-offset-4"
@@ -417,8 +509,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 >
                   VIP BIKE
                 </Link>{" "}
-                — не демо в вакууме, а софт, который каждый день работает на живом прокате
-                электробайков в Нижнем Новгороде.
+                — и работает для любого экипажа.
               </p>
             </Reveal>
 
@@ -460,10 +551,10 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             <Reveal delay={0.55}>
               <div className="font-jb mx-auto mt-10 flex max-w-3xl flex-wrap items-center justify-center gap-2 text-[11px] uppercase tracking-[0.14em]">
                 {[
-                  "308 аренд",
-                  "≈ 2,0 млн ₽",
-                  "31 дкп",
-                  "6 экипажей в пайплайне",
+                  "6 контуров — одна система",
+                  "45+ серверных модулей",
+                  "старт за 1 день",
+                  "ai-воркер в команде",
                 ].map((chip) => (
                   <span
                     key={chip}
@@ -479,8 +570,8 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
 
           {/* scroll cue */}
           <a
-            href="#proof"
-            aria-label="Листать к цифрам сезона"
+            href="#platform"
+            aria-label="Листать к платформе"
             className="sly-float absolute bottom-16 left-1/2 z-10 -translate-x-1/2"
             style={{ animation: "sly-float 2.4s ease-in-out infinite" }}
           >
@@ -507,192 +598,162 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
         </section>
 
         <main className="mx-auto w-full max-w-7xl space-y-24 px-4 pb-24 sm:px-6">
-          {/* ── 01 · ЦИФРЫ СЕЗОНА (bento + count-up) ─────────────────────── */}
-          <section id="proof" className="scroll-mt-20 pt-8">
+          {/* ── 01 · ПЛАТФОРМА (6 контуров + онбординг; промо PDF) ────────── */}
+          <section id="platform" className="scroll-mt-20 pt-8">
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                01 · сезон-2026 в цифрах
+                01 · что такое платформа
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                Первый клиент — <span style={{ color: p.accentMain }}>боевой</span>, не синтетика
+                Залил каталог — <span style={{ color: p.accentMain }}>это всё</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                VIP BIKE — тестовый экипаж в самом честном смысле: сначала платформа в бою, потом
-                продукт. Весь сезон 2026 идёт через неё: заказы из Telegram Mini App, договоры DOCX
-                с OCR паспорта и ВУ, депозиты, касса, смены и зарплаты операторов. Ни одна цифра
-                ниже не нарисована — всё считается из Supabase на странице{" "}
-                <Link
-                  href="/franchize/vip-bike"
-                  className="underline decoration-dotted underline-offset-4"
-                  style={{ color: p.accentMain }}
-                >
-                  «Сезон-2026» экипажа
-                </Link>
-                .
+                Остальное платформа достраивает сама: витрина с корзиной и оплатой, заявки
+                из Авито и сайта, аренда с договорами и залогами, двойная книга денег,
+                зарплаты команды и аналитика. Проблемы, которые она закрывает, знакомы
+                каждому, кто вёл прокат в переписках: заявки тонут в пяти мессенджерах,
+                брони и залоги живут в таблицах, которые врут после первой же смены,
+                зарплаты считаются «на словах», а касса не отделена от личной.
               </p>
             </Reveal>
 
-            <div className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {/* Большая плитка: 308 аренд + график по месяцам */}
-              <Reveal className="col-span-2 row-span-2" delay={0.05}>
-                <SpotlightCard
-                  className="flex h-full flex-col justify-between overflow-hidden rounded-2xl border p-6"
-                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
-                >
-                  <div>
-                    <div className="font-jb text-6xl font-extrabold leading-none sm:text-7xl" style={{ color: p.accentMain }}>
-                      <CountUp to={308} duration={2} />
+            {/* онбординг: четыре шага до первой сделки */}
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {ONBOARDING.map(({ n, title, text }, i) => (
+                <Reveal key={n} delay={0.05 + i * 0.06}>
+                  <SpotlightCard
+                    className="h-full rounded-2xl border p-5"
+                    style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="font-jb inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold"
+                        style={{ background: `${p.accentMain}1F`, color: p.accentMain }}
+                      >
+                        {n}
+                      </span>
+                      <h3 className="text-sm font-bold leading-snug" style={{ color: p.textPrimary }}>
+                        {title}
+                      </h3>
                     </div>
-                    <div className="mt-2 text-sm font-semibold" style={{ color: p.textPrimary }}>
-                      аренд за сезон 2026
+                    <p className="mt-3 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                      {text}
+                    </p>
+                  </SpotlightCard>
+                </Reveal>
+              ))}
+            </div>
+
+            {/* шесть контуров — одна система */}
+            <h3 className="mt-14 text-xl font-black tracking-tight sm:text-2xl" style={{ color: p.textPrimary }}>
+              Шесть контуров — <span style={{ color: p.accentMain }}>одна система</span>
+            </h3>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {CONTOURS.map((c, i) => (
+                <Reveal key={c.id} delay={0.04 + (i % 3) * 0.06}>
+                  <SpotlightCard
+                    className="h-full rounded-2xl border p-6"
+                    style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  >
+                    <div className="font-jb text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: p.accentMain }}>
+                      контур {String(i + 1).padStart(2, "0")}
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
-                      май → октябрь, включая ретро-импорт архива из 145 бумажных договоров
+                    <h4 className="mt-2 text-base font-bold" style={{ color: p.textPrimary }}>
+                      {c.title}
+                    </h4>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      {c.text}
+                    </p>
+                  </SpotlightCard>
+                </Reveal>
+              ))}
+            </div>
+
+            {/* продуктовые факты (публичные — из промо PDF, не приватные цифры);
+                count-up оставлен ради живости — считаются продуктовые пороги,
+                а не чья-то выручка */}
+            <Reveal delay={0.1}>
+              <div className="font-jb mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { prefix: "≤", to: 15, suffix: "", u: "мин", t: "целевой первый ответ клиенту" },
+                  { prefix: "", to: 2, suffix: "+", u: "аккаунта", t: "Авито в одном окне оператора" },
+                  { prefix: "", to: 100, suffix: "%", u: "событий", t: "мотопарка — с датой, автором и фото" },
+                  { prefix: "", to: 45, suffix: "+", u: "модулей", t: "серверной логики обкатаны живым бизнесом" },
+                ].map(({ prefix, to, suffix, u, t }) => (
+                  <div
+                    key={t}
+                    className="rounded-2xl border p-4"
+                    style={{ borderColor: p.borderSoft, background: `${p.bgCard}80` }}
+                  >
+                    <div className="text-2xl font-extrabold leading-none" style={{ color: p.accentMain }}>
+                      <CountUp to={to} prefix={prefix} suffix={suffix} duration={1.4} />{" "}
+                      <span className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: p.textSecondary }}>{u}</span>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed" style={{ color: p.textSecondary }}>
+                      {t}
                     </p>
                   </div>
-                  <div className="mt-6 flex items-end gap-2.5" style={{ height: 110 }}>
-                    {SEASON_MONTHS.map(({ m, n }, i) => (
-                      <div key={m} className="flex flex-1 flex-col items-center justify-end gap-2">
-                        <span className="font-jb text-[10px] font-semibold" style={{ color: p.textPrimary }}>
-                          {n}
-                        </span>
-                        <motion.div
-                          className="w-full rounded-t-md"
-                          initial={{ height: 0 }}
-                          whileInView={{ height: `${Math.max(6, Math.round((n / SEASON_MAX) * 100))}%` }}
-                          viewport={{ once: true, margin: "-60px" }}
-                          transition={{ duration: 0.9, delay: 0.15 + i * 0.08, ease: EASE }}
-                          style={{
-                            background: n === SEASON_MAX ? p.accentMain : `${p.accentMain}66`,
-                            minHeight: 6,
-                          }}
-                        />
-                        <span className="font-jb text-[10px]" style={{ color: p.textSecondary }}>
-                          {m}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </SpotlightCard>
-              </Reveal>
-
-              <Reveal delay={0.12}>
-                <SpotlightCard
-                  className="h-full rounded-2xl border p-5"
-                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
-                >
-                  <div className="font-jb text-3xl font-extrabold" style={{ color: p.textPrimary }}>
-                    <CountUp to={2} decimals={1} prefix="≈ " suffix=" млн ₽" />
-                  </div>
-                  <div className="mt-1 text-sm font-medium" style={{ color: p.accentMain }}>
-                    выручка по аренде
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: p.textSecondary }}>
-                    пик сезона: 109 аренд в сентябре
-                  </p>
-                </SpotlightCard>
-              </Reveal>
-
-              <Reveal delay={0.18}>
-                <SpotlightCard
-                  className="h-full rounded-2xl border p-5"
-                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
-                >
-                  <div className="font-jb text-3xl font-extrabold" style={{ color: p.textPrimary }}>
-                    <CountUp to={31} />
-                  </div>
-                  <div className="mt-1 text-sm font-medium" style={{ color: p.accentMain }}>
-                    продажи байков
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: p.textSecondary }}>
-                    ≈ 13,0 млн ₽ по договорам купли-продажи
-                  </p>
-                </SpotlightCard>
-              </Reveal>
-
-              <Reveal delay={0.24}>
-                <SpotlightCard
-                  className="h-full rounded-2xl border p-5"
-                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
-                >
-                  <div className="font-jb text-3xl font-extrabold" style={{ color: p.textPrimary }}>
-                    <CountUp to={16.5} decimals={1} prefix="≈ " suffix=" млн ₽" />
-                  </div>
-                  <div className="mt-1 text-sm font-medium" style={{ color: p.accentMain }}>
-                    оборот кассы
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: p.textSecondary }}>
-                    приход/расход со сдвигами и зарплатами
-                  </p>
-                </SpotlightCard>
-              </Reveal>
-
-              {/* Акцентная плитка: ретро-импорт */}
-              <Reveal delay={0.3}>
-                <SpotlightCard
-                  className="h-full rounded-2xl border p-5"
-                  style={{
-                    background: `linear-gradient(135deg, ${p.accentMain}1F, ${p.bgCard} 55%)`,
-                    borderColor: `${p.accentMain}55`,
-                  }}
-                >
-                  <div className="font-jb text-3xl font-extrabold" style={{ color: p.accentMain }}>
-                    +<CountUp to={188} suffix=" 000 ₽" />
-                  </div>
-                  <div className="mt-1 text-sm font-medium" style={{ color: p.textPrimary }}>
-                    вернул ретро-импорт
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: p.textSecondary }}>
-                    оцифровка архива закрыла «слепое пятно» весны
-                  </p>
-                </SpotlightCard>
-              </Reveal>
-            </div>
+                ))}
+              </div>
+            </Reveal>
           </section>
 
-          {/* ── 02 · СВЕРКА (picture background + параллакс) ──────────────── */}
+          {/* ── 02 · ДЕНЬГИ (picture background + параллакс) ──────────────── */}
           <section
-            id="audit"
+            id="money"
             ref={auditRef}
             className="relative -mx-4 overflow-hidden border-y px-4 py-20 sm:-mx-6 sm:px-6 sm:py-28"
             style={{ borderColor: p.borderSoft }}
           >
             <ParallaxBg
               targetRef={auditRef}
-              src={IMG.audit}
+              src={IMG.money}
               scrim={`linear-gradient(100deg, ${p.bgBase}F2 0%, ${p.bgBase}CC 45%, ${p.bgBase}59 100%)`}
               glow={`radial-gradient(52% 60% at 78% 40%, ${p.accentMain}1A 0%, transparent 70%)`}
             />
             <div className="relative z-10">
               <Reveal>
                 <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                  02 · сверка
+                  02 · деньги
                 </p>
                 <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                  Считаем каждую копейку — <span style={{ color: p.accentMain }}>прямо сейчас</span>
+                  Каждый рубль виден <span style={{ color: p.accentMain }}>дважды</span>
                 </h2>
                 <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                  Все данные сезона сохранены, и текущая задача — финальная сверка: считаем комиссии
-                  операторов по типам операций (аренда почасовая/посуточная, продажи, оборудование),
-                  депозиты и возвраты. Жёлтый октябрь-разбор показал, зачем это нужно: автоматический
-                  аудит нашёл расхождения «бумажный договор против книг» — и вернул потерянные деньги
-                  в учёт.
+                  Двойная книга денег: живая касса владельца и формальный леджер зарплат —
+                  две независимые записи одних и тех же операций. Зеркало выплат связывает
+                  их архитектурно: зарплата, выданная со страницы расчётов, появляется в
+                  обеих книгах автоматически. Двойных выплат и споров «сколько же мы
+                  насчитали?» больше нет — этот класс ошибок закрыт конструкцией, а не
+                  внимательностью.
                 </p>
               </Reveal>
               <div className="mt-9 grid gap-4 sm:grid-cols-3">
                 {[
-                  { n: 154, t: "аренды октября разобраны автоматическим аудитом" },
-                  { n: 32, t: "находки «sus»: бумага против книг — от депозита до итога" },
-                  { n: 18, t: "утерянных депозитов из старых договоров восстановлено в книгах" },
-                ].map(({ n, t }, i) => (
-                  <Reveal key={n} delay={0.1 + i * 0.08}>
+                  {
+                    h: "Кошелёк владельца",
+                    t: "Живая касса: доходы, расходы, снятия. Каждая запись — источник, человек, дата (MSK). Виден только владельцу.",
+                  },
+                  {
+                    h: "Леджер зарплат",
+                    t: "Расчёт по каждому оператору: доход, коэффициенты, баланс. Отметки «уже выплачено» с историей.",
+                  },
+                  {
+                    h: "Зеркало выплат",
+                    t: "Выплата со страницы расчётов автоматически отражается в обеих книгах — сверка в один тап.",
+                  },
+                ].map(({ h, t }, i) => (
+                  <Reveal key={h} delay={0.1 + i * 0.08}>
                     <SpotlightCard
                       className="h-full rounded-2xl border p-6 backdrop-blur-sm"
                       style={{ background: `${p.bgCard}D9`, borderColor: p.borderSoft }}
                     >
-                      <div className="font-jb text-4xl font-extrabold" style={{ color: p.accentMain }}>
-                        <CountUp to={n} duration={1.5} />
+                      <div className="font-jb text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: p.accentMain }}>
+                        книга {String(i + 1).padStart(2, "0")}
                       </div>
+                      <h3 className="mt-2 text-base font-bold" style={{ color: p.textPrimary }}>
+                        {h}
+                      </h3>
                       <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
                         {t}
                       </p>
@@ -702,29 +763,49 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               </div>
               <Reveal delay={0.2}>
                 <p className="mt-7 max-w-3xl text-sm leading-relaxed" style={{ color: p.textSecondary }}>
-                  Под капотом: комиссия по правилам экипажа (процент или фикс, по типу операции),
-                  планы зарплат и кассовая книга с проводками, сверка расчёта с оператором в один тап
-                  и payout-хаб. То, что для обычного проката — «тетрадка и калькулятор», здесь — код.
+                  Под капотом: комиссия по правилам экипажа (процент или фикс, по типу
+                  операции — почасовая аренда, посуточная, продажи, оборудование), планы
+                  зарплат, кассовая книга с проводками и payout-хаб. То, что для обычного
+                  проката — «тетрадка и калькулятор», здесь — код.
                 </p>
               </Reveal>
             </div>
           </section>
 
-          {/* ── 03 · ЭКОНОМИКА ФРАНШИЗЫ ───────────────────────────────────── */}
-          <section id="vision" className="scroll-mt-20">
+          {/* ── 03 · ОДИН ДВИЖОК — ЛЮБОЙ БИЗНЕС ───────────────────────────── */}
+          <section id="any" className="scroll-mt-20">
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                03 · экономика франшизы
+                03 · сценарии
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                Сначала заработать — <span style={{ color: p.accentMain }}>потом продавать</span>
+                Один движок — <span style={{ color: p.accentMain }}>любой бизнес</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                Если комиссии и деньги экипажа сходятся на платформе — это лучшее доказательство для
-                продажи установок другим прокатам. Пайплайн уже собран: несколько экипажей
-                подготовлены заранее, у каждого свой slug, каталог, брендинг и Telegram-бот.
+                Байки и мото — только первый сценарий. Каждый экипаж — это slug с полной
+                изоляцией данных: своя витрина, свои лиды, свои деньги, своя команда.
+                Каталог + заявки + аренда + деньги = контур проката, продажи или сервиса
+                чего угодно: движку всё равно, что стоит в карточке товара. Конфигуратор
+                витрины меняет меню, палитру и контакты без кода; роли owner / admin /
+                оператор решают, кто что видит.
               </p>
             </Reveal>
+
+            {/* вертикали мультиарендности */}
+            <Reveal delay={0.08}>
+              <ul className="mt-6 flex flex-wrap gap-2">
+                {VERTICALS.map((v) => (
+                  <li
+                    key={v}
+                    className="font-jb rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.1em]"
+                    style={{ borderColor: p.borderSoft, background: `${p.bgCard}80`, color: p.textSecondary }}
+                  >
+                    {v}
+                  </li>
+                ))}
+              </ul>
+            </Reveal>
+
             <div className="mt-9 grid gap-4 md:grid-cols-2">
               <Reveal delay={0.08}>
                 <SpotlightCard
@@ -791,22 +872,31 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     <span className="font-jb" style={{ color: p.accentMain }}>
                       ↑
                     </span>
-                    Как продаётся установка
+                    Не только прокат
                   </h3>
+                  <p className="mt-4 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                    Живой пример — партнёрский{" "}
+                    <Link href="/moto-selection" className="underline decoration-dotted underline-offset-4" style={{ color: p.accentMain }}>
+                      Moto.selection
+                    </Link>
+                    : в экипаже нет ни одной аренды, но платформа закрывает весь мотосервис —
+                    подбор и покупка, ТО и ремонт, детейлинг, эвакуация 24/7 и зимнее
+                    хранение с договором ответственного хранения, фотофиксацией и ПЭП
+                    прямо в Telegram. Смены, зарплаты и комиссии работают так же, как в
+                    прокате, — меняется каталог, а не логика.
+                  </p>
                   <ul className="mt-4 space-y-3.5 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
                     <li>
-                      <span style={{ color: p.textPrimary }}>White-label за 1–2 недели</span> — бренд
-                      клиента, свой каталог, витрина в Telegram Mini App (бот уже в проде).
+                      <span style={{ color: p.textPrimary }}>Сервисы и работы</span> — услуги
+                      с записью, прайсом и корзиной; эвакуация и выездные осмотры.
                     </li>
                     <li>
-                      <span style={{ color: p.textPrimary }}>Вертикаль из коробки</span>: договоры
-                      DOCX, OCR паспорта/ВУ, QR-claim, касса, депозиты — то, что generic-CRM строят
-                      месяцами.
+                      <span style={{ color: p.textPrimary }}>Хранение</span> — сезонные
+                      договоры, статусы, фотоотчёты и оплаты на стене экипажа.
                     </li>
                     <li>
-                      <span style={{ color: p.textPrimary }}>Модель монетизации</span>: запуск под
-                      ключ + подписка на сопровождение, платежи в Telegram (XTR), каркас Pro-пакетов
-                      single-city / multi-city / enterprise уже спроектирован.
+                      <span style={{ color: p.textPrimary }}>Продажи</span> — витрина, воронка
+                      и договоры купли-продажи рядом с арендой.
                     </li>
                   </ul>
                 </SpotlightCard>
@@ -814,11 +904,101 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </section>
 
-          {/* ── 04 · УСЛУГИ (обложки из каталога экипажа) ─────────────────── */}
+          {/* ── 04 · AI-ВОРКЕР В КАЖДОМ ЭКИПАЖЕ ───────────────────────────── */}
+          <section
+            id="ai"
+            ref={aiRef}
+            className="relative -mx-4 overflow-hidden border-y px-4 py-20 sm:-mx-6 sm:px-6 sm:py-28"
+            style={{ borderColor: p.borderSoft }}
+          >
+            <ParallaxBg
+              targetRef={aiRef}
+              src={IMG.ai}
+              scrim={`linear-gradient(to bottom, ${p.bgBase}E6, ${p.bgBase}B3 45%, ${p.bgBase}F2)`}
+              glow={`radial-gradient(50% 55% at 50% 45%, ${p.accentMain}1C 0%, transparent 70%)`}
+            />
+            <div className="relative z-10">
+              <Reveal>
+                <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                  04 · ai-воркер
+                </p>
+                <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                  Не бот для CRM — <span style={{ color: p.accentMain }}>CRM для бота</span>
+                </h2>
+                <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
+                  Ассистент-бот подключён к тем же серверным модулям, что и веб-приложение,
+                  — весь интерфейс доступен ему напрямую, без кликов и форм. Днём он
+                  принимает команды текстом и голосом, вечером сам присылает сводку по
+                  дню в 21:00. Новый сценарий экипажа — это фраза в чате, а не тикет
+                  разработчику.
+                </p>
+              </Reveal>
+
+              {/* демо: команды человеческим языком → подтверждения бота */}
+              <div className="mt-9 grid gap-3 md:grid-cols-2">
+                {AI_DEMOS.map(({ cmd, ack }, i) => (
+                  <Reveal key={cmd} delay={0.05 + i * 0.06}>
+                    <div
+                      className="rounded-2xl border p-4 backdrop-blur-sm"
+                      style={{ borderColor: p.borderSoft, background: `${p.bgCard}D9` }}
+                    >
+                      <p className="font-jb text-sm" style={{ color: p.textPrimary }}>
+                        <span style={{ color: p.accentMain }}>›</span> {cmd}
+                      </p>
+                      <p className="font-jb mt-2 flex items-center gap-2 text-xs" style={{ color: p.accentMain }}>
+                        <span
+                          className="inline-block h-1.5 w-1.5 rounded-full"
+                          style={{ background: p.accentMain }}
+                          aria-hidden
+                        />
+                        {ack}
+                      </p>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+
+              <Reveal delay={0.15}>
+                <div className="mt-8 grid gap-4 md:grid-cols-2">
+                  <SpotlightCard
+                    className="h-full rounded-2xl border p-6 backdrop-blur-sm"
+                    style={{ background: `${p.bgCard}D9`, borderColor: p.borderSoft }}
+                  >
+                    <h3 className="text-base font-bold" style={{ color: p.textPrimary }}>
+                      Оператору — готовый ответ за секунды
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      AI читает вопрос клиента, определяет интент — цена, наличие, залог,
+                      документы, доставка — и собирает ответ из библиотеки скриптов
+                      экипажа. Оператор правит пару слов и отправляет; источник ответа
+                      честно помечен бейджем ai / hybrid / rules.
+                    </p>
+                  </SpotlightCard>
+                  <SpotlightCard
+                    className="h-full rounded-2xl border p-6 backdrop-blur-sm"
+                    style={{ background: `${p.bgCard}D9`, borderColor: p.borderSoft }}
+                  >
+                    <h3 className="text-base font-bold" style={{ color: p.textPrimary }}>
+                      Часть каждого экипажа
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      AI-воркер на платформе — не плагин, а член команды: у него доступ к
+                      каталогу, витринам и настройкам экипажа. Лендинг партнёра
+                      Moto.selection, витрины экипажей и их каталоги собирались и
+                      правились в диалоге — так же он поможет и вашему экипажу: от
+                      структуры каталога до обучения команды работе с ботом.
+                    </p>
+                  </SpotlightCard>
+                </div>
+              </Reveal>
+            </div>
+          </section>
+
+          {/* ── 05 · УСЛУГИ (обложки из каталога экипажа) ─────────────── */}
           <section id="services" className="scroll-mt-20">
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                04 · услуги
+                05 · услуги
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Услуги и запуск экипажей
@@ -887,7 +1067,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           <section id="partners" className="scroll-mt-20">
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                05 · партнёры
+                06 · партнёры
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Партнёры на <span style={{ color: p.accentMain }}>одном софте</span>
@@ -937,12 +1117,39 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                       <ChevronRight className="h-3.5 w-3.5" aria-hidden />
                     </Link>
                     <Link
-                      href="/franchize/moto-selection?mode=service"
+                      href={MS_WEB_CATALOG}
                       className="inline-flex h-11 items-center justify-center rounded-full border px-6 text-xs font-bold uppercase tracking-[0.1em] transition active:scale-95"
                       style={{ borderColor: `${p.textPrimary}44`, color: p.textPrimary }}
                     >
                       Каталог экипажа
                     </Link>
+                  </div>
+                  {/* Deep links в разделы экипажа (boss 2026-10-25: «add proper
+                      links to moto-selection crew winter storage from landing,
+                      and for services, maybe even using deep links via
+                      startappparamrouter»). storage_moto-selection / crew_
+                      moto-selection роутит сам Mini App (startapp-параметры). */}
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                    <a
+                      href={MS_TG_STORAGE}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-jb inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition hover:opacity-100"
+                      style={{ color: p.accentMain }}
+                    >
+                      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: p.accentMain }} aria-hidden />
+                      зимнее хранение · mini app
+                    </a>
+                    <a
+                      href={MS_TG_CATALOG}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-jb inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition hover:opacity-100"
+                      style={{ color: p.accentMain }}
+                    >
+                      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: p.accentMain }} aria-hidden />
+                      8 услуг · mini app
+                    </a>
                   </div>
                 </div>
                 <div className="relative min-h-56 lg:min-h-full">
@@ -1009,7 +1216,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             <div className="relative z-10 mx-auto max-w-2xl">
               <Reveal>
                 <h2 className="text-2xl font-black tracking-tight sm:text-4xl">
-                  Есть прокат — нужна <span style={{ color: p.accentMain }}>такая же витрина?</span>
+                  Есть прокат, сервис или продажи — нужна <span style={{ color: p.accentMain }}>такая же витрина?</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed md:text-base" style={{ color: p.textSecondary }}>
                   Напишите: покажу живой экипаж изнутри, посчитаем запуск под ваш каталог и город.
@@ -1106,7 +1313,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           </div>
           <div className="border-t px-4 py-5 sm:px-6" style={{ borderColor: p.borderSoft }}>
             <p className="mx-auto max-w-7xl text-[11px]" style={{ color: p.textSecondary }}>
-              © 2026 SLY13 · цифры сезона — из базы экипажа vip-bike (Supabase), срез октябрь 2026
+              © 2026 SLY13 · платформа франшиз: витрина, лиды, аренда, деньги, команда — на одном движке
             </p>
           </div>
         </footer>

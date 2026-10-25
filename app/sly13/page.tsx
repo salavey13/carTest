@@ -1,32 +1,28 @@
 // /app/sly13/page.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// SLY13 — личная витрина salavey13 (task 136, «crank it to 13»).
+// SLY13 — личная витрина salavey13 (task 136; 2026-10-25 messaging overhaul).
 //
-// Босс: «i want /sly13 landing be as cool as /moto-selection (interlink us as
-// partners in respective sections;) Ditch project-level-default header and
-// footer on /sly13 ... Polish adaptability, animations ... search for latest
-// trends in web-design ... enhance sly 13 even further».
+// Босс 2026-10-25: «ditch "stats of vip-bike" — these numbers were not
+// actually intended for publication … generalize "the message" — focus on
+// variety of supported/tested features of my platform». Метаданные и контент
+// больше не оперируют приватными цифрами сезона: лендинг рассказывает про
+// платформу (каталог → CRM: 6 контуров, двойная книга денег, мультиарендность,
+// AI-воркер) — детали в Sly13LandingClient.
 //
 // Архитектура: этот RSC только тянет палитру экипажа (устойчиво к недоступности
 // БД — фолбэк на sly13-палитру из crewDocs) и отдаёт её клиентскому
 // Sly13LandingClient, где живут framer-motion-анимации, bento-сетки,
-// счётчики, параллакс картинок и собственные nav+footer (chrome подавлен в
+// параллакс картинок и собственные nav+footer (chrome подавлен в
 // ClientLayout THEME_CONFIG.sly13 — svarprofi/moto-selection паттерн).
-//
-// Данные витрины — те же проверенные цифры сезона-2026 (worklog tasks 111/113):
-// 308 аренд май→октябрь, ≈2,0 млн ₽ аренда, 31 ДКП ≈13,0 млн ₽, оборот кассы
-// ≈16,5 млн ₽, ретро-импорт архива ≈+188 000 ₽, пик сентября 109 аренд,
-// аудит октября: 154 аренды разобраны / 32 находки / 18 депозитов восстановлено.
-// Фотки услуг — обложки из каталога экипажа (public.cars, task 135).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getCrewPaletteBySlug } from "@/app/franchize/actions";
 import Sly13LandingClient from "./Sly13LandingClient";
 
 export const metadata = {
-  title: "SLY13 — платформа франшиз проката · salavey13",
+  title: "SLY13 — платформа для проката, продаж и сервисов · salavey13",
   description:
-    "Боевой экипаж VIP BIKE как первый клиент: сезон-2026 в живых цифрах, сверка и комиссии операторов, запуск экипажей под ключ. Витрина salavey13.",
+    "Залил каталог — получил готовый CRM: витрину с корзиной и оплатой, лиды и Авито, аренду с договорами и залогами, двойную книгу денег и команду. Один движок — любой бизнес, AI-воркер в каждом экипаже. Витрина salavey13.",
 };
 
 export default async function Sly13Landing() {

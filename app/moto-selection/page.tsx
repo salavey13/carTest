@@ -57,7 +57,11 @@ const T = "https://static.tildacdn.com";
 const IMG_EVAC_CATALOG =
   "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/moto-selection-svc-03/image_1.jpg";
 const IMG = {
-  hero: `${T}/tild3739-3737-4761-a335-353163363963/harley-davidson-ride.jpg`,
+  // 2026-10-25 (owner request): hero bg swap — the golden-hour harley ride
+  // made way for the stunt rider in blue smoke (moto-selection-svc-01, the
+  // crew's own platform catalog cover). Dark, dramatic, and the brand orange
+  // pops against the blue smoke. Kept on the platform's Supabase storage.
+  hero: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/moto-selection-svc-01/image_1.jpg",
   training: `${T}/tild3634-3538-4336-b032-613630643439/xmoto-182-1-scaled-1.jpg`,
   pickUp: `${T}/tild6632-3031-4331-b566-363037363236/noroot.png`,
   gear: `${T}/tild3436-3834-4462-a663-323333316239/9-Dainese-.jpg`,
@@ -103,8 +107,28 @@ const ACADEMY_SITE = "https://academy.cr/";
 const BIKELAND_HREF = "https://bikeland.ru/";
 const HISTORY_HREF = "/moto-selection/history";
 
+// ── Telegram Mini App deep links (boss 2026-10-25) ───────────────────────────
+// startapp-параметры маршрутизирует hooks/use-start-param-target.ts:
+//   storage_<slug> → /franchize/<slug>/storage (стена зимнего хранения),
+//   crew_<slug>    → /franchize/<slug> (каталог экипажа).
+// Грамматика покрыта регресс-спекой startapp-routing-regression.spec.ts —
+// crew extraction from the startapp parameter works (boss: «make sure»).
+const TG_BOT = "oneBikePlsBot";
+const TG_APP_BASE = `https://t.me/${TG_BOT}/app?startapp=`;
+const TG_STORAGE_DEEPLINK = `${TG_APP_BASE}storage_moto-selection`;
+const TG_CATALOG_DEEPLINK = `${TG_APP_BASE}crew_moto-selection`;
+// Web-фолбэки тех же разделов (браузер вне Telegram).
+const WEB_STORAGE_HREF = "/franchize/moto-selection/storage";
+const WEB_CATALOG_HREF = "/franchize/moto-selection?mode=service";
+// Логотип партнёра SLY13 (carpix/sly13_logo.jpg) — карточка в «партнёрах»
+// теперь визуально выровнена с Байкленд/Академия (boss 2026-10-25).
+const SLY13_LOGO =
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg";
+
 // «наши услуги» — 6 карточек оригинала + ДОБАВЛЕННАЯ эвакуация (данные из
 // каталога экипажа на платформе). Обложка эвакуации — из каталога (task 135).
+// Storage pic on the platform storage tab comes from metadata.franchize.storage
+// (PATCHed 2026-10-25) — the same tildacdn photo as here (IMG.storage).
 const SERVICES: {
   id: string;
   title: string;
@@ -323,11 +347,12 @@ export default function MotoSelectionLanding() {
 
       {/* ── HERO ────────────────────────────────────────────────────────── */}
       <section className="relative flex min-h-[92svh] items-end overflow-hidden sm:items-center">
-        {/* Hero image: original harley-davidson-ride.jpg, slow ken-burns.
-            Улучшение картинки (запрос босса): три слоя скрима — чёрная подушка
+        {/* Hero image: moto-selection-svc-01 (stunt rider in blue smoke,
+            owner-approved swap 2026-10-25), slow ken-burns.
+            Улучшение картинки: три слоя скрима — чёрная подушка
             слева под типографику, тёплый радиальный глушитель оранжевого
-            справа, нижний фейд в чёрный — картинка стала читаемой под текстом
-            и при этом осталась живой по краям. */}
+            справа, нижний фейд в чёрный. Новый кадр темнее оригинала, поэтому
+            скрима достаточно, а оранжевый акцент читается на синем дыме. */}
         <div className="absolute inset-0" aria-hidden>
           <div
             className="absolute inset-0 will-change-transform"
@@ -339,7 +364,7 @@ export default function MotoSelectionLanding() {
               fill
               priority
               sizes="100vw"
-              className="object-cover object-[68%_center]"
+              className="object-cover object-center"
             />
           </div>
           <div
@@ -382,10 +407,17 @@ export default function MotoSelectionLanding() {
             >
               искусство
             </span>
+            {/* TV-safe gradient (boss 2026-10-25): the previous inline
+                clipped-gradient pair painted a solid orange square on TV
+                WebKit (no background-clip:text support there). The class
+                defaults to the solid brand orange and upgrades to the
+                gradient only inside @supports — same cure as the root page
+                (.vip-accent-clip) and /sly13 (.landing-accent-clip). */}
             <span
-              className="block bg-clip-text text-transparent"
+              className="landing-accent-clip block"
               style={{
-                backgroundImage: `linear-gradient(92deg, ${BRAND} 10%, #ffa770 90%)`,
+                ["--accent-clip-from" as string]: BRAND,
+                ["--accent-clip-to" as string]: "#ffa770",
               }}
             >
               мотосервиса
@@ -684,6 +716,41 @@ export default function MotoSelectionLanding() {
                 Оставить заявку
               </a>
             </div>
+
+            {/* Платформа: онлайн-заявка на хранение — договор, акт и ПЭП
+                прямо в Telegram Mini App (босс 2026-10-25: «add proper links
+                to moto-selection crew winter storage from landing ... using
+                deep links via startappparamrouter»). storage_<slug> роутится
+                в /franchize/moto-selection/storage самим Mini App; веб-ссылка
+                — фолбэк для браузера. */}
+            <div className="mt-6 rounded-2xl border border-[var(--ms-accent)]/35 bg-black/60 p-5 backdrop-blur">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--ms-accent)]">
+                платформа · зимнее хранение онлайн
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">
+                Каталог экипажа принимает заявки на хранение круглый год: договор
+                ответственного хранения, акт приёма-передачи с фотофиксацией и
+                подпись простой электронной подписью — всё в Telegram.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href={TG_STORAGE_DEEPLINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--ms-accent)] px-6 text-xs font-bold uppercase tracking-[0.1em] text-black transition hover:brightness-110 active:scale-95"
+                >
+                  <Send className="h-4 w-4" aria-hidden />
+                  Хранение в Telegram
+                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </a>
+                <a
+                  href={WEB_STORAGE_HREF}
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-white/25 px-6 text-xs font-bold uppercase tracking-[0.1em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)] active:scale-95"
+                >
+                  Открыть в браузере
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -859,14 +926,22 @@ export default function MotoSelectionLanding() {
             />
           </a>
           {/* Партнёрская витрина платформы: cross-link к /sly13 (босс:
-              «interlink us as partners in respective sections») */}
+              «interlink us as partners in respective sections»).
+              2026-10-25: карточка получила ЛОГОТИП sly13 (carpix/
+              sly13_logo.jpg) и теперь визуально выровнена с Байкленд и
+              Академия — те тоже картинки, а не текст. */}
           <Link
             href="/sly13"
-            className="group flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center transition hover:border-[var(--ms-accent)]/60"
+            className="group flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/10 bg-black p-6 text-center transition hover:border-[var(--ms-accent)]/60"
           >
-            <span className="text-2xl font-black uppercase tracking-[0.14em] text-white">
-              SLY<span className="text-[var(--ms-accent)]">13</span>
-            </span>
+            <Image
+              src={SLY13_LOGO}
+              alt="SLY13 — платформа франшиз проката"
+              width={300}
+              height={300}
+              sizes="(max-width: 640px) 100vw, 300px"
+              className="h-auto w-48 rounded-xl object-contain transition group-hover:scale-105"
+            />
             <span className="text-xs leading-relaxed text-white/50">
               платформа франшиз проката — витрина партнёров, работающих на одном софте
             </span>
@@ -922,7 +997,7 @@ export default function MotoSelectionLanding() {
           {/* Платформенная витрина: каталог экипажа + личная витрина salavey13 */}
           <div className="mx-auto mt-12 grid max-w-4xl gap-4 sm:grid-cols-2">
             <Link
-              href="/franchize/moto-selection?mode=service"
+              href={WEB_CATALOG_HREF}
               className="group rounded-2xl border border-[var(--ms-accent)]/40 bg-black p-6 transition hover:border-[var(--ms-accent)]"
             >
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--ms-accent)]">платформа</p>
@@ -930,10 +1005,24 @@ export default function MotoSelectionLanding() {
               <p className="mt-2 text-sm leading-relaxed text-white/60">
                 Все 8 услуг экипажа с ценами и корзиной — в Telegram Mini App платформы.
               </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-accent)]">
-                Открыть каталог
-                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </span>
+              {/* startapp deep link (crew_moto-selection) роутится прямо в
+                  каталог экипажа — boss: «maybe even using deep links via
+                  startappparamrouter». Ссылка-дублер для браузера ниже. */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <a
+                  href={TG_CATALOG_DEEPLINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-accent)]"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden />
+                  Открыть в Telegram
+                </a>
+                <span className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-accent)]">
+                  Открыть в браузере
+                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </span>
+              </div>
             </Link>
             <Link
               href="/sly13"

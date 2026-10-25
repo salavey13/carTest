@@ -45,10 +45,26 @@ describe("storage season math (lib/storage mirror of storage-season)", () => {
     expect(storageMonthsCount("2025-10-17", "2025-10-17")).toBe(0);
   });
 
-  it("season defaults: before 15 Oct → the upcoming season (15.10 → 1.06)", () => {
+  // 2026-10-25 boss fix: winter storage must WORK during the season. The old
+  // rule jumped to the NEXT season the moment the start anchor passed — on
+  // Oct 25 (peak storage weeks) the form pre-filled 2027 → 2028. Now «now»
+  // inside [start anchor .. end anchor] (cross-year) yields the ONGOING
+  // season; only the summer gap (after Jun 1, before Oct 15) offers upcoming.
+  it("season defaults: in-season → the ONGOING season; summer gap → the upcoming one (15.10 → 1.06)", () => {
+    // off-season summer gap → upcoming season
     expect(storageSeasonDefaults(new Date("2026-09-27T12:00:00Z"))).toEqual({ start: "2026-10-15", end: "2027-06-01" });
-    expect(storageSeasonDefaults(new Date("2026-01-10T12:00:00Z"))).toEqual({ start: "2026-10-15", end: "2027-06-01" });
-    expect(storageSeasonDefaults(new Date("2026-10-16T12:00:00Z"))).toEqual({ start: "2027-10-15", end: "2028-06-01" });
+    // January = season TAIL (2025-10-15 → 2026-06-01 is still running)
+    expect(storageSeasonDefaults(new Date("2026-01-10T12:00:00Z"))).toEqual({ start: "2025-10-15", end: "2026-06-01" });
+    // season opened Oct 15 → the ongoing season, NOT next year (was 2027→2028)
+    expect(storageSeasonDefaults(new Date("2026-10-16T12:00:00Z"))).toEqual({ start: "2026-10-15", end: "2027-06-01" });
+    // peak storage weeks (boss filled the form on Oct 25 2026)
+    expect(storageSeasonDefaults(new Date("2026-10-25T12:00:00Z"))).toEqual({ start: "2026-10-15", end: "2027-06-01" });
+    // on the start anchor itself → ongoing season already
+    expect(storageSeasonDefaults(new Date("2026-10-15T12:00:00Z"))).toEqual({ start: "2026-10-15", end: "2027-06-01" });
+    // on the end anchor → still the ongoing season
+    expect(storageSeasonDefaults(new Date("2026-06-01T12:00:00Z"))).toEqual({ start: "2025-10-15", end: "2026-06-01" });
+    // per-crew anchors honored (same cross-year semantics)
+    expect(storageSeasonDefaults(new Date("2026-11-01T12:00:00Z"), { start: "11-01", end: "04-01" })).toEqual({ start: "2026-11-01", end: "2027-04-01" });
   });
 
   it("season date parsing: DD.MM.YYYY (checkout pickers) and ISO both → ISO", () => {

@@ -1471,3 +1471,28 @@ path.mr-spot-popup {
     color: transparent;
   }
 }
+
+/* ═══ Standalone landings accent text — the SAME smart-TV fix, generic ═══
+   Boss 2026-10-25: /moto-selection and /sly13 hero accent words showed the
+   identical TV bug as the root page (TV WebKit paints
+   -webkit-text-fill-color:transparent but does not support
+   background-clip:text → the inline gradient fills the WHOLE span = colored
+   squares on the living-room TV). Shared cure, var-driven so both landings
+   reuse it: default = solid accent (or currentColor when the landing did
+   not set the vars), gradient-clip only inside @supports. */
+.landing-accent-clip {
+  color: var(--accent-clip-from, currentColor);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .landing-accent-clip {
+    background-image: linear-gradient(
+      94deg,
+      var(--accent-clip-from),
+      var(--accent-clip-to, var(--accent-clip-from))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}

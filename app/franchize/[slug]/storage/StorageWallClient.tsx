@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { ArrowDownWideNarrow, ChevronDown, FileText, Loader2, MessageSquarePlus, Phone, RefreshCw, Snowflake } from "lucide-react";
 import { toast } from "sonner";
@@ -374,7 +375,24 @@ function GuestOffer({
   const price = config?.defaultMonthlyPriceRub ?? 2000;
   const careDuties = config?.careDuties?.length ? config.careDuties : [];
   return (
-    <div className="space-y-3 rounded-2xl border p-4" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+    <div className="overflow-hidden rounded-2xl border" style={{ borderColor: T.borderSoft, backgroundColor: T.bgCard }}>
+      {/* Offer cover (2026-10-25, boss: «add picture btw to winter storage
+          tab — steal image link from moto-selection»): per-crew config URL,
+          rendered only when the crew set one — vip-bike keeps the text-only
+          offer. next/image is safe here (images are unoptimized globally). */}
+      {config?.imageUrl ? (
+        <div className="relative h-44 w-full sm:h-56">
+          <Image
+            src={config.imageUrl}
+            alt="Зимнее хранение мототехники"
+            fill
+            sizes="(max-width: 640px) 100vw, 480px"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" aria-hidden />
+        </div>
+      ) : null}
+      <div className="space-y-3 p-4">
       <p className="text-sm leading-relaxed" style={{ color: T.textMuted }}>
         Сдаёте мотоцикл на зиму — мы храним его в тёплом закрытом помещении
         ({address}): подзарядка АКБ, контроль давления в шинах, чехол и защита
@@ -416,6 +434,7 @@ function GuestOffer({
         Откройте {crewName} через Telegram-бота — и эта стена покажет именно ваши
         байки: статус, историю перемещений, оплаты и договор.
       </p>
+      </div>
     </div>
   );
 }

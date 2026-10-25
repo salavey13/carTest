@@ -77,8 +77,14 @@ export function storageMonthsCount(startRaw: unknown, endRaw: unknown): number {
 
 /**
  * Season presets for the order form: 15 октября → 1 июня (vip-bike season).
- * Before the season opens (≤ season start day-month) the current season is
- * offered; after — the next one.
+ * 2026-10-25 fix (boss: winter storage must WORK for moto-selection NOW):
+ * the old rule offered the NEXT season as soon as the start anchor passed —
+ * on Oct 25 (peak «put your bike away» weeks) the form pre-filled
+ * 2027-10-15 → 2028-06-01, i.e. a year ahead. New rule follows the real
+ * season window: while «now» sits between season start and season end
+ * (a cross-year season by default) the ONGOING season is offered; only the
+ * summer off-season gap (after the end anchor, before the start anchor)
+ * offers the upcoming one.
  *
  * Per-crew config may override the day-month anchors (MM-DD strings from
  * storage-config); invalid overrides fall back to the vip-bike defaults.
@@ -97,12 +103,33 @@ export function storageSeasonDefaults(
   const end = parse(seasonMMDD?.end, 6, 1);
 
   const y = now.getFullYear();
-  const seasonStartYear =
-    now.getTime() < new Date(y, start.month - 1, start.day).getTime() ? y : y + 1;
   const pad = (n: number) => String(n).padStart(2, "0");
+  // Day-of-year anchors as comparable "MM-DD" strings (lexicographic = calendar).
+  const nowMMDD = `${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const startMMDD = `${pad(start.month)}-${pad(start.day)}`;
+  const endMMDD = `${pad(end.month)}-${pad(end.day)}`;
+  const crossesYear = startMMDD > endMMDD;
+
+  // Which season window contains «now» (or starts next, when off-season)?
+  //  · cross-year (default 10-15 → 06-01): season Y..Y+1 covers
+  //    [Oct 1 Y .. Sep 30 Y+1] — inside it the START year is Y when now ≥
+  //    start anchor, Y-1 when now ≤ end anchor;
+  //  · same-year (hypothetical summer season): season fits inside year Y.
+  const seasonStartYear = crossesYear
+    ? nowMMDD >= startMMDD
+      ? y
+      : nowMMDD <= endMMDD
+        ? y - 1
+        : y
+    : nowMMDD < startMMDD || nowMMDD > endMMDD
+      ? nowMMDD < startMMDD
+        ? y
+        : y + 1
+      : y;
+
   return {
     start: `${seasonStartYear}-${pad(start.month)}-${pad(start.day)}`,
-    end: `${seasonStartYear + 1}-${pad(end.month)}-${pad(end.day)}`,
+    end: `${seasonStartYear + (crossesYear ? 1 : 0)}-${pad(end.month)}-${pad(end.day)}`,
   };
 }
 

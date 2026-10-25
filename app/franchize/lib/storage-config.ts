@@ -29,6 +29,12 @@ export interface StorageCrewConfig {
   seasonEndMMDD: string;
   /** What the keeper does during the season (offer views). */
   careDuties: string[];
+  /**
+   * Offer cover picture (guest offer on the storage wall). Optional: crews
+   * without one keep the text-only offer (vip-bike unchanged). Absolute URL,
+   * capped like addresses — moto-selection steals its tildacdn photo
+   * (boss 2026-10-25: «add picture btw to winter storage tab»). */
+  imageUrl?: string;
 }
 
 export const DEFAULT_STORAGE_ADDRESS = "Стригинский переулок, 13Б";
@@ -82,6 +88,13 @@ function sanitizeCareDuties(raw: unknown): string[] {
     .filter((item) => item.length > 0 && item.length <= 300)
     .slice(0, 12);
   return list;
+}
+
+/** Offer cover URL: absolute http(s) only, capped — anything else = absent. */
+function sanitizeStorageImageUrl(raw: unknown): string | undefined {
+  const value = String(raw ?? "").trim();
+  if (!/^https:\/\/[^\s"'<>]{8,600}$/i.test(value)) return undefined;
+  return value;
 }
 
 export interface ResolveStorageConfigOptions {
@@ -151,5 +164,6 @@ export function resolveStorageConfig(
       const list = sanitizeCareDuties(readPath(storage, ["careDuties"], []));
       return list.length > 0 ? list : DEFAULT_STORAGE_CARE_DUTIES;
     })(),
+    imageUrl: sanitizeStorageImageUrl(readPath(storage, ["imageUrl"], "")),
   };
 }
