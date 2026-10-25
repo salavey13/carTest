@@ -1320,3 +1320,21 @@ Stage Summary:
 - Крон-репликация В ПРОДАКШЕНЕ: скедулы стартуют автоматически, всё помечено [GHA], dedup-стейт живёт в cache. Неделя параллельной работы → VPS-кронтаб гасить (ночные дубли пропадут: 09:07/22:30 придут дважды — [GHA]-версия и безметочная VPS — так и задумано для диффа).
 - vercel.json: 2 слота Hobby теперь оба полезные — wall-renter-notify (04:00 UTC) + cleanup-wallpix-staging (03:30 UTC). Crypto-фид мёртв, но route-файл на месте (можно снести позже одним коммитом).
 - Открытый хвост: проверить select * from cron.job; в Supabase SQL editor — если daily-insights там жив, он стучится в мёртвый URL (v0-эпоха) и его надо перепривязать или убить.
+
+---
+## Task 21 iter3 — вечерние комиссии (verified rentals) + wall-fanout drain ≤2ч + вердикт по pg_cron
+
+Boss: (1) «retry at 4am? are you kidding?» по wall-renter-notify; (2) в evening-summary — кроме ЗП смен добавить комиссии с ПРОВЕРЕННЫХ аренд; (3) прислал дамп select * from cron.job.
+
+Work Log:
+- Автор «4am retry» установлен: Z User <z@container>, c9e4ef6e8 (wall v2, 2026-09-29) — ИИ-экипаж. Семантика: одноразовый суточный backstop (1 пост/прогон, бюджет 50с).
+- evening-summary.sh: новая секция «💸 ЗП с аренд (проверено)» после Смены. Данные: rental_verifications, status=verified, verified_at в MSK-окне дня (--date backfill учитывается). Сумма = математика payout hub commissionOf 1:1: negotiation.agreed.split → snapshot.total (>0) → parts base/equipment/overprice clamped ≥0. «выплачено» = payout.operator.marked (инфо-субтотал). Имена: operator_chat_id → snapshot.attribution.createdByChatId → users(user_id,username,full_name). Top-5 + «… ещё N». Тихо схлопывается при пустоте/42P01. JQ вынесен маркерами COMMISSION_JQ_START/END для вербатим-экстракции тестами.
+- tests/evening-summary-commissions.spec.ts (pure, без БД): 8 кейсов — тотал/группировка/paid-стемпы, negotiation override, parts fallback с clamp, attribution fallback, top-5+хвост, []→'', error object→'', garbage snapshot без краша. 11/11 вместе с prepayment spec; bash -n OK; вечерний dry-run на живых данных (run 40230655450) — секция корректно схлопнулась (за 2026-10-25 проверенных не было).
+- wall-renter-notify: authorized() принимает SUPABASE_SERVICE_ROLE_KEY как равный Bearer (parity полномочий; query-param остался CRON_SECRET-only — секреты не ездят в URL). Workflow 2h-слот гонит drain-вызов (curl -m 55, || true) → хвост фангаута ≤2ч днём; ночной хвост ловит Vercel 04:00 UTC. tsc-срез PASS, eslint PASS, 106 wall/notify тестов PASS.
+- pg_cron-вердикт (дамп босса): v0-car-test.vercel.app ЖИВОЙ и это текущий прод-алиас (wall-renter-notify там = 401, не 404). Но x-cron-secret «13131313» → 401 на daily-insights (тот же credential-модель у forward-telegram) → секрет УСТАРЕЛ: jobid 17 (daily-insights, 21:00 UTC) и 16 (sleep-reminder, 01:20 UTC) роняются ежедневно молча. jobid 2 «hourly»-advice-broadcast на самом деле daily 16:20 UTC → smooth-responder (реальный токен!) — вопрос к боссу. jobid 11 sync-stocks с Bearer «13» — мусор. jobid 10 backup_users_to_csv — живой, оставить. vip-bike.ru → 212.67.11.25 (nginx на рентальной VPS!) — при списании VPS домен надо переезжать.
+- Коммит 18cc326cd → main.
+
+Stage Summary:
+- Вечерний дайджест: ЗП смен + комиссии с проверенных аренд одной секцией, [GHA]-метка летит через send_telegram.
+- Wall-fanout: ≤2ч днём / ≤10ч ночью вместо ≤24ч. Деплой route-патча уедет с main автоматически.
+- Ждёт босса: cron.unschedule(17); cron.unschedule(16); решение по jobid 2/11; помнить про vip-bike.ru на .25.
