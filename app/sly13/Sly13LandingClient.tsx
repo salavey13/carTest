@@ -323,6 +323,55 @@ function ParallaxBg({
 }
 
 // ── Основной компонент ──────────────────────────────────────────────────────
+/**
+ * Гост-водяной знак секции — ДНК moto-selection.ru (тон Word/нумерал
+ * 175–250px ЗА контентом; на тёмных артбордах оригинал добавляет blur 2px),
+ * перекрашен в cyan-on-graphite SLY13 (6% акцента). На обычных секциях
+ * -z-10 внутри isolate-секции (ниже статического контента); на
+ * параллакс-актах above=true → z-[1]: ВЫШЕ фото-скрима, НИЖЕ контента (z-10).
+ */
+function SlyGhostWord({ word, above = false }: { word: string; above?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`font-jb pointer-events-none absolute -top-2 left-0 select-none whitespace-nowrap text-[13vw] font-extrabold uppercase leading-none tracking-tight sm:text-[8vw] ${above ? "z-[1]" : "-z-10"}`}
+      style={{ color: "color-mix(in srgb, var(--sly-accent) 6%, transparent)", filter: "blur(2px)" }}
+    >
+      {word}
+    </span>
+  );
+}
+
+/**
+ * Акцентная лента-бегущая строка между актами — ДНК t1003
+ * moto-selection.ru (50px, сплошной акцент, вордмарк-повторы), палитра
+ * SLY13: фон = акцент, текст = bgBase, шрифт JetBrains Mono. Две ленты на
+ * странице идут ВСТРЕЧНО (reverse у второй, как data-marquee-direction=
+ * "opposite" у оригинала). CSS-only, aria-hidden; reduced-motion гасит
+ * общий .sly-marquee-track.
+ */
+function SlyBrandTicker({ p, reverse = false }: { p: { accentMain: string; bgBase: string }; reverse?: boolean }) {
+  const items = [
+    "залил каталог — получил CRM",
+    "двойная книга денег",
+    "ai-воркер в команде",
+    "telegram mini app",
+    "SLY13",
+  ];
+  return (
+    <div aria-hidden className="overflow-hidden py-3.5" style={{ background: p.accentMain }}>
+      <div
+        className="sly-marquee-track font-jb flex w-max items-center gap-10 whitespace-nowrap pr-10 text-[13px] font-bold uppercase tracking-[0.2em]"
+        style={{ animation: `sly-marquee 20s linear infinite${reverse ? " reverse" : ""}`, color: p.bgBase }}
+      >
+        {[...items, ...items].map((t, i) => (
+          <span key={i}>{t}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Sly13LandingClient({ palette: p }: { palette: Palette }) {
   const auditRef = useRef<HTMLElement>(null);
   const aiRef = useRef<HTMLElement>(null);
@@ -372,6 +421,19 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           }
           @media (prefers-reduced-motion: reduce) {
             .sly-marquee-track, .sly-kenburns, .sly-float { animation: none !important; }
+          }
+          /* TV/клавиатурный паритет мыши-спотлайта: outline с offset,
+             НИКОГДА box-shadow внутри overflow-hidden (урок task139-iter2) */
+          .sly-root a:focus-visible, .sly-root button:focus-visible {
+            outline: 2px solid var(--sly-accent);
+            outline-offset: 2px;
+          }
+          /* карточный лифт: transform не двигает layout (без CLS на ТВ);
+             !important перекрывает inline borderColor карточек */
+          .sly-lift { transition: transform .3s ease, border-color .3s ease; }
+          .sly-lift:hover {
+            transform: translateY(-4px);
+            border-color: color-mix(in srgb, var(--sly-accent) 45%, var(--sly-border)) !important;
           }
         `}</style>
 
@@ -475,7 +537,10 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               <Reveal delay={0.15}>
                 <span
                   className="block text-[9.4vw] sm:text-6xl lg:text-7xl"
-                  style={{ color: "transparent", WebkitTextStroke: `1.5px ${p.textPrimary}99` }}
+                  style={{
+                    color: "color-mix(in srgb, var(--sly-text) 12%, transparent)",
+                    WebkitTextStroke: `1.5px ${p.textPrimary}99`,
+                  }}
                 >
                   платформа
                 </span>
@@ -498,7 +563,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </h1>
 
             <Reveal delay={0.35}>
-              <p className="mx-auto mt-7 max-w-2xl text-base leading-relaxed sm:text-lg" style={{ color: p.textPrimary }}>
+              <p className="mx-auto mt-7 max-w-2xl text-balance text-base leading-relaxed sm:text-lg" style={{ color: p.textPrimary }}>
                 Залил каталог — остальное достроит сама: витрина с корзиной и оплатой,
                 заявки из Авито и сайта, аренда с договорами и залогами, двойная книга
                 денег, смены и зарплаты команды. Тот самый «свой CRM», который обычно
@@ -598,9 +663,13 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           </div>
         </section>
 
+        {/* лента №1 (ДНК t1003): между героем и актами */}
+        <SlyBrandTicker p={p} />
+
         <main className="mx-auto w-full max-w-7xl space-y-24 px-4 pb-24 sm:px-6">
           {/* ── 01 · ПЛАТФОРМА (6 контуров + онбординг; промо PDF) ────────── */}
-          <section id="platform" className="scroll-mt-20 pt-8">
+          <section id="platform" className="relative isolate scroll-mt-20 overflow-hidden pt-8">
+            <SlyGhostWord word="платформа" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
                 01 · что такое платформа
@@ -653,7 +722,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               {CONTOURS.map((c, i) => (
                 <Reveal key={c.id} delay={0.04 + (i % 3) * 0.06}>
                   <SpotlightCard
-                    className="h-full rounded-2xl border p-6"
+                    className="sly-lift h-full rounded-2xl border p-6"
                     style={{ background: p.bgCard, borderColor: p.borderSoft }}
                   >
                     <div className="font-jb text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: p.accentMain }}>
@@ -703,9 +772,12 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           <section
             id="money"
             ref={auditRef}
-            className="relative -mx-4 overflow-hidden border-y px-4 py-20 sm:-mx-6 sm:px-6 sm:py-28"
+            className="relative isolate -mx-4 scroll-mt-20 overflow-hidden border-y px-4 py-20 sm:-mx-6 sm:px-6 sm:py-28"
             style={{ borderColor: p.borderSoft }}
           >
+            {/* гост-нумерал акта — ДНК «02» (250px/700) оригинала; above:
+                ВЫШЕ параллакс-фото, НИЖЕ контента */}
+            <SlyGhostWord word="02" above />
             <ParallaxBg
               targetRef={auditRef}
               src={IMG.money}
@@ -774,7 +846,8 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           </section>
 
           {/* ── 03 · ОДИН ДВИЖОК — ЛЮБОЙ БИЗНЕС ───────────────────────────── */}
-          <section id="any" className="scroll-mt-20">
+          <section id="any" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="сценарии" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
                 03 · сценарии
@@ -909,9 +982,10 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           <section
             id="ai"
             ref={aiRef}
-            className="relative -mx-4 overflow-hidden border-y px-4 py-20 sm:-mx-6 sm:px-6 sm:py-28"
+            className="relative isolate -mx-4 scroll-mt-20 overflow-hidden border-y px-4 py-20 sm:-mx-6 sm:px-6 sm:py-28"
             style={{ borderColor: p.borderSoft }}
           >
+            <SlyGhostWord word="04" above />
             <ParallaxBg
               targetRef={aiRef}
               src={IMG.ai}
@@ -962,7 +1036,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               <Reveal delay={0.15}>
                 <div className="mt-8 grid gap-4 md:grid-cols-2">
                   <SpotlightCard
-                    className="h-full rounded-2xl border p-6 backdrop-blur-sm"
+                    className="sly-lift h-full rounded-2xl border p-6 backdrop-blur-sm"
                     style={{ background: `${p.bgCard}D9`, borderColor: p.borderSoft }}
                   >
                     <h3 className="text-base font-bold" style={{ color: p.textPrimary }}>
@@ -976,7 +1050,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     </p>
                   </SpotlightCard>
                   <SpotlightCard
-                    className="h-full rounded-2xl border p-6 backdrop-blur-sm"
+                    className="sly-lift h-full rounded-2xl border p-6 backdrop-blur-sm"
                     style={{ background: `${p.bgCard}D9`, borderColor: p.borderSoft }}
                   >
                     <h3 className="text-base font-bold" style={{ color: p.textPrimary }}>
@@ -995,8 +1069,12 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </section>
 
+          {/* лента №2 — встречное направление (ДНК «opposite» оригинала) */}
+          <SlyBrandTicker p={p} reverse />
+
           {/* ── 05 · УСЛУГИ (обложки из каталога экипажа) ─────────────── */}
-          <section id="services" className="scroll-mt-20">
+          <section id="services" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="услуги" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
                 05 · услуги
@@ -1010,37 +1088,63 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 каталоге.
               </p>
             </Reveal>
-            <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
               {SERVICES.map((s, i) => (
                 <Reveal key={s.id} delay={0.05 + (i % 3) * 0.07}>
                   <SpotlightCard
-                    className="group h-full overflow-hidden rounded-2xl border transition-transform duration-300 hover:-translate-y-1"
+                    className="group relative h-full min-h-[340px] overflow-hidden rounded-2xl border transition-transform duration-300 hover:-translate-y-1"
                     style={{ background: p.bgCard, borderColor: p.borderSoft }}
                   >
-                    <div className="relative h-44 w-full overflow-hidden">
-                      <Image
-                        src={`${SB}/${s.id}/image_1_4x3.jpg`}
-                        alt={s.title}
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover transition duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" aria-hidden />
+                    <Image
+                      src={`${SB}/${s.id}/image_1_4x3.jpg`}
+                      alt=""
+                      aria-hidden
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover transition duration-500 group-hover:scale-105"
+                    />
+                    {/* графит-стекло: ДНК карточек moto-selection.ru
+                        (чёрный 60% + backdrop-blur 5px) в палитре SLY13;
+                        без blur-поддержки остаётся graphite 72% — читается */}
+                    <div
+                      className="absolute inset-0"
+                      aria-hidden
+                      style={{
+                        background: "rgba(15,20,25,0.72)",
+                        backdropFilter: "blur(5px)",
+                        WebkitBackdropFilter: "blur(5px)",
+                      }}
+                    />
+                    <span
+                      className="font-jb absolute right-3 top-3 z-10 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                      style={{ background: p.accentMain, color: p.bgBase }}
+                    >
+                      {s.price}
+                    </span>
+                    <div className="relative z-10 flex h-full flex-col items-center p-6 text-center">
+                      {/* гост-нумерал из-под верхнего края — как на карточках
+                          услуг moto-selection (цифры до 250px), cyan */}
                       <span
-                        className="font-jb absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold"
-                        style={{ background: p.accentMain, color: p.bgBase }}
+                        aria-hidden
+                        className="font-jb pointer-events-none -mt-10 select-none text-[72px] font-extrabold leading-none"
+                        style={{ color: `${p.accentMain}B3` }}
                       >
-                        {s.price}
+                        {String(i + 1).padStart(2, "0")}
                       </span>
-                    </div>
-                    <div className="p-5">
-                      <h3 className="text-base font-bold leading-snug">{s.title}</h3>
-                      <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      <h3 className="mt-2 text-base font-bold uppercase leading-snug">{s.title}</h3>
+                      <p className="mt-2 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
                         {s.text}
                       </p>
-                      <p className="font-jb mt-3 text-[11px] uppercase tracking-[0.18em]" style={{ color: p.accentMain }}>
+                      <p className="font-jb mt-2 text-[11px] uppercase tracking-[0.18em]" style={{ color: p.accentMain }}>
                         {s.tag}
                       </p>
+                      <Link
+                        href="/franchize/sly13"
+                        className="mt-auto inline-flex h-11 w-[200px] items-center justify-center self-center rounded-full text-[11px] font-bold uppercase tracking-[0.08em] transition hover:brightness-110"
+                        style={{ background: p.accentMain, color: p.bgBase, marginTop: "auto" }}
+                      >
+                        Оформить в каталоге
+                      </Link>
                     </div>
                   </SpotlightCard>
                 </Reveal>
@@ -1064,8 +1168,9 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
           </section>
 
-          {/* ── 05 · ПАРТНЁРЫ (cross-link с /moto-selection) ──────────────── */}
-          <section id="partners" className="scroll-mt-20">
+          {/* ── 06 · ПАРТНЁРЫ (cross-link с /moto-selection) ──────────────── */}
+          <section id="partners" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="партнёры" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
                 06 · партнёры

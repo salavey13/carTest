@@ -94,7 +94,10 @@ const PHONE_HREF = "tel:+79875570444";
 const PHONE_TEXT = "+7 (987) 557-04-44";
 const WHATSAPP_HREF = "https://wa.me/79875570444";
 const TELEGRAM_HREF = "https://t.me/romani14";
-const EMAIL = "moto-selection@yandex.ru";
+// 2026-10-26 boss: «correct moto-selection email is: Sanderkoff@yandex.ru» —
+// replaces the previously guessed address (moto-selection@) everywhere on the
+// landing (header, contact block, footer, socials row).
+const EMAIL = "Sanderkoff@yandex.ru";
 const SOURCE_SITE = "https://moto-selection.ru";
 // Гранд-труф с оригинала (ms.html / ms-history.html, 2026-10-25):
 const SOCIAL_INSTAGRAM = "https://instagram.com/moto.selection";
@@ -270,6 +273,33 @@ const NAV_LINKS = [
   { href: "#contact", label: "Контакты" },
 ];
 
+/**
+ * ДНК оригинала (block t1003, 50px, #ff7522): оранжевая бегущая строка
+ * MOTO.SELECTION. На оригинале две строки с встречными направлениями
+ * (data-marquee-direction="opposite") — здесь реверс включается флагом.
+ * CSS-only (ms-marquee 0→-50%), контент задвоен для бесшовного стыка,
+ * pr компенсирует gap на шве (как у бегущей строки городов).
+ * aria-hidden — декоративный элемент, prefers-reduced-motion гасит
+ * (общий media-блок выше таргетит .ms-marquee-track).
+ */
+function MsBrandTicker({ reverse = false }: { reverse?: boolean }) {
+  const seq = Array.from({ length: 8 }, () => "MOTO.SELECTION");
+  return (
+    <div aria-hidden className="overflow-hidden bg-[var(--ms-accent)] py-3">
+      <div
+        className="ms-marquee-track flex w-max items-center gap-10 whitespace-nowrap pr-10"
+        style={{ animation: `ms-marquee 22s linear infinite${reverse ? " reverse" : ""}` }}
+      >
+        {[...seq, ...seq].map((t, i) => (
+          <span key={i} className="text-sm font-bold uppercase tracking-[0.2em] text-white">
+            {t}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function MotoSelectionLanding() {
   return (
     <div className="ms-root min-h-screen bg-black text-white" style={{ ["--ms-accent" as string]: BRAND }}>
@@ -291,18 +321,21 @@ export default function MotoSelectionLanding() {
         }
       `}</style>
 
-      {/* ── NAV ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/70 backdrop-blur-xl">
+      {/* ── NAV ── ДНК оригинала (rec499418588): сплошная ОРАНЖЕВАЯ полоса
+          навигации с белыми uppercase-ссылками — самый узнаваемый хром
+          оригинала. (до 2026-10-26 была чёрная стеклянная — boss: «align
+          our /moto-selection more to moto-selection.ru») */}
+      <header className="sticky top-0 z-50 bg-[var(--ms-accent)]">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link href="/moto-selection" className="flex items-center gap-1.5 whitespace-nowrap text-sm font-black uppercase tracking-[0.18em] text-white">
-            Moto<span className="text-[var(--ms-accent)]">.</span>selection
+            Moto<span className="text-black/80">.</span>selection
           </Link>
           <nav aria-label="Основная навигация" className="hidden items-center gap-6 md:flex">
             {NAV_LINKS.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60 transition hover:text-[var(--ms-accent)]"
+                className="text-xs font-semibold uppercase tracking-[0.14em] text-white/90 transition hover:text-black"
               >
                 {l.label}
               </a>
@@ -316,7 +349,7 @@ export default function MotoSelectionLanding() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Telegram"
-              className="hidden text-white/50 transition hover:text-[var(--ms-accent)] md:inline-flex"
+              className="hidden text-white/80 transition hover:text-black md:inline-flex"
             >
               <Send className="h-4 w-4" aria-hidden />
             </a>
@@ -325,22 +358,21 @@ export default function MotoSelectionLanding() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram"
-              className="hidden text-white/50 transition hover:text-[var(--ms-accent)] md:inline-flex"
+              className="hidden text-white/80 transition hover:text-black md:inline-flex"
             >
               <Instagram className="h-4 w-4" aria-hidden />
             </a>
             <a
               href={PHONE_HREF}
-              className="hidden text-sm font-bold text-white transition hover:text-[var(--ms-accent)] sm:inline-flex sm:items-center sm:gap-1.5"
+              className="hidden text-sm font-bold text-white transition hover:text-black sm:inline-flex sm:items-center sm:gap-1.5"
             >
-              <Phone className="h-4 w-4 text-[var(--ms-accent)]" aria-hidden />
+              <Phone className="h-4 w-4 text-black/80" aria-hidden />
               {PHONE_TEXT}
             </a>
             <button
               type="button"
               data-lead-modal-open
-              className="inline-flex h-10 items-center rounded-full px-4 text-xs font-black uppercase tracking-[0.1em] text-black transition hover:brightness-110 active:scale-95"
-              style={{ background: "linear-gradient(135deg, #ffa770 0%, #ff7522 65%)" }}
+              className="inline-flex h-10 items-center rounded-full bg-white px-4 text-xs font-black uppercase tracking-[0.1em] text-black transition hover:brightness-95 active:scale-95"
             >
               Заявка
             </button>
@@ -441,7 +473,7 @@ export default function MotoSelectionLanding() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
             <a
               href="#about"
-              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
             >
               Подробнее о нас
               <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -482,80 +514,114 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
-      {/* ── НАШИ УСЛУГИ ─────────────────────────────────────────────────── */}
-      <section id="services" className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
-        <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">наши услуги</p>
-        <h2 className="mt-3 max-w-2xl text-3xl font-black uppercase leading-tight tracking-tight text-white sm:text-4xl">
-          Всё для мотоцикла — в одном месте
-        </h2>
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/60 sm:text-base">
-          Семь направлений: от первого занятия и выбора байка до хранения зимой и детейлинга весной.
-          Цены и оформление заказа — на карточках и в каталоге экипажа на платформе.
-        </p>
+      {/* ── НАШИ УСЛУГИ ── ДНК оригинала rec499421781: гигантское гост-слово
+          «наши услуги» (195px/900) ЗА сеткой тёмных стеклянных карточек.
+          У оригинала артборд белый (#dbdbdb@0.4), витрина тёмная → тонировку
+          даёт белый на ≤8% альфы (Part A.4/A.5 REA, 2026-10-27). */}
+      <section id="services" className="relative scroll-mt-20 overflow-hidden">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-4 left-0 z-0 select-none whitespace-nowrap text-[13vw] font-black uppercase leading-none tracking-tight text-white/[0.06] sm:text-[10vw]"
+        >
+          наши услуги
+        </span>
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">
+            7 направлений — от обучения до эвакуации
+          </p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-black uppercase leading-tight tracking-tight text-white sm:text-4xl">
+            Всё для мотоцикла — в одном месте
+          </h2>
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/60 sm:text-base">
+            Семь направлений: от первого занятия и выбора байка до хранения зимой и детейлинга весной.
+            Цены и оформление заказа — на карточках и в каталоге экипажа на платформе.
+          </p>
 
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map((s, svcIdx) => (
-            <a
-              key={s.id}
-              href={s.anchor}
-              className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] transition hover:border-[var(--ms-accent)]/60 hover:bg-white/[0.07]"
-            >
-              {s.img ? (
-                <div className="relative h-44 w-full overflow-hidden">
+          {/* Анатомия карточки — 1:1 с оригиналом (A.4): фото на всю карточку →
+              фирменное «стекло» (чёрный 60% + backdrop-blur 5px) → гостовый
+              нумерал, наполовину выходящий за верхний край → заголовок 18px/400
+              uppercase по центру → оранжевая пилюля ПОДРОБНЕЕ (200×48, белый
+              текст). У эвакуации вместо фото — фирменный градиент, стекло поверх.
+              Без поддержки backdrop-filter остаётся чёрный 60% — карточка читается. */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
+            {SERVICES.map((s, svcIdx) => (
+              <a
+                key={s.id}
+                href={s.anchor}
+                className="group relative flex min-h-[320px] flex-col overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.04] transition hover:border-[var(--ms-accent)]/60"
+              >
+                {s.img ? (
                   <Image
                     src={s.img}
-                    alt={s.title}
+                    alt=""
+                    aria-hidden
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="object-cover transition duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" aria-hidden />
-                </div>
-              ) : (
-                // Эвакуация — единственная услуга без фото на оригинале:
-                // фирменный оранжевый блок с иконкой вместо картинки.
+                ) : (
+                  // Эвакуация — единственная услуга без фото на оригинале:
+                  // фирменный оранжевый блок с иконкой вместо картинки.
+                  <div className="absolute inset-0" aria-hidden style={{ background: `linear-gradient(135deg, ${BRAND} 0%, #c24e0d 100%)` }}>
+                    <Truck className="absolute right-5 top-5 h-14 w-14 text-black/70" aria-hidden />
+                    <span className="absolute right-5 top-24 rounded-full bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+                      24/7
+                    </span>
+                  </div>
+                )}
+                {/* фирменное стекло оригинала: чёрный 60% + blur(5px) */}
                 <div
-                  className="relative flex h-44 w-full items-center justify-center overflow-hidden"
-                  style={{ background: `linear-gradient(135deg, ${BRAND} 0%, #c24e0d 100%)` }}
-                >
-                  <Truck className="h-16 w-16 text-black/80" aria-hidden />
-                  <span className="absolute right-4 top-4 rounded-full bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
-                    24/7
-                  </span>
-                </div>
-              )}
-              <div className="relative flex flex-1 flex-col p-5">
-                {/* ДНК оригинала: крупные порядковые числа на услугах
-                    (01–07 в Tilda-верстке) — гостовые нумералы в углу карточки,
-                    подсвечиваются акцентом при ховере. */}
-                <span
+                  className="absolute inset-0"
                   aria-hidden
-                  className="pointer-events-none absolute -bottom-1 right-3 select-none text-6xl font-black leading-none tracking-tighter text-white/[0.05] transition duration-300 group-hover:text-[var(--ms-accent)]/20"
-                >
-                  {String(svcIdx + 1).padStart(2, "0")}
-                </span>
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base font-bold leading-snug text-white">{s.title}</h3>
+                  style={{
+                    background: "rgba(0,0,0,0.6)",
+                    backdropFilter: "blur(5px)",
+                    WebkitBackdropFilter: "blur(5px)",
+                  }}
+                />
+                <div className="relative z-10 flex flex-1 flex-col items-center p-6 text-center">
+                  {/* нумерал наполовину «выходит» из-под верхнего края карточки
+                      (оригинал: 120px, top = card − 53px); overflow-hidden срезает
+                      верхнюю часть — эффект появления из-за кромки */}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none -mt-12 select-none text-[88px] font-bold leading-none text-white/85 transition duration-300 group-hover:text-[var(--ms-accent)] sm:text-[110px]"
+                  >
+                    {String(svcIdx + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="mt-2 text-lg font-normal uppercase leading-snug text-white">{s.title}</h3>
                   {s.price && (
-                    <span className="shrink-0 rounded-full bg-[var(--ms-accent)] px-2.5 py-1 text-[11px] font-bold text-black">
+                    <span className="mt-2 rounded-full border border-white/25 px-3 py-1 text-[11px] font-semibold text-white/85">
                       {s.price}
                     </span>
                   )}
+                  <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-white/55">{s.text}</p>
+                  <span
+                    className="mt-auto inline-flex h-12 w-[200px] items-center justify-center self-center rounded-[30px] bg-[var(--ms-accent)] text-xs font-semibold uppercase tracking-[0.08em] text-white transition group-hover:brightness-110"
+                    style={{ marginTop: "auto" }}
+                  >
+                    Подробнее
+                  </span>
                 </div>
-                <p className="mt-2 text-sm leading-relaxed text-white/60">{s.text}</p>
-                <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-accent)]">
-                  Подробнее
-                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                </span>
-              </div>
-            </a>
-          ))}
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── АКАДЕМИЯ ────────────────────────────────────────────────────── */}
-      <section id="academy" className="border-t border-white/10 bg-white/[0.02]">
-        <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-2 lg:items-center">
+      {/* бегущая строка №1 (оригинал: между услугами и академией) */}
+      <MsBrandTicker />
+
+      {/* ── АКАДЕМИЯ ── ДНК rec499500838: гост-слово «академия» 250px за блоком */}
+      <section id="academy" className="relative scroll-mt-20 overflow-hidden border-t border-white/10 bg-white/[0.02]">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-0 top-6 z-0 select-none whitespace-nowrap text-[16vw] font-black uppercase leading-none tracking-tight text-white/[0.04] sm:text-[9rem]"
+          style={{ filter: "blur(2px)" }}
+        >
+          академия
+        </span>
+        <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">академия</p>
             <h2 className="mt-3 text-3xl font-black uppercase leading-tight tracking-tight text-white sm:text-4xl">
@@ -589,12 +655,12 @@ export default function MotoSelectionLanding() {
               href={ACADEMY_HREF}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-8 inline-flex h-12 items-center justify-center rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+              className="mt-8 inline-flex h-12 items-center justify-center rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
             >
               Узнать подробнее и записаться на первое занятие
             </a>
           </div>
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a]">
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#f2efea]">
             <Image
               src={IMG.academyLogo}
               alt="Автомотоспорт «Академия» — партнёр Moto.selection"
@@ -608,7 +674,19 @@ export default function MotoSelectionLanding() {
       </section>
 
       {/* ── ЦЕНЫ: подбор / осмотр / аренда ─────────────────────────────── */}
-      <section id="prices" className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+      {/* ── ЦЕНЫ ── ДНК rec499505669: гостовый нумерал «02» (250px/700) за
+          карточками + КВАДРАТНЫЕ (radius 0) оранжевые CTA — оригинал
+          сознательно смешивает язык кнопок: пилюли в карточках услуг,
+          квадрат на ценовых секциях */}
+      <section id="prices" className="relative scroll-mt-20 overflow-hidden">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-4 top-0 z-0 select-none font-bold leading-none text-white/[0.04] sm:text-[15rem]"
+          style={{ fontSize: "clamp(9rem, 18vw, 15rem)" }}
+        >
+          02
+        </span>
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
         <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">
           подбор мотоцикла, покупка, перевозка, аренда
         </p>
@@ -623,7 +701,7 @@ export default function MotoSelectionLanding() {
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ms-accent)]">{p.tag}</span>
-                <span className="rounded-full bg-[var(--ms-accent)] px-3 py-1 text-xs font-bold text-black">{p.price}</span>
+                <span className="rounded-full bg-[var(--ms-accent)] px-3 py-1 text-xs font-bold text-white">{p.price}</span>
               </div>
               <h3 className="mt-4 text-lg font-bold leading-snug text-white">{p.title}</h3>
               <ul className="mt-4 flex-1 space-y-3">
@@ -634,22 +712,25 @@ export default function MotoSelectionLanding() {
                   </li>
                 ))}
               </ul>
+              {/* ДНК rec499505669: квадратный (radius 0) оранжевый CTA
+                  на ценовых секциях — белый текст, без рамки */}
               <button
                 type="button"
                 data-lead-modal-open
-                className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-white/20 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)] active:scale-95"
+                className="mt-6 inline-flex h-11 items-center justify-center rounded-none bg-[var(--ms-accent)] text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:brightness-110 active:scale-95"
               >
                 Оставить заявку
               </button>
             </div>
           ))}
         </div>
+        </div>
       </section>
 
       {/* ── ДОБАВЛЕННАЯ УСЛУГА: ЭВАКУАЦИЯ 24/7 ─────────────────────────── */}
       {/* Запрос босса «Add one more service section». Данные — из каталога
           экипажа moto-selection на платформе (service, от 3 500 ₽, 24/7). */}
-      <section id="evac" className="relative overflow-hidden border-y border-white/10">
+      <section id="evac" className="relative scroll-mt-20 overflow-hidden border-y border-white/10">
         <div
           className="absolute inset-0"
           style={{ background: `linear-gradient(120deg, ${BRAND} 0%, #b34709 55%, #1a0d05 100%)` }}
@@ -695,8 +776,16 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
-      {/* ── ЗИМНЕЕ ХРАНЕНИЕ ────────────────────────────────────────────── */}
-      <section id="storage" className="relative overflow-hidden">
+      {/* ── ЗИМНЕЕ ХРАНЕНИЕ ── ДНК rec499509630: гостовый нумерал «05» за контентом */}
+      <section id="storage" className="relative scroll-mt-20 overflow-hidden">
+        {/* гост-нумерал ВЫШЕ фото-скрима (z-[1]) и НИЖЕ контента (z-10) */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-4 top-6 z-[1] select-none font-bold leading-none text-white/[0.05]"
+          style={{ fontSize: "clamp(9rem, 18vw, 15rem)" }}
+        >
+          05
+        </span>
         <div className="absolute inset-0" aria-hidden>
           <Image
             src={IMG.storage}
@@ -707,7 +796,7 @@ export default function MotoSelectionLanding() {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/50" />
         </div>
-        <div className="relative mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+            <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="max-w-2xl">
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">
               зимнее хранение мототехники
@@ -728,12 +817,12 @@ export default function MotoSelectionLanding() {
               </p>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              <span className="inline-flex items-center rounded-full bg-[var(--ms-accent)] px-5 py-2.5 text-lg font-black text-black">
+              <span className="inline-flex items-center rounded-full bg-[var(--ms-accent)] px-5 py-2.5 text-lg font-black text-white">
                 от 2 000 ₽
               </span>
               <a
                 href="#contact"
-                className="inline-flex h-12 items-center justify-center rounded-full border border-white/25 px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)] active:scale-95"
+                className="inline-flex h-12 items-center justify-center rounded-none bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
               >
                 Оставить заявку
               </a>
@@ -759,7 +848,7 @@ export default function MotoSelectionLanding() {
                   href={TG_STORAGE_DEEPLINK}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--ms-accent)] px-6 text-xs font-bold uppercase tracking-[0.1em] text-black transition hover:brightness-110 active:scale-95"
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--ms-accent)] px-6 text-xs font-bold uppercase tracking-[0.1em] text-white transition hover:brightness-110 active:scale-95"
                 >
                   <Send className="h-4 w-4" aria-hidden />
                   Хранение в Telegram
@@ -778,7 +867,7 @@ export default function MotoSelectionLanding() {
       </section>
 
       {/* ── ДЕТЕЙЛИНГ И КАСТОМИЗАЦИЯ ───────────────────────────────────── */}
-      <section id="detailing" className="relative overflow-hidden border-y border-white/10">
+      <section id="detailing" className="relative scroll-mt-20 overflow-hidden border-y border-white/10">
         <div className="absolute inset-0" aria-hidden>
           <Image
             src={IMG.detailing}
@@ -803,7 +892,7 @@ export default function MotoSelectionLanding() {
             <ul className="mt-5 space-y-3">
               {DETAILING_STEPS.map((step, i) => (
                 <li key={step} className="flex items-start gap-3 text-sm leading-relaxed text-white/75 sm:text-base">
-                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ms-accent)] text-xs font-black text-black">
+                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ms-accent)] text-xs font-black text-white">
                     {i + 1}
                   </span>
                   {step}
@@ -811,12 +900,12 @@ export default function MotoSelectionLanding() {
               ))}
             </ul>
             <div className="mt-8 flex flex-wrap items-center gap-4">
-              <span className="inline-flex items-center rounded-full bg-[var(--ms-accent)] px-5 py-2.5 text-lg font-black text-black">
+              <span className="inline-flex items-center rounded-full bg-[var(--ms-accent)] px-5 py-2.5 text-lg font-black text-white">
                 от 5 000 ₽
               </span>
               <a
                 href="#contact"
-                className="inline-flex h-12 items-center justify-center rounded-full border border-white/25 px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:border-[var(--ms-accent)] hover:text-[var(--ms-accent)] active:scale-95"
+                className="inline-flex h-12 items-center justify-center rounded-none bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
               >
                 Оставить заявку
               </a>
@@ -825,8 +914,17 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
-      {/* ── О НАС ───────────────────────────────────────────────────────── */}
-      <section id="about" className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+      {/* ── О НАС ── ДНК rec499516429: гост-слово «о нас» (175px/900 #2b2b2b
+          + blur 2px на оригинале) за контентом тёмной секции */}
+      <section id="about" className="relative scroll-mt-20 overflow-hidden">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-2 left-0 z-0 select-none whitespace-nowrap text-[11rem] font-black uppercase leading-none tracking-tight text-white/[0.05] sm:text-[13rem]"
+          style={{ filter: "blur(2px)" }}
+        >
+          о нас
+        </span>
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="grid gap-10 lg:grid-cols-[auto_1fr] lg:items-center lg:gap-16">
           <div className="relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 lg:w-96">
             <Image
@@ -866,7 +964,7 @@ export default function MotoSelectionLanding() {
                   /history — на платформе её зеркалит /moto-selection/history */}
               <Link
                 href={HISTORY_HREF}
-                className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
               >
                 Читать нашу историю
               </Link>
@@ -879,11 +977,24 @@ export default function MotoSelectionLanding() {
             </div>
           </div>
         </div>
+        </div>
       </section>
 
-      {/* ── ОТЗЫВЫ ──────────────────────────────────────────────────────── */}
-      <section id="reviews" className="border-y border-white/10 bg-white/[0.02]">
-        <div className="mx-auto w-full max-w-7xl px-4 py-16 text-center sm:px-6 sm:py-20">
+      {/* бегущая строка №2 — встречное направление (оригинал: между
+          детейлингом и отзывами, data-marquee-direction="opposite") */}
+      <MsBrandTicker reverse />
+
+      {/* ── ОТЗЫВЫ ── ДНК rec499409110: гост-слово «отзывы» (175px/900 #292929
+          + blur 2px) за центрированным контентом */}
+      <section id="reviews" className="relative scroll-mt-20 overflow-hidden border-y border-white/10 bg-white/[0.02]">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-2 left-0 z-0 select-none whitespace-nowrap text-[11rem] font-black uppercase leading-none tracking-tight text-white/[0.05] sm:text-[13rem]"
+          style={{ filter: "blur(2px)" }}
+        >
+          отзывы
+        </span>
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-16 text-center sm:px-6 sm:py-20">
           <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">отзывы клиентов</p>
           <blockquote className="mx-auto mt-4 max-w-3xl text-xl font-bold leading-snug text-white/90 sm:text-2xl">
             «Мы уже помогли осуществить мечту людей по всей России»
@@ -911,8 +1022,9 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
-      {/* ── ПАРТНЁРЫ ────────────────────────────────────────────────────── */}
-      <section id="partners" className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+      {/* ── ПАРТНЁРЫ ── оригинал rec499500560: белый артборд, у нас тёмная
+          витрина — остались карточки-логотипы */}
+      <section id="partners" className="relative scroll-mt-20 mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <p className="text-center text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">
           наши партнеры
         </p>
@@ -932,11 +1044,14 @@ export default function MotoSelectionLanding() {
               className="h-auto w-48 object-contain transition group-hover:scale-105"
             />
           </a>
+          {/* 2026-10-26 boss: лого Академии имеет ЧЁРНЫЙ текст на прозрачной
+              части — на тёмной подложке он пропадал; лёгкий тёплый тинт
+              возвращает контраст (у Байкленд своё фото, не задето). */}
           <a
             href={ACADEMY_SITE}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 transition hover:border-[var(--ms-accent)]/60"
+            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#f2efea] p-6 transition hover:border-[var(--ms-accent)]/60"
           >
             <Image
               src={IMG.academyLogo}
@@ -975,8 +1090,10 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
-      {/* ── КОНТАКТЫ / ЗАЯВКА ──────────────────────────────────────────── */}
-      <section id="contact" className="border-t border-white/10 bg-white/[0.02]">
+      {/* ── КОНТАКТЫ / ЗАЯВКА ── ДНК rec499515450: лид-форма на тёмно-синей
+          полосе #0f131c (у оригинала это единственный не-чисто-чёрный тёмный
+          артборд — намеренный тональный акцент перед подвалом) */}
+      <section id="contact" className="scroll-mt-20 border-t border-white/10 bg-[#0f131c]">
         <div className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">контакты</p>
@@ -993,7 +1110,7 @@ export default function MotoSelectionLanding() {
             <button
               type="button"
               data-lead-modal-open
-              className="mx-auto mt-8 flex h-14 w-full max-w-sm items-center justify-center rounded-2xl text-sm font-black uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+              className="mx-auto mt-8 flex h-14 w-full max-w-sm items-center justify-center rounded-2xl text-sm font-black uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
               style={{ background: "linear-gradient(135deg, #ffa770 0%, #ff7522 65%)" }}
             >
               Заполнить форму заявки
@@ -1003,7 +1120,7 @@ export default function MotoSelectionLanding() {
                 href={TELEGRAM_HREF}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--ms-accent)] text-sm font-bold uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
+                className="group flex h-14 items-center justify-center gap-2 rounded-2xl bg-[var(--ms-accent)] text-sm font-bold uppercase tracking-[0.08em] text-white transition hover:brightness-110 active:scale-95"
               >
                 <Send className="h-4 w-4" aria-hidden /> Telegram
               </a>
@@ -1085,14 +1202,14 @@ export default function MotoSelectionLanding() {
         </p>
       </div>
 
-      {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-      <footer className="border-t border-white/10 bg-black">
+      {/* ── FOOTER ── ДНК rec499421521: #111111 + мелкий принт #707070 */}
+      <footer className="border-t border-white/10 bg-[#111111]">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:grid-cols-3 sm:px-6">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.18em] text-white">
               Moto<span className="text-[var(--ms-accent)]">.</span>selection
             </p>
-            <p className="mt-3 text-xs leading-relaxed text-white/40">
+            <p className="mt-3 text-xs leading-relaxed text-[#707070]">
               © Moto.selection, 2022–2026. Копия официального сайта{" "}
               <a href={SOURCE_SITE} target="_blank" rel="noopener noreferrer" className="underline decoration-dotted underline-offset-4 hover:text-white/70">
                 moto-selection.ru
@@ -1101,7 +1218,7 @@ export default function MotoSelectionLanding() {
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">контакты</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#707070]">контакты</p>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li><a href={PHONE_HREF} className="transition hover:text-[var(--ms-accent)]">{PHONE_TEXT}</a></li>
               <li><a href={`mailto:${EMAIL}`} className="transition hover:text-[var(--ms-accent)]">{EMAIL}</a></li>
@@ -1110,7 +1227,7 @@ export default function MotoSelectionLanding() {
             </ul>
             {/* «мы в соцсетях» — блок оригинала: Telegram, Mail, Phone, WhatsApp
                 + Instagram / YouTube / VK из иконок страницы */}
-            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">мы в соцсетях</p>
+            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#707070]">мы в соцсетях</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {[
                 { href: TELEGRAM_HREF, label: "Telegram", Icon: Send },
@@ -1135,7 +1252,7 @@ export default function MotoSelectionLanding() {
             </div>
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">города</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#707070]">города</p>
             <p className="mt-3 text-xs leading-relaxed text-white/50">{CITIES.join(" · ")}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {NAV_LINKS.map((l) => (
@@ -1147,6 +1264,37 @@ export default function MotoSelectionLanding() {
           </div>
         </div>
       </footer>
+
+      {/* Плавающий виджет связи — ДНК t825 оригинала («СВЯЖИТЕСЬ С НАМИ»:
+          Telegram / WhatsApp / Звонок; Mail живёт в контактах и подвале).
+          Фикс. правый нижний угол, z-40 (модалка — z-120, выше виджета). */}
+      <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-2">
+        <a
+          href={TELEGRAM_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Написать в Telegram"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--ms-accent)] text-white shadow-lg shadow-black/50 transition hover:brightness-110 active:scale-95"
+        >
+          <Send className="h-5 w-5" aria-hidden />
+        </a>
+        <a
+          href={WHATSAPP_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Написать в WhatsApp"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--ms-accent)] text-white shadow-lg shadow-black/50 transition hover:brightness-110 active:scale-95"
+        >
+          <MessageCircle className="h-5 w-5" aria-hidden />
+        </a>
+        <a
+          href={PHONE_HREF}
+          aria-label="Позвонить"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--ms-accent)] text-white shadow-lg shadow-black/50 transition hover:brightness-110 active:scale-95"
+        >
+          <Phone className="h-5 w-5" aria-hidden />
+        </a>
+      </div>
 
       {/* Модальная форма заявки (Имя + Телефон + согласие) →
           /api/franchize/callback-lead → CRM экипажа moto-selection +

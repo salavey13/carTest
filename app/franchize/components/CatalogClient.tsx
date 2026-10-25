@@ -398,6 +398,26 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
   return typeof qty === "number" && qty > 1;
 }
 
+/**
+ * task 139 iter3 — full-card hover highlight (PC only).
+ * The highlighted state used to paint ONLY the info strip at the bottom
+ * (~28% of the card — boss: «highlight looks like 30% narrower then
+ * needed», «not related to border»). On PC the accent now covers the
+ * WHOLE card: a tinted wash over the photo plus a gradient that blends
+ * it into the solid-accent info area below. md: gate keeps touch
+ * hover-lock from stranding a tint on phones. Pair with the accent
+ * info-strip fill + hover border; the keyboard/TV focus outline
+ * (interactionCardFocusStyle) is a separate mechanism and stays.
+ */
+function CatalogHoverWash() {
+  return (
+    <>
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-20 md:block" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-24 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-70 md:block" />
+    </>
+  );
+}
+
 function ComboOfferCard({
   item,
   crew,
@@ -460,6 +480,7 @@ function ComboOfferCard({
               Фото загружается
             </div>
           )}
+          <CatalogHoverWash />
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-accent)] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)] shadow-sm">
             <Layers className="h-3 w-3" aria-hidden />
             Комбо · коллекция
@@ -1625,6 +1646,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
                           )}
                           {/* Speed / spec badge on image (rentalbikes-style) */}
+                          <CatalogHoverWash />
                           {specChips.length > 0 && (
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {specChips.slice(0, 2).map((spec, si) => (
@@ -1775,6 +1797,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
                           )}
                           {/* Spec badges on image (rentalbikes-style speedometer) */}
+                          <CatalogHoverWash />
                           {visibleSpecs.length > 0 && (
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {visibleSpecs.slice(0, 3).map((spec, index) => (

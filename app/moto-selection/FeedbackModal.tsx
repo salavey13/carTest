@@ -186,7 +186,7 @@ export default function FeedbackModal({
                 className="inline-flex h-16 w-16 items-center justify-center rounded-full"
                 style={{ background: `linear-gradient(135deg, ${accent.brandSoft}, ${accent.brand})` }}
               >
-                <Check className="h-8 w-8 text-black" aria-hidden />
+                <Check className="h-8 w-8 text-white" aria-hidden />
               </span>
               <h3 className="mt-5 text-xl font-black uppercase tracking-tight text-white">
                 Заявка отправлена!
@@ -270,7 +270,7 @@ export default function FeedbackModal({
                 <button
                   type="submit"
                   disabled={phase === "sending"}
-                  className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-full py-3.5 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                  className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-full py-3.5 text-sm font-black uppercase tracking-[0.1em] text-white transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
                   style={{ background: `linear-gradient(135deg, ${accent.brandSoft} 0%, ${accent.brand} 65%)` }}
                 >
                   {phase === "sending" ? (

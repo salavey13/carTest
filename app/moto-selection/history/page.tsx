@@ -54,7 +54,9 @@ const PHONE_HREF = "tel:+79875570444";
 const PHONE_TEXT = "+7 (987) 557-04-44";
 const PHONE_EXTRA_HREF = "tel:+79101496868";
 const PHONE_EXTRA_TEXT = "+7 (910) 149-68-68";
-const EMAIL = "moto-selection@yandex.ru";
+// 2026-10-26 boss: правильная почта — Sanderkoff@yandex.ru (была угаданная
+// moto-selection@yandex.ru).
+const EMAIL = "Sanderkoff@yandex.ru";
 const TELEGRAM_HREF = "https://t.me/romani14";
 const SOCIAL_INSTAGRAM = "https://instagram.com/moto.selection";
 const SOCIAL_YOUTUBE = "https://www.youtube.com/channel/UCS6_8H7BjW3AC-VHfUV0sYw";
