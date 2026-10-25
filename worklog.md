@@ -1231,3 +1231,19 @@ Work Log:
 
 Stage Summary:
 - vip-bike = 3rd illustrated crew; whole catalog's services now have images. Scripts: scripts/{gen-vipbike-services.sh,upload-vipbike-service-images.mjs,verify-service-images.mjs,inspect-vipbike.mjs}.
+
+---
+Task ID: 18-nearest-hour-pickup-default
+Agent: main (Z.ai, IM session web-ebfeeaf7)
+Task: boss — «период аренды - время выдачи» in the item modal (main franchize catalog) defaults to 10am — default it to the nearest hour instead (13:40 → 14:00); date is already preset, just fix the time.
+
+Work Log:
+- New helper app/franchize/lib/date-utils.ts: nearestHourHhMm() — LOCAL wall clock rounded UP to the next flat hour (13:40→14:00, sharp 13:00 stays, 09:59→10:00); 23:xx clamps to 23:00 (start date is today, 00:00-tomorrow pickup would contradict it). Boundary matrix 8/8.
+- All FIVE default sites switched in CatalogClient.tsx: selectedOptions init (→ lazy useState initializer), openItem defaults, edit-cart-line fallback, ?vehicle= deep link, share-link ?startTime/?endTime prefill (end falls back to the START value so end<start stays impossible when URL has only startTime). start===end keeps «same datetime = 1 day minimum» pricing semantics.
+- Item.tsx modal fallback state: useState(nearestHourHhMm) ×2; pricing-math ||"10:00" fallbacks for CLEARED inputs left as-is (not initial defaults).
+- Env wiped again mid-task → re-cloned with PAT; node_modules absent → npm install (lockfile churn reverted before commit).
+- Verify: typecheck:franchize PASS (0 debt), lint:target PASS, 165 vitest tests across 9 suites (cart, promo, iter16, hotfix-string-prices, winter-storage, item-share, testdrive-flash, storage-wall, task133) PASS.
+- Committed ad9692f32 → pushed main (no remote drift).
+
+Stage Summary:
+- «Время выдачи» now opens at the nearest flat hour of the renter's watch; operator sees round slots on the sheet. Ships on next Vercel deploy.
