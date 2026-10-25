@@ -37,6 +37,13 @@
 # this, an hourly reminder would re-alert the same rental on every run instead
 # of once per 12h like on the VPS.
 #
+# WALL FANOUT DRAIN (piggyback on the 2h slot): the Vercel cron
+# wall-renter-notify retries stuck crew-post fanouts only ONCE A DAY at
+# 04:00 UTC — boss's verdict: «retry at 4am? are you kidding?». The 2h slot
+# now also calls that endpoint (Bearer = service key, accepted by the route
+# as an equal credential), so a stuck notify_job lags ≤2h during the day;
+# the overnight gap is covered by the Vercel 04:00 UTC backstop.
+#
 # CSV sync reuses the repo's own scripts (scripts/export_vip_bike_*.py +
 # scripts/push_*_csv.py, plain git push) — auth via the workflow GITHUB_TOKEN.
 #
@@ -166,6 +173,15 @@ jobs:
               echo "--- rentals CSV sync ---"
               python3 scripts/export_vip_bike_rentals.py
               python3 scripts/push_rentals_csv.py
+              echo "--- wall fanout drain (stuck notify_job ≤2h instead of ≤24h) ---"
+              # Route accepts the service key as an equal credential (see
+              # app/api/cron/wall-renter-notify/route.ts authorized()). One
+              # post per call (50s budget server-side); the rest waits for
+              # the next slot. Non-fatal: an old deployment without the
+              # service-key auth just 401s here.
+              curl -s -m 55 \
+                -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+                https://v0-car-test.vercel.app/api/cron/wall-renter-notify || true
               ;;
             catalog-csv)
               python3 scripts/export_vip_bike_csv.py

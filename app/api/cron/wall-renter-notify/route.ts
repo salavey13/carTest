@@ -44,7 +44,19 @@ function authorized(req: NextRequest): boolean {
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const bearer = authHeader.slice("Bearer ".length).trim();
-    for (const secret of [process.env.CRON_SECRET]) {
+    // CRON_SECRET — the classic cron credential. SUPABASE_SERVICE_ROLE_KEY —
+    // accepted as an EQUAL credential for the GitHub Actions cron piggyback
+    // (boss 2026-10-26: «retry at 4am? are you kidding?»): the 2h Actions slot
+    // drains stuck notify_jobs so a fanout lags ≤2h in daytime instead of
+    // ≤24h. The Actions runner already holds the service key — no second
+    // secret to provision/rotate, Vercel env untouched. Power parity: anyone
+    // holding the service key already owns the whole DB, so this endpoint
+    // grants it nothing new. The query-param path stays CRON_SECRET-only —
+    // URLs leak into logs, headers don't.
+    for (const secret of [
+      process.env.CRON_SECRET,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ]) {
       if (secret && tokenMatches(bearer, secret)) return true;
     }
   }

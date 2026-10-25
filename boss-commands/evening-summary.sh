@@ -2,7 +2,8 @@
 # /home/z/my-project/analytics/boss-commands/evening-summary.sh
 #
 # Boss command: evening-summary
-# Sends an end-of-day KPI digest: rentals/sales/services + shifts/equipment.
+# Sends an end-of-day KPI digest: rentals/sales/services + shifts/equipment
+# + commissions from rentals VERIFIED today (payout-hub math) + prepayments.
 # Designed to run at 21:00 Moscow daily.
 #
 # Output: Telegram message to ADMIN_CHAT_ID
@@ -258,6 +259,96 @@ PREPAY_SECTION=$(echo "$PREPAY_DATA" | jq -r '
   end
 ' 2>/dev/null || echo "")
 
+# ─── Verified-rental commissions (boss request: «besides salary for shift
+# hours — include commissions from verified rentals») ────────────────────────
+# rental_verifications rows that became VERIFIED inside the digest window
+# (verified_at in the MSK day). Amount mirrors the payout hub math EXACTLY
+# (app/franchize/lib/rental-payout-core.ts commissionOf):
+#   1. negotiation.agreed.split (base+equipment+overprice) — a task-106 deal
+#      corrected the frozen split → agreed numbers win;
+#   2. else snapshot.total — the canonical computeRentalSalary output, when
+#      it is a positive number;
+#   3. else snapshot.base/equipment/overprice each clamped ≥0 and summed
+#      (old/hand-made backfill rows without total).
+# paid = payout.operator.marked (the one-tap «выплачено» stamp) — shown as an
+# informational subtotal, rows count regardless of the stamp.
+# Operator name: operator_chat_id, falling back to snapshot attribution
+# created_by (the same chain the сверка DM uses); resolved via users table.
+# Graceful degradation: if rental_verifications is not applied (42P01) the
+# query returns a PostgREST error object → non-array → empty section, the
+# digest renders exactly as before this block existed.
+VERIF_DATA=$(supabase_query "rental_verifications" \
+  "select=rental_id,operator_chat_id,owner_chat_id,verified_at,snapshot,negotiation,payout&crew_id=eq.${CREW_ID}&status=eq.verified&verified_at=gte.${START_UTC}&verified_at=lte.${END_UTC}&order=verified_at.asc&limit=200")
+
+# Operator chat ids (with the attribution fallback) → users lookup for names.
+OPER_IDS=$(echo "$VERIF_DATA" | jq -r '
+  [.[]?
+   | (((.operator_chat_id // "") | tostring),
+      (((.snapshot // {}) | (if type == "object" then . else {} end)
+        | (.attribution // {}) | (if type == "object" then . else {} end)
+        | (.createdByChatId // "")) | tostring))]
+  | map(select(length > 0)) | unique | .[]' 2>/dev/null || true)
+
+USERS_DATA='[]'
+if [[ -n "$OPER_IDS" ]]; then
+  USERS_DATA=$(supabase_query "users" \
+    "select=user_id,username,full_name&user_id=in.${OPER_IDS// /,}")
+fi
+# Names payload must ALWAYS be a JSON array for --argjson (a PostgREST error
+# object here must not kill the whole section — names just fall back to ids).
+USERS_DATA=$(echo "$USERS_DATA" | jq -c 'if type == "array" then . else [] end' 2>/dev/null || echo '[]')
+
+# COMMISSION_JQ_START (extracted verbatim by tests/evening-summary-commissions.spec.ts)
+COMMISSION_SECTION=$(echo "$VERIF_DATA" | jq -r --argjson users "$USERS_DATA" '
+  if type != "array" then ""
+  else
+    def obj: if type == "object" then . else {} end;
+    def num: tonumber? // 0;
+    def nonneg: (num | if . < 0 then 0 else . end);
+    def split_total: (((.base // 0) | num) + ((.equipment // 0) | num) + ((.overprice // 0) | num));
+    # Payout-hub commissionOf: agreed negotiation split → snapshot.total → parts sum.
+    def commission:
+      ((.negotiation // {}) | obj | (.agreed // {}) | obj | (.split // {}) | obj) as $agreed
+      | if ($agreed | length) > 0 then ($agreed | split_total)
+        else (.snapshot // {}) | obj as $s
+          | (($s.total // 0) | num) as $t
+          | if $t > 0 then $t
+            else ({base: (($s.base // 0) | nonneg),
+                   equipment: (($s.equipment // 0) | nonneg),
+                   overprice: (($s.overprice // 0) | nonneg)} | split_total)
+            end
+        end;
+    ($users | map({((.user_id // "") | tostring): ((.username // .full_name // ""))})
+             | add // {}) as $names
+    | [.[]
+       | ((.operator_chat_id // "") | tostring) as $oc
+       | (((.snapshot // {}) | obj | (.attribution // {}) | obj
+           | (.createdByChatId // "")) | tostring) as $attr
+       | {op: (if ($oc | length) > 0 then $oc else $attr end),
+          amt: commission,
+          paid: ((((.payout // {}) | obj | (.operator // {}) | obj | (.marked // false))) == true)}]
+    | map(select(.amt > 0))
+    | if length == 0 then ""
+      else
+        ([.[].amt] | add // 0 | round) as $total
+        | ([.[] | select(.paid) | .amt] | add // 0 | round) as $paid
+        | (group_by(.op) | map({op: .[0].op, amt: ([.[].amt] | add // 0), n: length})
+           | sort_by(-.amt)) as $sorted
+        | (["Проверено: \(length) · комиссий: \($total) ₽\(if $paid > 0 then " · выплачено: \($paid) ₽" else "" end)"] +
+           [$sorted[0:5][] |
+             (.op | tostring) as $opid
+             | (if $opid == "" then "Без оператора"
+                else (($names[$opid] // "")
+                      | if . == "" then "оператор …\($opid | if length > 4 then .[-4:] else . end)" else . end)
+                end) as $nm
+             | "• \($nm): \(.amt | round) ₽ (\(.n))"] +
+           (if ($sorted | length) > 5 then ["… ещё \(($sorted | length) - 5)"] else [] end))
+        | join("\n")
+      end
+  end
+' 2>/dev/null || echo "")
+# COMMISSION_JQ_END
+
 # ─── Total revenue ───────────────────────────────────────────────────────────
 # Day total = rentals (started-today, see RENTALS_TODAY) + sales + CLIENT
 # services + equipment ISSUED TODAY. Internal/crew services (no
@@ -373,6 +464,16 @@ ${PREPAY_SECTION}
 "
 fi
 
+# Commissions block: only occupies message space when something became
+# verified today (an empty COMMISSION_SECTION collapses to the old layout).
+COMMISSION_BLOCK=""
+if [[ -n "$COMMISSION_SECTION" ]]; then
+  COMMISSION_BLOCK="
+<b>💸 ЗП с аренд (проверено):</b>
+${COMMISSION_SECTION}
+"
+fi
+
 RENTALS_LINK="$(analytics_link "rentals" "$TODAY")"
 SALES_LINK="$(analytics_link "sales" "$TODAY")"
 SERVICES_LINK="$(analytics_link "services" "$TODAY")"
@@ -390,7 +491,7 @@ ${SERVICE_KPIS}
 
 <b>🕒 Смены</b>
 ${SHIFT_KPIS}
-
+${COMMISSION_BLOCK}
 <b>🧥 Экипировка</b> — на складе ${EQUIP_STOCK}
 ${EQUIP_KPIS}
 ${PREPAY_BLOCK}
