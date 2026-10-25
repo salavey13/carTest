@@ -52,6 +52,11 @@ const IMG = {
   ai: `${SB}/ural-bobber/image_1.jpg`,
   cta: `${SB}/suzuki-vzr1800-boulevard-2006/image_1.jpg`,
   motoHero: "https://static.tildacdn.com/tild3739-3737-4761-a335-353163363963/harley-davidson-ride.jpg",
+  // full-screen «передышки» (boss 2026-10-27: «wall of text — we need full
+  // screen rest picture sections») — та же студийная electro-серия с неоном,
+  // что у актов 02/04: золото ведёт в «деньги», аэро с cyan-трубой — в AI.
+  restGold: `${SB}/ducati-panigale-s-electro-gold/image_1.jpg`,
+  restAero: `${SB}/ducati-panigale-s-electro-black-aero/image_1.jpg`,
 };
 
 // Telegram Mini App deep links (boss 2026-10-25): партнёрский блок ведёт в
@@ -297,24 +302,29 @@ function SpotlightCard({
   );
 }
 
-/** Фоновая картинка секции с мягким параллаксом (scroll-linked). */
+/** Фоновая картинка секции с мягким параллаксом (scroll-linked).
+ *  imageClassName: класс поверх object-cover (по умолчанию приглушённые
+ *  opacity-45 под текстовые акты; полноэкранные передышки зовут с более
+ *  сильной прозрачностью — картинка там сама контент). */
 function ParallaxBg({
   targetRef,
   src,
   scrim,
   glow,
+  imageClassName = "opacity-45",
 }: {
   targetRef: React.RefObject<HTMLElement | null>;
   src: string;
   scrim: string;
   glow?: string;
+  imageClassName?: string;
 }) {
   const { scrollYProgress } = useScroll({ target: targetRef, offset: ["start end", "end start"] });
   const y = useTransform(scrollYProgress, [0, 1], ["-9%", "9%"]);
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden>
       <motion.div style={{ y }} className="absolute -inset-y-[10%] inset-x-0">
-        <Image src={src} alt="" fill sizes="100vw" className="object-cover opacity-45" />
+        <Image src={src} alt="" fill sizes="100vw" className={`object-cover ${imageClassName}`} />
       </motion.div>
       <div className="absolute inset-0" style={{ background: scrim }} />
       {glow && <div className="absolute inset-0" style={{ background: glow }} />}
@@ -376,11 +386,14 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
   const auditRef = useRef<HTMLElement>(null);
   const aiRef = useRef<HTMLElement>(null);
   const ctaRef = useRef<HTMLElement>(null);
+  // полноэкранные передышки (rest-акты) — параллаксу нужны свои таргеты
+  const restGoldRef = useRef<HTMLElement>(null);
+  const restAeroRef = useRef<HTMLElement>(null);
 
   return (
     <MotionConfig reducedMotion="user">
       <div
-        className="sly-root min-h-screen"
+        className="sly-root min-h-screen overflow-x-clip"
         style={{
           ["--sly-bg" as string]: p.bgBase,
           ["--sly-card" as string]: p.bgCard,
@@ -768,6 +781,42 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
           </section>
 
+          {/* ── ПЕРЕДЫШКА · ЗОЛОТО ── full-screen picture break (boss 2026-10-27:
+              лендинг «wall of text» — между текстовыми секциями нужны
+              полноэкранные картинки-передышки). Ноль карточек, одна mono-строка;
+              фото электросерии — то же неоновое семейство, что у актов 02/04.
+              Золотая трубка и золотые диски ведут в следующий акт — «деньги».
+              mx-calc(50%-50vw) = истинный full-bleed на любую ширину (внутри
+              max-w-7xl-колонки), горизонтальный перелив от скроллбара гасит
+              overflow-x-clip на .sly-root (clip НЕ создаёт scroll-контейнер —
+              sticky-навигация продолжает липнуть к вьюпорту). */}
+          <section
+            ref={restGoldRef}
+            className="relative isolate mx-[calc(50%-50vw)] flex h-[100svh] min-h-[560px] items-end overflow-hidden"
+          >
+            <ParallaxBg
+              targetRef={restGoldRef}
+              src={IMG.restGold}
+              imageClassName="opacity-90"
+              scrim={`linear-gradient(to bottom, ${p.bgBase} 0%, ${p.bgBase}14 20%, ${p.bgBase}14 70%, ${p.bgBase} 100%)`}
+              glow={`radial-gradient(46% 52% at 18% 42%, ${p.accentMain}12 0%, transparent 70%)`}
+            />
+            <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-14 sm:px-6 sm:pb-20">
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                sly13 · передышка
+              </p>
+              <p className="font-jb mt-2 text-2xl font-extrabold uppercase leading-tight tracking-tight sm:text-4xl" style={{ color: p.textPrimary }}>
+                Прокат как <span style={{ color: p.accentMain }}>система</span>
+              </p>
+              <p
+                className="font-jb mt-3 text-[10px] uppercase leading-relaxed tracking-[0.22em] sm:text-[11px]"
+                style={{ color: p.textSecondary }}
+              >
+                витрина · лиды · аренда · деньги · команда · аналитика
+              </p>
+            </div>
+          </section>
+
           {/* ── 02 · ДЕНЬГИ (picture background + параллакс) ──────────────── */}
           <section
             id="money"
@@ -975,6 +1024,36 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   </ul>
                 </SpotlightCard>
               </Reveal>
+            </div>
+          </section>
+
+          {/* ── ПЕРЕДЫШКА · CYAN ── вторая передышка (boss 2026-10-27): аэро
+              Panigale с cyan-трубой и дымом — чистый вход в мир AI-акта.
+              Строка-тизер следующей секции, без карточек и списков. */}
+          <section
+            ref={restAeroRef}
+            className="relative isolate mx-[calc(50%-50vw)] flex h-[100svh] min-h-[560px] items-end overflow-hidden"
+          >
+            <ParallaxBg
+              targetRef={restAeroRef}
+              src={IMG.restAero}
+              imageClassName="opacity-90"
+              scrim={`linear-gradient(to bottom, ${p.bgBase} 0%, ${p.bgBase}14 20%, ${p.bgBase}14 70%, ${p.bgBase} 100%)`}
+              glow={`radial-gradient(46% 52% at 12% 40%, ${p.accentMain}1A 0%, transparent 70%)`}
+            />
+            <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-14 sm:px-6 sm:pb-20">
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                sly13 · передышка
+              </p>
+              <p className="font-jb mt-2 text-2xl font-extrabold uppercase leading-tight tracking-tight sm:text-4xl" style={{ color: p.textPrimary }}>
+                Бот <span style={{ color: p.accentMain }}>не спит</span>
+              </p>
+              <p
+                className="font-jb mt-3 text-[10px] uppercase leading-relaxed tracking-[0.22em] sm:text-[11px]"
+                style={{ color: p.textSecondary }}
+              >
+                команды голосом и текстом · сводка за день в 21:00
+              </p>
             </div>
           </section>
 

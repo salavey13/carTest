@@ -75,8 +75,11 @@ describe("task140 — /moto-selection DNA alignment", () => {
   });
 
   it("service cards = original glass anatomy: full-bleed photo + black 60% + blur(5px) + edge numeral + 200px pill", () => {
-    expect(moto).toContain('background: "rgba(0,0,0,0.6)"');
-    expect(moto).toContain('backdropFilter: "blur(5px)"');
+    // 2026-10-27 (task141): glass moved from inline style to the .ms-glass CSS
+    // class — the hover-unblur transition (ground-truth behavior) needs real
+    // CSS; inline styles can't express :hover. Recipe itself unchanged.
+    expect(moto).toContain("background: rgba(0,0,0,0.6);");
+    expect(moto).toContain("backdrop-filter: blur(5px);");
     expect(moto).toContain("rounded-[20px]");
     // numeral emerges from under the card's top edge (original: top = card − 53px)
     expect(moto).toContain("-mt-12 select-none text-[88px] font-bold leading-none text-white/85");
@@ -138,8 +141,10 @@ describe("task140 — /moto-selection DNA alignment", () => {
     expect(moto).toContain(`const EMAIL = "${email}"`);
     expect(motoHistory).toContain(`const EMAIL = "${email}"`);
     expect(moto).not.toContain("moto-selection@yandex.ru");
-    // light tinted bg behind the transparent PNG with dark text (both usages)
-    expect((moto.match(/bg-\[#f2efea\]/g) ?? []).length).toBe(2);
+    // light tinted bg behind transparent logos with dark text — usages:
+    // АКАДЕМИЯ big image + АКАДЕМИЯ partner card + (2026-10-27, task141)
+    // Байкленд partner card (black-orange SVG logo, same recipe)
+    expect((moto.match(/bg-\[#f2efea\]/g) ?? []).length).toBe(3);
   });
 });
 

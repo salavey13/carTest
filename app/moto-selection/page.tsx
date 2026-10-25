@@ -71,7 +71,6 @@ const IMG = {
   detailing: `${T}/tild3662-6533-4431-a132-646161323463/4362862179014284_4d4.jpg`,
   academyLogo: `${T}/tild3237-3337-4732-a131-616361336230/VboLB5caDbrEwJdRviGc.png`,
   owner: `${T}/tild3830-6138-4362-b062-633738323463/IMG_54971.jpg`,
-  partnerBikeland: `${T}/tild6332-3437-4639-b864-626262356466/a85d6fbe3e31832458bb.jpg`,
 } as const;
 
 const BRAND = "#ff7522";
@@ -108,6 +107,10 @@ const REVIEWS_VK_HREF = "https://vk.com/vip_bike";
 // партнёры: ссылки прямо с оригинала (кнопка АКАДЕМИЯ в шапке и блок партнёров)
 const ACADEMY_HREF = "https://school.academy.cr/vzroslye/#b890948";
 const ACADEMY_SITE = "https://academy.cr/";
+// 2026-10-27 boss: Байкленд в партнёрах — прозрачный SVG-логотип, тот же
+// ассет, что висит в партнёрском блоке корневого vip-bike лендинга
+// (app/page.tsx) — hotlink как там, единый источник правды.
+const BIKELAND_LOGO_SVG = "https://bikeland.ru/local/templates/2019/svg/logo.svg";
 const BIKELAND_HREF = "https://bikeland.ru/";
 const HISTORY_HREF = "/moto-selection/history";
 
@@ -316,6 +319,24 @@ export default function MotoSelectionLanding() {
         }
         @keyframes ms-kenburns { 0% { transform: scale(1) translateY(0); } 100% { transform: scale(1.12) translateY(-1.5%); } }
         @keyframes ms-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        /* Фирменное стекло карточек услуг (чёрный 60% + blur 5px). 2026-10-27
+           boss: на ground truth moto-selection.ru при ховере картинка
+           РАЗМЫТИЕ СНИМАЕТСЯ — плавно blur(5px)→blur(0) под курсором.
+           Гейт hover:hover + pointer:fine = PC-only (тач не страндирует
+           размытое состояние, как в каталоге с wash md:block). Тёмная
+           подложка 60% остаётся — контраст текста не деградирует. */
+        .ms-glass {
+          background: rgba(0,0,0,0.6);
+          -webkit-backdrop-filter: blur(5px);
+          backdrop-filter: blur(5px);
+          transition: -webkit-backdrop-filter 0.5s ease, backdrop-filter 0.5s ease;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .group:hover .ms-glass {
+            -webkit-backdrop-filter: blur(0px);
+            backdrop-filter: blur(0px);
+          }
+        }
         @media (prefers-reduced-motion: reduce) {
           .ms-kenburns, .ms-marquee-track { animation: none !important; }
         }
@@ -569,16 +590,9 @@ export default function MotoSelectionLanding() {
                     </span>
                   </div>
                 )}
-                {/* фирменное стекло оригинала: чёрный 60% + blur(5px) */}
-                <div
-                  className="absolute inset-0"
-                  aria-hidden
-                  style={{
-                    background: "rgba(0,0,0,0.6)",
-                    backdropFilter: "blur(5px)",
-                    WebkitBackdropFilter: "blur(5px)",
-                  }}
-                />
+                {/* фирменное стекло оригинала: чёрный 60% + blur(5px);
+                    ховер снимает размытие (.ms-glass в <style> выше) */}
+                <div className="ms-glass absolute inset-0" aria-hidden />
                 <div className="relative z-10 flex flex-1 flex-col items-center p-6 text-center">
                   {/* нумерал наполовину «выходит» из-под верхнего края карточки
                       (оригинал: 120px, top = card − 53px); overflow-hidden срезает
@@ -1029,17 +1043,25 @@ export default function MotoSelectionLanding() {
           наши партнеры
         </p>
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {/* 2026-10-27 boss: картина Байкленд (900×900 JPG с заливкой) →
+              прозрачный SVG-логотип с посадочной /vipbikerental (партнёрский
+              блок корневого лендинга, bikeland.ru/local/templates/2019/svg/
+              logo.svg) — «will look cooler and more simmetrical with other
+              partners images». Лого ЧЁРНО-ОРАНЖЕЕ на прозрачном → та же
+              светлая подложка #f2efea, что у Академии (на bg-black чёрный
+              текст пропал бы). unoptimized: SVG мимо next-оптимайзера. */}
           <a
             href={BIKELAND_HREF}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black p-6 transition hover:border-[var(--ms-accent)]/60"
+            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#f2efea] p-6 transition hover:border-[var(--ms-accent)]/60"
           >
             <Image
-              src={IMG.partnerBikeland}
+              src={BIKELAND_LOGO_SVG}
               alt="Байкленд — партнёр Moto.selection"
-              width={300}
-              height={300}
+              width={480}
+              height={267}
+              unoptimized
               sizes="(max-width: 640px) 100vw, 300px"
               className="h-auto w-48 object-contain transition group-hover:scale-105"
             />

@@ -105,7 +105,10 @@ export default function MotoSelectionHistoryPage() {
         </div>
       </header>
 
-      {/* ── HERO ИСТОРИИ ────────────────────────────────────────────────── */}
+      {/* ── HERO ИСТОРИИ ── гост-слово «история» (B-P3.5, та же ДНК-рецептура
+          размытых гостей, что на главной; ВЫШЕ фото+скримов — контейнер
+          без z, гость после него по DOM = рисуется поверх, под контентом
+          z-10) ───────────────────────────────────────────────── */}
       <section className="relative flex min-h-[52svh] items-end overflow-hidden border-b border-white/10">
         <div className="absolute inset-0" aria-hidden>
           <div
@@ -137,6 +140,12 @@ export default function MotoSelectionHistoryPage() {
           />
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-black" />
         </div>
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-4 right-0 select-none whitespace-nowrap text-[16vw] font-black uppercase leading-none tracking-tight text-white/[0.05] blur-[2px] sm:text-[11vw]"
+        >
+          история
+        </span>
         <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-14 pt-24 sm:px-6">
           <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">история</p>
           <h1 className="max-w-3xl text-3xl font-black uppercase leading-[1.05] tracking-tight text-white sm:text-5xl">
