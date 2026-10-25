@@ -2492,6 +2492,7 @@ export function ItemModal({
                           onChange={(e) => setTestdriveDate(e.target.value)}
                           onClick={openNativePicker}
                           className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]`}
+                          style={{ colorScheme: T.isLight ? "light" : "dark" }}
                           aria-label="Дата тест-драйва"
                         />
                       </label>
@@ -2503,6 +2504,7 @@ export function ItemModal({
                           onChange={(e) => setTestdriveTime(e.target.value)}
                           onClick={openNativePicker}
                           className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]`}
+                          style={{ colorScheme: T.isLight ? "light" : "dark" }}
                           aria-label="Время тест-драйва"
                         />
                       </label>
