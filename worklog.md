@@ -1299,3 +1299,24 @@ Work Log:
 
 Stage Summary:
 - Крон-репликация готова на 99%: секреты стоят, YAML запушен в docs — нужен только paste в .github/workflows/ (или токен с workflow scope). Заявки с обеих витрин летят в CRM + Telegram. Скрипты VPS можно гасить после недели параллельной работы Actions.
+
+---
+## Task 21 iter2 — cron workflow SHIPPED (PAT с workflow scope), [GHA]-маркировка, crypto-слот → wallpix cleanup
+
+Boss выдал PAT с workflow scope (github_pat_11BAJ…VRBBF4S5) и попросил: (1) самому положить YAML в .github/workflows/; (2) маркировать уведомления из нового источника, чтобы отличать от VPS-крона; (3) ответить — детерминированы ли кроны, нет ли AI-вызовов; (4) crypto-prices слот освобождён boss'ом (obsolete) — заменить чем-то полезным; (5) рассказать, что такое wall-renter-notify.
+
+Work Log:
+- wall-renter-notify изучен (app/api/cron/wall-renter-notify/route.ts + lib): это страховка фангаут-рассылки постов стены прошлым арендаторам. Обычно рассылку запускает клиентский kick сразу после публикации (maxDuration=60); если вкладку закрыли/таймаут — пост остаётся с metadata.notify_job queued/running, и крон Vercel ежедневно в 04:00 UTC (07:00 MSK) подхватывает ОДИН пост за прогон (бюджет 50с, окно 7 дней, bounded fetch 300). Появился в c9e4ef6e8 (wall v2 fanout). Полностью детерминированный.
+- AI-вызовы: НЕТ нигде в крон-путях. Grep по boss-commands/, app/api/cron/, wall-renter-notify lib → единственный «хит» — комментарии «CLAUDE.md: …» (конвенции кодинга) в evening-summary.sh. Все джобы = SQL (PostgREST) + jq + curl в Telegram Bot API. daily-insights (Supabase pg_cron-задумка) тоже детерминированный, и его документированный SQL-скедул указывает на мёртвый v0-car-test.vercel.app — живьём вряд ли стреляет (босс может проверить: select * from cron.job;).
+- Обнаружена регрессия: cleanup-wallpix-staging ВЫПАЛ из vercel.json crons в 0bccd3020 (payout hub коммит случайно снёс запись) — route жив, а скедула нет: staging-мусор wallpix (TTL 48h) никто не чистил. Освобождённый crypto-слот отдан ему: «30 3 * * *» (03:30 UTC), как в его же док-комментарии. fetch-crypto-prices: крон-запись + functions-конфиг + identity-rewrite убраны (route-файл оставлен для ручных вызовов).
+- boss-commands/_lib.sh: source_tag() — при CRON_SOURCE≠∅ все send_telegram/send_telegram_keyboard получают префикс «[GHA] ». VPS-копии переменную не ставят → остаются без метки (legacy). Экспорт функции добавлен в export -f список.
+- .github/workflows/vip-bike-cron.yml (канонический, запушен): 6 скедулов 1:1 с VPS crontab; CRON_SOURCE=GHA на Run job step; actions/cache restore/save для /tmp/boss-alerts-state.json (дейли-ротация ключа boss-alerts-YYYY-MM-DD, restore-keys fallback, if: always() на save) — иначе на эфемерных раннерах dedup-кулдауны (returns-reminder 12ч, overdue-alert 4ч, watchdogs 12ч) сбрасывались бы каждый прогон → hourly-спам вместо 1 напоминания/12ч как на VPS. concurrency cancel-in-progress=false — прогонов-гонок на кэше нет.
+- docs/crewDocs/vip-bike-cron.workflow.yml → заглушка-указатель (история сохранена, канон теперь .github/workflows/).
+- Verify: bash -n _lib.sh OK; YAML/JSON parse OK; мок-тест маркера ([GHA] тег есть/нет) OK; vitest tests/evening-summary-prepayment.spec.ts 3 passed / 5 skipped (скипы ждут VPS secrets-файл — by design).
+- PUSH: git push origin main → SUCCESS (PAT с workflow scope работает; repo редиректит на salavey13/carTest). Коммит 8b83cfa86.
+- Live-пруф: workflow_dispatch morning-standup dry_run=false → run #1 (40226105438) ALL GREEN, «Sent morning-standup notification to chat ***» — реальный [GHA]-тегнутый дайджест доставлен в TG босса за ~40с. Cache save отработал.
+
+Stage Summary:
+- Крон-репликация В ПРОДАКШЕНЕ: скедулы стартуют автоматически, всё помечено [GHA], dedup-стейт живёт в cache. Неделя параллельной работы → VPS-кронтаб гасить (ночные дубли пропадут: 09:07/22:30 придут дважды — [GHA]-версия и безметочная VPS — так и задумано для диффа).
+- vercel.json: 2 слота Hobby теперь оба полезные — wall-renter-notify (04:00 UTC) + cleanup-wallpix-staging (03:30 UTC). Crypto-фид мёртв, но route-файл на месте (можно снести позже одним коммитом).
+- Открытый хвост: проверить select * from cron.job; в Supabase SQL editor — если daily-insights там жив, он стучится в мёртвый URL (v0-эпоха) и его надо перепривязать или убить.
