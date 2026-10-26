@@ -1,0 +1,227 @@
+{
+ "generatedAt": "2026-10-26T18:30:00Z",
+ "months": [
+  {
+   "key": "Апрель",
+   "revenue": 30000,
+   "deals": 1,
+   "svc": 1,
+   "svcSum": 2000
+  },
+  {
+   "key": "Май",
+   "revenue": 75000,
+   "deals": 15,
+   "svc": 0,
+   "svcSum": 0
+  },
+  {
+   "key": "Июнь",
+   "revenue": 350000,
+   "deals": 44,
+   "svc": 0,
+   "svcSum": 0
+  },
+  {
+   "key": "Июль",
+   "revenue": 562641,
+   "deals": 48,
+   "svc": 0,
+   "svcSum": 0
+  },
+  {
+   "key": "Август",
+   "revenue": 354153,
+   "deals": 47,
+   "svc": 34,
+   "svcSum": 22575
+  },
+  {
+   "key": "Сентябрь",
+   "revenue": 648088,
+   "deals": 90,
+   "svc": 38,
+   "svcSum": 32300
+  },
+  {
+   "key": "Октябрь",
+   "revenue": 310050,
+   "deals": 36,
+   "svc": 1,
+   "svcSum": 10
+  }
+ ],
+ "statusMix": {
+  "completed": 355,
+  "active": 0,
+  "cancelled": 14,
+  "pending": 5
+ },
+ "gearRevenue": 11500,
+ "depositHeld": 1465000,
+ "fleet": [
+  {
+   "name": "Kawasaki EX650K (Ninja 650)",
+   "revenue": 270000,
+   "deals": 27,
+   "days": 20.0
+  },
+  {
+   "name": "BMW F800R",
+   "revenue": 250800,
+   "deals": 24,
+   "days": 11.4
+  },
+  {
+   "name": "Ducati Panigale S Electro Black Z",
+   "revenue": 225469,
+   "deals": 33,
+   "days": 18.8
+  },
+  {
+   "name": "Sequence Zero",
+   "revenue": 187333,
+   "deals": 18,
+   "days": 9.4
+  },
+  {
+   "name": "Aprilia Shiver 750",
+   "revenue": 164100,
+   "deals": 13,
+   "days": 10.4
+  },
+  {
+   "name": "BENDA LFC700",
+   "revenue": 137000,
+   "deals": 2,
+   "days": 15.3
+  },
+  {
+   "name": "Yamaha R7",
+   "revenue": 133150,
+   "deals": 9,
+   "days": 11.6
+  },
+  {
+   "name": "Regulmoto Nibbler 300 4V",
+   "revenue": 100453,
+   "deals": 17,
+   "days": 12.0
+  },
+  {
+   "name": "Ducati Panigale S Electro Black Aero",
+   "revenue": 89250,
+   "deals": 10,
+   "days": 7.9
+  },
+  {
+   "name": "Yamaha R6",
+   "revenue": 87500,
+   "deals": 6,
+   "days": 9.2
+  },
+  {
+   "name": "Suzuki M109R 1800 Boulevard",
+   "revenue": 73300,
+   "deals": 8,
+   "days": 3.1
+  },
+  {
+   "name": "Suzuki GSX-S1000F",
+   "revenue": 71008,
+   "deals": 7,
+   "days": 3.2
+  },
+  {
+   "name": "Honda CBR600RR",
+   "revenue": 69250,
+   "deals": 7,
+   "days": 4.8
+  },
+  {
+   "name": "Rerode R1+",
+   "revenue": 67800,
+   "deals": 5,
+   "days": 1.8
+  },
+  {
+   "name": "Ducati 1199 Panigale",
+   "revenue": 66000,
+   "deals": 5,
+   "days": 3.2
+  },
+  {
+   "name": "Motoland Breakout 300",
+   "revenue": 58769,
+   "deals": 11,
+   "days": 6.2
+  },
+  {
+   "name": "79BIKE Falcon GT",
+   "revenue": 41750,
+   "deals": 8,
+   "days": 1.4
+  },
+  {
+   "name": "Jilang Max Pro",
+   "revenue": 38700,
+   "deals": 5,
+   "days": 4.0
+  },
+  {
+   "name": "Ducati Panigale S Electro Gold",
+   "revenue": 30500,
+   "deals": 3,
+   "days": 1.2
+  },
+  {
+   "name": "Ducati Panigale S Electro Red",
+   "revenue": 29000,
+   "deals": 2,
+   "days": 0.8
+  },
+  {
+   "name": "Leopard Asaka",
+   "revenue": 20000,
+   "deals": 4,
+   "days": 2.3
+  },
+  {
+   "name": "Y-VOLT Surge V",
+   "revenue": 20000,
+   "deals": 1,
+   "days": 1.0
+  },
+  {
+   "name": "79BIKE Falcon Pro",
+   "revenue": 19000,
+   "deals": 4,
+   "days": 2.0
+  },
+  {
+   "name": "Ducati Panigale S Electro Black",
+   "revenue": 18500,
+   "deals": 2,
+   "days": 0.8
+  },
+  {
+   "name": "Ducati Panigale S Electro Green Z",
+   "revenue": 17800,
+   "deals": 2,
+   "days": 0.5
+  },
+  {
+   "name": "79BIKE Falcon Lynx Purple",
+   "revenue": 13500,
+   "deals": 2,
+   "days": 1.0
+  },
+  {
+   "name": "Horwin CR1",
+   "revenue": 12500,
+   "deals": 3,
+   "days": 0.6
+  },
+  {
+   "name": "Wenbox U2 Pro",
+   "revenu
