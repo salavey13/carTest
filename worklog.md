@@ -1374,3 +1374,20 @@ Stage Summary:
 - Первый экран телефона: до фикса ~0 карточек аренд, после — список стартует на ~330-350px от верха (хедер+навигация+KPI-полоса+сверка ≈ 250px), видно 2-3 карточки сразу, остальное — скролл.
 - Секретные сверки/KPI никуда не делись: полоса прокручивается пальцем, снап на карточках.
 - Деплой уедет с main автоматически (Vercel).
+
+---
+Task ID: 145
+Agent: main (Z.ai CLI)
+Task: landings quality uplift — unified feedback forms (crew slugs → callback-lead → CRM + Telegram), leorus→djorudjov, partners logo-grids (reveal on hover/longtap), imagery.
+
+Work Log:
+- Resolved dead-session stash vs task144 commits: stash (18:41) = newer WIP → took stash side for app/{page,leorus/*,sly13,moto-selection,georg-electro}; PartnerRevealCard stays for catalog ServicesGrid.
+- components/landing/PartnerLogoGrid.tsx — new unified partner grid: logo-only at rest, hover/longtap ≥380ms reveal, touch two-tap gate, outside/scroll/ESC close, a11y, reduced-motion.
+- Wired on / /moto-selection /sly13 /leorus /georg-electro (4/4 crews each; self-link absent by design). sly13 +moto-selection tile (light backing).
+- FeedbackModal mounts: / (vip-bike, NEW trigger in final CTA), /vipbikerental (PartnersCrewsSection), existing on moto-selection/sly13/georg-electro; leorus inline form → slug «djorudjov» (crew id 71cbb838… verified).
+- Imagery: vipbikerental HowItWorks/Gear banners + Invest layer (carpix, 112–137KB); new public/leorus/{hero-bg,case-goafreaks,case-matreshka}.jpg + public/logos/*.png.
+- scripts/typecheck-task145.mjs: touched files clean; 8 pre-existing errors untouched (ignoreBuildErrors covers).
+- Smoke: dev SSR 5/5 × 200 + interlink counts verified; browser: modal opens, rest/open states screenshot-verified. Verified vip-bike svc rows 77/77 illustrated (batch was done earlier).
+
+Stage Summary:
+- Commit 9a12340 pushed to salavey13/carTest main.
