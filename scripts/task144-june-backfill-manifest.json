@@ -1,0 +1,285 @@
+{
+ "applied_at": "2026-10-26T19:31:30.893+00:00",
+ "source": "boss voice note 26.10.2026 «26 окт. 18.45 june full.mp3» (ASR: 43 coarse + 101 fine chunks)",
+ "dedupe_base": "9 existing june rows (Голубев 1.06, Шаронов 5.06, nibbler 17/20/21.06, suzuki x3 20.06, Ларин 29.06)",
+ "operator_attribution": "7813830016",
+ "inserted": [
+  {
+   "tag": "june-schmidt-zero",
+   "rental_id": "17a6559b-e4a0-413f-a80a-39f0358ea530",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 2500,
+   "kind": "rental",
+   "renter_name": "Шмит Руслан Дмитриевич",
+   "start": "2026-06-03T10:00:00+00:00"
+  },
+  {
+   "tag": "june-agapov-panigale",
+   "rental_id": "6a8c994c-4195-46c1-a9e3-0da60ec12780",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 5000,
+   "kind": "rental",
+   "renter_name": "Агапов Сергей Николаевич",
+   "start": "2026-06-03T11:00:00+00:00"
+  },
+  {
+   "tag": "june-melnikov-nibbler",
+   "rental_id": "8d82fc6b-1f38-4f21-8924-39a4a6bcb275",
+   "vehicle_id": "nibbler-regumoto-4v",
+   "total_cost": 8000,
+   "kind": "rental",
+   "renter_name": "Мельников Алексей Борисович",
+   "start": "2026-06-06T10:30:00+00:00"
+  },
+  {
+   "tag": "june-shimina-horwin",
+   "rental_id": "9019efa0-c390-457a-9dc4-30df3fa340ff",
+   "vehicle_id": "horwin-cr1",
+   "total_cost": 6000,
+   "kind": "rental",
+   "renter_name": "Шимина Вера Александровна",
+   "start": "2026-06-06T12:30:00+00:00"
+  },
+  {
+   "tag": "june-novoselov-nibbler",
+   "rental_id": "0a2e0484-0b3f-41d4-9075-1d5a1f4db672",
+   "vehicle_id": "nibbler-regumoto-4v",
+   "total_cost": 7500,
+   "kind": "rental",
+   "renter_name": "Новоселов Глеб Игоревич",
+   "start": "2026-06-06T18:00:00+00:00"
+  },
+  {
+   "tag": "june-narinkov-breakout",
+   "rental_id": "b612b18e-3ec5-4b4c-8df3-b4e2e4f4a043",
+   "vehicle_id": "motoland-breakout",
+   "total_cost": 6000,
+   "kind": "rental",
+   "renter_name": "Наринков Антон Николаевич",
+   "start": "2026-06-06T18:00:00+00:00"
+  },
+  {
+   "tag": "june-konkov-kawasaki",
+   "rental_id": "72d35207-aaae-4583-ba02-aa38ea0681fe",
+   "vehicle_id": "kawasaki-ex650k",
+   "total_cost": 15000,
+   "kind": "rental",
+   "renter_name": "Конков Александр Сергеевич",
+   "start": "2026-06-06T11:00:00+00:00"
+  },
+  {
+   "tag": "june-durandin-panigale",
+   "rental_id": "ab1eb2ef-b508-4ad4-908a-e3472f2a1c47",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 12000,
+   "kind": "rental",
+   "renter_name": "Дурандин Сергей Владимирович",
+   "start": "2026-06-07T09:00:00+00:00"
+  },
+  {
+   "tag": "june-andronikov-zero",
+   "rental_id": "e723d12c-9cbf-4576-88e2-14edaf2f3562",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 6500,
+   "kind": "rental",
+   "renter_name": "Андроников Алексей Сергеевич",
+   "start": "2026-06-07T17:00:00+00:00"
+  },
+  {
+   "tag": "june-bagirov-panigale",
+   "rental_id": "ffad4bd5-d1c8-48e2-b004-46faaa40497c",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 6000,
+   "kind": "rental",
+   "renter_name": "Багиров Рауф Эльчин оглы",
+   "start": "2026-06-08T20:00:00+00:00"
+  },
+  {
+   "tag": "june-shmakov-panigale",
+   "rental_id": "8b2fce3e-68cc-42f0-a3e8-4f09764988fe",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 7500,
+   "kind": "rental",
+   "renter_name": "Шмаков Кирилл Александрович",
+   "start": "2026-06-09T17:00:00+00:00"
+  },
+  {
+   "tag": "june-platonov-zero",
+   "rental_id": "fbeb50a7-660b-4daf-83b8-673ed9842603",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 10000,
+   "kind": "rental",
+   "renter_name": "Платонов Данил Александрович",
+   "start": "2026-06-09T12:00:00+00:00"
+  },
+  {
+   "tag": "june-tomashevsky-panigale",
+   "rental_id": "84099cf3-6f70-4c47-9b34-410d19d3f65b",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 10000,
+   "kind": "rental",
+   "renter_name": "Томашевский Николай Михайлович",
+   "start": "2026-06-10T09:00:00+00:00"
+  },
+  {
+   "tag": "june-mitnikov-panigale",
+   "rental_id": "dd60d980-d55c-44b3-9257-e6e79cd679fb",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 5000,
+   "kind": "rental",
+   "renter_name": "Митников Дмитрий Михайлович",
+   "start": "2026-06-09T09:00:00+00:00"
+  },
+  {
+   "tag": "june-morozov-horwin",
+   "rental_id": "5732cab1-5466-47e1-b569-8728f5d9226a",
+   "vehicle_id": "horwin-cr1",
+   "total_cost": 6500,
+   "kind": "rental",
+   "renter_name": "Морозов Сергей Сергеевич",
+   "start": "2026-06-16T13:00:00+00:00"
+  },
+  {
+   "tag": "june-sasov-zero",
+   "rental_id": "1851d77f-d43a-4efd-8e09-ebf9db500379",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 4000,
+   "kind": "rental",
+   "renter_name": "Сасов Никита Алексеевич",
+   "start": "2026-06-13T16:00:00+00:00"
+  },
+  {
+   "tag": "june-sv-breakout",
+   "rental_id": "f733c4bb-d5ab-4d89-9745-9b1619651f16",
+   "vehicle_id": "motoland-breakout",
+   "total_cost": 5000,
+   "kind": "rental",
+   "renter_name": "Сергей Владимирович (фамилия не продиктована)",
+   "start": "2026-06-13T12:00:00+00:00"
+  },
+  {
+   "tag": "june-kiselev-panigale",
+   "rental_id": "ca21b7de-c84b-4dbc-b228-ce1f65b069f0",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": null,
+   "kind": "rental",
+   "renter_name": "Киселёв Андрей Васильевич",
+   "start": "2026-06-13T10:00:00+00:00"
+  },
+  {
+   "tag": "june-balonin-honda",
+   "rental_id": "043fff8b-31fb-4a00-b20c-a74f50bf7bff",
+   "vehicle_id": "honda-cbr600rr-2003",
+   "total_cost": 9000,
+   "kind": "rental",
+   "renter_name": "Балонин Иван Константинович",
+   "start": "2026-06-16T12:00:00+00:00"
+  },
+  {
+   "tag": "june-kuzavakov-kawasaki",
+   "rental_id": "1badb0b8-7e9d-4e9b-b3b4-b6b11fd7bccb",
+   "vehicle_id": "kawasaki-ex650k",
+   "total_cost": 10000,
+   "kind": "rental",
+   "renter_name": "Кузаватов Евгений Александрович",
+   "start": "2026-06-16T20:40:00+00:00"
+  },
+  {
+   "tag": "june-baykin-breakout",
+   "rental_id": "a83666a4-4450-4d01-8c44-ee8a745837b2",
+   "vehicle_id": "motoland-breakout",
+   "total_cost": 6000,
+   "kind": "rental",
+   "renter_name": "Байкин Олег Евгеньевич",
+   "start": "2026-06-16T07:00:00+00:00"
+  },
+  {
+   "tag": "june-sharin-panigale",
+   "rental_id": "70a6f5f1-0f5f-4da3-8039-83607c748cba",
+   "vehicle_id": "ducati-panigale-s-electro-black",
+   "total_cost": 5000,
+   "kind": "rental",
+   "renter_name": "Шарин Денис Сергеевич",
+   "start": "2026-06-16T15:00:00+00:00"
+  },
+  {
+   "tag": "june-raev-zero",
+   "rental_id": "2acfa940-7653-4d0e-97e5-6462b8019596",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 7000,
+   "kind": "rental",
+   "renter_name": "Раев Дмитрий Алексеевич",
+   "start": "2026-06-16T17:00:00+00:00"
+  },
+  {
+   "tag": "june-emko-r7",
+   "rental_id": "292c232f-1c53-43d6-81f1-5c84ce5d3883",
+   "vehicle_id": "yamaha-r7",
+   "total_cost": 9000,
+   "kind": "rental",
+   "renter_name": "Емко Михаил Сергеевич",
+   "start": "2026-06-16T10:30:00+00:00"
+  },
+  {
+   "tag": "june-mihailov-1199",
+   "rental_id": "6c36a227-1040-4258-ac5c-762370cbee0d",
+   "vehicle_id": "ducati-1199-panigale-2012",
+   "total_cost": null,
+   "kind": "rental",
+   "renter_name": "Михайлов Александр Николаевич",
+   "start": "2026-06-21T14:00:00+00:00"
+  },
+  {
+   "tag": "june-smirnov-breakout",
+   "rental_id": "1a3eb28d-211f-40de-8f61-0b4b2dabbe9e",
+   "vehicle_id": "motoland-breakout",
+   "total_cost": 7000,
+   "kind": "rental",
+   "renter_name": "Смирнов Виктор Владимирович",
+   "start": "2026-06-26T07:00:00+00:00"
+  },
+  {
+   "tag": "june-dolinsky-jilang",
+   "rental_id": "9623de5e-db2d-46fc-ab75-0e4ccaec05ca",
+   "vehicle_id": "jilang-max-pro",
+   "total_cost": null,
+   "kind": "rental",
+   "renter_name": "Долинский Виталий Александрович",
+   "start": "2026-06-28T11:00:00+00:00"
+  },
+  {
+   "tag": "june-shihaboddin-nibbler",
+   "rental_id": "7e1f0065-9adc-4db7-90b7-84e47603e54b",
+   "vehicle_id": "nibbler-regumoto-4v",
+   "total_cost": null,
+   "kind": "rental",
+   "renter_name": "Шихабоддин Никифорович",
+   "start": "2026-06-23T12:00:00+00:00"
+  },
+  {
+   "tag": "june-golubev-update",
+   "rental_id": "8d3dd4d8-235d-44c7-8417-15431f65dc1a",
+   "total_cost": 2000,
+   "kind": "update"
+  }
+ ],
+ "dedupe_hits_skipped": [
+  "Шаронов 5-6.06 EX650 10 000 — уже в БД (6adc56df, task108 xlsx row13); диктовка подтверждает 10 000",
+  "Ларин Алексей Александрович 29.06 — уже в БД (38ab65f2 aprilia-shiver 6500); НО диктовка говорит «БМВ Ф800, с 6:30 до 9:30, за 8 000» — РАСХОЖДЕНИЕ (байк+цена+время), нужно слово босса"
+ ],
+ "held_not_inserted_needs_redictation": [
+  "Бочкарев Роман Андреевич ~21.06 — «электро»-байк неопознан (не секвензер по манере речи), цена/время не читаются",
+  "Баринов Иван Александрович 13.06 — Кавасаки; время «с 6 до …»/цена «60…» — нечитаемо",
+  "Булатников Дмитрий Иванович — BMW F800R; дата (13-е? 23-е?), время (13-23 / 10:30-20:30), цена — конфликт чтений",
+  "Овчаров/Афанасьев Станислав Алексеевич ~24.06 — «Квасики XC50»?, «на два дня», цена нет",
+  "Березов/Безруков Юрий Алексеевич ~24.06 — только имя в зашумлённом чанке",
+  "Шаинский Михаил Владимирович — «вайвольт» (Y-VOLT Surge V?), «двадцать первый»?, цена «20 тысяч»? — привязка цены неясна",
+  "Лазарев/Лазарь [Валерий?] Сергеевич — Фалкон GT, дата (~29-30.06) и цена не распознаны"
+ ],
+ "phones_not_inserted_garbled": [
+  "Мельников 6.06 (8-920-205-… vs 8-920-059-…)",
+  "Шимина 6.06 (хвост «20 33 72 27»)",
+  "Митников 9-13.06 («8-920-?0-50…»)",
+  "Морозов 16.06 («8-90?-384-71-74»)"
+ ]
+}
