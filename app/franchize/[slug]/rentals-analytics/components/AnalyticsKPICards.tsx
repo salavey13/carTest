@@ -4,7 +4,12 @@
 //
 // 7-card KPI row (iter25): Аренд сегодня | Выручка | Компании | Партнёрам
 //                          | Экипировка | Активных | Возвратов
-// Mobile: 2-col grid. Desktop: 1x7 horizontal.
+// Desktop (lg+): 1x7 grid — как и было.
+// Mobile fix (task143, boss: «верхняя часть занимает большую часть экрана»):
+//   2-col grid складывал 7 карточек в 4 ряда ≈ 360px — весь первый экран
+//   телефона уходил на статы, до списка аренд приходилось листать.
+//   Теперь на <lg это одна горизонтальная snap-полоса ≈ 64px (скролл пальцем,
+//   тонкий скроллбар как у рейла в CrewHeader). Desktop не тронут.
 // Semantic status colors allowed (PRD §0.6); everything else from T.*.
 //
 // iter25 — the money cards now answer the owner's question
@@ -63,7 +68,7 @@ export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
 
   return (
     <div
-      className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-7 lg:gap-3"
+      className="flex min-w-0 snap-x snap-mandatory gap-2 overflow-x-auto pb-1.5 [overscroll-behavior-x:contain] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 lg:grid lg:grid-cols-7 lg:gap-3 lg:overflow-visible lg:pb-0"
       role="region"
       aria-label="Ключевые показатели"
     >
@@ -73,7 +78,7 @@ export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.05, duration: 0.25 }}
-          className="rounded-2xl border p-3 md:p-4"
+          className="min-w-[7.5rem] shrink-0 snap-start rounded-2xl border p-2.5 md:p-3 lg:min-w-0 lg:snap-none lg:p-4"
           style={{
             borderColor: T.border,
             backgroundColor: T.bgCard,
@@ -87,7 +92,7 @@ export function AnalyticsKPICards({ kpis, T }: AnalyticsKPICardsProps) {
             {kpi.label}
           </p>
           <p
-            className="mt-1 text-lg font-bold tabular-nums md:text-2xl"
+            className="mt-1 whitespace-nowrap text-base font-bold tabular-nums sm:text-lg lg:text-2xl"
             style={{ color: kpi.color }}
           >
             {kpi.value}

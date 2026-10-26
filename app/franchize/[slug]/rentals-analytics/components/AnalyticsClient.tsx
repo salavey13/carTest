@@ -511,21 +511,24 @@ export function AnalyticsClient({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4" role="region" aria-label="Аналитика">
+    // task143 (boss: на телефоне верх занимает большую часть экрана):
+    // mobile-отступы между блоками сжаты 16→10px, desktop без изменений.
+    <div className="space-y-2.5 lg:space-y-4" role="region" aria-label="Аналитика">
       {/* Tab bar */}
       <AnalyticsTabNav activeTab={activeTab} onChange={handleTabChange} T={T} />
 
-      {/* Date navigator */}
-      <AnalyticsDateNav date={date} onChange={setDate} T={T} isToday={isToday} />
-
-      {/* FIX (F9 iter3): table-view trigger — table icon only (no text).
-          Opens the in-modal table view + download icon button for actual CSV. */}
-      {onExportCsv && (
-        <div className="flex justify-end">
+      {/* Date navigator. task143: таблица-триггер (F9 iter3, table icon only)
+          переехал в ПРАВЫЙ КРАЙ ЭТОЙ ЖЕ строки — раньше он сжигал целый ряд
+          44px ради одной иконки и уносил список аренд ниже первого экрана. */}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <AnalyticsDateNav date={date} onChange={setDate} T={T} isToday={isToday} />
+        </div>
+        {onExportCsv && (
           <button
             type="button"
             onClick={() => setCsvModalOpen(true)}
-            className="inline-flex items-center justify-center rounded-xl border px-2.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl border px-2.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2"
             style={{
               borderColor: "#3b82f64d",
               backgroundColor: "#3b82f615",
@@ -538,8 +541,8 @@ export function AnalyticsClient({
           >
             <Table2 className="h-4 w-4" aria-hidden />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* CSV table-view modal — date pickers + huge horizontally-scrollable
           table + download-icon button to actually save the CSV file + send
@@ -570,12 +573,15 @@ export function AnalyticsClient({
           негде жить, пока в экипаже нет ни одной сверки (сезон-2026). */}
       {activeTab === "rentals" && (verStrip.hasAny || viewerIsOwnerTier) && (
         <div
-          className="flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2.5"
+          // task143: на телефоне полоса сворачивается в ОДНУ горизонтальную
+          // строку (скролл пальцем) — flex-wrap раздувал её до 2-3 рядов.
+          // Desktop (lg+) ведёт себя как раньше (wrap, без скролла).
+          className="flex items-center gap-2 overflow-x-auto rounded-2xl border px-3 py-2 [overscroll-behavior-x:contain] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 lg:flex-wrap lg:overflow-visible lg:py-2.5"
           style={{ borderColor: T.border, backgroundColor: T.bgCard }}
           role="group"
           aria-label="Сверка расчётов по арендам"
         >
-          <span className="text-xs font-semibold" style={{ color: T.textMuted }}>
+          <span className="shrink-0 text-xs font-semibold" style={{ color: T.textMuted }}>
             🤝 Сверка:
           </span>
           <VerChip
@@ -611,7 +617,7 @@ export function AnalyticsClient({
               type="button"
               onClick={handleBulkVerifyFine}
               disabled={bulkFinePending}
-              className="cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
+              className="shrink-0 cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 disabled:cursor-wait disabled:opacity-50"
               style={{ background: "#22c55e1f", color: "#22c55e" }}
               title="Подтвердить все проверенные аудитом сверки этого месяца (grade=fine). Спорные и «почти ок» не трогаются."
             >
@@ -625,7 +631,7 @@ export function AnalyticsClient({
               type="button"
               onClick={handleStartVerificationRound}
               disabled={roundPending}
-              className="ml-1 inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
+              className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
               style={{ borderColor: "#f59e0b", color: "#f59e0b" }}
               title="Выслать сверки последним закрытым арендам (до 10), которых ещё нет в сверке"
             >
@@ -938,7 +944,7 @@ function VerChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className="min-h-[36px] cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2"
+      className="min-h-[36px] shrink-0 cursor-pointer rounded-full px-3 py-1 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2"
       style={{
         backgroundColor: active ? color : `${color}1a`,
         color: active ? "#0a0a0a" : color,
