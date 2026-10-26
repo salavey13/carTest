@@ -1,0 +1,267 @@
+{
+ "applied_at": "2026-10-26T16:22:44.022+00:00",
+ "source": "boss voice notes 24.10+26.10.2026 (service final.mp3, popki.mp3, may.mp3 — ASR)",
+ "note": "rentals.vehicle_id FK → cars.id: 29 vip-bike-svc-049..077 placeholders ensured in cars",
+ "inserted": [
+  {
+   "tag": "may9-sterlyakov-popravka",
+   "rental_id": "3f24ff4b-4422-4e5a-80e2-18266ed66f4e",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 9000,
+   "kind": "rental"
+  },
+  {
+   "tag": "may-rental-ryzhov-nibbler",
+   "rental_id": "990bdaac-78fe-4d89-9efd-b15a7b9c6793",
+   "vehicle_id": "nibbler-regumoto-4v",
+   "total_cost": 10000,
+   "kind": "rental"
+  },
+  {
+   "tag": "may-rental-platonov-falcon-pro",
+   "rental_id": "05da89b6-8e2b-4bfb-893b-d1a4e0a7917a",
+   "vehicle_id": "falcon-pro-2026",
+   "total_cost": 12000,
+   "kind": "rental"
+  },
+  {
+   "tag": "may-rental-kirdzintsev-zero",
+   "rental_id": "6a1025fd-be4e-4dd4-935b-722603610e04",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 6000,
+   "kind": "rental"
+  },
+  {
+   "tag": "may-rental-mitrofanov-falcon-gt",
+   "rental_id": "b19fd044-d5d4-4633-bc60-bb87754692af",
+   "vehicle_id": "falcon-gt-2026",
+   "total_cost": 0,
+   "kind": "rental"
+  },
+  {
+   "tag": "may-rental-germavaev-zero",
+   "rental_id": "56e3e7bb-c6e3-4983-a52a-061fa93aa1d3",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 2000,
+   "kind": "rental"
+  },
+  {
+   "tag": "svc-050",
+   "rental_id": "6765bb53-f5c2-4744-b03f-be0d2926084b",
+   "vehicle_id": "vip-bike-svc-050",
+   "total_cost": 250,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-049",
+   "rental_id": "d2282008-ca11-41b9-b824-1bdc5a70e6b5",
+   "vehicle_id": "vip-bike-svc-049",
+   "total_cost": 1250,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-051",
+   "rental_id": "e2cca47b-b322-4020-8886-83b5ec1b892d",
+   "vehicle_id": "vip-bike-svc-051",
+   "total_cost": 1250,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-053",
+   "rental_id": "cdfdfd32-c52b-4475-b027-d97cb63e9a74",
+   "vehicle_id": "vip-bike-svc-053",
+   "total_cost": 600,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-054",
+   "rental_id": "f58773e0-f109-4de3-8f13-91b2118ad3e7",
+   "vehicle_id": "vip-bike-svc-054",
+   "total_cost": 500,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-055",
+   "rental_id": "98b30b58-5105-4b52-91fc-703e4b85fc11",
+   "vehicle_id": "vip-bike-svc-055",
+   "total_cost": 2000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-052",
+   "rental_id": "1078bb01-e819-4467-a0c5-d2a968625924",
+   "vehicle_id": "vip-bike-svc-052",
+   "total_cost": 250,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-056",
+   "rental_id": "841613e9-d95e-42bb-8b83-52e020cca952",
+   "vehicle_id": "vip-bike-svc-056",
+   "total_cost": 6000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-057",
+   "rental_id": "1c5719ef-b8c6-4f52-8515-2bf293bfdb3c",
+   "vehicle_id": "vip-bike-svc-057",
+   "total_cost": 1000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-058",
+   "rental_id": "2c15b6fb-4c36-4c65-ba6f-6541bc93a852",
+   "vehicle_id": "vip-bike-svc-058",
+   "total_cost": 300,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-059",
+   "rental_id": "fa275c72-c5c7-4152-ade2-a4fdfa079e6c",
+   "vehicle_id": "vip-bike-svc-059",
+   "total_cost": 500,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-060",
+   "rental_id": "26a4fb5a-9854-4f80-b3ed-958c32008adf",
+   "vehicle_id": "vip-bike-svc-060",
+   "total_cost": 200,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-061",
+   "rental_id": "43779359-62ba-4288-b11a-065dbb1aae86",
+   "vehicle_id": "vip-bike-svc-061",
+   "total_cost": 500,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-062",
+   "rental_id": "e01ee7c6-86e0-4100-85eb-ae9c92a4259e",
+   "vehicle_id": "vip-bike-svc-062",
+   "total_cost": 500,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-063",
+   "rental_id": "8611523b-fc10-4371-9be8-b9e8982bdfbd",
+   "vehicle_id": "vip-bike-svc-063",
+   "total_cost": 1000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-064",
+   "rental_id": "cb3a5194-f71b-4d68-8041-823059a0ab5a",
+   "vehicle_id": "vip-bike-svc-064",
+   "total_cost": 300,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-065",
+   "rental_id": "5cd1dc05-62ee-44a6-95fb-60de8221e3be",
+   "vehicle_id": "vip-bike-svc-065",
+   "total_cost": 700,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-066",
+   "rental_id": "d0b7d562-dd79-4a46-85dd-4db061bdbfd5",
+   "vehicle_id": "vip-bike-svc-066",
+   "total_cost": 500,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-067",
+   "rental_id": "1c27c74f-0006-4552-9634-4fec4f9106c4",
+   "vehicle_id": "vip-bike-svc-067",
+   "total_cost": 200,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-068",
+   "rental_id": "f2614efb-3f6c-4966-9092-e7bc2a250ff0",
+   "vehicle_id": "vip-bike-svc-068",
+   "total_cost": 500,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-069",
+   "rental_id": "fee18afa-e1da-4154-be45-1e8767393b29",
+   "vehicle_id": "vip-bike-svc-069",
+   "total_cost": 200,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-070",
+   "rental_id": "306806ea-2d29-4fde-8382-a54d5dd79b98",
+   "vehicle_id": "vip-bike-svc-070",
+   "total_cost": 1200,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-071",
+   "rental_id": "ff664959-ee0a-494c-be8e-5bd4469c6348",
+   "vehicle_id": "vip-bike-svc-071",
+   "total_cost": 1000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-072",
+   "rental_id": "022abb04-b676-4970-a25e-4383a7322e50",
+   "vehicle_id": "vip-bike-svc-072",
+   "total_cost": 250,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-073",
+   "rental_id": "fcc0e1ee-52f3-45f9-9d8d-c658da2852fe",
+   "vehicle_id": "vip-bike-svc-073",
+   "total_cost": 3000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-074",
+   "rental_id": "1437fb6c-1662-4ec8-b95f-fd9f981407e3",
+   "vehicle_id": "vip-bike-svc-074",
+   "total_cost": 1000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-076",
+   "rental_id": "1c9f043f-0ce3-4e70-9e38-50c4474dd9a4",
+   "vehicle_id": "vip-bike-svc-076",
+   "total_cost": 200,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-075",
+   "rental_id": "772b5659-b594-4b46-bb45-13f9791ad43c",
+   "vehicle_id": "vip-bike-svc-075",
+   "total_cost": 1000,
+   "kind": "service"
+  },
+  {
+   "tag": "svc-077",
+   "rental_id": "a4d15bee-479c-4bc9-8023-1988a780fc59",
+   "vehicle_id": "vip-bike-svc-077",
+   "total_cost": 1000,
+   "kind": "service"
+  },
+  {
+   "tag": "may9-sterlyakov-popravka",
+   "rental_id": "3f24ff4b-4422-4e5a-80e2-18266ed66f4e",
+   "total_cost": 9000,
+   "kind": "update"
+  }
+ ],
+ "flags_not_inserted": [
+  "Богданов Дмитрий Михайлович — аренда 17 мая: байк и цена не разобраны (ASR «650/600»?), телефон неполный (8-962-556-53-9?)",
+  "Коронников Александр Викторович — аренда 25 мая: босс оборвал («я забыл последнее»), нет байка/цены/полного телефона",
+  "«??? зажигания — 2000₽» (~17 сент): байк и тип работы не распознаны",
+  "«Протирка — 100₽» (5-6 сент): объект неясен",
+  "«мой аккумулятор — 2000» (20 сент): личная пометка босса, не сервисная строка",
+  "«Дьябаев… взял наш штраф» (popki): контекст неясен",
+  "«замена колёс с натяжкой цепи — 500» (5-6 сент): похоже на ре-диктовку уже существующих svc-046/047"
+ ]
+}
