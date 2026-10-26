@@ -179,6 +179,34 @@ const SHOWSTOPPER_BIKE_NAMES = [
   "Yamaha R7", "Kawasaki Ninja 650", "Suzuki GSX-S1000F", "Falcon GT 2026",
 ];
 
+/* ══ ПАРК В КАДРЕ (task 145-б, boss: «upgrade the dad of all landings… more
+   pictures!») — мозаика 4×4: 6 ЖИВЫХ кадров из about-бакета vip-bike
+   (гараж на Комсомольской, покатушки, ночная смена — не сток) + 6 студийных
+   портретов парка из каталога carpix. Подписи честные: что видно, то пишем. */
+const ABOUT_BUCKET = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about";
+const about = (file: string) => `${ABOUT_BUCKET}/${file}`;
+
+const PARK_SHOTS: { src: string; title: string; tag: string; big?: boolean; wide?: boolean }[] = [
+  { src: img("ducati-panigale-s-electro-gold"), title: "Ducati Panigale S Electro", tag: "студия", big: true },
+  { src: about("1000033151-e9dcdbf2-03c3-45a2-87b0-4b22f1a9a084.jpg"), title: "Утро перед выездом", tag: "гараж" },
+  { src: about("SF2_F0AnoG8-eb48600f-4d24-4cf9-a8c3-fe53574b1c56.jpg"), title: "Экипировка по погоде", tag: "гараж" },
+  { src: about("IMG_20250722_211002-50aeb5aa-778b-4e77-8334-b87e0b7727e9.jpg"), title: "Спортбайк на районе", tag: "покатушка" },
+  { src: about("IMG_20250727_213657-b32c7743-f696-4be5-b264-63d5d8f01a36.jpg"), title: "Неон и хром", tag: "вечер" },
+  { src: img("falcon-gt-2026"), title: "Falcon GT 2026", tag: "студия" },
+  { src: about("mFdiL90Oxis-15d938c2-5b98-47b1-bfc9-fdf97adf9866.jpg"), title: "Ночная смена", tag: "Нижний", wide: true },
+  { src: img("yamaha-r7"), title: "Yamaha R7", tag: "студия" },
+  { src: img("ducati-panigale-s-electro-black-aero"), title: "Panigale · Aero", tag: "студия" },
+  { src: img("kawasaki-ex650k"), title: "Kawasaki Ninja 650", tag: "студия" },
+  { src: about("fat-1b4c292d-0c2d-452e-8139-93abc671df2d.webp"), title: "Дорога зовёт", tag: "трасса" },
+  { src: img("sequence-zero"), title: "Sequence Zero", tag: "студия" },
+];
+
+/* Штаб VIP Bike изнутри — тот же кадр, что на обложке зимнего хранения:
+   лаунж с диваном, стеллаж шлемов и стойка экипировки (about-бакет). */
+const HQ_PHOTO = about(
+  "81Dts9uMBXZXTKC7PjIbBRRRHYGQx_2TPEKFWvaUwDzzgSQPjxUf4GjAiRaDWIcWgwmeaZQTKppFn5VBS6yZeK7R-38bfc7fb-0d5a-4b62-b7e6-ca83950cb265.jpg",
+);
+
 const SOCIAL_LINKS: SocialLink[] = [
   {
     id: "instagram", label: "Instagram", href: INSTAGRAM_HREF, color: "#E4405F",
@@ -253,13 +281,13 @@ const BIKE_TIERS = [
 const PRICING_TIERS = [
   { id: "electric", label: "Электро", marker: "Э", price: "5 000–12 000 ₽", per: "/ сутки", note: "подтверждённые суточные тарифы",
     features: ["Sotion EM01 — 5 000 ₽", "Falcon GT — 12 000 ₽", "Y-VOLT Surge V — 12 000 ₽; выходной — 15 000 ₽"],
-    cta: "Выбрать электро", href: ELECTRIC_CATALOG_HREF, highlighted: true },
+    cta: "Выбрать электро", href: ELECTRIC_CATALOG_HREF, highlighted: true, img: img("falcon-gt-2026") },
   { id: "petrol", label: "Бензин", marker: "ДВС", price: "4 000–14 000 ₽", per: "/ сутки", note: "подтверждённые суточные тарифы",
     features: ["Kayo TSD 110 — 4 000 ₽", "Yamaha R7 — 10 000 ₽", "Suzuki GSX-S1000F — 14 000 ₽"],
-    cta: "Выбрать бензин", href: PETROL_CATALOG_HREF, highlighted: false },
+    cta: "Выбрать бензин", href: PETROL_CATALOG_HREF, highlighted: false, img: img("yamaha-r7") },
   { id: "terms", label: "Условия", marker: "INFO", price: "Уточнит менеджер", per: "", note: "до подтверждения брони",
     features: ["Паспорт и водительское удостоверение", "Для бензиновых моделей — категория А", "Даты и дополнительные условия подтверждаются отдельно"],
-    cta: "Написать менеджеру", href: OPERATOR_HREF, highlighted: false },
+    cta: "Написать менеджеру", href: OPERATOR_HREF, highlighted: false, img: img("ducati-panigale-s-electro-gold") },
 ];
 
 /* ══ FAQ ITEMS ══ */
@@ -706,8 +734,17 @@ function InfoIcon({ className = "w-4 h-4" }: { className?: string }) {
 function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: number }) {
   const { ref, shown, everHidden } = useSafeReveal<HTMLDivElement>();
   return (
-    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px var(--vip-accent-a20)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
-      {tier.highlighted && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>Хит</div>}
+    <motion.div ref={ref} initial={false} animate={shown ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }} transition={{ duration: everHidden && shown ? 0.6 : 0, delay: shown ? index * 0.15 : 0, ease: "easeOut" }} whileHover={{ y: -8 }} className="relative z-10 flex flex-col overflow-hidden rounded-3xl border-2 p-6 md:p-8 transition-colors duration-300" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: tier.highlighted ? "var(--vip-accent-main)" : "var(--vip-border-soft)", boxShadow: tier.highlighted ? `0 20px 60px var(--vip-accent-a20)` : "0 4px 16px rgba(0,0,0,0.15)" }}>
+      {/* task 145-б: фото-шапка тарифа — та же анатомия, что у карточек
+          каталога выше: фото сверху и растворение в фон карточки. Бейдж
+          «Хит» живёт НА фото (карточка overflow-hidden — прежний -top-3
+          обрезался бы). */}
+      <div className="relative -mx-6 -mt-6 mb-6 h-40 md:-mx-8 md:-mt-8 md:h-48 shrink-0 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={tier.img} alt="" aria-hidden loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 30%, var(--vip-bg-card) 97%)" }} />
+        {tier.highlighted && <div className="absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide" style={{ background: "var(--vip-accent-main)", color: "var(--vip-bg-base)" }}>Хит</div>}
+      </div>
       <div className="text-center mb-6">
         <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full border text-sm font-black" style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)" }}>{tier.marker}</div>
         <h4 className="text-xl font-bold uppercase tracking-wide" style={{ color: "var(--vip-text-primary)" }}>{tier.label}</h4>
@@ -730,6 +767,34 @@ function PricingCard({ tier, index }: { tier: (typeof PRICING_TIERS)[0]; index: 
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="ml-2 inline"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
       </MagneticButton>
     </motion.div>
+  );
+}
+
+/* ══ PARK IN FRAMES — одна плитка мозаики «Парк в кадре» (task 145-б).
+    Живое фото + стеклянная подпись-плашка снизу (ДНК стеклянных карточек
+    /moto-selection): на ПК ховер мягко зумит кадр, на таче подпись читается
+    сразу — скрытых действий нет, гейт не нужен. */
+function ParkShotTile({ shot, index }: { shot: (typeof PARK_SHOTS)[number]; index: number }) {
+  return (
+    <AnimatedSection
+      delay={(index % 4) * 0.07}
+      className={`${shot.big ? "col-span-2 row-span-2" : shot.wide ? "col-span-2" : ""} relative`}
+    >
+      <figure className="group relative h-full min-h-[150px] overflow-hidden rounded-2xl border" style={{ borderColor: "var(--vip-border-soft)" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={shot.src}
+          alt={shot.title}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
+        />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.14) 40%, transparent 62%)" }} />
+        <figcaption className="absolute inset-x-0 bottom-0 p-3.5 md:p-4">
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--vip-accent-main)", textShadow: "0 1px 8px rgba(0,0,0,0.75)" }}>{shot.tag}</div>
+          <div className="mt-0.5 text-sm md:text-base font-bold leading-tight" style={{ color: "#FFFAF0", textShadow: "0 1px 10px rgba(0,0,0,0.6)" }}>{shot.title}</div>
+        </figcaption>
+      </figure>
+    </AnimatedSection>
   );
 }
 
@@ -972,6 +1037,7 @@ export default function Home() {
   const router = useRouter();
   const navLinks = [
     { label: "Каталог", href: "#catalog" },
+    { label: "Парк в кадре", href: "#park" },
     { label: "Тарифы", href: "#pricing" }, { label: "Как это работает", href: "#how" },
     { label: "FAQ", href: "#faq" }, { label: "Контакты", href: "#contacts" },
   ];
@@ -1137,6 +1203,24 @@ export default function Home() {
             </div>
           </section>
 
+          {/* ─── ПАРК В КАДРЕ (task 145-б, boss: «more pictures!») ───
+              Мозаика 4×4: живые кадры парка и покатушек VIP Bike (гараж,
+              вечерний Нижний, трасса) вперемешку со студийными портретами
+              байков из каталога. Ховер — мягкий зум, подписи — на месте. */}
+          <section id="park" className="py-20 md:py-28 px-4 relative overflow-hidden">
+            <div className="max-w-7xl mx-auto">
+              <SectionHeader badge="Жизнь парка" title="Парк в кадре" highlight="— без стока" subtitle="Настоящие байки, настоящие выезды: гараж на Комсомольской, вечерний город и студийные портреты парка. Наведи — кадр оживёт." />
+              <div className="grid grid-cols-2 md:grid-cols-4 auto-rows-[160px] sm:auto-rows-[185px] md:auto-rows-[215px] gap-3 md:gap-4">
+                {PARK_SHOTS.map((shot, i) => (
+                  <ParkShotTile key={shot.src} shot={shot} index={i} />
+                ))}
+              </div>
+              <AnimatedSection delay={0.35} className="text-center mt-10">
+                <p className="mx-auto flex max-w-2xl items-start justify-center gap-1.5 text-sm" style={{ color: "var(--vip-text-secondary)" }}><InfoIcon className="mt-0.5 h-4 w-4 shrink-0" /> <span>Хочешь так же — но на своём байке? <a href={CATALOG_HREF} className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>Выбирай в каталоге</a> и выезжай.</span></p>
+              </AnimatedSection>
+            </div>
+          </section>
+
           {/* ─── HOW IT WORKS ─── */}
           <section id="how" className="py-20 md:py-28 px-4 relative overflow-hidden" style={{ backgroundColor: "var(--vip-card-a40)" }}>
             <div className="max-w-6xl mx-auto relative z-10">
@@ -1180,20 +1264,36 @@ export default function Home() {
           <section id="about" className="py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-card-a40)" }}>
             <div className="max-w-7xl mx-auto">
               <SectionHeader badge="О нас" title="VIP Bike —" highlight="аренда мотоциклов в Нижнем" subtitle="Электро и бензин с раздельным выбором и подтверждением условий." />
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { title: "Заявка онлайн", desc: "Выбирай модель и даты в каталоге или Telegram-боте" },
-                  { title: "Раздельный каталог", desc: "Электро и бензин не смешиваются в рекламных сценариях" },
-                  { title: "Условия до брони", desc: "Менеджер подтверждает доступность и дополнительные условия заранее" },
-                  { title: "Центр Нижнего", desc: "пл. Комсомольская 2 — удобно добираться из любой точки города" },
-                ].map((feature, idx) => (
-                  <AnimatedSection key={feature.title} delay={idx * 0.1}>
-                    <div className="relative z-10 p-6 rounded-2xl border text-center transition-all duration-300 group h-full hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
-                      <h4 className="text-lg font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>{feature.title}</h4>
-                      <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>{feature.desc}</p>
+              {/* task 145-б: штаб в кадре — слева живой интерьер лаунжа (тот же
+                  кадр, что на обложке зимнего хранения), справа факты 2×2 */}
+              <div className="grid lg:grid-cols-5 gap-6 items-stretch">
+                <AnimatedSection delay={0} className="lg:col-span-2">
+                  <div className="relative h-full min-h-[300px] overflow-hidden rounded-3xl border" style={{ borderColor: "var(--vip-border-soft)" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={HQ_PHOTO} alt="Штаб VIP Bike — пл. Комсомольская 2" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.18) 45%, transparent 70%)" }} />
+                    <div className="absolute inset-x-0 bottom-0 p-6">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--vip-accent-main)" }}>наш штаб</div>
+                      <div className="mt-0.5 text-xl font-black" style={{ color: "#FFFAF0", textShadow: "0 1px 10px rgba(0,0,0,0.6)" }}>пл. Комсомольская 2</div>
+                      <p className="mt-1 text-sm leading-relaxed" style={{ color: "rgba(255,250,240,0.88)" }}>Гараж и лаунж: примерка экипировки, чай и кофе, фотоотчёт перед каждым выездом. Ежедневно 10:00–20:00.</p>
                     </div>
-                  </AnimatedSection>
-                ))}
+                  </div>
+                </AnimatedSection>
+                <div className="lg:col-span-3 grid sm:grid-cols-2 gap-6">
+                  {[
+                    { title: "Заявка онлайн", desc: "Выбирай модель и даты в каталоге или Telegram-боте" },
+                    { title: "Раздельный каталог", desc: "Электро и бензин не смешиваются в рекламных сценариях" },
+                    { title: "Условия до брони", desc: "Менеджер подтверждает доступность и дополнительные условия заранее" },
+                    { title: "Центр Нижнего", desc: "пл. Комсомольская 2 — удобно добираться из любой точки города" },
+                  ].map((feature, idx) => (
+                    <AnimatedSection key={feature.title} delay={0.1 + idx * 0.1}>
+                      <div className="relative z-10 flex h-full flex-col justify-center p-6 rounded-2xl border text-center transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: "var(--vip-bg-card)", borderColor: "var(--vip-border-soft)" }}>
+                        <h4 className="text-lg font-bold mb-2" style={{ color: "var(--vip-text-primary)" }}>{feature.title}</h4>
+                        <p className="text-sm leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>{feature.desc}</p>
+                      </div>
+                    </AnimatedSection>
+                  ))}
+                </div>
               </div>
             </div>
           </section>

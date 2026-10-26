@@ -214,8 +214,13 @@ describe("task140 — /sly13 neon palette + quality raise", () => {
   });
 
   it("service cards = graphite glass anatomy with cyan numerals + 200px pill", () => {
-    expect(sly).toContain('background: "rgba(15,20,25,0.72)"');
-    expect(sly).toContain('backdropFilter: "blur(5px)"');
+    // task 145-б: стекло переехало из inline-стилей в CSS-класс .sly-glass
+    // и РАСТВОРЯЕТСЯ на ховере/первом тапе (ДНК /moto-selection, ground
+    // truth оригинала: тинт И blur уходят вместе, opacity 1→0).
+    expect(sly).toContain("rgba(15, 20, 25, 0.72)");
+    expect(sly).toContain("backdrop-filter: blur(5px)");
+    expect(sly).toContain(".sly-svc:hover .sly-glass { opacity: 0; }");
+    expect(sly).toContain('.sly-svc[data-reveal-active="true"] .sly-glass');
     expect(sly).toContain("min-h-[340px]");
     expect(sly).toContain("w-[200px] items-center justify-center self-center rounded-full");
     expect(sly).toContain("Оформить в каталоге");

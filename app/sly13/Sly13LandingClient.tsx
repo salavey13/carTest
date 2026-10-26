@@ -26,7 +26,7 @@
 // reduced-motion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { MotionConfig, motion, useScroll, useTransform, useInView, animate } from "framer-motion";
@@ -334,15 +334,17 @@ function SpotlightCard({
   children,
   className = "",
   style,
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
-}) {
+} & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={`sly-spot relative ${className}`}
       style={style}
+      {...rest}
       onMouseMove={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
         e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
@@ -442,6 +444,28 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
   const restGoldRef = useRef<HTMLElement>(null);
   const restAeroRef = useRef<HTMLElement>(null);
 
+  // task 145-б: карточки услуг получили то же обращение, что georg services
+  // и leorus directions (стекло — ДНК /moto-selection): ховер ПК снимает
+  // графит-стекло ЦЕЛИКОМ (тинт и blur уходят вместе), фото наводится на
+  // резкость. У тача ховера нет — ПЕРВЫЙ тап открывает карточку, ВТОРОЙ
+  // ведёт в каталог; грамматика PartnerRevealCard / MsServicesGrid /
+  // GlassServiceCard. Клавиатуре — :focus-within.
+  const [revealedSvcs, setRevealedSvcs] = useState<Record<string, boolean>>({});
+  const lastPointerWasTouch = useRef(false);
+  const svcGate = (key: string) => ({
+    "data-reveal-active": revealedSvcs[key] ? "true" : undefined,
+    onPointerDown: (e: React.PointerEvent) => {
+      lastPointerWasTouch.current = e.pointerType === "touch";
+    },
+    onClick: (e: React.MouseEvent) => {
+      if (lastPointerWasTouch.current && !revealedSvcs[key]) {
+        e.preventDefault();
+        e.stopPropagation();
+        setRevealedSvcs((prev) => ({ ...prev, [key]: true }));
+      }
+    },
+  });
+
   return (
     <MotionConfig reducedMotion="user">
       <div
@@ -500,6 +524,23 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             transform: translateY(-4px);
             border-color: color-mix(in srgb, var(--sly-accent) 45%, var(--sly-border)) !important;
           }
+          /* ── карточки услуг: стекло растворяется (ДНК /moto-selection) ── */
+          .sly-glass {
+            background: rgba(15, 20, 25, 0.72);
+            -webkit-backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
+            transition: opacity 0.5s ease;
+          }
+          .sly-svc img { transition: transform 0.5s ease; }
+          @media (hover: hover) and (pointer: fine) {
+            .sly-svc:hover .sly-glass { opacity: 0; }
+            .sly-svc:hover img { transform: scale(1.05); }
+          }
+          .sly-svc[data-reveal-active="true"] .sly-glass,
+          .sly-svc:focus-within .sly-glass { opacity: 0; }
+          .sly-svc[data-reveal-active="true"] img { transform: scale(1.05); }
+          /* текст поверх резкого фото после растворения — лёгкая тень */
+          .sly-svc h3, .sly-svc p { text-shadow: 0 1px 12px rgba(15, 20, 25, 0.8); }
         `}</style>
 
         <div className="sly-grain" aria-hidden />
@@ -1223,8 +1264,9 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               {SERVICES.map((s, i) => (
                 <Reveal key={s.id} delay={0.05 + (i % 3) * 0.07}>
                   <SpotlightCard
-                    className="group relative h-full min-h-[340px] overflow-hidden rounded-2xl border transition-transform duration-300 hover:-translate-y-1"
+                    className="sly-svc group relative h-full min-h-[340px] overflow-hidden rounded-2xl border transition-transform duration-300 hover:-translate-y-1"
                     style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                    {...svcGate(s.id)}
                   >
                     <Image
                       src={`${SB}/${s.id}/image_1_4x3.jpg`}
@@ -1232,20 +1274,15 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                       aria-hidden
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition duration-500 group-hover:scale-105"
+                      className="object-cover"
                     />
                     {/* графит-стекло: ДНК карточек moto-selection.ru
-                        (чёрный 60% + backdrop-blur 5px) в палитре SLY13;
-                        без blur-поддержки остаётся graphite 72% — читается */}
-                    <div
-                      className="absolute inset-0"
-                      aria-hidden
-                      style={{
-                        background: "rgba(15,20,25,0.72)",
-                        backdropFilter: "blur(5px)",
-                        WebkitBackdropFilter: "blur(5px)",
-                      }}
-                    />
+                        (чёрный 60% + backdrop-blur 5px) в палитре SLY13.
+                        Ховер/первый тап снимает его ЦЕЛИКОМ (opacity 1→0,
+                        тинт И blur вместе — ground truth оригинала), фото
+                        наводится на резкость; без blur-поддержки остаётся
+                        graphite 72% — читается */}
+                    <div className="sly-glass absolute inset-0" aria-hidden />
                     <span
                       className="font-jb absolute right-3 top-3 z-10 rounded-full px-2.5 py-1 text-[11px] font-bold"
                       style={{ background: p.accentMain, color: p.bgBase }}
