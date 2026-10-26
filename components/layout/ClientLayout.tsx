@@ -132,6 +132,29 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
+  // PATCH: georg-electro theme (2026-10-26) — standalone landing for the
+  // GEORG ELECTRO crew (электрик электробайков, one-man crew — Георгий).
+  // Amber/brown palette from crews.metadata (bgBase #140f06 / accent #f59e0b);
+  // renders its own nav + footer — svarprofi/motoSelection/sly13 pattern.
+  georgElectro: {
+    paths: ["/georg-electro"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
+  // PATCH: leorus theme (2026-10-26) — port of the LEORUS event-agency
+  // landing (Оруджов × Влад / djorudjov) from /var/www/orudjov-x-vlad on the
+  // VPS. Dark club aesthetics + own neon nav/footer — same standalone pattern.
+  leorus: {
+    paths: ["/leorus"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -167,6 +190,12 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/sly13")) {
     return THEME_CONFIG.sly13;
+  }
+  if (pathname.startsWith("/georg-electro")) {
+    return THEME_CONFIG.georgElectro;
+  }
+  if (pathname.startsWith("/leorus")) {
+    return THEME_CONFIG.leorus;
   }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;
