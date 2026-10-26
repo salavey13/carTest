@@ -63,11 +63,36 @@
 //   Rails are MEASURED, not guessed: auto table layout sizes columns by
 //   content, so the offsets come from the rendered header row
 //   (getBoundingClientRect) via a ResizeObserver — see lib/table-rails.ts.
+//
+// Task 146 (2026-10-27, boss — tableview round four: "make everything
+//   collapsible … keep showing date picker only in collapsed-controls mode
+//   … autocollapse in case screen is rotated on mobile"):
+//   1. COLLAPSIBLE CONTROLS — the header folds to ONE compact row: the date
+//      pickers stay visible (that's the "collapsed-controls" contract),
+//      search/send/download shrink to icon buttons (send/download hide on
+//      the narrowest phones), and the totals tiles + «ЗП по операторам»
+//      split + сверка chips fold away behind a CSS grid-rows 1fr↔0fr
+//      animation (inert + aria-hidden while folded) — the table gets the
+//      whole screen.
+//   2. DEFAULTS — desktop (fine pointer) starts expanded, touch starts
+//      collapsed: the boss works IN the table on the phone. The last MANUAL
+//      toggle is remembered per tab (sessionStorage) — a fresh tab falls
+//      back to the viewport default.
+//   3. AUTO-COLLAPSE — rotating a touch device to landscape folds the
+//      controls immediately (the rotated-short viewport is exactly when the
+//      chrome hurts). Never auto-EXPANDS: after the transition the manual
+//      toggle always wins.
+//   4. SHIPPING DETAILS — the toggle wears a count badge while a filter is
+//      active (a folded filter must never be invisible); a bulk-verify run
+//      force-opens the chips row so the progress button stays on screen;
+//      the collapsed phone search icon expands the controls and focuses the
+//      field once the fold animation has opened the row; the scroll
+//      container got a thin styled scrollbar + touch-action:manipulation.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { X, Download, Loader2, Send, Search, Table2, Camera, Check } from "lucide-react";
+import { X, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 // Task 128 — same owner-gated action the rental-page verification card uses.
 import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";
@@ -356,6 +381,11 @@ const verToneBg = (tone: Exclude<VerTone, null>, base: string): string =>
 const verToneFg = (tone: Exclude<VerTone, null>, isDark?: boolean): string =>
   isDark ? VER_TONE_FG_DARK[tone] : VER_TONE_FG[tone];
 
+// Task 146 — sessionStorage remembers the last MANUAL fold choice for this
+// tab: reopening the modal keeps the operator's layout, a fresh tab starts
+// from the viewport default (desktop expanded / touch collapsed).
+const CONTROLS_STORAGE_KEY = "rentalsAnalytics.csvTableControlsExpanded";
+
 export function ExportCsvModal({
   isOpen,
   onClose,
@@ -402,6 +432,17 @@ export function ExportCsvModal({
   // Belt-and-braces against a second batch racing the first (state batching
   // alone leaves a one-tick window between the click and the re-render).
   const bulkRunRef = useRef(false);
+
+  // Task 146 — collapsible controls (boss: "keep showing date picker only in
+  // collapsed-controls mode"). false folds the header to one compact row:
+  // date pickers + icon actions stay, the totals tiles / operator split /
+  // сверка chips fold away and the table takes the screen. Initialized per
+  // open in the isOpen effect below (viewport default + stored choice).
+  const [controlsExpanded, setControlsExpanded] = useState(true);
+  // Task 146 — the collapsed phone has no room for the search input; its
+  // icon expands the controls and focuses the field after the fold opens.
+  const [searchFocusPending, setSearchFocusPending] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadTable = useCallback(async (opts?: { silent?: boolean }) => {
     if (!fetchCsvText || !from || !to || from > to) return;
@@ -498,6 +539,9 @@ export function ExportCsvModal({
         `Незакрытые аренды сервер пропустит — по ним сверка не заводится.`,
     );
     if (!ok) return;
+    // Task 146 — the batch progress lives in the сверка chips row; open the
+    // folded controls so the count-up button stays visible while it runs.
+    setControlsExpanded(true);
     bulkRunRef.current = true;
     let done = 0;
     let failed = 0;
@@ -564,6 +608,20 @@ export function ExportCsvModal({
       // batch instead of silently no-op-ing on the stale running flag.
       bulkRunRef.current = false;
       setBulkVerify(null);
+      // Task 146 — fold state per open: the stored MANUAL choice wins; a tab
+      // without one falls back to the viewport default (desktop expanded /
+      // touch collapsed — the phone works IN the table). Touch devices that
+      // opened already rotated (landscape) also start folded via the same
+      // coarse-pointer default.
+      const coarse = window.matchMedia("(pointer: coarse)").matches;
+      let stored: string | null = null;
+      try {
+        stored = window.sessionStorage.getItem(CONTROLS_STORAGE_KEY);
+      } catch {
+        /* private mode — viewport default applies */
+      }
+      setControlsExpanded(stored != null ? stored === "1" : !coarse);
+      setSearchFocusPending(false);
     }
   }, [isOpen]);
 
@@ -583,6 +641,34 @@ export function ExportCsvModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose, downloading, sending]);
+
+  // Task 146 — boss: "autocollapse in case screen is rotated on mobile".
+  // A portrait→landscape transition on a touch device folds the controls
+  // right away. Fires on the TRANSITION only (a keyboard opening or a window
+  // resize never folds — the on-screen keyboard would otherwise fight the
+  // operator mid-search). Desktop (fine pointer) never auto-collapses, and
+  // nothing here ever auto-EXPANDS — the manual toggle wins after the flip.
+  useEffect(() => {
+    if (!isOpen) return;
+    const landscape = window.matchMedia("(orientation: landscape)");
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const onOrientationChange = () => {
+      if (landscape.matches && coarse.matches) setControlsExpanded(false);
+    };
+    landscape.addEventListener("change", onOrientationChange);
+    return () => landscape.removeEventListener("change", onOrientationChange);
+  }, [isOpen]);
+
+  // Task 146 — the collapsed-phone search icon: wait for the 340ms fold
+  // animation to open the controls row, then put the caret in the field.
+  useEffect(() => {
+    if (!searchFocusPending || !controlsExpanded) return;
+    const t = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      setSearchFocusPending(false);
+    }, 340);
+    return () => window.clearTimeout(t);
+  }, [searchFocusPending, controlsExpanded]);
 
   if (!isOpen) return null;
 
@@ -787,6 +873,32 @@ export function ExportCsvModal({
     canQuickVerify && !!effectiveOpFilter && verFilter === "none" &&
     (bulkActive || bulkTargetIds.length > 0);
 
+  // Task 146 — fold model. regionOpen forces the chips row visible while the
+  // bulk verify counts up; activeFilterCount powers the toggle's badge — a
+  // folded operator/сверка filter must never be invisible (the boss reads
+  // the table against the filters; a stale filter without a hint would lie).
+  const regionOpen = controlsExpanded || bulkActive;
+  const activeFilterCount =
+    (effectiveOpFilter ? 1 : 0) + (verFilter !== "all" ? 1 : 0);
+  const toggleControls = () => {
+    const next = !controlsExpanded;
+    setControlsExpanded(next);
+    try {
+      window.sessionStorage.setItem(CONTROLS_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      /* private mode — the layout choice just won't persist */
+    }
+  };
+  const expandAndFocusSearch = () => {
+    setControlsExpanded(true);
+    setSearchFocusPending(true);
+    try {
+      window.sessionStorage.setItem(CONTROLS_STORAGE_KEY, "1");
+    } catch {
+      /* private mode */
+    }
+  };
+
   // ── Legacy single-grid values (sales variant / old flat sheets) ───────────
   const headerRow = rows[0] ?? [];
   const bodyRows = rows.slice(1).filter((r) => r.some((c) => c.trim() !== ""));
@@ -861,11 +973,20 @@ export function ExportCsvModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Header — title + close + date pickers + actions ────────────────── */}
+        {/* ── Header — title + close + date pickers + actions ──────────────────
+            Task 146 — collapsible. Expanded = title row + full controls row
+            (dates + search + send/download). Collapsed = ONE compact row:
+            the DATE PICKERS stay visible (the "collapsed-controls" contract),
+            search/send/download become icon buttons (send/download hide on
+            the narrowest phones), and the summary region below folds away —
+            the table gets the screen. The toggle's badge shows how many
+            filters stay active while folded. */}
         <div
           className="flex flex-col gap-3 border-b p-3 sm:p-4"
           style={{ borderColor: T.border, background: T.bgElevated }}
         >
+          {controlsExpanded ? (
+            <>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Table2 className="h-5 w-5" style={{ color: T.accent }} aria-hidden />
@@ -886,15 +1007,31 @@ export function ExportCsvModal({
                     : `${visibleColCount} столбцов`}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Закрыть"
-              className="cursor-pointer rounded-lg p-2 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
-              style={{ color: T.textMuted, minHeight: "44px", minWidth: "44px" }}
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              {/* Task 146 — fold everything but the dates; the badge keeps
+                  active filters visible while folded. */}
+              <button
+                type="button"
+                onClick={toggleControls}
+                aria-expanded="true"
+                aria-controls="csv-controls-region"
+                title="Свернуть сводку и фильтры — останутся только даты"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+                style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgCard, minHeight: "36px" }}
+              >
+                <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                Свернуть
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Закрыть"
+                className="cursor-pointer rounded-lg p-2 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+                style={{ color: T.textMuted, minHeight: "44px", minWidth: "44px" }}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
@@ -943,6 +1080,7 @@ export function ExportCsvModal({
               >
                 <Search className="h-3.5 w-3.5 opacity-60" aria-hidden />
                 <input
+                  ref={searchInputRef}
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -996,8 +1134,172 @@ export function ExportCsvModal({
               </button>
             </div>
           </div>
+            </>
+          ) : (
+            /* Task 146 — COLLAPSED: one compact row. Date pickers keep their
+               ids/labels (sr-only here) so the «collapsed-controls» contract
+               holds; search/send/download shrink to icons — send/download
+               hide below sm where the row would overflow anyway; the
+               SlidersHorizontal toggle re-opens the summary region (badge =
+               active filter count) and the X stays in the same corner. */
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col">
+                <label className="sr-only" htmlFor="csv-from">
+                  С даты
+                </label>
+                <input
+                  id="csv-from"
+                  type="date"
+                  value={from}
+                  max={to}
+                  onChange={(e) => setFrom(e.target.value)}
+                  aria-label="С даты"
+                  className="rounded-lg border px-2 py-1.5 text-xs tabular-nums"
+                  style={inputStyle}
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="sr-only" htmlFor="csv-to">
+                  По дату
+                </label>
+                <input
+                  id="csv-to"
+                  type="date"
+                  value={to}
+                  min={from}
+                  onChange={(e) => setTo(e.target.value)}
+                  aria-label="По дату"
+                  className="rounded-lg border px-2 py-1.5 text-xs tabular-nums"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div className="ml-auto flex items-center gap-1.5">
+                {/* Search: inline input where the row has room (sm+), a
+                    one-tap expand+focus icon on phones (task 146). */}
+                <div
+                  className="relative hidden items-center rounded-lg border px-2 sm:flex"
+                  style={inputStyle}
+                >
+                  <Search className="h-3.5 w-3.5 opacity-60" aria-hidden />
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Поиск…"
+                    aria-label="Поиск по таблице"
+                    className="ml-1.5 w-24 bg-transparent py-1.5 text-xs outline-none sm:w-32"
+                    style={{ color: T.text }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={expandAndFocusSearch}
+                  aria-label="Найти в таблице"
+                  title="Найти в таблице"
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition hover:opacity-80 focus:outline-none focus-visible:ring-2 sm:hidden"
+                  style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgCard }}
+                >
+                  <Search className="h-4 w-4" aria-hidden />
+                </button>
+
+                {onSendTelegram && (
+                  <button
+                    type="button"
+                    onClick={handleSendTelegram}
+                    disabled={!isValid || sending || loading}
+                    aria-label="Отправить в Telegram"
+                    title={variant === "rentals" ? "Отправить XLSX в Telegram (подсветка сверки)" : "Отправить XLSX в Telegram"}
+                    className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition focus:outline-none focus-visible:ring-2 disabled:opacity-50 sm:inline-flex"
+                    style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
+                  >
+                    {sending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Send className="h-4 w-4" aria-hidden />
+                    )}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={!isValid || downloading || loading}
+                  aria-label="Скачать видимые данные в XLSX"
+                  title={variant === "rentals" ? "Скачать XLSX (подсветка сверки)" : "Скачать XLSX"}
+                  className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition focus:outline-none focus-visible:ring-2 disabled:opacity-50 sm:inline-flex"
+                  style={{ backgroundColor: "#3b82f6", color: "#ffffff" }}
+                >
+                  {downloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="h-4 w-4" aria-hidden />
+                  )}
+                </button>
+
+                {/* Re-open the summary region. The badge counts active
+                    filters (operator pill / сверка chip) — a folded filter
+                    must never be invisible. */}
+                <button
+                  type="button"
+                  onClick={toggleControls}
+                  aria-expanded="false"
+                  aria-controls="csv-controls-region"
+                  aria-label="Показать сводку и фильтры"
+                  title="Показать сводку и фильтры (итоги, ЗП по операторам, сверка)"
+                  className="relative inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border px-2 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+                  style={{
+                    borderColor: activeFilterCount > 0 ? T.accent : T.border,
+                    color: activeFilterCount > 0 ? T.accent : T.text,
+                    backgroundColor:
+                      activeFilterCount > 0
+                        ? `color-mix(in srgb, ${T.accent} 12%, ${T.bgCard})`
+                        : T.bgCard,
+                  }}
+                >
+                  <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                  {activeFilterCount > 0 && (
+                    <span
+                      className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold"
+                      style={{ backgroundColor: T.accent, color: "#ffffff" }}
+                    >
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Закрыть"
+                  className="cursor-pointer rounded-lg p-2 transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+                  style={{ color: T.textMuted, minHeight: "44px", minWidth: "44px" }}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* ── Foldable region (task 146): totals tiles + «ЗП по операторам» +
+            сверка chips. The grid-template-rows 1fr↔0fr animation needs the
+            overflow-hidden child (a scroll container's automatic minimum
+            size is 0 — that's what lets 0fr actually collapse); inert +
+            aria-hidden keep the folded controls out of the tab order and off
+            screen readers. bulkActive force-opens the region so the batch
+            progress button stays visible. */}
+        <div
+          id="csv-controls-region"
+          role="region"
+          aria-label="Сводка и фильтры таблицы"
+          aria-hidden={!regionOpen}
+          {...(regionOpen ? {} : { inert: "" })}
+          className="grid transition-[grid-template-rows] duration-300 ease-out"
+          style={{ gridTemplateRows: regionOpen ? "1fr" : "0fr" }}
+        >
+        <div className="overflow-hidden">
         {/* ── Totals card — per-block revenue + operator salary (iter52) ─────── */}
         {!loading && !error && isSectioned && visibleSections.length > 0 && (
           <div
@@ -1231,9 +1533,18 @@ export function ExportCsvModal({
             )}
           </div>
         )}
+        </div>
+        </div>
 
-        {/* ── Table(s) — horizontal scroll, sticky first column + header ─────── */}
-        <div className="flex-1 overflow-auto" style={{ backgroundColor: T.bg }}>
+        {/* ── Table(s) — horizontal scroll, sticky first column + header.
+            Task 146 polish: thin styled scrollbars (the horizontal one used
+            to be a chunky default bar eating row height on PC) and
+            touch-action:manipulation so double-tapping a row can't zoom the
+            sheet while the boss works fast. */}
+        <div
+          className="flex-1 overflow-auto [touch-action:manipulation] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          style={{ backgroundColor: T.bg }}
+        >
           {loading ? (
             <div className="flex h-full min-h-[200px] items-center justify-center p-8">
               <div className="flex items-center gap-2 text-sm" style={{ color: T.textMuted }}>

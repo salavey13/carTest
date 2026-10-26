@@ -194,8 +194,15 @@ describe("task127 · the «x» clears the TG native buttons", () => {
     expect(modal).toContain("...(tgSafeTop > 0 ? { paddingTop: `${tgSafeTop}px` } : {}),");
   });
 
-  it("still exactly one close button in the modal shell (task126 pin)", () => {
-    expect(modal.match(/aria-label="Закрыть"/g)?.length).toBe(1);
+  it("exactly one close button PER header branch — task146 fold added a second, mutually exclusive «x» (task126 pin updated)", () => {
+    // Task 146 split the header into two branches (expanded / collapsed);
+    // only one branch renders at a time, so the runtime invariant from
+    // task126 holds: exactly ONE close button in the DOM. The source now
+    // carries exactly one per branch — two total, never more (a third would
+    // mean someone duplicated the button inside a branch).
+    expect(modal.match(/aria-label="Закрыть"/g)?.length).toBe(2);
+    // The two branches are truly exclusive — one conditional, one else-arm.
+    expect(modal.match(/controlsExpanded \? \(/g)?.length).toBe(1);
   });
 
   it("the hook itself measures contentSafeAreaInset with the 54px mobile floor", () => {
