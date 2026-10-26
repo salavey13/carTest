@@ -34,7 +34,10 @@ import {
   Youtube,
 } from "lucide-react";
 import FeedbackModal from "./FeedbackModal";
+import { MsServicesGrid } from "./ServicesGrid";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
+import { RestBreak } from "@/components/landings/RestBreak";
+import { GhostWordmark } from "@/components/landings/GhostWordmark";
 
 export const metadata: Metadata = {
   title: "Moto.selection — высокое искусство мотосервиса | Нижний Новгород",
@@ -320,24 +323,28 @@ export default function MotoSelectionLanding() {
         }
         @keyframes ms-kenburns { 0% { transform: scale(1) translateY(0); } 100% { transform: scale(1.12) translateY(-1.5%); } }
         @keyframes ms-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        /* Фирменное стекло карточек услуг (чёрный 60% + blur 5px). 2026-10-27
-           boss: на ground truth moto-selection.ru при ховере картинка
-           РАЗМЫТИЕ СНИМАЕТСЯ — плавно blur(5px)→blur(0) под курсором.
-           Гейт hover:hover + pointer:fine = PC-only (тач не страндирует
-           размытое состояние, как в каталоге с wash md:block). Тёмная
-           подложка 60% остаётся — контраст текста не деградирует. */
+        /* Фирменное стекло карточек услуг (чёрный 60% + blur 5px).
+           2026-10-27 ПРОБА ОРИГИНАЛА (playwright, sbs-499421781): при ховере
+           moto-selection.ru стекло НЕ «blur(5px)→blur(0) с тинтом», а
+           ПОЛНОСТЬЮ РАСТВОРЯЕТСЯ — opacity 1 → 0 (уйти должен и blur, и
+           тёмный тинт; тинт поверх резкой фотографии читался боссом как
+           «всё ещё размыто»). Гейт hover:hover + pointer:fine = PC-only;
+           тач снимает стекло по data-active (первый тап — reveal, второй —
+           переход, MsServicesGrid), фокус-клавиатура — по :focus-visible.
+           task145 rebase: параллельный коммит вернул старый blur(0)-рецепт —
+           восстановлен ground-truth из task144, иначе босс снова увидит
+           «pictures still are blurred when selected/hovered». */
         .ms-glass {
           background: rgba(0,0,0,0.6);
           -webkit-backdrop-filter: blur(5px);
           backdrop-filter: blur(5px);
-          transition: -webkit-backdrop-filter 0.5s ease, backdrop-filter 0.5s ease;
+          transition: opacity 0.5s ease;
         }
         @media (hover: hover) and (pointer: fine) {
-          .group:hover .ms-glass {
-            -webkit-backdrop-filter: blur(0px);
-            backdrop-filter: blur(0px);
-          }
+          .group:hover .ms-glass { opacity: 0; }
         }
+        .ms-card[data-active="true"] .ms-glass,
+        .ms-card:focus-visible .ms-glass { opacity: 0; }
         @media (prefers-reduced-motion: reduce) {
           .ms-kenburns, .ms-marquee-track { animation: none !important; }
         }
@@ -564,63 +571,12 @@ export default function MotoSelectionLanding() {
               нумерал, наполовину выходящий за верхний край → заголовок 18px/400
               uppercase по центру → оранжевая пилюля ПОДРОБНЕЕ (200×48, белый
               текст). У эвакуации вместо фото — фирменный градиент, стекло поверх.
-              Без поддержки backdrop-filter остаётся чёрный 60% — карточка читается. */}
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
-            {SERVICES.map((s, svcIdx) => (
-              <a
-                key={s.id}
-                href={s.anchor}
-                className="group relative flex min-h-[320px] flex-col overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.04] transition hover:border-[var(--ms-accent)]/60"
-              >
-                {s.img ? (
-                  <Image
-                    src={s.img}
-                    alt=""
-                    aria-hidden
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="object-cover transition duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  // Эвакуация — единственная услуга без фото на оригинале:
-                  // фирменный оранжевый блок с иконкой вместо картинки.
-                  <div className="absolute inset-0" aria-hidden style={{ background: `linear-gradient(135deg, ${BRAND} 0%, #c24e0d 100%)` }}>
-                    <Truck className="absolute right-5 top-5 h-14 w-14 text-black/70" aria-hidden />
-                    <span className="absolute right-5 top-24 rounded-full bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
-                      24/7
-                    </span>
-                  </div>
-                )}
-                {/* фирменное стекло оригинала: чёрный 60% + blur(5px);
-                    ховер снимает размытие (.ms-glass в <style> выше) */}
-                <div className="ms-glass absolute inset-0" aria-hidden />
-                <div className="relative z-10 flex flex-1 flex-col items-center p-6 text-center">
-                  {/* нумерал наполовину «выходит» из-под верхнего края карточки
-                      (оригинал: 120px, top = card − 53px); overflow-hidden срезает
-                      верхнюю часть — эффект появления из-за кромки */}
-                  <span
-                    aria-hidden
-                    className="pointer-events-none -mt-12 select-none text-[88px] font-bold leading-none text-white/85 transition duration-300 group-hover:text-[var(--ms-accent)] sm:text-[110px]"
-                  >
-                    {String(svcIdx + 1).padStart(2, "0")}
-                  </span>
-                  <h3 className="mt-2 text-lg font-normal uppercase leading-snug text-white">{s.title}</h3>
-                  {s.price && (
-                    <span className="mt-2 rounded-full border border-white/25 px-3 py-1 text-[11px] font-semibold text-white/85">
-                      {s.price}
-                    </span>
-                  )}
-                  <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-white/55">{s.text}</p>
-                  <span
-                    className="mt-auto inline-flex h-12 w-[200px] items-center justify-center self-center rounded-[30px] bg-[var(--ms-accent)] text-xs font-semibold uppercase tracking-[0.08em] text-white transition group-hover:brightness-110"
-                    style={{ marginTop: "auto" }}
-                  >
-                    Подробнее
-                  </span>
-                </div>
-              </a>
-            ))}
-          </div>
+              Без поддержки backdrop-filter остаётся чёрный 60% — карточка читается.
+              task145 rebase: рендерим клиентский MsServicesGrid (та же анатомия)
+              — инлайн-версия из параллельного коммита потеряла тач-гейт
+              (первый тап — reveal стекла, второй — переход), а босс требовал
+              unblur «upon active/hover state» и на тач-устройствах тоже. */}
+          <MsServicesGrid services={SERVICES} brand={BRAND} />
         </div>
       </section>
 
@@ -929,6 +885,23 @@ export default function MotoSelectionLanding() {
         </div>
       </section>
 
+      {/* ── ПЕРЕДЫШКА (task 145) — full-screen rest act, pollinated from
+          /sly13 (boss: «we recently added "rest sections" to /sly13 —
+          LOOKS AND FEELS GREAT — pollonate this great idea to other
+          interlinked rentals»). Драматичный кадр мото-академии (дым, конусы,
+          синий неон) с параллаксом; строка-тизер ведёт в «о нас». */}
+      <RestBreak
+        src={IMG.training}
+        kicker="moto-selection · передышка"
+        title="Мотоцикл любит"
+        accentWord="внимание"
+        note="обучение · подбор · сервис · хранение · детилинг · эвакуация"
+        bg="#000000"
+        accent={BRAND}
+        textPrimary="#ffffff"
+        textSecondary="rgba(255,255,255,0.55)"
+      />
+
       {/* ── О НАС ── ДНК rec499516429: гост-слово «о нас» (175px/900 #2b2b2b
           + blur 2px на оригинале) за контентом тёмной секции */}
       <section id="about" className="relative scroll-mt-20 overflow-hidden">
@@ -1217,11 +1190,18 @@ export default function MotoSelectionLanding() {
 
       {/* ДНК оригинала: повторяющийся вордмарк-разделитель (на Tilda-странице
           MOTO.SELECTION повторяется 8 раз — декоративные повторы бренда).
-          Здесь — один гигантский гост-текст перед подвалом. */}
-      <div className="select-none overflow-hidden border-t border-white/10 py-5" aria-hidden>
-        <p className="whitespace-nowrap text-center text-[13vw] font-black uppercase leading-none tracking-tight text-white/[0.04]">
-          Moto<span className="text-[var(--ms-accent)]/15">.</span>selection
-        </p>
+          Здесь — один гигантский гост-текст перед подвалом.
+          task 145: 13vw CSS вёрстка влезала только в «MOTO.SELECTI» (14 глифов
+          Archivo/Montserrat-black ≈ 136vw) — GhostWordmark тянет строку ровно
+          на всю ширину через SVG textLength (никаких ручных оценок глифов). */}
+      <div className="border-t border-white/10 py-5" aria-hidden>
+        <GhostWordmark
+          parts={[
+            { text: "MOTO", color: "#ffffff", opacity: 0.04 },
+            { text: ".", color: "#ff7522", opacity: 0.15 },
+            { text: "SELECTION", color: "#ffffff", opacity: 0.04 },
+          ]}
+        />
       </div>
 
       {/* ── FOOTER ── ДНК rec499421521: #111111 + мелкий принт #707070 */}

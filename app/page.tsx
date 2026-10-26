@@ -14,6 +14,8 @@ import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { useTheme } from "next-themes";
 import FeedbackModal from "@/app/moto-selection/FeedbackModal";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
+import { RestBreak } from "@/components/landings/RestBreak";
+import { GhostWordmark } from "@/components/landings/GhostWordmark";
 
 /* ══ THEME PALETTES (dark: gold/black, light: dark cyan/white — WCAG AA) ══ */
 const VIP_BIKE_THEMES = {
@@ -1250,7 +1252,22 @@ export default function Home() {
           </section>
 
           {/* ══ PARTNERS SECTION — strong accent-tinted background, logos not inverted ══ */}
-          <section id="partners" className="relative overflow-hidden py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-partners-bg)" }}>
+          {/* ══ ПЕРЕДЫШКА (task 145) — sly13 rest act pollinated: золотая
+              Panigale на весь экран с параллаксом перед витриной партнёров
+              (родственный кадр — та же electro-серия, что в каталоге выше). */}
+          <RestBreak
+            src={img("ducati-panigale-s-electro-gold")}
+            kicker="vip bike · передышка"
+            title="Приходи —"
+            accentWord="садись — едь"
+            note="электро · бензин · экипировка · карта райдера · зимнее хранение"
+            bg="#0A0A0A"
+            accent="#FFD700"
+            textPrimary="#FFFAF0"
+            textSecondary="#D4AF37"
+          />
+
+          <section id="partners" className="relative overflow-hidden py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-partners-bg)", marginTop: "-1px" }}>
             {/* task 144: фирменный дым moto-selection.ru (прозрачный PNG) на
                 тёмной витрине партнёров — «use everywhere applicable». */}
             <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-64 opacity-70">
@@ -1357,6 +1374,19 @@ export default function Home() {
               </AnimatedSection>
             </div>
           </section>
+
+          {/* ══ ГИГАНТСКИЙ ВОРДМАРК (task 145) — ДНК /moto-selection: VIP.BIKE
+              гост-текст ровно на всю ширину экрана перед финалом (SVG
+              textLength — влезает целиком на любом вьюпорте). */}
+          <div className="border-t border-white/5 px-0 py-6" aria-hidden style={{ background: "#0A0A0A" }}>
+            <GhostWordmark
+              parts={[
+                { text: "VIP", color: "#FFFAF0", opacity: 0.05 },
+                { text: ".", color: "#FFD700", opacity: 0.45 },
+                { text: "BIKE", color: "#FFFAF0", opacity: 0.05 },
+              ]}
+            />
+          </div>
 
           {/* ══ CINEMATIC FINALE — Final CTA + Footer merged into ONE full-screen section ══ */}
           <CinematicFinaleSection>

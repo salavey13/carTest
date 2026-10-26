@@ -104,8 +104,9 @@ describe("task138 · moto-selection landing", () => {
   });
 
   it("SLY13 partner card is a LOGO card now (visually aligned with Байкленд/Академия)", () => {
+    // task145 re-baseline: the card is a PartnerLogoGrid tile (logoSrc + logoAlt)
     expect(ms).toContain("carpix/sly13_logo.jpg");
-    expect(ms).toContain('alt="SLY13 — платформа франшиз проката"');
+    expect(ms).toContain('logoAlt: "SLY13 — платформа франшиз проката"');
   });
 
   it("winter storage section carries platform CTAs: mini-app deep link + web fallback", () => {

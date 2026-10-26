@@ -1375,3 +1375,59 @@
   font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
   color: var(--text-faint, #6E6486); margin: 0 0 14px;
 }
+/* =============================================================
+   15. TASK 145 — dir-card photos + glass veil («same design tweak
+       as /moto-selection service cards»: tinted blurred picture
+       that UNBLURS on hover/tap; first tap reveals on touch,
+       second tap follows the inner link)
+   ============================================================= */
+.leorus-root .dir-card__bg{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(7px) brightness(0.48) saturate(0.92);
+  transform: scale(1.08);
+  transition: filter 0.45s ease, transform 0.45s ease;
+  z-index: 0;
+}
+.leorus-root .dir-card__veil{
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(10, 6, 18, 0.5);
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+/* цветное свечение карточки теперь поверх фото (было z-index:-1) */
+.leorus-root .dir-card::before{ z-index: 2; }
+.leorus-root .dir-card > *:not(.dir-card__bg):not(.dir-card__veil){ position: relative; z-index: 3; }
+.leorus-root .dir-card:hover .dir-card__bg,
+.leorus-root .dir-card:focus-within .dir-card__bg,
+.leorus-root .dir-card[data-reveal-active="true"] .dir-card__bg{
+  filter: blur(0) brightness(0.7) saturate(1);
+  transform: scale(1.12);
+}
+.leorus-root .dir-card:hover .dir-card__veil,
+.leorus-root .dir-card:focus-within .dir-card__veil,
+.leorus-root .dir-card[data-reveal-active="true"] .dir-card__veil{ opacity: 0; }
+/* читаемость плотного текста поверх резкого фото */
+.leorus-root .dir-card__title,
+.leorus-root .dir-card__desc{ text-shadow: 0 1px 14px rgba(10, 6, 18, 0.85); }
+.leorus-root .dir-card__list li,
+.leorus-root .dir-card__num{ text-shadow: 0 1px 10px rgba(10, 6, 18, 0.85); }
+.leorus-root .dir-card__more{ text-shadow: 0 1px 10px rgba(10, 6, 18, 0.85); }
+
+/* ── REST BREAK (sly13 pollination): полноэкранная передышка перед CTA.
+      RestBreak рендерит свои tailwind-классы; здесь только шрифтовая
+      привязка к системе LEORUS (Unbounded для заголовка). ── */
+.leorus-root .leorus-rest p{ font-family: var(--font-body); }
+.leorus-root .leorus-rest .leorus-rest__title{ font-family: var(--font-display); }
+
+/* ── WORDMARK STRIP (task 145): гост-вордмарк LEO.RUS перед подвалом ── */
+.leorus-root .leorus-wordmark{
+  border-top: 1px solid var(--line);
+  padding: 22px 0 8px;
+  background: var(--bg);
+}

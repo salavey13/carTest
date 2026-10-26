@@ -71,6 +71,17 @@ export default function FeedbackModal({
     const onClick = (e: MouseEvent) => {
       const el = (e.target as HTMLElement | null)?.closest?.("[data-lead-modal-open]");
       if (!el) return;
+      // task 145 — touch reveal-gate (GlassServiceCard): the FIRST tap on a
+      // gated card only reveals it (glass fades). The gate marks the element
+      // with data-reveal-pending synchronously inside the same click — a
+      // plain stopPropagation() can't block this delegation (React's own
+      // delegation and this listener end up on the same node). Consume the
+      // mark and stay closed; the SECOND tap finds no mark and opens.
+      if (el.getAttribute("data-reveal-pending") === "true") {
+        el.removeAttribute("data-reveal-pending");
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       setOpen(true);
     };

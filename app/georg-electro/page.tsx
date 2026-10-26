@@ -43,6 +43,15 @@ import {
 } from "lucide-react";
 import FeedbackModal from "../moto-selection/FeedbackModal";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
+import { GlassServiceCard, GlassServiceCardStyle } from "@/components/landings/GlassServiceCard";
+import { RestBreak } from "@/components/landings/RestBreak";
+import { GhostWordmark } from "@/components/landings/GhostWordmark";
+
+// task 144: фирменный дым moto-selection.ru (прозрачный PNG, alpha 0…176,
+// 1680×625) — на тёмных секциях нашей витрины тоже («use everywhere
+// applicable, looks awesome!!»)
+const SMOKE_TEXTURE =
+  "https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png";
 
 export const metadata: Metadata = {
   title: "GEORG ELECTRO — электрик электробайков · Нижний Новгород",
@@ -540,59 +549,30 @@ export default function GeorgElectroLanding() {
           </div>
 
           <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {SERVICES.map((s) => (
-              <article
+            {/* task 145 (boss: «apply same design tweak to cards on other
+                landings»): услуги = ms-glass карточки как на /moto-selection —
+                фото на всю карточку + фирменное стекло (тёмный тинт + blur),
+                ховер/первый тап растворяет стекло ЦЕЛИКОМ, второй тап/клик
+                открывает заявку. Тёплый тинт под палитру экипажа. */}
+            <GlassServiceCardStyle />
+            {SERVICES.map((s, svcIdx) => (
+              <GlassServiceCard
                 key={s.id}
-                className="group flex flex-col overflow-hidden rounded-3xl border transition-transform hover:-translate-y-1"
-                style={{ background: P.bgCard, borderColor: P.border }}
-              >
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <Image
-                    src={s.img}
-                    alt={s.title}
-                    fill
-                    sizes="(min-width: 768px) 33vw, 90vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        "linear-gradient(180deg, transparent 45%, rgba(20,15,6,0.65) 100%)",
-                    }}
-                  />
-                  <span
-                    className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl backdrop-blur"
-                    style={{ background: "rgba(20,15,6,0.6)", color: P.accent }}
-                  >
-                    <s.icon className="h-4.5 w-4.5" aria-hidden />
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col p-6">
-                  <h3 className="text-lg font-black uppercase leading-snug tracking-tight">
-                    {s.title}
-                  </h3>
-                  <p className="mt-3 flex-1 text-sm leading-relaxed" style={{ color: P.textSecondary }}>
-                    {s.text}
-                  </p>
-                  <div className="mt-5 flex items-center justify-between gap-3">
-                    <span
-                      className="text-xs font-bold uppercase tracking-[0.14em]"
-                      style={{ color: P.accent }}
-                    >
-                      цена по запросу
-                    </span>
-                    <button
-                      type="button"
-                      data-lead-modal-open
-                      className="inline-flex h-10 items-center rounded-full border px-4 text-xs font-black uppercase tracking-[0.1em] transition hover:brightness-110 active:scale-95"
-                      style={{ borderColor: P.border, color: P.textPrimary }}
-                    >
-                      Заявка
-                    </button>
-                  </div>
-                </div>
-              </article>
+                img={s.img}
+                num={String(svcIdx + 1).padStart(2, "0")}
+                title={s.title}
+                text={s.text}
+                price="цена по запросу"
+                ctaLabel="Заявка"
+                leadModal
+                ariaLabel={`${s.title} — оставить заявку`}
+                minH="360px"
+                style={{
+                  ["--gs-accent" as string]: P.accent,
+                  ["--gs-glass-bg" as string]: "rgba(20, 15, 6, 0.66)",
+                  background: P.bgCard,
+                }}
+              />
             ))}
           </div>
 
@@ -681,6 +661,20 @@ export default function GeorgElectroLanding() {
           </ol>
         </div>
       </section>
+
+      {/* ── ПЕРЕДЫШКА (task 145) — sly13 rest act, pollinated: мастерская в
+          янтарном свете с параллаксом; тизер ведёт в партнёров. */}
+      <RestBreak
+        src={IMG.workshop}
+        kicker="georg-electro · передышка"
+        title="Пока ты катаешь —"
+        accentWord="он уже чинит"
+        note="диагностика · контроллеры · проводка · свет · доп. оборудование"
+        bg={P.bgBase}
+        accent={P.accent}
+        textPrimary={P.textPrimary}
+        textSecondary={P.textSecondary}
+      />
 
       {/* ── ПАРТНЁРЫ — витрина платформы (task 141: interlink all-to-all).
           Все экипажи/лендинги на одном софте: аренда, мотосервис, платформа
@@ -822,6 +816,19 @@ export default function GeorgElectroLanding() {
           </p>
         </div>
       </section>
+
+      {/* ── ГИГАНТСКИЙ ВОРДМАРК (task 145) — ДНК /moto-selection: гост-текст
+          ровно на всю ширину экрана перед подвалом (SVG textLength — влезает
+          целиком на любом вьюпорте). */}
+      <div className="border-t py-5" style={{ borderColor: P.border }} aria-hidden>
+        <GhostWordmark
+          parts={[
+            { text: "GEORG", color: P.textPrimary, opacity: 0.05 },
+            { text: ".", color: P.accent, opacity: 0.55 },
+            { text: "ELECTRO", color: P.textPrimary, opacity: 0.05 },
+          ]}
+        />
+      </div>
 
       {/* ── FOOTER ───────────────────────────────────────────────────────── */}
       <footer className="border-t" style={{ borderColor: P.border, background: P.bgCard }}>

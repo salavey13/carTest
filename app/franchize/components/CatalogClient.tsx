@@ -416,26 +416,30 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
  *
  * task 144 iter5 — boss: «inactive state — add gradient to bottom of picture,
  * so it kinda merges into bg of card title; hover state — gradient should
- * change color to highlighted color». The bottom blend is now a THREE-layer
- * stack:
+ * change color to highlighted color». The bottom blend is a TWO-part stack:
  *   1. whole-photo accent wash (30%) — hover only, unchanged from iter4;
- *   2. BASE gradient from var(--catalog-card-bg) — the title strip's own bg —
- *      ALWAYS on (static visual, not hover-linked → no touch hover-lock):
- *      the photo visually sinks into the strip below, and the seam is
- *      invisible because the gradient's bottom edge is exactly the strip
- *      color it melts into;
- *   3. ACCENT gradient — cross-fades IN on md hover while (2) fades OUT:
- *      the merge color becomes the highlight color and its bottom edge meets
- *      the accent info strip (article bg flip) with zero seam. Full opacity
- *      on hover so the bottom pixel is pure accent = the strip below.
- * Height h-32 (was h-28): a taller fade reads as «melts», not «stripe».
+ *   2. MELT gradient (.catalog-melt, see globals.css) — ALWAYS on: the photo
+ *      sinks into the strip below, its bottom edge exactly the strip color.
+ *
+ * task 144 iter6 — boss: «slight delay in transition of color of the card
+ * and gradient over picture — the card part kinda lags a millisecond
+ * revealing seam between picture and description bloc». The iter5 cross-fade
+ * (base gradient fading OUT under accent fading IN) showed the PHOTO through
+ * both semi-transparent layers mid-transition, and the info strip blended on
+ * a different curve — a brief dark seam at the picture/strip boundary.
+ * Fix: ONE gradient element whose COLOR interpolates via @property
+ * (--catalog-melt-color: card-bg → accent, 300ms same easing as the strip's
+ * transition-colors) — no cross-fade, no photo bleed-through; the strip side
+ * now transitions bg-card → accent directly (same curve), so the melt bottom
+ * edge and the strip are the SAME mix at every frame. End states unchanged:
+ * idle melts into card-bg, hover bottom pixel = pure accent strip.
+ * Height h-32: a tall fade reads as «melts», not «stripe».
  */
 function CatalogHoverWash() {
   return (
     <>
       <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--catalog-card-bg)] to-transparent transition-opacity duration-300 md:group-hover:opacity-0" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-32 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 md:block" />
+      <div aria-hidden className="catalog-melt pointer-events-none absolute inset-x-0 bottom-0 h-32" />
     </>
   );
 }
@@ -1692,11 +1696,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         {/* flex-1 + flex-col fills the card height so the hover border aligns. */}
                         {/* task 133: no rounded-b-2xl — the accent hover fill must hug
                             the card silhouette, not read as a narrower inner block. */}
-                        {/* task 141 iter4: on hover this strip goes TRANSPARENT and the
-                            accent shows from the ARTICLE's own background (globals.css
-                            --card-base-bg flip) — one paint layer = exactly the card,
-                            a partial highlight is impossible by construction. */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-transparent">
+                        {/* task 144 iter6: strip transitions bg-card → accent DIRECTLY
+                            (same 300ms curve as .catalog-melt above it) — iter5's
+                            fade-to-transparent over the article flip blended on an
+                            accent² curve and lagged behind the picture gradient
+                            (boss: «the card part kinda lags a millisecond, revealing
+                            seam»). End state identical: opaque accent strip over
+                            the accent article = one solid highlight; the article
+                            flip still guarantees whole-card coverage. */}
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
@@ -1853,13 +1861,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             block floating inside the card (dark corner bites + dark moat vs
                             the framed image above) — on PC the boss read the highlighted
                             card as literally smaller. */}
-                        {/* task 141 iter4: on hover this strip goes TRANSPARENT and the
-                            accent shows from the ARTICLE's own background (globals.css
-                            --card-base-bg flip) — the accent then covers the whole
-                            border-box even when grid/carousel stretch leaves inner
-                            elements shorter than the card (the «1-row name next to a
-                            2-row name» case the boss kept hitting). */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-transparent">
+                        {/* task 144 iter6: strip bg-card → accent directly (same curve
+                            as the melt gradient) — desync history in the carousel
+                            card comment above; the article flip below stays as the
+                            whole-card guarantee for stretched grid rows. */}
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (

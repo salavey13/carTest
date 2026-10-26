@@ -25,8 +25,10 @@
 // стилистике оригинального [data-success] блока.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
+import { RestBreak } from "@/components/landings/RestBreak";
+import { GhostWordmark } from "@/components/landings/GhostWordmark";
 import "./leorus.css";
 
 type FormPhase = "idle" | "sending" | "success" | "error";
@@ -36,6 +38,26 @@ export default function LeorusLandingClient() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formPhase, setFormPhase] = useState<FormPhase>("idle");
   const [formError, setFormError] = useState("");
+
+  // task 145 — dir-cards got the /moto-selection glass treatment (tinted
+  // blurred photo that unblurs on hover). Touch has no hover: the FIRST tap
+  // reveals the card (veil fades), the SECOND tap follows the inner link —
+  // same grammar as PartnerRevealCard / MsServicesGrid.
+  const [revealedDirs, setRevealedDirs] = useState<Record<string, boolean>>({});
+  const lastPointerWasTouch = useRef(false);
+  const dirGate = (key: string) => ({
+    "data-reveal-active": revealedDirs[key] ? "true" : undefined,
+    onPointerDown: (e: React.PointerEvent) => {
+      lastPointerWasTouch.current = e.pointerType === "touch";
+    },
+    onClick: (e: React.MouseEvent) => {
+      if (lastPointerWasTouch.current && !revealedDirs[key]) {
+        e.preventDefault();
+        e.stopPropagation();
+        setRevealedDirs((prev) => ({ ...prev, [key]: true }));
+      }
+    },
+  });
 
   // sticky nav state (original: onScroll → is-scrolled)
   useEffect(() => {
@@ -349,7 +371,11 @@ export default function LeorusLandingClient() {
 
         <div className="dir-grid">
           
-          <article className="dir-card dir-card--festival">
+          <article className="dir-card dir-card--festival" {...dirGate("festival")}>
+            {/* task 145: фото-фон + вуаль (тинт + blur) — ховер/тап снимает
+                вуаль и фокусирует фото (glass DNA /moto-selection) */}
+            <img className="dir-card__bg" src="/leorus/case-ananda.jpg" alt="" aria-hidden="true" loading="lazy" />
+            <div className="dir-card__veil" aria-hidden="true" />
             <div className="dir-card__num">01</div>
             <div className="dir-card__icon" aria-hidden="true">
               <svg viewBox="0 0 48 48" fill="none">
@@ -379,7 +405,9 @@ export default function LeorusLandingClient() {
           </article>
 
           
-          <article className="dir-card dir-card--dj">
+          <article className="dir-card dir-card--dj" {...dirGate("dj")}>
+            <img className="dir-card__bg" src="/leorus/case-clubs.jpg" alt="" aria-hidden="true" loading="lazy" />
+            <div className="dir-card__veil" aria-hidden="true" />
             <div className="dir-card__num">02</div>
             <div className="dir-card__icon" aria-hidden="true">
               <svg viewBox="0 0 48 48" fill="none">
@@ -409,7 +437,9 @@ export default function LeorusLandingClient() {
           </article>
 
           
-          <article className="dir-card dir-card--video">
+          <article className="dir-card dir-card--video" {...dirGate("video")}>
+            <img className="dir-card__bg" src="/leorus/case-orudjovnews.jpg" alt="" aria-hidden="true" loading="lazy" />
+            <div className="dir-card__veil" aria-hidden="true" />
             <div className="dir-card__num">03</div>
             <div className="dir-card__icon" aria-hidden="true">
               <svg viewBox="0 0 48 48" fill="none">
@@ -437,7 +467,9 @@ export default function LeorusLandingClient() {
           </article>
 
           
-          <article className="dir-card dir-card--corp">
+          <article className="dir-card dir-card--corp" {...dirGate("corp")}>
+            <img className="dir-card__bg" src="/leorus/case-corporates.jpg" alt="" aria-hidden="true" loading="lazy" />
+            <div className="dir-card__veil" aria-hidden="true" />
             <div className="dir-card__num">04</div>
             <div className="dir-card__icon" aria-hidden="true">
               <svg viewBox="0 0 48 48" fill="none">
@@ -715,6 +747,22 @@ export default function LeorusLandingClient() {
       </div>
     </section>
 
+    {/* ── ПЕРЕДЫШКА (task 145) — sly13 rest act pollinated: кадр ANANDA
+        фестиваля на весь экран с параллаксом, тизер ведёт в форму заявки. */}
+    <RestBreak
+      src="/leorus/case-ananda.jpg"
+      kicker="leorus · передышка"
+      title="Тишина перед"
+      accentWord="громким"
+      note="фестивали · dj и шоу · видео-продакшн · корпоративы"
+      bg="#0A0612"
+      accent="#00F0FF"
+      textPrimary="#F5F2FF"
+      textSecondary="#9B92B0"
+      className="leorus-rest"
+      titleClass="leorus-rest__title"
+    />
+
     
     <section className="cta section" id="cta" aria-labelledby="cta-title">
       <div className="container">
@@ -894,6 +942,18 @@ export default function LeorusLandingClient() {
       </div>
     </section>
   </main>
+
+  {/* ── ГИГАНТСКИЙ ВОРДМАРК (task 145) — ДНК /moto-selection: LEO.RUS
+      ровно на всю ширину экрана перед подвалом (SVG textLength). */}
+  <div className="leorus-wordmark" aria-hidden="true">
+    <GhostWordmark
+      parts={[
+        { text: "LEO", color: "#F5F2FF", opacity: 0.05 },
+        { text: ".", color: "#00F0FF", opacity: 0.5 },
+        { text: "RUS", color: "#F5F2FF", opacity: 0.05 },
+      ]}
+    />
+  </div>
 
   
   <footer className="footer">

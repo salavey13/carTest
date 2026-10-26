@@ -34,6 +34,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { FaTelegramPlane } from "react-icons/fa";
 import FeedbackModal from "@/app/moto-selection/FeedbackModal";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
+import { GhostWordmark } from "@/components/landings/GhostWordmark";
 
 type Palette = {
   bgBase: string;
@@ -1483,6 +1484,19 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </section>
         </main>
+
+        {/* ── ГИГАНТСКИЙ ВОРДМАРК (task 145) — ДНК /moto-selection: гост-текст
+            ровно на всю ширину экрана перед подвалом (SVG textLength).
+            JetBrains Mono — фирменный шрифт витрины; «13» — акцентная. */}
+        <div className="border-t py-5" style={{ borderColor: p.borderSoft }} aria-hidden>
+          <GhostWordmark
+            parts={[
+              { text: "SLY", color: p.textPrimary, opacity: 0.05 },
+              { text: "13", color: p.accentMain, opacity: 0.35 },
+            ]}
+            fontFamily="'JetBrains Mono', ui-monospace, monospace"
+          />
+        </div>
 
         {/* ── FOOTER (собственный) ─────────────────────────────────────────── */}
         <footer className="border-t" style={{ borderColor: p.borderSoft, background: `${p.bgBase}` }}>

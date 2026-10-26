@@ -37,7 +37,7 @@ const sly = read("app/sly13/Sly13LandingClient.tsx");
 const paletteAction = read("app/franchize/server-actions/palette.ts");
 
 describe("task140 — catalog full-card hover wash (PC only)", () => {
-  it("wash component: accent tint + md gate + hover opacity, gradient blend layer", () => {
+  it("wash component: accent tint + SYNCED melt gradient (iter6)", () => {
     expect(catalog).toContain("function CatalogHoverWash()");
     // tint layer: PC only (md:block — touch hover-lock can't strand a tint),
     // invisible at rest; task141 iter4: 30% on hover (20% was invisible on
@@ -45,10 +45,18 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
     expect(catalog).toContain(
       'className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block"',
     );
-    // blend layer: bottom gradient bridges the photo into the solid-accent info strip
-    expect(catalog).toContain(
-      'className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-80 md:block"',
-    );
+    // iter6: ONE melt element whose COLOR transitions (no cross-fade — the
+    // iter5 two-gradient cross-fade let the photo bleed through mid-transition
+    // and lagged behind the strip: boss «the card part kinda lags a
+    // millisecond revealing seam»). The interpolation contract lives in
+    // globals.css (@property --catalog-melt-color).
+    expect(catalog).toContain('className="catalog-melt pointer-events-none absolute inset-x-0 bottom-0 h-32"');
+    const css = read("app/globals.css");
+    expect(css).toContain("@property --catalog-melt-color");
+    expect(css).toContain("--catalog-melt-color: var(--catalog-card-bg)");
+    expect(css).toContain("transition: --catalog-melt-color 300ms cubic-bezier(0.4, 0, 0.2, 1)");
+    expect(css).toContain("[data-catalog-item]:hover .catalog-melt");
+    expect(css).toContain("--catalog-melt-color: var(--catalog-accent)");
   });
 
   it("task141 iter4: the BASE highlight layer is the ARTICLE background (var flip)", () => {
@@ -62,8 +70,11 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
     expect(css).toContain("[data-catalog-item]:hover");
     expect(css).toContain("--card-base-bg: var(--catalog-accent)");
     expect(css).toContain("--card-base-img: none");
-    // info strips step aside on hover (article accent shows through)
-    expect(catalog).toContain("md:group-hover:bg-transparent");
+    // info strips transition bg-card → accent DIRECTLY on hover (iter6:
+    // same 300ms curve as the melt gradient — the fade-to-transparent
+    // recipe blended on an accent² curve and lagged behind the picture)
+    expect(catalog).toContain("md:group-hover:bg-[var(--catalog-accent)]");
+    expect(catalog).not.toContain("md:group-hover:bg-transparent");
   });
 
   it("wash is used in ALL THREE card shapes: carousel, grid, combo offer", () => {
@@ -96,11 +107,14 @@ describe("task140 — /moto-selection DNA alignment", () => {
     // CSS; inline styles can't express :hover. Recipe itself unchanged.
     expect(moto).toContain("background: rgba(0,0,0,0.6);");
     expect(moto).toContain("backdrop-filter: blur(5px);");
-    expect(moto).toContain("rounded-[20px]");
+    // 2026-10-27 (task144): the grid is a client component (MsServicesGrid) —
+    // touch needed the reveal tap-gate; the card anatomy moved with it.
+    const grid = read("app/moto-selection/ServicesGrid.tsx");
+    expect(grid).toContain("rounded-[20px]");
     // numeral emerges from under the card's top edge (original: top = card − 53px)
-    expect(moto).toContain("-mt-12 select-none text-[88px] font-bold leading-none text-white/85");
+    expect(grid).toContain("-mt-12 select-none text-[88px] font-bold leading-none text-white/85");
     // original pill: 200×48, radius 30, white 14px/600 text
-    expect(moto).toContain("h-12 w-[200px] items-center justify-center self-center rounded-[30px] bg-[var(--ms-accent)]");
+    expect(grid).toContain("h-12 w-[200px] items-center justify-center self-center rounded-[30px] bg-[var(--ms-accent)]");
   });
 
   it("giant watermark word behind the services grid + reworded kicker (no duplication)", () => {
@@ -141,7 +155,7 @@ describe("task140 — /moto-selection DNA alignment", () => {
 
   it("footer #111111 + small print #707070; lead band #0f131c (rec499421521 / rec499515450)", () => {
     expect(moto).toContain('footer className="border-t border-white/10 bg-[#111111]"');
-    expect(moto).toContain('id="contact" className="scroll-mt-20 border-t border-white/10 bg-[#0f131c]"');
+    expect(moto).toContain('bg-[#0f131c]"');
     expect(moto).toContain("text-[#707070]");
   });
 
@@ -157,10 +171,12 @@ describe("task140 — /moto-selection DNA alignment", () => {
     expect(moto).toContain(`const EMAIL = "${email}"`);
     expect(motoHistory).toContain(`const EMAIL = "${email}"`);
     expect(moto).not.toContain("moto-selection@yandex.ru");
-    // light tinted bg behind transparent logos with dark text — usages:
-    // АКАДЕМИЯ big image + АКАДЕМИЯ partner card + (2026-10-27, task141)
-    // Байкленд partner card (black-orange SVG logo, same recipe)
-    expect((moto.match(/bg-\[#f2efea\]/g) ?? []).length).toBe(3);
+    // light tinted bg behind transparent logos with dark text. task145
+    // re-baseline: partner tiles moved into PartnerLogoGrid — the tint
+    // travels as `backing: "#f2efea"` props (Академия + Байкленд), the big
+    // АКАДЕМИЯ image keeps the bg-[#f2efea] class.
+    expect((moto.match(/bg-\[#f2efea\]/g) ?? []).length).toBe(1);
+    expect((moto.match(/backing: "#f2efea"/g) ?? []).length).toBe(2);
   });
 });
 
@@ -223,5 +239,62 @@ describe("task140 — /sly13 neon palette + quality raise", () => {
     expect(sly).not.toMatch(/bg-clip-text|WebkitTextFillColor/);
     expect(moto).not.toMatch(/bg-clip-text|WebkitTextFillColor/);
     expect(sly).toContain("landing-accent-clip");
+  });
+});
+
+describe("task145 — rest acts, full-width wordmarks, glass pollination", () => {
+  const georg = read("app/georg-electro/page.tsx");
+  const leorus = read("app/leorus/LeorusLandingClient.tsx");
+  const leorusCss = read("app/leorus/leorus.css");
+  const root = read("app/page.tsx");
+  const restBreak = read("components/landings/RestBreak.tsx");
+  const wordmark = read("components/landings/GhostWordmark.tsx");
+  const glass = read("components/landings/GlassServiceCard.tsx");
+
+  it("shared RestBreak exists (sly13 pollination) and 4 more landings breathe", () => {
+    expect(restBreak).toContain("useScroll");
+    expect(restBreak).toContain("h-[100svh]");
+    // moto-selection: академия-дым кадр между детейлингом и «о нас»
+    expect(moto).toContain("<RestBreak");
+    expect(moto).toContain("Мотоцикл любит");
+    // georg: мастерская между «как работаем» и партнёрами
+    expect(georg).toContain("Пока ты катаешь —");
+    // leorus: ANANDA перед формой
+    expect(leorus).toContain("Тишина перед");
+    // root: золотая Panigale перед партнёрами
+    expect(root).toContain("садись — едь");
+  });
+
+  it("GhostWordmark spans the FULL width by construction (SVG textLength) — no more MOTO.SELECTI clipping", () => {
+    expect(wordmark).toContain('textLength="1000"');
+    expect(wordmark).toContain('lengthAdjust="spacingAndGlyphs"');
+    // the broken 13vw CSS version is gone from /moto-selection
+    expect(moto).not.toContain("whitespace-nowrap text-center text-[13vw]");
+    expect(moto).toContain("<GhostWordmark");
+    // pollinated: SLY13 / GEORG.ELECTRO / LEO.RUS / VIP.BIKE
+    expect(sly).toContain('text: "SLY"');
+    expect(georg).toContain('text: "GEORG"');
+    expect(leorus).toContain('text: "LEO"');
+    expect(root).toContain('text: "VIP"');
+  });
+
+  it("ms-glass design pollinated: georg services use GlassServiceCard with tap-gate", () => {
+    expect(glass).toContain("data-lead-modal-open");
+    expect(glass).toContain('gs-card[data-active="true"] .gs-glass');
+    expect(georg).toContain("<GlassServiceCard");
+    expect(georg).toContain("<GlassServiceCardStyle />");
+    // old static card layout is gone
+    expect(georg).not.toContain('className="group flex flex-col overflow-hidden rounded-3xl border transition-transform hover:-translate-y-1"');
+  });
+
+  it("leorus dir-cards: photos added + veil unblurs on hover/tap", () => {
+    for (const img of ["case-ananda.jpg", "case-clubs.jpg", "case-orudjovnews.jpg", "case-corporates.jpg"]) {
+      expect(leorus).toContain(`dir-card__bg" src="/leorus/${img}`);
+    }
+    expect(leorusCss).toContain(".dir-card__veil");
+    expect(leorusCss).toContain('blur(0) brightness(0.7)');
+    expect(leorusCss).toContain('[data-reveal-active="true"] .dir-card__veil');
+    // touch gate wired in the client
+    expect(leorus).toContain("dirGate(");
   });
 });

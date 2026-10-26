@@ -379,6 +379,45 @@
       --card-base-img: none;
     }
   }
+
+  /* ── task 144 iter6: SYNCED melt gradient (boss: «slight delay in transition
+     of color of the card and gradient over picture — the card part kinda lags
+     a millisecond revealing seam between picture and description bloc») ──
+     History: iter5 cross-faded TWO stacked gradients (base card-bg fading OUT
+     + accent fading IN). Cross-fade IS the desync: mid-transition both layers
+     are semi-transparent at the bottom pixel, so the PHOTO shows through
+     (dark seam flash), while the info strip below blends on its own curve
+     (strip fades to transparent over the article color flip — effectively an
+     accent² curve). Fix, two halves:
+     1. MELT = ONE gradient whose COLOR transitions (no cross-fade → the
+        photo never shows through): @property registers --catalog-melt-color
+        as a real <color>, so `transition` can interpolate it — the gradient
+        repaints every frame from bg-card to accent.
+     2. STRIPS stop fading to transparent (an opacity curve stacked on a
+        color curve = quadratic mix) and transition background-color
+        bg-card → accent DIRECTLY — the exact same curve as the melt bottom
+        edge. End states are pixel-identical to iter5 (opaque strip painted
+        accent over the accent article = same color); mid-transition both
+        sides of the seam are the SAME mix — the seam is impossible by math.
+     Timing contract: 300ms cubic-bezier(0.4,0,0.2,1) = Tailwind
+     duration-300 + transition-colors defaults used by the strips/article.
+     @property support: Chrome 85+, Safari 16.4+, Firefox 128+; older
+     browsers snap the color (no transition, still seam-free at rest). */
+  @property --catalog-melt-color {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: transparent;
+  }
+  .catalog-melt {
+    --catalog-melt-color: var(--catalog-card-bg);
+    background: linear-gradient(to top, var(--catalog-melt-color), transparent);
+    transition: --catalog-melt-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @media (min-width: 768px) {
+    [data-catalog-item]:hover .catalog-melt {
+      --catalog-melt-color: var(--catalog-accent);
+    }
+  }
 }
 
 @layer utilities {
