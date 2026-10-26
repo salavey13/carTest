@@ -413,12 +413,29 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
  * md: gate keeps touch hover-lock from stranding a tint on phones. The
  * keyboard/TV focus outline (interactionCardFocusStyle) is a separate
  * mechanism and stays.
+ *
+ * task 144 iter5 — boss: «inactive state — add gradient to bottom of picture,
+ * so it kinda merges into bg of card title; hover state — gradient should
+ * change color to highlighted color». The bottom blend is now a THREE-layer
+ * stack:
+ *   1. whole-photo accent wash (30%) — hover only, unchanged from iter4;
+ *   2. BASE gradient from var(--catalog-card-bg) — the title strip's own bg —
+ *      ALWAYS on (static visual, not hover-linked → no touch hover-lock):
+ *      the photo visually sinks into the strip below, and the seam is
+ *      invisible because the gradient's bottom edge is exactly the strip
+ *      color it melts into;
+ *   3. ACCENT gradient — cross-fades IN on md hover while (2) fades OUT:
+ *      the merge color becomes the highlight color and its bottom edge meets
+ *      the accent info strip (article bg flip) with zero seam. Full opacity
+ *      on hover so the bottom pixel is pure accent = the strip below.
+ * Height h-32 (was h-28): a taller fade reads as «melts», not «stripe».
  */
 function CatalogHoverWash() {
   return (
     <>
       <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-80 md:block" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--catalog-card-bg)] to-transparent transition-opacity duration-300 md:group-hover:opacity-0" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-32 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 md:block" />
     </>
   );
 }

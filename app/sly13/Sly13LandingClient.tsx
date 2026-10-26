@@ -33,6 +33,7 @@ import { MotionConfig, motion, useScroll, useTransform, useInView, animate } fro
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { FaTelegramPlane } from "react-icons/fa";
 import FeedbackModal from "@/app/moto-selection/FeedbackModal";
+import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
 
 type Palette = {
   bgBase: string;
@@ -46,6 +47,9 @@ type Palette = {
 
 // ── Данные витрины (публичное промо платформы — «Каталог → CRM») ────────────
 const SB = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix";
+// task 144: фирменный дым moto-selection.ru (прозрачный PNG) на тёмной
+// секции партнёров — «use everywhere applicable, looks awesome!!:)»
+const SMOKE_TEXTURE = "https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png";
 const IMG = {
   hero: `${SB}/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg`,
   money: `${SB}/ducati-1199-panigale-2012/image_1.jpg`,
@@ -189,10 +193,13 @@ const SERVICES = [
 // каталог экипажа /franchize/{slug}; djorudjov теперь настоящий экипаж
 // в БД — мёртвой ссылки больше нет).
 const PIPELINE_CREWS = [
-  { slug: "georg-electro", href: "/georg-electro", label: "georg-electro", note: "электрик электробайков — диагностика, контроллеры, свет" },
+  // task 144: карточки пайплайна получили НАСТОЯЩИЕ картинки-лого (ревилы
+  // «PICTURE LOGOS AND TITLES BE REVEALED ON TAP/HOVER»); djorudjov теперь
+  // ведёт на готовый лендинг /leorus (экипаж уже на платформе).
+  { slug: "georg-electro", href: "/georg-electro", label: "georg-electro", note: "электрик электробайков — диагностика, контроллеры, свет", img: "/images/georg/hero.png", imgFit: "cover" },
   { slug: "nn-mototeh-nn", href: null, label: "nn-mototeh-nn", note: "мототехника NN, колесо фортуны e2e" },
-  { slug: "djorudjov", href: null, label: "djorudjov · LEORUS", note: "ивент-агентство — фестивали, DJ и шоу, видео, корпоративы" },
-  { slug: "vip-bike", href: "/vipbikerental", label: "VIP BIKE Rental", note: "аренда электромото — флагман платформы" },
+  { slug: "djorudjov", href: "/leorus", label: "djorudjov · LEORUS", note: "ивент-агентство — фестивали, DJ и шоу, видео, корпоративы", img: "/leorus/case-liveshows.jpg", imgFit: "cover" },
+  { slug: "vip-bike", href: "/vipbikerental", label: "VIP BIKE Rental", note: "аренда электромото — флагман платформы", img: "/leorus/partner-vipbike.png", imgFit: "contain" },
 ];
 
 const TICKER = [
@@ -423,6 +430,38 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           @keyframes sly-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
           @keyframes sly-kenburns { 0% { transform: scale(1) translateY(0); } 100% { transform: scale(1.14) translateY(-2%); } }
           @keyframes sly-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+          /* task 144: партнёрские ревил-карточки пайплайна — дефолт:
+             приглушённое фото-лого; ховер/тап: цвет + титул/нота/CTA снизу.
+             Тач-гейт в PartnerRevealCard (data-reveal-active). */
+          .sly-pcard {
+            position: relative; display: flex; min-height: 230px; overflow: hidden;
+            border-radius: 1rem; border-width: 1px; border-style: solid;
+            background: color-mix(in srgb, var(--sly-bg) 84%, black);
+            transition: border-color .3s ease, transform .3s ease;
+          }
+          .sly-pcard:hover, .sly-pcard[data-reveal-active="true"] {
+            border-color: color-mix(in srgb, var(--sly-accent) 55%, transparent);
+            transform: translateY(-2px);
+          }
+          .sly-pcard__img {
+            position: absolute; inset: 0;
+            filter: grayscale(.5) brightness(.62);
+            transition: filter .45s ease, transform .45s ease;
+          }
+          .sly-pcard:hover .sly-pcard__img,
+          .sly-pcard[data-reveal-active="true"] .sly-pcard__img { filter: none; transform: scale(1.04); }
+          .sly-pcard__scrim {
+            position: absolute; inset: 0;
+            background: linear-gradient(to top, color-mix(in srgb, var(--sly-bg) 94%, black) 0%, color-mix(in srgb, var(--sly-bg) 32%, transparent) 48%, transparent 74%);
+          }
+          .sly-pcard__body {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; gap: 4px; padding: 14px;
+            opacity: 0; transform: translateY(10px);
+            transition: opacity .35s ease, transform .35s ease;
+          }
+          .sly-pcard:hover .sly-pcard__body,
+          .sly-pcard[data-reveal-active="true"] .sly-pcard__body { opacity: 1; transform: none; }
           /* spotlight-подсветка карточки за курсором */
           .sly-spot::before {
             content: ''; position: absolute; inset: 0; border-radius: inherit;
@@ -1254,6 +1293,14 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           {/* ── 06 · ПАРТНЁРЫ (cross-link с /moto-selection) ──────────────── */}
           <section id="partners" className="relative isolate scroll-mt-20 overflow-hidden">
             <SlyGhostWord word="партнёры" />
+            {/* task 144: дым на дне секции — под контентом (изолят isolate,
+                z-0; контент ниже по DOM без z поднимается сам). */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-56"
+            >
+              <Image src={SMOKE_TEXTURE} alt="" fill sizes="100vw" className="object-cover object-bottom" />
+            </div>
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
                 06 · партнёры
@@ -1359,33 +1406,67 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
 
             {/* Остальные экипажи пайплайна (task 141: + VIP BIKE Rental,
-                djorudjov теперь реальный экипаж в БД) */}
+                djorudjov теперь реальный экипаж в БД). task 144: у трёх из
+                четырёх — настоящие картинки-лого; ховер/тап раскрывает титул,
+                ноту и CTA (PartnerRevealCard — первый тап reveal, второй —
+                переход). nn-mototeh-nn без лендинга остаётся текстовой. */}
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {PIPELINE_CREWS.map((c, i) => (
                 <Reveal key={c.slug} delay={0.06 + i * 0.06}>
-                  <Link href={c.href || `/franchize/${c.slug}`} className="block h-full">
-                    <SpotlightCard
-                      className="group h-full rounded-2xl border p-5 transition-transform duration-300 hover:-translate-y-1"
-                      style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  {c.img ? (
+                    <PartnerRevealCard
+                      href={c.href || `/franchize/${c.slug}`}
+                      className="sly-pcard group h-full"
+                      style={{ borderColor: p.borderSoft }}
+                      ariaLabel={`${c.label} — открыть витрину партнёра`}
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <Image
+                        src={c.img}
+                        alt=""
+                        aria-hidden
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        className={c.imgFit === "contain" ? "sly-pcard__img object-contain p-9" : "sly-pcard__img object-cover"}
+                      />
+                      <span className="sly-pcard__scrim" aria-hidden />
+                      <span className="sly-pcard__body">
                         <span className="font-jb text-sm font-semibold" style={{ color: p.textPrimary }}>
                           {c.label}
                         </span>
-                        <ChevronRight
-                          className="h-4 w-4 transition-transform group-hover:translate-x-1"
-                          style={{ color: p.accentMain }}
-                          aria-hidden
-                        />
-                      </div>
-                      <p className="mt-2 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
-                        {c.note}
-                      </p>
-                      <p className="font-jb mt-3 text-[10px] uppercase tracking-[0.18em]" style={{ color: p.accentMain }}>
-                        в подготовке
-                      </p>
-                    </SpotlightCard>
-                  </Link>
+                        <span className="text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                          {c.note}
+                        </span>
+                        <span className="font-jb mt-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.18em]" style={{ color: p.accentMain }}>
+                          Открыть витрину
+                          <ChevronRight className="h-3 w-3" aria-hidden />
+                        </span>
+                      </span>
+                    </PartnerRevealCard>
+                  ) : (
+                    <Link href={c.href || `/franchize/${c.slug}`} className="block h-full">
+                      <SpotlightCard
+                        className="group h-full rounded-2xl border p-5 transition-transform duration-300 hover:-translate-y-1"
+                        style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-jb text-sm font-semibold" style={{ color: p.textPrimary }}>
+                            {c.label}
+                          </span>
+                          <ChevronRight
+                            className="h-4 w-4 transition-transform group-hover:translate-x-1"
+                            style={{ color: p.accentMain }}
+                            aria-hidden
+                          />
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                          {c.note}
+                        </p>
+                        <p className="font-jb mt-3 text-[10px] uppercase tracking-[0.18em]" style={{ color: p.accentMain }}>
+                          в подготовке
+                        </p>
+                      </SpotlightCard>
+                    </Link>
+                  )}
                 </Reveal>
               ))}
             </div>

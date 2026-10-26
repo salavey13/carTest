@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { useTheme } from "next-themes";
+import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
 
 /* ══ THEME PALETTES (dark: gold/black, light: dark cyan/white — WCAG AA) ══ */
 const VIP_BIKE_THEMES = {
@@ -1248,8 +1249,14 @@ export default function Home() {
           </section>
 
           {/* ══ PARTNERS SECTION — strong accent-tinted background, logos not inverted ══ */}
-          <section id="partners" className="py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-partners-bg)" }}>
-            <div className="max-w-6xl mx-auto">
+          <section id="partners" className="relative overflow-hidden py-20 md:py-28 px-4" style={{ backgroundColor: "var(--vip-partners-bg)" }}>
+            {/* task 144: фирменный дым moto-selection.ru (прозрачный PNG) на
+                тёмной витрине партнёров — «use everywhere applicable». */}
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-64 opacity-70">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png" alt="" loading="lazy" className="h-full w-full object-cover object-bottom" />
+            </div>
+            <div className="relative z-10 max-w-6xl mx-auto">
               <SectionHeader badge="Партнёры" title="Друзья и" highlight="партнёры" subtitle="Магазины, академия и сообщество — вместе мы делаем мото-сцену Нижнего сильнее." />
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
@@ -1294,35 +1301,52 @@ export default function Home() {
 
               {/* ══ task 141: interlink all-to-all — витрина экипажей платформы.
                   Лендинги /sly13, /moto-selection, /georg-electro, /leorus
-                  ссылаются сюда (в их партнёрских секциях), мы — на них. ══ */}
+                  ссылаются сюда (в их партнёрских секциях), мы — на них.
+                  task 144: карточки-ревилы с НАСТОЯЩИМИ картинками-лого
+                  («PICTURE LOGOS AND TITLES BE REVEALED ON TAP/HOVER») —
+                  дефолт приглушён, ховер/тап раскрывает титул/ноту/CTA;
+                  тач-гейт (первый тап reveal, второй — переход) в
+                  PartnerRevealCard. ══ */}
               <AnimatedSection delay={0.15}>
                 <p className="mt-14 text-center text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: "var(--vip-accent-main)" }}>
                   экипажи платформы · на одном софте
                 </p>
                 <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { name: "SLY13", href: "/sly13", tag: "платформа франшиз", desc: "Каталог, CRM, договоры, лиды и витрина каждого экипажа.", accent: "#22D3EE" },
-                    { name: "Moto.Selection", href: "/moto-selection", tag: "мотосервис", desc: "Обучение, подбор мото, ТО, детейлинг, хранение 24/7.", accent: "#FF7522" },
-                    { name: "Georg.Electro", href: "/georg-electro", tag: "электрика", desc: "Диагностика, контроллеры, проводка, свет — один мастер.", accent: "#F59E0B" },
-                    { name: "LEORUS", href: "/leorus", tag: "ивент-агентство", desc: "Фестивали, DJ и шоу, видео-продакшн, корпоративы.", accent: "#00F0FF" },
+                    { name: "SLY13", href: "/sly13", tag: "платформа франшиз", desc: "Каталог, CRM, договоры, лиды и витрина каждого экипажа.", accent: "#22D3EE", img: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg" },
+                    { name: "Moto.Selection", href: "/moto-selection", tag: "мотосервис", desc: "Обучение, подбор мото, ТО, детейлинг, хранение 24/7.", accent: "#FF7522", img: "https://static.tildacdn.com/tild3664-3162-4266-b638-633466343365/1____6666.jpg" },
+                    { name: "Georg.Electro", href: "/georg-electro", tag: "электрика", desc: "Диагностика, контроллеры, проводка, свет — один мастер.", accent: "#F59E0B", img: "/images/georg/hero.png" },
+                    { name: "LEORUS", href: "/leorus", tag: "ивент-агентство", desc: "Фестивали, DJ и шоу, видео-продакшн, корпоративы.", accent: "#00F0FF", img: "/leorus/case-liveshows.jpg" },
                   ].map((crew) => (
-                    <Link
+                    <PartnerRevealCard
                       key={crew.href}
                       href={crew.href}
-                      className="group flex flex-col rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1"
+                      ariaLabel={`${crew.name} — открыть витрину партнёра`}
+                      className="group relative flex flex-col justify-end overflow-hidden min-h-[210px] rounded-2xl border transition-all duration-300 hover:-translate-y-1"
                       style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "var(--vip-bg-card)" }}
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: crew.accent }}>{crew.tag}</span>
-                      <span className="mt-2 text-base font-black uppercase tracking-tight" style={{ color: "var(--vip-text-primary)" }}>
-                        {crew.name}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={crew.img}
+                        alt=""
+                        aria-hidden
+                        loading="lazy"
+                        className="absolute inset-0 h-full w-full object-cover opacity-55 grayscale-[55%] brightness-90 transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0 group-hover:brightness-100 group-data-[reveal-active=true]:scale-105 group-data-[reveal-active=true]:opacity-100 group-data-[reveal-active=true]:grayscale-0 group-data-[reveal-active=true]:brightness-100"
+                      />
+                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                      <span className="relative z-10 flex translate-y-2.5 flex-col p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-data-[reveal-active=true]:translate-y-0 group-data-[reveal-active=true]:opacity-100">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: crew.accent }}>{crew.tag}</span>
+                        <span className="mt-1 text-base font-black uppercase tracking-tight" style={{ color: "var(--vip-text-primary)" }}>
+                          {crew.name}
+                        </span>
+                        <span className="mt-1 text-xs leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
+                          {crew.desc}
+                        </span>
+                        <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: crew.accent }}>
+                          Открыть витрину <ArrowRight className="h-3 w-3" />
+                        </span>
                       </span>
-                      <span className="mt-1.5 text-xs leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
-                        {crew.desc}
-                      </span>
-                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] transition-transform duration-300 group-hover:translate-x-0.5" style={{ color: crew.accent }}>
-                        Открыть витрину <ArrowRight className="h-3 w-3" />
-                      </span>
-                    </Link>
+                    </PartnerRevealCard>
                   ))}
                 </div>
               </AnimatedSection>

@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
+import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
 import "./leorus.css";
 
 type FormPhase = "idle" | "sending" | "success" | "error";
@@ -623,6 +624,11 @@ export default function LeorusLandingClient() {
 
     
     <section className="partner section" aria-labelledby="partner-title">
+      {/* task 144: фирменный дым moto-selection.ru на дне партнёрской секции —
+          прозрачный PNG, под контентом (container z-index: 1 в leorus.css). */}
+      <div className="partner-smoke" aria-hidden>
+        <img src="https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png" alt="" loading="lazy" />
+      </div>
       <div className="container">
         <article className="partner-card">
           <div className="partner-card__left">
@@ -645,30 +651,49 @@ export default function LeorusLandingClient() {
 
         {/* task 141: interlink all-to-all — витрина экипажей платформы SLY13.
             LEORUS (экипаж djorudjov) живёт на одном софте с арендой, мотосервисом
-            и электрикой: ссылаемся на их лендинги, они ссылаются на нас. */}
+            и электрикой: ссылаемся на их лендинги, они ссылаются на нас.
+            task 144: карточки — ревилы с настоящими картинками-лого («PICTURE
+            LOGOS AND TITLES BE REVEALED ON TAP/HOVER»); первый тап — reveal,
+            второй — переход (PartnerRevealCard). */}
         <div className="crew-links" role="list" aria-label="Витрины партнёров платформы">
           <p className="crew-links__eyebrow">витрина платформы · экипажи на одном софте</p>
           <div className="crew-links__grid">
-            <a href="/vipbikerental" className="crew-link" role="listitem">
-              <span className="crew-link__title">VIP BIKE Rental</span>
-              <span className="crew-link__note">аренда электромото · экипировка · карта райдеров · зимнее хранение</span>
-              <span className="crew-link__more">Открыть витрину →</span>
-            </a>
-            <a href="/moto-selection" className="crew-link" role="listitem">
-              <span className="crew-link__title">Moto.Selection</span>
-              <span className="crew-link__note">мотосервис · обучение · подбор мото · ТО · хранение 24/7</span>
-              <span className="crew-link__more">Открыть витрину →</span>
-            </a>
-            <a href="/sly13" className="crew-link" role="listitem">
-              <span className="crew-link__title">SLY13</span>
-              <span className="crew-link__note">платформа франшиз проката — каталог, CRM, договоры, лиды</span>
-              <span className="crew-link__more">Открыть витрину →</span>
-            </a>
-            <a href="/georg-electro" className="crew-link" role="listitem">
-              <span className="crew-link__title">Georg.Electro</span>
-              <span className="crew-link__note">электрик электробайков — диагностика, контроллеры, проводка, свет</span>
-              <span className="crew-link__more">Открыть витрину →</span>
-            </a>
+            <PartnerRevealCard href="/vipbikerental" className="crew-link" role="listitem" ariaLabel="VIP BIKE Rental — открыть витрину партнёра">
+              <img className="crew-link__img crew-link__img--contain" src="/leorus/partner-vipbike.png" alt="" loading="lazy" />
+              <span className="crew-link__scrim" aria-hidden />
+              <span className="crew-link__body">
+                <span className="crew-link__title">VIP BIKE Rental</span>
+                <span className="crew-link__note">аренда электромото · экипировка · карта райдеров · зимнее хранение</span>
+                <span className="crew-link__more">Открыть витрину →</span>
+              </span>
+            </PartnerRevealCard>
+            <PartnerRevealCard href="/moto-selection" className="crew-link" role="listitem" ariaLabel="Moto.Selection — открыть витрину партнёра">
+              <img className="crew-link__img" src="https://static.tildacdn.com/tild3664-3162-4266-b638-633466343365/1____6666.jpg" alt="" loading="lazy" />
+              <span className="crew-link__scrim" aria-hidden />
+              <span className="crew-link__body">
+                <span className="crew-link__title">Moto.Selection</span>
+                <span className="crew-link__note">мотосервис · обучение · подбор мото · ТО · хранение 24/7</span>
+                <span className="crew-link__more">Открыть витрину →</span>
+              </span>
+            </PartnerRevealCard>
+            <PartnerRevealCard href="/sly13" className="crew-link" role="listitem" ariaLabel="SLY13 — открыть витрину партнёра">
+              <img className="crew-link__img" src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg" alt="" loading="lazy" />
+              <span className="crew-link__scrim" aria-hidden />
+              <span className="crew-link__body">
+                <span className="crew-link__title">SLY13</span>
+                <span className="crew-link__note">платформа франшиз проката — каталог, CRM, договоры, лиды</span>
+                <span className="crew-link__more">Открыть витрину →</span>
+              </span>
+            </PartnerRevealCard>
+            <PartnerRevealCard href="/georg-electro" className="crew-link" role="listitem" ariaLabel="Georg.Electro — открыть витрину партнёра">
+              <img className="crew-link__img" src="/images/georg/hero.png" alt="" loading="lazy" />
+              <span className="crew-link__scrim" aria-hidden />
+              <span className="crew-link__body">
+                <span className="crew-link__title">Georg.Electro</span>
+                <span className="crew-link__note">электрик электробайков — диагностика, контроллеры, проводка, свет</span>
+                <span className="crew-link__more">Открыть витрину →</span>
+              </span>
+            </PartnerRevealCard>
           </div>
         </div>
       </div>
