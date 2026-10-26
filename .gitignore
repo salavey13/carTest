@@ -55,3 +55,6 @@ upload/DEAL_*.csv
 # critic loop throwaway harness + evidence
 .critic/
 __pycache__/
+
+# local service-role key for data-fix scripts (never commit)
+scripts/.sb_key

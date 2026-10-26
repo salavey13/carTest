@@ -1,0 +1,22 @@
+{
+ "applied_at": "2026-10-26T14:50:20.408+00:00",
+ "source": "boss voice note 26.10.2026 (april2renttest.mp3 + 4tgmay2rent.mp3, ASR)",
+ "inserted": [
+  {
+   "tag": "arrenda-row1-dated",
+   "rental_id": "3852823d-888d-430d-9139-10f03522945a",
+   "vehicle_id": "sequence-zero",
+   "total_cost": 30000
+  },
+  {
+   "tag": "arrenda-row2-dated",
+   "rental_id": "d71fc2c3-e5c3-4ea7-ba4c-81e512eb07b5",
+   "vehicle_id": "vip-bike-svc-001",
+   "total_cost": 2000
+  }
+ ],
+ "dedupe_check": {
+  "may4_ducati_konyakhin": "already in DB (task108 retro_backfill_v1)",
+  "may4_sequence_zero": "already in DB (task108 retro_backfill_v1, renter unknown)"
+ }
+}
