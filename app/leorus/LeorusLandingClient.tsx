@@ -642,6 +642,35 @@ export default function LeorusLandingClient() {
             <img className="partner-card__logo partner-card__logo--img" src="/leorus/partner-vipbike.png" alt="VIP BIKE ELECTRO — магазин электромотоциклов, партнёр LEORUS" loading="lazy" width="520" height="380" />
           </div>
         </article>
+
+        {/* task 141: interlink all-to-all — витрина экипажей платформы SLY13.
+            LEORUS (экипаж djorudjov) живёт на одном софте с арендой, мотосервисом
+            и электрикой: ссылаемся на их лендинги, они ссылаются на нас. */}
+        <div className="crew-links" role="list" aria-label="Витрины партнёров платформы">
+          <p className="crew-links__eyebrow">витрина платформы · экипажи на одном софте</p>
+          <div className="crew-links__grid">
+            <a href="/vipbikerental" className="crew-link" role="listitem">
+              <span className="crew-link__title">VIP BIKE Rental</span>
+              <span className="crew-link__note">аренда электромото · экипировка · карта райдеров · зимнее хранение</span>
+              <span className="crew-link__more">Открыть витрину →</span>
+            </a>
+            <a href="/moto-selection" className="crew-link" role="listitem">
+              <span className="crew-link__title">Moto.Selection</span>
+              <span className="crew-link__note">мотосервис · обучение · подбор мото · ТО · хранение 24/7</span>
+              <span className="crew-link__more">Открыть витрину →</span>
+            </a>
+            <a href="/sly13" className="crew-link" role="listitem">
+              <span className="crew-link__title">SLY13</span>
+              <span className="crew-link__note">платформа франшиз проката — каталог, CRM, договоры, лиды</span>
+              <span className="crew-link__more">Открыть витрину →</span>
+            </a>
+            <a href="/georg-electro" className="crew-link" role="listitem">
+              <span className="crew-link__title">Georg.Electro</span>
+              <span className="crew-link__note">электрик электробайков — диагностика, контроллеры, проводка, свет</span>
+              <span className="crew-link__more">Открыть витрину →</span>
+            </a>
+          </div>
+        </div>
       </div>
     </section>
 

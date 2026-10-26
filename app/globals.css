@@ -357,6 +357,28 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* ── task 141 iter4: catalog hover highlight lives ON THE CARD ITSELF ──
+     History: three attempts (task 133, 139, 140) painted the hover accent on
+     INNER elements (info strip, photo wash). The boss still saw «highlight
+     covers less then whole card» — inner paint can always leave an unpainted
+     sliver (stretched grid/carousel rows, fractional aspect-ratio rounding,
+     zoom/DPI scaling). The only element that is exactly «the whole card» is
+     the <article data-catalog-item>, so on PC hover we redefine the CSS
+     variables its OWN background is built from (see catalogCardVariantStyles
+     in app/franchize/lib/theme.ts: backgroundColor/backgrounImage are
+     var(--card-base-bg, <variant>) / var(--card-base-img, <variant>)).
+     Result: the accent fill covers the article border-box edge-to-edge BY
+     CONSTRUCTION; inner layers (transparent strip, photo wash + gradient)
+     blend on top and cannot leave a gap. Cards outside the catalog root
+     (parts cards, skeletons) never resolve --catalog-accent here and keep
+     their fallback visuals; touch devices are excluded (no sticky hover). */
+  @media (min-width: 768px) {
+    [data-catalog-item]:hover {
+      --card-base-bg: var(--catalog-accent);
+      --card-base-img: none;
+    }
+  }
 }
 
 @layer utilities {

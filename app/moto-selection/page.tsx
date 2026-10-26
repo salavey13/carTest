@@ -32,6 +32,7 @@ import {
   Send,
   Truck,
   Youtube,
+  Zap,
 } from "lucide-react";
 import FeedbackModal from "./FeedbackModal";
 
@@ -1103,6 +1104,81 @@ export default function MotoSelectionLanding() {
             />
             <span className="text-xs leading-relaxed text-white/50">
               платформа франшиз проката — витрина партнёров, работающих на одном софте
+            </span>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
+              Открыть витрину
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </span>
+          </Link>
+          {/* task 141: interlink all-to-all — партнёрские витрины платформы.
+              Георгий чинит электро прямо в нашем цехе (сосед по площадке). */}
+          <Link
+            href="/georg-electro"
+            className="group flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/10 bg-black p-6 text-center transition hover:border-[var(--ms-accent)]/60"
+          >
+            <span
+              className="flex h-24 w-24 items-center justify-center rounded-2xl text-3xl font-black"
+              style={{ background: "#140f06", color: "#f59e0b", border: "1px solid #4a3a18" }}
+              aria-hidden
+            >
+              <Zap className="h-10 w-10" />
+            </span>
+            <span className="text-sm font-black uppercase tracking-[0.12em] text-white">
+              Georg<span style={{ color: "#f59e0b" }}>.</span>Electro
+            </span>
+            <span className="text-xs leading-relaxed text-white/50">
+              электрик электробайков — диагностика, контроллеры, проводка, свет; один мастер, без менеджеров
+            </span>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
+              Открыть витрину
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </span>
+          </Link>
+          {/* LEORUS — ивент-агентство Рустама Оруджова × Влада Иващенко
+              (лендинг /leorus, экипаж djorudjov на платформе). */}
+          <Link
+            href="/leorus"
+            className="group flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/10 p-6 text-center transition hover:border-[var(--ms-accent)]/60"
+            style={{ background: "#0A0612" }}
+          >
+            <span
+              className="text-2xl font-black uppercase tracking-[0.08em]"
+              style={{ color: "#F5F2FF" }}
+              aria-hidden
+            >
+              LEOR<span style={{ color: "#00F0FF" }}>US</span>
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: "#9B92B0" }}>
+              event bureau · NN
+            </span>
+            <span className="text-xs leading-relaxed text-white/50">
+              ивент-агентство — фестивали под ключ, DJ и шоу-программы, видео-продакшн, корпоративы
+            </span>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
+              Открыть витрину
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </span>
+          </Link>
+          {/* VIP BIKE Rental — флагман платформы (лендинг /vipbikerental). */}
+          <Link
+            href="/vipbikerental"
+            className="group flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-white/10 p-6 text-center transition hover:border-[var(--ms-accent)]/60"
+            style={{ background: "linear-gradient(160deg, #0d0d0d 0%, #1a1408 100%)" }}
+          >
+            <span
+              className="flex h-24 w-24 items-center justify-center rounded-full text-sm font-black uppercase tracking-[0.08em]"
+              style={{
+                background: "radial-gradient(circle at 35% 30%, #f7d64a 0%, #d4a017 60%, #8a6a0f 100%)",
+                color: "#141005",
+                boxShadow: "0 0 34px rgba(247, 214, 74, 0.28)",
+              }}
+              aria-hidden
+            >
+              VIP BIKE
+            </span>
+            <span className="text-sm font-black uppercase tracking-[0.12em] text-white">VIP BIKE Rental</span>
+            <span className="text-xs leading-relaxed text-white/50">
+              аренда электромото в Нижнем Новгороде — каталог, экипировка, карта райдеров, зимнее хранение
             </span>
             <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
               Открыть витрину

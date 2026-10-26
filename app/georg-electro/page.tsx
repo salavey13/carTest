@@ -28,6 +28,7 @@ import Link from "next/link";
 import {
   BadgeCheck,
   BatteryCharging,
+  ChevronRight,
   Clock,
   Cpu,
   Gauge,
@@ -129,6 +130,7 @@ const NAV_LINKS = [
   { href: "#master", label: "Мастер" },
   { href: "#services", label: "Услуги" },
   { href: "#process", label: "Как работаем" },
+  { href: "#partners", label: "Партнёры" },
   { href: "#contact", label: "Контакты" },
 ];
 
@@ -679,6 +681,95 @@ export default function GeorgElectroLanding() {
         </div>
       </section>
 
+      {/* ── ПАРТНЁРЫ — витрина платформы (task 141: interlink all-to-all).
+          Все экипажи/лендинги на одном софте: аренда, мотосервис, платформа
+          франшиз и ивент-агентство. Карточки в стилистике страницы (тёмный
+          фон, янтарный ховер), как партнёрская витрина на /moto-selection. */}
+      <section
+        id="partners"
+        className="scroll-mt-20 border-t"
+        style={{ borderColor: P.border, background: P.bgBase }}
+      >
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+          <p
+            className="text-center text-[11px] font-bold uppercase tracking-[0.24em]"
+            style={{ color: P.accent }}
+          >
+            05 / Партнёры
+          </p>
+          <h2 className="mx-auto mt-3 max-w-2xl text-center text-3xl font-black uppercase leading-tight tracking-tight sm:text-4xl">
+            Экипажи на{" "}
+            <span style={{ color: P.accent }}>одном софте</span>
+          </h2>
+          <p
+            className="mx-auto mt-4 max-w-xl text-center leading-relaxed"
+            style={{ color: P.textSecondary }}
+          >
+            Витрины, которые уже живут на платформе SLY13. Каждый — со своим
+            брендом и каталогом, но цифры, договоры и лиды — общие.
+          </p>
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-2">
+            {[
+              {
+                href: "/vipbikerental",
+                eyebrow: "аренда электромото",
+                title: "VIP BIKE Rental",
+                text: "Площадка-партнёр и флагман платформы: аренда электромото в Нижнем Новгороде, экипировка, карта райдеров, зимнее хранение.",
+              },
+              {
+                href: "/moto-selection",
+                eyebrow: "мотосервис",
+                title: "Moto.Selection",
+                text: "Обучение, подбор мото, ТО, детейлинг, хранение и эвакуация 24/7. Сосед по цеху — заедьте на ТО, пока Георгий чинит проводку.",
+              },
+              {
+                href: "/sly13",
+                eyebrow: "платформа",
+                title: "SLY13",
+                text: "Платформа франшиз проката: каталог, CRM, договоры, лиды и витрина каждого экипажа на одном софте.",
+              },
+              {
+                href: "/leorus",
+                eyebrow: "ивент-агентство",
+                title: "LEORUS",
+                text: "Фестивали под ключ, DJ и шоу-программы, видео-продакшн, корпоративы. Рустам Оруджов × Влад Иващенко — громко делаем события.",
+              },
+            ].map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                className="group flex flex-col rounded-2xl border p-5 transition hover:-translate-y-0.5"
+                style={{
+                  borderColor: P.border,
+                  background: P.bgCard,
+                }}
+              >
+                <span
+                  className="text-[10px] font-bold uppercase tracking-[0.2em]"
+                  style={{ color: P.accent }}
+                >
+                  {c.eyebrow}
+                </span>
+                <span className="mt-2 flex items-center justify-between gap-3">
+                  <span className="text-lg font-black uppercase tracking-tight" style={{ color: P.textPrimary }}>
+                    {c.title}
+                  </span>
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1"
+                    style={{ color: P.accent }}
+                    aria-hidden
+                  />
+                </span>
+                <span className="mt-2 text-sm leading-relaxed" style={{ color: P.textSecondary }}>
+                  {c.text}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA + КОНТАКТЫ ───────────────────────────────────────────────── */}
       <section
         id="contact"
@@ -698,7 +789,7 @@ export default function GeorgElectroLanding() {
             className="text-[11px] font-bold uppercase tracking-[0.24em]"
             style={{ color: P.accent }}
           >
-            04 / Контакты
+            06 / Контакты
           </p>
           <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-black uppercase leading-tight tracking-tight sm:text-4xl">
             Электромот ведёт себя странно?

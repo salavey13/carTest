@@ -80,9 +80,12 @@ describe('franchize theme helpers', () => {
   });
 
   it('cycles catalog card variants predictably', () => {
+    // task141 iter4: bg is emitted through --card-base-* vars with the
+    // variant value as fallback — the article-level hover flip (globals.css)
+    // redefines the vars on PC hover; the fallback keeps the variant look.
     expect(catalogCardVariantStyles(theme, 0)).toMatchObject({
       borderColor: 'rgba(63, 63, 70, 0.3)',
-      backgroundColor: '#20242a',
+      backgroundColor: 'var(--card-base-bg, #20242a)',
     });
     expect(catalogCardVariantStyles(theme, 3)).toEqual(catalogCardVariantStyles(theme, 0));
     expect(catalogCardVariantStyles(theme, -1)).toEqual(catalogCardVariantStyles(theme, 1));

@@ -40,14 +40,30 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
   it("wash component: accent tint + md gate + hover opacity, gradient blend layer", () => {
     expect(catalog).toContain("function CatalogHoverWash()");
     // tint layer: PC only (md:block — touch hover-lock can't strand a tint),
-    // invisible at rest, 20% accent on hover
+    // invisible at rest; task141 iter4: 30% on hover (20% was invisible on
+    // the dark studio photos — boss kept reading the highlight as partial)
     expect(catalog).toContain(
-      'className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-20 md:block"',
+      'className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block"',
     );
     // blend layer: bottom gradient bridges the photo into the solid-accent info strip
     expect(catalog).toContain(
-      'className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-24 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-70 md:block"',
+      'className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-80 md:block"',
     );
+  });
+
+  it("task141 iter4: the BASE highlight layer is the ARTICLE background (var flip)", () => {
+    // card bg is emitted through CSS vars with the variant as fallback…
+    const theme = read("app/franchize/lib/theme.ts");
+    expect(theme).toContain("var(--card-base-bg, ");
+    expect(theme).toContain("var(--card-base-img, ");
+    // …and ONE globals.css rule flips those vars on PC hover — coverage of
+    // the whole border-box is structural, no inner element can leave a gap
+    const css = read("app/globals.css");
+    expect(css).toContain("[data-catalog-item]:hover");
+    expect(css).toContain("--card-base-bg: var(--catalog-accent)");
+    expect(css).toContain("--card-base-img: none");
+    // info strips step aside on hover (article accent shows through)
+    expect(catalog).toContain("md:group-hover:bg-transparent");
   });
 
   it("wash is used in ALL THREE card shapes: carousel, grid, combo offer", () => {

@@ -169,6 +169,25 @@ export function crewPaletteWithCssVars(theme: FranchizeTheme) {
   return crewPaletteForSurface(theme);
 }
 
+/**
+ * task 141 iter4 — card background is emitted THROUGH CSS variables
+ * (--card-base-bg / --card-base-img) with the variant value as fallback.
+ *
+ * WHY: the hover highlight was painted on INNER elements (info strip, photo
+ * wash) three times in a row (task 133, 139, 140) and the boss still saw
+ * «highlight covers less then whole card». Painting inner elements can always
+ * leave an unpainted sliver: stretched grid/carousel rows, fractional
+ * aspect-ratio rounding, zoom/DPI scaling. The ONLY element that is exactly
+ * «the whole card» is the <article data-catalog-item> itself, so the accent
+ * fill now happens on the ARTICLE: globals.css redefines --card-base-bg to
+ * var(--catalog-accent) on [data-catalog-item]:hover (PC only). Inner layers
+ * (strip → transparent on hover, photo wash) blend on top; any region they
+ * fail to cover shows the accent background underneath — a gap is now
+ * impossible by construction.
+ *
+ * Note: consumers that never get the hover rule (e.g. PartsCatalogClient
+ * cards, skeletons) resolve the fallback = exactly the previous visuals.
+ */
 export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: number) {
   const isAuto = theme.isAuto;
   const palette = theme.palette;
@@ -191,7 +210,14 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
         boxShadow: `0 0 0 1px color-mix(in srgb, var(--franchize-accent-main) 8%, transparent), 0 12px 20px color-mix(in srgb, var(--franchize-bg-base) 40%, transparent)`,
       },
     ] as const;
-    return variants[Math.abs(variantIndex) % variants.length];
+    const v = variants[Math.abs(variantIndex) % variants.length];
+    const shadow = "boxShadow" in v ? (v.boxShadow as string) : undefined;
+    return {
+      borderColor: v.borderColor,
+      backgroundColor: `var(--card-base-bg, ${"backgroundColor" in v ? v.backgroundColor : "transparent"})`,
+      backgroundImage: "backgroundImage" in v ? `var(--card-base-img, ${v.backgroundImage})` : `var(--card-base-img, none)`,
+      ...(shadow ? { boxShadow: shadow } : {}),
+    };
   }
 
   const variants = [
@@ -211,7 +237,14 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
     },
   ] as const;
 
-  return variants[Math.abs(variantIndex) % variants.length];
+  const v = variants[Math.abs(variantIndex) % variants.length];
+  const shadow = "boxShadow" in v ? (v.boxShadow as string) : undefined;
+  return {
+    borderColor: v.borderColor,
+    backgroundColor: `var(--card-base-bg, ${"backgroundColor" in v ? v.backgroundColor : "transparent"})`,
+    backgroundImage: "backgroundImage" in v ? `var(--card-base-img, ${v.backgroundImage})` : `var(--card-base-img, none)`,
+    ...(shadow ? { boxShadow: shadow } : {}),
+  };
 }
 
 

@@ -1291,6 +1291,41 @@ export default function Home() {
               <AnimatedSection delay={0.4} className="text-center mt-10">
                 <p className="text-sm" style={{ color: "var(--vip-text-secondary)" }}>Хочешь стать партнёром? Напиши оператору{" "}<a href={OPERATOR_HREF} target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: "var(--vip-accent-main)" }}>@I_O_S_NN</a>{" "}— обсудим.</p>
               </AnimatedSection>
+
+              {/* ══ task 141: interlink all-to-all — витрина экипажей платформы.
+                  Лендинги /sly13, /moto-selection, /georg-electro, /leorus
+                  ссылаются сюда (в их партнёрских секциях), мы — на них. ══ */}
+              <AnimatedSection delay={0.15}>
+                <p className="mt-14 text-center text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: "var(--vip-accent-main)" }}>
+                  экипажи платформы · на одном софте
+                </p>
+                <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { name: "SLY13", href: "/sly13", tag: "платформа франшиз", desc: "Каталог, CRM, договоры, лиды и витрина каждого экипажа.", accent: "#22D3EE" },
+                    { name: "Moto.Selection", href: "/moto-selection", tag: "мотосервис", desc: "Обучение, подбор мото, ТО, детейлинг, хранение 24/7.", accent: "#FF7522" },
+                    { name: "Georg.Electro", href: "/georg-electro", tag: "электрика", desc: "Диагностика, контроллеры, проводка, свет — один мастер.", accent: "#F59E0B" },
+                    { name: "LEORUS", href: "/leorus", tag: "ивент-агентство", desc: "Фестивали, DJ и шоу, видео-продакшн, корпоративы.", accent: "#00F0FF" },
+                  ].map((crew) => (
+                    <Link
+                      key={crew.href}
+                      href={crew.href}
+                      className="group flex flex-col rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1"
+                      style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "var(--vip-bg-card)" }}
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: crew.accent }}>{crew.tag}</span>
+                      <span className="mt-2 text-base font-black uppercase tracking-tight" style={{ color: "var(--vip-text-primary)" }}>
+                        {crew.name}
+                      </span>
+                      <span className="mt-1.5 text-xs leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
+                        {crew.desc}
+                      </span>
+                      <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] transition-transform duration-300 group-hover:translate-x-0.5" style={{ color: crew.accent }}>
+                        Открыть витрину <ArrowRight className="h-3 w-3" />
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </AnimatedSection>
             </div>
           </section>
 

@@ -399,21 +399,26 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
 }
 
 /**
- * task 139 iter3 — full-card hover highlight (PC only).
- * The highlighted state used to paint ONLY the info strip at the bottom
- * (~28% of the card — boss: «highlight looks like 30% narrower then
- * needed», «not related to border»). On PC the accent now covers the
- * WHOLE card: a tinted wash over the photo plus a gradient that blends
- * it into the solid-accent info area below. md: gate keeps touch
- * hover-lock from stranding a tint on phones. Pair with the accent
- * info-strip fill + hover border; the keyboard/TV focus outline
- * (interactionCardFocusStyle) is a separate mechanism and stays.
+ * task 141 iter4 — photo-area part of the full-card hover highlight (PC only).
+ * History: the original complaint was «highlight looks like 30% narrower then
+ * needed» (task 139) — iter3 (task 140) added a 20% tint that is practically
+ * invisible on the dark studio photos (boss kept reading the highlight as
+ * «less then whole card»), so the wash is now 30% and the blend gradient is
+ * taller (h-28) and stronger (80%): the photo clearly lights up and melts
+ * into the solid accent strip below.
+ * The BASE layer of the highlight is the article's own background — see
+ * catalogCardVariantStyles (task 141 iter4): globals.css flips
+ * --card-base-bg to var(--catalog-accent) on [data-catalog-item]:hover, so
+ * the accent covers the whole border-box no matter what inner elements do.
+ * md: gate keeps touch hover-lock from stranding a tint on phones. The
+ * keyboard/TV focus outline (interactionCardFocusStyle) is a separate
+ * mechanism and stays.
  */
 function CatalogHoverWash() {
   return (
     <>
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-20 md:block" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-24 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-70 md:block" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-[var(--catalog-accent)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-80 md:block" />
     </>
   );
 }
@@ -448,7 +453,7 @@ function ComboOfferCard({
       key={item.id}
       data-catalog-item="true"
       data-combo-offer="true"
-      className="group col-span-full overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)]"
+      className="group col-span-full overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-colors duration-300 hover:!border-[var(--catalog-accent)]"
       style={{
         ...catalogCardVariantStyles(crew.theme, crewPaletteSeed(item.id)),
         // task 139 iter2: focus frame on the ARTICLE (outline, negative
@@ -492,8 +497,11 @@ function ComboOfferCard({
           )}
         </div>
 
-        {/* Info + CTA */}
-        <div className="flex flex-1 flex-col p-4 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+        {/* Info + CTA — task 141 iter4: NO bg here; the hover accent comes
+            from the article's own background (globals.css --card-base-bg
+            flip), so the fill hugs the card silhouette edge-to-edge and no
+            inner element can leave an unpainted sliver. */}
+        <div className="flex flex-1 flex-col p-4">
           <h3 className="text-base font-bold leading-6 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
             {item.title}
           </h3>
@@ -1590,7 +1598,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)] sm:w-[220px] sm:max-w-[240px]"
+                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-colors duration-300 hover:!border-[var(--catalog-accent)] sm:w-[220px] sm:max-w-[240px]"
                       style={{
                         ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
                         // task 139 iter2: focus frame lives HERE (outline,
@@ -1663,12 +1671,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </span>
                         </div>
 
-                        {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container to avoid gap) ── */}
+                        {/* ── Info + CTA area ── */}
                         {/* flex-1 + flex-col fills the card height so the hover border aligns. */}
-                        {/* task 133: no rounded-b-2xl — same reason as the grid card
-                            below (the accent hover fill must hug the card silhouette,
-                            not read as a narrower inner block). */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+                        {/* task 133: no rounded-b-2xl — the accent hover fill must hug
+                            the card silhouette, not read as a narrower inner block. */}
+                        {/* task 141 iter4: on hover this strip goes TRANSPARENT and the
+                            accent shows from the ARTICLE's own background (globals.css
+                            --card-base-bg flip) — one paint layer = exactly the card,
+                            a partial highlight is impossible by construction. */}
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-transparent">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
@@ -1760,7 +1771,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     <article
                       key={item.id}
                       data-catalog-item="true"
-                      className="group overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-[border-color] duration-300 hover:!border-[var(--catalog-accent)]"
+                      className="group overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-colors duration-300 hover:!border-[var(--catalog-accent)]"
                       style={{
                         ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
                         // task 139 iter2: same article-level focus frame as
@@ -1814,7 +1825,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </span>
                         </div>
 
-                        {/* ── Info + CTA area (rentalbikes-style: highlight on hover, unified container) ── */}
+                        {/* ── Info + CTA area ── */}
                         {/* flex-1 + flex-col so this area grows to fill the card height (the
                             image is fixed aspect-[9/16]). Without this, shorter cards left a
                             gap between the content and the article border, so the hover border
@@ -1825,7 +1836,13 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             block floating inside the card (dark corner bites + dark moat vs
                             the framed image above) — on PC the boss read the highlighted
                             card as literally smaller. */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]">
+                        {/* task 141 iter4: on hover this strip goes TRANSPARENT and the
+                            accent shows from the ARTICLE's own background (globals.css
+                            --card-base-bg flip) — the accent then covers the whole
+                            border-box even when grid/carousel stretch leaves inner
+                            elements shorter than the card (the «1-row name next to a
+                            2-row name» case the boss kept hitting). */}
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-transparent">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (

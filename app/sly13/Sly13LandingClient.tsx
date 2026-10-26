@@ -185,10 +185,14 @@ const SERVICES = [
   },
 ];
 
+// task 141: href — куда ведёт карточка (лендинг, если он есть, иначе
+// каталог экипажа /franchize/{slug}; djorudjov теперь настоящий экипаж
+// в БД — мёртвой ссылки больше нет).
 const PIPELINE_CREWS = [
-  { slug: "georg-electro", label: "georg-electro", note: "диагностика электро-систем" },
-  { slug: "nn-mototeh-nn", label: "nn-mototeh-nn", note: "мототехника NN, колесо фортуны e2e" },
-  { slug: "djorudjov", label: "djorudjov", note: "контент и рассылки экипажа" },
+  { slug: "georg-electro", href: "/georg-electro", label: "georg-electro", note: "электрик электробайков — диагностика, контроллеры, свет" },
+  { slug: "nn-mototeh-nn", href: null, label: "nn-mototeh-nn", note: "мототехника NN, колесо фортуны e2e" },
+  { slug: "djorudjov", href: null, label: "djorudjov · LEORUS", note: "ивент-агентство — фестивали, DJ и шоу, видео, корпоративы" },
+  { slug: "vip-bike", href: "/vipbikerental", label: "VIP BIKE Rental", note: "аренда электромото — флагман платформы" },
 ];
 
 const TICKER = [
@@ -945,7 +949,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     {PIPELINE_CREWS.map((c) => (
                       <Link
                         key={c.slug}
-                        href={`/franchize/${c.slug}`}
+                        href={c.href || `/franchize/${c.slug}`}
                         className="group flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition"
                         style={{ borderColor: p.borderSoft, background: `${p.bgBase}80` }}
                       >
@@ -1354,11 +1358,12 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               </SpotlightCard>
             </Reveal>
 
-            {/* Остальные экипажи пайплайна */}
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            {/* Остальные экипажи пайплайна (task 141: + VIP BIKE Rental,
+                djorudjov теперь реальный экипаж в БД) */}
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {PIPELINE_CREWS.map((c, i) => (
                 <Reveal key={c.slug} delay={0.06 + i * 0.06}>
-                  <Link href={`/franchize/${c.slug}`} className="block h-full">
+                  <Link href={c.href || `/franchize/${c.slug}`} className="block h-full">
                     <SpotlightCard
                       className="group h-full rounded-2xl border p-5 transition-transform duration-300 hover:-translate-y-1"
                       style={{ background: p.bgCard, borderColor: p.borderSoft }}

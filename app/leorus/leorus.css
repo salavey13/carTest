@@ -1349,3 +1349,44 @@
 }
 @media (max-width: 720px) {.leorus-root .partner-card__logo--img{ max-width: 240px; }
 }
+
+/* ── task 141: crew-links — витрина экипажей платформы (interlink all-to-all).
+   Стили в ДНК leorus: тёмные карточки, cyan-ховер, тонкие линии. ── */
+.leorus-root .crew-links{ margin-top: 26px; }
+.leorus-root .crew-links__eyebrow{
+  font-family: var(--font-mono, monospace);
+  font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--text-faint, #6E6486); margin: 0 0 14px;
+}
+.leorus-root .crew-links__grid{
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 720px){ .leorus-root .crew-links__grid{ grid-template-columns: 1fr; } }
+.leorus-root .crew-link{
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 18px 20px;
+  background: var(--bg-card, #15101F);
+  border: 1px solid var(--line, rgba(255,255,255,0.08));
+  border-radius: 16px;
+  text-decoration: none;
+  transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+}
+.leorus-root .crew-link:hover{
+  border-color: var(--cyan-glow, rgba(0,240,255,0.45));
+  transform: translateY(-2px);
+  box-shadow: 0 12px 34px rgba(0, 240, 255, 0.08);
+}
+.leorus-root .crew-link__title{
+  font-family: var(--font-display, inherit);
+  font-size: 17px; font-weight: 800; letter-spacing: 0.02em;
+  color: var(--text, #F5F2FF);
+}
+.leorus-root .crew-link__note{
+  font-size: 13px; line-height: 1.5; color: var(--text-mute, #9B92B0);
+}
+.leorus-root .crew-link__more{
+  margin-top: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--cyan, #00F0FF);
+}
