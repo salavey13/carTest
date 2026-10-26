@@ -34,8 +34,7 @@ import {
   Youtube,
 } from "lucide-react";
 import FeedbackModal from "./FeedbackModal";
-import { MsServicesGrid } from "./ServicesGrid";
-import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
+import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 
 export const metadata: Metadata = {
   title: "Moto.selection — высокое искусство мотосервиса | Нижний Новгород",
@@ -59,16 +58,6 @@ const T = "https://static.tildacdn.com";
 // эвакуации фото нет, а у нас уже есть.
 const IMG_EVAC_CATALOG =
   "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/moto-selection-svc-03/image_1.jpg";
-// task 144 (boss: «moto-selection.ru has cool smoke picture on dark
-// backgrounds, try to find its url and use everywhere applicable»): the
-// original overlays a TRANSPARENT smoke-cloud PNG on dark blocks (probed:
-// rec499516429 «о нас», rec499505669, rec499515450 — white smoke, alpha 0…176,
-// 1680×625). It floats on ANY dark section — no blend mode needed.
-const SMOKE_TEXTURE = `${T}/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png`;
-// PICTURE LOGOS for the partner reveal cards (task 144: «PICTURE LOGOS AND
-// TITLES BE REVEALED ON TAP/HOVER»): real brand assets — moto-selection's own
-// tildacdn logo, sly13/leorus/vip-bike assets already in the repo.
-const PARTNER_LOGO_MOTO = `${T}/tild3664-3162-4266-b638-633466343365/1____6666.jpg`;
 const IMG = {
   // 2026-10-25 (owner request): hero bg swap — the golden-hour harley ride
   // made way for the stunt rider in blue smoke (moto-selection-svc-01, the
@@ -331,66 +320,24 @@ export default function MotoSelectionLanding() {
         }
         @keyframes ms-kenburns { 0% { transform: scale(1) translateY(0); } 100% { transform: scale(1.12) translateY(-1.5%); } }
         @keyframes ms-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        /* Фирменное стекло карточек услуг (чёрный 60% + blur 5px).
-           2026-10-27 ПРОБА ОРИГИНАЛА (playwright, sbs-499421781-1665341278793):
-           при ховере moto-selection.ru стекло НЕ «blur(5px)→blur(0) с тинтом»,
-           а ПОЛНОСТЬЮ РАСТВОРЯЕТСЯ — opacity 1 → 0 (уйти должен и blur, и
-           тёмный тинт; тинт поверх резкой фотографии и читался боссом как
-           «всё ещё размыто»). Гейт hover:hover + pointer:fine = PC-only;
-           тач снимает стекло по data-active (первый тап — reveal, второй —
-           переход, MsServicesGrid), фокус-клавиатура — по :focus-visible. */
+        /* Фирменное стекло карточек услуг (чёрный 60% + blur 5px). 2026-10-27
+           boss: на ground truth moto-selection.ru при ховере картинка
+           РАЗМЫТИЕ СНИМАЕТСЯ — плавно blur(5px)→blur(0) под курсором.
+           Гейт hover:hover + pointer:fine = PC-only (тач не страндирует
+           размытое состояние, как в каталоге с wash md:block). Тёмная
+           подложка 60% остаётся — контраст текста не деградирует. */
         .ms-glass {
           background: rgba(0,0,0,0.6);
           -webkit-backdrop-filter: blur(5px);
           backdrop-filter: blur(5px);
-          transition: opacity 0.5s ease;
+          transition: -webkit-backdrop-filter 0.5s ease, backdrop-filter 0.5s ease;
         }
         @media (hover: hover) and (pointer: fine) {
-          .group:hover .ms-glass { opacity: 0; }
+          .group:hover .ms-glass {
+            -webkit-backdrop-filter: blur(0px);
+            backdrop-filter: blur(0px);
+          }
         }
-        .ms-card[data-active="true"] .ms-glass,
-        .ms-card:focus-visible .ms-glass { opacity: 0; }
-        /* ── task 144: партнёрские карточки-ревилы («PICTURE LOGOS AND TITLES
-           BE REVEALED ON TAP/HOVER») — дефолт: приглушённое фото-лого;
-           ховер/тап: цвет + титул/нота/CTA выезжают снизу. Тап-гейт тот же,
-           что у услуг (PartnerRevealCard data-reveal-active). */
-        .ms-pcard {
-          position: relative;
-          display: flex;
-          min-height: 200px;
-          overflow: hidden;
-          border-radius: 1rem;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: #0a0a0a;
-          transition: border-color 0.3s ease;
-        }
-        .ms-pcard:hover, .ms-pcard[data-reveal-active="true"] { border-color: rgba(255,117,34,0.6); }
-        .ms-pcard__img {
-          position: absolute; inset: 0;
-          filter: grayscale(0.55) brightness(0.72);
-          transition: filter 0.45s ease, transform 0.45s ease;
-        }
-        .ms-pcard:hover .ms-pcard__img,
-        .ms-pcard[data-reveal-active="true"] .ms-pcard__img { filter: none; transform: scale(1.04); }
-        .ms-pcard__scrim {
-          position: absolute; inset: 0;
-          background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.28) 48%, rgba(0,0,0,0) 72%);
-        }
-        .ms-pcard__body {
-          position: absolute; left: 0; right: 0; bottom: 0;
-          display: flex; flex-direction: column; gap: 4px;
-          padding: 16px;
-          opacity: 0; transform: translateY(10px);
-          transition: opacity 0.35s ease, transform 0.35s ease;
-        }
-        .ms-pcard:hover .ms-pcard__body,
-        .ms-pcard[data-reveal-active="true"] .ms-pcard__body { opacity: 1; transform: none; }
-        /* фирменный дым оригинала на тёмных секциях (о нас / контакты) */
-        .ms-smoke {
-          position: absolute; left: 0; right: 0; bottom: 0;
-          height: 260px; pointer-events: none;
-        }
-        .ms-smoke img { object-fit: cover; object-position: bottom; width: 100%; height: 100%; }
         @media (prefers-reduced-motion: reduce) {
           .ms-kenburns, .ms-marquee-track { animation: none !important; }
         }
@@ -614,10 +561,66 @@ export default function MotoSelectionLanding() {
 
           {/* Анатомия карточки — 1:1 с оригиналом (A.4): фото на всю карточку →
               фирменное «стекло» (чёрный 60% + backdrop-blur 5px) → гостовый
-              нумерал → заголовок → оранжевая пилюля ПОДРОБНЕЕ. Разметка живёт
-              в клиентском MsServicesGrid (task 144: тап-гейт для снятия
-              стекла на таче — hover-only CSS тач не покрывает). */}
-          <MsServicesGrid services={SERVICES} brand={BRAND} />
+              нумерал, наполовину выходящий за верхний край → заголовок 18px/400
+              uppercase по центру → оранжевая пилюля ПОДРОБНЕЕ (200×48, белый
+              текст). У эвакуации вместо фото — фирменный градиент, стекло поверх.
+              Без поддержки backdrop-filter остаётся чёрный 60% — карточка читается. */}
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-9">
+            {SERVICES.map((s, svcIdx) => (
+              <a
+                key={s.id}
+                href={s.anchor}
+                className="group relative flex min-h-[320px] flex-col overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.04] transition hover:border-[var(--ms-accent)]/60"
+              >
+                {s.img ? (
+                  <Image
+                    src={s.img}
+                    alt=""
+                    aria-hidden
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover transition duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  // Эвакуация — единственная услуга без фото на оригинале:
+                  // фирменный оранжевый блок с иконкой вместо картинки.
+                  <div className="absolute inset-0" aria-hidden style={{ background: `linear-gradient(135deg, ${BRAND} 0%, #c24e0d 100%)` }}>
+                    <Truck className="absolute right-5 top-5 h-14 w-14 text-black/70" aria-hidden />
+                    <span className="absolute right-5 top-24 rounded-full bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+                      24/7
+                    </span>
+                  </div>
+                )}
+                {/* фирменное стекло оригинала: чёрный 60% + blur(5px);
+                    ховер снимает размытие (.ms-glass в <style> выше) */}
+                <div className="ms-glass absolute inset-0" aria-hidden />
+                <div className="relative z-10 flex flex-1 flex-col items-center p-6 text-center">
+                  {/* нумерал наполовину «выходит» из-под верхнего края карточки
+                      (оригинал: 120px, top = card − 53px); overflow-hidden срезает
+                      верхнюю часть — эффект появления из-за кромки */}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none -mt-12 select-none text-[88px] font-bold leading-none text-white/85 transition duration-300 group-hover:text-[var(--ms-accent)] sm:text-[110px]"
+                  >
+                    {String(svcIdx + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="mt-2 text-lg font-normal uppercase leading-snug text-white">{s.title}</h3>
+                  {s.price && (
+                    <span className="mt-2 rounded-full border border-white/25 px-3 py-1 text-[11px] font-semibold text-white/85">
+                      {s.price}
+                    </span>
+                  )}
+                  <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-white/55">{s.text}</p>
+                  <span
+                    className="mt-auto inline-flex h-12 w-[200px] items-center justify-center self-center rounded-[30px] bg-[var(--ms-accent)] text-xs font-semibold uppercase tracking-[0.08em] text-white transition group-hover:brightness-110"
+                    style={{ marginTop: "auto" }}
+                  >
+                    Подробнее
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -936,12 +939,6 @@ export default function MotoSelectionLanding() {
         >
           о нас
         </span>
-        {/* task 144: фирменный дым оригинала — на moto-selection.ru он висит
-            именно над этим блоком (rec499516429). Прозрачный PNG поверх
-            тёмной секции, под контентом (z-10). */}
-        <div className="ms-smoke z-0" aria-hidden>
-          <Image src={SMOKE_TEXTURE} alt="" fill sizes="100vw" />
-        </div>
         <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="grid gap-10 lg:grid-cols-[auto_1fr] lg:items-center lg:gap-16">
           <div className="relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 lg:w-96">
@@ -1046,169 +1043,80 @@ export default function MotoSelectionLanding() {
         <p className="text-center text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">
           наши партнеры
         </p>
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {/* 2026-10-27 boss: картина Байкленд (900×900 JPG с заливкой) →
-              прозрачный SVG-логотип с посадочной /vipbikerental (партнёрский
-              блок корневого лендинга, bikeland.ru/local/templates/2019/svg/
-              logo.svg) — «will look cooler and more simmetrical with other
-              partners images». Лого ЧЁРНО-ОРАНЖЕЕ на прозрачном → та же
-              светлая подложка #f2efea, что у Академии (на bg-black чёрный
-              текст пропал бы). unoptimized: SVG мимо next-оптимайзера. */}
-          <a
-            href={BIKELAND_HREF}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#f2efea] p-6 transition hover:border-[var(--ms-accent)]/60"
-          >
-            <Image
-              src={BIKELAND_LOGO_SVG}
-              alt="Байкленд — партнёр Moto.selection"
-              width={480}
-              height={267}
-              unoptimized
-              sizes="(max-width: 640px) 100vw, 300px"
-              className="h-auto w-48 object-contain transition group-hover:scale-105"
-            />
-          </a>
-          {/* 2026-10-26 boss: лого Академии имеет ЧЁРНЫЙ текст на прозрачной
-              части — на тёмной подложке он пропадал; лёгкий тёплый тинт
-              возвращает контраст (у Байкленд своё фото, не задето). */}
-          <a
-            href={ACADEMY_SITE}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#f2efea] p-6 transition hover:border-[var(--ms-accent)]/60"
-          >
-            <Image
-              src={IMG.academyLogo}
-              alt="Академия — партнёр Moto.selection"
-              width={300}
-              height={268}
-              sizes="(max-width: 640px) 100vw, 300px"
-              className="h-auto w-48 object-contain transition group-hover:scale-105"
-            />
-          </a>
-          {/* Партнёрская витрина платформы: cross-link к /sly13 (босс:
-              «interlink us as partners in respective sections»).
-              2026-10-25: карточка получила ЛОГОТИП sly13 (carpix/
-              sly13_logo.jpg) и теперь визуально выровнена с Байкленд и
-              Академия — те тоже картинки, а не текст. */}
-          {/* task 144: «PICTURE LOGOS AND TITLES BE REVEALED ON TAP/HOVER» —
-              карточки экипажей платформы теперь — ревилы: приглушённое
-              фото-лого по дефолту, на ховере/тапе цвет + титул/нота/CTA.
-              Тач-гейт (первый тап reveal, второй переход) в
-              PartnerRevealCard. */}
-          <PartnerRevealCard href="/sly13" className="ms-pcard" ariaLabel="SLY13 — платформа франшиз проката, открыть витрину">
-            <Image
-              src={SLY13_LOGO}
-              alt=""
-              aria-hidden
-              fill
-              sizes="(max-width: 640px) 100vw, 300px"
-              className="ms-pcard__img"
-            />
-            <span className="ms-pcard__scrim" aria-hidden />
-            <span className="ms-pcard__body">
-              <span className="text-sm font-black uppercase tracking-[0.12em] text-white">SLY13</span>
-              <span className="text-xs leading-relaxed text-white/60">
-                платформа франшиз проката — витрина партнёров, работающих на одном софте
-              </span>
-              <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
-                Открыть витрину
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </span>
-          </PartnerRevealCard>
-          {/* task 141: interlink all-to-all — партнёрские витрины платформы.
-              Георгий чинит электро прямо в нашем цехе (сосед по площадке).
-              task 144: вместо иконки-заглушки — настоящее фото мастерской
-              (/images/georg/hero.png) в ревиле. */}
-          <PartnerRevealCard href="/georg-electro" className="ms-pcard" ariaLabel="Georg.Electro — электрик электробайков, открыть витрину">
-            <Image
-              src="/images/georg/hero.png"
-              alt=""
-              aria-hidden
-              fill
-              sizes="(max-width: 640px) 100vw, 300px"
-              className="ms-pcard__img"
-            />
-            <span className="ms-pcard__scrim" aria-hidden />
-            <span className="ms-pcard__body">
-              <span className="text-sm font-black uppercase tracking-[0.12em] text-white">
-                Georg<span style={{ color: "#f59e0b" }}>.</span>Electro
-              </span>
-              <span className="text-xs leading-relaxed text-white/60">
-                электрик электробайков — диагностика, контроллеры, проводка, свет; один мастер, без менеджеров
-              </span>
-              <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
-                Открыть витрину
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </span>
-          </PartnerRevealCard>
-          {/* LEORUS — ивент-агентство Рустама Оруджова × Влада Иващенко
-              (лендинг /leorus, экипаж djorudjov на платформе). task 144:
-              текстовая карточка → ревил с живым кейс-фото фестиваля. */}
-          <PartnerRevealCard href="/leorus" className="ms-pcard" ariaLabel="LEORUS — ивент-агентство, открыть витрину">
-            <Image
-              src="/leorus/case-liveshows.jpg"
-              alt=""
-              aria-hidden
-              fill
-              sizes="(max-width: 640px) 100vw, 300px"
-              className="ms-pcard__img"
-            />
-            <span className="ms-pcard__scrim" aria-hidden />
-            <span className="ms-pcard__body">
-              <span className="text-sm font-black uppercase tracking-[0.12em] text-white">
-                LEOR<span style={{ color: "#00F0FF" }}>US</span>
-              </span>
-              <span className="text-xs leading-relaxed text-white/60">
-                ивент-агентство — фестивали под ключ, DJ и шоу-программы, видео-продакшн, корпоративы
-              </span>
-              <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
-                Открыть витрину
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </span>
-          </PartnerRevealCard>
-          {/* VIP BIKE Rental — флагман платформы (лендинг /vipbikerental).
-              task 144: вместо текстового медальона — неоновый лого VIP BIKE
-              ELECTRO (тот же ассет, что в партнёрском блоке /leorus). */}
-          <PartnerRevealCard href="/vipbikerental" className="ms-pcard" ariaLabel="VIP BIKE Rental — аренда электромото, открыть витрину">
-            <Image
-              src="/leorus/partner-vipbike.png"
-              alt=""
-              aria-hidden
-              fill
-              sizes="(max-width: 640px) 100vw, 300px"
-              className="ms-pcard__img object-contain p-8"
-            />
-            <span className="ms-pcard__scrim" aria-hidden />
-            <span className="ms-pcard__body">
-              <span className="text-sm font-black uppercase tracking-[0.12em] text-white">VIP BIKE Rental</span>
-              <span className="text-xs leading-relaxed text-white/60">
-                аренда электромото в Нижнем Новгороде — каталог, экипировка, карта райдеров, зимнее хранение
-              </span>
-              <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ms-accent)]">
-                Открыть витрину
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </span>
-          </PartnerRevealCard>
+        {/* 2026-10-27 босс: партнёры на всех лендингах единообразно — СНАЧАЛА
+            только логотипы, название раскрывается на hover/долгом тапе.
+            Сквозной компонент PartnerLogoGrid (как на /leorus, /sly13,
+            /georg-electro, /vipbikerental). У каждого лого своя подложка:
+            светлые у Байкленд/Академия/Moto.Selection (тёмный арт), тёмные
+            у неоновых SLY13/LEORUS/Georg/VIP BIKE. */}
+        <div className="mt-8">
+          <PartnerLogoGrid
+            accent="#ff7522"
+            columns={3}
+            ariaLabel="Партнёры Moto.selection"
+            partners={[
+              {
+                href: BIKELAND_HREF,
+                title: "Байкленд",
+                tagline: "мотомаркет и экипировка — партнёр Moto.selection",
+                logoSrc: BIKELAND_LOGO_SVG,
+                logoAlt: "Байкленд — партнёр Moto.selection",
+                external: true,
+                backing: "#f2efea",
+                lightBacking: true,
+              },
+              {
+                href: ACADEMY_SITE,
+                title: "Академия",
+                tagline: "партнёр Moto.selection — обучение и развитие",
+                logoSrc: IMG.academyLogo,
+                logoAlt: "Академия — партнёр Moto.selection",
+                external: true,
+                backing: "#f2efea",
+                lightBacking: true,
+              },
+              {
+                href: "/sly13",
+                title: "SLY13",
+                tagline: "платформа франшиз проката — витрина партнёров на одном софте",
+                logoSrc: SLY13_LOGO,
+                logoAlt: "SLY13 — платформа франшиз проката",
+                backing: "#030303",
+              },
+              {
+                href: "/georg-electro",
+                title: "Georg.Electro",
+                tagline: "электрик электробайков — диагностика, контроллеры, проводка, свет; один мастер, без менеджеров",
+                logoSrc: "/logos/georg-electro-logo.png",
+                logoAlt: "Georg.Electro",
+                backing: "#140f06",
+              },
+              {
+                href: "/leorus",
+                title: "LEORUS",
+                tagline: "ивент-агентство — фестивали под ключ, DJ и шоу-программы, видео-продакшн, корпоративы",
+                logoSrc: "/logos/leorus-logo.png",
+                logoAlt: "LEORUS — ивент-агентство",
+                backing: "#0A0612",
+              },
+              {
+                href: "/vipbikerental",
+                title: "VIP BIKE Rental",
+                tagline: "аренда электромото в Нижнем Новгороде — каталог, экипировка, карта райдеров, зимнее хранение",
+                logoSrc: "/leorus/partner-vipbike.png",
+                logoAlt: "VIP BIKE Rental",
+                backing: "linear-gradient(160deg, #0d0d0d 0%, #1a1408 100%)",
+              },
+            ]}
+          />
         </div>
       </section>
 
       {/* ── КОНТАКТЫ / ЗАЯВКА ── ДНК rec499515450: лид-форма на тёмно-синей
           полосе #0f131c (у оригинала это единственный не-чисто-чёрный тёмный
           артборд — намеренный тональный акцент перед подвалом) */}
-      <section id="contact" className="relative scroll-mt-20 overflow-hidden border-t border-white/10 bg-[#0f131c]">
-        {/* task 144: тот же дым оригинала на финальной тёмной секции —
-            «use everywhere applicable». Под контентом, не мешает форме. */}
-        <div className="ms-smoke z-0" aria-hidden>
-          <Image src={SMOKE_TEXTURE} alt="" fill sizes="100vw" />
-        </div>
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+      <section id="contact" className="scroll-mt-20 border-t border-white/10 bg-[#0f131c]">
+        <div className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[var(--ms-accent)]">контакты</p>
             <h2 className="mt-3 text-3xl font-black uppercase leading-tight tracking-tight text-white sm:text-4xl">

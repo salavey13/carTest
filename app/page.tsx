@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { useTheme } from "next-themes";
-import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
+import FeedbackModal from "@/app/moto-selection/FeedbackModal";
+import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 
 /* ══ THEME PALETTES (dark: gold/black, light: dark cyan/white — WCAG AA) ══ */
 const VIP_BIKE_THEMES = {
@@ -1302,52 +1303,56 @@ export default function Home() {
               {/* ══ task 141: interlink all-to-all — витрина экипажей платформы.
                   Лендинги /sly13, /moto-selection, /georg-electro, /leorus
                   ссылаются сюда (в их партнёрских секциях), мы — на них.
-                  task 144: карточки-ревилы с НАСТОЯЩИМИ картинками-лого
-                  («PICTURE LOGOS AND TITLES BE REVEALED ON TAP/HOVER») —
-                  дефолт приглушён, ховер/тап раскрывает титул/ноту/CTA;
-                  тач-гейт (первый тап reveal, второй — переход) в
-                  PartnerRevealCard. ══ */}
+                  task 145 (босс 2026-10-27): «showing only logos at first,
+                  and reveal title on longtap/hover» — тот же сквозной
+                  PartnerLogoGrid, что на всех витринах экипажей: в покое
+                  только логотипы, hover/долгий тап (≥380 мс) раскрывает
+                  название и подводку, второй тап ведёт на витрину. ══ */}
               <AnimatedSection delay={0.15}>
                 <p className="mt-14 text-center text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: "var(--vip-accent-main)" }}>
                   экипажи платформы · на одном софте
                 </p>
-                <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { name: "SLY13", href: "/sly13", tag: "платформа франшиз", desc: "Каталог, CRM, договоры, лиды и витрина каждого экипажа.", accent: "#22D3EE", img: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg" },
-                    { name: "Moto.Selection", href: "/moto-selection", tag: "мотосервис", desc: "Обучение, подбор мото, ТО, детейлинг, хранение 24/7.", accent: "#FF7522", img: "https://static.tildacdn.com/tild3664-3162-4266-b638-633466343365/1____6666.jpg" },
-                    { name: "Georg.Electro", href: "/georg-electro", tag: "электрика", desc: "Диагностика, контроллеры, проводка, свет — один мастер.", accent: "#F59E0B", img: "/images/georg/hero.png" },
-                    { name: "LEORUS", href: "/leorus", tag: "ивент-агентство", desc: "Фестивали, DJ и шоу, видео-продакшн, корпоративы.", accent: "#00F0FF", img: "/leorus/case-liveshows.jpg" },
-                  ].map((crew) => (
-                    <PartnerRevealCard
-                      key={crew.href}
-                      href={crew.href}
-                      ariaLabel={`${crew.name} — открыть витрину партнёра`}
-                      className="group relative flex flex-col justify-end overflow-hidden min-h-[210px] rounded-2xl border transition-all duration-300 hover:-translate-y-1"
-                      style={{ borderColor: "var(--vip-border-soft)", backgroundColor: "var(--vip-bg-card)" }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={crew.img}
-                        alt=""
-                        aria-hidden
-                        loading="lazy"
-                        className="absolute inset-0 h-full w-full object-cover opacity-55 grayscale-[55%] brightness-90 transition-all duration-500 group-hover:scale-105 group-hover:opacity-100 group-hover:grayscale-0 group-hover:brightness-100 group-data-[reveal-active=true]:scale-105 group-data-[reveal-active=true]:opacity-100 group-data-[reveal-active=true]:grayscale-0 group-data-[reveal-active=true]:brightness-100"
-                      />
-                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                      <span className="relative z-10 flex translate-y-2.5 flex-col p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-data-[reveal-active=true]:translate-y-0 group-data-[reveal-active=true]:opacity-100">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: crew.accent }}>{crew.tag}</span>
-                        <span className="mt-1 text-base font-black uppercase tracking-tight" style={{ color: "var(--vip-text-primary)" }}>
-                          {crew.name}
-                        </span>
-                        <span className="mt-1 text-xs leading-relaxed" style={{ color: "var(--vip-text-secondary)" }}>
-                          {crew.desc}
-                        </span>
-                        <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: crew.accent }}>
-                          Открыть витрину <ArrowRight className="h-3 w-3" />
-                        </span>
-                      </span>
-                    </PartnerRevealCard>
-                  ))}
+                <div className="mt-8">
+                  <PartnerLogoGrid
+                    accent="#FFD700"
+                    columns={4}
+                    ariaLabel="Витрины экипажей платформы — партнёры VIP BIKE"
+                    partners={[
+                      {
+                        href: "/sly13",
+                        title: "SLY13",
+                        tagline: "платформа франшиз — каталог, CRM, договоры, лиды",
+                        logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
+                        logoAlt: "SLY13",
+                        backing: "#030303",
+                      },
+                      {
+                        href: "/moto-selection",
+                        title: "Moto.Selection",
+                        tagline: "мотосервис — обучение, подбор мото, ТО, хранение 24/7",
+                        logoSrc: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png",
+                        logoAlt: "Moto.Selection",
+                        backing: "#f2efea",
+                        lightBacking: true,
+                      },
+                      {
+                        href: "/georg-electro",
+                        title: "Georg.Electro",
+                        tagline: "электрик электробайков — диагностика, контроллеры, свет",
+                        logoSrc: "/logos/georg-electro-logo.png",
+                        logoAlt: "Georg.Electro",
+                        backing: "#140f06",
+                      },
+                      {
+                        href: "/leorus",
+                        title: "LEORUS · djorudjov",
+                        tagline: "ивент-агентство — фестивали, DJ и шоу, видео, корпоративы",
+                        logoSrc: "/logos/leorus-logo.png",
+                        logoAlt: "LEORUS",
+                        backing: "#0A0612",
+                      },
+                    ]}
+                  />
                 </div>
               </AnimatedSection>
             </div>
@@ -1364,6 +1369,20 @@ export default function Home() {
                 <p className="text-xl max-w-2xl mx-auto mb-10" style={{ color: "var(--vip-text-secondary)" }}>Выбери тип техники и модель, укажи даты — менеджер подтвердит доступность и условия.</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <MagneticButton href={CATALOG_HREF} primary>Выбрать байк<ArrowRight /></MagneticButton>
+                  {/* task 145: форма заявки — та же механика, что на всех
+                      витринах экипажей: data-lead-modal-open открывает общий
+                      FeedbackModal → POST /api/franchize/callback-lead со
+                      slug «vip-bike» → CRM экипажа + Telegram (владелец +
+                      ростер + ADMIN_CHAT_ID salavey13). */}
+                  <button
+                    type="button"
+                    data-lead-modal-open
+                    className="inline-flex items-center justify-center gap-2 rounded-full border-2 px-8 py-3 text-sm font-bold uppercase tracking-[0.08em] transition-all hover:scale-105 active:scale-95"
+                    style={{ borderColor: "var(--vip-accent-main)", color: "var(--vip-accent-main)", backgroundColor: "var(--vip-accent-a10)" }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" className="h-4 w-4" style={{ stroke: "currentColor" }}><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    Перезвоните мне
+                  </button>
                   <MagneticButton href={OPERATOR_HREF}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="mr-2 inline"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" /></svg>
                     Написать оператору
@@ -1473,6 +1492,17 @@ export default function Home() {
           </CinematicFinaleSection>
         </main>
       </div>
+
+      {/* Общая модалка заявки (та же, что на /moto-selection, /sly13,
+          /leorus, /georg-electro): POST /api/franchize/callback-lead со
+          slug «vip-bike» — получатели резолвятся из ростера экипажа +
+          ADMIN_CHAT_ID (salavey13). Триггеры — [data-lead-modal-open]. */}
+      <FeedbackModal
+        slug="vip-bike"
+        accent={{ brand: "#E6B800", brandSoft: "#FFD700" }}
+        formSource="vipbike-landing"
+        landingPath="/"
+      />
     </>
   );
 }

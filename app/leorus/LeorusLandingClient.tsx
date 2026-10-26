@@ -17,14 +17,16 @@
 //
 // Что переписано на React: sticky-nav состояние (is-scrolled), мобильный
 // бургер, и — вместо мок-сабмита — форма заявки POST-ит в существующий
-// /api/franchize/callback-lead (slug «vip-bike»: Rustam — vip-bike админ,
-// получатели резолвятся через resolveLeadNotifyRecipients + ADMIN_CHAT_ID,
-// т.е. босс и ростер vip-bike получают лид в Telegram). Успех/ошибка — в
+// /api/franchize/callback-lead. 2026-10-27 босс: «link "leoris" to
+// "djorudjov" crew properly» — slug сменён с «vip-bike» на «djorudjov»
+// (экипаж LEORUS реально существует в БД, id 71cbb838…): получателей лидов
+// резолвит resolveLeadNotifyRecipients("djorudjov") — владелец экипажа +
+// ростер, плюс ADMIN_CHAT_ID (salavey13). Успех/ошибка — в
 // стилистике оригинального [data-success] блока.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
-import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
+import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 import "./leorus.css";
 
 type FormPhase = "idle" | "sending" | "success" | "error";
@@ -68,7 +70,7 @@ export default function LeorusLandingClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            slug: "vip-bike",
+            slug: "djorudjov",
             name: String(fd.get("name") || "").trim(),
             phone: String(fd.get("phone") || "").trim(),
             consent: true,
@@ -166,6 +168,10 @@ export default function LeorusLandingClient() {
     
     <section className="hero" aria-labelledby="hero-title">
       <div className="hero__bg" aria-hidden="true">
+        {/* task 144: фоновое фото площадки (крыша, стринг-лайты, фиолетовая
+            ночь) под неоновой CSS-графикой — фотография проступает сквозь
+            сетку и орбы, делает hero живым, но не ярче контента. */}
+        <img className="hero__photo" src="/leorus/hero-bg.jpg" alt="" width="1600" height="1200" />
         <div className="hero__grid"></div>
         <div className="hero__orb hero__orb--1"></div>
         <div className="hero__orb hero__orb--2"></div>
@@ -505,27 +511,11 @@ export default function LeorusLandingClient() {
 
           
           <article className="port-card port-card--violet">
-            <div className="port-card__media" aria-hidden="true">
-              <svg className="port-card__bg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
-                <defs>
-                  <linearGradient id="p3g" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#1B0A3A"/>
-                    <stop offset="100%" stopColor="#3F1370"/>
-                  </linearGradient>
-                </defs>
-                <rect width="400" height="400" fill="url(#p3g)"/>
-                <g fill="#8338EC" opacity="0.5">
-                  <circle cx="200" cy="200" r="100"/>
-                </g>
-                <g fill="#FF2D9B" opacity="0.6">
-                  <circle cx="160" cy="180" r="30"/>
-                  <circle cx="240" cy="220" r="20"/>
-                </g>
-                <g stroke="#F5F2FF" strokeWidth="1" fill="none" opacity="0.4">
-                  <path d="M100 280 Q200 250 300 280"/>
-                  <path d="M100 300 Q200 270 300 300"/>
-                </g>
-              </svg>
+            <div className="port-card__media">
+              {/* task 144: вместо абстрактной SVG-заглушки — сгенерированное
+                  фото ночного фестиваля (текст-хостильный промпт, sharp
+                  1000px mozjpeg q80, 141KB). */}
+              <img className="port-card__bg" src="/leorus/case-matreshka.jpg" alt="MatreshkaFest — ночная сцена, толпа и флаги стран" loading="lazy" width="1000" height="750" />
             </div>
             <div className="port-card__overlay">
               <span className="port-card__year">2019–2020</span>
@@ -550,27 +540,11 @@ export default function LeorusLandingClient() {
 
           
           <article className="port-card port-card--magenta">
-            <div className="port-card__media" aria-hidden="true">
-              <svg className="port-card__bg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
-                <defs>
-                  <radialGradient id="p5r" cx="0.5" cy="0.5" r="0.7">
-                    <stop offset="0%" stopColor="#5A0E2E"/>
-                    <stop offset="100%" stopColor="#0A0414"/>
-                  </radialGradient>
-                </defs>
-                <rect width="400" height="400" fill="url(#p5r)"/>
-                <g stroke="#FF2D9B" strokeWidth="1" fill="none" opacity="0.6">
-                  <circle cx="200" cy="200" r="120"/>
-                  <circle cx="200" cy="200" r="90"/>
-                  <circle cx="200" cy="200" r="60"/>
-                </g>
-                <g fill="#FF2D9B">
-                  <circle cx="200" cy="80" r="4"/>
-                  <circle cx="320" cy="200" r="4"/>
-                  <circle cx="200" cy="320" r="4"/>
-                  <circle cx="80" cy="200" r="4"/>
-                </g>
-              </svg>
+            <div className="port-card__media">
+              {/* task 144: вместо абстрактной SVG-заглушки — сгенерированное
+                  фото огненного шоу на пляже Гоа (текст-хостильный промпт,
+                  sharp 1000px mozjpeg q80, 114KB). */}
+              <img className="port-card__bg" src="/leorus/case-goafreaks.jpg" alt="Goa-freaks — огненное шоу на ночном пляже" loading="lazy" width="1000" height="750" />
             </div>
             <div className="port-card__overlay">
               <span className="port-card__year">Goa · Индия</span>
@@ -624,11 +598,6 @@ export default function LeorusLandingClient() {
 
     
     <section className="partner section" aria-labelledby="partner-title">
-      {/* task 144: фирменный дым moto-selection.ru на дне партнёрской секции —
-          прозрачный PNG, под контентом (container z-index: 1 в leorus.css). */}
-      <div className="partner-smoke" aria-hidden>
-        <img src="https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png" alt="" loading="lazy" />
-      </div>
       <div className="container">
         <article className="partner-card">
           <div className="partner-card__left">
@@ -649,52 +618,53 @@ export default function LeorusLandingClient() {
           </div>
         </article>
 
-        {/* task 141: interlink all-to-all — витрина экипажей платформы SLY13.
+        {/* task 141→144: interlink all-to-all — витрина экипажей платформы SLY13.
             LEORUS (экипаж djorudjov) живёт на одном софте с арендой, мотосервисом
-            и электрикой: ссылаемся на их лендинги, они ссылаются на нас.
-            task 144: карточки — ревилы с настоящими картинками-лого («PICTURE
-            LOGOS AND TITLES BE REVEALED ON TAP/HOVER»); первый тап — reveal,
-            второй — переход (PartnerRevealCard). */}
-        <div className="crew-links" role="list" aria-label="Витрины партнёров платформы">
+            и электрикой. Босс 2026-10-27: карточки-партнёры на всех лендингах
+            единообразно — СНАЧАЛА только логотипы, название раскрывается на
+            hover/долгом тапе (PartnerLogoGrid, сквозной компонент). */}
+        <div className="crew-links">
           <p className="crew-links__eyebrow">витрина платформы · экипажи на одном софте</p>
-          <div className="crew-links__grid">
-            <PartnerRevealCard href="/vipbikerental" className="crew-link" role="listitem" ariaLabel="VIP BIKE Rental — открыть витрину партнёра">
-              <img className="crew-link__img crew-link__img--contain" src="/leorus/partner-vipbike.png" alt="" loading="lazy" />
-              <span className="crew-link__scrim" aria-hidden />
-              <span className="crew-link__body">
-                <span className="crew-link__title">VIP BIKE Rental</span>
-                <span className="crew-link__note">аренда электромото · экипировка · карта райдеров · зимнее хранение</span>
-                <span className="crew-link__more">Открыть витрину →</span>
-              </span>
-            </PartnerRevealCard>
-            <PartnerRevealCard href="/moto-selection" className="crew-link" role="listitem" ariaLabel="Moto.Selection — открыть витрину партнёра">
-              <img className="crew-link__img" src="https://static.tildacdn.com/tild3664-3162-4266-b638-633466343365/1____6666.jpg" alt="" loading="lazy" />
-              <span className="crew-link__scrim" aria-hidden />
-              <span className="crew-link__body">
-                <span className="crew-link__title">Moto.Selection</span>
-                <span className="crew-link__note">мотосервис · обучение · подбор мото · ТО · хранение 24/7</span>
-                <span className="crew-link__more">Открыть витрину →</span>
-              </span>
-            </PartnerRevealCard>
-            <PartnerRevealCard href="/sly13" className="crew-link" role="listitem" ariaLabel="SLY13 — открыть витрину партнёра">
-              <img className="crew-link__img" src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg" alt="" loading="lazy" />
-              <span className="crew-link__scrim" aria-hidden />
-              <span className="crew-link__body">
-                <span className="crew-link__title">SLY13</span>
-                <span className="crew-link__note">платформа франшиз проката — каталог, CRM, договоры, лиды</span>
-                <span className="crew-link__more">Открыть витрину →</span>
-              </span>
-            </PartnerRevealCard>
-            <PartnerRevealCard href="/georg-electro" className="crew-link" role="listitem" ariaLabel="Georg.Electro — открыть витрину партнёра">
-              <img className="crew-link__img" src="/images/georg/hero.png" alt="" loading="lazy" />
-              <span className="crew-link__scrim" aria-hidden />
-              <span className="crew-link__body">
-                <span className="crew-link__title">Georg.Electro</span>
-                <span className="crew-link__note">электрик электробайков — диагностика, контроллеры, проводка, свет</span>
-                <span className="crew-link__more">Открыть витрину →</span>
-              </span>
-            </PartnerRevealCard>
-          </div>
+          <PartnerLogoGrid
+            accent="#00F0FF"
+            columns={4}
+            ariaLabel="Витрины партнёров платформы"
+            partners={[
+              {
+                href: "/vipbikerental",
+                title: "VIP BIKE Rental",
+                tagline: "аренда электромото · экипировка · карта райдеров · зимнее хранение",
+                logoSrc: "/leorus/partner-vipbike.png",
+                logoAlt: "VIP BIKE ELECTRO",
+                backing: "#050508",
+              },
+              {
+                href: "/moto-selection",
+                title: "Moto.Selection",
+                tagline: "мотосервис · обучение · подбор мото · ТО · хранение 24/7",
+                logoSrc: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png",
+                logoAlt: "Moto.Selection",
+                backing: "#f2efea",
+                lightBacking: true,
+              },
+              {
+                href: "/sly13",
+                title: "SLY13",
+                tagline: "платформа франшиз проката — каталог, CRM, договоры, лиды",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
+                logoAlt: "SLY13",
+                backing: "#030303",
+              },
+              {
+                href: "/georg-electro",
+                title: "Georg.Electro",
+                tagline: "электрик электробайков — диагностика, контроллеры, проводка, свет",
+                logoSrc: "/logos/georg-electro-logo.png",
+                logoAlt: "Georg.Electro",
+                backing: "#140f06",
+              },
+            ]}
+          />
         </div>
       </div>
     </section>

@@ -42,13 +42,7 @@ import {
   Zap,
 } from "lucide-react";
 import FeedbackModal from "../moto-selection/FeedbackModal";
-import { PartnerRevealCard } from "@/components/partners/PartnerRevealCard";
-
-// task 144: фирменный дым moto-selection.ru (прозрачный PNG, alpha 0…176,
-// 1680×625) — на тёмных секциях нашей витрины тоже («use everywhere
-// applicable, looks awesome!!»)
-const SMOKE_TEXTURE =
-  "https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png";
+import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 
 export const metadata: Metadata = {
   title: "GEORG ELECTRO — электрик электробайков · Нижний Новгород",
@@ -207,48 +201,6 @@ export default function GeorgElectroLanding() {
         .ge-ticker-track { animation: ge-marquee 26s linear infinite; }
         @keyframes ge-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
         .ge-pulse { animation: ge-pulse 2.4s ease-in-out infinite; }
-        /* task 144: партнёрские ревил-карточки («PICTURE LOGOS AND TITLES BE
-           REVEALED ON TAP/HOVER») — дефолт: приглушённое фото-лого; ховер/тап:
-           цвет + титул/нота/CTA выезжают снизу. Тач-гейт (первый тап reveal,
-           второй — переход) в PartnerRevealCard (data-reveal-active). */
-        .ge-pcard {
-          position: relative;
-          display: flex;
-          min-height: 210px;
-          overflow: hidden;
-          border-radius: 1rem;
-          border: 1px solid transparent;
-          background: transparent;
-          transition: border-color 0.3s ease, transform 0.3s ease;
-        }
-        .ge-pcard:hover, .ge-pcard[data-reveal-active="true"] { border-color: rgba(245,158,11,0.55); transform: translateY(-2px); }
-        .ge-pcard__img {
-          position: absolute; inset: 0;
-          filter: grayscale(0.5) brightness(0.66);
-          transition: filter 0.45s ease, transform 0.45s ease;
-        }
-        .ge-pcard:hover .ge-pcard__img,
-        .ge-pcard[data-reveal-active="true"] .ge-pcard__img { filter: none; transform: scale(1.04); }
-        .ge-pcard__scrim {
-          position: absolute; inset: 0;
-          background: linear-gradient(to top, rgba(20,15,6,0.92) 0%, rgba(20,15,6,0.30) 48%, rgba(20,15,6,0.05) 74%);
-        }
-        .ge-pcard__body {
-          position: absolute; left: 0; right: 0; bottom: 0;
-          display: flex; flex-direction: column; gap: 4px;
-          padding: 16px;
-          opacity: 0; transform: translateY(10px);
-          transition: opacity 0.35s ease, transform 0.35s ease;
-        }
-        .ge-pcard:hover .ge-pcard__body,
-        .ge-pcard[data-reveal-active="true"] .ge-pcard__body { opacity: 1; transform: none; }
-        /* фирменный дым moto-selection.ru на тёмной CTA-секции (task 144,
-           «use everywhere applicable») — прозрачный PNG, под контентом */
-        .ge-smoke {
-          position: absolute; left: 0; right: 0; bottom: 0;
-          height: 240px; pointer-events: none;
-        }
-        .ge-smoke img { object-fit: cover; object-position: bottom; width: 100%; height: 100%; }
         @media (prefers-reduced-motion: reduce) {
           .ge-ticker-track, .ge-pulse { animation: none !important; }
           .ge-kenburns { animation: none !important; }
@@ -758,83 +710,50 @@ export default function GeorgElectroLanding() {
             брендом и каталогом, но цифры, договоры и лиды — общие.
           </p>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-2">
-            {/* task 144: партнёры → ревил-карточки с НАСТОЯЩИМИ картинками-лого
-                (vip-bike — неоновый лого, moto-selection — фирменный оранжевый
-                лого с tildacdn, sly13 — carpix-лого, leorus — кейс-фото):
-                дефолт приглушён, на ховере/тапе цвет + титул/нота/CTA. */}
-            {[
-              {
-                href: "/vipbikerental",
-                img: "/leorus/partner-vipbike.png",
-                imgFit: "contain",
-                eyebrow: "аренда электромото",
-                title: "VIP BIKE Rental",
-                text: "Площадка-партнёр и флагман платформы: аренда электромото в Нижнем Новгороде, экипировка, карта райдеров, зимнее хранение.",
-              },
-              {
-                href: "/moto-selection",
-                img: "https://static.tildacdn.com/tild3664-3162-4266-b638-633466343365/1____6666.jpg",
-                imgFit: "cover",
-                eyebrow: "мотосервис",
-                title: "Moto.Selection",
-                text: "Обучение, подбор мото, ТО, детейлинг, хранение и эвакуация 24/7. Сосед по цеху — заедьте на ТО, пока Георгий чинит проводку.",
-              },
-              {
-                href: "/sly13",
-                img: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
-                imgFit: "cover",
-                eyebrow: "платформа",
-                title: "SLY13",
-                text: "Платформа франшиз проката: каталог, CRM, договоры, лиды и витрина каждого экипажа на одном софте.",
-              },
-              {
-                href: "/leorus",
-                img: "/leorus/case-liveshows.jpg",
-                imgFit: "cover",
-                eyebrow: "ивент-агентство",
-                title: "LEORUS",
-                text: "Фестивали под ключ, DJ и шоу-программы, видео-продакшн, корпоративы. Рустам Оруджов × Влад Иващенко — громко делаем события.",
-              },
-            ].map((c) => (
-              <PartnerRevealCard
-                key={c.href}
-                href={c.href}
-                className="ge-pcard"
-                ariaLabel={`${c.title} — открыть витрину партнёра`}
-              >
-                <Image
-                  src={c.img}
-                  alt=""
-                  aria-hidden
-                  fill
-                  sizes="(max-width: 640px) 100vw, 50vw"
-                  className={`ge-pcard__img ${c.imgFit === "contain" ? "object-contain p-10" : "object-cover"}`}
-                />
-                <span className="ge-pcard__scrim" aria-hidden />
-                <span className="ge-pcard__body">
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                    style={{ color: P.accent }}
-                  >
-                    {c.eyebrow}
-                  </span>
-                  <span className="text-lg font-black uppercase tracking-tight" style={{ color: P.textPrimary }}>
-                    {c.title}
-                  </span>
-                  <span className="text-sm leading-relaxed" style={{ color: P.textSecondary }}>
-                    {c.text}
-                  </span>
-                  <span
-                    className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em]"
-                    style={{ color: P.accent }}
-                  >
-                    Открыть витрину
-                    <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-                  </span>
-                </span>
-              </PartnerRevealCard>
-            ))}
+          {/* 2026-10-27 босс: партнёры на всех лендингах единообразно —
+              СНАЧАЛА только логотипы, название раскрывается на hover/долгом
+              тапе (PartnerLogoGrid, как на всех лендингах платформы). */}
+          <div className="mt-10">
+            <PartnerLogoGrid
+              accent={P.accent}
+              columns={4}
+              ariaLabel="Экипажи на одном софте — витрины партнёров"
+              partners={[
+                {
+                  href: "/vipbikerental",
+                  title: "VIP BIKE Rental",
+                  tagline: "аренда электромото в Нижнем Новгороде — экипировка, карта райдеров, зимнее хранение",
+                  logoSrc: "/leorus/partner-vipbike.png",
+                  logoAlt: "VIP BIKE ELECTRO",
+                  backing: "#050508",
+                },
+                {
+                  href: "/moto-selection",
+                  title: "Moto.Selection",
+                  tagline: "мотосервис — сосед по цеху: обучение, подбор, ТО, детейлинг, хранение и эвакуация 24/7",
+                  logoSrc: "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png",
+                  logoAlt: "Moto.Selection",
+                  backing: "#f2efea",
+                  lightBacking: true,
+                },
+                {
+                  href: "/sly13",
+                  title: "SLY13",
+                  tagline: "платформа франшиз проката — каталог, CRM, договоры, лиды и витрина каждого экипажа",
+                  logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
+                  logoAlt: "SLY13",
+                  backing: "#030303",
+                },
+                {
+                  href: "/leorus",
+                  title: "LEORUS",
+                  tagline: "ивент-агентство — фестивали под ключ, DJ и шоу-программы, видео-продакшн, корпоративы",
+                  logoSrc: "/logos/leorus-logo.png",
+                  logoAlt: "LEORUS",
+                  backing: "#0A0612",
+                },
+              ]}
+            />
           </div>
         </div>
       </section>
@@ -853,11 +772,6 @@ export default function GeorgElectroLanding() {
               "radial-gradient(60% 80% at 50% 0%, rgba(245,158,11,0.14) 0%, rgba(245,158,11,0) 70%)",
           }}
         />
-        {/* task 144: фирменный дым moto-selection.ru на тёмной CTA-секции —
-            прозрачный PNG лежит на градиенте, под контентом (z-10). */}
-        <div className="ge-smoke z-0" aria-hidden>
-          <Image src={SMOKE_TEXTURE} alt="" fill sizes="100vw" />
-        </div>
         <div className="relative mx-auto w-full max-w-7xl px-4 py-20 text-center sm:px-6 lg:py-28">
           <p
             className="text-[11px] font-bold uppercase tracking-[0.24em]"

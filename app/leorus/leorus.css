@@ -315,7 +315,21 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-}.leorus-root .hero__grid{
+}/* task 144: фоновое фото площадки под неоновой графикой — проступает
+   сквозь сетку/орбы (opacity .34), снизу растворяется в фон страницы */
+.leorus-root .hero__photo{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.34;
+  filter: saturate(1.15) contrast(1.05);
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, rgba(0,0,0,0.55) 72%, transparent 96%);
+  mask-image: linear-gradient(to bottom, black 40%, rgba(0,0,0,0.55) 72%, transparent 96%);
+}
+@media (max-width: 720px){ .leorus-root .hero__photo{ opacity: 0.26; } }
+.leorus-root .hero__grid{
   position: absolute;
   inset: 0;
   background-image:
@@ -1350,80 +1364,14 @@
 @media (max-width: 720px) {.leorus-root .partner-card__logo--img{ max-width: 240px; }
 }
 
-/* ── task 141: crew-links — витрина экипажей платформы (interlink all-to-all).
-   task 144 (boss: «PICTURE LOGOS AND TITLES BE REVEALED ON TAP/HOVER»):
-   карточки стали ревилами — фото-лого приглушено по дефолту, ховер/тап
-   раскрывает титул/ноту/CTA снизу (первый тап — reveal, второй — переход:
-   гейт в PartnerRevealCard). Стили в ДНК leorus: тёмные карточки, cyan-ховер. ── */
+/* ── task 141→144: crew-links — витрина экипажей платформы (interlink all-to-all).
+   2026-10-27 босс: карточки-партнёры на всех лендингах единообразно —
+   только логотипы, название на hover/долгом тапе. Рендерит сквозной
+   компонент components/landing/PartnerLogoGrid.tsx (свои стили), здесь
+   остался только eyebrow-заголовок обёртки. ── */
 .leorus-root .crew-links{ margin-top: 26px; }
 .leorus-root .crew-links__eyebrow{
   font-family: var(--font-mono, monospace);
   font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
   color: var(--text-faint, #6E6486); margin: 0 0 14px;
 }
-.leorus-root .crew-links__grid{
-  display: grid; gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-@media (max-width: 720px){ .leorus-root .crew-links__grid{ grid-template-columns: 1fr; } }
-.leorus-root .crew-link{
-  position: relative; display: flex; flex-direction: column;
-  justify-content: flex-end;
-  min-height: 190px; overflow: hidden;
-  padding: 0;
-  background: var(--bg-card, #15101F);
-  border: 1px solid var(--line, rgba(255,255,255,0.08));
-  border-radius: 16px;
-  text-decoration: none;
-  transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
-}
-.leorus-root .crew-link:hover,
-.leorus-root .crew-link[data-reveal-active="true"]{
-  border-color: var(--cyan-glow, rgba(0,240,255,0.45));
-  transform: translateY(-2px);
-  box-shadow: 0 12px 34px rgba(0, 240, 255, 0.08);
-}
-.leorus-root .crew-link__img{
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover;
-  filter: grayscale(.5) brightness(.62);
-  transition: filter .4s ease, transform .4s ease;
-}
-.leorus-root .crew-link__img--contain{ object-fit: contain; padding: 34px; }
-.leorus-root .crew-link:hover .crew-link__img,
-.leorus-root .crew-link[data-reveal-active="true"] .crew-link__img{ filter: none; transform: scale(1.04); }
-.leorus-root .crew-link__scrim{
-  position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(10,6,18,0.92) 0%, rgba(10,6,18,0.30) 48%, rgba(10,6,18,0.05) 74%);
-}
-.leorus-root .crew-link__body{
-  position: relative;
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 16px 20px 18px;
-  opacity: 0; transform: translateY(10px);
-  transition: opacity .35s ease, transform .35s ease;
-}
-.leorus-root .crew-link:hover .crew-link__body,
-.leorus-root .crew-link[data-reveal-active="true"] .crew-link__body{ opacity: 1; transform: none; }
-.leorus-root .crew-link__title{
-  font-family: var(--font-display, inherit);
-  font-size: 17px; font-weight: 800; letter-spacing: 0.02em;
-  color: var(--text, #F5F2FF);
-}
-.leorus-root .crew-link__note{
-  font-size: 13px; line-height: 1.5; color: var(--text-mute, #9B92B0);
-}
-.leorus-root .crew-link__more{
-  margin-top: 4px;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--cyan, #00F0FF);
-}
-/* task 144: фирменный дым moto-selection.ru (прозрачный PNG) на дне
-   партнёрской секции — под контентом контейнера */
-.leorus-root .partner{ position: relative; overflow: hidden; }
-.leorus-root .partner .container{ position: relative; z-index: 1; }
-.leorus-root .partner-smoke{
-  position: absolute; left: 0; right: 0; bottom: 0; height: 240px;
-  pointer-events: none;
-}
-.leorus-root .partner-smoke img{ width: 100%; height: 100%; object-fit: cover; object-position: bottom; }

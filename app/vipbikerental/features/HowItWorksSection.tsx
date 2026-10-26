@@ -7,6 +7,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { CheckCircle, ArrowRight } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
@@ -41,6 +42,29 @@ export function HowItWorksSection({ crewSlug = "vip-bike" }: HowItWorksSectionPr
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-white/70">
           5 простых шагов от выбора до вашего первого выезда
+        </p>
+      </motion.div>
+
+      {/* Photo banner (task 145, босс: «more pictures the better»): флагман
+          Sequence Zero — фото уже лежит сжатым в carpix (~114 KB),
+          доп. загрузки/генерации не требует. */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.7 }}
+        className="relative mb-10 h-44 overflow-hidden rounded-3xl border border-amber-400/20 sm:h-60"
+      >
+        <Image
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sequence-zero/image_1.jpg"
+          alt="Флагманский электроэндуро Sequence Zero — подготовка к выезду"
+          fill
+          sizes="(max-width: 1024px) 100vw, 1200px"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+        <p className="absolute bottom-4 left-5 right-5 text-sm font-semibold text-white/90">
+          Каждый байк парка проходит чек-лист из 20 пунктов до выдачи райдеру
         </p>
       </motion.div>
 

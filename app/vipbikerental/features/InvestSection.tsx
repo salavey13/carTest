@@ -10,6 +10,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,19 @@ export function InvestSection({ onDwellTime }: { onDwellTime?: (seconds: number)
       className="relative mt-24 overflow-hidden rounded-3xl border border-primary/30 bg-black/70 backdrop-blur-xl"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,120,0,0.25),transparent_55%)]" />
+      {/* Photo layer (task 145: «more pictures the better») — золотая
+          Panigale S Electro из carpix (~137 KB) под тёмным скримом:
+          премиальная картинка для инвест-блока. */}
+      <div className="pointer-events-none absolute inset-0">
+        <Image
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ducati-panigale-s-electro-gold/image_1.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover opacity-25"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/75 to-black/90" />
+      </div>
       <div className="relative z-10 px-6 py-16 md:px-12">
         <div className="mx-auto max-w-3xl text-center">
           <div className="mb-3 text-brand-yellow"><VibeContentRenderer content="::FaChartLine:: INVEST MODE ACTIVATED" /></div>

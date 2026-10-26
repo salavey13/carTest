@@ -7,6 +7,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { Shield, Check } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { GEAR_ITEMS } from "./shared/data";
@@ -44,6 +45,28 @@ export function GearSection() {
         <p className="mx-auto mt-3 max-w-2xl text-sm text-white/70">
           Перед арендой или покупкой сразу закрываем вопрос защиты: подбираем комплект
           под стиль катания и сезон. Вся экипировка выдается бесплатно.
+        </p>
+      </motion.div>
+
+      {/* Photo banner (task 145: «more pictures the better») — электроэндуро
+          в экипе, фото уже сжато в carpix (~112 KB). */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.7 }}
+        className="relative mb-10 h-44 overflow-hidden rounded-3xl border border-amber-400/20 sm:h-60"
+      >
+        <Image
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/falcon-lynx-purple/image_1.jpg"
+          alt="Электроэндуро в полной экипировке — комплект выдаётся бесплатно"
+          fill
+          sizes="(max-width: 1024px) 100vw, 1200px"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+        <p className="absolute bottom-4 left-5 right-5 text-sm font-semibold text-white/90">
+          Шлем, броня, перчатки и наколенники входят в каждую аренду — бесплатно
         </p>
       </motion.div>
 

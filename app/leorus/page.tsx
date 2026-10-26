@@ -11,8 +11,9 @@
 //
 // Хром платформы подавлен в ClientLayout THEME_CONFIG.leorus — паттерн
 // svarprofi/nnvolt/motoSelection/sly13. Лид-форма POST-ит в существующий
-// /api/franchize/callback-lead со slug «vip-bike» (djorudjov — vip-bike
-// админ; получатели: ростер vip-bike + ADMIN_CHAT_ID salavey13).
+// /api/franchize/callback-lead со slug «djorudjov» (2026-10-27 босс:
+// «link "leoris" to "djorudjov" crew properly» — экипаж LEORUS существует
+// в БД; получатели: владелец + ростер djorudjov + ADMIN_CHAT_ID salavey13).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";

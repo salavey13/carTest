@@ -73,6 +73,8 @@ import type {
 } from "@/app/franchize/lib/onboarding/experience-types";
 
 // ── Feature component imports ──
+import FeedbackModal from "@/app/moto-selection/FeedbackModal";
+import { PartnersCrewsSection } from "./features/PartnersCrewsSection";
 import { ConversionPilot } from "./features/ConversionPilot";
 import { ElectroEnduroShowcase } from "./features/ElectroEnduroShowcase";
 import { MapRidersLivePreview } from "./features/MapRidersLivePreview";
@@ -583,7 +585,24 @@ export function VipBikeRentalClient({
       {/* Dynamic sections — ordered and filtered by experience config */}
       <div className="container mx-auto max-w-7xl space-y-20 px-4 py-16 sm:space-y-24 sm:py-24">
         {renderedSections}
+
+        {/* Партнёрская сетка экипажей + лид-CTA — терминальный блок (как на
+            /moto-selection, /sly13, /leorus, /georg-electro): вне
+            персонализированного sectionOrder, чтобы interlinking был на
+            каждом заходе независимо от пресета опыта. */}
+        <PartnersCrewsSection />
       </div>
+
+      {/* Общая модалка заявки (как на всех лендингах экипажей): POST
+          /api/franchize/callback-lead со slug «vip-bike» → CRM экипажа
+          + Telegram (владелец + ростер + ADMIN_CHAT_ID salavey13).
+          Открывается любым элементом с [data-lead-modal-open]. */}
+      <FeedbackModal
+        slug="vip-bike"
+        accent={{ brand: "#d99a00", brandSoft: "#ffca28" }}
+        formSource="vipbike-landing"
+        landingPath="/vipbikerental"
+      />
     </div>
   );
 }
