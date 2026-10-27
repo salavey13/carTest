@@ -167,6 +167,17 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
+  // PATCH: romanGift theme (2026-10-27, task 154) — secret birthday page at
+  // /gift/roman. Renders its own dark-gold certificate layout; platform
+  // chrome would spoil the surprise (same pattern as svarprofi/leorus).
+  romanGift: {
+    paths: ["/gift/roman"],
+    Header: null,
+    Footer: null,
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true, // Secret page — no chat, no nav, just the gift
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -211,6 +222,9 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/mototehnn")) {
     return THEME_CONFIG.mototehnn;
+  }
+  if (pathname.startsWith("/gift/roman")) {
+    return THEME_CONFIG.romanGift;
   }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;
@@ -353,6 +367,7 @@ function shouldShowGlobalHeaderAndFooter(pathname: string) {
     pathname === "/csv-compare" ||
     pathname === "/streamer" ||
     pathname === "/vipbikerental" ||
+    pathname === "/gift/roman" ||
     pathname === "/blogger" ||
     pathname.startsWith("/optimapipe") ||
     pathname.startsWith("/rules") ||

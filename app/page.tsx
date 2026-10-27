@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { useTheme } from "next-themes";
 import FeedbackModal from "@/app/moto-selection/FeedbackModal";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 import { RestBreak } from "@/components/landings/RestBreak";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
@@ -1641,6 +1642,16 @@ export default function Home() {
         accent={{ brand: "#E6B800", brandSoft: "#FFD700" }}
         formSource="vipbike-landing"
         landingPath="/"
+      />
+
+      {/* task154: secret birthday quest — stop 1/3 (Roman only, hidden corner
+          cake at the bottom-left of the main landing). Riddle trail:
+          / → /vip-bike-electro → /vip-bike-dashboard → /gift/roman */}
+      <RomanQuestCake
+        stop={1}
+        riddle="Подарок уже спрятан. Первый след: там, где байки едут без капли бензина и без выхлопа. Найди страницу, чьё имя совпадает с твоим позывным в Telegram."
+        nextHref="/vip-bike-electro"
+        nextLabel="Искать в электро"
       />
     </>
   );
