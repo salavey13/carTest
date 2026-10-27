@@ -67,14 +67,18 @@ describe("task129 · bulk «подтвердить все видимые»", () 
       modal.indexOf("const handleBulkVerify = async () => {"),
       modal.indexOf("  useEffect(() => {\n    if (isOpen) {"),
     );
-    expect(bulkFn).toContain("adminVerifyRentalAction({ slug, rentalId })");
+    // task151/152 — the call carries the password-identity params
+    expect(bulkFn).toContain("adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });");
     // sequential loop with per-row bookkeeping
     expect(bulkFn).toContain("for (const rentalId of ids) {");
     expect(bulkFn).toContain("setVerifyingIds((prev) => new Set(prev).add(rentalId));");
     expect(bulkFn).toContain("setJustVerified((prev) => new Set(prev).add(rentalId));");
-    // exactly ONE canonical refetch for the whole batch (not per row)
+    // exactly ONE canonical refetch for the whole batch (not per row) —
+    // task152: it rides expectVerified for the honest stale-read warning
     expect(bulkFn.match(/loadTable\(/g)?.length).toBe(1);
-    expect(bulkFn).toContain("void loadTable({ silent: true });");
+    expect(bulkFn).toContain(
+      "const stuck = await loadTable({ silent: true, expectVerified: new Set(succeededIds) });",
+    );
   });
 
   it("aggregated summary toast: full success / zero / partial with first error", () => {
@@ -109,12 +113,16 @@ describe("task129 · codereview gap fixes", () => {
     );
     // …but only on SUCCESS — a silent refetch failure must keep the tint
     const load = modal.slice(modal.indexOf("const loadTable = useCallback"), modal.indexOf("  // Task 128 — quick verify"));
-    const tryIdx = load.indexOf("setRows(parseCsv(text));");
+    const tryIdx = load.indexOf("const parsed = parseCsv(text);");
     const pruneIdx = load.indexOf("setJustVerified((prev)");
     const catchIdx = load.indexOf("} catch (e) {");
     expect(tryIdx).toBeGreaterThan(-1);
     expect(pruneIdx).toBeGreaterThan(tryIdx);
     expect(pruneIdx).toBeLessThan(catchIdx);
+    // task152 — the just-verified ids ride as expectVerified: a fresh label
+    // that is NOT «подтверждено» yet keeps its tint (honest stale-read
+    // handling) instead of being pruned into the revert illusion.
+    expect(load).toContain("if (verificationToneOf(verLabelForId(parsed, id)) !== \"verified\") stuck.add(id);");
   });
 
   it("the ✓ on a disputed row discloses that confirming overrides the dispute", () => {

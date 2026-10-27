@@ -280,8 +280,9 @@ describe("task126 · card actions keep the owner-gated server actions", () => {
   const card = src("app/franchize/components/CommissionVerificationCard.tsx");
 
   it("same actions, same confirm dialog semantics, inline failure flags", () => {
-    expect(card).toContain("adminVerifyRentalAction({ slug, rentalId })");
-    expect(card).toContain("resendVerificationDmsAction({ slug, rentalId })");
+    // task151 — both actions carry the password-identity params (...verifyActorParams)
+    expect(card).toContain("adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });");
+    expect(card).toContain("resendVerificationDmsAction({ slug, rentalId, ...verifyActorParams });");
     expect(card).toContain("window.confirm(");
     expect(card).toContain("не сохранилось");
     expect(card).toContain("не отправилось");

@@ -127,7 +127,12 @@ describe("task111: bulk FINE confirm action", () => {
   it("exists with owner-tier gate", () => {
     expect(acts).toMatch(/export async function bulkVerifyFineAction/);
     const fn = acts.slice(acts.indexOf("export async function bulkVerifyFineAction"));
-    expect(fn).toMatch(/access\.isOwner !== true/);
+    // task151 — the gate moved into the shared resolveVerifyOwnerActor (TG
+    // cookie first, password identity as the second accepted path); the
+    // owner-only verdict lives inside it (access.isOwner !== true).
+    expect(fn).toMatch(/resolveVerifyOwnerActor\(/);
+    expect(fn).toMatch(/Массовое подтверждение доступно владельцу или администратору экипажа\./);
+    expect(acts).toMatch(/access\.isOwner !== true/);
   });
 
   it("only grade=fine pending rows, optimistic-locked", () => {

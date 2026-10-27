@@ -109,17 +109,24 @@ describe("task128 · quick verify right in the table view", () => {
   });
 
   it("uses the SAME owner-gated action + confirm pattern as the rental-page card", () => {
+    // task152 — the modal now imports the verify action AND the resend action
+    // (the per-row «выслать сверку» button) from the same owner-gated module.
     expect(modal).toContain(
-      'import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";',
+      "adminVerifyRentalAction,\n  resendVerificationDmsAction,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
     );
-    expect(modal).toContain("adminVerifyRentalAction({ slug, rentalId })");
+    expect(modal).toContain("adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });");
     expect(modal).toContain("window.confirm(");
     expect(modal).toContain("Подтвердить сверку по этой аренде?");
   });
 
   it("success = optimistic verified tint + silent CSV refetch (no loading flash)", () => {
     expect(modal).toContain("setJustVerified((prev) => new Set(prev).add(rentalId));");
-    expect(modal).toContain("void loadTable({ silent: true });");
+    // task152 — the silent refetch now rides expectVerified: when the fresh
+    // CSV does not reflect the just-verified id yet, the tint is KEPT and an
+    // honest warning fires (no more silent revert illusion).
+    expect(modal).toContain(
+      "const stuck = await loadTable({ silent: true, expectVerified: new Set([rentalId]) });",
+    );
     expect(modal).toContain("const silent = opts?.silent === true;");
     // silent mode skips the loading state entirely
     expect(modal).toMatch(/if \(!silent\) \{\s*setLoading\(true\);\s*setError\(null\);\s*\}/);
@@ -128,10 +135,10 @@ describe("task128 · quick verify right in the table view", () => {
   });
 
   it("the ✓ shows only on unverified rows with a uuid, spins while in-flight", () => {
-    expect(modal).toContain(
-      '!!onQuickVerify && !!rowRentalId && section.key === "rentals" && verTone !== "verified"',
-    );
-    expect(modal).toContain("disabled={verifyPending}");
+    // task152 — the ✓ ALSO stays visible (disabled) on a row verified THIS
+    // session, so the button never vanishes under the finger mid-batch.
+    expect(modal).toContain('(verTone !== "verified" || verifiedThisSession);');
+    expect(modal).toContain("disabled={verifyPending || verifiedThisSession}");
     expect(modal).toContain('<Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />');
     expect(modal).toContain('<Check className="h-3.5 w-3.5" aria-hidden />');
   });
@@ -150,7 +157,10 @@ describe("task128 · quick verify right in the table view", () => {
   it("SectionTable carries the verify bookkeeping props", () => {
     expect(modal).toContain("verifyingIds?: Set<string>;");
     expect(modal).toContain("justVerified?: Set<string>;");
-    expect(modal).toContain("onQuickVerify?: (rentalId: string) => Promise<void> | void;");
+    // task152 — row context for the confirm dialogs + the send-request props.
+    expect(modal).toContain("onQuickVerify?: (rentalId: string, ctx?: QuickRowCtx) => Promise<void> | void;");
+    expect(modal).toContain("sendingIds?: Set<string>;");
+    expect(modal).toContain("onSendRequest?: (rentalId: string, ctx?: QuickRowCtx) => Promise<void> | void;");
   });
 
   it("verify state resets when the modal opens", () => {

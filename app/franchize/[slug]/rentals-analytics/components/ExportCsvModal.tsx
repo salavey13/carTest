@@ -95,7 +95,13 @@ import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 // Task 128 — same owner-gated action the rental-page verification card uses.
-import { adminVerifyRentalAction } from "@/app/franchize/server-actions/rental-verify-actions";
+// Task 152 — resendVerificationDmsAction powers the per-row «выслать сверку»
+// button (send the verification REQUEST to operator + owner right from the
+// table view, without opening the rental — boss request 2026-10-27).
+import {
+  adminVerifyRentalAction,
+  resendVerificationDmsAction,
+} from "@/app/franchize/server-actions/rental-verify-actions";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { toNumber } from "./lib/csv-money";
 // Task 127 — fullscreen TG native buttons (close/expand) overlay the top-right
@@ -358,6 +364,44 @@ function verificationToneOf(label: string): VerTone {
   if (s.includes("ждёт") || s.includes("ожидает")) return "waiting";
   return null;
 }
+
+// Task 152 — per-row context (дата · байк · цена) carried from the rendered
+// row into the confirm dialogs: a verify/request tap must SHOW which row it
+// is about to touch, so an off-by-one tap on a dense touch table is visible
+// BEFORE the action fires (boss 2026-10-27: a verify landed on the row BELOW
+// the one he was looking at — success toast, wrong row).
+type QuickRowCtx = { date: string; bike: string; price: string };
+const EMPTY_ROW_CTX: QuickRowCtx = { date: "", bike: "", price: "" };
+function quickRowLabel(ctx?: Partial<QuickRowCtx>): string {
+  if (!ctx) return "";
+  const parts = [ctx.date, ctx.bike, ctx.price ? `${ctx.price} ₽` : ""].filter(Boolean);
+  return parts.join(" · ");
+}
+
+/**
+ * Task 152 — read the «Верификация» label for one rental uuid from a freshly
+ * parsed CSV. Walks the АРЕНДЫ block (header row containing «Верификация»,
+ * data rows until the next ALL-CAPS block banner). Empty string = not found
+ * (block missing / old layout) — callers treat it as «not reflected yet».
+ */
+function verLabelForId(rows: string[][], rentalId: string): string {
+  if (!rentalId) return "";
+  const hi = rows.findIndex((r) => r.some((c) => (c || "").trim() === "Верификация"));
+  if (hi === -1) return "";
+  const header = rows[hi];
+  const verIdx = header.findIndex((c) => (c || "").trim() === "Верификация");
+  const idIdx = header.findIndex((c) => (c || "").trim() === "ID");
+  if (verIdx === -1 || idIdx === -1) return "";
+  for (let i = hi + 1; i < rows.length; i += 1) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+    const first = (r[0] || "").trim();
+    if (!first) continue;
+    if (first === first.toUpperCase() && first.length < 12) break; // next block banner (ЭКИП/ПРОДАЖИ/СВОДКА)
+    if ((r[idIdx] || "").trim() === rentalId) return (r[verIdx] || "").trim();
+  }
+  return "";
+}
 const VER_TONE_FG: Record<Exclude<VerTone, null>, string> = {
   verified: "#16a34a",
   disputed: "#dc2626",
@@ -450,8 +494,18 @@ export function ExportCsvModal({
   const [searchFocusPending, setSearchFocusPending] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const loadTable = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!fetchCsvText || !from || !to || from > to) return;
+  // Task 152 — the loader returns the set of ids from `expectVerified` whose
+  // fresh labels are STILL not «подтверждено» (empty set when all reflected,
+  // null when the refetch itself failed). Callers turn a non-empty set into
+  // an honest warning instead of a silent revert illusion: the verify WRITE
+  // landed server-side, but the table data did not catch up yet (WebView
+  // cache / replication lag) — the old code silently cleared the optimistic
+  // tint, which read as «verified flipped itself back to ожидает».
+  const loadTable = useCallback(async (opts?: {
+    silent?: boolean;
+    expectVerified?: Set<string>;
+  }): Promise<Set<string> | null> => {
+    if (!fetchCsvText || !from || !to || from > to) return null;
     // Task 128 — silent mode: a quick-verify just landed server-side; swap in
     // the regenerated CSV WITHOUT the loading flash (rows stay on screen).
     // A silent failure keeps the old rows — the optimistic tint may linger,
@@ -463,12 +517,31 @@ export function ExportCsvModal({
     }
     try {
       const text = await fetchCsvText(from, to);
-      setRows(parseCsv(text));
+      const parsed = parseCsv(text);
+      setRows(parsed);
       // Task 129 review fix — canonical data is on screen now: drop the session
       // optimism so the row tints always follow the CSV label (not a stale
       // just-verified stamp). A silent failure never reaches this line — the
       // optimistic tint correctly survives a failed refetch.
+      // Task 152 — EXCEPT the ids the caller just verified: when the fresh CSV
+      // does not reflect them yet, KEEP their tint (the write is accepted
+      // server-side) and report them back for the warning toast.
+      const expect = opts?.expectVerified;
+      if (expect && expect.size > 0) {
+        const stuck = new Set<string>();
+        for (const id of expect) {
+          if (verificationToneOf(verLabelForId(parsed, id)) !== "verified") stuck.add(id);
+        }
+        setJustVerified((prev) => {
+          const next = new Set(prev);
+          for (const id of expect) if (!stuck.has(id)) next.delete(id);
+          for (const id of stuck) next.add(id);
+          return next;
+        });
+        return stuck;
+      }
       setJustVerified((prev) => (prev.size > 0 ? new Set<string>() : prev));
+      return new Set<string>();
     } catch (e) {
       // FIX (iter6): show the ACTUAL error next to the generic message so the
       // operator can tell a 500 from an offline device from a bad date range.
@@ -482,6 +555,7 @@ export function ExportCsvModal({
     } finally {
       if (!silent) setLoading(false);
     }
+    return null; // silent-failure path — caller keeps the optimistic tint, no warning
   }, [fetchCsvText, from, to]);
 
   // task151 — identity params for the quick-verify server action: the TG
@@ -499,11 +573,22 @@ export function ExportCsvModal({
   // Task 128 — quick verify from the table view. Same action, same confirm
   // pattern and same toasts as the rental-page CommissionVerificationCard —
   // only the entry point is different (a ✓ inside the «Верификация» cell).
+  // Task 152 (boss 2026-10-27):
+  //   • the confirm dialog now shows WHICH row is about to be verified
+  //     (дата · байк · цена) — the tappable table is dense and the ✓ is
+  //     small, so a one-row-off touch must be visible BEFORE the OK;
+  //   • after the silent refetch the fresh label for THIS id is checked —
+  //     when the table still shows the old status, the optimistic tint is
+  //     KEPT and an honest warning toast fires instead of the silent revert
+  //     illusion («verified → ожидает»).
   const handleQuickVerify = useCallback(
-    async (rentalId: string) => {
+    async (rentalId: string, ctx?: QuickRowCtx) => {
       if (!slug || verifyingIds.has(rentalId)) return;
+      const rowLabel = quickRowLabel(ctx);
       const ok = window.confirm(
-        "Подтвердить сверку по этой аренде?\n\nСтрока будет помечена «подтверждено» для оператора и владельца (используйте после личной сверки).",
+        "Подтвердить сверку по этой аренде?\n\n" +
+          (rowLabel ? `${rowLabel}\n\n` : "") +
+          "Строка будет помечена «подтверждено» для оператора и владельца (используйте после личной сверки).",
       );
       if (!ok) return;
       setVerifyingIds((prev) => new Set(prev).add(rentalId));
@@ -512,7 +597,13 @@ export function ExportCsvModal({
         if (res.success) {
           toast.success("Сверка подтверждена ✅");
           setJustVerified((prev) => new Set(prev).add(rentalId));
-          void loadTable({ silent: true });
+          const stuck = await loadTable({ silent: true, expectVerified: new Set([rentalId]) });
+          if (stuck && stuck.has(rentalId)) {
+            toast.warning(
+              `Подтверждение принято${rowLabel ? ` (${rowLabel})` : ""}, но таблица пока показывает старый статус — обновите таблицу ещё раз через пару секунд.`,
+              { duration: 7000 },
+            );
+          }
         } else {
           toast.error(res.error || "Не удалось подтвердить сверку");
         }
@@ -527,6 +618,58 @@ export function ExportCsvModal({
       }
     },
     [slug, verifyingIds, loadTable, verifyActorParams],
+  );
+
+  // Task 152 — «выслать сверку» from the table view (boss: «hope to be able
+  // to send verification requests right from tableview, not just confirm
+  // right away»). The resend action creates the verification row when it
+  // does not exist yet and DMs BOTH parties (operator + owner) the frozen
+  // расчёт with the ✅/⚠️ keyboard — each confirms SEPARATELY, the row walks
+  // ожидает → ждёт владельца / ждёт оператора → подтверждено. Owner-tier
+  // gated server-side (same resolveVerifyOwnerActor as the verify action).
+  const [sendingIds, setSendingIds] = useState<Set<string>>(() => new Set());
+  const handleSendRequest = useCallback(
+    async (rentalId: string, ctx?: QuickRowCtx) => {
+      if (!slug || sendingIds.has(rentalId)) return;
+      const rowLabel = quickRowLabel(ctx);
+      const ok = window.confirm(
+        "Выслать сверку в Telegram?\n\n" +
+          (rowLabel ? `${rowLabel}\n\n` : "") +
+          "Оператор и владелец получат сообщение с кнопками ✅ / ⚠️ и подтвердят расчёт по отдельности — строка пройдёт «ожидает → ждёт владельца/оператора → подтверждено».",
+      );
+      if (!ok) return;
+      setSendingIds((prev) => new Set(prev).add(rentalId));
+      try {
+        const res = await resendVerificationDmsAction({ slug, rentalId, ...verifyActorParams });
+        if (res.success && res.data) {
+          // Honest delivery report (same wording as the rental-page card).
+          const sent = res.data.sentTo?.length ?? 0;
+          const failed = res.data.failed ?? [];
+          const copied = res.data.actorCopied === true;
+          const failNote = failed.length
+            ? ` ⚠️ Не доставлено: ${failed.map((f) => f.chatId).join(", ")}`
+            : "";
+          toast.success(
+            `${res.data.created ? "Сверка создана и отправлена" : "Сверка отправлена в Telegram"} (${sent} получено${copied ? " + копия вам" : ""}) ✅${failNote}`,
+            { duration: 6000 },
+          );
+          // A freshly created row changes the «Верификация» cell (пусто →
+          // ожидает) — pull the canonical labels without a loading flash.
+          if (res.data.created) void loadTable({ silent: true });
+        } else {
+          toast.error(res.error || "Не удалось отправить сверку");
+        }
+      } catch {
+        toast.error("Не удалось отправить сверку");
+      } finally {
+        setSendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(rentalId);
+          return next;
+        });
+      }
+    },
+    [slug, sendingIds, loadTable, verifyActorParams],
   );
   // Owner-tier + rentals variant + a slug to act through — otherwise the ✓
   // never renders (sales sheets, non-owner crew). Password viewers DO get the
@@ -565,6 +708,9 @@ export function ExportCsvModal({
     let done = 0;
     let failed = 0;
     let firstError: string | null = null;
+    // Task 152 — ids whose verify was ACCEPTED server-side this batch; the
+    // post-batch refetch checks their labels actually turned «подтверждено».
+    const succeededIds: string[] = [];
     setBulkVerify({ total: n, done: 0 });
     for (const rentalId of ids) {
       setVerifyingIds((prev) => new Set(prev).add(rentalId));
@@ -572,6 +718,7 @@ export function ExportCsvModal({
         const res = await adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });
         if (res.success) {
           done += 1;
+          succeededIds.push(rentalId);
           setJustVerified((prev) => new Set(prev).add(rentalId));
         } else {
           failed += 1;
@@ -603,10 +750,19 @@ export function ExportCsvModal({
       );
     }
     // One canonical refetch for the whole batch; the optimistic tint bridges
-    // the gap (same contract as the single-row quick verify).
+    // the gap (same contract as the single-row quick verify). Task 152 — the
+    // just-verified ids ride as expectVerified: any row whose fresh label is
+    // still not «подтверждено» keeps its tint and gets ONE honest warning
+    // instead of silently flipping back to «ожидает».
     bulkRunRef.current = false;
     setBulkVerify(null);
-    void loadTable({ silent: true });
+    const stuck = await loadTable({ silent: true, expectVerified: new Set(succeededIds) });
+    if (stuck && stuck.size > 0) {
+      toast.warning(
+        `Подтверждения приняты, но таблица пока показывает старые статусы (${stuck.size}) — обновите таблицу ещё раз через пару секунд.`,
+        { duration: 7000 },
+      );
+    }
   };
 
   useEffect(() => {
@@ -1619,6 +1775,8 @@ export function ExportCsvModal({
                     verifyingIds={verifyingIds}
                     justVerified={justVerified}
                     onQuickVerify={canQuickVerify ? handleQuickVerify : undefined}
+                    sendingIds={sendingIds}
+                    onSendRequest={canQuickVerify ? handleSendRequest : undefined}
                   />
                 ))}
               </div>
@@ -1860,6 +2018,8 @@ function SectionTable({
   verifyingIds,
   justVerified,
   onQuickVerify,
+  sendingIds,
+  onSendRequest,
 }: {
   section: ParsedCsvSection;
   T: ThemeTokens;
@@ -1872,7 +2032,13 @@ function SectionTable({
   /** Task 128 — ids verified this session (optimistic verified tint). */
   justVerified?: Set<string>;
   /** Task 128 — present only for owner-tier viewers (rentals variant). */
-  onQuickVerify?: (rentalId: string) => Promise<void> | void;
+  onQuickVerify?: (rentalId: string, ctx?: QuickRowCtx) => Promise<void> | void;
+  /** Task 152 — ids with an in-flight «выслать сверку» (the 📨 spins). */
+  sendingIds?: Set<string>;
+  /** Task 152 — per-row «выслать сверку в Telegram»: DMs the frozen расчёт
+   *  to operator + owner with the ✅/⚠️ keyboard — each confirms SEPARATELY,
+   *  right from the table view without opening the rental. */
+  onSendRequest?: (rentalId: string, ctx?: QuickRowCtx) => Promise<void> | void;
 }) {
   const cfg = SECTION_COLS[section.key];
   const accent = SECTION_ACCENT[section.key];
@@ -2063,8 +2229,33 @@ function SectionTable({
             // only when the modal was opened by an owner-tier viewer. The
             // server action re-gates (owner-tier + completed status).
             const verifyPending = !!(rowRentalId && verifyingIds?.has(rowRentalId));
+            // Task 152 — per-row context for the confirm dialogs (дата ·
+            // байк · цена): the tap must SHOW which row it touches. Data-space
+            // indexes: Дата 0, Цена 3, Марка 6 (SECTION_COLS.rentals).
+            const quickCtx: QuickRowCtx = rowRentalId
+              ? {
+                  date: (r[0] || "").trim(),
+                  bike: (r[6] || "").trim(),
+                  price: (r[3] || "").trim(),
+                }
+              : EMPTY_ROW_CTX;
+            // Task 152 — a ✓ on a row verified THIS SESSION stays visible but
+            // disabled: the button must not vanish under the finger right
+            // after a successful tap (the old code dropped it for verified
+            // rows, so the next tap at the same spot hit the NEIGHBOR row —
+            // an off-by-one self-inflicted by the UI itself).
+            const verifiedThisSession = !!(rowRentalId && justVerified?.has(rowRentalId));
             const showQuickVerify =
-              !!onQuickVerify && !!rowRentalId && section.key === "rentals" && verTone !== "verified";
+              !!onQuickVerify &&
+              !!rowRentalId &&
+              section.key === "rentals" &&
+              (verTone !== "verified" || verifiedThisSession);
+            // Task 152 — «выслать сверку» affordance: same gating as the ✓,
+            // offered while the row is NOT verified yet (waiting / disputed /
+            // no row yet — the action creates it).
+            const sendPending = !!(rowRentalId && sendingIds?.has(rowRentalId));
+            const showSendRequest =
+              !!onSendRequest && !!rowRentalId && section.key === "rentals" && verTone !== "verified";
             // Task 127 — operator identity for this row (when the split is on).
             const opLabel =
               showOpMarkers && cfg.opCol != null ? (r[cfg.opCol] || "").trim() : "";
@@ -2142,8 +2333,10 @@ function SectionTable({
                         ...railCellStyle(di, rowBg, "0.06"),
                       }}
                     >
-                      {section.key === "rentals" && dataIdx === cfg.verification && (showQuickVerify || verifyPending || forceVerified) ? (
-                        // Task 128 — «Верификация» cell with the inline ✓.
+                      {section.key === "rentals" && dataIdx === cfg.verification && (showQuickVerify || verifyPending || forceVerified || showSendRequest || sendPending) ? (
+                        // Task 128/152 — «Верификация» cell with the inline ✓
+                        // (confirm for both parties) + 📨 (send the verification
+                        // REQUEST — operator & owner confirm separately).
                         <span className="inline-flex items-center gap-1.5">
                           <span
                             style={{
@@ -2156,20 +2349,22 @@ function SectionTable({
                           {showQuickVerify && (
                             <button
                               type="button"
-                              disabled={verifyPending}
+                              disabled={verifyPending || verifiedThisSession}
                               onClick={(e) => {
                                 // The row itself is a tap-through to the rental
                                 // page — the ✓ must not trigger it.
                                 e.stopPropagation();
-                                if (onQuickVerify) void onQuickVerify(rowRentalId);
+                                if (onQuickVerify) void onQuickVerify(rowRentalId, quickCtx);
                               }}
                               aria-label="Подтвердить сверку"
                               title={
                                 verTone === "disputed"
                                   ? "Подтвердить сверку — снимет статус спора (после личного разбора с оператором)"
-                                  : "Подтвердить сверку (закрытая аренда; после личной сверки)"
+                                  : verifiedThisSession
+                                    ? "Сверка подтверждена в этом сеансе"
+                                    : "Подтвердить сверку (закрытая аренда; после личной сверки)"
                               }
-                              className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
+                              className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
                               style={{
                                 borderColor: `color-mix(in srgb, ${VER_TONE_FG.verified} 45%, transparent)`,
                                 backgroundColor: `color-mix(in srgb, ${VER_TONE_FG.verified} 12%, ${T.bgCard})`,
@@ -2180,6 +2375,30 @@ function SectionTable({
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                               ) : (
                                 <Check className="h-3.5 w-3.5" aria-hidden />
+                              )}
+                            </button>
+                          )}
+                          {showSendRequest && (
+                            <button
+                              type="button"
+                              disabled={sendPending || verifiedThisSession}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSendRequest) void onSendRequest(rowRentalId, quickCtx);
+                              }}
+                              aria-label="Выслать сверку в Telegram"
+                              title="Выслать сверку в Telegram — оператор и владелец подтвердят расчёт по отдельности (✅ / ⚠️ в личке)"
+                              className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
+                              style={{
+                                borderColor: "color-mix(in srgb, #3b82f6 45%, transparent)",
+                                backgroundColor: `color-mix(in srgb, #3b82f6 12%, ${T.bgCard})`,
+                                color: isDark ? "#60a5fa" : "#2563eb",
+                              }}
+                            >
+                              {sendPending ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                              ) : (
+                                <Send className="h-3.5 w-3.5" aria-hidden />
                               )}
                             </button>
                           )}

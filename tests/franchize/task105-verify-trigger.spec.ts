@@ -76,7 +76,8 @@ describe("task105 · verification trigger survives the serverless invocation", (
     expect(drawer).toContain("onChanged");
     // the card owns the actions: same server actions, honest labels
     const card = src("app/franchize/components/CommissionVerificationCard.tsx");
-    expect(card).toContain("resendVerificationDmsAction({ slug, rentalId })");
+    // task151 — the card carries the password-identity params (...verifyActorParams)
+    expect(card).toContain("resendVerificationDmsAction({ slug, rentalId, ...verifyActorParams });");
     expect(card).toContain("Завести сверку в TG");
     expect(card).toContain("Выслать сверку");
   });

@@ -13,6 +13,15 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyCrewAccess } from "../_auth";
 import { buildSalesCsv } from "@/lib/csv-builders/sales-csv";
 
+// Task 152 — same staleness guard as rentals-csv-export: the sales table view
+// refetches this endpoint silently after mutations; a WebView-cached copy
+// would resurrect pre-mutation rows. Always dynamic → always no-store.
+const NO_STORE_HEADERS: Record<string, string> = {
+  "Cache-Control": "no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  Vary: "*",
+};
+
 // Reads request.url (searchParams) + cookies-based crew auth → must never be
 // statically prerendered (Vercel build fails with DYNAMIC_SERVER_USAGE otherwise).
 export const dynamic = "force-dynamic";
@@ -53,6 +62,7 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        ...NO_STORE_HEADERS,
       },
     });
   } catch (err) {

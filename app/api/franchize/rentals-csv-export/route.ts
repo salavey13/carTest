@@ -16,6 +16,18 @@ import { csvToXlsxBuffer } from "@/lib/csv-builders/csv-to-xlsx";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+// Task 152 — the table view refetches this endpoint after every quick-verify;
+// a cached response would show the PRE-verify statuses (boss 2026-10-27:
+// «status briefly changes to verified, then almost instantly changes back to
+// ожидает»). The response carried NO Cache-Control at all, and Telegram
+// in-app WebViews happily serve a stale copy from their HTTP cache.
+// no-store on every data response — the CSV is always dynamic.
+const NO_STORE_HEADERS: Record<string, string> = {
+  "Cache-Control": "no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  Vary: "*",
+};
+
 // Reads request.url (searchParams) + cookies-based crew auth → must never be
 // statically prerendered (Vercel build fails with DYNAMIC_SERVER_USAGE otherwise).
 export const dynamic = "force-dynamic";
@@ -62,6 +74,7 @@ export async function GET(request: NextRequest) {
         headers: {
           "Content-Type": XLSX_MIME,
           "Content-Disposition": `attachment; filename="${filename.replace(/\.csv$/, ".xlsx")}"`,
+          ...NO_STORE_HEADERS,
         },
       });
     }
@@ -71,6 +84,7 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        ...NO_STORE_HEADERS,
       },
     });
   } catch (err) {
