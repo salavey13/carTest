@@ -97,6 +97,10 @@ describe("graph canvas — fullwidth + in-canvas info", () => {
 describe("discovery page — howtos + useful links", () => {
   const page = read("app/franchize/discovery/page.tsx");
 
+  // task154 iter2: the hidden Roman quest cake links /leaderboard on purpose;
+  // this contract is about the ORGANIC surface, so strip the quest block.
+  const organicPage = page.replace(/\{\/\* task154 iter2:[\s\S]*?nextLabel=[\s\S]*?\/>/g, "");
+
   it("carries the howto strip: six real answers with deep-links", () => {
     expect(page).toContain('id="howto"');
     expect(page).toContain('aria-label="Как это работает"');
@@ -140,8 +144,8 @@ describe("discovery page — howtos + useful links", () => {
     ]) {
       expect(page).toContain(`"${label}"`);
     }
-    expect(page).not.toContain("Рейтинг райдеров");
-    expect(page).not.toContain("/leaderboard");
+    expect(organicPage).not.toContain("Рейтинг райдеров");
+    expect(organicPage).not.toContain("/leaderboard");
   });
 
   it("storage howto targets a crew that ACTUALLY runs the storage service", () => {

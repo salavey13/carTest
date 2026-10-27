@@ -269,6 +269,13 @@ describe("global discovery page — static route, memberships-only data", () => 
   const page = read("app/franchize/discovery/page.tsx");
   const graph = read("app/franchize/discovery/CrewDiscoveryGraph.tsx");
 
+  // task154 iter2: Roman's hidden birthday quest cake intentionally links
+  // outside the franchize namespace (hall of fame → garage → gift). It is a
+  // hidden overlay, NOT part of the organic discovery surface, so the
+  // namespace guards below strip it before checking links.
+  const stripQuest = (src: string) =>
+    src.replace(/\{\/\* task154 iter2:[\s\S]*?nextLabel=[\s\S]*?\/>/g, "");
+
   it("exists as a static segment (wins over /franchize/[slug] for 'discovery')", () => {
     expect(page.includes("export default async function CrewDiscoveryPage")).toBe(true);
   });
@@ -306,7 +313,7 @@ describe("global discovery page — static route, memberships-only data", () => 
 
   it("every href on the discovery surface stays inside the franchize namespace", () => {
     // collect template hrefs from both files; static ones must be franchize-scoped
-    const sources = page + graph;
+    const sources = stripQuest(page) + graph;
     expect(sources.includes('"/admin')).toBe(false);
     expect(sources.includes('"/leaderboard')).toBe(false);
     expect(sources.includes('"/crews')).toBe(false);

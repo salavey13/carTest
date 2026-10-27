@@ -1644,14 +1644,17 @@ export default function Home() {
         landingPath="/"
       />
 
-      {/* task154: secret birthday quest — stop 1/3 (Roman only, hidden corner
-          cake at the bottom-left of the main landing). Riddle trail:
-          / → /vip-bike-electro → /vip-bike-dashboard → /gift/roman */}
+      {/* task154 iter2: secret birthday quest — stop 1/5 (Roman only, hidden
+          corner cake at the bottom-left of the main landing). Boss audio
+          27.10 23:53: main page stays, trail now goes through the franchize
+          world + hall of fame + garage (5 stops instead of 3):
+          / → /franchize/vip-bike → /franchize/discovery → /leaderboard
+          → /rent-bike → /gift/roman */}
       <RomanQuestCake
         stop={1}
-        riddle="Подарок уже спрятан. Первый след: там, где байки едут без капли бензина и без выхлопа. Найди страницу, чьё имя совпадает с твоим позывным в Telegram."
-        nextHref="/vip-bike-electro"
-        nextLabel="Искать в электро"
+        riddle="Подарок уже спрятан, и экипаж оставил тебе пять следов. Первый ведёт туда, где твой экипаж встречает гостей: витрина с парком, ценами и корзиной — как у настоящего магазина."
+        nextHref="/franchize/vip-bike"
+        nextLabel="Открыть витрину экипажа"
       />
     </>
   );

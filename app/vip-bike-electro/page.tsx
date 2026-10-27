@@ -29,7 +29,6 @@ import {
   FAQ,
   Footer,
 } from "@/components/landing/vip-bike";
-import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 export default function VipBikeElectroPage() {
   return (
@@ -44,13 +43,6 @@ export default function VipBikeElectroPage() {
       <FAQ />
       <Footer />
 
-      {/* task154: secret birthday quest — stop 2/3 (Roman only, hidden corner cake) */}
-      <RomanQuestCake
-        stop={2}
-        riddle="Отличный нюх! Второй след: табло, где день экипажа виден целиком — золото на тёмном, аренды, продажи и смены. Сегодняшний день."
-        nextHref="/vip-bike-dashboard"
-        nextLabel="К табло экипажа"
-      />
     </main>
   );
 }

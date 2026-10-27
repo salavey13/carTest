@@ -12,6 +12,7 @@ import { JoinCrewBanner } from "../components/JoinCrewBanner";
 import { getFranchizeBySlug } from "../actions";
 import { getFranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { crewPaletteWithCssVars } from "../lib/theme";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeSlugPageProps {
   params: Promise<{ slug: string }>;
@@ -302,6 +303,18 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       </section>
       )}
       </DisplayModeProvider>
+
+      {/* task154 iter2: secret birthday quest — stop 2/5. Boss: franchize
+          world is the fun part. Gated to the vip-bike crew only (this page
+          serves every crew slug); hidden corner cake, Roman only. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          stop={2}
+          riddle="Витрина — это только дверца. Дальше интереснее: карта всей сети, где каждый экипаж — круг, а размер круга — это его люди. Глянь со стороны, какой мир вы с Ильёй строите."
+          nextHref="/franchize/discovery"
+          nextLabel="Открыть карту сети"
+        />
+      )}
 
       {!isVipBikeRentalHost && <CrewFooter crew={crew} />}
     </main>

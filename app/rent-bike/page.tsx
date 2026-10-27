@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { useAppContext } from "@/contexts/AppContext";
 import { getVehiclesWithStatus, getVehicleCalendar, createBooking, getUserRentals } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
@@ -395,6 +396,16 @@ export default function RentBikePage() {
             </AnimatePresence>
             </div>
         </div>
+
+        {/* task154 iter2: secret birthday quest — stop 5/5, the last riddle
+            before the gift (Roman only, hidden corner cake). Boss audio:
+            «кнопку это уже всё есть — просто нажми кнопку и жми на тортик». */}
+        <RomanQuestCake
+          stop={5}
+          riddle="Вот и весь гараж — последняя подсказка самая простая. Прибавь к адресу сайта /gift/roman — и забери своё. Осталось нажать одну кнопку."
+          nextHref="/gift/roman"
+          nextLabel="Открыть подарок"
+        />
       </div>
     </div>
   );

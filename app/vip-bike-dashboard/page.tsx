@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { format, subDays, addDays, startOfDay } from "date-fns";
 import { ru } from "date-fns/locale";
-import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 // Palette constants matching web app
 const PALETTE = {
@@ -583,13 +582,6 @@ export default function VipBikeDashboard() {
         VIP Bike Dashboard · сделано на ZAI · данные из Supabase ({format(currentDate, "yyyy-MM-dd")})
       </div>
 
-      {/* task154: secret birthday quest — stop 3/3 (Roman only, hidden corner cake) */}
-      <RomanQuestCake
-        stop={3}
-        riddle="Табло помнит каждый день сезона. Финал прямой как струна: прибавь к адресу сайта /gift/roman — и забери своё."
-        nextHref="/gift/roman"
-        nextLabel="Открыть подарок"
-      />
     </div>
   );
 }

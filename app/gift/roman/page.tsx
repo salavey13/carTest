@@ -1,24 +1,26 @@
 "use client";
 
-// /gift/roman — Roman's birthday surprise (task154)
+// /gift/roman — Roman's birthday surprise (task154 + iter2)
 // ──────────────────────────────────────────────────────────────────────────
-// The end of the hidden quest (vipbikerental → vip-bike-electro →
-// vip-bike-dashboard → here). Deliberately NOT cybervibe: warm premium
+// The end of the hidden quest (boss audio 27.10 23:53 — trail now runs
+// / → /franchize/vip-bike → /franchize/discovery → /leaderboard → /rent-bike
+// → here). Deliberately NOT cybervibe: warm premium
 // dark + champagne gold, serif typography, REAL achievements from the
-// crew's season data (co-ownership since 19.03.2026, 50/50, Sequence Zero
-// ride 12–13.07, real franchize explorer badges, the record season P&L).
+// crew's season data. iter2 per boss audio: the Sequence Zero rental story
+// is REMOVED («убери про то, что он там пытался арендовать»), the closing
+// congratulates him on behalf of the company («поздравляем вас от имени
+// нашей компании, спасибо вам большое»), quest stamp counts 5 stops.
 // Confetti is a tiny zero-dependency canvas burst.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { readRomanQuestProgress } from "@/components/roman-gift/RomanQuestCake";
+import { readRomanQuestProgress, ROMAN_QUEST_STOPS } from "@/components/roman-gift/RomanQuestCake";
 
 const ACHIEVEMENTS: Array<{ icon: string; title: string; sub: string }> = [
   { icon: "👑", title: "Со-владелец года", sub: "Половина империи — и ни одного спора за весь сезон" },
   { icon: "⚡", title: "Электро-первопроходец", sub: "Поверил в розетку раньше, чем остальные в бензин. Ник обязывает" },
   { icon: "🤫", title: "Тихая мощность", sub: "Ноль выхлопа. Самый громкий звук его байка — улыбка" },
   { icon: "📈", title: "Инвестор парка", sub: "Личный вклад в закупку — каждый байк сезона отчасти его" },
-  { icon: "🏍️", title: "Zero-райдер", sub: "Sequence Zero, 12–13 июля: два дня чистой тишины и кайфа" },
   { icon: "🧭", title: "Глаз аналитика", sub: "explorer_analytics + explorer_map_riders — открыл то, что другие не нашли" },
 ];
 
@@ -103,7 +105,7 @@ export default function RomanGiftPage() {
     return () => clearTimeout(t);
   }, [burst]);
 
-  const questDone = questProgress >= 3;
+  const questDone = questProgress >= ROMAN_QUEST_STOPS;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0c0b09] text-amber-50">
@@ -139,7 +141,7 @@ export default function RomanGiftPage() {
           <div className="mx-auto mt-6 inline-flex items-center gap-3 rounded-full border border-amber-400/40 bg-amber-400/10 px-5 py-2">
             <span className="text-lg">{questDone ? "🏅" : "🎂"}</span>
             <span className="text-sm tracking-wide text-amber-200">
-              {questDone ? "Квест пройден: 3 из 3 — респект" : `Найдено подсказок: ${questProgress} из 3 — загляни ещё`}
+              {questDone ? `Квест пройден: ${ROMAN_QUEST_STOPS} из ${ROMAN_QUEST_STOPS} — респект` : `Найдено подсказок: ${questProgress} из ${ROMAN_QUEST_STOPS} — загляни ещё`}
             </span>
           </div>
         </div>
@@ -226,7 +228,7 @@ export default function RomanGiftPage() {
 
         {/* ── letter ── */}
         <section className="mt-14 rounded-2xl border border-stone-800 bg-[#12100d]/80 p-7 sm:p-9">
-          <p className="font-serif text-[11px] uppercase tracking-[0.4em] text-amber-400/80">Письмо от экипажа</p>
+          <p className="font-serif text-[11px] uppercase tracking-[0.4em] text-amber-400/80">Письмо от экипажа и компании</p>
           <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-stone-300">
             <p>
               Роман, привет. В этом году ты сделал то, на что мало кто решается: не «зашёл посмотреть», а
@@ -234,12 +236,14 @@ export default function RomanGiftPage() {
               что честнее всего, половина побед.
             </p>
             <p>
-              Мы помним июльский Zero, который проехал два дня и ни разу не рыгнул выхлопом. Помним, что
-              именно ты раньше всех сказал «электричество — это серьёзно». И знаем, что ты редко открываешь
-              эту панель — поэтому подарок спрятан тут, чтобы было повод зайти.
+              Мы видим, как спокойно и по делу ты считаешь риски каждого нового байка — и знаем, что ты
+              редко открываешь эту панель. Именно поэтому подарок спрятан тут: пусть будет повод зайти
+              и немного поторчить, ища его.
             </p>
             <p className="font-serif text-lg text-amber-200">
-              Здоровья, тишины в моторе и полного заряда — во всех смыслах. Обнимает весь экипаж.
+              Поздравляем тебя от имени всей компании VIP BIKE — спасибо тебе большое за сезон, за доверие
+              и за половину общего дела. Здоровья, тишины в моторе и полного заряда — во всех смыслах.
+              Обнимает весь экипаж.
             </p>
           </div>
           <div className="mt-7 flex flex-col gap-1 border-t border-stone-800 pt-5 text-sm text-stone-500">

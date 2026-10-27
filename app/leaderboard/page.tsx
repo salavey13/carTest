@@ -9,6 +9,7 @@ import { FaBug } from "react-icons/fa6";
 import { getTopFleets, getTopCrews } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 type DebugInfo = {
   [key: string]: string | number;
@@ -172,6 +173,15 @@ export default function LeaderboardPage() {
         </div>
 
         {debugInfo && <DebugInfoSection info={debugInfo} />}
+
+        {/* task154 iter2: secret birthday quest — stop 4/5 (Roman only,
+            hidden corner cake; riddle describes the garage next) */}
+        <RomanQuestCake
+          stop={4}
+          riddle="Слава — это приятно, но ты человек дела. Следующий след — твой гараж: MOTO-GARAGE, где можно выбрать байк, даты и собрать бронирование. Загляни, как это выглядит изнутри."
+          nextHref="/rent-bike"
+          nextLabel="Открыть гараж"
+        />
       </div>
     </div>
   );

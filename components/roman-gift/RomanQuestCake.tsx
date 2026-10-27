@@ -1,11 +1,16 @@
 "use client";
 
-// RomanQuestCake — hidden birthday quest stop for Roman (task154)
+// RomanQuestCake — hidden birthday quest stop for Roman (task154 + iter2)
 // ──────────────────────────────────────────────────────────────────────────
 // A tiny floating 🎂 sits in the bottom-left corner of a host page. Most
 // visitors never notice it; Roman follows the riddle trail from the kickoff
-// message. Each click opens a warm dark-gold modal with a riddle that points
-// to the next stop (or to the gift itself on the last stop).
+// message. Each click opens a warm dark-gold modal with a riddle that
+// DESCRIBES what awaits on the next page (boss: «на всякую страничку —
+// описание, чё его ожидает») and a button that walks him there. The iter2
+// trail (boss audio 27.10 23:53: main page ok, old electro/dashboard stops
+// replaced, MORE pages to click, franchize world included):
+//   / → /franchize/vip-bike → /franchize/discovery → /leaderboard
+//   → /rent-bike → /gift/roman
 //
 // Progress lives in localStorage under "roman-quest-progress" (max stop
 // reached) — the gift page reads the same key to show the quest stamp.
@@ -25,8 +30,8 @@ export function readRomanQuestProgress(): number {
 }
 
 interface RomanQuestCakeProps {
-  /** Which stop of the trail this host page is (1..3). */
-  stop: 1 | 2 | 3;
+  /** Which stop of the trail this host page is (1..5). */
+  stop: 1 | 2 | 3 | 4 | 5;
   /** Riddle text shown in the modal. */
   riddle: string;
   /** Where the "next" button leads (next stop or the gift). */
@@ -35,7 +40,10 @@ interface RomanQuestCakeProps {
   nextLabel: string;
 }
 
-const STOPS_TOTAL = 3;
+const STOPS_TOTAL = 5;
+
+/** Total stops in the quest — the gift page reads it for its stamp. */
+export const ROMAN_QUEST_STOPS = STOPS_TOTAL;
 
 export function RomanQuestCake({ stop, riddle, nextHref, nextLabel }: RomanQuestCakeProps) {
   const router = useRouter();

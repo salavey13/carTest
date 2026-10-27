@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, Bike, ChevronDown, Handshake, Info, MapPin, MessagesSquare, Snowflake, Sparkles, Trophy, Users } from "lucide-react";
 import { logger } from "@/lib/logger";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { CrewDiscoveryGraph } from "./CrewDiscoveryGraph";
 import { loadNetworkModel } from "./load-network-model";
 
@@ -337,6 +338,14 @@ export default async function CrewDiscoveryPage() {
             Создать свой экипаж
           </Link>
         </p>
+        {/* task154 iter2: secret birthday quest — stop 3/5 (Roman only,
+            hidden corner cake; riddle describes the hall of fame next) */}
+        <RomanQuestCake
+          stop={3}
+          riddle="Карта показала, сколько вас и как вы связаны. Следующий след — про славу: там горят топы экипажей и флотов всего проекта. Найди в зале славы знакомые имена."
+          nextHref="/leaderboard"
+          nextLabel="Войти в зал славы"
+        />
       </div>
     </main>
   );
