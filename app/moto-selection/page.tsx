@@ -1080,6 +1080,15 @@ export default function MotoSelectionLanding() {
                 logoAlt: "VIP BIKE Rental",
                 backing: "linear-gradient(160deg, #0d0d0d 0%, #1a1408 100%)",
               },
+              {
+                href: "/mototehnn",
+                title: "МотоТех НН",
+                tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+                logoSrc: "/logos/mototehnn-logo.png",
+                logoAlt: "МотоТех НН",
+                backing: "#e8edf6",
+                lightBacking: true,
+              },
             ]}
           />
         </div>

@@ -194,19 +194,18 @@ const SERVICES = [
 // партнёров рендерится из PARTNER_LOGOS выше.
 const PIPELINE_CREWS = [
   { slug: "georg-electro", href: "/georg-electro", label: "georg-electro", note: "электрик электробайков — диагностика, контроллеры, свет" },
-  { slug: "nn-mototeh-nn", href: null, label: "nn-mototeh-nn", note: "мототехника NN, колесо фортуны e2e" },
+  { slug: "nn-mototeh-nn", href: "/mototehnn", label: "nn-mototeh-nn · МотоТех НН", note: "мотосалон — техника, запчасти, мотосервис, хранение, эвакуация" },
   { slug: "djorudjov", href: "/leorus", label: "djorudjov · LEORUS", note: "ивент-агентство — фестивали, DJ и шоу, видео, корпоративы" },
   { slug: "vip-bike", href: "/vipbikerental", label: "VIP BIKE Rental", note: "аренда электромото — флагман платформы" },
 ];
 
-// task 141→144: витрина пайплайна теперь рендерится сквозным компонентом
+// task 141→144: витрина пайплайна рендерится сквозным компонентом
 // PartnerLogoGrid (босс 2026-10-27: только логотипы, название на
 // hover/долгом тапе). djorudjov — реальный экипаж в БД, его витрина —
-// лендинг /leorus. nn-mototeh-nn пока без лого — остаётся в каталоге
-// /franchize/nn-mototeh-nn, в лого-сетку не входит.
-// Все лендинги ссылаются друг на друга (4/4 экипажей с витринами):
-// moto-selection тоже в сетке — его лого-арт на светлой подложке,
-// как в обратную сторону на /moto-selection.
+// лендинг /leorus.
+// Task 148: у nn-mototeh-nn появилась собственная витрина /mototehnn —
+// экипаж переехал из «пайплайна без лого» в лого-сетку (5/5: каждая
+// витрина ссылается на каждую).
 const PARTNER_LOGOS = [
   {
     href: "/moto-selection",
@@ -240,6 +239,15 @@ const PARTNER_LOGOS = [
     logoSrc: "/leorus/partner-vipbike.png",
     logoAlt: "VIP BIKE ELECTRO",
     backing: "#050508",
+  },
+  {
+    href: "/mototehnn",
+    title: "МотоТех НН",
+    tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+    logoSrc: "/logos/mototehnn-logo.png",
+    logoAlt: "МотоТех НН",
+    backing: "#e8edf6",
+    lightBacking: true,
   },
 ];
 
@@ -1450,7 +1458,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
               <div className="mt-4">
                 <PartnerLogoGrid
                   accent={p.accentMain}
-                  columns={3}
+                  columns={5}
                   ariaLabel="Витрины экипажей пайплайна"
                   partners={PARTNER_LOGOS}
                 />

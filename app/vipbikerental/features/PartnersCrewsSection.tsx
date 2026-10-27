@@ -26,9 +26,10 @@ import { Handshake, PhoneCall } from "lucide-react";
 
 const ACCENT = "#d99a00";
 
-// Те же четыре витрины экипажей, что в партнёрских сетках остальных
-// лендингов (4/4: каждая витрина ссылается на каждую). Логотипы и подложки
-// совпадают 1:1 с сетками на других лендингах.
+// Те же витрины экипажей, что в партнёрских сетках остальных
+// лендингов (5/5: каждая витрина ссылается на каждую, task 148 добавил
+// МотоТех НН). Логотипы и подложки совпадают 1:1 с сетками на других
+// лендингах.
 const CREW_TILES = [
   {
     href: "/moto-selection",
@@ -62,6 +63,15 @@ const CREW_TILES = [
     logoSrc: "/logos/georg-electro-logo.png",
     logoAlt: "Georg.Electro",
     backing: "#140f06",
+  },
+  {
+    href: "/mototehnn",
+    title: "МотоТех НН",
+    tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+    logoSrc: "/logos/mototehnn-logo.png",
+    logoAlt: "МотоТех НН",
+    backing: "#e8edf6",
+    lightBacking: true,
   },
 ];
 
@@ -99,7 +109,7 @@ export function PartnersCrewsSection() {
         <div className="mt-8">
           <PartnerLogoGrid
             accent={ACCENT}
-            columns={4}
+            columns={5}
             ariaLabel="Витрины экипажей платформы — партнёры VIP BIKE"
             partners={CREW_TILES}
           />

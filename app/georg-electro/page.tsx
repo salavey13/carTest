@@ -710,7 +710,7 @@ export default function GeorgElectroLanding() {
           <div className="mt-10">
             <PartnerLogoGrid
               accent={P.accent}
-              columns={4}
+              columns={5}
               ariaLabel="Экипажи на одном софте — витрины партнёров"
               partners={[
                 {
@@ -745,6 +745,15 @@ export default function GeorgElectroLanding() {
                   logoSrc: "/logos/leorus-logo.png",
                   logoAlt: "LEORUS",
                   backing: "#0A0612",
+                },
+                {
+                  href: "/mototehnn",
+                  title: "МотоТех НН",
+                  tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+                  logoSrc: "/logos/mototehnn-logo.png",
+                  logoAlt: "МотоТех НН",
+                  backing: "#e8edf6",
+                  lightBacking: true,
                 },
               ]}
             />

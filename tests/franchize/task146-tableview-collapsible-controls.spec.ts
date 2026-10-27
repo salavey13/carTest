@@ -159,6 +159,15 @@ describe("task146 · adaptability polish", () => {
     expect(modal).toContain("[&::-webkit-scrollbar-thumb]:rounded-full");
   });
 
+  it("codereview fix (task 148): the thumb uses a v3-safe palette alpha, not bg-current/20", () => {
+    // `bg-current/20` compiles to NOTHING in Tailwind 3 (opacity on
+    // currentColor needs v4 color-mix) — the thumb was invisible on WebKit
+    // while the bar still reserved its 8px. Palette colors decompose in v3.
+    expect(modal).not.toMatch(/\[&::-webkit-scrollbar-thumb\]:bg-current\/20/);
+    expect(modal).toContain('[&::-webkit-scrollbar-thumb]:bg-white/20');
+    expect(modal).toContain('[&::-webkit-scrollbar-thumb]:bg-black/20');
+  });
+
   it("the fullscreen shell from task137 is untouched (no regression to boxed modal)", () => {
     expect(modal).toContain(
       "fixed inset-0 z-[70] flex items-stretch justify-center bg-black/60 backdrop-blur-sm",

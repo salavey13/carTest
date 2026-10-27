@@ -1391,3 +1391,19 @@ Work Log:
 
 Stage Summary:
 - Commit 9a12340 pushed to salavey13/carTest main.
+
+---
+Task ID: 148
+Agent: main (Z.ai CLI)
+Task: tableview codereview (fix) + /mototehnn landing (quality bar of the 5 crew landings).
+
+Work Log:
+- ExportCsvModal: codereview fix — `bg-current/20` scrollbar thumb silently compiled to nothing in Tailwind 3 (opacity on currentColor = v4 color-mix); thumb was invisible on WebKit while the bar kept its 8px. Now theme-aware palette alphas (white/20 on dark, black/20 on light). task146 spec pins the regression.
+- app/mototehnn/page.tsx: new RSC landing for crew nn-mototeh-nn (navy #0a0f1a / blue #3b82f6 from crews.metadata with fallback). Sections: hero (ken-burns + дилер BENDA badge + факты 100+/10 000+/30–60 мин), тикер, Салон (USP+бренды), Техника (13 типов), Запчасти (12 категорий + гарантии), Сервис (4 GlassServiceCard: ТО/хранение/эвакуация/подбор), RestBreak (хранение), Партнёры (PartnerLogoGrid → 5 витрин), Контакты (реальные: Артельная 15б, +7 (831) 242-90-00, t.me/mototehnn, vk.com/mototehnn, mototehnn.ru), GhostWordmark, footer. FeedbackModal slug «nn-mototeh-nn» (crew существует в БД) — ноль нового серверного кода.
+- public/images/mototehnn/*.jpg ×7 (генерация scripts/gen-mototehnn-landing-images.sh, тексто-враждебные промпты; mozjpeg q80 105–140 KB) + public/logos/mototehnn-logo.png (trim+resize 19.6 KB).
+- Interlink: mototehnn-плашка во всех 6 партнёрских сетках (/, /vipbikerental, /moto-selection, /sly13, /leorus, /georg-electro); sly13 pipeline href null → /mototehnn; ClientLayout THEME_CONFIG.mototehnn.
+- Tests: tests/franchize/task148-mototehnn-landing.spec.ts (19 pins: ДНК, честный контент, 5/5 interlink, chrome, ассеты ≤150 KB). Full franchize suite 3588 ✓. next build ✓, /mototehnn в маршрутах; SSR smoke 200/7 картинок/5 ссылок.
+
+Stage Summary:
+- Таблица: 1 реальный баг из codereview исправлен и закреплён спекой.
+- Витрина /mototehnn: паритет с /georg-electro по ДНК, контент — всё с mototehnn.ru, все 6 витрин ссылаются друг на друга (5/5 экипажей + флагман).

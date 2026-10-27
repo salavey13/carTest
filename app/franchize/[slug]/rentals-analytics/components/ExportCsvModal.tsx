@@ -1540,9 +1540,19 @@ export function ExportCsvModal({
             Task 146 polish: thin styled scrollbars (the horizontal one used
             to be a chunky default bar eating row height on PC) and
             touch-action:manipulation so double-tapping a row can't zoom the
-            sheet while the boss works fast. */}
+            sheet while the boss works fast.
+            Codereview fix (task 148): `bg-current/20` compiles to NOTHING in
+            Tailwind 3 (opacity on currentColor is a v4 color-mix feature) —
+            the thumb was fully transparent on WebKit while the bar still
+            reserved its 8px: you paid the height AND got no affordance.
+            Palette colors decompose fine in v3, so the thumb picks a real
+            color per theme (white on dark / black on light at the same 20%). */}
         <div
-          className="flex-1 overflow-auto [touch-action:manipulation] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-current/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          className={`flex-1 overflow-auto [touch-action:manipulation] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent ${
+            isDark
+              ? "[&::-webkit-scrollbar-thumb]:bg-white/20"
+              : "[&::-webkit-scrollbar-thumb]:bg-black/20"
+          }`}
           style={{ backgroundColor: T.bg }}
         >
           {loading ? (

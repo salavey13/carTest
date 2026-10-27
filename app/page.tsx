@@ -1432,7 +1432,7 @@ export default function Home() {
                 <div className="mt-8">
                   <PartnerLogoGrid
                     accent="#FFD700"
-                    columns={4}
+                    columns={5}
                     ariaLabel="Витрины экипажей платформы — партнёры VIP BIKE"
                     partners={[
                       {
@@ -1467,6 +1467,15 @@ export default function Home() {
                         logoSrc: "/logos/leorus-logo.png",
                         logoAlt: "LEORUS",
                         backing: "#0A0612",
+                      },
+                      {
+                        href: "/mototehnn",
+                        title: "МотоТех НН",
+                        tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+                        logoSrc: "/logos/mototehnn-logo.png",
+                        logoAlt: "МотоТех НН",
+                        backing: "#e8edf6",
+                        lightBacking: true,
                       },
                     ]}
                   />

@@ -155,6 +155,18 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
+  // PATCH: mototehnn theme (2026-10-27, task 148) — standalone landing for
+  // the МОТОТЕХ НН crew (мотосалон: техника, запчасти, сервис; mototehnn.ru).
+  // Dark navy palette from crews.metadata (bgBase #0a0f1a / accent #3b82f6);
+  // renders its own nav + footer — svarprofi/motoSelection/sly13 pattern.
+  mototehnn: {
+    paths: ["/mototehnn"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -196,6 +208,9 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/leorus")) {
     return THEME_CONFIG.leorus;
+  }
+  if (pathname.startsWith("/mototehnn")) {
+    return THEME_CONFIG.mototehnn;
   }
   if (pathname.startsWith("/franchize/")) {
     return THEME_CONFIG.franchize;

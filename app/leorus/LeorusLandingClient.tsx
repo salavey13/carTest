@@ -659,7 +659,7 @@ export default function LeorusLandingClient() {
           <p className="crew-links__eyebrow">витрина платформы · экипажи на одном софте</p>
           <PartnerLogoGrid
             accent="#00F0FF"
-            columns={4}
+            columns={5}
             ariaLabel="Витрины партнёров платформы"
             partners={[
               {
@@ -694,6 +694,15 @@ export default function LeorusLandingClient() {
                 logoSrc: "/logos/georg-electro-logo.png",
                 logoAlt: "Georg.Electro",
                 backing: "#140f06",
+              },
+              {
+                href: "/mototehnn",
+                title: "МотоТех НН",
+                tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+                logoSrc: "/logos/mototehnn-logo.png",
+                logoAlt: "МотоТех НН",
+                backing: "#e8edf6",
+                lightBacking: true,
               },
             ]}
           />
