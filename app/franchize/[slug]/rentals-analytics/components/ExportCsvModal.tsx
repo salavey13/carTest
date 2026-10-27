@@ -123,6 +123,36 @@ import {
   type ParsedCsvSection,
 } from "@/lib/csv-builders/rentals-csv-sections";
 
+// Task 153 — server actions carry NO deadline of their own: a silently
+// dropped TCP connection (RU DPI window on 2026-10-27 / a flaky route) kept
+// the row spinner spinning for minutes and the «выслать сверку» button felt
+// HANGED (boss report, PC/password session). Every verify-family call from
+// the table view now races a 45 s client-side deadline: on timeout the
+// spinner clears and an honest toast tells the presser to retry. The
+// orphaned server call, if it ever lands late, stays safe — verify is
+// idempotent and resend creates-or-reuses the same verification row.
+const SERVER_ACTION_TIMEOUT_MS = 45_000;
+class ServerActionTimeoutError extends Error {}
+async function withServerTimeout<T>(pending: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new ServerActionTimeoutError(
+            "Сервер не ответил за 45 с — соединение потеряно. Попробуйте ещё раз.",
+          ),
+        ),
+      SERVER_ACTION_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([pending, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Task 137 — the sticky rails are a PC affordance: on a narrow scrollport
  *  the two rails together (Дата+Марка ≈ 290px left, выдал+принял+Верификация
  *  ≈ 600px right) would cover a 390px phone ENTIRELY. Below lg (1024px) the
@@ -593,7 +623,9 @@ export function ExportCsvModal({
       if (!ok) return;
       setVerifyingIds((prev) => new Set(prev).add(rentalId));
       try {
-        const res = await adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });
+        const res = await withServerTimeout(
+          adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams }),
+        );
         if (res.success) {
           toast.success("Сверка подтверждена ✅");
           setJustVerified((prev) => new Set(prev).add(rentalId));
@@ -607,8 +639,12 @@ export function ExportCsvModal({
         } else {
           toast.error(res.error || "Не удалось подтвердить сверку");
         }
-      } catch {
-        toast.error("Не удалось подтвердить сверку");
+      } catch (err) {
+        toast.error(
+          err instanceof ServerActionTimeoutError
+            ? err.message
+            : "Не удалось подтвердить сверку",
+        );
       } finally {
         setVerifyingIds((prev) => {
           const next = new Set(prev);
@@ -640,7 +676,8 @@ export function ExportCsvModal({
       if (!ok) return;
       setSendingIds((prev) => new Set(prev).add(rentalId));
       try {
-        const res = await resendVerificationDmsAction({ slug, rentalId, ...verifyActorParams });
+        const call = resendVerificationDmsAction({ slug, rentalId, ...verifyActorParams });
+        const res = await withServerTimeout(call);
         if (res.success && res.data) {
           // Honest delivery report (same wording as the rental-page card).
           const sent = res.data.sentTo?.length ?? 0;
@@ -659,8 +696,12 @@ export function ExportCsvModal({
         } else {
           toast.error(res.error || "Не удалось отправить сверку");
         }
-      } catch {
-        toast.error("Не удалось отправить сверку");
+      } catch (err) {
+        toast.error(
+          err instanceof ServerActionTimeoutError
+            ? err.message
+            : "Не удалось отправить сверку",
+        );
       } finally {
         setSendingIds((prev) => {
           const next = new Set(prev);
