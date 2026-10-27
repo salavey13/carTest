@@ -495,7 +495,12 @@
 }.leorus-root .hero__stats li:last-child{ border-right: none; }.leorus-root .hero__stat-num{
   font-family: var(--font-display);
   font-weight: 900;
-  font-size: clamp(22px, 4vw, 36px);
+  /* task 154: «1 000 000» в Unbounded 900 — ≈6.4em. При 36px это ~230px,
+     а трек hero__stats ≈ 154px (@1024) … 199px (@1440+): лишняя ширина у
+     gradient-clip текста невидима (у глифа за пределами спана нет фона) —
+     число «обрезалось» до «1 000 0C». Фолбэк 27px ≈ 173px — влезает в узкий
+     трек; ниже — точная посадка в свой трек через container queries. */
+  font-size: clamp(22px, 2vw, 27px);
   line-height: 1;
   letter-spacing: -0.02em;
   background: var(--grad-mixed);
@@ -509,6 +514,16 @@
   color: var(--text-mute);
   letter-spacing: 0.06em;
   line-height: 1.3;
+}/* task 154: цифра статистики = 14% ширины СВОЕЙ колонки (число ≈6.4em →
+   0.14×6.4 ≈ 0.9 трека — влезает на любой ширине вьюпорта). Каждый li —
+   inline-size container. На ≤720px li — строка «цифра + лейбл» на всю
+   ширину: cqw там дал бы 34px+ и распирал строку — оставляем фолбэк.
+   Старые WebKit (TV) без container queries получают фолбэк clamp выше. */
+@supports (container-type: inline-size) {
+  .leorus-root .hero__stats li{ container-type: inline-size; }
+  @media (min-width: 721px) {
+    .leorus-root .hero__stat-num{ font-size: clamp(19px, 14cqw, 34px); }
+  }
 }/* Ticker */.leorus-root .hero__ticker{
   position: relative;
   z-index: 1;
@@ -1170,7 +1185,9 @@
   color: var(--text-faint);
   line-height: 1.4;
   max-width: 360px;
-}.leorus-root .cta-form__success{
+}/* task 154: display:flex перебивал UA-стиль [hidden]{display:none} — блок
+   «Заявка улетела» торчал ещё до заполнения формы. Гасим явно. */
+.leorus-root .cta-form__success[hidden]{ display: none; }.leorus-root .cta-form__success{
   display: flex;
   align-items: center;
   gap: 12px;
