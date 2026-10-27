@@ -1407,3 +1407,20 @@ Work Log:
 Stage Summary:
 - Таблица: 1 реальный баг из codereview исправлен и закреплён спекой.
 - Витрина /mototehnn: паритет с /georg-electro по ДНК, контент — всё с mototehnn.ru, все 6 витрин ссылаются друг на друга (5/5 экипажей + флагман).
+
+---
+Task ID: 154
+Agent: main (Z.ai CLI)
+Task: «fix success message in feedback form on /leorus — it's always visible even before form is filled. and in hero section 1000000 is cropped, didn't fit :)» + russian explainer «how to go further» (fork → own Vercel → own TG bot → web app → notifications from own bot).
+
+Work Log:
+- Success banner: `.cta-form__success{display:flex}` (class, 0-1-0) перебивал UA-стиль `[hidden]{display:none}` — React честно ставил hidden={formPhase!=="success"}, но блок «Заявка улетела» был виден всегда. Фикс: явный `.leorus-root .cta-form__success[hidden]{display:none}` в leorus.css.
+- Hero «1 000 000»: в Unbounded 900 число ≈6.4em; при clamp(22px,4vw,36px) → ~230px, а трек hero__stats (grid repeat(3,1fr), li min-width:0) ≈154px@1024 … 199px@1440+. У gradient-clip текста (-webkit-text-fill-color:transparent + background-clip:text) глифы ЗА пределами спана не имеют фона → невидимы: число «обрезалось» до «1 000 0C» (подтверждено скрином прода rental.vip-bike.ru/leorus).
+- Фикс двухуровневый: (1) фолбэк clamp(22px,2vw,27px) — влезает в самый узкий десктоп-трек (173px < 185px@1200+; на ≤720 остаётся прежний вид 22px в строке с лейблом); (2) современные браузеры: @supports (container-type:inline-size) → каждый li = inline-size container, шрифт = clamp(19px,14cqw,34px) только для >720px — цифра всегда ≈90% ширины СВОЕЙ колонки на любом вьюпорте; TV-era WebKit без CQ получает безопасный фолбэк.
+- Проверки (headless Chromium, dev): 1440 — «1 000 000» целиком (cqw-режим); 1024 (худший трек 153px) — computed 20.35px, число 145.4px, запас 7.6px; 390 — строки «цифра+лейбл», fits:true. Форма: до сабмита computed display:none; E2E с замоканным /api/franchize/callback-lead → после сабмита hidden=false, display:flex, плашка «Заявка улетела…» видна (скрины в download/leorus-fix-*.png).
+- docs/OWN_LANDING_OWN_BOT_RU.md — русский гайд «свой лендинг — свой бот»: схема замкнутого цикла (бот → Menu Button → лендинг → форма → callback-lead → resolveLeadNotifyRecipients(slug)+ADMIN_CHAT_ID → telegramDeliver с ТВОИМ токеном), 6 шагов (форк; свой Supabase vs общая БД — таблица решений; BotFather /newbot + /start-правило; Vercel env-таблица (TELEGRAM_BOT_TOKEN решает, ЧЕЙ бот шлёт); /newapp+Menu Button = лендинг как Mini App; проверка под ключ) + грабли (бот не пишет первым, service_role обязателен, slug в LeorusLandingClient.tsx:95, групповой чат -100…, кастомный домен, upstream-синк форка).
+- Commit cfc8868 → salavey13/carTest@main (Vercel автодеплой подхватит).
+
+Stage Summary:
+- /leorus: success-плашка показывается только после успешного сабмита; «1 000 000» больше не режется ни на одной ширине (проверено 1440/1024/768/390 + мат.запас на худшем треке).
+- Русский гайд docs/OWN_LANDING_OWN_BOT_RU.md подтверждает схему босса: да, уведомления уходят от бота, чей токен в env деплоя; Web App в BotFather замыкает цикл внутри его бота.
