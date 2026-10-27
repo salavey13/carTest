@@ -70,6 +70,10 @@ interface CommissionVerificationCardProps {
   audit?: { grade?: string; notes?: string[] } | null;
   /** Owner-tier gate for the manual «✓ подтвердить» button. */
   canVerify?: boolean;
+  /** task151: password-session owner id (PC viewer, /analytics_pass flow) —
+   *  lets verify/resend act as the crew owner without the TG actor cookie;
+   *  the server re-gates the claimed id against crews.owner_id. */
+  passwordAuthOwnerId?: string | null;
   /** Parent refetch hook (analytics reload token / router.refresh). */
   onChanged?: () => void;
   T: CommissionCardTheme;
@@ -85,9 +89,15 @@ export function CommissionVerificationCard({
   proposalOpen,
   audit,
   canVerify = false,
+  passwordAuthOwnerId = null,
   onChanged,
   T,
 }: CommissionVerificationCardProps) {
+  // task151 — identity params for the verify/resend server actions: empty
+  // for the TG-cookie session, owner id + flag for the PC password session.
+  const verifyActorParams = passwordAuthOwnerId
+    ? { actorUserId: passwordAuthOwnerId, isPasswordAuth: true }
+    : {};
   // Task 126 (codereview #4): when the parent gives no onChanged hook (the
   // rental page is a server component), refresh the route ourselves so the
   // chip/status never lies after a successful action.
@@ -128,7 +138,7 @@ export function CommissionVerificationCard({
     setVerifying(true);
     setVerifyFailed(false);
     try {
-      const res = await adminVerifyRentalAction({ slug, rentalId });
+      const res = await adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });
       if (res.success) {
         toast.success(disputed ? "Спор закрыт — сверка подтверждена ✅" : "Сверка подтверждена ✅");
         notifyChanged();
@@ -149,7 +159,7 @@ export function CommissionVerificationCard({
     setSending(true);
     setSendFailed(false);
     try {
-      const res = await resendVerificationDmsAction({ slug, rentalId });
+      const res = await resendVerificationDmsAction({ slug, rentalId, ...verifyActorParams });
       if (res.success) {
         // Honest delivery report (boss 2026-10-20): the parties are operator +
         // owner; the presser usually gets only the actor proof copy.

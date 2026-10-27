@@ -89,7 +89,7 @@
 //      field once the fold animation has opened the row; the scroll
 //      container got a thin styled scrollbar + touch-action:manipulation.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal } from "lucide-react";
@@ -158,6 +158,11 @@ interface ExportCsvModalProps {
    *  unverified АРЕНДЫ rows get an inline ✓ quick-verify button. The server
    *  action re-gates, this only decides whether the button renders. */
   canVerify?: boolean;
+  /** task151 — password-session owner id (PC viewer, /analytics_pass flow):
+   *  forwarded to the quick-verify calls so they act as the crew owner when
+   *  the Telegram actor cookie is absent (server re-gates against
+   *  crews.owner_id). */
+  passwordAuthOwnerId?: string | null;
 }
 
 function firstDayOfMonthIso(): string {
@@ -397,6 +402,7 @@ export function ExportCsvModal({
   slug,
   isDark,
   canVerify = false,
+  passwordAuthOwnerId = null,
 }: ExportCsvModalProps) {
   const router = useRouter();
   // Task 127 — px of the TG fullscreen native-buttons zone (exact measurement
@@ -478,6 +484,18 @@ export function ExportCsvModal({
     }
   }, [fetchCsvText, from, to]);
 
+  // task151 — identity params for the quick-verify server action: the TG
+  // cookie path stays untouched; the PC password session adds its owner id.
+  // Memoized + declared BEFORE handleQuickVerify so the callback identity
+  // only tracks the restored owner id (sessionStorage mount effect).
+  const verifyActorParams = useMemo(
+    () =>
+      passwordAuthOwnerId
+        ? { actorUserId: passwordAuthOwnerId, isPasswordAuth: true }
+        : {},
+    [passwordAuthOwnerId],
+  );
+
   // Task 128 — quick verify from the table view. Same action, same confirm
   // pattern and same toasts as the rental-page CommissionVerificationCard —
   // only the entry point is different (a ✓ inside the «Верификация» cell).
@@ -490,7 +508,7 @@ export function ExportCsvModal({
       if (!ok) return;
       setVerifyingIds((prev) => new Set(prev).add(rentalId));
       try {
-        const res = await adminVerifyRentalAction({ slug, rentalId });
+        const res = await adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });
         if (res.success) {
           toast.success("Сверка подтверждена ✅");
           setJustVerified((prev) => new Set(prev).add(rentalId));
@@ -508,11 +526,12 @@ export function ExportCsvModal({
         });
       }
     },
-    [slug, verifyingIds, loadTable],
+    [slug, verifyingIds, loadTable, verifyActorParams],
   );
   // Owner-tier + rentals variant + a slug to act through — otherwise the ✓
-  // never renders (sales sheets, password viewers, non-owner crew). The
-  // server action re-gates anyway — this is presentation only.
+  // never renders (sales sheets, non-owner crew). Password viewers DO get the
+  // ✓ when the password session resolved to the crew owner (task151) — the
+  // server re-gates the identity anyway, this is presentation only.
   const canQuickVerify = canVerify && variant === "rentals" && !!slug;
 
   // Task 129 — «подтвердить все видимые»: ONE confirm, N rows. Available only
@@ -550,7 +569,7 @@ export function ExportCsvModal({
     for (const rentalId of ids) {
       setVerifyingIds((prev) => new Set(prev).add(rentalId));
       try {
-        const res = await adminVerifyRentalAction({ slug, rentalId });
+        const res = await adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });
         if (res.success) {
           done += 1;
           setJustVerified((prev) => new Set(prev).add(rentalId));

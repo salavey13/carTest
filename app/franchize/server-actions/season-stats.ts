@@ -551,15 +551,48 @@ export interface VerificationRoundResult {
 export async function startSeasonVerificationRound(params: {
   slug: string;
   limit?: number;
+  /** Password-auth path (PC viewer): owner id from validateAnalyticsPassword. */
+  actorUserId?: string;
+  /** Password-auth path flag — must come with actorUserId. */
+  isPasswordAuth?: boolean;
 }): Promise<ActionResponse<VerificationRoundResult>> {
   try {
     const access = await verifyCrewAccess(params.slug);
-    if (!access.allowed || !access.crewId) return { success: false, error: access.error };
-    if (access.isOwner !== true) {
+    // task151: the PC password session has no TG actor cookie — fall back to
+    // the password-auth identity (crews.owner_id echoed by the client from
+    // validateAnalyticsPassword, re-gated server-side; same contract as the
+    // verify family in rental-verify-actions.ts).
+    let crewId = access.crewId || "";
+    let actorChatId = String(access.actorUserId || "");
+    if (!access.allowed && params.isPasswordAuth && params.actorUserId?.trim()) {
+      const claimed = params.actorUserId.trim();
+      const { data: crew } = await supabaseAdmin
+        .from("crews")
+        .select("id, owner_id")
+        .eq("slug", params.slug)
+        .maybeSingle();
+      if (!crew) return { success: false, error: "Экипаж не найден." };
+      const { data: adminUser } = await supabaseAdmin
+        .from("users")
+        .select("role, status, metadata")
+        .eq("user_id", claimed)
+        .maybeSingle();
+      const adminMeta = (adminUser?.metadata || {}) as Record<string, unknown>;
+      const pwOk =
+        crew.owner_id === claimed ||
+        adminUser?.role === "admin" ||
+        adminUser?.role === "vprAdmin" ||
+        adminUser?.status === "admin" ||
+        adminMeta?.role === "admin" ||
+        adminMeta?.status === "admin";
+      if (!pwOk) return { success: false, error: access.error };
+      crewId = crew.id;
+      actorChatId = claimed;
+    } else if (!access.allowed || !access.crewId) {
+      return { success: false, error: access.error };
+    } else if (access.isOwner !== true) {
       return { success: false, error: "Запустить раунд сверки может владелец или администратор экипажа." };
     }
-    const crewId = access.crewId;
-    const actorChatId = String(access.actorUserId || "");
     const limit = Math.min(Math.max(Number(params.limit) || 10, 1), 25);
 
     // candidates: latest completed rentals of the crew

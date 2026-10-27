@@ -112,6 +112,9 @@ interface RentalDetailDrawerProps {
   /** Owner-tier gate for the card's manual «✓ подтвердить» button (the
    *  server action re-checks the role — this only hides the affordance). */
   canVerify?: boolean;
+  /** task151: password-session owner id (PC viewer) — forwarded to the
+   *  сверка card so verify/resend work without the TG actor cookie. */
+  passwordAuthOwnerId?: string | null;
 }
 
 type TodoFilter = "all" | "mine" | "overdue";
@@ -153,6 +156,7 @@ export function RentalDetailDrawer({
   crewSlug,
   onChanged,
   canVerify = false,
+  passwordAuthOwnerId = null,
 }: RentalDetailDrawerProps) {
   const [todoFilter, setTodoFilter] = useState<TodoFilter>("all");
   const [newNote, setNewNote] = useState("");
@@ -439,6 +443,7 @@ export function RentalDetailDrawer({
           proposalOpen={rental.verificationProposalOpen}
           audit={rental.verificationAudit}
           canVerify={canVerify}
+          passwordAuthOwnerId={passwordAuthOwnerId}
           onChanged={onChanged}
           T={T}
         />

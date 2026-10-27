@@ -643,6 +643,10 @@ export function AnalyticsClientV2({
       onSendCsvToTelegram={sendCsvToTelegram}
       onDataRefresh={() => setReloadToken((t) => t + 1)}
       viewerIsOwnerTier={viewerIsOwnerTier}
+      // task151 — password session identity for the owner-tier WRITE actions
+      // (verify ✓, resend, bulk sweeps, verification round): without it they
+      // all bounce off verifyCrewAccess with «Не авторизовано» on PC.
+      passwordAuthOwnerId={passwordAuthOwnerId}
       // Task 127 — the resolved theme mode drives the verification tone text
       // in the table view modal (brighter tones on dark).
       isDark={!themeArgs.isLightTheme}

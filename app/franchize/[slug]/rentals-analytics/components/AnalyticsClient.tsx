@@ -88,6 +88,11 @@ interface AnalyticsClientProps {
   /** Task 127: dark theme — brightens the verification tone text in the
    *  table view modal (row tints are theme-proof regardless). */
   isDark?: boolean;
+  /** task151: password-session owner id (PC viewer, /analytics_pass flow).
+   *  Forwarded to the owner-tier WRITE actions (verify ✓ / resend / bulk /
+   *  verification round) which otherwise bounce with «Не авторизовано» when
+   *  the Telegram actor cookie is absent. */
+  passwordAuthOwnerId?: string | null;
 }
 
 export function AnalyticsClient({
@@ -112,7 +117,14 @@ export function AnalyticsClient({
   onDataRefresh,
   viewerIsOwnerTier = false,
   isDark,
+  passwordAuthOwnerId = null,
 }: AnalyticsClientProps) {
+  // task151 — identity params for the verify-family server actions: the TG
+  // cookie path stays untouched; the password session adds its owner id so
+  // the server can re-gate it against crews.owner_id.
+  const verifyActorParams = passwordAuthOwnerId
+    ? { actorUserId: passwordAuthOwnerId, isPasswordAuth: true }
+    : {};
   const router = useRouter();
   // Date state: controlled (when parent passes `date` + `onDateChange`) or
   // uncontrolled (fallback to internal state initialized from initialDate).
@@ -440,7 +452,7 @@ export function AnalyticsClient({
     const month = date.slice(0, 7);
     setBulkFinePending(true);
     try {
-      const preview = await bulkVerifyFineAction({ slug: initialSlug, month, dryRun: true });
+      const preview = await bulkVerifyFineAction({ slug: initialSlug, month, dryRun: true, ...verifyActorParams });
       if (!preview.success) {
         toast.error(preview.error || "Не удалось собрать кандидатов на массовое подтверждение");
         return;
@@ -461,7 +473,7 @@ export function AnalyticsClient({
           `\n\nСтатус станет «verified» (оператор + владелец). «Почти ок» и «подозрительные» не трогаются.`,
       );
       if (!ok) return;
-      const res = await bulkVerifyFineAction({ slug: initialSlug, month, dryRun: false });
+      const res = await bulkVerifyFineAction({ slug: initialSlug, month, dryRun: false, ...verifyActorParams });
       if (res.success) {
         toast.success(`Подтверждено: ${res.data?.applied ?? 0}. Не тронуто (не fine): ${res.data?.skippedNotFine ?? 0}${res.data?.failed ? `, ошибок: ${res.data.failed}` : ""}`);
         setVerFilter("all");
@@ -488,7 +500,7 @@ export function AnalyticsClient({
     if (roundPending) return;
     setRoundPending(true);
     try {
-      const res = await startSeasonVerificationRound({ slug: initialSlug, limit: 10 });
+      const res = await startSeasonVerificationRound({ slug: initialSlug, limit: 10, ...verifyActorParams });
       if (res.success && res.data) {
         const r = res.data;
         if (r.sent > 0) {
@@ -559,6 +571,7 @@ export function AnalyticsClient({
           T={T}
           isDark={isDark}
           canVerify={viewerIsOwnerTier}
+          passwordAuthOwnerId={passwordAuthOwnerId}
         />
       )}
 
@@ -758,6 +771,7 @@ export function AnalyticsClient({
                   onClose={closeDrawer}
                   onChanged={onDataRefresh}
                   canVerify={viewerIsOwnerTier}
+                  passwordAuthOwnerId={passwordAuthOwnerId}
                 />
               )}
               {activeTab === "sales" && selectedSale && (
@@ -807,6 +821,7 @@ export function AnalyticsClient({
               asSheetChild
               onChanged={onDataRefresh}
               canVerify={viewerIsOwnerTier}
+              passwordAuthOwnerId={passwordAuthOwnerId}
             />
           )}
           {activeTab === "sales" && selectedSale && (
@@ -850,6 +865,7 @@ function RentalDetailDrawerInline({
   onClose,
   onChanged,
   canVerify,
+  passwordAuthOwnerId,
 }: {
   rental: DrawerRentalRow;
   crewSlug: string;
@@ -860,6 +876,8 @@ function RentalDetailDrawerInline({
   onChanged?: () => void;
   /** Owner-tier gate for the card's manual confirm (server re-checks). */
   canVerify?: boolean;
+  /** task151: password-session owner id for the verify/resend actions. */
+  passwordAuthOwnerId?: string | null;
 }) {
   return (
     <RentalDetailDrawer
@@ -871,6 +889,7 @@ function RentalDetailDrawerInline({
       asSheetChild
       onChanged={onChanged}
       canVerify={canVerify}
+      passwordAuthOwnerId={passwordAuthOwnerId}
     />
   );
 }
