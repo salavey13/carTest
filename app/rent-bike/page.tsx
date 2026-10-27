@@ -397,14 +397,13 @@ export default function RentBikePage() {
             </div>
         </div>
 
-        {/* task154 iter2: secret birthday quest — stop 5/5, the last riddle
-            before the gift (Roman only, hidden corner cake). Boss audio:
-            «кнопку это уже всё есть — просто нажми кнопку и жми на тортик». */}
+        {/* task154 iter3: secret birthday quest — stop 5/7, now teasing the
+            live rider map (feature pages per boss); hidden corner cake. */}
         <RomanQuestCake
           stop={5}
-          riddle="Вот и весь гараж — последняя подсказка самая простая. Прибавь к адресу сайта /gift/roman — и забери своё. Осталось нажать одну кнопку."
-          nextHref="/gift/roman"
-          nextLabel="Открыть подарок"
+          riddle="Гараж — это железо. А теперь живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас, — и держи следующий след."
+          nextHref="/franchize/vip-bike/map-riders"
+          nextLabel="Открыть карту райдеров"
         />
       </div>
     </div>

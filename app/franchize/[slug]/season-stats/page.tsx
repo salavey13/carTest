@@ -12,6 +12,7 @@ import { buildFranchizeSectionMetadata } from "../metadata";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { verifyTelegramActorCookieValue, TELEGRAM_ACTOR_COOKIE } from "@/lib/telegram-actor-cookie";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { SeasonStatsClient, type SeasonStatsTokens } from "./SeasonStatsClient";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -87,6 +88,16 @@ export default async function SeasonStatsPage({ params }: Props) {
             Войдите через Telegram WebApp, чтобы увидеть цифры своего экипажа.
           </p>
         </div>
+        {/* task154 iter3: quest stop 7/7 lives in BOTH branches — the cake is
+            an overlay, so the hunt works even on the locked PC fallback */}
+        {slug === "vip-bike" && (
+          <RomanQuestCake
+            stop={7}
+            riddle="Вот они, плоды общего дела — весь сезон до рубля. Остался последний шаг: прибавь к адресу сайта /gift/roman — и забери своё. Осталось нажать одну кнопку."
+            nextHref="/gift/roman"
+            nextLabel="Открыть подарок"
+          />
+        )}
       </main>
     );
   }
@@ -102,6 +113,16 @@ export default async function SeasonStatsPage({ params }: Props) {
           tokens={tokens}
         />
       </FranchizePageShell>
+      {/* task154 iter3: secret birthday quest — stop 7/7, the last riddle
+          before the gift (vip-bike crew only; Roman opens logged in) */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          stop={7}
+          riddle="Вот они, плоды общего дела — весь сезон до рубля. Остался последний шаг: прибавь к адресу сайта /gift/roman — и забери своё. Осталось нажать одну кнопку."
+          nextHref="/gift/roman"
+          nextLabel="Открыть подарок"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

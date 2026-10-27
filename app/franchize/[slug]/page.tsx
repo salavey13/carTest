@@ -304,7 +304,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       )}
       </DisplayModeProvider>
 
-      {/* task154 iter2: secret birthday quest — stop 2/5. Boss: franchize
+      {/* task154 iter2: secret birthday quest — stop 2/7. Boss: franchize
           world is the fun part. Gated to the vip-bike crew only (this page
           serves every crew slug); hidden corner cake, Roman only. */}
       {slug === "vip-bike" && (

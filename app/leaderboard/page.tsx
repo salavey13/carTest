@@ -174,7 +174,7 @@ export default function LeaderboardPage() {
 
         {debugInfo && <DebugInfoSection info={debugInfo} />}
 
-        {/* task154 iter2: secret birthday quest — stop 4/5 (Roman only,
+        {/* task154 iter2: secret birthday quest — stop 4/7 (Roman only,
             hidden corner cake; riddle describes the garage next) */}
         <RomanQuestCake
           stop={4}

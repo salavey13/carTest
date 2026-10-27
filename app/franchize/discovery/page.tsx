@@ -338,7 +338,7 @@ export default async function CrewDiscoveryPage() {
             Создать свой экипаж
           </Link>
         </p>
-        {/* task154 iter2: secret birthday quest — stop 3/5 (Roman only,
+        {/* task154 iter2: secret birthday quest — stop 3/7 (Roman only,
             hidden corner cake; riddle describes the hall of fame next) */}
         <RomanQuestCake
           stop={3}

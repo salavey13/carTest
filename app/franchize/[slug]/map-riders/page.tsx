@@ -7,6 +7,7 @@ import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@
 import dynamic from "next/dynamic";
 import { logger } from "@/lib/logger";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { AchievementExplorer } from "../../components/AchievementExplorer";
 import { loadNetworkModel, type CrewNetworkModelResult } from "@/app/franchize/discovery/load-network-model";
 
@@ -97,6 +98,17 @@ export default async function MapRidersPage(
         <CrewHeader crew={crew} activePath={activePath} sectionLinks={buildFranchizeIntentLinks(crewSlug, activePath, { storageEnabled: crew.storage?.enabled })} items={items} showRail={false} />
       </div>
       <MapRidersClient crew={crew} slug={crewSlug} items={items} wallParams={wallParams} network={network} />
+
+      {/* task154 iter3: secret birthday quest — stop 6/7 (hidden corner cake,
+          vip-bike crew only — the whole quest is gated client+server side) */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          stop={6}
+          riddle="Карта живая — как и весь экипаж. И последнее, самое вкусное для со-владельца: весь сезон 2026, посчитанный до рубля — аренды, продажи, касса и сверка. Табло ждёт."
+          nextHref="/franchize/vip-bike/season-stats"
+          nextLabel="Открыть цифры сезона"
+        />
+      )}
     </main>
   );
 }

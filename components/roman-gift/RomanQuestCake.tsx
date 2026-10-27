@@ -1,20 +1,28 @@
 "use client";
 
-// RomanQuestCake — hidden birthday quest stop for Roman (task154 + iter2)
+// RomanQuestCake — hidden birthday quest stop for Roman (task154 iter2+iter3)
 // ──────────────────────────────────────────────────────────────────────────
 // A tiny floating 🎂 sits in the bottom-left corner of a host page. Most
 // visitors never notice it; Roman follows the riddle trail from the kickoff
 // message. Each click opens a warm dark-gold modal with a riddle that
 // DESCRIBES what awaits on the next page (boss: «на всякую страничку —
-// описание, чё его ожидает») and a button that walks him there. The iter2
-// trail (boss audio 27.10 23:53: main page ok, old electro/dashboard stops
-// replaced, MORE pages to click, franchize world included):
+// описание, чё его ожидает») and a button that walks him there.
+// iter3 trail (boss: «more pages about features» + «he will be logged in
+// don't worry» — members-only pages allowed):
 //   / → /franchize/vip-bike → /franchize/discovery → /leaderboard
-//   → /rent-bike → /gift/roman
+//   → /rent-bike → /franchize/vip-bike/map-riders
+//   → /franchize/vip-bike/season-stats → /gift/roman
+//   (iter2 audio trail was: / → vitrine → discovery → leaderboard →
+//   rent-bike → gift; electro/dashboard were dropped as «old»)
+//
+// GATE (boss: «gate the cakes! let them appear on pages only for vip-bike
+// crew members and on PC (no tg auth) — hide for simple users if web app is
+// opened»): every cake consults /api/roman-quest/gate once per browser
+// session (sessionStorage cache) — TG-identified non-crew users (renters)
+// never see the quest; vip-bike crew does; anonymous PC visitors do.
 //
 // Progress lives in localStorage under "roman-quest-progress" (max stop
 // reached) — the gift page reads the same key to show the quest stamp.
-// Zero server dependencies: pure client, no auth, no tracking, no DB.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,9 +37,70 @@ export function readRomanQuestProgress(): number {
   }
 }
 
+export type RomanQuestGateMode = "loading" | "pc" | "crew" | "hidden";
+
+const GATE_SESSION_KEY = "roman-quest-gate";
+
+function readGateFromSession(): RomanQuestGateMode | null {
+  try {
+    const v = window.sessionStorage.getItem(GATE_SESSION_KEY);
+    return v === "pc" || v === "crew" || v === "hidden" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeGateToSession(mode: Exclude<RomanQuestGateMode, "loading">) {
+  try {
+    window.sessionStorage.setItem(GATE_SESSION_KEY, mode);
+  } catch {
+    /* private mode — best-effort cache */
+  }
+}
+
+/**
+ * Shared visibility gate for every Roman-quest surface (cakes + the overview
+ * page). Resolves once per browser session via /api/roman-quest/gate:
+ *   pc     — no TG auth (Roman may open via PC) → show
+ *   crew   — TG-identified vip-bike crew member → show
+ *   hidden — TG-identified simple user (renter) → hide
+ * Fails OPEN on network/API errors so a gate outage can't hide the gift.
+ */
+export function useRomanQuestGate(): RomanQuestGateMode {
+  const [mode, setMode] = useState<RomanQuestGateMode>("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = readGateFromSession();
+    if (cached) {
+      setMode(cached);
+      return;
+    }
+    fetch("/api/roman-quest/gate", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: { mode?: string }) => {
+        if (cancelled) return;
+        const next: Exclude<RomanQuestGateMode, "loading"> =
+          data?.mode === "crew" || data?.mode === "hidden" ? data.mode : "pc";
+        writeGateToSession(next);
+        setMode(next);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        writeGateToSession("pc");
+        setMode("pc");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return mode;
+}
+
 interface RomanQuestCakeProps {
-  /** Which stop of the trail this host page is (1..5). */
-  stop: 1 | 2 | 3 | 4 | 5;
+  /** Which stop of the trail this host page is (1..7). */
+  stop: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   /** Riddle text shown in the modal. */
   riddle: string;
   /** Where the "next" button leads (next stop or the gift). */
@@ -40,13 +109,14 @@ interface RomanQuestCakeProps {
   nextLabel: string;
 }
 
-const STOPS_TOTAL = 5;
+const STOPS_TOTAL = 7;
 
 /** Total stops in the quest — the gift page reads it for its stamp. */
 export const ROMAN_QUEST_STOPS = STOPS_TOTAL;
 
 export function RomanQuestCake({ stop, riddle, nextHref, nextLabel }: RomanQuestCakeProps) {
   const router = useRouter();
+  const gate = useRomanQuestGate();
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -69,6 +139,11 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel }: RomanQuest
     setOpen(false);
     router.push(nextHref);
   }, [nextHref, router]);
+
+  // GATE: simple TG users (renters) never see the quest; crew + PC do.
+  // Renders nothing while the verdict loads, so there is no flash for
+  // hidden users and no layout shift on host pages.
+  if (gate === "loading" || gate === "hidden") return null;
 
   return (
     <>

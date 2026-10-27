@@ -1455,3 +1455,20 @@ Work Log:
 Stage Summary:
 - Квест стал длиннее и интереснее (5 страниц вместо 3), проходит через франшизный мир и зал славы, каждая остановка тизерит следующую; ноль упоминаний аренды Sequence Zero; поздравление — от имени компании, словами босса.
 - Для запуска боссу: отправить Роману новое приветствие квеста (порог — торт 🎂 в левом нижнем углу главной).
+
+---
+Task ID: 154-iter3
+Agent: main (Z.ai CLI)
+Task: boss — «more pages about features, create an awesome overview out of Roman's quest — he will be logged in don't worry; moreover gate the cakes! let them appear on pages only for vip-bike crew members and on PC (no tg auth) — hide for simple users if web app is opened».
+
+Work Log:
+- Трейл 5→7 остановок, добавлены фичевые страницы для со-владельца (Роман логинится через TG — members-only разрешены): + /franchize/vip-bike/map-riders (стоп 6, публичная) и + /franchize/vip-bike/season-stats (стоп 7, members-only; кейк в ОБЕИХ ветках возврата — на залоченном PC-фолбэке квест тоже работает, это оверлей). Загадки новых остановок — фиче-питчи (карта райдеров = экипаж на ладони; сезон = деньги до рубля). Кик-офф на / теперь «семь следов».
+- ГЕЙТ ТОРТОВ: новый API /api/roman-quest/gate — нет валидной TG-cookie → {show,mode:"pc"} (PC/анон, босс явно попросил); TG-cookie + членство vip-bike (crew_members active | owner_id | global admin — тот же контракт, что season-stats) → "crew"; TG-cookie + все остальные (рентеры в WebApp) → {show:false,"hidden"}. no-store, fail-open при ошибке API (день рождения не должен зависеть от гейта).
+- useRomanQuestGate() в RomanQuestCake: sessionStorage-кеш «roman-quest-gate» (один запрос на сессию), во время loading рендерит null (нет флеша для скрытых юзеров), gate!=="show" → null. Кейк-компонент и обзорная страница сидят на одном хуке.
+- ОБЗОР /gift/roman-quest (layout noindex, ClientLayout глушит хром через startsWith("/gift/roman") — уже покрыто): тёмно-золотая карта квеста = лаунчер + «список полезного для Романа»: таймлайн 7 карточек (иконка, название страницы, фиче-питч, «пройдено ✓» из localStorage), финальная карточка 🎁 (подсвечена при 7/7), прогресс-бар, sticky-CTA «Продолжить квест →» ведёт на ПЕРВЫЙ непройденный след. Для hidden-юзеров — пустая страница.
+- Подарочная страница: ссылка «🗺 Карта квеста — все семь следов» под грамотой; штамп автоматом 7 из 7 (ROMAN_QUEST_STOPS).
+- tsc --noEmit (8GB) чисто; vitest full 3766 passed / 0 failed.
+
+Stage Summary:
+- Квест = управляемый тур по приложению с гейтом (crew/PC видят, рентеры нет), обзорная страница-карта на /gift/roman-quest — единственная ссылка, которую босс шлёт Роману, дальше ведёт sticky-CTA.
+- Гейт-вердикты: pc (анон) и crew (vip-bike членство) → квест виден; hidden (любой другой TG-юзер) → ни кейка, ни карты.

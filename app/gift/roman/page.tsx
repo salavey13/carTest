@@ -2,14 +2,16 @@
 
 // /gift/roman — Roman's birthday surprise (task154 + iter2)
 // ──────────────────────────────────────────────────────────────────────────
-// The end of the hidden quest (boss audio 27.10 23:53 — trail now runs
+// The end of the hidden quest (boss iter3: trail now runs
 // / → /franchize/vip-bike → /franchize/discovery → /leaderboard → /rent-bike
-// → here). Deliberately NOT cybervibe: warm premium
-// dark + champagne gold, serif typography, REAL achievements from the
-// crew's season data. iter2 per boss audio: the Sequence Zero rental story
-// is REMOVED («убери про то, что он там пытался арендовать»), the closing
-// congratulates him on behalf of the company («поздравляем вас от имени
-// нашей компании, спасибо вам большое»), quest stamp counts 5 stops.
+// → /franchize/vip-bike/map-riders → /franchize/vip-bike/season-stats
+// → here; the companion overview lives at /gift/roman-quest — boss: «create
+// an awesome overview out of Roman's quest»). Deliberately NOT cybervibe:
+// warm premium dark + champagne gold, serif typography, REAL achievements
+// from the crew's season data. iter2 per boss audio: the Sequence Zero rental
+// story is REMOVED («убери про то, что он там пытался арендовать»), the
+// closing congratulates him on behalf of the company («поздравляем вас от
+// имени нашей компании, спасибо вам большое»), quest stamp counts 7 stops.
 // Confetti is a tiny zero-dependency canvas burst.
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -263,6 +265,12 @@ export default function RomanGiftPage() {
             🖨️ Грамота для печати (A4)
           </a>
           <p className="mt-3 text-xs text-stone-600">распечатай и повесь рядом с зарядкой</p>
+          <a
+            href="/gift/roman-quest"
+            className="mt-5 inline-block text-sm text-amber-400/70 underline decoration-amber-400/30 underline-offset-4 transition-colors hover:text-amber-300"
+          >
+            🗺 Карта квеста — все семь следов на одной странице
+          </a>
         </section>
 
         {/* ── footer ── */}

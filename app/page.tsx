@@ -1644,7 +1644,7 @@ export default function Home() {
         landingPath="/"
       />
 
-      {/* task154 iter2: secret birthday quest — stop 1/5 (Roman only, hidden
+      {/* task154 iter2: secret birthday quest — stop 1/7 (Roman only, hidden
           corner cake at the bottom-left of the main landing). Boss audio
           27.10 23:53: main page stays, trail now goes through the franchize
           world + hall of fame + garage (5 stops instead of 3):
@@ -1652,7 +1652,7 @@ export default function Home() {
           → /rent-bike → /gift/roman */}
       <RomanQuestCake
         stop={1}
-        riddle="Подарок уже спрятан, и экипаж оставил тебе пять следов. Первый ведёт туда, где твой экипаж встречает гостей: витрина с парком, ценами и корзиной — как у настоящего магазина."
+        riddle="Подарок уже спрятан, и экипаж оставил тебе семь следов. Первый ведёт туда, где твой экипаж встречает гостей: витрина с парком, ценами и корзиной — как у настоящего магазина."
         nextHref="/franchize/vip-bike"
         nextLabel="Открыть витрину экипажа"
       />
