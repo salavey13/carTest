@@ -61,10 +61,16 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
 
   it("task141 iter4: the BASE highlight layer is the ARTICLE background (var flip)", () => {
     // card bg is emitted through CSS vars with the variant as fallback…
+    // task 149: variants are FLAT now (gradient/box-shadow depth read as
+    // TV glitches — see catalogCardVariantStyles), so only --card-base-bg
+    // remains; the hover flip still owns the whole border-box.
     const theme = read("app/franchize/lib/theme.ts");
     expect(theme).toContain("var(--card-base-bg, ");
-    expect(theme).toContain("var(--card-base-img, ");
-    // …and ONE globals.css rule flips those vars on PC hover — coverage of
+    // task 149/147: variant depth is GONE (gradient + soft shadows read as
+    // TV glitches) — every variant resolves to an opaque bg-card face
+    expect(theme).not.toContain("linear-gradient(to bottom, ${withAlpha(palette.bgCard");
+    expect(theme).not.toContain("0 12px 20px");
+    // …and ONE globals.css rule flips that var on PC hover — coverage of
     // the whole border-box is structural, no inner element can leave a gap
     const css = read("app/globals.css");
     expect(css).toContain("[data-catalog-item]:hover");
@@ -301,5 +307,66 @@ describe("task145 — rest acts, full-width wordmarks, glass pollination", () =>
     expect(leorusCss).toContain('[data-reveal-active="true"] .dir-card__veil');
     // touch gate wired in the client
     expect(leorus).toContain("dirGate(");
+  });
+});
+
+/**
+ * task 149 — TV (720p) catalog card glitch batch (boss photo report):
+ * 1/ «strange glow behind some item cards» + 2/ «glow overlaps partially
+ * card on the left, lower z than the image, reveals the seam» — variant
+ * depth (article gradient + soft box-shadows) is GONE (flat bordered face).
+ * 3/ «second card has partial bg color cover, dark part on the right side»
+ * — same article gradient exposed at composited-layer edges — gone with it.
+ * 4/ «забронировать button not centered, jumps with title lines» — CTA is
+ * pinned to the strip floor (mt-auto) + title reserves a 2-line box.
+ * 5/ «quick specs balloons contrast vs accent gradient in hover/selected
+ * state — turn specs to primary (black) in highlighted state» — the
+ * balloon classes never compiled in TW3 (opacity modifier on var color is
+ * dropped → transparent); now .catalog-spec-chip = real balloon at rest,
+ * solid primary black on hover AND :focus-within (TV D-pads), same 300ms
+ * curve as the melt. Availability pill got the same balloon fix.
+ */
+describe("task149 — TV/720p catalog card glitch batch", () => {
+  const repo = resolve(__dirname, "../..");
+  const read = (p: string) => readFileSync(resolve(repo, p), "utf8");
+  const catalog = read("app/franchize/components/CatalogClient.tsx");
+  const css = read("app/globals.css");
+  const theme = read("app/franchize/lib/theme.ts");
+
+  it("glow: variants are flat — no article gradient, no decorative box-shadows", () => {
+    expect(theme).not.toContain("linear-gradient(to bottom, ${withAlpha(palette.bgCard");
+    expect(theme).not.toContain("0 12px 20px");
+    expect(theme).not.toContain("0 8px 24px");
+    // variant faces are equal now: one bordered, bg-card face; hover flip untouched
+    expect((theme.match(/catalogCardVariantStyles/g) || []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("spec chips: real balloon class on BOTH card shapes, broken /65 class gone", () => {
+    expect((catalog.match(/className="catalog-spec-chip/g) || []).length).toBe(2);
+    expect(catalog).not.toContain("bg-[var(--catalog-bg)]/65");
+    expect(css).toContain(".catalog-spec-chip {");
+    expect(css).toContain("rgba(10, 10, 10, 0.6)");
+  });
+
+  it("highlighted state drills INTO the chips: primary balloon on hover AND focus-within (TV)", () => {
+    expect(css).toContain("[data-catalog-item]:hover .catalog-spec-chip");
+    expect(css).toContain("[data-catalog-item]:focus-within .catalog-spec-chip");
+    expect(css).toContain("background-color: var(--catalog-accent-contrast, #0a0a0a)");
+  });
+
+  it("availability pill: same balloon fix (broken /60 and /70 classes gone)", () => {
+    expect((catalog.match(/catalog-avail-pill/g) || []).length).toBe(3);
+    expect(catalog).not.toContain("bg-[var(--catalog-bg)]/60");
+    expect(catalog).not.toContain("bg-[var(--catalog-bg)]/70");
+    expect(css).toContain(".catalog-avail-pill");
+  });
+
+  it("CTA is pinned to the strip floor in BOTH card shapes (no more jumping)", () => {
+    expect((catalog.match(/className="mt-auto pt-3"/g) || []).length).toBe(2);
+    expect(catalog).not.toContain('className="mt-3"');
+  });
+
+  it("title reserves a 2-line box — price row stops shifting between titles", () => {
+    expect((catalog.match(/min-h-\[2\.5rem\]/g) || []).length).toBe(2);
   });
 });

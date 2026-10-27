@@ -512,7 +512,7 @@ function ComboOfferCard({
             Комбо · коллекция
           </span>
           {typeof stockQty === "number" && (
-            <span className="absolute right-2 top-2 inline-flex items-center rounded-full bg-[var(--catalog-bg)]/70 px-2 py-0.5 text-[9px] font-semibold text-[var(--catalog-text)] backdrop-blur-sm">
+            <span className="absolute right-2 top-2 inline-flex items-center rounded-full catalog-avail-pill px-2 py-0.5 text-[9px] font-semibold text-[var(--catalog-text)] backdrop-blur-sm">
               {stockQty} шт. в наличии
             </span>
           )}
@@ -1679,14 +1679,20 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {specChips.length > 0 && (
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {specChips.slice(0, 2).map((spec, si) => (
-                                <span key={`${item.id}-badge-${si}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent-contrast)] md:group-hover:text-[var(--catalog-accent)]">
+                              /* task 149: balloon classes moved to globals.css — the old TW3
+                              arbitrary bg with a /65 opacity modifier never compiled (opacity
+                              on a var() color is dropped → transparent «balloon»), and on a
+                              highlighted card the accent melt gradient drowned the accent
+                              text. .catalog-spec-chip = real translucent balloon at rest,
+                              solid primary black on hover/:focus-within (TV D-pads). */
+                              <span key={`${item.id}-badge-${si}`} className="catalog-spec-chip inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
                                   {spec.text}
                                 </span>
                               ))}
                             </div>
                           )}
                           {/* Availability dot on image top-right */}
-                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-bg)]/60 px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm" style={{ color: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }}>
+                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full catalog-avail-pill px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm" style={{ color: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }}>
                             <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }} />
                             {rentalStrip.availabilityLabel}
                           </span>
@@ -1717,7 +1723,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* Title */}
-                          <h3 className="text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
+                          {/* task 149: title reserves a 2-line box — price row (and everything
+                              below it) stops shifting between 1-line and 2-line titles. */}
+                          <h3 className="min-h-[2.5rem] text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
 
                           {/* Price — conditional on displayMode */}
                           <div className="mt-1.5">
@@ -1737,11 +1745,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
-                          {/* CTA — task 147: mt-auto pins the button to the card
-                              bottom, so title length / badge rows can no longer
-                              move it between neighbours in a stretched row
-                              (boss: «button jumps around depending on title
-                              lines — calm it down»). */}
+                          {/* task 149: CTA pinned to the strip floor (mt-auto, not mt-3) — the
+                              button no longer jumps with title line count / badge wraps;
+                              every card in a row parks it on the same baseline. */}
                           <div className="mt-auto pt-3">
                             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
                               {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
@@ -1842,14 +1848,15 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {visibleSpecs.length > 0 && (
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {visibleSpecs.slice(0, 3).map((spec, index) => (
-                                <span key={`${item.id}-spec-${index}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent-contrast)] md:group-hover:text-[var(--catalog-accent)]">
+                                /* task 149: same balloon fix as the carousel card above. */
+                                <span key={`${item.id}-spec-${index}`} className="catalog-spec-chip inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
                                   {spec.text}
                                 </span>
                               ))}
                             </div>
                           )}
                           {/* Availability dot on image top-right */}
-                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-bg)]/60 px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm" style={{ color: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }}>
+                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full catalog-avail-pill px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm" style={{ color: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }}>
                             <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: rentalStrip.isAvailable ? "#4ade80" : "#f87171" }} />
                             {rentalStrip.availabilityLabel}
                           </span>
@@ -1883,7 +1890,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* Title */}
-                          <h3 className="text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
+                          {/* task 149: title reserves a 2-line box — price row (and everything
+                              below it) stops shifting between 1-line and 2-line titles. */}
+                          <h3 className="min-h-[2.5rem] text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
 
                           {/* Price — conditional on displayMode */}
                           <div className="mt-1.5">
@@ -1903,9 +1912,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
-                          {/* CTA — task 147: same bottom-pin as the carousel card
-                              above so grid rows keep aligned buttons regardless
-                              of title line count. */}
+                          {/* task 149: CTA pinned to the strip floor (mt-auto, not mt-3) — the
+                              button no longer jumps with title line count / badge wraps;
+                              every card in a row parks it on the same baseline. */}
                           <div className="mt-auto pt-3">
                             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
                               {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}

@@ -418,6 +418,36 @@
       --catalog-melt-color: var(--catalog-accent);
     }
   }
+
+  /* ── task 149: spec chips + availability pill on the card photo ──
+     The old Tailwind arbitrary classes bg-[var(--catalog-bg)]/65 and /60
+     never compiled (TW3 drops the opacity modifier on arbitrary var()
+     colors — same class-drop as task148's bg-current/20 scrollbar), so the
+     «balloons» were bare accent text over a blur. On a highlighted card
+     the accent melt gradient behind the accent text drowned them (boss:
+     «contrast issue with these quick specs balloons and gradient»).
+     Fixed rgba values instead of color-mix — TV browsers may predate
+     Chrome 111. At rest: translucent dark balloon (reads on the dark
+     studio photos in both themes). On a highlighted card (hover /
+     :focus-within for TV D-pads and keyboards) the balloon turns solid
+     primary black and keeps the accent text — it flips on the fly with
+     the card state on the same 300ms curve as the melt. */
+  .catalog-spec-chip {
+    background-color: rgba(10, 10, 10, 0.6);
+    transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .catalog-avail-pill {
+    background-color: rgba(10, 10, 10, 0.6);
+  }
+  @media (min-width: 768px) {
+    [data-catalog-item]:hover .catalog-spec-chip,
+    [data-catalog-item]:focus-within .catalog-spec-chip {
+      /* task 147 (parallel batch) intent absorbed: the balloon flips to the
+         theme's own primary/contrast color (near-black for vip-bike gold),
+         not a hardcoded hex — stays correct for every crew palette. */
+      background-color: var(--catalog-accent-contrast, #0a0a0a);
+    }
+  }
 }
 
 @layer utilities {
