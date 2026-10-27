@@ -187,6 +187,22 @@ export function crewPaletteWithCssVars(theme: FranchizeTheme) {
  *
  * Note: consumers that never get the hover rule (e.g. PartsCatalogClient
  * cards, skeletons) resolve the fallback = exactly the previous visuals.
+ * task 147 iter1 — TV 720p glitch batch (boss: «strange glow behind some
+ * cards», «glow overlaps the left card and reveals the seam between photo
+ * and info strip», «second card has a partial dark bg cover on the right»):
+ * the variant system itself was the culprit —
+ *   • variants 1/2 carried accent-tinted boxShadows (accent@5% / bgBase@40%)
+ *     → only SOME cards glowed, and on the TV's gamma the 24px accent wash
+ *     reads as a «strange glow» spilling onto neighbours;
+ *   • variant 1's base was a TRANSLUCENT gradient (bgCard@96% → bgBase) →
+ *     neighbour glow bled through around the photo, and the gradient's dark
+ *     bgBase bottom peeked at the card edges (fractional rounding on 720p)
+ *     as a «partial dark cover».
+ * Calm-down fix: every variant gets the SAME opaque bg-card base — the
+ * variant identity now lives only in the border (soft vs transparent).
+ * No shadows, no gradients: nothing can bleed, nothing can peek. The
+ * --card-base-bg / --card-base-img hover contract is preserved untouched
+ * (globals.css still flips the whole article to accent on hover).
  */
 export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: number) {
   const isAuto = theme.isAuto;
@@ -201,13 +217,11 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
       },
       {
         borderColor: "transparent",
-        backgroundImage: `linear-gradient(to bottom, color-mix(in srgb, var(--franchize-bg-card) 96%, transparent), var(--franchize-bg-base))`,
-        boxShadow: `0 8px 24px color-mix(in srgb, var(--franchize-accent-main) 5%, transparent)`,
+        backgroundColor: "var(--franchize-bg-card)",
       },
       {
         borderColor: "transparent",
         backgroundColor: "var(--franchize-bg-card)",
-        boxShadow: `0 0 0 1px color-mix(in srgb, var(--franchize-accent-main) 8%, transparent), 0 12px 20px color-mix(in srgb, var(--franchize-bg-base) 40%, transparent)`,
       },
     ] as const;
     const v = variants[Math.abs(variantIndex) % variants.length];
@@ -227,13 +241,11 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
     },
     {
       borderColor: "transparent",
-      backgroundImage: `linear-gradient(to bottom, ${withAlpha(palette.bgCard, 0.96)}, ${palette.bgBase})`,
-      boxShadow: `0 8px 24px ${withAlpha(palette.accentMain, 0.05)}`,
+      backgroundColor: palette.bgCard,
     },
     {
       borderColor: "transparent",
       backgroundColor: palette.bgCard,
-      boxShadow: `0 0 0 1px ${withAlpha(palette.accentMain, 0.08)}, 0 12px 20px ${withAlpha(palette.bgBase, 0.4)}`,
     },
   ] as const;
 

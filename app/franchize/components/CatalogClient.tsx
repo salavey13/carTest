@@ -1679,7 +1679,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {specChips.length > 0 && (
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {specChips.slice(0, 2).map((spec, si) => (
-                                <span key={`${item.id}-badge-${si}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
+                                <span key={`${item.id}-badge-${si}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent-contrast)] md:group-hover:text-[var(--catalog-accent)]">
                                   {spec.text}
                                 </span>
                               ))}
@@ -1737,7 +1737,12 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
-                          <div className="mt-3">
+                          {/* CTA — task 147: mt-auto pins the button to the card
+                              bottom, so title length / badge rows can no longer
+                              move it between neighbours in a stretched row
+                              (boss: «button jumps around depending on title
+                              lines — calm it down»). */}
+                          <div className="mt-auto pt-3">
                             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
                               {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
                             </span>
@@ -1837,7 +1842,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           {visibleSpecs.length > 0 && (
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {visibleSpecs.slice(0, 3).map((spec, index) => (
-                                <span key={`${item.id}-spec-${index}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
+                                <span key={`${item.id}-spec-${index}`} className="inline-flex items-center gap-1 rounded-lg bg-[var(--catalog-bg)]/65 px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent-contrast)] md:group-hover:text-[var(--catalog-accent)]">
                                   {spec.text}
                                 </span>
                               ))}
@@ -1898,7 +1903,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                           </div>
 
                           {/* CTA button inside same container (rentalbikes-style: bordered, accent color) */}
-                          <div className="mt-3">
+                          {/* CTA — task 147: same bottom-pin as the carousel card
+                              above so grid rows keep aligned buttons regardless
+                              of title line count. */}
+                          <div className="mt-auto pt-3">
                             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
                               {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
                             </span>
