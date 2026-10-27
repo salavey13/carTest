@@ -1424,3 +1424,17 @@ Work Log:
 Stage Summary:
 - /leorus: success-плашка показывается только после успешного сабмита; «1 000 000» больше не режется ни на одной ширине (проверено 1440/1024/768/390 + мат.запас на худшем треке).
 - Русский гайд docs/OWN_LANDING_OWN_BOT_RU.md подтверждает схему босса: да, уведомления уходят от бота, чей токен в env деплоя; Web App в BotFather замыкает цикл внутри его бота.
+
+---
+Task ID: 155
+Agent: main (Z.ai CLI)
+Task: boss — «add this reference to example to README.md and maybe improve readme itself, it was not updated for long time» (про docs/OWN_LANDING_OWN_BOT_RU.md).
+
+Work Log:
+- Факт-чек перед правкой (ноль выдуманных цифр): миграций 184 (легаси — 37 SQL в подпапках), spec-файлов franchize 140, последний прогон ~3600 (worklog task148-153), все npm-скрипты из README существуют, палитра-SQL и webhook-роут на месте, YANDEX_PAY_*/ONC_* живы в коде, .env.example обзавёлся SMTP_YANDEX_*.
+- README.MD переписан: интро + white-label фраза; в таблицу поверхности — строки «Витрины экипажей» и «Лиды»; новая подсекция «Витрины экипажей» (таблица 6 витрин: /, /vipbikerental, /moto-selection+history, /sly13, /leorus, /georg-electro, /mototehnn + общая ДНК: палитра из crews.metadata, callback-lead → свой экипаж, партнёрская сетка hover/longtap); ссылка на docs/OWN_LANDING_OWN_BOT_RU.md — вверху секции «Клон → деплой» и в карте документации; устаревшие числа обновлены (160→184 миграций, 930→~3600 тестов); SMTP_YANDEX_* и 1С-коннектор в env-списке.
+- Автопроверка скриптом: все 12 doc-ссылок и 4 app-роута из README существуют, таблицы сбалансированы.
+- Commit 422c6c1 → main.
+
+Stage Summary:
+- README снова отражает продукт: платформа + семейство витрин экипажей; гайд «свой лендинг — свой бот» виден с главного экрана репо (форкнувший не его пропустит).
