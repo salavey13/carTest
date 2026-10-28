@@ -93,7 +93,7 @@ export default async function SeasonStatsPage({ params }: Props) {
         {slug === "vip-bike" && (
           <RomanQuestCake
             stop={7}
-            riddle="Вот они, плоды общего дела — весь сезон до рубля. Остался последний шаг: прибавь к адресу сайта /gift/roman — и забери своё. Осталось нажать одну кнопку."
+            riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
             nextHref="/gift/roman"
             nextLabel="Открыть подарок"
           />
@@ -118,7 +118,7 @@ export default async function SeasonStatsPage({ params }: Props) {
       {slug === "vip-bike" && (
         <RomanQuestCake
           stop={7}
-          riddle="Вот они, плоды общего дела — весь сезон до рубля. Остался последний шаг: прибавь к адресу сайта /gift/roman — и забери своё. Осталось нажать одну кнопку."
+          riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
           nextHref="/gift/roman"
           nextLabel="Открыть подарок"
         />

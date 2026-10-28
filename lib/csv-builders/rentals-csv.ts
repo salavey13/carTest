@@ -233,15 +233,30 @@ export async function buildRentalsCsv(
   // Task 106: the label gains «· скорректировано (N ₽)» when the row carries
   // an agreed (negotiated) split — the export shows the money as settled.
   const verificationMap = await getVerificationStatusMap(rentalRows.map((r: any) => String(r.rental_id)));
+  const VERIF_ROLE_RU: Record<string, string> = { operator: "оператор", owner: "владелец", admin: "админ" };
   const verificationLabel = (rentalId: unknown): string => {
     const brief = verificationMap.get(String(rentalId || ""));
     if (!brief) return "";
     const base = VERIFICATION_STATUS_LABELS[brief.status];
     if (brief.agreedSplit) {
       const agreedTotal = brief.agreedSplit.base + brief.agreedSplit.equipment + brief.agreedSplit.overprice;
-      return `${base} · скорректировано (${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(agreedTotal)} ₽)`;
+      return `${base} · скорректировано (${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(agreedTotal)} ₽)${brief.comment ? " · ✍️" : ""}`;
     }
-    return base;
+    // task156: a standing negotiation comment gets a short marker here (the
+    // rail-safe cell stays narrow); the TEXT itself rides in «Заметки».
+    return brief.comment ? `${base} · ✍️` : base;
+  };
+  /** task156: the «Заметки» cell gains the verification comment — the boss
+   *  looked for the bot's «комментарий: …» there and found nothing (the text
+   *  lived only in rental_verifications.negotiation). Capped, author-labelled. */
+  const verificationCommentPart = (rentalId: unknown): string => {
+    const brief = verificationMap.get(String(rentalId || ""));
+    if (!brief?.comment) return "";
+    const role = brief.commentRole ? VERIF_ROLE_RU[brief.commentRole] || brief.commentRole : "";
+    const text = brief.comment.length > 140
+      ? `${brief.comment.slice(0, 139).trimEnd()}…`
+      : brief.comment;
+    return `сверка · ✍️ ${role}: ${text}`;
   };
 
   // ── Batched users lookup — subrenter labels (АРЕНДЫ) + «Выдал»/«Принял»
@@ -482,6 +497,10 @@ export async function buildRentalsCsv(
 
     // iter20: notes / subrenter / photos.
     const notesStr = rentalNotesSummary(meta);
+    // task156: the verification comment (bot «комментарий: …») joins the notes
+    // cell — the place the boss actually reads — most-relevant first.
+    const verComment = verificationCommentPart(r.rental_id);
+    const notesCell = [verComment, notesStr].filter(Boolean).join(" | ");
     const subrenterStr = subrenterId
       ? subrenterCsvLabel(userById.get(subrenterId) ?? { user_id: subrenterId, full_name: null, username: null })
       : "";
@@ -490,7 +509,7 @@ export async function buildRentalsCsv(
     rows.push(rowOf([
       dateStr, salaryStr, partnerPayout > 0 ? String(partnerPayout) : "", price, equipStr, depositStr,
       bikeName, odoBefore, odoAfter, timeStr, comment,
-      notesStr, subrenterStr, photosStr, r.rental_id || "",
+      notesCell, subrenterStr, photosStr, r.rental_id || "",
       // Task 98: generated audit columns
       String(salary.base), String(salary.equipment), String(salary.overprice),
       equipParts.join("+"),

@@ -129,6 +129,7 @@ export {
   formatRubVerify,
   formatVerificationSummary,
   labelFromUsersMap,
+  latestNegotiationComment,
   parseNegotiation,
   parseProposalCallback,
   proposalResponseKeyboard,
@@ -2239,7 +2240,7 @@ export async function handleRentalVerifyCommentText(params: {
   try {
     const { data: stateRow, error: stateReadErr } = await supabaseAdmin
       .from("user_states")
-      .select("state, context")
+      .select("state, context, expires_at")
       .eq("user_id", params.userId)
       .like("state", "vrf_comment_%")
       .maybeSingle();
@@ -2251,11 +2252,26 @@ export async function handleRentalVerifyCommentText(params: {
       return !isMissingRelationError(stateReadErr);
     }
     if (!stateRow?.state) return false;
+    // task156: mirror doc-manual — an EXPIRED capture mode is not a capture
+    // mode (the state is cleaned up; the text flows to the normal router).
+    if (stateRow.expires_at && new Date(stateRow.expires_at).getTime() < Date.now()) {
+      await supabaseAdmin.from("user_states").delete().eq("user_id", params.userId).like("state", "vrf_comment_%");
+      return false;
+    }
     const rentalId = String(stateRow.state).slice("vrf_comment_".length);
     const text = String(params.text || "").trim();
     // Best-effort state cleanup regardless of outcome.
     await supabaseAdmin.from("user_states").delete().eq("user_id", params.userId).like("state", "vrf_comment_%");
     if (!rentalId) return true;
+
+    /** Best-effort honest reply — a typed comment must never vanish silently. */
+    const reply = async (lines: string[]): Promise<void> => {
+      try {
+        await sendComplexMessage(String(params.chatId), lines.join("\n"));
+      } catch {
+        /* non-fatal */
+      }
+    };
 
     const { data: row, error } = await supabaseAdmin
       .from("rental_verifications")
@@ -2263,14 +2279,36 @@ export async function handleRentalVerifyCommentText(params: {
       .eq("rental_id", rentalId)
       .maybeSingle();
     if (error && !isMissingRelationError(error)) throw error;
-    if (!row) return true;
+    if (!row) {
+      // task156 (codereview): previously a silent `return true` — the comment
+      // disappeared without a trace. Now the sender knows why.
+      await reply([
+        `✍️ Комментарий не сохранён — сверка по этой аренде не найдена (строка удалена).`,
+        `Вышлите сверку заново (📨 в таблице аренд) и повторите комментарий.`,
+      ]);
+      return true;
+    }
     const current = row as RentalVerificationRow;
     // Task 118: crew staff (admins) can also draft comments on their proposals.
     const staffChatIds = await loadCrewStaffChatIds(current.crew_slug || null);
     const role = resolveVerificationRole(current, String(params.userId), staffChatIds);
-    if (!role) return true;
+    if (!role) {
+      // task156 (codereview): previously silent — now an honest answer.
+      await reply([`✍️ Комментарий не сохранён — вы не участник сверки по этой аренде.`]);
+      return true;
+    }
+    if (current.status === "verified") {
+      // task156 (codereview): a comment on a settled row would dead-end in a
+      // draft nobody reads — answer honestly instead of capturing.
+      await reply([`✅ Расчёт по этой аренде уже подтверждён — комментарий не нужен.`]);
+      return true;
+    }
     const original = snapshotSplitOf(current.snapshot as Partial<RentalVerificationSnapshot>);
     let nego = parseNegotiation((current as any).negotiation);
+    // task156: was the actor's draft comment EMPTY before this message? Then
+    // this is the FIRST comment — staff get one note (edits stay quiet, the
+    // counterparty hears it with the proposal).
+    const isFirstComment = !(nego.draft && nego.draft.by === String(params.userId) && typeof nego.draft.comment === "string" && nego.draft.comment.trim());
     if (!nego.draft || nego.draft.by !== String(params.userId)) {
       const prefill = nego.open && nego.open.by === String(params.userId) ? nego.open.split : undefined;
       nego = startDraft(nego, String(params.userId), role, original, prefill);
@@ -2295,6 +2333,21 @@ export async function handleRentalVerifyCommentText(params: {
       if (isMissingNegotiationError(upErr)) return true;
       throw upErr;
     }
+    // task156: the crew staff (the boss reads these) learn about the FIRST
+    // comment right away — the dispute voice is no longer TG-invisible.
+    if (isFirstComment) {
+      const actorLabel = labelFromUsersMap(await loadUsersMap([String(params.userId)]), String(params.userId));
+      await ccVerificationNoteToCrewStaff({
+        crewSlug: current.crew_slug || null,
+        rentalId,
+        text: [
+          `✍️ ${escapeVerifyHtml(actorLabel)}${role === "admin" ? " (админ)" : ""} добавил комментарий к спору по аренде ${escapeVerifyHtml((current.snapshot as any)?.bikeName || "")}:`,
+          `«${escapeVerifyHtml(text)}»`,
+          `Виден в веб-таблице («Заметки») — второй стороне уйдёт вместе с предложением.`,
+        ].join("\n"),
+        exclude: [String(params.userId)],
+      });
+    }
     const ctx = (stateRow.context || {}) as { editorMessageId?: number | null };
     await renderEditorMessage(String(params.chatId), ctx.editorMessageId ?? undefined, formatDisputeEditor({
       snapshot: current.snapshot as Partial<RentalVerificationSnapshot>,
@@ -2302,6 +2355,10 @@ export async function handleRentalVerifyCommentText(params: {
       actorLabel: labelFromUsersMap(await loadUsersMap([String(params.userId)]), String(params.userId)),
       comment: nego.draft!.comment,
     }), disputeEditorKeyboard(rentalId, nego.draft!.split, original));
+    // task156: set expectations — where the comment lives now.
+    await reply([
+      `✍️ Комментарий сохранён: он уже виден в веб-таблице аренд («Заметки» / колонка «Верификация») и уйдёт второй стороне вместе с предложением («📤 Отправить предложение»).`,
+    ]);
     return true;
   } catch (e) {
     logger.warn("[rental-verify] comment capture failed (non-fatal):", e);
@@ -2536,6 +2593,15 @@ export async function getVerificationStatusMap(rentalIds: string[]): Promise<Map
           operatorChatId: row.operator_chat_id,
           ownerChatId: row.owner_chat_id,
           ...(nego ? { proposalOpen: !!nego.open, agreedSplit: nego.agreed ? nego.agreed.split : null } : {}),
+          // task156: the standing negotiation comment (sent proposal / editor
+          // draft / last round) — the boss's «Где наличка ???» case lived ONLY
+          // in negotiation.draft.comment and never reached the web surfaces.
+          ...(nego
+            ? (() => {
+                const c = latestNegotiationComment(nego);
+                return c ? { comment: c.text, commentRole: c.role } : {};
+              })()
+            : {}),
           ...(audit && typeof audit === "object" ? { audit } : {}),
           ...(commission ? { commission } : {}),
         });

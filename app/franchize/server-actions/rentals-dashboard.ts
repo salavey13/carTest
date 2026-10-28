@@ -92,6 +92,11 @@ export interface RentalDashboardItem {
   verificationCommission?: VerificationCommissionBrief | null;
   /** Task 126: negotiated split after an accepted proposal (сверка card). */
   verificationAgreedSplit?: SplitParts | null;
+  /** task156: the standing negotiation comment (bot «комментарий: …») —
+   *  surfaced in the drawer сверка card + list chip tooltip. */
+  verificationComment?: string | null;
+  /** task156: who wrote it (operator / owner / admin). */
+  verificationCommentRole?: "operator" | "owner" | "admin" | null;
   // Resolved operator display name (username/full_name from public.users)
   operatorName?: string | null;
   // iter20: resolved partner-owner label ("@username · Full Name") for
@@ -810,6 +815,9 @@ export async function getRentalsDashboard(input: {
             verificationAudit: verificationMap.get(item.rental_id)?.audit ?? null,
             verificationCommission: verificationMap.get(item.rental_id)?.commission ?? null,
             verificationAgreedSplit: verificationMap.get(item.rental_id)?.agreedSplit ?? null,
+            // task156: the standing negotiation comment reaches the drawer + list
+            verificationComment: verificationMap.get(item.rental_id)?.comment ?? null,
+            verificationCommentRole: verificationMap.get(item.rental_id)?.commentRole ?? null,
           }));
         } catch (verErr) {
           console.warn("[rentals-dashboard] verification enrich failed (non-fatal):", verErr);

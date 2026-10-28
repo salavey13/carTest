@@ -368,7 +368,8 @@ describe("iter20 · source guards", () => {
     // iter52: users map is shared between subrenter labels and «Выдал»/«Принял»
     expect(src).toContain("subrenterCsvLabel(userById.get(subrenterId)");
     // rental rows carry the rental id in the hidden column
-    expect(src).toMatch(/notesStr, subrenterStr, photosStr, r\.rental_id \|\| ""/);
+    // (task156: the notes cell now joins the verification comment first)
+    expect(src).toMatch(/notesCell, subrenterStr, photosStr, r\.rental_id \|\| ""/);
   });
 
   it("ExportCsvModal hides the id column, supports tap-through and photo glyph", () => {

@@ -44,7 +44,7 @@ const QUEST_STOPS: Array<{
     icon: "🏍️",
     title: "Витрина экипажа",
     page: "/franchize/vip-bike",
-    pitch: "Свой каталог со корзиной: гость выбирает байк и даты сам, бот оформляет договор и напоминания.",
+    pitch: "Свой каталог с корзиной: гость выбирает байк и даты сам, бот оформляет договор и напоминания.",
   },
   {
     n: 3,
@@ -52,7 +52,7 @@ const QUEST_STOPS: Array<{
     icon: "🛰",
     title: "Карта сети",
     page: "/franchize/discovery",
-    pitch: "Все экипажи проекта — круги, размер которых это люди. Видно, какой мир вы с Ильёй строите.",
+    pitch: "Все экипажи проекта — круги, и размер круга — это его люди. Видно, какой мир вы с Ильёй строите.",
   },
   {
     n: 4,
@@ -111,7 +111,17 @@ export default function RomanQuestOverviewPage() {
       </main>
     );
   }
-  if (gate === "hidden") return null;
+  if (gate === "hidden") {
+    // task156: hidden is no longer a BLANK page (felt broken) — a quiet
+    // neutral screen with just the wordmark, zero quest content leaked.
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[#0c0b09] text-stone-700">
+        <div className="font-serif text-2xl font-bold tracking-[0.3em]">
+          VIP<span className="text-amber-400/40">BIKE</span>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0c0b09] text-amber-50">
@@ -230,7 +240,7 @@ export default function RomanQuestOverviewPage() {
               </h2>
               <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-stone-400">
                 {questDone
-                  ? "Все семь следов собраны. Осталось нажать одну кнопку."
+                  ? "Все семь следов собраны — подарок твой. Заходи."
                   : `Собери все ${ROMAN_QUEST_STOPS} следов — и он откроется.`}
               </p>
             </button>

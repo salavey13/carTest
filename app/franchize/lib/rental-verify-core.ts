@@ -1175,6 +1175,42 @@ export function acceptOpenProposal(
   return { state: pushRound({ ...nego, open: null, agreed: accepted }, round), ok: true };
 }
 
+// ── task156: the standing negotiation COMMENT, for web surfaces ─────────────
+// Boss's case: the owner disputed + typed «Где наличка ???» to the bot — the
+// bot echoed it in the editor, the text landed in negotiation.draft.comment
+// … and nowhere else. The web table (Заметки / Верификация), the drawer card
+// and the list chips all read the VERIFICATION BRIEF, which never carried the
+// comment. This helper picks the most authoritative standing comment:
+//   1. open.comment        — a SENT proposal (what the other party must answer)
+//   2. draft.comment       — typed in the editor, not sent yet (the live case)
+//   3. last round with one — accept/decline/withdraw/counter history
+export type NegotiationCommentSource = "open" | "draft" | "round";
+
+export interface StandingNegotiationComment {
+  text: string;
+  role: "operator" | "owner" | "admin";
+  where: NegotiationCommentSource;
+}
+
+export function latestNegotiationComment(
+  nego: NegotiationState | null | undefined,
+): StandingNegotiationComment | null {
+  if (!nego || typeof nego !== "object") return null;
+  const clean = (v: unknown): string =>
+    typeof v === "string" && v.trim().length > 0 ? v.trim() : "";
+  const open = clean(nego.open?.comment);
+  if (open && nego.open) return { text: open, role: nego.open.role, where: "open" };
+  const draft = clean(nego.draft?.comment);
+  if (draft && nego.draft) return { text: draft, role: nego.draft.role, where: "draft" };
+  const rounds = Array.isArray(nego.rounds) ? nego.rounds : [];
+  for (let i = rounds.length - 1; i >= 0; i -= 1) {
+    const r = rounds[i];
+    const text = clean(r?.comment);
+    if (text) return { text, role: r.role, where: "round" };
+  }
+  return null;
+}
+
 /** The other party declines → back to a plain disputed row (manual talk). */
 export function declineOpenProposal(
   nego: NegotiationState,
@@ -1375,6 +1411,11 @@ export interface VerificationBrief {
   audit?: { grade?: string; notes?: string[] } | null;
   /** Task 126: frozen commission numbers — the «Сверка комиссии» card data. */
   commission?: VerificationCommissionBrief | null;
+  /** task156: the standing negotiation comment (sent proposal / editor draft /
+   *  last round) — surfaced in the table sheet, drawer card and list chips. */
+  comment?: string | null;
+  /** task156: who wrote the standing comment (for the «✍️ комментарий …» label). */
+  commentRole?: "operator" | "owner" | "admin" | null;
 }
 
 /**

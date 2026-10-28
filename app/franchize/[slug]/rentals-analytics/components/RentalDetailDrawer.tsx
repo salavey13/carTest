@@ -442,6 +442,8 @@ export function RentalDetailDrawer({
           agreedSplit={rental.verificationAgreedSplit}
           proposalOpen={rental.verificationProposalOpen}
           audit={rental.verificationAudit}
+          comment={rental.verificationComment}
+          commentRole={rental.verificationCommentRole}
           canVerify={canVerify}
           passwordAuthOwnerId={passwordAuthOwnerId}
           onChanged={onChanged}

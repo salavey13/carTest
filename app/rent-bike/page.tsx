@@ -401,7 +401,7 @@ export default function RentBikePage() {
             live rider map (feature pages per boss); hidden corner cake. */}
         <RomanQuestCake
           stop={5}
-          riddle="Гараж — это железо. А теперь живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас, — и держи следующий след."
+          riddle="Гараж — это железо. А теперь — живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас, — вот и твой следующий след."
           nextHref="/franchize/vip-bike/map-riders"
           nextLabel="Открыть карту райдеров"
         />

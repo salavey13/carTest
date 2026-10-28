@@ -53,6 +53,13 @@ import {
 
 // ── Pure helpers (exported for tests) ───────────────────────────────────────
 
+/** task156 — human label for the comment author (ru, genitive-ish). */
+export const COMMENT_ROLE_RU: Record<string, string> = {
+  operator: "оператора",
+  owner: "владельца",
+  admin: "админа экипажа",
+};
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 interface CommissionVerificationCardProps {
@@ -68,6 +75,11 @@ interface CommissionVerificationCardProps {
   proposalOpen?: boolean;
   /** Task 114 audit verdict — WHY the numbers deserve a look. */
   audit?: { grade?: string; notes?: string[] } | null;
+  /** task156: the standing negotiation comment (bot «комментарий: …») —
+   *  shown as its own block so the dispute voice is visible on the web. */
+  comment?: string | null;
+  /** task156: who wrote the comment (operator / owner / admin). */
+  commentRole?: "operator" | "owner" | "admin" | null;
   /** Owner-tier gate for the manual «✓ подтвердить» button. */
   canVerify?: boolean;
   /** task151: password-session owner id (PC viewer, /analytics_pass flow) —
@@ -88,6 +100,8 @@ export function CommissionVerificationCard({
   agreedSplit,
   proposalOpen,
   audit,
+  comment,
+  commentRole,
   canVerify = false,
   passwordAuthOwnerId = null,
   onChanged,
@@ -271,6 +285,27 @@ export function CommissionVerificationCard({
             ? "Сверки ещё нет. Заведите её — обе стороны получат полный расчёт комиссии с кнопками ✅/⚠️ в Telegram."
             : "Сверка появится после закрытия аренды."}
         </p>
+      )}
+
+      {/* task156 — the negotiation voice: the standing comment from the
+          сверка DM editor (sent proposal / typed draft / last round). Hidden
+          on verified rows — there the dispute is settled and the agreed
+          numbers already tell the story. */}
+      {comment && cardStatus !== "verified" && (
+        <div
+          className="mx-3 mt-2.5 rounded-xl border px-2.5 py-2"
+          style={{
+            borderColor: "#f59e0b55",
+            backgroundColor: "#f59e0b0d",
+          }}
+        >
+          <p className="text-[11px] font-bold" style={{ color: "#f59e0b" }}>
+            ✍️ комментарий {COMMENT_ROLE_RU[commentRole ?? ""] ?? "участника сверки"}:
+          </p>
+          <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-snug" style={{ color: T.text }}>
+            {comment}
+          </p>
+        </div>
       )}
 
       {/* Audit verdict — the WHY, never hidden behind a hover */}

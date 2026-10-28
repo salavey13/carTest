@@ -72,6 +72,12 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
             : ver === "pending"
               ? { color: "#f59e0b", label: `${auditBadge}⏳ сверка` }
               : null;
+  // task156: the standing negotiation comment rides the chip as a tooltip —
+  // a scanned list already shows WHAT the dispute is about without opening.
+  const verCommentTitle =
+    ver && ver !== "verified" && rental.verificationComment
+      ? `✍️ ${rental.verificationComment}`
+      : undefined;
 
   const startDate = rental.agreed_start_date || rental.requested_start_date;
   const endDate = rental.agreed_end_date || rental.requested_end_date;
@@ -84,7 +90,7 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
       whileHover={{ y: -1 }}
       transition={{ type: "spring", damping: 24, stiffness: 320 }}
       aria-pressed={selected}
-      aria-label={`Аренда: ${bikeTitle}, ${renterName}, ${statusMeta.label}${verMeta ? `, ${verMeta.label}` : ""}`}
+      aria-label={`Аренда: ${bikeTitle}, ${renterName}, ${statusMeta.label}${verMeta ? `, ${verMeta.label}` : ""}${verCommentTitle ? `, ${verCommentTitle}` : ""}`}
       className="relative w-full overflow-hidden rounded-2xl border p-3 pl-4 text-left transition focus:outline-none focus-visible:ring-2 md:p-4 md:pl-5"
       style={{
         borderColor: selected
@@ -188,6 +194,7 @@ export function AnalyticsRentalCard({ rental, selected, onSelect, T }: Analytics
                 backgroundColor: `${verMeta.color}15`,
                 color: verMeta.color,
               }}
+              title={verCommentTitle}
             >
               {verMeta.label}
             </span>

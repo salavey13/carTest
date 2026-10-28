@@ -162,6 +162,9 @@ function toAnalyticsRental(item: RentalDashboardItem): AnalyticsRentalRow {
     // Task 126: frozen commission numbers — the drawer's «Сверка комиссии» card.
     verificationCommission: item.verificationCommission ?? null,
     verificationAgreedSplit: item.verificationAgreedSplit ?? null,
+    // task156: the standing negotiation comment — drawer card + chip tooltip.
+    verificationComment: item.verificationComment ?? null,
+    verificationCommentRole: item.verificationCommentRole ?? null,
   };
 }
 

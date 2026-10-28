@@ -84,6 +84,11 @@ export interface AnalyticsRentalRow {
   verificationCommission?: VerificationCommissionBrief | null;
   /** Task 126: negotiated split after an accepted proposal (сверка card). */
   verificationAgreedSplit?: SplitParts | null;
+  /** task156: the standing negotiation comment (bot «комментарий: …») —
+   *  drawer сверка card + list chip tooltip. */
+  verificationComment?: string | null;
+  /** task156: who wrote it (operator / owner / admin). */
+  verificationCommentRole?: "operator" | "owner" | "admin" | null;
 }
 
 export interface AnalyticsSaleRow {

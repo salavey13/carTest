@@ -867,6 +867,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               agreedSplit={verBrief?.agreedSplit ?? null}
               proposalOpen={verBrief?.proposalOpen === true}
               audit={verBrief?.audit ?? null}
+              comment={verBrief?.comment ?? null}
+              commentRole={verBrief?.commentRole ?? null}
               canVerify={verAccess?.isOwner === true}
               T={{
                 bg: "transparent",
