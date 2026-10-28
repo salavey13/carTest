@@ -80,6 +80,7 @@ import {
   formatRubVerify,
   formatVerificationSummary,
   labelFromUsersMap,
+  latestNegotiationComment,
   nextUpLine,
   otherPartyChatId,
   parseNegotiation,
