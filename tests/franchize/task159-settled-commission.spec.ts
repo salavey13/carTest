@@ -160,7 +160,10 @@ describe("task159 · money surfaces use the settlement", () => {
     expect(src("app/franchize/lib/analytics-owner-cookie.ts")).toContain("timingSafeEqual");
     const dash = src("app/franchize/server-actions/rentals-dashboard.ts");
     expect(dash).toContain("buildAnalyticsOwnerCookieValue");
-    expect(dash).toContain("ANALYTICS_OWNER_COOKIE");
+    // TASK161 re-baseline: the cookie name is now PER-CREW (a second crew's
+    // password used to overwrite the first session — the PC сверка card for
+    // the earlier crew silently vanished mid-day).
+    expect(dash).toContain("analyticsOwnerCookieName(String(result.slug))");
     const page = src("app/franchize/[slug]/rental/[id]/page.tsx");
     expect(page).toContain("resolveAnalyticsPasswordOwnerForSlug(resolvedSlug)");
     expect(page).toContain("passwordAuthOwnerId={passwordAuthOwnerId}");

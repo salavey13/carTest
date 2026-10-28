@@ -1849,11 +1849,13 @@ export async function validateAnalyticsPassword(input: {
     if (result.slug && result.crew_owner_id) {
       try {
         const { cookies } = await import("next/headers");
-        const { buildAnalyticsOwnerCookieValue, ANALYTICS_OWNER_COOKIE } = await import(
+        const { buildAnalyticsOwnerCookieValue, analyticsOwnerCookieName } = await import(
           "@/app/franchize/lib/analytics-owner-cookie"
         );
         const cookie = buildAnalyticsOwnerCookieValue(String(result.crew_owner_id), String(result.slug));
-        (await cookies()).set(ANALYTICS_OWNER_COOKIE, cookie.value, {
+        // TASK161: имя cookie пер-экипаж — параллельные сессии нескольких
+        // экипажей не затирают друг друга (slug зашит и в имя, и в подпись).
+        (await cookies()).set(analyticsOwnerCookieName(String(result.slug)), cookie.value, {
           httpOnly: true,
           sameSite: "lax",
           secure: process.env.NODE_ENV === "production",

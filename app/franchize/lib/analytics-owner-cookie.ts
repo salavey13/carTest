@@ -23,6 +23,17 @@ export const ANALYTICS_OWNER_COOKIE = "vb_analytics_owner";
 /** 30 дней — комфорт для ПК владельца; пароли аналитики истекают сами. */
 const COOKIE_TTL_MS = 30 * 24 * 3600 * 1000;
 
+/**
+ * TASK161 — имя cookie ПЕР-ЭКИПАЖ. Общее имя перезаписывалось при валидации
+ * пароля второго экипажа, и карточка сверки на ПК у первого экипажа молча
+ * пропадала (slug-mismatch) — ровно в день сплошной сверки. Владельцы с
+ * несколькими экипажами теперь держат параллельные сессии.
+ */
+export function analyticsOwnerCookieName(slug: string): string {
+  const safe = String(slug || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+  return `${ANALYTICS_OWNER_COOKIE}_${safe || "x"}`;
+}
+
 function hmacSecret(): string {
   return process.env.SUPABASE_SERVICE_ROLE_KEY || "vb-analytics-owner-fallback";
 }
@@ -83,7 +94,7 @@ export async function resolveAnalyticsPasswordOwnerForSlug(
   slug: string,
 ): Promise<string | null> {
   try {
-    const raw = (await cookies()).get(ANALYTICS_OWNER_COOKIE)?.value;
+    const raw = (await cookies()).get(analyticsOwnerCookieName(slug))?.value;
     const parsed = verifyAnalyticsOwnerCookieValue(raw, slug);
     if (!parsed) return null;
     const { data: crew } = await supabaseAdmin
