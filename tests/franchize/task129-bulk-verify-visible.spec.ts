@@ -75,10 +75,12 @@ describe("task129 · bulk «подтвердить все видимые»", () 
     expect(bulkFn).toContain("setJustVerified((prev) => new Set(prev).add(rentalId));");
     // exactly ONE canonical refetch for the whole batch (not per row) —
     // task152: it rides expectVerified for the honest stale-read warning
+    // (task157 re-baseline: the composite return { stuckVer, operatorStuck })
     expect(bulkFn.match(/loadTable\(/g)?.length).toBe(1);
     expect(bulkFn).toContain(
-      "const stuck = await loadTable({ silent: true, expectVerified: new Set(succeededIds) });",
+      "const result = await loadTable({ silent: true, expectVerified: new Set(succeededIds) });",
     );
+    expect(bulkFn).toContain("if (result?.stuckVer && result.stuckVer.size > 0) {");
   });
 
   it("aggregated summary toast: full success / zero / partial with first error", () => {

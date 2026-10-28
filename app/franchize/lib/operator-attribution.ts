@@ -8,6 +8,14 @@
 // 0 even on days they personally handed out every bike.
 //
 // ATTRIBUTION CHAIN (most authoritative first, per rental):
+//   0. metadata.salary_operator_override.user_id — MANUAL REASSIGNMENT
+//      (task157, boss 2026-10-28: «choosing a different operator in the
+//      tableview dropdown should reassign it in the rental — commissions go
+//      to the new operator, proper full reassignment»). Written ONLY by the
+//      owner-tier reassignRentalOperatorAction; carries by/at for the audit.
+//      Sits ABOVE every automatic source so a reassignment survives the
+//      original evidence: the handout/return metadata still says who
+//      physically worked the rental — the override says who gets PAID for it.
 //   1. created_by_operator_chat_id  — the operator who ran /doc (doc_command,
 //      doc_command_recovery, claude_bot sources).
 //   2. metadata.pickup_freeze.frozen_by — the operator who conducted the
@@ -37,6 +45,7 @@ export interface ShiftLike {
 }
 
 export type AttributionSource =
+  | "override"
   | "doc_command"
   | "handout"
   | "return"
@@ -99,11 +108,31 @@ function stringFromMetadata(
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
 }
 
+/**
+ * Task157 — the manual salary-operator reassignment stamp the tableview
+ * dropdown writes (metadata.salary_operator_override). Returns the NEW
+ * operator's users.user_id, or null when the rental carries no override.
+ * Tolerates garbage (wrong types / empty strings) the same way every other
+ * metadata reader here does.
+ */
+export function readSalaryOperatorOverride(
+  metadata: Record<string, unknown> | null | undefined,
+): string | null {
+  const raw = metadata?.["salary_operator_override"];
+  if (!raw || typeof raw !== "object") return null;
+  return stringFromMetadata(raw as Record<string, unknown>, "user_id");
+}
+
 /** Full rental attribution chain — see the module docblock. */
 export function resolveRentalOperator(
   rental: RentalAttributionInput,
   shifts: ShiftLike[],
 ): Attribution {
+  // 0. Manual reassignment — the owner's explicit «this rental's ЗП goes to
+  //    THAT operator» beats every automatic source (see the docblock).
+  const overrideId = readSalaryOperatorOverride(rental.metadata ?? null);
+  if (overrideId) return { operatorId: overrideId, source: "override" };
+
   const direct =
     typeof rental.created_by_operator_chat_id === "string" &&
     rental.created_by_operator_chat_id.trim().length > 0
@@ -164,6 +193,7 @@ export function resolveSaleOperator(
 
 /** Human label for the attribution source (breakdown transparency). */
 export const ATTRIBUTION_SOURCE_LABELS: Record<AttributionSource, string> = {
+  override: "переназначено",
   doc_command: "/doc",
   handout: "выдача",
   return: "возврат",

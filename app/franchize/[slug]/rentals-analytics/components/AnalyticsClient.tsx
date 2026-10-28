@@ -571,6 +571,9 @@ export function AnalyticsClient({
           T={T}
           isDark={isDark}
           canVerify={viewerIsOwnerTier}
+          // Task157 — the «Оператор (ЗП)» reassignment dropdown rides the same
+          // owner-tier gate as the verify ✓ (server re-gates both paths).
+          canReassign={viewerIsOwnerTier}
           passwordAuthOwnerId={passwordAuthOwnerId}
         />
       )}

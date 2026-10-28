@@ -100,7 +100,10 @@ import { toast } from "sonner";
 // table view, without opening the rental — boss request 2026-10-27).
 import {
   adminVerifyRentalAction,
+  getSalaryOperatorsAction,
+  reassignRentalOperatorAction,
   resendVerificationDmsAction,
+  type SalaryOperatorOption,
 } from "@/app/franchize/server-actions/rental-verify-actions";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { toNumber } from "./lib/csv-money";
@@ -199,6 +202,10 @@ interface ExportCsvModalProps {
    *  the Telegram actor cookie is absent (server re-gates against
    *  crews.owner_id). */
   passwordAuthOwnerId?: string | null;
+  /** Task157 — viewer passed the owner-tier gate: the «Оператор (ЗП)» cell
+   *  (АРЕНДЫ block) renders a reassignment dropdown. The server action
+   *  re-gates, this only decides whether the dropdown renders. */
+  canReassign?: boolean;
 }
 
 function firstDayOfMonthIso(): string {
@@ -438,6 +445,30 @@ function verLabelForId(rows: string[][], rentalId: string): string {
   }
   return "";
 }
+/**
+ * Task157 — read the «Оператор (ЗП)» label for one rental uuid from a freshly
+ * parsed CSV (same walk as verLabelForId: header row containing the column,
+ * data rows until the next ALL-CAPS block banner). Empty string = not found.
+ */
+function opLabelForId(rows: string[][], rentalId: string): string {
+  if (!rentalId) return "";
+  const hi = rows.findIndex((r) => r.some((c) => (c || "").trim() === "Оператор (ЗП)"));
+  if (hi === -1) return "";
+  const header = rows[hi];
+  const opIdx = header.findIndex((c) => (c || "").trim() === "Оператор (ЗП)");
+  const idIdx = header.findIndex((c) => (c || "").trim() === "ID");
+  if (opIdx === -1 || idIdx === -1) return "";
+  for (let i = hi + 1; i < rows.length; i += 1) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+    const first = (r[0] || "").trim();
+    if (!first) continue;
+    if (first === first.toUpperCase() && first.length < 12) break; // next block banner
+    if ((r[idIdx] || "").trim() === rentalId) return (r[opIdx] || "").trim();
+  }
+  return "";
+}
+
 const VER_TONE_FG: Record<Exclude<VerTone, null>, string> = {
   verified: "#16a34a",
   disputed: "#dc2626",
@@ -483,6 +514,7 @@ export function ExportCsvModal({
   isDark,
   canVerify = false,
   passwordAuthOwnerId = null,
+  canReassign = false,
 }: ExportCsvModalProps) {
   const router = useRouter();
   // Task 127 — px of the TG fullscreen native-buttons zone (exact measurement
@@ -519,6 +551,19 @@ export function ExportCsvModal({
   // alone leaves a one-tick window between the click and the re-render).
   const bulkRunRef = useRef(false);
 
+  // Task157 — operator reassignment from the «Оператор (ЗП)» cell:
+  //   operators      — the crew roster the dropdown offers (owner-tier read);
+  //   reassigningIds — rows with an in-flight reassignment (spinner);
+  //   justReassigned — rentalId → expected NEW label, bridging the optimistic
+  //                    display until the silent refetch confirms it (same
+  //                    honesty contract as justVerified — a fresh CSV that
+  //                    does not reflect the write yet must NOT read as a
+  //                    silent revert).
+  const [operators, setOperators] = useState<SalaryOperatorOption[]>([]);
+  const [operatorsLoading, setOperatorsLoading] = useState(false);
+  const [reassigningIds, setReassigningIds] = useState<Set<string>>(() => new Set());
+  const [justReassigned, setJustReassigned] = useState<Map<string, string>>(() => new Map());
+
   // Task 146 — collapsible controls (boss: "keep showing date picker only in
   // collapsed-controls mode"). false folds the header to one compact row:
   // date pickers + icon actions stay, the totals tiles / operator split /
@@ -540,7 +585,11 @@ export function ExportCsvModal({
   const loadTable = useCallback(async (opts?: {
     silent?: boolean;
     expectVerified?: Set<string>;
-  }): Promise<Set<string> | null> => {
+    /** Task157 — after the refetch, the «Оператор (ЗП)» cell of THIS rental
+     *  must read `label`; a stale read keeps the optimistic override on
+     *  screen (justReassigned) and reports the mismatch to the caller. */
+    expectOperator?: { rentalId: string; label: string };
+  }): Promise<{ stuckVer: Set<string> | null; operatorStuck: boolean } | null> => {
     if (!fetchCsvText || !from || !to || from > to) return null;
     // Task 128 — silent mode: a quick-verify just landed server-side; swap in
     // the regenerated CSV WITHOUT the loading flash (rows stay on screen).
@@ -574,10 +623,37 @@ export function ExportCsvModal({
           for (const id of stuck) next.add(id);
           return next;
         });
-        return stuck;
+        // Task157 — a batch may carry BOTH expectations (verify + reassign are
+        // independent cells); handle the operator one before returning.
+        const opExp = opts?.expectOperator;
+        let operatorStuck = false;
+        if (opExp) {
+          const fresh = opLabelForId(parsed, opExp.rentalId);
+          operatorStuck = !fresh || fresh !== opExp.label;
+          setJustReassigned((prev) => {
+            const next = new Map(prev);
+            if (operatorStuck) next.set(opExp.rentalId, opExp.label);
+            else next.delete(opExp.rentalId);
+            return next;
+          });
+        }
+        return { stuckVer: stuck, operatorStuck };
+      }
+      // Task157 — operator-only expectation (reassignment without a verify).
+      const opExp = opts?.expectOperator;
+      if (opExp) {
+        const fresh = opLabelForId(parsed, opExp.rentalId);
+        const operatorStuck = !fresh || fresh !== opExp.label;
+        setJustReassigned((prev) => {
+          const next = new Map(prev);
+          if (operatorStuck) next.set(opExp.rentalId, opExp.label);
+          else next.delete(opExp.rentalId);
+          return next;
+        });
+        return { stuckVer: new Set<string>(), operatorStuck };
       }
       setJustVerified((prev) => (prev.size > 0 ? new Set<string>() : prev));
-      return new Set<string>();
+      return { stuckVer: new Set<string>(), operatorStuck: false };
     } catch (e) {
       // FIX (iter6): show the ACTUAL error next to the generic message so the
       // operator can tell a 500 from an offline device from a bad date range.
@@ -635,8 +711,8 @@ export function ExportCsvModal({
         if (res.success) {
           toast.success("Сверка подтверждена ✅");
           setJustVerified((prev) => new Set(prev).add(rentalId));
-          const stuck = await loadTable({ silent: true, expectVerified: new Set([rentalId]) });
-          if (stuck && stuck.has(rentalId)) {
+          const result = await loadTable({ silent: true, expectVerified: new Set([rentalId]) });
+          if (result?.stuckVer?.has(rentalId)) {
             toast.warning(
               `Подтверждение принято${rowLabel ? ` (${rowLabel})` : ""}, но таблица пока показывает старый статус — обновите таблицу ещё раз через пару секунд.`,
               { duration: 7000 },
@@ -723,6 +799,103 @@ export function ExportCsvModal({
   // ✓ when the password session resolved to the crew owner (task151) — the
   // server re-gates the identity anyway, this is presentation only.
   const canQuickVerify = canVerify && variant === "rentals" && !!slug;
+  // Task157 — the reassignment dropdown rides the same gate (owner tier,
+  // rentals sheet, real slug); the roster read + the write re-gate server-side.
+  const canReassignRows = canReassign && variant === "rentals" && !!slug;
+
+  // Task157 — the crew roster behind the dropdown. Fetched ONCE per modal
+  // open (owner-tier read; the roster changes rarely and every open re-reads
+  // it cheap). Password sessions pass the owner id — the action re-gates it.
+  useEffect(() => {
+    if (!isOpen || !canReassignRows) return;
+    let cancelled = false;
+    setOperatorsLoading(true);
+    getSalaryOperatorsAction({ slug: slug!, ...verifyActorParams })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.data) setOperators(res.data);
+        else {
+          // No roster = no dropdown (the cell falls back to plain text); the
+          // reason lands in the console, not as a toast — the table itself
+          // still works and the toast would spam every open for non-owners.
+          console.warn("[ExportCsvModal] roster read failed:", res.error);
+          setOperators([]);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.warn("[ExportCsvModal] roster read exception:", e);
+          setOperators([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOperatorsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, canReassignRows, slug, passwordAuthOwnerId]);
+
+  // Task157 — reassign the salary operator of ONE rental straight from the
+  // «Оператор (ЗП)» cell. Same honesty contract as the verify family: the
+  // confirm dialog shows WHICH row (дата · байк · цена) and WHICH change
+  // (old label → new label) is about to land; after the write ONE silent
+  // refetch with expectOperator — a fresh CSV that still shows the old
+  // operator keeps the optimistic label on screen and fires a warning
+  // instead of the silent revert illusion.
+  const handleReassign = useCallback(
+    async (rentalId: string, nextUserId: string, ctx?: QuickRowCtx) => {
+      if (!slug || reassigningIds.has(rentalId)) return;
+      const next = operators.find((o) => o.userId === nextUserId);
+      if (!next) return;
+      const rowLabel = quickRowLabel(ctx);
+      const ok = window.confirm(
+        "Переназначить оператора (ЗП) по этой аренде?\n\n" +
+          (rowLabel ? `${rowLabel}\n\n` : "") +
+          `Комиссии уйдут: ${next.label}. Счётчики и сводка по операторам пересчитаются автоматически.`,
+      );
+      if (!ok) return;
+      setReassigningIds((prev) => new Set(prev).add(rentalId));
+      try {
+        const res = await withServerTimeout(
+          reassignRentalOperatorAction({ slug, rentalId, operatorUserId: nextUserId, ...verifyActorParams }),
+        );
+        if (res.success && res.data) {
+          toast.success(
+            `Оператор (ЗП): ${res.data.operatorLabel} ✅${res.data.verificationNote ? ` ${res.data.verificationNote}` : ""}`,
+            { duration: res.data.verificationNote ? 8000 : 5000 },
+          );
+          setJustReassigned((prev) => new Map(prev).set(rentalId, res.data!.operatorLabel));
+          const result = await loadTable({
+            silent: true,
+            expectOperator: { rentalId, label: res.data.operatorLabel },
+          });
+          if (result?.operatorStuck) {
+            toast.warning(
+              `Переназначение принято${rowLabel ? ` (${rowLabel})` : ""}, но таблица пока показывает старого оператора — обновите таблицу ещё раз через пару секунд.`,
+              { duration: 7000 },
+            );
+          }
+        } else {
+          toast.error(res.error || "Не удалось переназначить оператора");
+        }
+      } catch (err) {
+        toast.error(
+          err instanceof ServerActionTimeoutError
+            ? err.message
+            : "Не удалось переназначить оператора",
+        );
+      } finally {
+        setReassigningIds((prev) => {
+          const nextIds = new Set(prev);
+          nextIds.delete(rentalId);
+          return nextIds;
+        });
+      }
+    },
+    [slug, reassigningIds, operators, loadTable, verifyActorParams],
+  );
 
   // Task 129 — «подтвердить все видимые»: ONE confirm, N rows. Available only
   // when BOTH scoping filters are on — the operator pill narrows the blast
@@ -803,10 +976,10 @@ export function ExportCsvModal({
     // instead of silently flipping back to «ожидает».
     bulkRunRef.current = false;
     setBulkVerify(null);
-    const stuck = await loadTable({ silent: true, expectVerified: new Set(succeededIds) });
-    if (stuck && stuck.size > 0) {
+    const result = await loadTable({ silent: true, expectVerified: new Set(succeededIds) });
+    if (result?.stuckVer && result.stuckVer.size > 0) {
       toast.warning(
-        `Подтверждения приняты, но таблица пока показывает старые статусы (${stuck.size}) — обновите таблицу ещё раз через пару секунд.`,
+        `Подтверждения приняты, но таблица пока показывает старые статусы (${result.stuckVer.size}) — обновите таблицу ещё раз через пару секунд.`,
         { duration: 7000 },
       );
     }
@@ -825,6 +998,11 @@ export function ExportCsvModal({
       setOpFilter(null);
       setVerifyingIds(new Set());
       setJustVerified(new Set());
+      // Task157 — reassignment bookkeeping resets per open; the roster is
+      // re-read by its own isOpen effect (cheap owner-tier query).
+      setReassigningIds(new Set());
+      setJustReassigned(new Map());
+      setOperators([]);
       // Task 129 review fix — a batch still running from BEFORE the close keeps
       // going server-side (idempotent per row); a fresh open must allow a new
       // batch instead of silently no-op-ing on the stale running flag.
@@ -1824,6 +2002,13 @@ export function ExportCsvModal({
                     onQuickVerify={canQuickVerify ? handleQuickVerify : undefined}
                     sendingIds={sendingIds}
                     onSendRequest={canQuickVerify ? handleSendRequest : undefined}
+                    // Task157 — the «Оператор (ЗП)» dropdown (owner tier, one
+                    // roster read per open; the select lives in the АРЕНДЫ rows).
+                    canReassignRows={canReassignRows}
+                    operators={operators}
+                    reassigningIds={reassigningIds}
+                    justReassigned={justReassigned}
+                    onReassign={canReassignRows ? handleReassign : undefined}
                   />
                 ))}
               </div>
@@ -2067,6 +2252,11 @@ function SectionTable({
   onQuickVerify,
   sendingIds,
   onSendRequest,
+  canReassignRows = false,
+  operators = [],
+  reassigningIds,
+  justReassigned,
+  onReassign,
 }: {
   section: ParsedCsvSection;
   T: ThemeTokens;
@@ -2086,6 +2276,17 @@ function SectionTable({
    *  to operator + owner with the ✅/⚠️ keyboard — each confirms SEPARATELY,
    *  right from the table view without opening the rental. */
   onSendRequest?: (rentalId: string, ctx?: QuickRowCtx) => Promise<void> | void;
+  /** Task157 — owner-tier flag: the «Оператор (ЗП)» cell renders the
+   *  reassignment dropdown (АРЕНДЫ block only). */
+  canReassignRows?: boolean;
+  /** Task157 — the crew roster the dropdown offers ({@username → full_name}). */
+  operators?: SalaryOperatorOption[];
+  /** Task157 — ids with an in-flight reassignment (the select is disabled). */
+  reassigningIds?: Set<string>;
+  /** Task157 — rentalId → expected NEW label (optimistic display until the
+   *  silent refetch confirms the write, same contract as justVerified). */
+  justReassigned?: Map<string, string>;
+  onReassign?: (rentalId: string, operatorUserId: string, ctx?: QuickRowCtx) => Promise<void> | void;
 }) {
   const cfg = SECTION_COLS[section.key];
   const accent = SECTION_ACCENT[section.key];
@@ -2305,11 +2506,27 @@ function SectionTable({
             const showSendRequest =
               !!onSendRequest && !!rowRentalId && section.key === "rentals" && verTone !== "verified";
             // Task 127 — operator identity for this row (when the split is on).
-            const opLabel =
-              showOpMarkers && cfg.opCol != null ? (r[cfg.opCol] || "").trim() : "";
+            // Task157 — the dropdown needs the RAW cell label UNGATED (it must
+            // render even with a single operator in the period, where the
+            // marker icons stay off), plus the optimistic override label:
+            // after a reassignment the cell (icon/color/text) must read the
+            // NEW operator immediately, even when the silent refetch brought
+            // a stale CSV.
+            const rawOpLabel = cfg.opCol != null ? (r[cfg.opCol] || "").trim() : "";
+            const optimisticOpLabel = rowRentalId ? justReassigned?.get(rowRentalId) : undefined;
+            const csvOpLabel = showOpMarkers ? rawOpLabel : "";
+            const opLabel = optimisticOpLabel ?? csvOpLabel;
             const opMeta = opLabel
               ? { icon: operatorIconOf(opLabel), color: operatorColorOf(opLabel) }
               : null;
+            // Task157 — dropdown affordance per row (АРЕНДЫ + owner tier +
+            // a rental uuid; total/banner rows never carry a uuid). The select
+            // renders only when a roster exists — otherwise the cell degrades
+            // to the plain colored label.
+            const reassignPending = !!(rowRentalId && reassigningIds?.has(rowRentalId));
+            const showOpSelect =
+              canReassignRows && !!onReassign && !!rowRentalId &&
+              section.key === "rentals" && cfg.opCol != null && operators.length > 0;
             const rowBg = verTone
               ? verToneBg(verTone, T.bgCard)
               : isGrandTotal
@@ -2456,13 +2673,67 @@ function SectionTable({
                           <Camera className="h-3 w-3" aria-hidden />
                           {cell}
                         </span>
+                      ) : showOpSelect && dataIdx === cfg.opCol ? (
+                        // Task157 — reassignment dropdown in the «Оператор (ЗП)»
+                        // cell (boss: «choosing a different operator should
+                        // reassign it in the rental — commissions go to the new
+                        // operator»). The label match (cell text ↔ roster
+                        // label) is safe: the roster action builds labels with
+                        // the SAME compactUserLabel rule as the CSV builder.
+                        // stopPropagation on click AND change — the row itself
+                        // is a tap-through to the rental page.
+                        <span className="inline-flex items-center gap-1">
+                          <span aria-hidden>{operatorIconOf(optimisticOpLabel ?? rawOpLabel)}</span>
+                          <select
+                            value={
+                              operators.find(
+                                (o) => o.label === (optimisticOpLabel ?? rawOpLabel),
+                              )?.userId ?? ""
+                            }
+                            disabled={reassignPending}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const v = e.target.value;
+                              if (!v) return;
+                              const currentId = operators.find(
+                                (o) => o.label === (optimisticOpLabel ?? rawOpLabel),
+                              )?.userId;
+                              if (v === currentId) return;
+                              if (onReassign) void onReassign(rowRentalId, v, quickCtx);
+                            }}
+                            aria-label="Переназначить оператора (ЗП)"
+                            title="Переназначить оператора — комиссии по этой аренде уйдут выбранному оператору, счётчики пересчитаются"
+                            className="max-w-[11rem] cursor-pointer rounded-md border bg-transparent px-1 py-0.5 text-xs font-semibold transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
+                            style={{
+                              borderColor: `color-mix(in srgb, ${operatorColorOf(optimisticOpLabel ?? rawOpLabel)} 45%, transparent)`,
+                              color: operatorColorOf(optimisticOpLabel ?? rawOpLabel),
+                            }}
+                          >
+                            {!operators.some(
+                              (o) => o.label === (optimisticOpLabel ?? rawOpLabel),
+                            ) && (
+                              <option value="">{optimisticOpLabel ?? (rawOpLabel || "— не назначен —")}</option>
+                            )}
+                            {operators.map((o) => (
+                              <option key={o.userId} value={o.userId}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                          {reassignPending && (
+                            <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
+                          )}
+                        </span>
                       ) : opMeta && (di === 0 || dataIdx === cfg.opCol) ? (
                         // Task 127 — crew-member marker: stable emoji on the
                         // sticky date cell (always visible while scrolling)
                         // and next to the name in «Оператор (ЗП)».
+                        // Task157 — the opCol cell displays the OPTIMISTIC label
+                        // when one is pending (matches the dropdown above).
                         <span className="inline-flex items-center gap-1">
                           <span aria-hidden>{opMeta.icon}</span>
-                          {cell || "\u00A0"}
+                          {(dataIdx === cfg.opCol ? opLabel : cell) || "\u00A0"}
                         </span>
                       ) : (
                         cell || "\u00A0"

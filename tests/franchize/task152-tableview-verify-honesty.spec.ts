@@ -39,9 +39,11 @@ describe("task152 · tableview verify honesty + send-request", () => {
     // task 156 moved Марка to data col 7 (Способ оплаты/Имя/Телефон split)
     expect(modal).toContain("bike: (r[7] || \"\").trim(),");
     expect(modal).toContain("price: (r[3] || \"\").trim(),");
-    // and rendered into BOTH confirm dialogs before the OK
+    // and rendered into ALL confirm dialogs before the OK (task 152: quick-✓
+    // + 📨; task157 re-baseline: the «Оператор (ЗП)» reassignment dialog
+    // reuses the same WHICH-row pattern → 3)
     expect(modal).toContain("const rowLabel = quickRowLabel(ctx);");
-    expect(modal.match(/rowLabel \? `\$\{rowLabel\}\\n\\n` : ""/g)?.length).toBe(2);
+    expect(modal.match(/rowLabel \? `\$\{rowLabel\}\\n\\n` : ""/g)?.length).toBe(3);
   });
 
   it("post-refetch honesty: a fresh CSV that lacks «подтверждено» keeps the tint + warns", () => {

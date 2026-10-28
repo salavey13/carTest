@@ -111,8 +111,10 @@ describe("task128 · quick verify right in the table view", () => {
   it("uses the SAME owner-gated action + confirm pattern as the rental-page card", () => {
     // task152 — the modal now imports the verify action AND the resend action
     // (the per-row «выслать сверку» button) from the same owner-gated module.
+    // task157 re-baseline — the roster + reassign actions joined the import
+    // block (the «Оператор (ЗП)» dropdown), so the closing brace moved.
     expect(modal).toContain(
-      "adminVerifyRentalAction,\n  resendVerificationDmsAction,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
+      "adminVerifyRentalAction,\n  getSalaryOperatorsAction,\n  reassignRentalOperatorAction,\n  resendVerificationDmsAction,\n  type SalaryOperatorOption,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
     );
     expect(modal).toContain("adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });");
     expect(modal).toContain("window.confirm(");
@@ -124,9 +126,12 @@ describe("task128 · quick verify right in the table view", () => {
     // task152 — the silent refetch now rides expectVerified: when the fresh
     // CSV does not reflect the just-verified id yet, the tint is KEPT and an
     // honest warning fires (no more silent revert illusion).
+    // task157 re-baseline: loadTable returns { stuckVer, operatorStuck } —
+    // the composite carries the operator-reassignment expectation too.
     expect(modal).toContain(
-      "const stuck = await loadTable({ silent: true, expectVerified: new Set([rentalId]) });",
+      "const result = await loadTable({ silent: true, expectVerified: new Set([rentalId]) });",
     );
+    expect(modal).toContain("if (result?.stuckVer?.has(rentalId)) {");
     expect(modal).toContain("const silent = opts?.silent === true;");
     // silent mode skips the loading state entirely
     expect(modal).toMatch(/if \(!silent\) \{\s*setLoading\(true\);\s*setError\(null\);\s*\}/);

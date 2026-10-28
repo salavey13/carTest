@@ -813,3 +813,221 @@ export async function getClosureCommissionPreviewAction(params: {
     return errorResponse(handleError(err, "getClosureCommissionPreviewAction"));
   }
 }
+
+// ── Task157 — salary-operator reassignment from the analytics tableview ─────
+//
+// Boss (2026-10-28): «Оператор (ЗП) column — show a dropdown in the cells,
+// choosing a different operator should reassign it in the rental, commissions
+// go to the new operator, recalculate quick counters, proper full
+// reassignment» — and it must work in the analytics opened on PC WITH the
+// password (no TG cookie), like the verify family above.
+//
+// Mechanics: the override lands in rentals.metadata.salary_operator_override
+// and sits at the TOP of the attribution chain (lib/operator-attribution.ts,
+// source "override") — so EVERY consumer flips together with zero extra
+// plumbing: the tableview «Оператор (ЗП)» column + operator-split pills
+// (CSV builder), the member profile «Комиссии» math (computeCategoryBonuses
+// → salaries / team-earnings / my-work) and the verification snapshot
+// attribution (rental-verify.ts). The handout/return metadata keeps saying
+// who physically worked the rental — the override says who gets PAID.
+
+export interface SalaryOperatorOption {
+  /** users.user_id (the tg-id space every attribution source speaks). */
+  userId: string;
+  /** Display label — built with the SAME rule as the CSV builder's
+   *  compactUserLabel (@username → full_name → raw id), so the option the
+   *  user picks always matches the cell text they saw. */
+  label: string;
+}
+
+/** Owner-tier roster read for the tableview reassignment dropdown. */
+export async function getSalaryOperatorsAction(params: {
+  slug: string;
+  /** Password-auth path (PC viewer): owner id from validateAnalyticsPassword. */
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
+}): Promise<ActionResponse<SalaryOperatorOption[]>> {
+  try {
+    const actor = await resolveVerifyOwnerActor({
+      slug: params.slug,
+      actorUserId: params.actorUserId,
+      isPasswordAuth: params.isPasswordAuth,
+      ownerOnlyError: "Операторы для переназначения доступны только владельцу или администратору экипажа.",
+    });
+    if (!actor.ok) return { success: false, error: actor.error };
+
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", params.slug)
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
+
+    // Two flat queries (same shape as the CSV builder's lookup — no reliance
+    // on a crew_members→users FK hint): roster + display names.
+    const { data: members, error } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id")
+      .eq("crew_id", crew.id);
+    if (error) throw error;
+    const ids = Array.from(new Set((members || []).map((m: { user_id: string }) => m.user_id).filter(Boolean)));
+    if (ids.length === 0) return { success: true, data: [] };
+
+    const { data: users, error: usersError } = await supabaseAdmin
+      .from("users")
+      .select("user_id, full_name, username")
+      .in("user_id", ids);
+    if (usersError) throw usersError;
+    const byId = new Map<string, { full_name: string | null; username: string | null }>(
+      ((users || []) as Array<{ user_id: string; full_name: string | null; username: string | null }>).map((u) => [
+        u.user_id,
+        { full_name: u.full_name ?? null, username: u.username ?? null },
+      ]),
+    );
+
+    const options: SalaryOperatorOption[] = ids.map((userId) => {
+      const u = byId.get(userId);
+      const label = u ? (u.username ? `@${u.username}` : u.full_name || userId) : userId;
+      return { userId, label };
+    });
+    // Deterministic order — alphabetical by label, the way a picklist reads.
+    options.sort((a, b) => a.label.localeCompare(b.label, "ru"));
+    return { success: true, data: options };
+  } catch (err: any) {
+    logger.error("[rental-verify] getSalaryOperatorsAction exception:", err);
+    return errorResponse(handleError(err, "getSalaryOperatorsAction"));
+  }
+}
+
+export interface ReassignOperatorResult {
+  rentalId: string;
+  operatorUserId: string;
+  /** Server-resolved display label of the NEW operator (echoed to the client
+   *  so the optimistic cell + the post-refetch check use one source of truth). */
+  operatorLabel: string;
+  /** Human note about what happened to an existing verification row. */
+  verificationNote: string | null;
+}
+
+/**
+ * The write: stamps metadata.salary_operator_override and realigns an open
+ * verification row to the new operator. Owner-tier gated (both auth paths —
+ * the TG cookie and the PC password session), same resolveVerifyOwnerActor
+ * as the verify family.
+ */
+export async function reassignRentalOperatorAction(params: {
+  slug: string;
+  rentalId: string;
+  /** users.user_id of the NEW ЗП operator — must be a crew member. */
+  operatorUserId: string;
+  /** Password-auth path (PC viewer): owner id from validateAnalyticsPassword. */
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
+}): Promise<ActionResponse<ReassignOperatorResult>> {
+  try {
+    const actor = await resolveVerifyOwnerActor({
+      slug: params.slug,
+      actorUserId: params.actorUserId,
+      isPasswordAuth: params.isPasswordAuth,
+      ownerOnlyError: "Переназначать оператора может только владелец или администратор экипажа.",
+    });
+    if (!actor.ok) return { success: false, error: actor.error };
+    const actorChatId = String(actor.actorChatId || "");
+
+    const operatorUserId = String(params.operatorUserId || "").trim();
+    if (!operatorUserId) return { success: false, error: "Не выбран оператор." };
+
+    const { data: rentalRow, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, crew_id, metadata")
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    if (rentalError) throw rentalError;
+    const rental = rentalRow as any;
+    if (!rental) return { success: false, error: "Аренда не найдена." };
+
+    // The new operator must belong to THIS crew — a stray id would silently
+    // redirect commissions to someone with no access to the money.
+    const { data: member, error: memberError } = await supabaseAdmin
+      .from("crew_members")
+      .select("user_id")
+      .eq("crew_id", rental.crew_id)
+      .eq("user_id", operatorUserId)
+      .maybeSingle();
+    if (memberError) throw memberError;
+    if (!member) return { success: false, error: "Выбранный оператор не состоит в этом экипаже." };
+
+    // Display label — same rule as the roster/CSV builder.
+    const { data: userRow } = await supabaseAdmin
+      .from("users")
+      .select("full_name, username")
+      .eq("user_id", operatorUserId)
+      .maybeSingle();
+    const operatorLabel = userRow
+      ? (userRow.username ? `@${userRow.username}` : userRow.full_name || operatorUserId)
+      : operatorUserId;
+
+    // Read-modify-write (same pattern as pickup_freeze / notify_job writers) —
+    // the rental metadata carries the deposit split, freeze, notes etc.
+    const nowIso = new Date().toISOString();
+    const nextMetadata = {
+      ...((rental.metadata || {}) as Record<string, unknown>),
+      salary_operator_override: {
+        user_id: operatorUserId,
+        by: actorChatId,
+        at: nowIso,
+      },
+    };
+    const { error: updateError } = await supabaseAdmin
+      .from("rentals")
+      .update({ metadata: nextMetadata })
+      .eq("rental_id", params.rentalId);
+    if (updateError) throw updateError;
+
+    // Verification alignment: an OPEN сверка walks ожидает → ждёт владельца/оператора
+    // → подтверждено with the OLD operator as a party — after a reassignment
+    // that walk must restart with the NEW operator, or the 📨 resend would DM
+    // the person who no longer gets the commission. Verified/disputed rows are
+    // historical facts (the reconciliation HAPPENED with the old operator) —
+    // left untouched, the response note says so.
+    const { data: verRow } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("rental_id, status")
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    let verificationNote: string | null = null;
+    const verStatus = (verRow?.status as string | undefined) || null;
+    if (verRow && verStatus && !["verified", "disputed"].includes(verStatus)) {
+      const { error: verError } = await supabaseAdmin
+        .from("rental_verifications")
+        .update({
+          operator_chat_id: operatorUserId,
+          status: "pending",
+          operator_confirmed_at: null,
+          updated_at: nowIso,
+        })
+        .eq("rental_id", params.rentalId);
+      if (verError) {
+        // The override already landed — the money is reassigned. A failed
+        // verification realignment is reported, not fatal.
+        logger.warn(`[rental-verify] reassign ${params.rentalId}: verification realignment failed:`, verError);
+        verificationNote = "Сверка не переведена на нового оператора автоматически — выслайте сверку заново (📨).";
+      } else {
+        verificationNote = "Сверка переведена на нового оператора, статус сброшен в «ожидает».";
+      }
+    } else if (verStatus === "disputed") {
+      verificationNote = "Сверка в статусе «спор» осталась на старом операторе — разберите спор и при необходимости переотправьте сверку (📨).";
+    } else if (verStatus === "verified") {
+      verificationNote = "Подтверждённая сверка остаётся в силе.";
+    }
+
+    logger.info(`[rental-verify] reassign ${params.rentalId} → ${operatorUserId} by ${actorChatId} (slug=${params.slug})`);
+    return {
+      success: true,
+      data: { rentalId: params.rentalId, operatorUserId, operatorLabel, verificationNote },
+    };
+  } catch (err: any) {
+    logger.error("[rental-verify] reassignRentalOperatorAction exception:", err);
+    return errorResponse(handleError(err, "reassignRentalOperatorAction"));
+  }
+}
