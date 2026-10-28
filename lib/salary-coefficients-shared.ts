@@ -12,8 +12,10 @@
 //   • Subrented (partner) bikes: Ducati Aero, Yamaha R7, Suzuki GSX-S1000F,
 //     Kawasaki EX650K (task 156, boss 2026-10-28: «Кавасаки — субарендный,
 //     комиссия 500, не 1000»), Aprilia Shiver (task 157, boss 2026-10-28:
-//     «Шивер как Кавасаки — субаренда, 500, не 1000»). Partner category =
-//     subrented + price tier.
+//     «Шивер как Кавасаки — субаренда, 500, не 1000»), Suzuki M109R Boulevard
+//     (task 158, boss 2026-10-28: «same here — Boulevard is subrented, and the
+//     rental is hourly: 50% from 50%»). Partner category = subrented + price
+//     tier.
 //   • Per-bike classification is stored in cars.specs.salary (jsonb) —
 //     NO new tables. Crew-level ₽ rates live in
 //     crews.metadata.franchize.salaryCoefficients (jsonb).
@@ -117,7 +119,7 @@ export const RENTAL_CATEGORY_DESCRIPTIONS: Record<RentalCategory, string> = {
   regular: "Цена аренды 7 000–13 999 ₽/сутки",
   partner_regular: "Субаренда (Дукати Аэро, Ямаха R7, Кавасаки 650, Априлия Шивер) при цене 7 000–13 999 ₽/сутки",
   premium: "Цена аренды от 14 000 ₽/сутки",
-  partner_premium: "Субаренда (Сузуки 1000) при цене от 14 000 ₽/сутки",
+  partner_premium: "Субаренда (Сузуки GSX-S1000F, Сузуки M109R 1800 Boulevard) при цене от 14 000 ₽/сутки",
 };
 
 export const SALE_CATEGORY_LABELS: Record<SaleCategory, string> = {
@@ -167,8 +169,9 @@ export const DEFAULT_PRICE_TIERS = {
 
 /**
  * Subrented (partner) bikes — the list per the owner (2026-08-26 + task 156 /
- * task 157, 2026-10-28): Ducati Aero, Yamaha R7, Suzuki GSX-S1000F, Kawasaki
- * EX650K (Ninja 650), Aprilia Shiver 750. Everything else is owned.
+ * task 157 / task 158, 2026-10-28): Ducati Aero, Yamaha R7, Suzuki GSX-S1000F,
+ * Kawasaki EX650K (Ninja 650), Aprilia Shiver 750, Suzuki M109R 1800
+ * Boulevard. Everything else is owned.
  */
 export const SUBRENTED_BIKE_IDS: readonly string[] = [
   "ducati-panigale-s-electro-black-aero",
@@ -176,6 +179,7 @@ export const SUBRENTED_BIKE_IDS: readonly string[] = [
   "suzuki-gsx-s1000f",
   "kawasaki-ex650k",
   "aprilia-shiver",
+  "suzuki-vzr1800-boulevard-2006",
 ];
 
 export function isSubrentedBike(bikeId: string): boolean {

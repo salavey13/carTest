@@ -1501,3 +1501,16 @@ Fix, both layers (task156 recipe):
 - All 9 frozen Shiver snapshots (23.08–20.10, incl. the verified task119 rebuild a5532f57 3200→2700) recalculated in DB: base 1000→500, total −500, formula.baseCoef, rentalCategory/Label, snapshot.correction={at,by:boss-assistant,from,reason} — both sides see why the numbers moved. Statuses/stamps untouched (verified stays verified, task156 precedent 2bfceacc).
 
 Tests: new tests/franchize/task157-aprilia-shiver-subrent.spec.ts ×4; vitest full 3638 passed / 8 skipped. tsc OOM'd on this 4GB VPS (pre-existing, needs 8GB — see task154 note); change is a string-array append, type-safe by construction.
+
+## Task 158 — Suzuki M109R Boulevard is a subrent: 50% from 50% (2026-10-28)
+
+Boss (DM сверка 17.10, 3 000 ₽, комиссия 1500): «same here — Boulevard is subrented and this rental is hourly, so 50% from 50%». Third bike of the day. UNIQUE root cause: cars.specs.salary was the corrupted STRING "[object Object]" (a JS stringify bug somewhere in an old writer) — parseSpecsSalary correctly rejects it, but the bike was NOT in the fallback list, so 16 000 ₽/сутки resolved as OWNED premium (1500 ₽).
+
+Fix, both layers (task156/157 recipe):
+- SUBRENTED_BIKE_IDS += "suzuki-vzr1800-boulevard-2006"; partner_premium description now names GSX-S1000F + M109R Boulevard.
+- Prod cars.specs.salary replaced with a proper partner_premium object (the corrupted string is gone). Same cleanup for yamaha-r7 whose salary was the same corrupted string — it was rescued by the fallback list, numbers unchanged, written as partner_regular@12000 for hygiene.
+- ALL 8 frozen Boulevard snapshots (17.09–19.10) recalculated to the CURRENT engine math: coef 1500→750, and windows <24h additionally halved (the snapshots were frozen 18.10, BEFORE the task120 <24h rule of 21.10 — the boss's «50% from 50%» says the halving applies): 1h/2h/3h/6h/6h/9h → 375 ₽; two exactly-24h → 750 ₽; disputed f17df94a total 1550→425 (overprice 50 kept). Statuses untouched (verified fc5bc7fe and disputed stay as historical facts).
+- task157 residuals closed: 4 verified Shiver snapshots still cat regular (38ab65f2/a1c640d6/61d15d69/8a52700d — the task119-era rebuild batch was missed) → partner_regular, formula.baseCoef 1000→500, short windows (2h/7.5h) halved to 250; 3 pending Shiver snapshots corrected yesterday to 500 without the <24h halving (243aece4 3h, c99687c7 14h, 693eacd0 5.5h) → 250.
+- 15 snapshot PATCHes total, each with pre-check of old base/total/cat (abort on mismatch) and the task156 correction shape {at, by: boss-assistant, from, reason}. Operator delta vs the frozen numbers: Boulevard −8 250 ₽, Shiver residuals −2 250 ₽.
+
+Tests: new tests/franchize/task158-boulevard-subrent.spec.ts ×4 (list membership incl. the corrupted-string tolerance — pins the prod root cause, specs-win resolution, 750/375/24h-not-short math). Salary spec suite: 12 files, 194 passed.
