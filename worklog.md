@@ -1472,3 +1472,21 @@ Work Log:
 Stage Summary:
 - Квест = управляемый тур по приложению с гейтом (crew/PC видят, рентеры нет), обзорная страница-карта на /gift/roman-quest — единственная ссылка, которую босс шлёт Роману, дальше ведёт sticky-CTA.
 - Гейт-вердикты: pc (анон) и crew (vip-bike членство) → квест виден; hidden (любой другой TG-юзер) → ни кейка, ни карты.
+
+## Task 156 — verification comments surface everywhere + bot edge-case polish (2026-10-28)
+
+Boss report: owner disputed a сверка and typed «комментарий: бла бла» to the bot — the bot echoed it, but the comment never appeared in the rentals-analytics tableview («Заметки» showed rental-metadata notes only, «Комментарий» is the generated renter line). Live prod case found: rental d7b4d4dc, status=disputed, owner 356282674, «Где наличка ???» sitting in rental_verifications.negotiation.draft.comment since 28.10 13:06.
+
+Root cause: the negotiation jsonb (draft/open/rounds comments) was loaded by getVerificationStatusMap but only proposalOpen/agreedSplit were surfaced — the comment was dropped on the floor.
+
+Fix chain:
+- rental-verify-core.ts: latestNegotiationComment() — open > draft > last-round priority, trims, null-safe; VerificationBrief.comment/commentRole.
+- rentals-csv.ts (feeds tableview preview + CSV + XLSX): «Верификация» cell gains rail-safe «· ✍️» marker; «Заметки» cell now leads with the capped (140), author-labelled TEXT «сверка · ✍️ владелец: …» — exactly where the boss looked.
+- rentals-dashboard rows carry verificationComment/Role → CommissionVerificationCard renders an amber comment block (hidden on verified rows — dispute settled there); rental page card gets the same; list card chip tooltip + aria.
+- Bot hardening (handleRentalVerifyCommentText): expired vrf_comment_ state → cleaned + released to the router (mirrors doc-manual); missing row / non-party / already-verified now answer HONESTLY in TG instead of a silent swallow; FIRST comment fires one staff CC note (edits stay quiet — the counterparty hears it with the proposal); capture confirmation tells where the comment is visible.
+
+Roman quest polish (boss: «polish edge cases, improve wording»): stop-5 riddle «— вот и твой следующий след», stop-7 (both gated branches) «подарок ждёт тебя там с самого начала» (redundant double ending removed), overview pitch grammar («с корзиной», «размер круга — это его люди»), final card «подарок твой. Заходи.», hidden users on /gift/roman-quest get a neutral VIPBIKE wordmark page instead of a blank screen.
+
+Verification: tsc clean; vitest 3787 passed (new tests/franchize/task156-verify-comments-surface.spec.ts ×21; iter20 CSV row guard updated to notesCell). CRITICAL catch: the live-prod check script (scripts/task156-live-csv-check.mjs, real buildRentalsCsv vs prod DB) exposed latestNegotiationComment being re-exported but NOT imported into rental-verify.ts — runtime throw invisible to tsc/vitest; fixed in d607026. After the fix the script is GREEN against prod DB: Заметки = «сверка · ✍️ владелец: Где наличка ???», Верификация = «спор · ✍️». Prod E2E (agent-browser): gate API {show:true,mode:pc}; overview renders (0/7), hidden simulation = wordmark page; stop-5 modal shows the new riddle; locked season-stats fallback shows stop-7 with the new riddle. Screenshots: my-project/task156-stop5-modal.png.
+
+Security note: the sandbox-restore artifact .sb_key (service-role JWT) was accidentally committed in 3097713 and removed in 19c340f (~1 min exposure, private repo) — recommend rotating the Supabase service key when convenient.
