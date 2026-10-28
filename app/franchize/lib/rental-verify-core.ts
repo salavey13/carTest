@@ -402,6 +402,29 @@ export function labelFromUsersMap(
 }
 
 /**
+ * TASK162 — the CSV-PARITY twin of labelFromUsersMap. The rentals CSV builder
+ * (lib/csv-builders/rentals-csv.ts compactUserLabel) prints @username →
+ * full_name → the RAW id — no «id» prefix. The role-reassignment chain MUST
+ * speak the same dialect: the tableview's expectRole honesty check compares
+ * the action's returned operatorLabel against the fresh CSV cell, so a
+ * «id356…» vs «356…» divergence would keep every edit for such a member
+ * permanently «stuck» (optimistic label never clears, warning toast on every
+ * refetch). Same rule as getSalaryOperatorsAction's roster labels.
+ */
+export function compactLabelFromUsersMap(
+  usersMap: Map<string, { username?: string | null; full_name?: string | null }>,
+  chatId: string | null | undefined,
+): string {
+  if (!chatId) return "";
+  const u = usersMap.get(String(chatId));
+  if (!u) return String(chatId);
+  const username = (u.username || "").trim();
+  if (username) return `@${username}`;
+  const fullName = (u.full_name || "").trim();
+  return fullName || String(chatId);
+}
+
+/**
  * Task 117 — MSK timestamp for the DM date line (pure: Intl handles the TZ).
  * «12.10 15:30» — compact, the format every crew chat already reads.
  */

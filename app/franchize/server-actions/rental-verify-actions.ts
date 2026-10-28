@@ -956,14 +956,24 @@ export interface SetRoleOperatorResult {
  * so the tableview and the TG ✍️ buttons behave IDENTICALLY: the physical
  * role is set, the audit trail appended, the legacy override retired and the
  * open сверка realigned to the new top shareholder with a patched snapshot.
+ *
+ * TASK162 hardening:
+ *  • CROSS-CREW GUARD — the rental must belong to THIS slug's crew. The
+ *    actor gate alone would let an owner of crew A rewrite crew B's roles by
+ *    posting a foreign rentalId (the CSV/tableview only shows the slug crew's
+ *    rentals, so no legitimate path ever crosses crews).
+ *  • CLEAR — operatorUserId null/empty is the sanctioned «очистить роль»:
+ *    the role returns to «не указан» and the generated split re-derives from
+ *    the remaining filled roles (the boss's 1/2+1/2 self-order rule needs an
+ *    EMPTY «создал» to be reachable again after a mistaken fill).
  */
 export async function setRentalRoleOperatorAction(params: {
   slug: string;
   rentalId: string;
   /** Which role column the dropdown edits. */
   role: RentalRoleKey;
-  /** users.user_id of the new role holder — must be a crew member. */
-  operatorUserId: string;
+  /** users.user_id of the new role holder; null/empty = clear the role. */
+  operatorUserId: string | null;
   /** Password-auth path (PC viewer): owner id from validateAnalyticsPassword. */
   actorUserId?: string;
   isPasswordAuth?: boolean;
@@ -981,19 +991,27 @@ export async function setRentalRoleOperatorAction(params: {
     if (!["created", "handed_out", "received"].includes(role)) {
       return { success: false, error: "Неизвестная роль оператора." };
     }
-    const operatorUserId = String(params.operatorUserId || "").trim();
-    if (!operatorUserId) return { success: false, error: "Не выбран оператор." };
+    const operatorUserId = params.operatorUserId ? String(params.operatorUserId).trim() || null : null;
+
+    // TASK162 — the slug's crew id for the cross-crew guard inside the core.
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id")
+      .eq("slug", params.slug)
+      .maybeSingle();
+    if (!crew) return { success: false, error: "Экипаж не найден." };
 
     const result = await writeRentalRoleOperator({
       rentalId: params.rentalId,
       role,
       operatorUserId,
       actorChatId: String(actor.actorChatId || ""),
+      expectedCrewId: String(crew.id),
     });
     if (!result.ok) return { success: false, error: result.error };
 
-    const newLabel = result.split.find((e) => e.userId === operatorUserId)?.label || operatorUserId;
-    logger.info(`[rental-verify] setRentalRoleOperatorAction ${params.rentalId} ${role} → ${operatorUserId} (slug=${params.slug})`);
+    const newLabel = (operatorUserId && result.split.find((e) => e.userId === operatorUserId)?.label) || null;
+    logger.info(`[rental-verify] setRentalRoleOperatorAction ${params.rentalId} ${role} → ${operatorUserId ?? "—очищено—"} (slug=${params.slug})`);
     return {
       success: true,
       data: {

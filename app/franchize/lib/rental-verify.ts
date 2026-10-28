@@ -77,6 +77,7 @@ import {
   auditGradeLine,
   bikeTierLabelRu,
   clearDraft,
+  compactLabelFromUsersMap,
   computeNoProblemoStreak,
   declineOpenProposal,
   disputeEditorKeyboard,
@@ -138,6 +139,7 @@ export {
   declineOpenProposal,
   disputeEditorKeyboard,
   escapeVerifyHtml,
+  compactLabelFromUsersMap,
   formatDealDoneText,
   formatDisputeEditor,
   formatProposalMessage,
@@ -804,8 +806,12 @@ async function loadCrewRosterLabeled(
   const ids = [...new Set((members || []).map((m: { user_id: string }) => m.user_id).filter(Boolean))];
   if (ids.length === 0) return [];
   const usersMap = await loadUsersMap(ids);
+  // TASK162 — compactLabelFromUsersMap (the CSV dialect), not labelFromUsersMap:
+  // the picker must offer the SAME names the sheet and the «ЗП по долям» line
+  // print — a member without username/full_name reads as their raw id,
+  // never as «id356…».
   return ids
-    .map((userId) => ({ userId, label: labelFromUsersMap(usersMap, userId) }))
+    .map((userId) => ({ userId, label: compactLabelFromUsersMap(usersMap, userId) }))
     .sort((a, b) => a.label.localeCompare(b.label, "ru"));
 }
 
@@ -843,6 +849,14 @@ export async function writeRentalRoleOperator(params: {
   /** users.user_id of the new role holder; null = clear the role. */
   operatorUserId: string | null;
   actorChatId: string;
+  /**
+   * TASK162 hardening — when the caller knows the slug's crew id (the web
+   * action), the rental MUST belong to it: an owner of crew A must not be
+   * able to rewrite roles on crew B's rentals by posting a foreign rentalId.
+   * The TG ✍️ flow omits the guard — it is already row-scoped (the callback
+   * gate resolves crew staff + parties of THAT verification row).
+   */
+  expectedCrewId?: string;
 }): Promise<WriteRoleResult> {
   try {
     const { data: rentalRow, error: rentalError } = await supabaseAdmin
@@ -853,10 +867,15 @@ export async function writeRentalRoleOperator(params: {
     if (rentalError) throw rentalError;
     const rental = rentalRow as any;
     if (!rental) return { ok: false, error: "Аренда не найдена." };
+    if (params.expectedCrewId && String(rental.crew_id) !== String(params.expectedCrewId)) {
+      return { ok: false, error: "Эта аренда принадлежит другому экипажу." };
+    }
 
     const newUserId = params.operatorUserId ? String(params.operatorUserId).trim() : null;
     // The role holder must belong to THIS crew — a stray id must not pull
-    // commission share (same guard as the task157 override write).
+    // commission share (same guard as the task157 override write). Empty
+    // (null) is the sanctioned CLEAR: the role returns to «не указан» and the
+    // generated split re-derives from the remaining filled roles.
     if (newUserId) {
       const { data: member, error: memberError } = await supabaseAdmin
         .from("crew_members")
@@ -867,10 +886,6 @@ export async function writeRentalRoleOperator(params: {
       if (memberError) throw memberError;
       if (!member) return { ok: false, error: "Выбранный оператор не состоит в этом экипаже." };
     }
-
-    // Display labels — same rule as the roster/CSV builder.
-    const labelIds = [newUserId].filter(Boolean) as string[];
-    const usersMap = await loadUsersMap(labelIds);
 
     // ── Read-modify-write the metadata + the creator column ──
     const meta = { ...((rental.metadata || {}) as Record<string, unknown>) };
@@ -959,11 +974,13 @@ export async function writeRentalRoleOperator(params: {
     );
     newTopUserId = top.operatorId;
 
-    // Labels for every engaged operator.
+    // Labels for every engaged operator — CSV dialect (compactLabelFromUsersMap):
+    // the expectRole honesty check in the tableview compares the action's
+    // operatorLabel with the fresh CSV cell, so the two MUST be byte-equal.
     const allLabels = await loadUsersMap(shares.map((s) => s.operatorId));
     splitEntries = shares.map((s) => ({
       userId: s.operatorId,
-      label: labelFromUsersMap(allLabels, s.operatorId),
+      label: compactLabelFromUsersMap(allLabels, s.operatorId),
       fraction: s.fraction,
       amount: 0,
     }));
@@ -972,9 +989,11 @@ export async function writeRentalRoleOperator(params: {
       const snapshot = (verRow.snapshot || {}) as Record<string, unknown>;
       const total = Number(snapshot.total) || 0;
       const pieces = buildSnapshotSalarySplit(total, shares);
+      // Same CSV dialect as the first build — THIS is the entry list the web
+      // action returns (its labels feed the toast + the expectRole check).
       splitEntries = shares.map((s, i) => ({
         userId: s.operatorId,
-        label: labelFromUsersMap(allLabels, s.operatorId),
+        label: compactLabelFromUsersMap(allLabels, s.operatorId),
         fraction: s.fraction,
         amount: pieces[i]?.amount ?? 0,
       }));
@@ -998,6 +1017,12 @@ export async function writeRentalRoleOperator(params: {
         patch.operator_chat_id = newTopUserId;
         patch.status = "pending";
         patch.operator_confirmed_at = null;
+        // TASK162 FIX — the owner's stamp must go TOO. The state machine
+        // auto-verifies when the operator confirms an owner_confirmed row;
+        // keeping a stale owner_confirmed_at here let the NEW top shareholder
+        // close the сверка with ONE tap after a role swap — the owner never
+        // re-confirmed the new split. The 📨 walk restarts for BOTH parties.
+        patch.owner_confirmed_at = null;
         if (verStatus !== "pending") {
           verificationNote = "Сверка сброшена в «ожидает» — доли поменялись.";
         } else {
@@ -1144,7 +1169,18 @@ export async function handleRentalVerifyReassignCallback(params: {
         await answerCallback(params.callbackQueryId, "В экипаже нет участников — некого выбирать.");
         return true;
       }
-      const keyboard: Array<Array<{ text: string; callback_data: string }>> = roster.map((m) => [
+      // TASK162 — Telegram silently DROPS callback_data longer than 64 bytes
+      // (the button renders but the tap does nothing). Filter roster entries
+      // whose apply-callback would overflow; if that leaves nothing usable,
+      // say so honestly instead of showing dead buttons.
+      const fits = roster.filter(
+        (m) => `vrf_re_s_${roleChar}_${rentalId}_${m.userId}`.length <= 64,
+      );
+      if (fits.length === 0) {
+        await answerCallback(params.callbackQueryId, "Слишком длинный идентификатор — измени роль в таблице аналитики.");
+        return true;
+      }
+      const keyboard: Array<Array<{ text: string; callback_data: string }>> = fits.map((m) => [
         { text: m.label, callback_data: `vrf_re_s_${roleChar}_${rentalId}_${m.userId}` },
       ]);
       keyboard.push([{ text: "✕ Отмена", callback_data: `vrf_re_x_${rentalId}` }]);

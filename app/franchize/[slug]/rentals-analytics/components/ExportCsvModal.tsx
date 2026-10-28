@@ -873,33 +873,44 @@ export function ExportCsvModal({
   // keeps the optimistic label on screen and fires a warning instead of the
   // silent revert illusion. The «Оператор (ЗП)» cell + all counters
   // regenerate from the roles server-side (the split is GENERATED now).
+  // TASK162 — the sentinel «__clear__» is the sanctioned UNDO: the role
+  // returns to «не указан» and the split re-derives from the remaining
+  // filled roles (the boss's 1/2+1/2 self-order rule needs an EMPTY «создал»
+  // to be reachable again after a mistaken fill). expectRole.label "" — the
+  // fresh CSV cell for a cleared role is the empty string.
   const handleRoleEdit = useCallback(
     async (rentalId: string, role: RentalRoleKey, nextUserId: string, ctx?: QuickRowCtx) => {
       if (!slug || reassigningIds.has(rentalId)) return;
-      const next = operators.find((o) => o.userId === nextUserId);
-      if (!next) return;
+      const clearing = nextUserId === "__clear__";
+      const next = clearing ? undefined : operators.find((o) => o.userId === nextUserId);
+      if (!clearing && !next) return;
       const rowLabel = quickRowLabel(ctx);
       const roleLabel = RENTAL_ROLE_COL_LABELS[role];
       const ok = window.confirm(
-        `Изменить «${roleLabel}» по этой аренде?\n\n` +
-          (rowLabel ? `${rowLabel}\n\n` : "") +
-          `Новый оператор: ${next.label}. Доли ЗП пересчитаются автоматически — заполненная роль = равная доля (пустой «создал» → 1/2+1/2 между выдал/принял).`,
+        clearing
+          ? `Очистить «${roleLabel}» по этой аренде?\n\n` +
+            (rowLabel ? `${rowLabel}\n\n` : "") +
+            "Роль вернётся в «не указан» — доли ЗП пересчитаются по оставшимся заполненным ролям (пустой «создал» при заполненных выдал/принял = 1/2+1/2)."
+          : `Изменить «${roleLabel}» по этой аренде?\n\n` +
+            (rowLabel ? `${rowLabel}\n\n` : "") +
+            `Новый оператор: ${next!.label}. Доли ЗП пересчитаются автоматически — заполненная роль = равная доля (пустой «создал» → 1/2+1/2 между выдал/принял).`,
       );
       if (!ok) return;
       setReassigningIds((prev) => new Set(prev).add(rentalId));
       try {
         const res = await withServerTimeout(
-          setRentalRoleOperatorAction({ slug, rentalId, role, operatorUserId: nextUserId, ...verifyActorParams }),
+          setRentalRoleOperatorAction({ slug, rentalId, role, operatorUserId: clearing ? null : nextUserId, ...verifyActorParams }),
         );
         if (res.success && res.data) {
+          const newLabel = clearing ? "не указан" : res.data.operatorLabel || next!.label;
           toast.success(
-            `${roleLabel}: ${res.data.operatorLabel} ✅ ЗП: ${res.data.splitText}${res.data.verificationNote ? ` · ${res.data.verificationNote}` : ""}`,
+            `${roleLabel}: ${newLabel} ✅ ЗП: ${res.data.splitText}${res.data.verificationNote ? ` · ${res.data.verificationNote}` : ""}`,
             { duration: res.data.verificationNote ? 8000 : 6000 },
           );
-          setJustRoleEdited((prev) => new Map(prev).set(`${role}:${rentalId}`, res.data!.operatorLabel || next.label));
+          setJustRoleEdited((prev) => new Map(prev).set(`${role}:${rentalId}`, clearing ? "" : res.data!.operatorLabel || next!.label));
           const result = await loadTable({
             silent: true,
-            expectRole: { rentalId, role, label: res.data.operatorLabel || next.label },
+            expectRole: { rentalId, role, label: clearing ? "" : res.data.operatorLabel || next!.label },
           });
           if (result?.roleStuck) {
             toast.warning(
@@ -2738,8 +2749,12 @@ function SectionTable({
                         // rental page. The optimistic label (justRoleEdited)
                         // bridges the refetch gap (task152 contract).
                         (() => {
+                          // TASK162 — the optimistic entry can legitimately be ""
+                          // (a CLEARED role): presence check, not truthiness, or
+                          // the stale CSV label would shine through until the
+                          // refetch lands.
                           const optimistic = justRoleEdited?.get(`${roleForCell}:${rowRentalId}`);
-                          const shown = optimistic || cell.trim() || "";
+                          const shown = optimistic !== undefined ? optimistic : (cell.trim() || "");
                           const roleColor = shown ? operatorColorOf(shown) : T.textMuted;
                           return (
                             <span className="inline-flex items-center gap-1">
@@ -2752,6 +2767,11 @@ function SectionTable({
                                   e.stopPropagation();
                                   const v = e.target.value;
                                   if (!v) return;
+                                  // TASK162 — «✕ очистить роль» (the sanctioned undo)
+                                  if (v === "__clear__") {
+                                    if (onRoleEdit) void onRoleEdit(rowRentalId, roleForCell, "__clear__", quickCtx);
+                                    return;
+                                  }
                                   const currentId = operators.find((o) => o.label === shown)?.userId;
                                   if (v === currentId) return;
                                   if (onRoleEdit) void onRoleEdit(rowRentalId, roleForCell, v, quickCtx);
@@ -2772,6 +2792,9 @@ function SectionTable({
                                     {o.label}
                                   </option>
                                 ))}
+                                {shown && (
+                                  <option value="__clear__">✕ очистить роль</option>
+                                )}
                               </select>
                               {reassignPending && (
                                 <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
