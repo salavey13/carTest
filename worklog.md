@@ -1490,3 +1490,14 @@ Roman quest polish (boss: «polish edge cases, improve wording»): stop-5 riddle
 Verification: tsc clean; vitest 3787 passed (new tests/franchize/task156-verify-comments-surface.spec.ts ×21; iter20 CSV row guard updated to notesCell). CRITICAL catch: the live-prod check script (scripts/task156-live-csv-check.mjs, real buildRentalsCsv vs prod DB) exposed latestNegotiationComment being re-exported but NOT imported into rental-verify.ts — runtime throw invisible to tsc/vitest; fixed in d607026. After the fix the script is GREEN against prod DB: Заметки = «сверка · ✍️ владелец: Где наличка ???», Верификация = «спор · ✍️». Prod E2E (agent-browser): gate API {show:true,mode:pc}; overview renders (0/7), hidden simulation = wordmark page; stop-5 modal shows the new riddle; locked season-stats fallback shows stop-7 with the new riddle. Screenshots: my-project/task156-stop5-modal.png.
 
 Security note: the sandbox-restore artifact .sb_key (service-role JWT) was accidentally committed in 3097713 and removed in 19c340f (~1 min exposure, private repo) — recommend rotating the Supabase service key when convenient.
+
+## Task 157 — Aprilia Shiver is a subrent: commission 1000→500 (2026-10-28)
+
+Boss (voice follow-up to task156, same day): «поправь shiver — он как kawasaki, комиссия считается как не субарендный 1000, а надо 500». Same disease as Kawasaki: cars.specs.salary (set 2026-08-26) said subrented:false/regular and explicit specs BEAT the hardcode list — every Shiver сверка paid double.
+
+Fix, both layers (task156 recipe):
+- SUBRENTED_BIKE_IDS += "aprilia-shiver"; partner_regular description gains «Априлия Шивер».
+- Prod cars.specs.salary patched: subrented:true, rentalCategory:"partner_regular" (500 ₽ full day, 250 short <24h).
+- All 9 frozen Shiver snapshots (23.08–20.10, incl. the verified task119 rebuild a5532f57 3200→2700) recalculated in DB: base 1000→500, total −500, formula.baseCoef, rentalCategory/Label, snapshot.correction={at,by:boss-assistant,from,reason} — both sides see why the numbers moved. Statuses/stamps untouched (verified stays verified, task156 precedent 2bfceacc).
+
+Tests: new tests/franchize/task157-aprilia-shiver-subrent.spec.ts ×4; vitest full 3638 passed / 8 skipped. tsc OOM'd on this 4GB VPS (pre-existing, needs 8GB — see task154 note); change is a string-array append, type-safe by construction.
