@@ -1514,3 +1514,24 @@ Fix, both layers (task156/157 recipe):
 - 15 snapshot PATCHes total, each with pre-check of old base/total/cat (abort on mismatch) and the task156 correction shape {at, by: boss-assistant, from, reason}. Operator delta vs the frozen numbers: Boulevard −8 250 ₽, Shiver residuals −2 250 ₽.
 
 Tests: new tests/franchize/task158-boulevard-subrent.spec.ts ×4 (list membership incl. the corrupted-string tolerance — pins the prod root cause, specs-win resolution, 750/375/24h-not-short math). Salary spec suite: 12 files, 194 passed.
+
+## Task 159 — «Оператор (ЗП)» is GENERATED from the three role columns: equal-split commissions + role dropdowns + ✍️ reassign in the сверка DMs (2026-10-29)
+
+Boss (2026-10-29): «instead of adding dropdown to "Оператор (ЗП)" lets make this column generated — the list of operators engaged in the rental, based on "Оператор создал"/"Оператор выдал"/"Оператор принял" — lets make THESE THREE dropdowns instead. If all 3 are same everything goes to same dude, several dudes → split equally; handed out AND received by one dude, created by another → 1/3 creator + 2/3 commission. EDGE CASE: rider created rental himself via web app → "Оператор создал" empty → split 1/2 between who handed out/in. …maybe also add buttons to verification messages to reassign operators who handed out and received bike back». Plus an on-the-fly edit: kawasaki 9 Oct (the second one — Никита Золотов) → creator+выдал = @I_O_S_NN, принял stays Гундермурд → «2/3 i_o_s_nn + 1/3 Гундермурд, right? :)» — yes.
+
+Money rule (per-ROLE weighting — each FILLED role carries 1/N of the commission, roles accumulate):
+- created A · выдал B · принял C → 1/3+1/3+1/3 · A / B+B → 1/3+2/3 · all same → 100% · empty creator → 1/2+1/2 · no roles at all → old shift cross-ref 100%.
+- Integer rubles: round per share, remainder → largest share, Σ always exact (800 ₽ → 533+267; 725 → 483+242).
+
+Implementation (commit 8ba238ed6, rebased over df01d6f2c):
+- operator-attribution.ts: `resolveRentalOperatorSplit` = canonical money math (reduced fractions, stable создал→выдал→принял order); `resolveRentalOperator` now answers the TOP shareholder (largest fraction, tie → earlier role) so every single-face consumer can never disagree with the split; task157 override RETIRED (the only override ever written — kawasaki 685a9152 — migrated to the roles).
+- lib/salary-split.ts (new, pure): cell format «@a (2/3) + @b (1/3)» + parser + splitAmountByFractions — one format for the builder, the pills and the DM.
+- CSV builder: «Оператор (ЗП)» = generated split list; «Атрибуция ЗП» = «раздел ЗП».
+- Tableview: THREE role dropdowns (cols 22/23/24, right sticky rail next to Верификация; owner tier — TG cookie AND PC password session via the same resolveVerifyOwnerActor); ЗП cell renders each part with own icon/color/fraction; split pills parse fractions (pills = profile ruble-for-ruble); op filter contains-match; role edits ride the task152 honesty contract (confirm → setRentalRoleOperatorAction → optimistic label → ONE silent refetch with expectRole → stuck-warning, never a silent-revert illusion).
+- Shared write core `writeRentalRoleOperator` (web action + TG buttons): sets the physical role (created_by_operator_chat_id / pickup_freeze.frozen_by / return_confirmed_by), appends metadata.salary_roles_audit, purges stale overrides, realigns the open сверка to the new top shareholder and PATCHES the frozen snapshot (attribution + salarySplit — the next 📨 resend tells the truth; verified/disputed stay historical).
+- Verification DM: «👥 ЗП по долям: @a (2/3) — 483 ₽ · @b (1/3) — 242 ₽» line + ✍️ Кто выдал / Кто принял buttons (vrf_re_* → crew picker → apply → fresh summary to the actor; staff + сверка parties gated). Payout hub / operator копилка / done-DM count the ADDRESSED operator's SLICE (addressedShareAmount), never the whole commission.
+- Profile math: computeCategoryBonuses + my-work credit each member their fraction (share recorded on the item) — Комиссии / Мои доходы / team-earnings pick the split up automatically.
+
+Data edit (kawasaki 685a9152, Никита Золотов 18 750 ₽): created DJORUDJOV→I_O_S_NN, выдал Paul→I_O_S_NN, принял Гундермурд (kept), override purged, snapshot patched. Verified live with the NEW builder against prod DB: cell = «@I_O_S_NN (2/3) + Гундермурд Сигурдфлордбрадсен (1/3)», атрибуция = «раздел ЗП»; profile 533 + 267 = 800 ₽; snapshot 483 + 242 = 725 ₽ (frozen earlier at the 725 rate).
+
+Tests: task157 spec → task158-salary-split.spec ×19 (the boss's 2/3 case, 1/2+1/2 edge, all-same, 3×1/3, shift fallback, retired-override guard, cell round-trip, remainder rule, wiring pins); iter20/task98/task117/task127/task128 re-baselined. Suite 3838 passed / 8 skipped; eslint clean; tsc scoped clean (2 pre-existing). Deploy: VPS disk 95% → docker prune (13G freed) → build 17:30–17:44 → swap 17:44:39, /franchize/vip-bike 200, routes verified.
