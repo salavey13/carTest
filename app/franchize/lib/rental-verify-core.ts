@@ -224,6 +224,11 @@ export interface ApplyActionResult {
  *     a doubt stops the verification (manual reconciliation follows; the
  *     owner can still final-verify via his own ✅ or the drawer's manual
  *     owner-tier confirm).
+ *   • Task 156 (boss 2026-10-28: «завершенные тоже разрешить перередактировать,
+ *     переоткрыть»): ⚠️ on a VERIFIED row REOPENS it — the stamps are cleared
+ *     and the row drops back to «disputed» so the split editor can correct the
+ *     numbers; an accepted proposal then re-verifies with the corrected split
+ *     (the same task-106 deal path). A ✅ on a verified row stays a no-op.
  *   • When operator === owner (or operator is null), the owner's single
  *     confirm verifies immediately — there is no second human.
  *   • Re-confirming an already-confirmed side is a no-op (idempotent taps).
@@ -245,6 +250,26 @@ export function applyVerificationAction(
     return { row: null, effect: "noop", actor: null, error: "Вы не участник сверки по этой аренде." };
   }
   if (row.status === "verified") {
+    // Task 156 — REOPEN: ⚠️ on a verified row is the sanctioned way to correct
+    // a settled расчёт (boss: a confirmed сверка must stay editable). Clear
+    // BOTH confirm stamps + verified_at so the re-confirmation walk is honest;
+    // the reopen lands as a normal dispute → split editor → proposal → accept
+    // re-verifies with the corrected numbers (task-106 deal path).
+    if (params.action === "dispute") {
+      return {
+        row: {
+          ...row,
+          status: "disputed",
+          operator_confirmed_at: null,
+          owner_confirmed_at: null,
+          verified_at: null,
+          disputed_by: chatId,
+          dispute_reason: params.reason?.trim() || "подтверждённая сверка переоткрыта — расчёт пересматривается",
+        },
+        effect: "disputed",
+        actor: role,
+      };
+    }
     return {
       row: null,
       effect: "noop",
@@ -646,6 +671,18 @@ export function verificationKeyboard(rentalId: string): Array<Array<{ text: stri
       { text: "⚠️ Оспорить", callback_data: `vrf_dis_${rentalId}` },
     ],
   ];
+}
+
+/**
+ * Task 156 — keyboard for a VERIFIED row's resend (boss 2026-10-28: «когда
+ * перевысылаем уже подтверждённую сверку, кнопок в сообщении нет — завершенные
+ * тоже разрешить перередактировать, переоткрыть»). A ✅ on a verified row is a
+ * no-op, so the single 🔁 button routes to vrf_dis_ — the callback the state
+ * machine now treats as a REOPEN: stamps cleared → split editor → proposal →
+ * accept re-verifies with the corrected numbers.
+ */
+export function verificationReopenKeyboard(rentalId: string): Array<Array<{ text: string; callback_data: string }>> {
+  return [[{ text: "🔁 Переоткрыть сверку", callback_data: `vrf_dis_${rentalId}` }]];
 }
 
 /**

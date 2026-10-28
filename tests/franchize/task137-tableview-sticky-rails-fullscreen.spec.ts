@@ -12,8 +12,8 @@
 //      (text-xs) for density.
 //
 // Layers pinned here:
-//   • RENTALS_DISPLAY_ORDER — the remap is a permutation of 0..24 with the
-//     rails at the edges (unit-tested directly).
+//   • RENTALS_DISPLAY_ORDER — the remap is a permutation of 0..27 (task 156
+//     layout) with the rails at the edges (unit-tested directly).
 //   • computeRailOffsets — measured rail geometry (prefix/suffix sums,
 //     clamped) (unit-tested directly).
 //   • Wiring: cfg.order/stickyLeft/stickyRight → SectionTable render loops
@@ -34,29 +34,29 @@ const modal = src(
 );
 
 describe("task137 · АРЕНДЫ display-order remap (bike id + operator tail)", () => {
-  it("remap is a permutation of all 25 data indexes — nothing lost, nothing duplicated", () => {
-    expect(RENTALS_DISPLAY_ORDER).toHaveLength(25);
+  it("remap is a permutation of all 28 data indexes — nothing lost, nothing duplicated", () => {
+    expect(RENTALS_DISPLAY_ORDER).toHaveLength(28);
     expect([...RENTALS_DISPLAY_ORDER].sort((a, b) => a - b)).toEqual(
-      Array.from({ length: 25 }, (_, i) => i),
+      Array.from({ length: 28 }, (_, i) => i),
     );
   });
 
-  it("LEFT rail: Дата (0) first, Марка (bike id, 6) second", () => {
+  it("LEFT rail: Дата (0) first, Марка (bike id, 7) second", () => {
     expect(RENTALS_DISPLAY_ORDER[0]).toBe(0);
-    expect(RENTALS_DISPLAY_ORDER[1]).toBe(6);
+    expect(RENTALS_DISPLAY_ORDER[1]).toBe(7);
   });
 
-  it("RIGHT rail: Оператор выдал (20) / принял (21) at the tail, right before Верификация (24, last)", () => {
+  it("RIGHT rail: Оператор выдал (23) / принял (24) at the tail, right before Верификация (27, last)", () => {
     const tail = RENTALS_DISPLAY_ORDER.slice(-3);
-    expect(tail).toEqual([20, 21, 24]);
+    expect(tail).toEqual([23, 24, 27]);
   });
 
   it("the remap is DISPLAY-ONLY — op split / quick verify / notes / photos cfg lookups stay in data space", () => {
-    // SECTION_COLS.rentals keeps the RAW data indexes...
-    expect(modal).toContain("verification: 24,");
-    expect(modal).toContain("opCol: 22,");
-    expect(modal).toContain("notes: 11,");
-    expect(modal).toContain("photos: 13,");
+    // SECTION_COLS.rentals keeps the RAW data indexes (task 156 layout)...
+    expect(modal).toContain("verification: 27,");
+    expect(modal).toContain("opCol: 25,");
+    expect(modal).toContain("notes: 14,");
+    expect(modal).toContain("photos: 16,");
     // ...and the render loops compare cfg against dataIdx, not the display position
     expect(modal).toContain("dataIdx === cfg.verification");
     expect(modal).toContain("dataIdx === cfg.opCol");

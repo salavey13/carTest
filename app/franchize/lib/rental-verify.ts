@@ -98,6 +98,7 @@ import {
   startDraft,
   streakProgressLine,
   verificationKeyboard,
+  verificationReopenKeyboard,
   verificationSpeedLine,
   verificationStatusNote,
   verifyProgressLine,
@@ -143,6 +144,7 @@ export {
   startDraft,
   tallyVerificationStatuses,
   verificationKeyboard,
+  verificationReopenKeyboard,
   verificationStatusNote,
   withdrawOpenProposal,
   VERIFICATION_STATUS_LABELS,
@@ -1381,6 +1383,9 @@ export async function handleRentalVerifyCallback(params: {
     // the editor.
     let current_ = current;
     const staffChatIds = await loadCrewStaffChatIds(current_.crew_slug || null);
+    // Task 156: ⚠️ on a VERIFIED row is a REOPEN (stamps cleared, editor opens)
+    // — word the DMs accordingly instead of a plain «оспорил».
+    const wasVerified = current_.status === "verified";
     let result = applyVerificationAction(current_, {
       action: ok ? "confirm" : "dispute",
       chatId: String(params.chatId),
@@ -1543,14 +1548,24 @@ export async function handleRentalVerifyCallback(params: {
     }
 
     if (result.effect === "disputed") {
-      await answerCallback(params.callbackQueryId, "Отмечено как спор — сверьтесь вручную.");
+      await answerCallback(
+        params.callbackQueryId,
+        wasVerified ? "Сверка переоткрыта — поправьте числа в редакторе." : "Отмечено как спор — сверьтесь вручную.",
+      );
       const actorLabel = labelFromUsersMap(usersMap, String(params.chatId));
-      const disputeText = [
-        `⚠️ <b>Расчёт оспорен</b>`,
-        ``,
-        `${escapeVerifyHtml(actorLabel)}${result.actor === "admin" ? " (администратор экипажа)" : ""} оспорил сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} (комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
-        `Аренда помечена как «спор» в ЗП-списках — разберитесь лично и закройте вопрос до конца месяца.`,
-      ].join("\n");
+      const disputeText = wasVerified
+        ? [
+            `🔁 <b>Сверка переоткрыта</b>`,
+            ``,
+            `${escapeVerifyHtml(actorLabel)}${result.actor === "admin" ? " (администратор экипажа)" : ""} переоткрыл подтвержденную сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} (было: комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
+            `Числа пересматриваются заново — скорректированный расчёт подтверждается обеими сторонами.`,
+          ].join("\n")
+        : [
+            `⚠️ <b>Расчёт оспорен</b>`,
+            ``,
+            `${escapeVerifyHtml(actorLabel)}${result.actor === "admin" ? " (администратор экипажа)" : ""} оспорил сверку по аренде ${escapeVerifyHtml(snapshot?.bikeName || "")} (комиссия ${formatRubVerify(Number(snapshot?.total) || 0)}).`,
+            `Аренда помечена как «спор» в ЗП-списках — разберитесь лично и закройте вопрос до конца месяца.`,
+          ].join("\n");
       const disputeRecipients = [...new Set([current.operator_chat_id, current.owner_chat_id].filter(Boolean) as string[])];
       for (const chatId of disputeRecipients) {
         if (chatId === String(params.chatId)) continue;

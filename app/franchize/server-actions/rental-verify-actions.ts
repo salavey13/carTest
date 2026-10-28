@@ -32,6 +32,7 @@ import {
   labelFromUsersMap,
   loadUsersMap,
   verificationKeyboard,
+  verificationReopenKeyboard,
   verificationStatusNote,
   type RentalVerificationRow,
 } from "@/app/franchize/lib/rental-verify";
@@ -521,8 +522,17 @@ export async function resendVerificationDmsAction(params: {
         ownerLabel,
       }),
     });
-    const withKeyboard = row.status === "pending" || row.status === "operator_confirmed" || row.status === "owner_confirmed";
-    const keyboard = withKeyboard ? verificationKeyboard(row.rental_id) : [];
+    // Task 156 (boss 2026-10-28: «перевысылаем уже подтверждённую сверку — кнопок
+    // нет; завершенные тоже разрешить перередактировать, переоткрыть»): every
+    // resend now carries a keyboard. Verified rows get the 🔁 reopen button
+    // (vrf_dis_ — the state machine clears the stamps and opens the split
+    // editor); disputed rows get the standard ✅/⚠️ pair back (⚠️ re-enters the
+    // editor, ✅ closes the спор when the other side has already confirmed).
+    const keyboard =
+      row.status === "verified"
+        ? verificationReopenKeyboard(row.rental_id)
+        : verificationKeyboard(row.rental_id);
+    const withKeyboard = keyboard.length > 0;
 
     const sentTo: string[] = [];
     const failed: Array<{ chatId: string; error: string }> = [];

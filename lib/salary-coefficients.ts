@@ -6,7 +6,7 @@
 //   • Crew-level ₽ rates   → crews.metadata.franchize.salaryCoefficients (jsonb)
 //   • Per-bike categories  → cars.specs.salary (jsonb), derived from PRICE
 //     (premium ≥ 14 000 ₽/сутки, regular ≥ 7 000, budget below) + subrented
-//     flag (Ducati Aero, Yamaha R7, Suzuki GSX-S1000F).
+//     flag (Ducati Aero, Yamaha R7, Suzuki GSX-S1000F, Kawasaki EX650K).
 //   The iter5 migration (salary_coefficients + bike_salary_categories tables)
 //   was REMOVED — it was never applied to production.
 //

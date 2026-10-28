@@ -296,17 +296,23 @@ const SALES_NUMERIC_COLS = new Set([3]);
 const SALES_DATE_COLS = new Set([0]);
 
 // ── Block-section column kinds (iter52) ─────────────────────────────────────
-// Column indexes per block of the new sheet layout (builder: rentals-csv.ts):
-//   АРЕНДЫ  (25): Дата, ЗП Аренда, Партнеру, Цена, Экип, Залог, Марка,
-//                 Пробег до, Пробег после, Время, Комментарий, Заметки,
-//                 Субарендатор, Фото, ID, ЗП техника, ЗП экип, ЗП наценка,
-//                 Экип флаги, Оператор создал, Оператор выдал, Оператор
-//                 принял, Оператор (ЗП), Атрибуция ЗП, Верификация
+// Column indexes per block of the sheet layout (builder: rentals-csv.ts):
+//   АРЕНДЫ  (28): Дата, ЗП Аренда, Партнеру, Цена, Способ оплаты, Экип, Залог,
+//                 Марка, Пробег до, Пробег после, Время, Имя, Телефон,
+//                 Комментарий, Заметки, Субарендатор, Фото, ID, ЗП техника,
+//                 ЗП экип, ЗП наценка, Экип флаги, Оператор создал, Оператор
+//                 выдал, Оператор принял, Оператор (ЗП), Атрибуция ЗП,
+//                 Верификация
 //   ЭКИП     (7): Дата, Наименование, Цена, Выдал, Принял, Комментарий, ID
 //   СЕРВИС   (5): Дата, Услуга, Байк, Цена, ID
 //   ПРОДАЖИ  (8): Дата, ЗП Продажа, Наименование, Цена, Комментарий, ID,
 //                 Оператор (ЗП), Атрибуция ЗП
 //   СВОДКА   (5): Блок, Записей, Выручка, ЗП, Примечание
+//
+// Task 156 (boss 2026-10-28): «Комментарий» (имя + телефон + нал/банк одним
+// текстом) split into Имя (11) / Телефон (12) / Способ оплаты (4) — способ
+// оплаты стоит сразу после Цены, чтобы «налито или не налито» читалось рядом
+// с суммой. «Комментарий» (13) keeps the rest (причина бесплатной аренды).
 interface SectionColCfg {
   numeric: Set<number>;
   date: Set<number>;
@@ -333,17 +339,17 @@ interface SectionColCfg {
 
 const SECTION_COLS: Record<CsvSectionKey, SectionColCfg> = {
   rentals: {
-    numeric: new Set([1, 3, 4, 5, 7, 8]),
+    numeric: new Set([1, 3, 5, 6, 8, 9]),
     date: new Set([0]),
-    hide: new Set([14]),
-    notes: 11,
-    subrenter: 12,
-    photos: 13,
-    verification: 24,
-    opCol: 22,
-    idCol: 14,
-    // Task 137 — Марка (6) → display position 2, Оператор выдал (20) /
-    // принял (21) → the tail right before Верификация (24). Left rail pins
+    hide: new Set([17]),
+    notes: 14,
+    subrenter: 15,
+    photos: 16,
+    verification: 27,
+    opCol: 25,
+    idCol: 17,
+    // Task 137 — Марка (7) → display position 2, Оператор выдал (23) /
+    // принял (24) → the tail right before Верификация (27). Left rail pins
     // «Дата + Марка», right rail pins «выдал / принял / верификация» — the
     // middle scrolls, the context never leaves the screen.
     order: RENTALS_DISPLAY_ORDER,
@@ -2272,11 +2278,12 @@ function SectionTable({
             const verifyPending = !!(rowRentalId && verifyingIds?.has(rowRentalId));
             // Task 152 — per-row context for the confirm dialogs (дата ·
             // байк · цена): the tap must SHOW which row it touches. Data-space
-            // indexes: Дата 0, Цена 3, Марка 6 (SECTION_COLS.rentals).
+            // indexes (task 156 layout): Дата 0, Цена 3, Марка 7
+            // (SECTION_COLS.rentals).
             const quickCtx: QuickRowCtx = rowRentalId
               ? {
                   date: (r[0] || "").trim(),
-                  bike: (r[6] || "").trim(),
+                  bike: (r[7] || "").trim(),
                   price: (r[3] || "").trim(),
                 }
               : EMPTY_ROW_CTX;

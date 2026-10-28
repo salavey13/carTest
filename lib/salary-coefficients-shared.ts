@@ -9,8 +9,9 @@
 // REWORK (iter6, owner feedback):
 //   • Bike "coolness" (budget / regular / premium) is judged BY PRICE,
 //     not by hardcoded model lists.
-//   • Subrented (partner) bikes are exactly three: Ducati Aero, Yamaha R7,
-//     Suzuki GSX-S1000F. Partner category = subrented + price tier.
+//   • Subrented (partner) bikes: Ducati Aero, Yamaha R7, Suzuki GSX-S1000F,
+//     Kawasaki EX650K (task 156, boss 2026-10-28: «Кавасаки — субарендный,
+//     комиссия 500, не 1000»). Partner category = subrented + price tier.
 //   • Per-bike classification is stored in cars.specs.salary (jsonb) —
 //     NO new tables. Crew-level ₽ rates live in
 //     crews.metadata.franchize.salaryCoefficients (jsonb).
@@ -112,7 +113,7 @@ export const RENTAL_CATEGORY_LABELS: Record<RentalCategory, string> = {
 export const RENTAL_CATEGORY_DESCRIPTIONS: Record<RentalCategory, string> = {
   budget: "Цена аренды до 7 000 ₽/сутки (мопеды, питбайки, скутеры)",
   regular: "Цена аренды 7 000–13 999 ₽/сутки",
-  partner_regular: "Субаренда (Дукати Аэро, Ямаха R7) при цене 7 000–13 999 ₽/сутки",
+  partner_regular: "Субаренда (Дукати Аэро, Ямаха R7, Кавасаки 650) при цене 7 000–13 999 ₽/сутки",
   premium: "Цена аренды от 14 000 ₽/сутки",
   partner_premium: "Субаренда (Сузуки 1000) при цене от 14 000 ₽/сутки",
 };
@@ -163,13 +164,15 @@ export const DEFAULT_PRICE_TIERS = {
 } as const;
 
 /**
- * Subrented (partner) bikes — the complete list per the owner (2026-08-26):
- * Ducati Aero, Yamaha R7, Suzuki GSX-S1000F. Everything else is owned.
+ * Subrented (partner) bikes — the list per the owner (2026-08-26 + task 156,
+ * 2026-10-28): Ducati Aero, Yamaha R7, Suzuki GSX-S1000F, Kawasaki EX650K
+ * (Ninja 650). Everything else is owned.
  */
 export const SUBRENTED_BIKE_IDS: readonly string[] = [
   "ducati-panigale-s-electro-black-aero",
   "yamaha-r7",
   "suzuki-gsx-s1000f",
+  "kawasaki-ex650k",
 ];
 
 export function isSubrentedBike(bikeId: string): boolean {

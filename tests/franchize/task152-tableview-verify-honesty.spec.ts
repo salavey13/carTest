@@ -36,7 +36,8 @@ describe("task152 · tableview verify honesty + send-request", () => {
     // the row context is extracted from the rendered row's data cells
     expect(modal).toContain("const quickCtx: QuickRowCtx = rowRentalId");
     expect(modal).toContain("date: (r[0] || \"\").trim(),");
-    expect(modal).toContain("bike: (r[6] || \"\").trim(),");
+    // task 156 moved Марка to data col 7 (Способ оплаты/Имя/Телефон split)
+    expect(modal).toContain("bike: (r[7] || \"\").trim(),");
     expect(modal).toContain("price: (r[3] || \"\").trim(),");
     // and rendered into BOTH confirm dialogs before the OK
     expect(modal).toContain("const rowLabel = quickRowLabel(ctx);");

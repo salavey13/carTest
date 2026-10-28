@@ -85,7 +85,7 @@ describe("task102: both-tap race converges to verified", () => {
     expect(r.error).toContain("не участник");
   });
 
-  it("verified is terminal — a late third tap cannot mutate the row", () => {
+  it("verified: a late confirm is still a noop, but dispute is the deliberate REOPEN (task 156)", () => {
     const verified: RentalVerificationRow = {
       ...BASE_ROW,
       status: "verified",
@@ -93,12 +93,28 @@ describe("task102: both-tap race converges to verified", () => {
       owner_confirmed_at: NOW,
       verified_at: NOW,
     };
-    for (const action of ["confirm", "dispute"] as const) {
-      for (const chatId of ["7813830016", "413553377"]) {
-        const r = applyVerificationAction(verified, { action, chatId, nowIso: "2026-10-17T13:00:00.000Z" });
-        expect(r.row).toBeNull();
-        expect(r.effect).toBe("noop");
-      }
+    // confirm stays terminal — a stray third ✅ can never mutate the row
+    for (const chatId of ["7813830016", "413553377"]) {
+      const r = applyVerificationAction(verified, { action: "confirm", chatId, nowIso: "2026-10-17T13:00:00.000Z" });
+      expect(r.row).toBeNull();
+      expect(r.effect).toBe("noop");
+    }
+    // dispute REOPENS the settled row: all stamps cleared, disputed_by recorded,
+    // so both parties must re-confirm against the corrected numbers.
+    for (const chatId of ["7813830016", "413553377"]) {
+      const r = applyVerificationAction(verified, { action: "dispute", chatId, nowIso: "2026-10-17T13:00:00.000Z" });
+      expect(r.effect).toBe("disputed");
+      expect(r.row?.status).toBe("disputed");
+      expect(r.row?.operator_confirmed_at).toBeNull();
+      expect(r.row?.owner_confirmed_at).toBeNull();
+      expect(r.row?.verified_at).toBeNull();
+      expect(r.row?.disputed_by).toBe(chatId);
+      // default reason explains the reopen to both parties
+      expect(r.row?.dispute_reason).toContain("переоткрыта");
+      // and the reopened row can walk both parties back to verified
+      const opAgain = applyVerificationAction(r.row!, { action: "confirm", chatId: "7813830016", nowIso: "2026-10-17T14:00:00.000Z" });
+      const ownerAgain = applyVerificationAction(opAgain.row!, { action: "confirm", chatId: "413553377", nowIso: "2026-10-17T14:01:00.000Z" });
+      expect(ownerAgain.effect).toBe("verified");
     }
   });
 

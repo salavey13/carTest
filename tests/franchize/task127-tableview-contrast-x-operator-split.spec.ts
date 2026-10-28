@@ -10,8 +10,8 @@
 //
 // Layers pinned here:
 //   • Pure: hashString / operatorIconOf / operatorColorOf / buildOperatorSplit.
-//   • Wiring: SECTION_COLS opCol (22 rentals / 6 sales) → split over the
-//     visible sections → pills; row markers on the date + op cells.
+//   • Wiring: SECTION_COLS opCol (25 rentals after task156 / 6 sales) → split
+//     over the visible sections → pills; row markers on the date + op cells.
 //   • Theme: color-mix tint derivation + VER_TONE_FG_DARK + isDark threading
 //     AnalyticsClientV2 → AnalyticsClient → ExportCsvModal → SectionTable.
 //   • Safe top: useTelegramContentSafeTop → panel paddingTop.
@@ -119,8 +119,8 @@ describe("task127 · buildOperatorSplit", () => {
 describe("task127 · ExportCsvModal operator split wiring", () => {
   const modal = src("app/franchize/[slug]/rentals-analytics/components/ExportCsvModal.tsx");
 
-  it("opCol mapped to the builder's attribution columns (22 rentals / 6 sales)", () => {
-    expect(modal).toContain("opCol: 22,");
+  it("opCol mapped to the builder's attribution columns (25 rentals after task156 / 6 sales)", () => {
+    expect(modal).toContain("opCol: 25,");
     expect(modal).toContain("opCol: 6,");
   });
 

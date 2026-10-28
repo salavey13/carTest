@@ -267,7 +267,8 @@ describe("task124: analytics XLSX export", () => {
 
   it("the modal preview colors the verification column + tints rows", () => {
     const modal = read("app/franchize/[slug]/rentals-analytics/components/ExportCsvModal.tsx");
-    expect(modal).toContain("verification: 24");
+    // task 156 moved «Верификация» to col 27 (Способ оплаты/Имя/Телефон split)
+    expect(modal).toContain("verification: 27");
     expect(modal).toContain("verificationToneOf");
     // Task 127 renamed the hardcoded pastels to theme-derived tints
     // (color-mix into the theme bg — dark theme no longer washes out).

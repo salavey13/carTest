@@ -326,8 +326,8 @@ export async function buildRentalsCsv(
   // moved to their own block (previously shared the same rows via col 13-17).
   rows.push(CSV_SECTION_TITLES.rentals);
   rows.push(rowOf([
-    "Дата", "ЗП Аренда", "Партнеру", "Цена", "Экип", "Залог",
-    "Марка", "Пробег до", "Пробег после", "Время", "Комментарий",
+    "Дата", "ЗП Аренда", "Партнеру", "Цена", "Способ оплаты", "Экип", "Залог",
+    "Марка", "Пробег до", "Пробег после", "Время", "Имя", "Телефон", "Комментарий",
     "Заметки", "Субарендатор", "Фото", "ID",
     // Task 98: generated audit columns — the ₽ split of «ЗП Аренда»,
     // machine-friendly equipment flags and the commission attribution
@@ -487,13 +487,16 @@ export async function buildRentalsCsv(
 
     const renterName = meta.renter_name || "";
     const renterPhone = meta.renter_phone || "";
+    // Task 156 (boss 2026-10-28): «Способ оплаты» becomes its own column right
+    // after «Цена» (нал/банк видно рядом с суммой), Имя и Телефон — отдельные
+    // колонки; «Комментарий» keeps only the rest (причина бесплатной аренды).
     const paymentMethod = meta.payment_split?.card_destination
       ? `карта ${meta.payment_split.card_destination}`
       : meta.payment_split?.cash > 0
         ? "нал"
         : "";
     const freeReason = meta.free_rental_reason || "";
-    const comment = [renterName, renterPhone, paymentMethod, freeReason].filter(Boolean).join(" ");
+    const comment = freeReason;
 
     // iter20: notes / subrenter / photos.
     const notesStr = rentalNotesSummary(meta);
@@ -507,8 +510,9 @@ export async function buildRentalsCsv(
     const photosStr = rentalPhotoCountsLabel(r.start_photo_count, r.end_photo_count);
 
     rows.push(rowOf([
-      dateStr, salaryStr, partnerPayout > 0 ? String(partnerPayout) : "", price, equipStr, depositStr,
-      bikeName, odoBefore, odoAfter, timeStr, comment,
+      dateStr, salaryStr, partnerPayout > 0 ? String(partnerPayout) : "", price, paymentMethod,
+      equipStr, depositStr,
+      bikeName, odoBefore, odoAfter, timeStr, renterName, renterPhone, comment,
       notesCell, subrenterStr, photosStr, r.rental_id || "",
       // Task 98: generated audit columns
       String(salary.base), String(salary.equipment), String(salary.overprice),
@@ -527,10 +531,10 @@ export async function buildRentalsCsv(
     blockRentals.revenue,
     totalEquipment,
     (rentalRows as any[]).reduce((sum, r) => sum + Number(r.metadata?.deposit_amount || 0), 0),
-    "", "", "", "", "", "", "", "", "",
+    "", "", "", "", "", "", "", "", "", "", "", "",
     // Task 98: «ЗП Аренда» split — техника + экип + наценка = ЗП Аренда
     rentalsSalaryBase, rentalsSalaryEquipment, rentalsSalaryOverprice,
-    "", "", "", "", "", "",
+    "", "", "", "", "", "", "", "",
   ]));
   rows.push("");
 
