@@ -53,11 +53,18 @@ import {
   equipmentFlagsLabel,
   hoursLabelRu,
 } from "@/lib/salary-coefficients-shared";
-import { resolveRentalOperator, type ShiftLike } from "@/app/franchize/lib/operator-attribution";
+import {
+  resolveRentalOperator,
+  resolveRentalOperatorSplit,
+  rentalRoleIds,
+  type OperatorShare,
+  type ShiftLike,
+} from "@/app/franchize/lib/operator-attribution";
+import { splitAmountByFractions } from "@/lib/salary-split";
 // Task 114: per-rental audit grade computed at request time (pure module).
 import { buildAuditStamp, computeRentalAuditGrade, computeVerificationReasonability } from "@/app/franchize/lib/rental-audit";
 // Task 117: the operator score uses the SAME commission math as the payout hub.
-import { commissionOf } from "./rental-payout-core";
+import { addressedShareAmount, commissionOf } from "./rental-payout-core";
 import {
   grantFranchizeAchievementAction,
   syncFranchizeCountersAction,
@@ -107,6 +114,7 @@ import {
   type InlineButton,
   type NegotiationState,
   type OpenProposal,
+  type RentalRoleKey,
   type RentalVerificationRow,
   type RentalVerificationSnapshot,
   type RentalVerificationStatus,
@@ -116,6 +124,10 @@ import {
   type VerificationBrief,
   type VerificationCommissionBrief,
 } from "./rental-verify-core";
+
+// TASK158 — the role keys live in the pure core; re-export for the server
+// actions + webhook wrapper surfaces.
+export type { RentalRoleKey } from "./rental-verify-core";
 
 // Re-export the pure surface so consumers (webhook wrapper, server actions,
 // CSV builder, category bonuses) have ONE import path.
@@ -483,9 +495,13 @@ export async function requestRentalVerification(params: {
       return { sent: false, reason: "equipment/service doc — no operator bonus" };
     }
 
-    // ── Attributed operator (canonical chain) ──
+    // ── TASK158: the generated commission split ──
     // Same window idiom as computeCategoryBonuses: ±1 day around created_at so
-    // a rental created at 23:50 still matches the operator's shift.
+    // a rental created at 23:50 still matches the operator's shift. The
+    // operator PARTY of the сверка = the TOP shareholder (largest fraction;
+    // ties → the earlier role) — one face per DM, but the summary now ALSO
+    // prints the full «👥 ЗП по долям» line when several operators are
+    // engaged, and the split rides the frozen snapshot.
     const createdAtMs = Date.parse(String(rental.created_at || "")) || Date.now();
     const { data: shiftRows } = await supabaseAdmin
       .from("crew_member_shifts")
@@ -498,16 +514,15 @@ export async function requestRentalVerification(params: {
       clock_in_time: s.clock_in_time,
       clock_out_time: s.clock_out_time ?? null,
     }));
-    const attribution = resolveRentalOperator(
-      {
-        created_by_operator_chat_id: rental.created_by_operator_chat_id,
-        created_at: rental.created_at,
-        metadata: rental.metadata,
-      },
-      shifts,
-    );
+    const splitInput = {
+      created_by_operator_chat_id: rental.created_by_operator_chat_id,
+      created_at: rental.created_at,
+      metadata: rental.metadata,
+    };
+    const { shares } = resolveRentalOperatorSplit(splitInput, shifts);
+    const topShare = resolveRentalOperator(splitInput, shifts);
 
-    const operatorChatId = attribution.operatorId ? String(attribution.operatorId) : null;
+    const operatorChatId = topShare.operatorId ? String(topShare.operatorId) : null;
     const ownerChatId = rental.owner_id ? String(rental.owner_id) : null;
     if (!operatorChatId && !ownerChatId) return { sent: false, reason: "no parties to verify" };
 
@@ -531,6 +546,9 @@ export async function requestRentalVerification(params: {
       crewId: rental.crew_id,
       requestedAtIso: nowIso,
     });
+    // TASK158 — freeze the generated split with the numbers: each engaged
+    // operator's integer-ruble piece of the commission (Σ = snapshot.total).
+    snapshot.salarySplit = buildSnapshotSalarySplit(snapshot.total, shares);
 
     // ── Task 114: audit grade — frozen with the numbers ──
     // Same 8 checks as the Aug/Sep/Oct backfill audit, now for EVERY new row:
@@ -739,6 +757,492 @@ export async function requestRentalVerification(params: {
   }
 }
 
+// ── TASK158: the generated role split — shared write + TG reassign flow ────
+//
+// Boss (2026-10-29): «Оператор (ЗП) is GENERATED from "Оператор создал" /
+// "Оператор выдал" / "Оператор принял" — equal split between the engaged
+// dudes; empty creator (rider self-ordered via web app) → 1/2 between who
+// handed out/in … maybe also add buttons to verification messages to be able
+// to reassign operators who handed out and recieved bike back».
+//
+// The three tableview dropdowns and the TG «✍️ Кто выдал / Кто принял»
+// buttons ALL land in writeRentalRoleOperator below — ONE write, ONE audit
+// trail, ONE verification realignment, wherever the fix comes from.
+
+/** The snapshot's frozen salarySplit — integer rubles, Σ = total. */
+export function buildSnapshotSalarySplit(
+  total: number,
+  shares: OperatorShare[],
+): Array<{ userId: string; fraction: { n: number; d: number }; amount: number }> {
+  const amounts = splitAmountByFractions(total, shares.map((s) => s.fraction));
+  return shares.map((s, i) => ({
+    userId: s.operatorId,
+    fraction: s.fraction,
+    amount: amounts[i] ?? 0,
+  }));
+}
+
+// RentalRoleKey comes from the pure core (imported + re-exported above).
+
+export const RENTAL_ROLE_LABELS: Record<RentalRoleKey, string> = {
+  created: "Оператор создал",
+  handed_out: "Оператор выдал",
+  received: "Оператор принял",
+};
+
+/** Crew roster with the SAME compact labels the CSV builder prints. */
+async function loadCrewRosterLabeled(
+  crewId: string,
+): Promise<Array<{ userId: string; label: string }>> {
+  const { data: members, error } = await supabaseAdmin
+    .from("crew_members")
+    .select("user_id")
+    .eq("crew_id", crewId);
+  if (error) throw error;
+  const ids = [...new Set((members || []).map((m: { user_id: string }) => m.user_id).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const usersMap = await loadUsersMap(ids);
+  return ids
+    .map((userId) => ({ userId, label: labelFromUsersMap(usersMap, userId) }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+}
+
+export interface RentalSplitEntry {
+  userId: string;
+  label: string;
+  fraction: { n: number; d: number };
+  amount: number;
+}
+
+export type WriteRoleResult =
+  | {
+      ok: true;
+      rentalId: string;
+      role: RentalRoleKey;
+      newUserId: string | null;
+      /** The freshly generated «Оператор (ЗП)» split (labels resolved). */
+      split: RentalSplitEntry[];
+      splitText: string;
+      verificationNote: string | null;
+    }
+  | { ok: false; error: string };
+
+/**
+ * THE shared role write (tableview dropdowns + TG ✍️ buttons): sets one
+ * physical-fact role on the rental, appends the audit trail, retires any
+ * legacy task157 override and realigns the open сверка row — the operator
+ * party becomes the new TOP shareholder and the frozen snapshot's
+ * attribution + salarySplit are patched so the next resend tells the truth.
+ * Money numbers themselves are NEVER touched here (no snapshot.total edits).
+ */
+export async function writeRentalRoleOperator(params: {
+  rentalId: string;
+  role: RentalRoleKey;
+  /** users.user_id of the new role holder; null = clear the role. */
+  operatorUserId: string | null;
+  actorChatId: string;
+}): Promise<WriteRoleResult> {
+  try {
+    const { data: rentalRow, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, crew_id, metadata, created_by_operator_chat_id, created_at")
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    if (rentalError) throw rentalError;
+    const rental = rentalRow as any;
+    if (!rental) return { ok: false, error: "Аренда не найдена." };
+
+    const newUserId = params.operatorUserId ? String(params.operatorUserId).trim() : null;
+    // The role holder must belong to THIS crew — a stray id must not pull
+    // commission share (same guard as the task157 override write).
+    if (newUserId) {
+      const { data: member, error: memberError } = await supabaseAdmin
+        .from("crew_members")
+        .select("user_id")
+        .eq("crew_id", rental.crew_id)
+        .eq("user_id", newUserId)
+        .maybeSingle();
+      if (memberError) throw memberError;
+      if (!member) return { ok: false, error: "Выбранный оператор не состоит в этом экипаже." };
+    }
+
+    // Display labels — same rule as the roster/CSV builder.
+    const labelIds = [newUserId].filter(Boolean) as string[];
+    const usersMap = await loadUsersMap(labelIds);
+
+    // ── Read-modify-write the metadata + the creator column ──
+    const meta = { ...((rental.metadata || {}) as Record<string, unknown>) };
+    const prev = rentalRoleIds({
+      created_by_operator_chat_id: rental.created_by_operator_chat_id,
+      created_at: rental.created_at,
+      metadata: meta,
+    });
+    const fromId =
+      params.role === "created" ? prev.created
+      : params.role === "handed_out" ? prev.handedOut
+      : prev.received;
+
+    const nowIso = new Date().toISOString();
+    const updates: Record<string, unknown> = {};
+    if (params.role === "created") {
+      updates.created_by_operator_chat_id = newUserId;
+    } else if (params.role === "handed_out") {
+      const freeze = { ...((meta.pickup_freeze || {}) as Record<string, unknown>) };
+      if (newUserId) freeze.frozen_by = newUserId;
+      else delete freeze.frozen_by;
+      meta.pickup_freeze = freeze;
+    } else {
+      if (newUserId) meta.return_confirmed_by = newUserId;
+      else delete meta.return_confirmed_by;
+    }
+    // Audit trail (capped) — who moved which role, from → to.
+    const audit = Array.isArray(meta.salary_roles_audit) ? [...(meta.salary_roles_audit as unknown[])] : [];
+    audit.push({ role: params.role, from: fromId, to: newUserId, by: String(params.actorChatId), at: nowIso });
+    meta.salary_roles_audit = audit.slice(-20);
+    // The task157 single-operator override is RETIRED — the generated split
+    // is the reassignment now; a stale override would sit above the roles.
+    delete meta.salary_operator_override;
+    updates.metadata = meta;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("rentals")
+      .update(updates)
+      .eq("rental_id", params.rentalId);
+    if (updateError) throw updateError;
+
+    // ── Realign the open сверка row + patch the frozen snapshot ──
+    const { data: verRow } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("rental_id, status, snapshot, operator_chat_id")
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    let verificationNote: string | null = null;
+    let newTopUserId: string | null = newUserId;
+    let splitEntries: RentalSplitEntry[] = [];
+
+    // Recompute the split from the UPDATED roles (±25h shift idiom).
+    const createdAtMs = Date.parse(String(rental.created_at || "")) || Date.now();
+    const { data: shiftRows } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("member_id, clock_in_time, clock_out_time")
+      .eq("crew_id", rental.crew_id)
+      .gte("clock_in_time", new Date(createdAtMs - 25 * 3600 * 1000).toISOString())
+      .lte("clock_in_time", new Date(createdAtMs + 25 * 3600 * 1000).toISOString());
+    const shifts: ShiftLike[] = (shiftRows || []).map((s: any) => ({
+      member_id: s.member_id,
+      clock_in_time: s.clock_in_time,
+      clock_out_time: s.clock_out_time ?? null,
+    }));
+    const freshRoles = rentalRoleIds({
+      created_by_operator_chat_id:
+        params.role === "created" ? newUserId : rental.created_by_operator_chat_id,
+      created_at: rental.created_at,
+      metadata: meta,
+    });
+    const { shares } = resolveRentalOperatorSplit(
+      {
+        created_by_operator_chat_id: freshRoles.created,
+        created_at: rental.created_at,
+        metadata: { pickup_freeze: { frozen_by: freshRoles.handedOut }, return_confirmed_by: freshRoles.received },
+      },
+      shifts,
+    );
+    const top = resolveRentalOperator(
+      {
+        created_by_operator_chat_id: freshRoles.created,
+        created_at: rental.created_at,
+        metadata: { pickup_freeze: { frozen_by: freshRoles.handedOut }, return_confirmed_by: freshRoles.received },
+      },
+      shifts,
+    );
+    newTopUserId = top.operatorId;
+
+    // Labels for every engaged operator.
+    const allLabels = await loadUsersMap(shares.map((s) => s.operatorId));
+    splitEntries = shares.map((s) => ({
+      userId: s.operatorId,
+      label: labelFromUsersMap(allLabels, s.operatorId),
+      fraction: s.fraction,
+      amount: 0,
+    }));
+
+    if (verRow) {
+      const snapshot = (verRow.snapshot || {}) as Record<string, unknown>;
+      const total = Number(snapshot.total) || 0;
+      const pieces = buildSnapshotSalarySplit(total, shares);
+      splitEntries = shares.map((s, i) => ({
+        userId: s.operatorId,
+        label: labelFromUsersMap(allLabels, s.operatorId),
+        fraction: s.fraction,
+        amount: pieces[i]?.amount ?? 0,
+      }));
+      const nextSnapshot = {
+        ...snapshot,
+        attribution: {
+          ...((snapshot.attribution as Record<string, unknown>) || {}),
+          createdByChatId: freshRoles.created,
+          handedByChatId: freshRoles.handedOut,
+          returnedByChatId: freshRoles.received,
+        },
+        salarySplit: pieces,
+      };
+      const verStatus = (verRow.status as string) || "pending";
+      const open = !["verified", "disputed"].includes(verStatus);
+      const patch: Record<string, unknown> = {
+        snapshot: nextSnapshot,
+        updated_at: nowIso,
+      };
+      if (open) {
+        patch.operator_chat_id = newTopUserId;
+        patch.status = "pending";
+        patch.operator_confirmed_at = null;
+        if (verStatus !== "pending") {
+          verificationNote = "Сверка сброшена в «ожидает» — доли поменялись.";
+        } else {
+          verificationNote = "Сверка остаётся «ожидает», оператор партии обновлён.";
+        }
+      } else {
+        verificationNote =
+          verStatus === "verified"
+            ? "Подтверждённая сверка остаётся в силе (суммы не тронуты, роли обновлены)."
+            : "Сверка в статусе «спор» — роли обновлены, спор разберите отдельно.";
+      }
+      const { error: verError } = await supabaseAdmin
+        .from("rental_verifications")
+        .update(patch)
+        .eq("rental_id", params.rentalId);
+      if (verError) {
+        logger.warn(`[rental-verify] role write ${params.rentalId}: verification patch failed:`, verError);
+        verificationNote = "Роли сохранены, но сверку не удалось обновить — выслайте сверку заново (📨).";
+      }
+    }
+
+    const splitText = splitEntries
+      .map((e) => `${e.label}${e.fraction.d !== 1 ? ` (${e.fraction.n}/${e.fraction.d})` : ""}`)
+      .join(" · ");
+    logger.info(
+      `[rental-verify] role write ${params.rentalId} role=${params.role} → ${newUserId ?? "—"} by ${params.actorChatId}; split: ${splitText || "—"}`,
+    );
+    return {
+      ok: true,
+      rentalId: params.rentalId,
+      role: params.role,
+      newUserId,
+      split: splitEntries,
+      splitText,
+      verificationNote,
+    };
+  } catch (err) {
+    logger.error(`[rental-verify] writeRentalRoleOperator failed for ${params.rentalId}:`, err);
+    return { ok: false, error: "Не удалось сохранить роль оператора." };
+  }
+}
+
+// ── TASK158: TG «✍️ Кто выдал / Кто принял» flow (verification DMs) ─────────
+
+/**
+ * Callback grammar (≤ 64 bytes; `vrf_re_` routed with the vrf_ family):
+ *   vrf_re_h_<rentalId>            — open the «Кто ВЫДАЛ» crew picker
+ *   vrf_re_r_<rentalId>            — open the «Кто ПРИНЯЛ» crew picker
+ *   vrf_re_s_<h|r>_<rentalId>_<uid> — apply the role write
+ *   vrf_re_x_<rentalId>            — cancel the picker
+ * Allowed actors: crew staff (owner/admin/co_owner) + the row's operator and
+ * owner parties — exactly the humans the DM was addressed to.
+ */
+export async function handleRentalVerifyReassignCallback(params: {
+  data: string;
+  chatId: string;
+  callbackQueryId: string;
+  messageId?: number;
+}): Promise<boolean> {
+  const data = params.data || "";
+  if (!data.startsWith("vrf_re_")) return false;
+  const rest = data.slice("vrf_re_".length);
+  const cancel = rest.startsWith("x_");
+  const pick = rest.startsWith("h_") || rest.startsWith("r_");
+  const apply = rest.startsWith("s_");
+  if (!cancel && !pick && !apply) {
+    await answerCallback(params.callbackQueryId, "Не распознал действие.");
+    return true;
+  }
+
+  try {
+    let roleChar = "";
+    let rentalId = "";
+    let targetUserId = "";
+    if (pick) {
+      roleChar = rest[0];
+      rentalId = rest.slice(2).trim();
+    } else if (apply) {
+      // s_<h|r>_<rentalId>_<uid>
+      const body = rest.slice(2);
+      roleChar = body[0] || "";
+      const afterRole = body.slice(2);
+      const us = afterRole.lastIndexOf("_");
+      rentalId = (us === -1 ? afterRole : afterRole.slice(0, us)).trim();
+      targetUserId = us === -1 ? "" : afterRole.slice(us + 1).trim();
+    } else {
+      rentalId = rest.slice(2).trim();
+    }
+    if (!rentalId) {
+      await answerCallback(params.callbackQueryId, "Не распознал аренду.");
+      return true;
+    }
+
+    // ── The row + the permission gate ──
+    const { data: row, error } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("rental_id, crew_id, crew_slug, status, operator_chat_id, owner_chat_id")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+    if (error && !isMissingRelationError(error)) throw error;
+    if (!row) {
+      await answerCallback(params.callbackQueryId, "Сверка не найдена — выслайте сверку из аналитики (📨).");
+      return true;
+    }
+    const staffChatIds = await loadCrewStaffChatIds((row.crew_slug as string) || null);
+    const allowed = new Set<string>([
+      ...staffChatIds,
+      ...(row.operator_chat_id ? [String(row.operator_chat_id)] : []),
+      ...(row.owner_chat_id ? [String(row.owner_chat_id)] : []),
+    ]);
+    if (!allowed.has(String(params.chatId))) {
+      await answerCallback(params.callbackQueryId, "Менять операторов могут участники сверки или администрация экипажа.");
+      return true;
+    }
+
+    // ── Cancel / picker ──
+    if (cancel) {
+      if (params.messageId) {
+        try {
+          const token = process.env.TELEGRAM_BOT_TOKEN;
+          if (token) {
+            await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: params.chatId,
+                message_id: params.messageId,
+                reply_markup: { inline_keyboard: [] },
+              }),
+            });
+          }
+        } catch {
+          /* cosmetic only */
+        }
+      }
+      await answerCallback(params.callbackQueryId, "Отменено.");
+      return true;
+    }
+
+    if (pick) {
+      const roleLabel = roleChar === "h" ? "Кто ВЫДАЛ байк?" : "Кто ПРИНЯЛ байк обратно?";
+      const roster = await loadCrewRosterLabeled(String(row.crew_id));
+      if (roster.length === 0) {
+        await answerCallback(params.callbackQueryId, "В экипаже нет участников — некого выбирать.");
+        return true;
+      }
+      const keyboard: Array<Array<{ text: string; callback_data: string }>> = roster.map((m) => [
+        { text: m.label, callback_data: `vrf_re_s_${roleChar}_${rentalId}_${m.userId}` },
+      ]);
+      keyboard.push([{ text: "✕ Отмена", callback_data: `vrf_re_x_${rentalId}` }]);
+      await sendComplexMessage(params.chatId, `✍️ ${roleLabel}\nВыбери участника экипажа:`, keyboard, {
+        keyboardType: "inline",
+      });
+      await answerCallback(params.callbackQueryId, "Выбери участника 👇");
+      return true;
+    }
+
+    // ── Apply ──
+    const role: RentalRoleKey = roleChar === "h" ? "handed_out" : "received";
+    const result = await writeRentalRoleOperator({
+      rentalId,
+      role,
+      operatorUserId: targetUserId || null,
+      actorChatId: String(params.chatId),
+    });
+    if (!result.ok) {
+      await answerCallback(params.callbackQueryId, result.error);
+      return true;
+    }
+
+    // Strip the tapped picker's keyboard (cosmetic, failures ignored).
+    if (params.messageId) {
+      try {
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        if (token) {
+          await fetch(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: params.chatId,
+              message_id: params.messageId,
+              reply_markup: { inline_keyboard: [] },
+            }),
+          });
+        }
+      } catch {
+        /* cosmetic only */
+      }
+    }
+
+    // Fresh summary to the actor: the patched snapshot now carries the new
+    // roles + the new «👥 ЗП по долям» line, so the confirmation shows EXACTLY
+    // what changed without leaving Telegram.
+    const { data: fresh } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("rental_id, status, snapshot, operator_chat_id, owner_chat_id, crew_slug")
+      .eq("rental_id", rentalId)
+      .maybeSingle();
+    if (fresh) {
+      const snapshot = (fresh.snapshot || {}) as unknown as RentalVerificationSnapshot;
+      const usersMap = await loadUsersMap([fresh.operator_chat_id, fresh.owner_chat_id].filter(Boolean).map(String));
+      const operatorLabel = labelFromUsersMap(usersMap, fresh.operator_chat_id ? String(fresh.operator_chat_id) : null);
+      const ownerLabel = labelFromUsersMap(usersMap, fresh.owner_chat_id ? String(fresh.owner_chat_id) : null);
+      const singleParty = !fresh.operator_chat_id || String(fresh.operator_chat_id) === String(fresh.owner_chat_id ?? "");
+      const summary = formatVerificationSummary({
+        crewName: (fresh.crew_slug as string) || null,
+        snapshot,
+        usersMap,
+        operatorChatId: fresh.operator_chat_id ? String(fresh.operator_chat_id) : null,
+        ownerChatId: fresh.owner_chat_id ? String(fresh.owner_chat_id) : null,
+        statusNote: verificationStatusNote({
+          status: (fresh.status as RentalVerificationStatus) || "pending",
+          singleParty,
+          operatorLabel,
+          ownerLabel,
+        }),
+      });
+      const keyboard =
+        fresh.status === "verified"
+          ? verificationReopenKeyboard(rentalId)
+          : verificationKeyboard(rentalId);
+      const roleLabel = RENTAL_ROLE_LABELS[role];
+      const who = result.split.find((e) => e.userId === targetUserId)?.label || targetUserId;
+      try {
+        await sendComplexMessage(
+          params.chatId,
+          `✍️ ${roleLabel}: <b>${escapeVerifyHtml(who)}</b>\nЗП по долям: ${escapeVerifyHtml(result.splitText || "—")}\n\n${summary}`,
+          keyboard,
+          { parseMode: "HTML", keyboardType: "inline" },
+        );
+      } catch (sendErr) {
+        logger.warn(`[rental-verify] reassign fresh summary failed for ${params.chatId} (rental ${rentalId}):`, sendErr);
+      }
+    }
+
+    await answerCallback(
+      params.callbackQueryId,
+      `${role === "handed_out" ? "Выдал" : "Принял"}: ${result.splitText || "сохранено"} ✅`,
+    );
+    return true;
+  } catch (err) {
+    logger.warn("[rental-verify] reassign callback failed:", err);
+    await answerCallback(params.callbackQueryId, "Не удалось сохранить — попробуйте ещё раз.");
+    return true;
+  }
+}
+
 // ── Task 117: operator score (копилка) + bike photo preview ────────────────
 
 /**
@@ -767,7 +1271,9 @@ export async function loadOperatorVerifiedScore(
       return out;
     }
     for (const row of (rows || []) as PayoutSourceRowLike[]) {
-      out.sum += commissionOf(row).amount;
+      // TASK158 — the piggy bank counts the addressed operator's SLICE of a
+      // split rental (the same number the payout hub + done-DM show).
+      out.sum += addressedShareAmount(row as never);
       out.count += 1;
     }
   } catch (e) {
@@ -776,11 +1282,12 @@ export async function loadOperatorVerifiedScore(
   return out;
 }
 
-/** Minimal shape commissionOf needs (avoids importing the payout row type). */
+/** Minimal shape commissionOf/addressedShareAmount need (avoids importing the payout row type). */
 interface PayoutSourceRowLike {
   snapshot?: unknown;
   negotiation?: unknown;
   payout?: unknown;
+  operator_chat_id?: string | null;
 }
 
 /**
@@ -1495,7 +2002,9 @@ export async function handleRentalVerifyCallback(params: {
       // bank grew right now, show it (+this commission) instead of a stale
       // number. Falls back to «без счёта» on any failure (never blocks).
       const freshScore = await loadOperatorVerifiedScore(current_.operator_chat_id).catch(() => null);
-      const { amount: confirmedAmount } = commissionOf(current_);
+      // TASK158 — the score tail counts the ADDRESSED operator's slice of a
+      // split rental, not the whole commission.
+      const confirmedAmount = addressedShareAmount(current_);
       const doneText = [
         isAdminVerify ? `🤝 <b>Расчёт подтверждён владельцем и администрацией</b>` : `🤝 <b>Расчёт подтверждён обеими сторонами</b>`,
         ``,

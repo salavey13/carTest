@@ -20,6 +20,7 @@ import {
 } from "@/app/franchize/[slug]/rentals-analytics/components/lib/analytics-utils";
 import {
   resolveRentalOperator,
+  resolveRentalOperatorSplit,
   resolveSaleOperator,
   pickShiftAt,
   ATTRIBUTION_SOURCE_LABELS,
@@ -165,27 +166,41 @@ describe("iter20 · operator-attribution (salary credit chain)", () => {
   const PAUL = "413553377";
   const ILYA = "356282674";
 
-  it("priority 1 — /doc creator wins over everything", () => {
-    const attr = resolveRentalOperator(
-      {
-        created_by_operator_chat_id: ILYA,
-        created_at: "2026-08-29T12:00:00Z",
-        metadata: { pickup_freeze: { frozen_by: PAUL }, return_confirmed_by: PAUL },
-      },
-      [{ member_id: "999", clock_in_time: "2026-08-29T06:00:00Z", clock_out_time: "2026-08-29T18:00:00Z" }],
-    );
-    expect(attr).toEqual({ operatorId: ILYA, source: "doc_command" });
+  it("TASK158 — filled roles split the commission; top shareholder is the single face", () => {
+    // OLD iter20 chain (creator beats handout beats return) became the
+    // generated split: each FILLED role carries an equal weight, an operator
+    // holding several roles accumulates them. ILYA created, PAUL handed out
+    // AND received → PAUL 2/3, ILYA 1/3 → the top share (what
+    // resolveRentalOperator answers) is PAUL with the "split" source.
+    const input = {
+      created_by_operator_chat_id: ILYA,
+      created_at: "2026-08-29T12:00:00Z",
+      metadata: { pickup_freeze: { frozen_by: PAUL }, return_confirmed_by: PAUL },
+    };
+    const shifts = [{ member_id: "999", clock_in_time: "2026-08-29T06:00:00Z", clock_out_time: "2026-08-29T18:00:00Z" }];
+    const { shares, source } = resolveRentalOperatorSplit(input, shifts);
+    expect(source).toBe("split");
+    expect(shares.map((s) => [s.operatorId, s.fraction.n, s.fraction.d])).toEqual([
+      [ILYA, 1, 3],
+      [PAUL, 2, 3],
+    ]);
+    expect(resolveRentalOperator(input, shifts)).toEqual({ operatorId: PAUL, source: "split" });
   });
 
-  it("priority 2 — pickup-freeze operator (web order handout) beats shift + return", () => {
-    const attr = resolveRentalOperator(
-      {
-        created_at: "2026-08-29T14:22:00Z",
-        metadata: { pickup_freeze: { frozen_by: PAUL }, return_confirmed_by: ILYA },
-      },
-      [{ member_id: "999", clock_in_time: "2026-08-29T07:41:00Z", clock_out_time: "2026-08-29T18:07:00Z" }],
-    );
-    expect(attr).toEqual({ operatorId: PAUL, source: "handout" });
+  it("TASK158 — web self-order (no creator): handout + return split 1/2 + 1/2", () => {
+    const input = {
+      created_at: "2026-08-29T14:22:00Z",
+      metadata: { pickup_freeze: { frozen_by: PAUL }, return_confirmed_by: ILYA },
+    };
+    const shifts = [{ member_id: "999", clock_in_time: "2026-08-29T07:41:00Z", clock_out_time: "2026-08-29T18:07:00Z" }];
+    const { shares, source } = resolveRentalOperatorSplit(input, shifts);
+    expect(source).toBe("split");
+    expect(shares.map((s) => [s.operatorId, s.fraction.n, s.fraction.d])).toEqual([
+      [PAUL, 1, 2],
+      [ILYA, 1, 2],
+    ]);
+    // tie → the earlier role (handout) is the single face
+    expect(resolveRentalOperator(input, shifts)).toEqual({ operatorId: PAUL, source: "split" });
   });
 
   it("priority 3 — return confirmer when no handout was frozen", () => {
@@ -409,8 +424,11 @@ describe("iter20 · source guards", () => {
     // auth guard). The guard now checks BOTH: the lib keeps the full
     // attribution chain, and calculateSalaryForPeriod still wires it in.
     const lib = read("app/franchize/lib/salary-category-bonuses.ts");
-    expect(lib).toContain("resolveRentalOperator(r, shifts)");
+    // TASK158 — the credits go through the generated role SPLIT (a member can
+    // hold a 2/3 share); the sale attribution keeps the single chain.
+    expect(lib).toContain("resolveRentalOperatorSplit(r, shifts)");
     expect(lib).toContain("resolveSaleOperator(s, memberIds, shifts)");
+    expect(lib).toContain("splitAmountByFractions");
     expect(lib).toContain('from("crew_member_shifts")');
     expect(lib).toContain("ATTRIBUTION_SOURCE_LABELS");
     // the old direct member filter must be gone from the rentals query

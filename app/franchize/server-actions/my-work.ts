@@ -19,12 +19,13 @@ import {
   type RentalEquipment,
 } from "@/lib/salary-coefficients";
 import {
-  resolveRentalOperator,
+  resolveRentalOperatorSplit,
   resolveSaleOperator,
   ATTRIBUTION_SOURCE_LABELS,
   type AttributionSource,
   type ShiftLike,
 } from "@/app/franchize/lib/operator-attribution";
+import { splitAmountByFractions } from "@/lib/salary-split";
 import { computeSaleSalary } from "@/lib/salary-coefficients-shared";
 
 /**
@@ -205,8 +206,12 @@ export async function getMyWorkDayAction(params: {
     let rentalsRevenue = 0;
     let rentalsSalary = 0;
     for (const r of (dayRentals || []) as any[]) {
-      const attribution = resolveRentalOperator(r, allShifts);
-      if (attribution.operatorId !== secureUserId) continue;
+      // TASK158 — the member sees THEIR share of the rental (generated role
+      // split: same math as the profile «Комиссии» and the CSV pills).
+      const { shares, source } = resolveRentalOperatorSplit(r, allShifts);
+      const shareIndex = shares.findIndex((s) => s.operatorId === secureUserId);
+      if (shareIndex === -1) continue;
+      const mySource = shares.length > 1 ? source : shares[shareIndex].roles[0];
 
       const meta = r.metadata || {};
       const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
@@ -238,14 +243,19 @@ export async function getMyWorkDayAction(params: {
       });
 
       rentalsRevenue += price;
-      rentalsSalary += salary.total;
+      const mySalary =
+        splitAmountByFractions(
+          salary.total,
+          shares.map((s) => s.fraction),
+        )[shareIndex] ?? 0;
+      rentalsSalary += mySalary;
       rentalDetails.push({
         rentalId: String(r.rental_id),
         bikeLabel,
         status: r.status || "unknown",
         revenue: price,
-        salary: salary.total,
-        sourceLabel: ATTRIBUTION_SOURCE_LABELS[attribution.source as AttributionSource] || "—",
+        salary: mySalary,
+        sourceLabel: ATTRIBUTION_SOURCE_LABELS[mySource as AttributionSource] || "—",
       });
     }
 

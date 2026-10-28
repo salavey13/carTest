@@ -26,7 +26,7 @@ import { codexCommand } from "./codex";
 import { docCommand, handleDocText, handleDocCallback } from "./doc-manual";
 import { ekipCommand, handleEkipText, handleEkipCallback } from "./ekip-manual";
 import { handleSubrentManualCommand } from "./subrent-manual";
-import { handleRentalVerifyCallbackCommand, handleRentalVerifyProposalCallbackCommand, handleRentalVerifyTextCommand } from "./rental-verify";
+import { handleRentalVerifyCallbackCommand, handleRentalVerifyProposalCallbackCommand, handleRentalVerifyReassignCallbackCommand, handleRentalVerifyTextCommand } from "./rental-verify";
 import { handleRentalPayoutCallbackCommand, handlePayoutsCommand, isPayoutStartPayload } from "./rental-payout";
 import { analyticsPassCommand } from "./analytics_pass";
 import { testDriveCommand, handleTestDriveText, handleTestDriveCallback } from "./testdrive-manual";
@@ -111,6 +111,20 @@ export async function handleCommand(update: any) {
         // commission snapshot right after the rental closes.
         // Task 106: `vrfp_*` routes the dispute editor / proposal flow —
         // same unique-prefix logic, checked together with `vrf_`.
+        // TASK158: `vrf_re_*` routes the «✍️ Кто выдал / Кто принял» role
+        // reassignment (picker + apply) — same family, checked FIRST because
+        // `vrf_re_` would otherwise fall into the `vrf_ok_`/`vrf_dis_` startsWith
+        // net below and be answered by the wrong handler.
+        if (update.callback_query && text.startsWith("vrf_re_")) {
+            const handled = await handleRentalVerifyReassignCallbackCommand({
+                userIdStr,
+                chatId,
+                text,
+                callbackQueryId: update.callback_query.id,
+                messageId: update.callback_query?.message?.message_id,
+            });
+            if (handled) return;
+        }
         if (update.callback_query && (text.startsWith("vrf_ok_") || text.startsWith("vrf_dis_") || text.startsWith("vrfp_"))) {
             const handled = text.startsWith("vrfp_")
                 ? await handleRentalVerifyProposalCallbackCommand({

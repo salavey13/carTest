@@ -412,9 +412,10 @@ describe("task117 · wiring pins", () => {
     expect(idxSend).toBeGreaterThan(idx);
   });
 
-  it("the score uses commissionOf (same money as the payout hub) and feeds both DMs", () => {
+  it("the score uses the payout-hub money (TASK158: the operator's SLICE of a split) and feeds both DMs", () => {
     const s = src("app/franchize/lib/rental-verify.ts");
-    expect(s).toContain('import { commissionOf } from "./rental-payout-core";');
+    expect(s).toContain('import { addressedShareAmount, commissionOf } from "./rental-payout-core";');
+    expect(s).toContain("addressedShareAmount(row as never)");
     expect(s).toContain("export async function loadOperatorVerifiedScore(");
     expect(s).toContain('.eq("operator_chat_id", viewer)');
     expect(s).toContain('.eq("status", "verified")');

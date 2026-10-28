@@ -36,6 +36,7 @@ import {
   type RentalVerificationStatus,
   type SplitParts,
 } from "./rental-verify-core";
+import { splitAmountByFractions } from "@/lib/salary-split";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -170,6 +171,35 @@ export function commissionOf(row: Pick<PayoutSourceRow, "snapshot" | "negotiatio
 }
 
 /**
+ * TASK158 — the ADDRESSED operator's slice of the commission.
+ * The сверка DM + the payout hub address ONE operator (the top shareholder
+ * of the generated role split) — this returns THEIR integer-ruble piece
+ * (snapshot.salarySplit fractions, remainder to the largest share), so a
+ * «@a (2/3) + @b (1/3)» rental never pays the full commission to @a.
+ * Rows without a split (single-operator rentals, old snapshots) pay 100%.
+ */
+export function addressedShareAmount(
+  row: Pick<PayoutSourceRow, "snapshot" | "negotiation" | "operator_chat_id">,
+): number {
+  const { amount: base } = commissionOf(row);
+  const snap = (row.snapshot || {}) as Record<string, unknown>;
+  // (parenthesised cast — `as Array<{…{…}}>}` trips the TS parser)
+  const split = Array.isArray(snap.salarySplit)
+    ? (snap.salarySplit as (Array<{ userId?: unknown; fraction?: { n?: unknown; d?: unknown } }>))
+    : [];
+  if (split.length <= 1) return base;
+  const op = row.operator_chat_id ? String(row.operator_chat_id) : null;
+  if (!op) return base;
+  const idx = split.findIndex((p) => p && String(p.userId ?? "") === op);
+  if (idx === -1) return base;
+  const fractions = split.map((p) => ({
+    n: Number(p.fraction?.n) > 0 ? Number(p.fraction?.n) : 0,
+    d: Number(p.fraction?.d) > 0 ? Number(p.fraction?.d) : 1,
+  }));
+  return splitAmountByFractions(base, fractions)[idx] ?? base;
+}
+
+/**
  * True when the row carries REAL payout money: an operator commission that
  * must leave the till. Single-party rows (operator === owner, or no operator)
  * are the boss's own money — not a payout.
@@ -194,7 +224,10 @@ export function buildPayoutItem(row: PayoutSourceRow, viewerChatId: string): Pay
   if (!isPayoutRow(row)) return null;
   const viewer = String(viewerChatId || "");
   const snap = (row.snapshot || {}) as Record<string, unknown>;
-  const { amount, adjusted } = commissionOf(row);
+  // TASK158 — the hub tracks the ADDRESSED operator's slice (a 2/3 share of
+  // a split rental is 2/3 of the money, never the whole commission).
+  const amount = addressedShareAmount(row);
+  const { adjusted } = commissionOf(row);
   const totalCost = Math.max(0, Number(snap.totalCost) || 0);
   const payout = parsePayoutInfo(row.payout);
   const op = payout.operator;

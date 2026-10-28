@@ -1,42 +1,44 @@
 // app/franchize/lib/operator-attribution.ts
 //
-// iter20 — salary operator attribution.
+// iter20 — salary operator attribution. TASK158 (boss 2026-10-29) — the
+// attribution is now a SPLIT, not a single winner:
 //
-// PROBLEM: the salary breakdown credited rentals ONLY via
-// rentals.created_by_operator_chat_id (set by the bot /doc flow). Every
-// self-service web order has it NULL, so the operators' rental counts showed
-// 0 even on days they personally handed out every bike.
+// «lets make this column generated — it should contain automatically
+// generated list of operators who were engaged somehow in rental: we have
+// 3 other columns to base this list on: "Оператор создал", "Оператор
+// выдал", "Оператор принял" … if all 3 are same everything goes to same
+// dude, and in case columns contain several dudes - split equally … EDGE
+// CASE: when rider created rental himself via web app then "Оператор
+// создал" is empty - then split 1/2 between who handed out/in».
 //
-// ATTRIBUTION CHAIN (most authoritative first, per rental):
-//   0. metadata.salary_operator_override.user_id — MANUAL REASSIGNMENT
-//      (task157, boss 2026-10-28: «choosing a different operator in the
-//      tableview dropdown should reassign it in the rental — commissions go
-//      to the new operator, proper full reassignment»). Written ONLY by the
-//      owner-tier reassignRentalOperatorAction; carries by/at for the audit.
-//      Sits ABOVE every automatic source so a reassignment survives the
-//      original evidence: the handout/return metadata still says who
-//      physically worked the rental — the override says who gets PAID for it.
-//   1. created_by_operator_chat_id  — the operator who ran /doc (doc_command,
-//      doc_command_recovery, claude_bot sources).
-//   2. metadata.pickup_freeze.frozen_by — the operator who conducted the
-//      HANDOUT of a web order (rental page "Фиксация выдачи"). This is the
-//      person who physically worked with the client, so it beats the shift
-//      cross-reference below (which is ambiguous when several members are on
-//      shift at once).
-//   3. metadata.return_confirmed_by — the operator who closed the rental
-//      (last resort for rentals that were never picked up via the web flow).
-//   4. Shift cross-reference — the crew member whose crew_member_shifts row
-//      covers the rental's created_at. When several shifts overlap, the one
-//      with the LONGEST overlap wins; ties break to the earliest clock_in
-//      (deterministic).
+// THE RULE (per-ROLE weighting — each FILLED role carries an equal share of
+// the commission, an operator holding several roles accumulates them):
+//   создал A · выдал B · принял C   → A 1/3 · B 1/3 · C 1/3
+//   создал A · выдал B · принял B   → A 1/3 · B 2/3
+//   создал A · выдал A · принял A   → A 100%
+//   создал —  · выдал B · принял C   → B 1/2 · C 1/2   (web self-order)
+//   создал —  · выдал B · принял —   → B 100%
+//   no role evidence at all         → the old shift cross-ref (100%).
 //
-// Sales (sale_contract_artifacts) use the same idea:
-//   1. telegram_chat_id — the member whose bot session created the sale
-//      (verified against the known member ids).
+// The old task157 single-operator override (metadata.salary_operator_override)
+// is RETIRED — the generated role split IS the reassignment now (the three
+// role dropdowns in the tableview edit the physical-fact roles, the money
+// follows mechanically). The one override ever written (kawasaki 9 Oct,
+// 685a9152) was migrated to the roles by task158.
+//
+// `resolveRentalOperatorSplit` is the canonical money math. The legacy
+// `resolveRentalOperator` (single operator) survives for surfaces that need
+// ONE face per rental (the verification DM operator party, the payout hub
+// recipient) — it now means «the TOP shareholder» (largest fraction wins,
+// ties break to the earliest role: создал → выдал → принял), so it can never
+// disagree with the split.
+//
+// Sales (sale_contract_artifacts) keep the single-operator chain:
+//   1. telegram_chat_id — the member whose bot session created the sale.
 //   2. Shift covering created_at (same tie-breaks).
 //
 // Pure functions — zero Supabase deps — unit-tested in
-// tests/franchize/iter20-suite.spec.ts.
+// tests/franchize/iter20-suite.spec.ts + tests/franchize/task158-salary-split.spec.ts.
 
 export interface ShiftLike {
   member_id: string;
@@ -45,11 +47,11 @@ export interface ShiftLike {
 }
 
 export type AttributionSource =
-  | "override"
   | "doc_command"
   | "handout"
   | "return"
   | "shift"
+  | "split"
   | "none";
 
 export interface RentalAttributionInput {
@@ -61,6 +63,15 @@ export interface RentalAttributionInput {
 export interface Attribution {
   operatorId: string | null;
   source: AttributionSource;
+}
+
+/** One engaged operator's slice of the rental commission. */
+export interface OperatorShare {
+  operatorId: string;
+  /** Reduced fraction of the commission (n/d both ≤ 3 in practice). */
+  fraction: { n: number; d: number };
+  /** Which filled roles the operator holds (attribution-space labels). */
+  roles: AttributionSource[];
 }
 
 /** ISO timestamp → epoch ms, null-safe (unparseable/missing → null). */
@@ -108,55 +119,125 @@ function stringFromMetadata(
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
 }
 
-/**
- * Task157 — the manual salary-operator reassignment stamp the tableview
- * dropdown writes (metadata.salary_operator_override). Returns the NEW
- * operator's users.user_id, or null when the rental carries no override.
- * Tolerates garbage (wrong types / empty strings) the same way every other
- * metadata reader here does.
- */
-export function readSalaryOperatorOverride(
-  metadata: Record<string, unknown> | null | undefined,
-): string | null {
-  const raw = metadata?.["salary_operator_override"];
-  if (!raw || typeof raw !== "object") return null;
-  return stringFromMetadata(raw as Record<string, unknown>, "user_id");
+/** The three physical-fact role ids of a rental (trimmed; null = role empty). */
+export interface RentalRoleIds {
+  created: string | null;
+  handedOut: string | null;
+  received: string | null;
 }
 
-/** Full rental attribution chain — see the module docblock. */
-export function resolveRentalOperator(
-  rental: RentalAttributionInput,
-  shifts: ShiftLike[],
-): Attribution {
-  // 0. Manual reassignment — the owner's explicit «this rental's ЗП goes to
-  //    THAT operator» beats every automatic source (see the docblock).
-  const overrideId = readSalaryOperatorOverride(rental.metadata ?? null);
-  if (overrideId) return { operatorId: overrideId, source: "override" };
-
-  const direct =
+/**
+ * Read the three role ids the generated «Оператор (ЗП)» list is built from:
+ *   создал  → rentals.created_by_operator_chat_id (/doc operator, null for
+ *             self-service web orders — the EDGE CASE),
+ *   выдал   → metadata.pickup_freeze.frozen_by,
+ *   принял  → metadata.return_confirmed_by.
+ * Tolerates garbage the same way every other metadata reader here does.
+ */
+export function rentalRoleIds(rental: RentalAttributionInput): RentalRoleIds {
+  const created =
     typeof rental.created_by_operator_chat_id === "string" &&
     rental.created_by_operator_chat_id.trim().length > 0
       ? rental.created_by_operator_chat_id.trim()
       : null;
-  if (direct) return { operatorId: direct, source: "doc_command" };
-
   const md = rental.metadata ?? null;
   const freeze = md?.["pickup_freeze"];
-  const frozenBy =
+  const handedOut =
     freeze && typeof freeze === "object"
       ? stringFromMetadata(freeze as Record<string, unknown>, "frozen_by")
       : null;
-  if (frozenBy) return { operatorId: frozenBy, source: "handout" };
+  const received = stringFromMetadata(md, "return_confirmed_by");
+  return { created, handedOut, received };
+}
 
-  const returnBy = stringFromMetadata(md, "return_confirmed_by");
-  if (returnBy) return { operatorId: returnBy, source: "return" };
+/** Greatest common divisor (fractions stay reduced — 2/6 never prints). */
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
 
-  const createdAt = toMs(rental.created_at);
-  if (createdAt != null) {
-    const shift = pickShiftAt(shifts, createdAt);
-    if (shift) return { operatorId: shift.member_id, source: "shift" };
+/**
+ * TASK158 — the generated commission split. Filled roles share the
+ * commission EQUALLY (weight = 1 / count of filled roles); an operator
+ * holding several roles accumulates their weights (2 filled roles held by
+ * one dude = 2/3). Order of shares = first appearance across
+ * создал → выдал → принял (stable for the CSV cell + tests). No filled role
+ * at all → the shift cross-ref covers the whole commission (the old last
+ * resort), source "shift"; nothing anywhere → empty list.
+ */
+export function resolveRentalOperatorSplit(
+  rental: RentalAttributionInput,
+  shifts: ShiftLike[],
+): { shares: OperatorShare[]; source: AttributionSource } {
+  const roles = rentalRoleIds(rental);
+  const filled: Array<{ operatorId: string; role: AttributionSource }> = [];
+  if (roles.created) filled.push({ operatorId: roles.created, role: "doc_command" });
+  if (roles.handedOut) filled.push({ operatorId: roles.handedOut, role: "handout" });
+  if (roles.received) filled.push({ operatorId: roles.received, role: "return" });
+
+  if (filled.length === 0) {
+    const createdAt = toMs(rental.created_at);
+    if (createdAt != null) {
+      const shift = pickShiftAt(shifts, createdAt);
+      if (shift) {
+        return {
+          shares: [{ operatorId: shift.member_id, fraction: { n: 1, d: 1 }, roles: ["shift"] }],
+          source: "shift",
+        };
+      }
+    }
+    return { shares: [], source: "none" };
   }
-  return { operatorId: null, source: "none" };
+
+  const d = filled.length;
+  const byOperator = new Map<string, { count: number; roles: AttributionSource[] }>();
+  for (const f of filled) {
+    const existing = byOperator.get(f.operatorId);
+    if (existing) {
+      existing.count += 1;
+      existing.roles.push(f.role);
+    } else {
+      byOperator.set(f.operatorId, { count: 1, roles: [f.role] });
+    }
+  }
+  const shares: OperatorShare[] = [...byOperator.entries()].map(([operatorId, acc]) => {
+    const g = gcd(acc.count, d);
+    return { operatorId, fraction: { n: acc.count / g, d: d / g }, roles: acc.roles };
+  });
+  const source: AttributionSource = shares.length > 1 ? "split" : filled[0].role;
+  return { shares, source };
+}
+
+/**
+ * The TOP shareholder of the split — the single face a rental wears on
+ * surfaces that address ONE operator (the сверка DM operator party, the
+ * payout recipient, the legacy attribution consumers). Largest fraction
+ * wins; ties break to the EARLIER role (создал beats выдал beats принял —
+ * the first appearance order the Map keeps). Null when nobody is engaged.
+ */
+export function topShareOf(
+  rental: RentalAttributionInput,
+  shifts: ShiftLike[],
+): Attribution {
+  const { shares, source } = resolveRentalOperatorSplit(rental, shifts);
+  if (shares.length === 0) return { operatorId: null, source: "none" };
+  let best = shares[0];
+  for (const s of shares) {
+    if (s.fraction.n * best.fraction.d > best.fraction.n * s.fraction.d) best = s;
+  }
+  return { operatorId: best.operatorId, source: shares.length > 1 ? source : best.roles[0] };
+}
+
+/**
+ * Legacy single-operator view — now EXACTLY the top shareholder of the
+ * generated split (see topShareOf). Kept under the old name because a dozen
+ * surfaces (verification heal, my-work, CSV/CSV-sections) still want one id;
+ * the money math itself goes through resolveRentalOperatorSplit.
+ */
+export function resolveRentalOperator(
+  rental: RentalAttributionInput,
+  shifts: ShiftLike[],
+): Attribution {
+  return topShareOf(rental, shifts);
 }
 
 export interface SaleAttributionInput {
@@ -193,10 +274,10 @@ export function resolveSaleOperator(
 
 /** Human label for the attribution source (breakdown transparency). */
 export const ATTRIBUTION_SOURCE_LABELS: Record<AttributionSource, string> = {
-  override: "переназначено",
   doc_command: "/doc",
   handout: "выдача",
   return: "возврат",
   shift: "смена",
+  split: "раздел ЗП",
   none: "—",
 };

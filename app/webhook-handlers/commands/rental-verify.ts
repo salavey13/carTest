@@ -16,6 +16,7 @@ import {
   handleRentalVerifyCallback,
   handleRentalVerifyCommentText,
   handleRentalVerifyProposalCallback,
+  handleRentalVerifyReassignCallback,
 } from "@/app/franchize/lib/rental-verify";
 
 export async function handleRentalVerifyCallbackCommand(params: {
@@ -55,6 +56,30 @@ export async function handleRentalVerifyProposalCallbackCommand(params: {
     });
   } catch (e) {
     logger.warn("[rental-verify] proposal webhook dispatch failed:", e);
+    return false;
+  }
+}
+
+/**
+ * TASK158: the «✍️ Кто выдал / Кто принял» role reassignment flow —
+ * picker + apply callbacks (`vrf_re_*`).
+ */
+export async function handleRentalVerifyReassignCallbackCommand(params: {
+  userIdStr: string;
+  chatId: number;
+  text: string;
+  callbackQueryId: string;
+  messageId?: number;
+}): Promise<boolean> {
+  try {
+    return await handleRentalVerifyReassignCallback({
+      data: params.text,
+      chatId: String(params.chatId),
+      callbackQueryId: params.callbackQueryId,
+      messageId: params.messageId,
+    });
+  } catch (e) {
+    logger.warn("[rental-verify] reassign webhook dispatch failed:", e);
     return false;
   }
 }

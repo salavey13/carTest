@@ -48,8 +48,10 @@ describe("task128 · operator filter (tap a pill → filter rows)", () => {
     );
     // task129 review fix: opCol hoisted to a local const — property narrowing
     // doesn't survive into the filter closure (the bare r[cfg.opCol] was TS2538)
+    // TASK158 — the filter is a CONTAINS match on the parsed split labels (a
+    // 2-operator row shows up under both pills, each with its own fraction).
     expect(modal).toContain(
-      'data: s.data.filter((r) => (r[opIdx] || "").trim() === effectiveOpFilter),',
+      "return parseSalarySplitCell(cell).some((p) => p.label === effectiveOpFilter);",
     );
   });
 
@@ -111,10 +113,10 @@ describe("task128 · quick verify right in the table view", () => {
   it("uses the SAME owner-gated action + confirm pattern as the rental-page card", () => {
     // task152 — the modal now imports the verify action AND the resend action
     // (the per-row «выслать сверку» button) from the same owner-gated module.
-    // task157 re-baseline — the roster + reassign actions joined the import
-    // block (the «Оператор (ЗП)» dropdown), so the closing brace moved.
+    // TASK158 re-baseline — the roster + ROLE actions joined the import block
+    // (the three role dropdowns), so the closing brace moved.
     expect(modal).toContain(
-      "adminVerifyRentalAction,\n  getSalaryOperatorsAction,\n  reassignRentalOperatorAction,\n  resendVerificationDmsAction,\n  type SalaryOperatorOption,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
+      "adminVerifyRentalAction,\n  getSalaryOperatorsAction,\n  setRentalRoleOperatorAction,\n  resendVerificationDmsAction,\n  type SalaryOperatorOption,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
     );
     expect(modal).toContain("adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });");
     expect(modal).toContain("window.confirm(");

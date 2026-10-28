@@ -125,7 +125,11 @@ describe("task127 · ExportCsvModal operator split wiring", () => {
   });
 
   it("split sums the ЗП column (col 1) over the PRE-op-filter sections (task128: pills stay tappable while filtered)", () => {
-    expect(modal).toContain("entries.push({ label, amount: toNumber(r[1] || \"\") });");
+    // TASK158 — a generated split cell contributes EACH operator's FRACTION
+    // of the row's ЗП (parseSalarySplitCell), so the pills match the profile
+    // ruble-for-ruble; sales rows stay single-operator (1/1).
+    expect(modal).toContain("const parts = s.key === \"rentals\" ? parseSalarySplitCell(cell) : [{ label: cell, fraction: { n: 1, d: 1 } }];");
+    expect(modal).toContain("amount: Math.round((rowAmount * part.fraction.n) / part.fraction.d),");
     expect(modal).toContain("return buildOperatorSplit(entries, opGrandTotal);");
     expect(modal).toContain("const opGrandTotal = sumCell(rentPre, 1) + sumCell(salesPre, 1);");
   });
@@ -140,13 +144,14 @@ describe("task127 · ExportCsvModal operator split wiring", () => {
   });
 
   it("rows carry the operator marker on the sticky date cell + the op cell", () => {
-    expect(modal).toContain("const opMeta = opLabel");
-    // task137 renamed the SectionTable loop vars (ci → di display / dataIdx
-    // data) for the sticky-rail remap — the marker still rides the date cell
-    // (display 0) and the «Оператор (ЗП)» cell.
-    expect(modal).toContain("opMeta && (di === 0 || dataIdx === cfg.opCol)");
-    expect(modal).toContain("operatorIconOf(opLabel)");
-    expect(modal).toContain("operatorColorOf(opLabel)");
+    // TASK158 — the marker rides the FIRST (largest-share) operator of the
+    // generated split cell; the ЗП cell itself renders every part with its
+    // own icon/color (opParts), plain single-label cells (ПРОДАЖИ) keep the
+    // opMeta marker path.
+    expect(modal).toContain("const opMeta = csvOpLabel");
+    expect(modal).toContain("opMeta && (di === 0 || (dataIdx === cfg.opCol && opParts.length === 0))");
+    expect(modal).toContain("operatorIconOf(opLeadLabel)");
+    expect(modal).toContain("operatorColorOf(opLeadLabel)");
   });
 });
 

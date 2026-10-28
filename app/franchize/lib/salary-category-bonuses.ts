@@ -54,12 +54,13 @@ import {
   type SalaryBucketMap,
 } from "@/lib/salary-bucket";
 import {
-  resolveRentalOperator,
+  resolveRentalOperatorSplit,
   resolveSaleOperator,
   ATTRIBUTION_SOURCE_LABELS,
   type ShiftLike,
   type AttributionSource,
 } from "@/app/franchize/lib/operator-attribution";
+import { splitAmountByFractions } from "@/lib/salary-split";
 import { getVerificationStatusMap, type RentalVerificationStatus } from "@/app/franchize/lib/rental-verify";
 
 /** One credited rental in the member's TL;DR list (profile + docx report). */
@@ -78,8 +79,11 @@ export interface CategoryBonusRentalItem {
   equipmentUnits: number;
   /** Compact ru flags, e.g. «1шл+1перч» (matches the CSV «Экип» column style). */
   equipmentFlags: string;
-  /** How this rental was credited to the member (operator-attribution chain). */
+  /** How this rental was credited to the member (operator-attribution chain).
+   *  TASK158: "split" when the commission divides between several operators. */
   source: AttributionSource;
+  /** TASK158 — the member's fraction of the commission ({1,1} = solo). */
+  share?: { n: number; d: number };
   /** Operator who created the rental (/doc) — null for self-service web orders. */
   createdByChatId: string | null;
   /** Operator who handed the bike out / activated the web order («Фиксация выдачи»). */
@@ -195,22 +199,37 @@ export async function computeCategoryBonuses(params: {
     logger.warn("[computeCategoryBonuses] category rentals query failed:", rentalsError);
   }
 
-  // Keep only rentals attributed to THIS member; remember WHY so the
-  // breakdown can show the operator exactly how each rental was credited.
-  // Task 98: standalone gear docs (item_type=equipment / cars.type=equipment)
-  // and service works (type=service) are NOT bonus-bearing — the CSV pays
-  // them 0 (СВОДКА: «бонус за экип уже учтён в ЗП аренд») — so they must not
-  // enter the rental pool here either (alignment with the analytics export).
-  const attributedRentals: Array<{ rental: any; source: AttributionSource }> = [];
+  // Keep only rentals THIS member holds a share of; remember WHY (and HOW
+  // MUCH — the generated role split) so the breakdown can show the operator
+  // exactly how each rental was credited. Task 98: standalone gear docs
+  // (item_type=equipment / cars.type=equipment) and service works
+  // (type=service) are NOT bonus-bearing — the CSV pays them 0 (СВОДКА:
+  // «бонус за экип уже учтён в ЗП аренд») — so they must not enter the
+  // rental pool here either (alignment with the analytics export).
+  const attributedRentals: Array<{
+    rental: any;
+    source: AttributionSource;
+    fraction: { n: number; d: number };
+    shareIndex: number;
+    allFractions: Array<{ n: number; d: number }>;
+  }> = [];
   for (const r of (rentals || []) as any[]) {
     const meta = (r.metadata || {}) as Record<string, unknown>;
     const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
     if (meta.item_type === "equipment" || vehicle?.type === "equipment") continue;
     if (vehicle?.type === "service") continue;
-    const attribution = resolveRentalOperator(r, shifts);
-    if (attribution.operatorId === memberId) {
-      attributedRentals.push({ rental: r, source: attribution.source });
-    }
+    const { shares, source } = resolveRentalOperatorSplit(r, shifts);
+    const shareIndex = shares.findIndex((s) => s.operatorId === memberId);
+    if (shareIndex === -1) continue;
+    attributedRentals.push({
+      rental: r,
+      // Solo → the member's own role (/doc, выдача, возврат, смена); a real
+      // split marks every piece "split" — the breakdown says «раздел ЗП».
+      source: shares.length > 1 ? source : shares[shareIndex].roles[0],
+      fraction: shares[shareIndex].fraction,
+      shareIndex,
+      allFractions: shares.map((s) => s.fraction),
+    });
   }
 
   const byRentalCategory: SalaryBucketMap = new Map();
@@ -218,7 +237,7 @@ export async function computeCategoryBonuses(params: {
   // Task 106: parallel to rentalItems — where each item's bucket lives, so
   // the agreed-split correction can adjust the breakdown amounts in place.
   const rentalItemBuckets: Array<{ label: string; source: AttributionSource }> = [];
-  for (const { rental: r, source } of attributedRentals) {
+  for (const { rental: r, source, fraction, shareIndex, allFractions } of attributedRentals) {
     const meta = r.metadata || {};
     const vehicle = Array.isArray(r.vehicle) ? r.vehicle[0] : r.vehicle;
     const categories = resolveBikeCategories(vehicle?.id || "", bikeOverrides);
@@ -244,7 +263,13 @@ export async function computeCategoryBonuses(params: {
       equipmentDays: gearDays,
       rentalHours: stdDetail.hours, // Task 120: <24h → commission halved
     });
-    rentalTotal += salary.total;
+    // TASK158 — the member gets THEIR fraction of the commission (integer
+    // rubles; the rounding remainder lands on the largest share — the SAME
+    // splitAmountByFractions rule the CSV pills and the сверка DM use, so
+    // every surface agrees to the ruble).
+    const myAmount =
+      splitAmountByFractions(salary.total, allFractions)[shareIndex] ?? 0;
+    rentalTotal += myAmount;
     const label = RENTAL_CATEGORY_LABELS[categories.rental];
     // Task 98: accumulateSalaryBucket performs the missing .set() — this is
     // the bugfix that makes rental lines visible again.
@@ -257,13 +282,14 @@ export async function computeCategoryBonuses(params: {
       bikeName: `${vehicle?.make || ""} ${vehicle?.model || ""}`.trim(),
       status: String(r.status || ""),
       totalCost: price,
-      amount: salary.total,
+      amount: myAmount,
       base: salary.base,
       equipment: salary.equipment,
       overprice: salary.overprice,
       equipmentUnits: countEquipmentUnits(eq),
       equipmentFlags: equipmentFlagsLabel(eq),
       source,
+      share: allFractions.length > 1 ? fraction : undefined,
       createdByChatId:
         typeof r.created_by_operator_chat_id === "string" && r.created_by_operator_chat_id.trim()
           ? r.created_by_operator_chat_id.trim()

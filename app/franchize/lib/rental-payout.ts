@@ -40,6 +40,7 @@ import {
   buildCrewPayoutLedger,
   buildPayoutItem,
   commissionOf,
+  addressedShareAmount,
   encodePayoutCallback,
   formatPayoutAllConfirm,
   formatPayoutCard,
@@ -517,7 +518,8 @@ async function notifyPartiesAboutPayout(params: {
   const { row, actorChatId, mark } = params;
   const recipients = otherPartyChatIds(row, actorChatId);
   if (recipients.length === 0) return;
-  const { amount } = commissionOf(row);
+  // TASK158 — the notify text shows the ADDRESSED operator's slice.
+  const amount = addressedShareAmount(row);
   const usersMap = await loadUsersMap([actorChatId]);
   const actorLabel = labelFromUsersMap(usersMap, actorChatId);
   const snap = (row.snapshot || {}) as Record<string, unknown>;

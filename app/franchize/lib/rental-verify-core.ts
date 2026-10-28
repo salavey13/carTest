@@ -25,6 +25,16 @@ export type RentalVerificationStatus =
   | "verified"
   | "disputed";
 
+/**
+ * TASK158 — the three physical-fact operator roles a rental carries
+ * («Оператор создал» / «Оператор выдал» / «Оператор принял»). Pure type —
+ * the tableview dropdowns + the TG ✍️ buttons + the shared write core all
+ * speak these keys.
+ */
+export type RentalRoleKey = "created" | "handed_out" | "received";
+
+export const RENTAL_ROLE_KEYS: RentalRoleKey[] = ["created", "handed_out", "received"];
+
 /** Compact ru labels for tables/lists/CSV. */
 export const VERIFICATION_STATUS_LABELS: Record<RentalVerificationStatus, string> = {
   pending: "ожидает",
@@ -56,6 +66,14 @@ export interface RentalVerificationSnapshot {
     handedByChatId: string | null;
     returnedByChatId: string | null;
   };
+  /**
+   * TASK158 — the generated commission split frozen with the numbers
+   * (equal weight per FILLED role: создал/выдал/принял). Single-operator
+   * rentals either omit it or carry one {1,1} entry; the DM prints a
+   * «👥 ЗП: …» line only when there are 2+ entries. `amount` is this
+   * operator's integer-ruble piece of snapshot.total (Σ = total).
+   */
+  salarySplit?: Array<{ userId: string; fraction: { n: number; d: number }; amount: number }>;
   requestedAtIso: string;
   /**
    * Task 114: audit grade frozen with the numbers (task114: auto-audit at
@@ -551,6 +569,23 @@ export function formatVerificationSummary(params: {
       : `  • наценка: нет`,
   );
 
+  // ── TASK158: the generated commission split ──
+  // Rentals worked by several operators divide the commission (equal weight
+  // per FILLED role). The line rides with the «Комиссия оператора» line —
+  // same visibility (inside the spoiler in the calm layout), so the reader
+  // ALWAYS sees whose money the total is before confirming.
+  const splitParts = (s.salarySplit || []).filter((p) => p && p.userId && Number.isFinite(p.amount));
+  if (splitParts.length > 1) {
+    const splitLine = splitParts
+      .map((p) => {
+        const who = escapeVerifyHtml(labelFromUsersMap(params.usersMap, p.userId));
+        const frac = p.fraction && p.fraction.d !== 1 ? ` (${p.fraction.n}/${p.fraction.d})` : "";
+        return `${who}${frac} — ${formatRubVerify(p.amount)}`;
+      })
+      .join(" · ");
+    out(`  👥 ЗП по долям: ${splitLine}`);
+  }
+
   // ── Task 117: «откуда цифры» — the full formula ──
   const f = s.formula;
   if (f && !f.fallback && f.standardTotal > 0) {
@@ -663,12 +698,21 @@ export function formatVerificationSummary(params: {
   return lines.join("\n");
 }
 
-/** Inline keyboard for the verification DM (callback_data ≤ 64 bytes: uuid fits). */
+/** Inline keyboard for the verification DM (callback_data ≤ 64 bytes: uuid fits).
+ *  TASK158 — the second row lets the parties FIX the physical roles right
+ *  from the DM (boss: «maybe also add buttons to verification messages as
+ *  well to be able to reassign operators who handed out and recieved bike
+ *  back») — «✍️ выдал» / «✍️ принял» open the crew picker; the money split
+ *  (Оператор (ЗП)) regenerates from the roles mechanically after the write. */
 export function verificationKeyboard(rentalId: string): Array<Array<{ text: string; callback_data: string }>> {
   return [
     [
       { text: "✅ Подтверждаю", callback_data: `vrf_ok_${rentalId}` },
       { text: "⚠️ Оспорить", callback_data: `vrf_dis_${rentalId}` },
+    ],
+    [
+      { text: "✍️ Кто выдал", callback_data: `vrf_re_h_${rentalId}` },
+      { text: "✍️ Кто принял", callback_data: `vrf_re_r_${rentalId}` },
     ],
   ];
 }

@@ -53,15 +53,18 @@ import { CSV_SECTION_TITLES } from "@/lib/csv-builders/rentals-csv-sections";
 // Task 98 (boss 2026-10-16, djorudjov): generated columns for manual auditing —
 // the ₽ split of «ЗП Аренда» (техника / экип / наценка), equipment-set flags
 // and commission attribution (who created / handed out / returned + who gets
-// the bonus). Filtering the sheet by «Оператор (ЗП)» and summing «ЗП Аренда»
-// now reproduces the member's profile «Комиссии» EXACTLY — same attribution
-// chain (lib/operator-attribution.ts) and the same shift cross-reference.
+// the bonus). TASK158: «Оператор (ЗП)» is the GENERATED split list of every
+// engaged operator (создал/выдал/принял, equal weight per filled role) —
+// filtering the sheet by an operator and summing «ЗП Аренда» × his fraction
+// reproduces the member's profile «Комиссии» EXACTLY — same split chain
+// (lib/operator-attribution.ts) and the same shift cross-reference.
 import {
-  resolveRentalOperator,
+  resolveRentalOperatorSplit,
   resolveSaleOperator,
   ATTRIBUTION_SOURCE_LABELS,
   type ShiftLike,
 } from "@/app/franchize/lib/operator-attribution";
+import { formatSalarySplitCell } from "@/lib/salary-split";
 // iter53 (2026-10-08, boss): standalone equipment docs written with 0 cost
 // (gear money lives inside the paired bike rental) still show a PROPER
 // reference price in the ЭКИП block — «hourly rental — half price, 2nd+ day
@@ -430,16 +433,12 @@ export async function buildRentalsCsv(
     if (eq.charger) equipParts.push("заряд↔");
     const equipStr = equipParts.length > 0 ? `${equipParts.join("+")} (${equipCost}${equipExact ? "" : "~"})` : "";
 
-    // Task 98: attribution — same chain + same shift set as the profile
-    // salary math, so filtering this sheet reproduces the profile numbers.
-    const attribution = resolveRentalOperator(
-      {
-        created_by_operator_chat_id: r.created_by_operator_chat_id ?? null,
-        created_at: r.created_at ?? null,
-        metadata: meta,
-      },
-      shiftsForAttribution,
-    );
+    // Task 98 → TASK158: the attribution columns are the three physical-fact
+    // roles («Оператор создал/выдал/принял»), and «Оператор (ЗП)» is now the
+    // GENERATED split list built from them (each engaged operator with their
+    // reduced fraction — @a (2/3) + @b (1/3); a single operator stays a bare
+    // label). Same chain + same shift set as the profile salary math, so
+    // filtering this sheet reproduces the profile numbers.
     const createdByLabel = r.created_by_operator_chat_id ? compactUserLabel(String(r.created_by_operator_chat_id)) : "";
     const freezeMeta = (meta as Record<string, unknown>).pickup_freeze as Record<string, unknown> | undefined;
     const handedById = freezeMeta && typeof freezeMeta.frozen_by === "string" && freezeMeta.frozen_by.trim()
@@ -451,8 +450,18 @@ export async function buildRentalsCsv(
       ? String((meta as Record<string, unknown>).return_confirmed_by).trim()
       : "";
     const returnedByLabel = returnedById ? compactUserLabel(returnedById) : "";
-    const attributedToLabel = attribution.operatorId ? compactUserLabel(attribution.operatorId) : "";
-    const attributionLabel = ATTRIBUTION_SOURCE_LABELS[attribution.source] || attribution.source;
+    const { shares, source: splitSource } = resolveRentalOperatorSplit(
+      {
+        created_by_operator_chat_id: r.created_by_operator_chat_id ?? null,
+        created_at: r.created_at ?? null,
+        metadata: meta,
+      },
+      shiftsForAttribution,
+    );
+    const attributedToLabel = formatSalarySplitCell(
+      shares.map((s) => ({ label: compactUserLabel(s.operatorId), fraction: s.fraction })),
+    );
+    const attributionLabel = ATTRIBUTION_SOURCE_LABELS[splitSource] || splitSource;
 
     const depositAmount = Number(meta.deposit_amount || 0);
     // iter20: deposit method — direct metadata, else derived from the payment
@@ -713,7 +722,7 @@ export async function buildRentalsCsv(
 
   rows.push(rowOf([
     "Аренды", blockRentals.count, blockRentals.revenue, blockRentals.salary,
-    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор (ЗП)/Атрибуция ЗП: фильтр по оператору и сумма «ЗП Аренда» = его комиссии в профиле; верификация — колонка «Верификация»: подтверждено = расчёт сверен оператором и владельцем, «· скорректировано (N ₽)» = спор закрыт согласованном предложением с новой суммой, пусто = сверки ещё нет`,
+    `категория техники + экип при аренде + оверпрайс; состав ЗП: техника ${rentalsSalaryBase} / экип ${rentalsSalaryEquipment} / наценка ${rentalsSalaryOverprice} (колонки ЗП техника/экип/наценка); атрибуция — колонки Оператор создал/выдал/принял + Оператор (ЗП): ЗП генерируется из ролей (заполненная роль = равная доля, «@a (2/3) + @b (1/3)»; пустой «создал» = 1/2+1/2 между выдал/принял), фильтр по оператору и сумма «ЗП Аренда»×доля = его комиссии в профиле; верификация — колонка «Верификация»: подтверждено = расчёт сверен оператором и владельцем, «· скорректировано (N ₽)» = спор закрыт согласованном предложением с новой суммой, пусто = сверки ещё нет`,
   ]));
   rows.push(rowOf([
     "Экип", blockEquipment.count, blockEquipment.revenue, 0,

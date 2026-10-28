@@ -101,10 +101,14 @@ import { toast } from "sonner";
 import {
   adminVerifyRentalAction,
   getSalaryOperatorsAction,
-  reassignRentalOperatorAction,
+  setRentalRoleOperatorAction,
   resendVerificationDmsAction,
   type SalaryOperatorOption,
 } from "@/app/franchize/server-actions/rental-verify-actions";
+import type { RentalRoleKey } from "@/app/franchize/lib/rental-verify-core";
+import { RENTAL_ROLE_KEYS as CORE_ROLE_KEYS } from "@/app/franchize/lib/rental-verify-core";
+// TASK158 — parse/format the GENERATED «Оператор (ЗП)» cell (@a (2/3) + @b (1/3)).
+import { parseSalarySplitCell } from "@/lib/salary-split";
 import type { ThemeTokens } from "../hooks/useTheme";
 import { toNumber } from "./lib/csv-money";
 // Task 127 — fullscreen TG native buttons (close/expand) overlay the top-right
@@ -332,6 +336,11 @@ interface SectionColCfg {
   /** Task 127 — «Оператор (ЗП)» column: powers the commission split + row
    *  emoji markers (АРЕНДЫ col 22, ПРОДАЖИ col 6 in the new sheet layout). */
   opCol?: number;
+  /** TASK158 — the three physical-fact ROLE columns the «Оператор (ЗП)»
+   *  cell is GENERATED from (АРЕНДЫ only): each renders an owner-tier
+   *  dropdown (создал = created_by_operator_chat_id, выдал =
+   *  pickup_freeze.frozen_by, принял = return_confirmed_by). */
+  roleCols?: { created: number; handed_out: number; received: number };
   /** Rental uuid column for the row tap-through (АРЕНДЫ only). */
   idCol: number;
   /** Task 137 — display-order remap (DATA indexes; every cfg lookup above
@@ -354,6 +363,7 @@ const SECTION_COLS: Record<CsvSectionKey, SectionColCfg> = {
     photos: 16,
     verification: 27,
     opCol: 25,
+    roleCols: { created: 22, handed_out: 23, received: 24 },
     idCol: 17,
     // Task 137 — Марка (7) → display position 2, Оператор выдал (23) /
     // принял (24) → the tail right before Верификация (27). Left rail pins
@@ -421,6 +431,17 @@ function quickRowLabel(ctx?: Partial<QuickRowCtx>): string {
   return parts.join(" · ");
 }
 
+// TASK158 — the three role columns behind the generated «Оператор (ЗП)».
+// Labels mirror the CSV header (roleCellForId matches by them) and the
+// confirm dialogs; the role KEY order comes from the pure core
+// (rental-verify-core — zero imports, client-safe).
+const RENTAL_ROLE_COL_LABELS: Record<RentalRoleKey, string> = {
+  created: "Оператор создал",
+  handed_out: "Оператор выдал",
+  received: "Оператор принял",
+};
+const RENTAL_ROLE_KEYS = CORE_ROLE_KEYS;
+
 /**
  * Task 152 — read the «Верификация» label for one rental uuid from a freshly
  * parsed CSV. Walks the АРЕНДЫ block (header row containing «Верификация»,
@@ -446,25 +467,27 @@ function verLabelForId(rows: string[][], rentalId: string): string {
   return "";
 }
 /**
- * Task157 — read the «Оператор (ЗП)» label for one rental uuid from a freshly
- * parsed CSV (same walk as verLabelForId: header row containing the column,
- * data rows until the next ALL-CAPS block banner). Empty string = not found.
+ * TASK158 — read ONE column's cell for a rental uuid from a freshly parsed
+ * CSV (header row containing `headerLabel`, data rows until the next
+ * ALL-CAPS block banner). Empty string = not found. Generalizes the
+ * task157 opLabelForId — the optimistic-role-edit honesty contract needs
+ * each ROLE column («Оператор создал/выдал/принял») individually.
  */
-function opLabelForId(rows: string[][], rentalId: string): string {
-  if (!rentalId) return "";
-  const hi = rows.findIndex((r) => r.some((c) => (c || "").trim() === "Оператор (ЗП)"));
+function roleCellForId(rows: string[][], headerLabel: string, rentalId: string): string {
+  if (!rentalId || !headerLabel) return "";
+  const hi = rows.findIndex((r) => r.some((c) => (c || "").trim() === headerLabel));
   if (hi === -1) return "";
   const header = rows[hi];
-  const opIdx = header.findIndex((c) => (c || "").trim() === "Оператор (ЗП)");
+  const colIdx = header.findIndex((c) => (c || "").trim() === headerLabel);
   const idIdx = header.findIndex((c) => (c || "").trim() === "ID");
-  if (opIdx === -1 || idIdx === -1) return "";
+  if (colIdx === -1 || idIdx === -1) return "";
   for (let i = hi + 1; i < rows.length; i += 1) {
     const r = rows[i];
     if (!r || r.length === 0) continue;
     const first = (r[0] || "").trim();
     if (!first) continue;
     if (first === first.toUpperCase() && first.length < 12) break; // next block banner
-    if ((r[idIdx] || "").trim() === rentalId) return (r[opIdx] || "").trim();
+    if ((r[idIdx] || "").trim() === rentalId) return (r[colIdx] || "").trim();
   }
   return "";
 }
@@ -551,18 +574,20 @@ export function ExportCsvModal({
   // alone leaves a one-tick window between the click and the re-render).
   const bulkRunRef = useRef(false);
 
-  // Task157 — operator reassignment from the «Оператор (ЗП)» cell:
-  //   operators      — the crew roster the dropdown offers (owner-tier read);
-  //   reassigningIds — rows with an in-flight reassignment (spinner);
-  //   justReassigned — rentalId → expected NEW label, bridging the optimistic
-  //                    display until the silent refetch confirms it (same
-  //                    honesty contract as justVerified — a fresh CSV that
-  //                    does not reflect the write yet must NOT read as a
-  //                    silent revert).
+  // TASK158 — role reassignment from the THREE role columns («Оператор
+  // создал/выдал/принял»): the «Оператор (ЗП)» cell is GENERATED from them
+  // now, so the dropdowns live in the role columns.
+  //   operators      — the crew roster the dropdowns offer (owner-tier read);
+  //   reassigningIds — rows with an in-flight role write (spinner);
+  //   justRoleEdited — "${role}:${rentalId}" → expected NEW label, bridging
+  //                    the optimistic display until the silent refetch
+  //                    confirms it (same honesty contract as justVerified —
+  //                    a fresh CSV that does not reflect the write yet must
+  //                    NOT read as a silent revert).
   const [operators, setOperators] = useState<SalaryOperatorOption[]>([]);
   const [operatorsLoading, setOperatorsLoading] = useState(false);
   const [reassigningIds, setReassigningIds] = useState<Set<string>>(() => new Set());
-  const [justReassigned, setJustReassigned] = useState<Map<string, string>>(() => new Map());
+  const [justRoleEdited, setJustRoleEdited] = useState<Map<string, string>>(() => new Map());
 
   // Task 146 — collapsible controls (boss: "keep showing date picker only in
   // collapsed-controls mode"). false folds the header to one compact row:
@@ -585,11 +610,12 @@ export function ExportCsvModal({
   const loadTable = useCallback(async (opts?: {
     silent?: boolean;
     expectVerified?: Set<string>;
-    /** Task157 — after the refetch, the «Оператор (ЗП)» cell of THIS rental
-     *  must read `label`; a stale read keeps the optimistic override on
-     *  screen (justReassigned) and reports the mismatch to the caller. */
-    expectOperator?: { rentalId: string; label: string };
-  }): Promise<{ stuckVer: Set<string> | null; operatorStuck: boolean } | null> => {
+    /** TASK158 — after the refetch, THIS rental's role-column cell must read
+     *  `label` (contains — the cell is one role, the check stays exact);
+     *  a stale read keeps the optimistic label on screen (justRoleEdited)
+     *  and reports the mismatch to the caller. */
+    expectRole?: { rentalId: string; role: RentalRoleKey; label: string };
+  }): Promise<{ stuckVer: Set<string> | null; roleStuck: boolean } | null> => {
     if (!fetchCsvText || !from || !to || from > to) return null;
     // Task 128 — silent mode: a quick-verify just landed server-side; swap in
     // the regenerated CSV WITHOUT the loading flash (rows stay on screen).
@@ -623,37 +649,39 @@ export function ExportCsvModal({
           for (const id of stuck) next.add(id);
           return next;
         });
-        // Task157 — a batch may carry BOTH expectations (verify + reassign are
-        // independent cells); handle the operator one before returning.
-        const opExp = opts?.expectOperator;
-        let operatorStuck = false;
-        if (opExp) {
-          const fresh = opLabelForId(parsed, opExp.rentalId);
-          operatorStuck = !fresh || fresh !== opExp.label;
-          setJustReassigned((prev) => {
+        // TASK158 — a batch may carry BOTH expectations (verify + role edit
+        // are independent cells); handle the role one before returning.
+        const roleExp = opts?.expectRole;
+        let roleStuck = false;
+        if (roleExp) {
+          const fresh = roleCellForId(parsed, RENTAL_ROLE_COL_LABELS[roleExp.role], roleExp.rentalId);
+          roleStuck = fresh !== roleExp.label;
+          setJustRoleEdited((prev) => {
             const next = new Map(prev);
-            if (operatorStuck) next.set(opExp.rentalId, opExp.label);
-            else next.delete(opExp.rentalId);
+            const key = `${roleExp.role}:${roleExp.rentalId}`;
+            if (roleStuck) next.set(key, roleExp.label);
+            else next.delete(key);
             return next;
           });
         }
-        return { stuckVer: stuck, operatorStuck };
+        return { stuckVer: stuck, roleStuck };
       }
-      // Task157 — operator-only expectation (reassignment without a verify).
-      const opExp = opts?.expectOperator;
-      if (opExp) {
-        const fresh = opLabelForId(parsed, opExp.rentalId);
-        const operatorStuck = !fresh || fresh !== opExp.label;
-        setJustReassigned((prev) => {
+      // TASK158 — role-only expectation (role edit without a verify).
+      const roleExp = opts?.expectRole;
+      if (roleExp) {
+        const fresh = roleCellForId(parsed, RENTAL_ROLE_COL_LABELS[roleExp.role], roleExp.rentalId);
+        const roleStuck = fresh !== roleExp.label;
+        setJustRoleEdited((prev) => {
           const next = new Map(prev);
-          if (operatorStuck) next.set(opExp.rentalId, opExp.label);
-          else next.delete(opExp.rentalId);
+          const key = `${roleExp.role}:${roleExp.rentalId}`;
+          if (roleStuck) next.set(key, roleExp.label);
+          else next.delete(key);
           return next;
         });
-        return { stuckVer: new Set<string>(), operatorStuck };
+        return { stuckVer: new Set<string>(), roleStuck };
       }
       setJustVerified((prev) => (prev.size > 0 ? new Set<string>() : prev));
-      return { stuckVer: new Set<string>(), operatorStuck: false };
+      return { stuckVer: new Set<string>(), roleStuck: false };
     } catch (e) {
       // FIX (iter6): show the ACTUAL error next to the generic message so the
       // operator can tell a 500 from an offline device from a bad date range.
@@ -837,54 +865,56 @@ export function ExportCsvModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, canReassignRows, slug, passwordAuthOwnerId]);
 
-  // Task157 — reassign the salary operator of ONE rental straight from the
-  // «Оператор (ЗП)» cell. Same honesty contract as the verify family: the
-  // confirm dialog shows WHICH row (дата · байк · цена) and WHICH change
-  // (old label → new label) is about to land; after the write ONE silent
-  // refetch with expectOperator — a fresh CSV that still shows the old
-  // operator keeps the optimistic label on screen and fires a warning
-  // instead of the silent revert illusion.
-  const handleReassign = useCallback(
-    async (rentalId: string, nextUserId: string, ctx?: QuickRowCtx) => {
+  // TASK158 — edit ONE physical-fact role («Оператор создал/выдал/принял»)
+  // straight from its column cell. Same honesty contract as the verify
+  // family: the confirm dialog shows WHICH row (дата · байк · цена) and
+  // WHICH role → which operator is about to land; after the write ONE silent
+  // refetch with expectRole — a fresh CSV that still shows the old role
+  // keeps the optimistic label on screen and fires a warning instead of the
+  // silent revert illusion. The «Оператор (ЗП)» cell + all counters
+  // regenerate from the roles server-side (the split is GENERATED now).
+  const handleRoleEdit = useCallback(
+    async (rentalId: string, role: RentalRoleKey, nextUserId: string, ctx?: QuickRowCtx) => {
       if (!slug || reassigningIds.has(rentalId)) return;
       const next = operators.find((o) => o.userId === nextUserId);
       if (!next) return;
       const rowLabel = quickRowLabel(ctx);
+      const roleLabel = RENTAL_ROLE_COL_LABELS[role];
       const ok = window.confirm(
-        "Переназначить оператора (ЗП) по этой аренде?\n\n" +
+        `Изменить «${roleLabel}» по этой аренде?\n\n` +
           (rowLabel ? `${rowLabel}\n\n` : "") +
-          `Комиссии уйдут: ${next.label}. Счётчики и сводка по операторам пересчитаются автоматически.`,
+          `Новый оператор: ${next.label}. Доли ЗП пересчитаются автоматически — заполненная роль = равная доля (пустой «создал» → 1/2+1/2 между выдал/принял).`,
       );
       if (!ok) return;
       setReassigningIds((prev) => new Set(prev).add(rentalId));
       try {
         const res = await withServerTimeout(
-          reassignRentalOperatorAction({ slug, rentalId, operatorUserId: nextUserId, ...verifyActorParams }),
+          setRentalRoleOperatorAction({ slug, rentalId, role, operatorUserId: nextUserId, ...verifyActorParams }),
         );
         if (res.success && res.data) {
           toast.success(
-            `Оператор (ЗП): ${res.data.operatorLabel} ✅${res.data.verificationNote ? ` ${res.data.verificationNote}` : ""}`,
-            { duration: res.data.verificationNote ? 8000 : 5000 },
+            `${roleLabel}: ${res.data.operatorLabel} ✅ ЗП: ${res.data.splitText}${res.data.verificationNote ? ` · ${res.data.verificationNote}` : ""}`,
+            { duration: res.data.verificationNote ? 8000 : 6000 },
           );
-          setJustReassigned((prev) => new Map(prev).set(rentalId, res.data!.operatorLabel));
+          setJustRoleEdited((prev) => new Map(prev).set(`${role}:${rentalId}`, res.data!.operatorLabel || next.label));
           const result = await loadTable({
             silent: true,
-            expectOperator: { rentalId, label: res.data.operatorLabel },
+            expectRole: { rentalId, role, label: res.data.operatorLabel || next.label },
           });
-          if (result?.operatorStuck) {
+          if (result?.roleStuck) {
             toast.warning(
-              `Переназначение принято${rowLabel ? ` (${rowLabel})` : ""}, но таблица пока показывает старого оператора — обновите таблицу ещё раз через пару секунд.`,
+              `Изменение принято${rowLabel ? ` (${rowLabel})` : ""}, но таблица пока показывает старую роль — обновите таблицу ещё раз через пару секунд.`,
               { duration: 7000 },
             );
           }
         } else {
-          toast.error(res.error || "Не удалось переназначить оператора");
+          toast.error(res.error || "Не удалось изменить роль оператора");
         }
       } catch (err) {
         toast.error(
           err instanceof ServerActionTimeoutError
             ? err.message
-            : "Не удалось переназначить оператора",
+            : "Не удалось изменить роль оператора",
         );
       } finally {
         setReassigningIds((prev) => {
@@ -998,10 +1028,10 @@ export function ExportCsvModal({
       setOpFilter(null);
       setVerifyingIds(new Set());
       setJustVerified(new Set());
-      // Task157 — reassignment bookkeeping resets per open; the roster is
+      // TASK158 — role-edit bookkeeping resets per open; the roster is
       // re-read by its own isOpen effect (cheap owner-tier query).
       setReassigningIds(new Set());
-      setJustReassigned(new Map());
+      setJustRoleEdited(new Map());
       setOperators([]);
       // Task 129 review fix — a batch still running from BEFORE the close keeps
       // going server-side (idempotent per row); a fresh open must allow a new
@@ -1165,6 +1195,10 @@ export function ExportCsvModal({
 
   // Task 127 — per-operator commission split (grouped client-side from the
   // builder's attribution columns — same chain as the profile math).
+  // TASK158 — the АРЕНДЫ «Оператор (ЗП)» cell is the GENERATED split list
+  // («@a (2/3) + @b (1/3)»): each row contributes its OWN FRACTION of the
+  // «ЗП Аренда» to every listed operator, so the pills match the profile
+  // ruble-for-ruble. ПРОДАЖИ keep single-operator cells (parsed as 1/1).
   const opSplit: OperatorSplitEntry[] = (() => {
     if (!isSectioned) return [];
     const entries: { label: string; amount: number }[] = [];
@@ -1173,9 +1207,16 @@ export function ExportCsvModal({
       // Only blocks that both pay and attribute ЗП (АРЕНДЫ, ПРОДАЖИ).
       if (cfg.opCol == null || s.key === "summary") continue;
       for (const r of s.data) {
-        const label = (r[cfg.opCol] || "").trim();
-        if (!label) continue;
-        entries.push({ label, amount: toNumber(r[1] || "") });
+        const cell = (r[cfg.opCol] || "").trim();
+        if (!cell) continue;
+        const rowAmount = toNumber(r[1] || "");
+        const parts = s.key === "rentals" ? parseSalarySplitCell(cell) : [{ label: cell, fraction: { n: 1, d: 1 } }];
+        for (const part of parts) {
+          entries.push({
+            label: part.label,
+            amount: Math.round((rowAmount * part.fraction.n) / part.fraction.d),
+          });
+        }
       }
     }
     return buildOperatorSplit(entries, opGrandTotal);
@@ -1205,7 +1246,15 @@ export function ExportCsvModal({
     if (opIdx == null || s.key === "summary") return s;
     return {
       ...s,
-      data: s.data.filter((r) => (r[opIdx] || "").trim() === effectiveOpFilter),
+      // TASK158 — a generated split cell lists EVERY engaged operator, so
+      // the filter is a CONTAINS match on the parsed labels (a 2-operator
+      // row shows up under both pills; each keeps its own fraction).
+      data: s.data.filter((r) => {
+        const cell = (r[opIdx] || "").trim();
+        if (!cell) return false;
+        if (s.key !== "rentals") return cell === effectiveOpFilter;
+        return parseSalarySplitCell(cell).some((p) => p.label === effectiveOpFilter);
+      }),
       // Filtered sums would not match the full-period СВОДКА block — hide them.
       totals: null,
     };
@@ -2002,13 +2051,14 @@ export function ExportCsvModal({
                     onQuickVerify={canQuickVerify ? handleQuickVerify : undefined}
                     sendingIds={sendingIds}
                     onSendRequest={canQuickVerify ? handleSendRequest : undefined}
-                    // Task157 — the «Оператор (ЗП)» dropdown (owner tier, one
-                    // roster read per open; the select lives in the АРЕНДЫ rows).
+                    // TASK158 — the THREE role dropdowns («Оператор создал» /
+                    // «выдал» / «принял», owner tier, one roster read per open;
+                    // the «Оператор (ЗП)» cell is GENERATED from them).
                     canReassignRows={canReassignRows}
                     operators={operators}
                     reassigningIds={reassigningIds}
-                    justReassigned={justReassigned}
-                    onReassign={canReassignRows ? handleReassign : undefined}
+                    justRoleEdited={justRoleEdited}
+                    onRoleEdit={canReassignRows ? handleRoleEdit : undefined}
                   />
                 ))}
               </div>
@@ -2255,8 +2305,8 @@ function SectionTable({
   canReassignRows = false,
   operators = [],
   reassigningIds,
-  justReassigned,
-  onReassign,
+  justRoleEdited,
+  onRoleEdit,
 }: {
   section: ParsedCsvSection;
   T: ThemeTokens;
@@ -2276,17 +2326,18 @@ function SectionTable({
    *  to operator + owner with the ✅/⚠️ keyboard — each confirms SEPARATELY,
    *  right from the table view without opening the rental. */
   onSendRequest?: (rentalId: string, ctx?: QuickRowCtx) => Promise<void> | void;
-  /** Task157 — owner-tier flag: the «Оператор (ЗП)» cell renders the
-   *  reassignment dropdown (АРЕНДЫ block only). */
+  /** Task157 — owner-tier flag: the АРЕНДЫ role cells render reassignment
+   *  dropdowns («Оператор создал/выдал/принял» — the generated «Оператор
+   *  (ЗП)» follows mechanically). */
   canReassignRows?: boolean;
-  /** Task157 — the crew roster the dropdown offers ({@username → full_name}). */
+  /** Task157 — the crew roster the dropdowns offer ({@username → full_name}). */
   operators?: SalaryOperatorOption[];
-  /** Task157 — ids with an in-flight reassignment (the select is disabled). */
+  /** Task157 — ids with an in-flight role write (the select is disabled). */
   reassigningIds?: Set<string>;
-  /** Task157 — rentalId → expected NEW label (optimistic display until the
-   *  silent refetch confirms the write, same contract as justVerified). */
-  justReassigned?: Map<string, string>;
-  onReassign?: (rentalId: string, operatorUserId: string, ctx?: QuickRowCtx) => Promise<void> | void;
+  /** TASK158 — "${role}:${rentalId}" → expected NEW label (optimistic display
+   *  until the silent refetch confirms the write, same contract as justVerified). */
+  justRoleEdited?: Map<string, string>;
+  onRoleEdit?: (rentalId: string, role: RentalRoleKey, operatorUserId: string, ctx?: QuickRowCtx) => Promise<void> | void;
 }) {
   const cfg = SECTION_COLS[section.key];
   const accent = SECTION_ACCENT[section.key];
@@ -2506,27 +2557,28 @@ function SectionTable({
             const showSendRequest =
               !!onSendRequest && !!rowRentalId && section.key === "rentals" && verTone !== "verified";
             // Task 127 — operator identity for this row (when the split is on).
-            // Task157 — the dropdown needs the RAW cell label UNGATED (it must
-            // render even with a single operator in the period, where the
-            // marker icons stay off), plus the optimistic override label:
-            // after a reassignment the cell (icon/color/text) must read the
-            // NEW operator immediately, even when the silent refetch brought
-            // a stale CSV.
+            // TASK158 — the «Оператор (ЗП)» cell is the GENERATED split list
+            // («@a (2/3) + @b (1/3)»): parse it once, the marker icon rides
+            // the FIRST (largest-share) operator's identity, the cell renders
+            // every part with its own icon/color. Role cells carry the
+            // optimistic label after an edit (justRoleEdited) — the fresh CSV
+            // may lag one refetch behind the accepted write.
             const rawOpLabel = cfg.opCol != null ? (r[cfg.opCol] || "").trim() : "";
-            const optimisticOpLabel = rowRentalId ? justReassigned?.get(rowRentalId) : undefined;
-            const csvOpLabel = showOpMarkers ? rawOpLabel : "";
-            const opLabel = optimisticOpLabel ?? csvOpLabel;
-            const opMeta = opLabel
-              ? { icon: operatorIconOf(opLabel), color: operatorColorOf(opLabel) }
+            const opParts = section.key === "rentals" ? parseSalarySplitCell(rawOpLabel) : [];
+            const opLeadLabel = opParts[0]?.label || rawOpLabel;
+            const csvOpLabel = showOpMarkers ? opLeadLabel : "";
+            const opMeta = csvOpLabel
+              ? { icon: operatorIconOf(opLeadLabel), color: operatorColorOf(opLeadLabel) }
               : null;
-            // Task157 — dropdown affordance per row (АРЕНДЫ + owner tier +
-            // a rental uuid; total/banner rows never carry a uuid). The select
-            // renders only when a roster exists — otherwise the cell degrades
-            // to the plain colored label.
+            // TASK158 — dropdown affordance per ROLE cell (АРЕНДЫ + owner tier
+            // + a rental uuid; total/banner rows never carry a uuid). The
+            // selects render only when a roster exists — otherwise the cells
+            // degrade to plain colored labels. (Which role a column IS is
+            // resolved per CELL below — dataIdx lives inside the map.)
             const reassignPending = !!(rowRentalId && reassigningIds?.has(rowRentalId));
             const showOpSelect =
-              canReassignRows && !!onReassign && !!rowRentalId &&
-              section.key === "rentals" && cfg.opCol != null && operators.length > 0;
+              canReassignRows && !!onRoleEdit && !!rowRentalId &&
+              section.key === "rentals" && cfg.roleCols != null && operators.length > 0;
             const rowBg = verTone
               ? verToneBg(verTone, T.bgCard)
               : isGrandTotal
@@ -2550,6 +2602,11 @@ function SectionTable({
                   const cell = r[dataIdx] ?? "";
                   const isNum = cfg.numeric.has(dataIdx) && isNumericLike(cell);
                   const isDate = cfg.date.has(dataIdx);
+                  // TASK158 — is THIS display column one of the three role
+                  // columns (и does the viewer get the dropdown)?
+                  const roleForCell = showOpSelect
+                    ? RENTAL_ROLE_KEYS.find((k) => cfg.roleCols?.[k] === dataIdx)
+                    : undefined;
                   if (cfg.hide.has(dataIdx)) {
                     return (
                       <td
@@ -2673,67 +2730,81 @@ function SectionTable({
                           <Camera className="h-3 w-3" aria-hidden />
                           {cell}
                         </span>
-                      ) : showOpSelect && dataIdx === cfg.opCol ? (
-                        // Task157 — reassignment dropdown in the «Оператор (ЗП)»
-                        // cell (boss: «choosing a different operator should
-                        // reassign it in the rental — commissions go to the new
-                        // operator»). The label match (cell text ↔ roster
-                        // label) is safe: the roster action builds labels with
-                        // the SAME compactUserLabel rule as the CSV builder.
-                        // stopPropagation on click AND change — the row itself
-                        // is a tap-through to the rental page.
-                        <span className="inline-flex items-center gap-1">
-                          <span aria-hidden>{operatorIconOf(optimisticOpLabel ?? rawOpLabel)}</span>
-                          <select
-                            value={
-                              operators.find(
-                                (o) => o.label === (optimisticOpLabel ?? rawOpLabel),
-                              )?.userId ?? ""
-                            }
-                            disabled={reassignPending}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              const v = e.target.value;
-                              if (!v) return;
-                              const currentId = operators.find(
-                                (o) => o.label === (optimisticOpLabel ?? rawOpLabel),
-                              )?.userId;
-                              if (v === currentId) return;
-                              if (onReassign) void onReassign(rowRentalId, v, quickCtx);
-                            }}
-                            aria-label="Переназначить оператора (ЗП)"
-                            title="Переназначить оператора — комиссии по этой аренде уйдут выбранному оператору, счётчики пересчитаются"
-                            className="max-w-[11rem] cursor-pointer rounded-md border bg-transparent px-1 py-0.5 text-xs font-semibold transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
-                            style={{
-                              borderColor: `color-mix(in srgb, ${operatorColorOf(optimisticOpLabel ?? rawOpLabel)} 45%, transparent)`,
-                              color: operatorColorOf(optimisticOpLabel ?? rawOpLabel),
-                            }}
-                          >
-                            {!operators.some(
-                              (o) => o.label === (optimisticOpLabel ?? rawOpLabel),
-                            ) && (
-                              <option value="">{optimisticOpLabel ?? (rawOpLabel || "— не назначен —")}</option>
-                            )}
-                            {operators.map((o) => (
-                              <option key={o.userId} value={o.userId}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                          {reassignPending && (
-                            <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
-                          )}
+                      ) : roleForCell ? (
+                        // TASK158 — role cells: the select decides WHO holds
+                        // the physical role; the generated «Оператор (ЗП)»
+                        // follows mechanically. stopPropagation on click AND
+                        // change — the row itself is a tap-through to the
+                        // rental page. The optimistic label (justRoleEdited)
+                        // bridges the refetch gap (task152 contract).
+                        (() => {
+                          const optimistic = justRoleEdited?.get(`${roleForCell}:${rowRentalId}`);
+                          const shown = optimistic || cell.trim() || "";
+                          const roleColor = shown ? operatorColorOf(shown) : T.textMuted;
+                          return (
+                            <span className="inline-flex items-center gap-1">
+                              {shown && <span aria-hidden>{operatorIconOf(shown)}</span>}
+                              <select
+                                value={operators.find((o) => o.label === shown)?.userId ?? ""}
+                                disabled={reassignPending}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const v = e.target.value;
+                                  if (!v) return;
+                                  const currentId = operators.find((o) => o.label === shown)?.userId;
+                                  if (v === currentId) return;
+                                  if (onRoleEdit) void onRoleEdit(rowRentalId, roleForCell, v, quickCtx);
+                                }}
+                                aria-label={`Изменить: ${RENTAL_ROLE_COL_LABELS[roleForCell]}`}
+                                title={`${RENTAL_ROLE_COL_LABELS[roleForCell]} — выбери оператора; доли ЗП пересчитаются автоматически (заполненная роль = равная доля)`}
+                                className="max-w-[11rem] cursor-pointer rounded-md border bg-transparent px-1 py-0.5 text-xs font-semibold transition hover:opacity-85 focus:outline-none focus-visible:ring-2 disabled:cursor-default disabled:opacity-60"
+                                style={{
+                                  borderColor: `color-mix(in srgb, ${roleColor} 45%, transparent)`,
+                                  color: roleColor,
+                                }}
+                              >
+                                {!operators.some((o) => o.label === shown) && (
+                                  <option value="">{shown || "— не указан —"}</option>
+                                )}
+                                {operators.map((o) => (
+                                  <option key={o.userId} value={o.userId}>
+                                    {o.label}
+                                  </option>
+                                ))}
+                              </select>
+                              {reassignPending && (
+                                <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden />
+                              )}
+                            </span>
+                          );
+                        })()
+                      ) : section.key === "rentals" && dataIdx === cfg.opCol && opParts.length > 0 ? (
+                        // TASK158 — the GENERATED «Оператор (ЗП)» cell: every
+                        // engaged operator wears their own icon/color, the
+                        // reduced fraction prints after the label. Plain text —
+                        // the MONEY is edited through the role columns now.
+                        <span className="inline-flex items-center gap-1.5">
+                          {opParts.map((p) => (
+                            <span key={p.label} className="inline-flex items-center gap-0.5">
+                              <span aria-hidden>{operatorIconOf(p.label)}</span>
+                              <span style={{ color: operatorColorOf(p.label), fontWeight: 600 }}>{p.label}</span>
+                              {p.fraction.d !== 1 && (
+                                <span style={{ color: T.textMuted }}>
+                                  ({p.fraction.n}/{p.fraction.d})
+                                </span>
+                              )}
+                            </span>
+                          ))}
                         </span>
-                      ) : opMeta && (di === 0 || dataIdx === cfg.opCol) ? (
+                      ) : opMeta && (di === 0 || (dataIdx === cfg.opCol && opParts.length === 0)) ? (
                         // Task 127 — crew-member marker: stable emoji on the
                         // sticky date cell (always visible while scrolling)
-                        // and next to the name in «Оператор (ЗП)».
-                        // Task157 — the opCol cell displays the OPTIMISTIC label
-                        // when one is pending (matches the dropdown above).
+                        // and next to the name in «Оператор (ЗП)» (ПРОДАЖИ —
+                        // single-operator cells).
                         <span className="inline-flex items-center gap-1">
                           <span aria-hidden>{opMeta.icon}</span>
-                          {(dataIdx === cfg.opCol ? opLabel : cell) || "\u00A0"}
+                          {(dataIdx === cfg.opCol ? opLeadLabel : cell) || "\u00A0"}
                         </span>
                       ) : (
                         cell || "\u00A0"
