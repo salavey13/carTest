@@ -262,11 +262,11 @@ describe("task126 · rental page сверка card", () => {
     expect(page).not.toMatch(/Сверка расчёта<\/p>/);
   });
 
-  it("renders for completed closures only, and ONLY for crew staff (codereview #2)", () => {
-    expect(page).toMatch(/status === "completed" && isCrewStaff/);
+  it("renders for completed closures only, and ONLY for crew staff or the password session (codereview #2 + task159)", () => {
+    expect(page).toMatch(/status === "completed" && \(isCrewStaff \|\| passwordAuthOwnerId\)/);
     // the brief is fetched behind the same server-side gate — never embedded
-    // into a renter's RSC payload
-    expect(page).toMatch(/rental\.found && isCrewStaff\n    \? \(await getVerificationStatusMap/);
+    // into a renter's RSC payload (passwordAuthOwnerId is DB-gated too)
+    expect(page).toMatch(/rental\.found && \(isCrewStaff \|\| passwordAuthOwnerId\)\n    \? \(await getVerificationStatusMap/);
   });
 
   it("the manual confirm is owner-tier gated server-side AND client-side (codereview #5)", () => {

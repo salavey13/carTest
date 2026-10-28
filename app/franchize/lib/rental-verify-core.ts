@@ -1009,6 +1009,107 @@ export function splitTotal(s: SplitParts): number {
   return (Number(s.base) || 0) + (Number(s.equipment) || 0) + (Number(s.overprice) || 0);
 }
 
+// ── TASK159 — the SETTLED commission (one canon for every money surface) ────
+// Boss 2026-10-28: verification overrides must flow EVERYWHERE — the
+// rentals-analytics table, the CSV/XLSX export, the profile «Комиссии»,
+// my-work, team-earnings, the salary pages and the payout hub — not only
+// into the «· скорректировано» label. ONE precedence rule, decided here:
+//
+//   1. negotiation.agreed wins when it is NEWER than the last snapshot
+//      correction (an accepted дил that postdates a boss-assistant
+//      correction). A STALE agreed (accepted BEFORE the correction —
+//      e.g. task156/157/158 subrent recalcs) must NOT resurrect old money:
+//      fc5bc7fe settled 1000 on 19.10, the 28.10 correction froze 375 → 375.
+//   2. otherwise the FROZEN snapshot numbers are the truth (what the сверка
+//      DM showed both parties, incl. the correction notes) — they win over
+//      any live recompute so the sheet can never disagree with the сверка.
+//   3. no snapshot numbers → null (the caller keeps the live compute).
+//
+// The accept flow (task159) rewrites the snapshot on acceptance, so after
+// this deploy rule 1 and rule 2 converge — but old rows and direct jsonb
+// edits still need the timestamp check.
+
+/** snapshot.correction written by boss-assistant scripts / the accept flow. */
+export interface SnapshotCorrection {
+  at?: string;
+  by?: string;
+  reason?: string | null;
+  from?: { base?: number; equipment?: number; overprice?: number; total?: number };
+}
+
+export function parseSnapshotCorrection(snapshot: unknown): SnapshotCorrection | null {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return null;
+  const correction = (snapshot as Record<string, unknown>).correction;
+  if (!correction || typeof correction !== "object" || Array.isArray(correction)) return null;
+  return correction as SnapshotCorrection;
+}
+
+/** ISO ts of the last snapshot correction (null when never corrected). */
+export function snapshotCorrectionAt(snapshot: unknown): string | null {
+  const at = parseSnapshotCorrection(snapshot)?.at;
+  return typeof at === "string" && at ? at : null;
+}
+
+export interface SettledCommission {
+  base: number;
+  equipment: number;
+  overprice: number;
+  total: number;
+  /** true when the numbers come from an accepted дил OR a corrected snapshot. */
+  adjusted: boolean;
+  /** Where the numbers came from — diagnostics/labels. */
+  source: "agreed" | "snapshot";
+}
+
+/**
+ * The settled commission of a verification row (see the precedence rule
+ * above). Returns null when the row carries no money numbers at all — the
+ * caller then keeps its live computeRentalSalary canon.
+ */
+export function settledCommissionOf(row: {
+  snapshot?: unknown;
+  negotiation?: unknown;
+}): SettledCommission | null {
+  const snap = (row.snapshot && typeof row.snapshot === "object" && !Array.isArray(row.snapshot))
+    ? (row.snapshot as Record<string, unknown>)
+    : {};
+  const original = snapshotSplitOf(snap as never);
+  const hasNumbers =
+    snap.base != null || snap.equipment != null || snap.overprice != null || snap.total != null;
+  if (!hasNumbers) return null;
+
+  const nego = row.negotiation !== undefined ? parseNegotiation(row.negotiation) : null;
+  const agreed = nego?.agreed ?? null;
+  const correctionAt = snapshotCorrectionAt(snap);
+  const agreedNewer =
+    !!agreed &&
+    (!correctionAt ||
+      Date.parse(agreed.at || "") > Date.parse(correctionAt));
+
+  if (agreed && agreedNewer) {
+    // Clamp ≥0 per part, total = sum of the CLAMPED parts (a garbage jsonb
+    // edit with a negative part can only reduce to zero, never pay −N ₽).
+    const parts = {
+      base: Math.max(0, Number(agreed.split.base) || 0),
+      equipment: Math.max(0, Number(agreed.split.equipment) || 0),
+      overprice: Math.max(0, Number(agreed.split.overprice) || 0),
+    };
+    return {
+      ...parts,
+      total: parts.base + parts.equipment + parts.overprice,
+      adjusted: true,
+      source: "agreed",
+    };
+  }
+  const snapTotal = Number(snap.total);
+  return {
+    ...original,
+    total: Number.isFinite(snapTotal) && snapTotal > 0 ? snapTotal : splitTotal(original),
+    adjusted: !!correctionAt,
+    source: "snapshot",
+  };
+}
+
 export function splitsEqual(a: SplitParts, b: SplitParts): boolean {
   return a.base === b.base && a.equipment === b.equipment && a.overprice === b.overprice;
 }
@@ -1492,6 +1593,14 @@ export interface VerificationBrief {
   audit?: { grade?: string; notes?: string[] } | null;
   /** Task 126: frozen commission numbers — the «Сверка комиссии» card data. */
   commission?: VerificationCommissionBrief | null;
+  /**
+   * TASK159: the SETTLED commission (accepted дил newer than the last
+   * correction, else the frozen/corrected snapshot). Every money surface —
+   * CSV/tableview cells, profile «Комиссии», my-work, salary totals — must
+   * use THESE numbers when present instead of the live recompute, so the
+   * sheet always agrees with the сверка. Null → keep the live canon.
+   */
+  settled?: SettledCommission | null;
   /** task156: the standing negotiation comment (sent proposal / editor draft /
    *  last round) — surfaced in the table sheet, drawer card and list chips. */
   comment?: string | null;

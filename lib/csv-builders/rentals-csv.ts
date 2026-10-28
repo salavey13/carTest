@@ -235,12 +235,20 @@ export async function buildRentalsCsv(
   // just stays empty, the sheet keeps its shape).
   // Task 106: the label gains «· скорректировано (N ₽)» when the row carries
   // an agreed (negotiated) split — the export shows the money as settled.
+  // TASK159: the settled numbers ALSO become the money cells — «ЗП Аренда»
+  // and the ЗП техника/экип/наценка columns pay the settled commission when
+  // a сверка exists, so the sheet can never disagree with the сверка DM
+  // (boss 2026-10-28: «make sure overriden proper new values are used for
+  // salary totals calculations, not only in rentals analytics»).
   const verificationMap = await getVerificationStatusMap(rentalRows.map((r: any) => String(r.rental_id)));
   const VERIF_ROLE_RU: Record<string, string> = { operator: "оператор", owner: "владелец", admin: "админ" };
   const verificationLabel = (rentalId: unknown): string => {
     const brief = verificationMap.get(String(rentalId || ""));
     if (!brief) return "";
     const base = VERIFICATION_STATUS_LABELS[brief.status];
+    if (brief.settled?.adjusted) {
+      return `${base} · скорректировано (${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(brief.settled.total)} ₽)${brief.comment ? " · ✍️" : ""}`;
+    }
     if (brief.agreedSplit) {
       const agreedTotal = brief.agreedSplit.base + brief.agreedSplit.equipment + brief.agreedSplit.overprice;
       return `${base} · скорректировано (${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(agreedTotal)} ₽)${brief.comment ? " · ✍️" : ""}`;
@@ -401,7 +409,7 @@ export async function buildRentalsCsv(
     });
     const gearDays = effectiveGearDays(stdDetail);
     const stdPrice = stdDetail.price + equipmentStandardCost(eq, gearDays, stdDetail.hours); // Task 121: <24h → client gear price halves too (эталон = what the client should pay)
-    const salary = computeRentalSalary({
+    const liveSalary = computeRentalSalary({
       config: salaryConfig,
       rentalCategory: categories.rental,
       equipmentUnits,
@@ -410,6 +418,22 @@ export async function buildRentalsCsv(
       equipmentDays: gearDays,
       rentalHours: stdDetail.hours, // Task 120: <24h → commission halved
     });
+    // TASK159 — the verification SETTLEMENT wins over the live recompute:
+    // an accepted дил (newer than the last correction) or the frozen/
+    // corrected snapshot is the money BOTH parties saw. The sheet pays the
+    // settled ₽ — e.g. the 02.10 CBR600RR correction (техника 1000 → 500)
+    // now lands in «ЗП Аренда»/«ЗП техника» and the totals, not only in the
+    // сверка label. No сверка → the live canon as before.
+    const settled = verificationMap.get(String(r.rental_id || ""))?.settled ?? null;
+    const salary = settled
+      ? {
+          base: settled.base,
+          equipment: settled.equipment,
+          overprice: settled.overprice,
+          total: settled.total,
+          shortRental: liveSalary.shortRental,
+        }
+      : liveSalary;
     const salaryStr = String(salary.total);
     blockRentals.salary += salary.total;
     blockRentals.count += 1;

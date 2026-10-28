@@ -27,6 +27,7 @@ import { FranchizeRentalLifecycleActions } from "../../../components/FranchizeRe
 // replaces the bare resend strip on the rental page.
 import { CommissionVerificationCard } from "../../../components/CommissionVerificationCard";
 import { getVerificationStatusMap } from "../../../lib/rental-verify";
+import { resolveAnalyticsPasswordOwnerForSlug } from "../../../lib/analytics-owner-cookie";
 import { verifyCrewAccess } from "../../../server-actions/shared/auth-helpers";
 // goodmorning-polish: removed FranchizePageShell import — replaced with plain <div>
 // to avoid backdrop-blur breaking position:fixed on QuickActionBar + excessive padding.
@@ -302,7 +303,16 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
     }
   }
   const isCrewStaff = verAccess?.allowed === true;
-  const verBrief = rental.found && isCrewStaff
+  // TASK159 (boss 2026-10-28): пароль-сессия аналитики (ПК без Telegram) —
+  // подписанная httpOnly cookie от validateAnalyticsPassword. Владелец
+  // перегейчивается по БД (resolveAnalyticsPasswordOwnerForSlug), серверные
+  // экшены карточки дополнительно проверяют claimed id. Рендерим сверку
+  // (с комментарием переговоров) без клиентского RoleGuard.
+  let passwordAuthOwnerId: string | null = null;
+  if (rental.found && status === "completed" && !isCrewStaff) {
+    passwordAuthOwnerId = await resolveAnalyticsPasswordOwnerForSlug(resolvedSlug);
+  }
+  const verBrief = rental.found && (isCrewStaff || passwordAuthOwnerId)
     ? (await getVerificationStatusMap([rental.rentalId]).catch((e) => {
         console.warn("[rental page] verification brief fetch failed (non-fatal):", e);
         return null;
@@ -848,7 +858,8 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             actions (подтвердить / выслать), right on the rental page. The
             card owns its actions; server actions re-gate the owner role.
             Legacy bare «🤝 Сверка расчёта» strip is REPLACED by this card. */}
-        {status === "completed" && isCrewStaff && (
+        {status === "completed" && (isCrewStaff || passwordAuthOwnerId) && (
+          isCrewStaff ? (
           <FranchizeRentalRoleGuard
             allowedRoles={["operator", "admin", "owner"]}
             ownerId={rental.ownerId}
@@ -883,6 +894,35 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               }}
             />
           </FranchizeRentalRoleGuard>
+          ) : (
+          /* TASK159: пароль-сессия аналитики — сервер уже доказал, что зритель
+             владелец этого экипажа; экшены карточки перепроверят id сами. */
+          <CommissionVerificationCard
+            slug={resolvedSlug}
+            rentalId={rental.rentalId}
+            rentalStatus={status}
+            commission={verBrief?.commission ?? null}
+            verificationStatus={verBrief?.status ?? null}
+            agreedSplit={verBrief?.agreedSplit ?? null}
+            proposalOpen={verBrief?.proposalOpen === true}
+            audit={verBrief?.audit ?? null}
+            comment={verBrief?.comment ?? null}
+            commentRole={verBrief?.commentRole ?? null}
+            canVerify
+            passwordAuthOwnerId={passwordAuthOwnerId}
+            T={{
+              bg: "transparent",
+              bgCard: isAuto ? "var(--franchize-bg-card, #1a1a1a)" : (p?.bgCard || "#1a1a1a"),
+              bgElevated: isAuto ? "var(--franchize-bg-base, #232323)" : (p?.bgBase || "#232323"),
+              border: borderSoft,
+              borderSoft,
+              text: textPrimary,
+              textMuted: textSecondary,
+              textFaint: textSecondary,
+              accent: accent,
+            }}
+          />
+          )
         )}
 
         {/* Phase 5: Renter-specific actions panel */}

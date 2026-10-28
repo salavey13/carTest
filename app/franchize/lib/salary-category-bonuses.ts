@@ -311,30 +311,43 @@ export async function computeCategoryBonuses(params: {
   // Task 101: batch-fetch the operator+owner verification state for the
   // credited rentals (one chunked query; empty map when the table is not
   // applied yet — badges then simply do not render).
-  // Task 106: when the row carries an AGREED (corrected) split — the pair
-  // settled a dispute through the negotiation flow — the corrected numbers
-  // are THE truth: item amounts, the bucket breakdown and rentalTotal all
-  // move to them, so the profile pays what was actually agreed.
+  // TASK159 — the verification SETTLEMENT wins over the live recompute: the
+  // corrected snapshot, or the accepted дил split when it is NEWER than the
+  // correction (settledCommissionOf). The member still gets only HIS fraction
+  // of the settled total (splitAmountByFractions — the same rule as the CSV
+  // pills and the сверка DM), so the profile pays exactly what was actually
+  // agreed, to the ruble, per operator. Legacy rows without frozen numbers
+  // (agreed split only) keep the old task-106 path.
   const verificationMap = await getVerificationStatusMap(rentalItems.map((i) => i.rentalId));
   for (let idx = 0; idx < rentalItems.length; idx += 1) {
     const item = rentalItems[idx];
     const brief = verificationMap.get(item.rentalId);
     item.verificationStatus = brief?.status ?? null;
-    if (brief?.agreedSplit) {
-      const agreed = brief.agreedSplit;
-      const agreedTotal = agreed.base + agreed.equipment + agreed.overprice;
-      const delta = agreedTotal - item.amount;
-      if (delta !== 0) {
-        const bucket = byRentalCategory.get(rentalItemBuckets[idx]?.label || "");
-        if (bucket) bucket.amount += delta;
-        rentalTotal += delta;
-      }
-      item.base = agreed.base;
-      item.equipment = agreed.equipment;
-      item.overprice = agreed.overprice;
-      item.amount = agreedTotal;
-      item.verificationAdjusted = true;
+    const settled = brief?.settled ?? null;
+    const agreed = !settled && brief?.agreedSplit ? brief.agreedSplit : null;
+    if (!settled && !agreed) continue;
+    const parts = settled
+      ? { base: settled.base, equipment: settled.equipment, overprice: settled.overprice, total: settled.total }
+      : {
+          base: agreed!.base,
+          equipment: agreed!.equipment,
+          overprice: agreed!.overprice,
+          total: agreed!.base + agreed!.equipment + agreed!.overprice,
+        };
+    const allFractions = attributedRentals[idx]?.allFractions ?? [{ n: 1, d: 1 }];
+    const shareIndex = attributedRentals[idx]?.shareIndex ?? 0;
+    const myAmount = splitAmountByFractions(parts.total, allFractions)[shareIndex] ?? 0;
+    const delta = myAmount - item.amount;
+    if (delta !== 0) {
+      const bucket = byRentalCategory.get(rentalItemBuckets[idx]?.label || "");
+      if (bucket) bucket.amount += delta;
+      rentalTotal += delta;
     }
+    item.base = parts.base;
+    item.equipment = parts.equipment;
+    item.overprice = parts.overprice;
+    item.amount = myAmount;
+    item.verificationAdjusted = true;
   }
 
   if (rentalTotal > 0 || byRentalCategory.size > 0) {

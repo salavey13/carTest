@@ -27,6 +27,7 @@ import {
 } from "@/app/franchize/lib/operator-attribution";
 import { splitAmountByFractions } from "@/lib/salary-split";
 import { computeSaleSalary } from "@/lib/salary-coefficients-shared";
+import { getVerificationStatusMap } from "@/app/franchize/lib/rental-verify";
 
 /**
  * I5 — My Work server actions for profile sections.
@@ -257,6 +258,29 @@ export async function getMyWorkDayAction(params: {
         salary: mySalary,
         sourceLabel: ATTRIBUTION_SOURCE_LABELS[mySource as AttributionSource] || "—",
       });
+    }
+
+    // TASK159 — the verification SETTLEMENT (corrected snapshot / accepted дил
+    // split when newer) wins over the live recompute here too: the day card
+    // must show the same rubles as the table view and the profile. The
+    // member's FRACTION of the settled total (splitAmountByFractions, same
+    // rule as everywhere); live numbers stay when no verification row exists.
+    if (rentalDetails.length > 0) {
+      const verificationMap = await getVerificationStatusMap(rentalDetails.map((d) => d.rentalId));
+      for (const d of rentalDetails) {
+        const settled = verificationMap.get(d.rentalId)?.settled ?? null;
+        if (!settled) continue;
+        const { shares } = resolveRentalOperatorSplit(
+          (dayRentals || []).find((r: any) => String(r.rental_id) === d.rentalId) ?? { metadata: {} },
+          allShifts,
+        );
+        const shareIdx = shares.findIndex((s) => s.operatorId === secureUserId);
+        const mySettled = shareIdx === -1
+          ? settled.total
+          : (splitAmountByFractions(settled.total, shares.map((s) => s.fraction))[shareIdx] ?? 0);
+        rentalsSalary += mySettled - d.salary;
+        d.salary = mySettled;
+      }
     }
 
     // ── Sales: ACTUAL sale contracts attributed to me ──

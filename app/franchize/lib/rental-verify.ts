@@ -98,6 +98,7 @@ import {
   resolveVerificationRole,
   sendProposalFromDraft,
   selfHealErrorText,
+  settledCommissionOf,
   setDraftComment,
   setDraftSplit,
   snapshotSplitOf,
@@ -151,6 +152,7 @@ export {
   resolveVerificationRole,
   sendProposalFromDraft,
   selfHealErrorText,
+  settledCommissionOf,
   snapshotSplitOf,
   splitTotal,
   startDraft,
@@ -2532,10 +2534,46 @@ export async function handleRentalVerifyProposalCallback(params: {
         }
         // Narrow once — closures below (remaining-party filter) must see non-null.
         const confirmRow = confirm.row;
+        // TASK159 — the accepted deal REWRITES the frozen snapshot money: the
+        // agreed split becomes the row's settled truth (a correction block
+        // keeps the pre-deal numbers + when/why), so every surface reading the
+        // snapshot — table view, CSV, profile, payouts, day cards — pays the
+        // agreed rubles even after the negotiation jsonb rotates away. When
+        // the deal numbers match the frozen ones, the snapshot stays untouched
+        // (no phantom «скорректировано» marker).
+        const agreedSplit = acc.state.agreed!.split;
+        const prevSnap = current.snapshot && typeof current.snapshot === "object" && !Array.isArray(current.snapshot)
+          ? { ...(current.snapshot as Record<string, unknown>) }
+          : {};
+        const dealSameAsFrozen =
+          Number(prevSnap.base ?? 0) === (Number(agreedSplit.base) || 0) &&
+          Number(prevSnap.equipment ?? 0) === (Number(agreedSplit.equipment) || 0) &&
+          Number(prevSnap.overprice ?? 0) === (Number(agreedSplit.overprice) || 0);
+        const rewrittenSnapshot = dealSameAsFrozen
+          ? prevSnap
+          : {
+              ...prevSnap,
+              base: Math.max(0, Number(agreedSplit.base) || 0),
+              equipment: Math.max(0, Number(agreedSplit.equipment) || 0),
+              overprice: Math.max(0, Number(agreedSplit.overprice) || 0),
+              total: splitTotal(agreedSplit),
+              correction: {
+                at: acc.state.agreed!.at || new Date().toISOString(),
+                by: "дил по сверке",
+                from: {
+                  base: Number(prevSnap.base ?? 0) || 0,
+                  equipment: Number(prevSnap.equipment ?? 0) || 0,
+                  overprice: Number(prevSnap.overprice ?? 0) || 0,
+                  total: Number(prevSnap.total ?? 0) || 0,
+                },
+                reason: "принято предложение по сверке",
+              },
+            };
         const { data: written, error: upErr } = await supabaseAdmin
           .from("rental_verifications")
           .update({
             negotiation: acc.state,
+            snapshot: rewrittenSnapshot,
             status: confirmRow.status,
             operator_confirmed_at: confirmRow.operator_confirmed_at,
             owner_confirmed_at: confirmRow.owner_confirmed_at,
@@ -3063,12 +3101,12 @@ export async function getVerificationStatusMap(rentalIds: string[]): Promise<Map
       "rental_id, status, operator_chat_id, owner_chat_id, negotiation, audit:snapshot->audit, " +
       "com_base:snapshot->base, com_equip:snapshot->equipment, com_over:snapshot->overprice, " +
       "com_total:snapshot->total, com_client:snapshot->totalCost, com_cat:snapshot->rentalCategoryLabel, " +
-      "com_units:snapshot->equipmentUnits, com_formula:snapshot->formula";
+      "com_units:snapshot->equipmentUnits, com_formula:snapshot->formula, com_corr_at:snapshot->correction->at";
     const COLS_PLAIN =
       "rental_id, status, operator_chat_id, owner_chat_id, audit:snapshot->audit, " +
       "com_base:snapshot->base, com_equip:snapshot->equipment, com_over:snapshot->overprice, " +
       "com_total:snapshot->total, com_client:snapshot->totalCost, com_cat:snapshot->rentalCategoryLabel, " +
-      "com_units:snapshot->equipmentUnits, com_formula:snapshot->formula";
+      "com_units:snapshot->equipmentUnits, com_formula:snapshot->formula, com_corr_at:snapshot->correction->at";
     const CHUNK = 200;
     for (let i = 0; i < ids.length; i += CHUNK) {
       const chunk = ids.slice(i, i + CHUNK);
@@ -3118,6 +3156,23 @@ export async function getVerificationStatusMap(rentalIds: string[]): Promise<Map
           operatorChatId: row.operator_chat_id,
           ownerChatId: row.owner_chat_id,
           ...(nego ? { proposalOpen: !!nego.open, agreedSplit: nego.agreed ? nego.agreed.split : null } : {}),
+          // TASK159 — the settled commission (accepted дил newer than the
+          // last correction, else the frozen/corrected snapshot). Built from
+          // the same jsonb picks so the money surfaces (CSV/tableview,
+          // profile, my-work) never need a second query.
+          ...(() => {
+            const settled = settledCommissionOf({
+              snapshot: {
+                base: row.com_base ?? null,
+                equipment: row.com_equip ?? null,
+                overprice: row.com_over ?? null,
+                total: row.com_total ?? null,
+                correction: row.com_corr_at != null ? { at: row.com_corr_at } : undefined,
+              },
+              negotiation: nego ? { agreed: nego.agreed ?? null } : undefined,
+            });
+            return settled ? { settled } : {};
+          })(),
           // task156: the standing negotiation comment (sent proposal / editor
           // draft / last round) — the boss's «Где наличка ???» case lived ONLY
           // in negotiation.draft.comment and never reached the web surfaces.

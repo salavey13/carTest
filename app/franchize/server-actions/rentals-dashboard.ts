@@ -811,7 +811,12 @@ export async function getRentalsDashboard(input: {
             ...item,
             verificationStatus: verificationMap.get(item.rental_id)?.status ?? null,
             verificationProposalOpen: verificationMap.get(item.rental_id)?.proposalOpen === true,
-            verificationAdjusted: !!verificationMap.get(item.rental_id)?.agreedSplit,
+            // TASK159 — «скорректировано» badge fires for a corrected snapshot
+            // (boss script / accepted дил rewrote the frozen numbers) OR a
+            // standing negotiated split — whichever settled the money.
+            verificationAdjusted:
+              verificationMap.get(item.rental_id)?.settled?.adjusted === true ||
+              !!verificationMap.get(item.rental_id)?.agreedSplit,
             verificationAudit: verificationMap.get(item.rental_id)?.audit ?? null,
             verificationCommission: verificationMap.get(item.rental_id)?.commission ?? null,
             verificationAgreedSplit: verificationMap.get(item.rental_id)?.agreedSplit ?? null,
@@ -1836,6 +1841,30 @@ export async function validateAnalyticsPassword(input: {
       crewId: result.crew_id,
       ownerId: result.crew_owner_id,
     });
+
+    // TASK159 — подписанная httpOnly cookie: серверные страницы (карточка
+    // аренды со сверкой/комментарием) видят пароль-сессию без Telegram.
+    // Подпись HMAC + срок проверяются в analytics-owner-cookie.ts, владелец
+    // перегейчивается по БД на каждой защищённой поверхности.
+    if (result.slug && result.crew_owner_id) {
+      try {
+        const { cookies } = await import("next/headers");
+        const { buildAnalyticsOwnerCookieValue, ANALYTICS_OWNER_COOKIE } = await import(
+          "@/app/franchize/lib/analytics-owner-cookie"
+        );
+        const cookie = buildAnalyticsOwnerCookieValue(String(result.crew_owner_id), String(result.slug));
+        (await cookies()).set(ANALYTICS_OWNER_COOKIE, cookie.value, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: cookie.maxAgeSeconds,
+        });
+      } catch (cookieErr) {
+        // Не ломаем вход в аналитику, если окружение не даёт поставить cookie.
+        console.warn("[analytics-password] owner cookie set failed (non-fatal):", cookieErr);
+      }
+    }
 
     return {
       success: true,

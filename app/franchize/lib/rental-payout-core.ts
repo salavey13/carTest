@@ -31,6 +31,7 @@ import {
   formatRubVerify,
   parseNegotiation,
   ruPlural,
+  settledCommissionOf,
   splitTotal,
   snapshotSplitOf,
   type RentalVerificationStatus,
@@ -150,19 +151,30 @@ export function isCommissionPaid(row: Pick<PayoutSourceRow, "payout">): boolean 
 
 // ── Money math ───────────────────────────────────────────────────────────────
 
-/** Commission for a row: agreed (corrected) split total, else the snapshot. */
+/**
+ * Commission for a row: the SETTLED numbers (task159 canon — an accepted дил
+ * wins ONLY while it is newer than the last snapshot correction; then the
+ * frozen/corrected snapshot). Falls back to a zero split when the row has no
+ * numbers at all.
+ */
 export function commissionOf(row: Pick<PayoutSourceRow, "snapshot" | "negotiation">): {
   amount: number;
   split: SplitParts;
   adjusted: boolean;
 } {
+  // TASK159: an STALE agreed (accepted before a boss-assistant correction —
+  // e.g. the fc5bc7fe Boulevard deal: settled 1000 on 19.10, corrected to
+  // 375 on 28.10) must NOT resurrect the old money in the payout hub.
+  const settled = settledCommissionOf(row);
+  if (settled) {
+    return {
+      amount: settled.total,
+      split: { base: settled.base, equipment: settled.equipment, overprice: settled.overprice },
+      adjusted: settled.adjusted,
+    };
+  }
   const snap = (row.snapshot || {}) as Record<string, unknown>;
   const original = snapshotSplitOf(snap as never);
-  const nego = row.negotiation !== undefined ? parseNegotiation(row.negotiation) : parseNegotiation(undefined);
-  const agreed = nego?.agreed?.split;
-  if (agreed) {
-    return { amount: splitTotal(agreed), split: agreed, adjusted: true };
-  }
   // snapshot.total is the canonical commission; fall back to the parts sum
   // when an old/foreign row lacks it (hand-made rows during backfill).
   const total = Number(snap.total);

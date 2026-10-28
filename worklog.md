@@ -1535,3 +1535,29 @@ Implementation (commit 8ba238ed6, rebased over df01d6f2c):
 Data edit (kawasaki 685a9152, Никита Золотов 18 750 ₽): created DJORUDJOV→I_O_S_NN, выдал Paul→I_O_S_NN, принял Гундермурд (kept), override purged, snapshot patched. Verified live with the NEW builder against prod DB: cell = «@I_O_S_NN (2/3) + Гундермурд Сигурдфлордбрадсен (1/3)», атрибуция = «раздел ЗП»; profile 533 + 267 = 800 ₽; snapshot 483 + 242 = 725 ₽ (frozen earlier at the 725 rate).
 
 Tests: task157 spec → task158-salary-split.spec ×19 (the boss's 2/3 case, 1/2+1/2 edge, all-same, 3×1/3, shift fallback, retired-override guard, cell round-trip, remainder rule, wiring pins); iter20/task98/task117/task127/task128 re-baselined. Suite 3838 passed / 8 skipped; eslint clean; tsc scoped clean (2 pre-existing). Deploy: VPS disk 95% → docker prune (13G freed) → build 17:30–17:44 → swap 17:44:39, /franchize/vip-bike 200, routes verified.
+
+## Task 160 — settled-комиссия сверки = единственная истина денег оператора: все поверхности + субаренда-аудит + Falcon 5000 + сверка на ПК без Telegram (2026-10-28)
+
+Boss (2026-10-28, одним пакетом): аудит всех субарендных байков («bet there are more issues like that») и затронутых аренд с делением часов на 2; CBR600RR 02.10 (техника 1000→500) всё ещё 1400 в аналитике; Boulevard 17.10 «375 ₽ → 0 ₽»; Boulevard 19.10 оверрайд не виден в таблице; комментарий сверки невидим на ПК без аутентификации; Falcon Pro 10.10 → комиссия 5000; «make sure overriden proper new values are used for salary totals calculations, not only in rentals analytics, tableview, rentals but even in profile page, everywhere»; codereview всех фиксов дня; redeploy + ускорение + комментарий с нюансами в build-deploy.sh.
+
+Корень: аналитика/таблица/CSV/profile/my-work считали ЗП ЖИВЫМ пересчётом и игнорировали сверку; + stale-agreed баг (fc5bc7fe: дил 1000₽ от 19.10 воскрешал старые деньги поверх правки 375₽ от 28.10).
+
+Канон — settledCommissionOf (rental-verify-core, precedence): (1) agreed побеждает только если NEWER последней правки снапшота; (2) иначе замороженный/скорректированный снапшот побеждает живой пересчёт; (3) нет чисел → null → живой canon. Комиссия оператора больше НИГДЕ не живёт отдельно от сверки:
+- rentals-csv.ts (она же tableview): settled пишет «ЗП Аренда» + ЗП техника/экип/наценка + блоки/СВОДКА; «Верификация» помечает «· скорректировано (N ₽)».
+- salary-category-bonuses.ts (profile «Комиссии», team-earnings): settled × ДОЛЯ участника (splitAmountByFractions(parts.total, allFractions)[shareIndex]) — починил конфликт task106 (agreed платил FULL total каждому участнику сплита); legacy-строки без чисел держат agreedSplit-fallback.
+- my-work.ts (дневная карточка): тот же settled-оверрайд после живого сплита.
+- rental-payout-core.ts commissionOf: делегирует settledCommissionOf (stale-agreed фикс).
+- rentals-dashboard: бейдж «скорректировано» срабатывает и от corrected snapshot, не только от дила.
+- accept-флоу сверки: принятый дил ПЕРЕЗАПИСЫВАЕТ снапшот (correction {at: agreed.at, by: дил по сверке, from: старые числа}); числа совпали — снапшот не трогаем (без фантомного «скорректировано»). getVerificationStatusMap тащит com_corr_at:snapshot->correction->at.
+
+БД (scripts/task159-money-fixes-20261028.mjs, dry-run→apply):
+- Субаренда (аудит нашёл 3 байка с specs.subrenter_chat_id без партнёрской ставки): yamaha-r6-2007 → partner_regular@12000, ducati-1199-panigale-2012 → partner_premium@18000, ducati-panigale-s-electro-green → partner_regular@10000 (+ код: SUBRENTED_BIKE_IDS += все три).
+- 13 замороженных сверок пересчитаны (base = партнёрский коэф × (часы<24 ? 0.5 : 1), экип/наценка не тронуты, correction shape как task156/157/158): R6 ×6 (1000→500/250), 1199 ×5 (1500→750/375), electro-green ×2. Статусы не тронуты.
+- Falcon: falcon-pro-2026 + falcon-gt-2026 specs.salary.saleCategory = enduro_moped (5000 ₽) — ретро-фикс всех прошлых продаж (комиссии считаются на лету из категорий байка).
+- Дил-бэкфилл: 9991969f (Boulevard 17.10) снапшот 375→0 (принятый дил 0/0/0 от 17:18:50) — больше не «выпадает» из расчётов.
+
+Сверка на ПК: validateAnalyticsPassword ставит httpOnly cookie vb_analytics_owner (HMAC-SHA256 подпись, секрет = SERVICE_ROLE_KEY, 30 дней, lib/analytics-owner-cookie.ts); страница аренды читает cookie → подпись/срок → перегейт владельца по БД (владелец экипажа/глобальный админ) → рендерит CommissionVerificationCard с passwordAuthOwnerId (без TG RoleGuard; сервер-экшены карточки перепроверяют id сами). Комментарий сверки теперь виден с ПК после ввода пароля аналитики.
+
+Live-check против прод-БД: CBR600RR 02.10 → ЗП 900 + «скорректировано (900 ₽)» ✅; Boulevard 19.10 → 375 + «подтверждено · скорректировано (375 ₽)» ✅; Boulevard 17.10 → 0 ✅. (Проверка сырых строк по \n ловит не всё — ячейка с многострочным Заметки переносит хвост строки; парсить CSV-парсером.)
+
+Tests: task159-settled-commission.spec ×17 (precedence-кейсы на реальных строках, кламп отрицательных частей, доли settled, source-pins всех поверхностей + cookie-гейт + субаренда-список; тест поймал баг: agreed total считался из сырых частей без клампа — починен); task106/task126 пины re-baselined под settled. Affected suite: 10 файлов, 207 passed; tsc по изменённым файлам чистый (parseNegotiation import в payout-core восстановлен).

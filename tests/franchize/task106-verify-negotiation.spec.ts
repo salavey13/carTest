@@ -477,9 +477,14 @@ describe("task106 · wiring pins (source-level)", () => {
 
   it("agreed split overrides the REAL salary items (profile pays the deal)", () => {
     const s = src("app/franchize/lib/salary-category-bonuses.ts");
+    // TASK159: the settled commission (corrected snapshot / accepted дил)
+    // drives the override; legacy rows keep the agreedSplit fallback.
+    expect(s).toContain("brief?.settled");
     expect(s).toContain("brief?.agreedSplit");
     expect(s).toContain("item.verificationAdjusted = true");
     expect(s).toContain("rentalTotal += delta");
+    // the member still gets only HIS fraction of the settled total
+    expect(s).toContain("splitAmountByFractions(parts.total, allFractions)[shareIndex]");
   });
 
   it("deal achievements are registered in the catalog", () => {

@@ -172,6 +172,12 @@ export const DEFAULT_PRICE_TIERS = {
  * task 157 / task 158, 2026-10-28): Ducati Aero, Yamaha R7, Suzuki GSX-S1000F,
  * Kawasaki EX650K (Ninja 650), Aprilia Shiver 750, Suzuki M109R 1800
  * Boulevard. Everything else is owned.
+ *
+ * TASK159 (boss 2026-10-28, аудит субаренды): + Yamaha R6 2007, Ducati 1199
+ * Panigale 2012, Ducati Panigale S Electro (зелёная) — все три ездят с
+ * specs.subrenter_chat_id, но в списке не были, и аренды платились по полной
+ * ставке вместо партнёрской. Этим же байкам в БД прописан specs.salary
+ * (партнёрские категории); список ниже — канон для новых байков без specs.
  */
 export const SUBRENTED_BIKE_IDS: readonly string[] = [
   "ducati-panigale-s-electro-black-aero",
@@ -180,6 +186,9 @@ export const SUBRENTED_BIKE_IDS: readonly string[] = [
   "kawasaki-ex650k",
   "aprilia-shiver",
   "suzuki-vzr1800-boulevard-2006",
+  "yamaha-r6-2007",
+  "ducati-1199-panigale-2012",
+  "ducati-panigale-s-electro-green",
 ];
 
 export function isSubrentedBike(bikeId: string): boolean {
