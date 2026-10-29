@@ -154,16 +154,23 @@ export function parseLeadDeepLink(param: string): { leadId?: string; segment?: s
 }
 
 /**
- * Parse a rental_ deep-link parameter (for analytics page, NOT the rent_ QR link).
+ * Parse a rental_ deep-link parameter (the dedicated rental page, NOT the rent_ QR link).
  *
- * Formats:
- *   rental_{rentalId}  → open analytics page with this rental's detail drawer
+ * Formats in the wild:
+ *   rental_{rentalId}              — rentals/actions.ts, doc-manual, reports, docphotoocr
+ *   rental_{action}_{rentalId}     — app/api/notify (confirm-pickup / confirm-return / view / …)
+ *
+ * BUG FIX (2026-10-29, «telegram web deep links не работают»): rental ids are
+ * UUIDs — hyphens only, NEVER underscores — and the notify action words never
+ * contain "_" either, so the LAST underscore-separated segment is always the
+ * id itself. The previous slice(7) returned «confirm-return_<uuid>» verbatim
+ * and the router built a 404 path /franchize/<slug>/rental/confirm-return_<uuid>.
  *
  * Returns null if the param doesn't start with "rental_".
  */
 export function parseRentalDetailDeepLink(param: string): { rentalId: string } | null {
   if (!param.startsWith("rental_")) return null;
-  const rentalId = param.slice(7).trim();
+  const rentalId = param.split("_").at(-1)?.trim() ?? "";
   if (!rentalId) return null;
   return { rentalId };
 }

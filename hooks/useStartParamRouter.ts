@@ -28,6 +28,7 @@ import {
   parseTestdriveDeepLink,
   START_PARAM_PAGE_MAP,
 } from "@/hooks/use-start-param-target";
+import { getTelegramLaunchParamsFromWindow } from "@/lib/telegram-launch-params";
 
 // Re-export for backwards compatibility: existing consumers import the
 // resolver from this hook file; the pure implementation lives in
@@ -263,7 +264,19 @@ export function useStartParamRouter() {
 
   useEffect(() => {
     const processStartParam = async () => {
-      const urlStartParam = searchParams.get("tgWebAppStartParam") || searchParams.get("startapp");
+      // FIX (Telegram Web deep links, 2026-10-29): Telegram передаёт
+      // launch-параметры в URL-ФРАГМЕНТЕ
+      // (…#tgWebAppData=…&tgWebAppStartParam=rental_<id>), который Next.js
+      // useSearchParams() НЕ видит (он читает только query string). Если
+      // telegram-web-app.js не загрузился/не отдал start_param (webk/webz
+      // quirk), фрагмент — единственный носитель параметра: читаем его тем же
+      // хелпером, что и auth-хук (query → hash, см. telegram-launch-params.ts).
+      const hashStartParam =
+        typeof window !== "undefined" ? getTelegramLaunchParamsFromWindow().startParam : null;
+      const urlStartParam =
+        searchParams.get("tgWebAppStartParam") ||
+        searchParams.get("startapp") ||
+        hashStartParam;
       const rawStartParam = startParamPayload || urlStartParam;
       const paramToProcess = normalizeStartParamPath(rawStartParam);
       const normalizedUrlStartParam = normalizeStartParamPath(urlStartParam);
@@ -554,6 +567,16 @@ export function useStartParamRouter() {
           // FranchizeRentalLifecycleActions + RentalReturnChecklist live, so
           // deep links from boss-commands (returns-reminder.sh, evening-summary.sh)
           // should land operators THERE.
+          //
+          // FIX (2026-10-29, «telegram web deep links не работают»): two layers.
+          // 1) Telegram Web доставляет startapp через URL-фрагмент
+          //    (#tgWebAppStartParam=…), который searchParams не видит — теперь
+          //    читаем хэш (см. hashStartParam выше) + AppContext берёт
+          //    telegramHookData.startParam (SDK+hash merge из useTelegramAuth).
+          // 2) app/api/notify генерит rental_{action}_{rentalId}
+          //    (confirm-pickup / confirm-return / view) — parseRentalDetailDeepLink
+          //    теперь отдаёт последний "_"-сегмент как id (uuid-ы без
+          //    подчёркиваний), а не «confirm-return_<uuid>» (был 404).
           //
           // If you want the analytics drawer, use `analytics_rental_<id>`
           // (handled by parseAnalyticsDeepLink below).

@@ -37,6 +37,7 @@ import {
   riderProfileStartParam,
 } from "@/lib/wall-deeplink";
 import { botUsernameFromCrewMetadata, normalizeBotUsername } from "@/app/franchize/lib/crew-bot";
+import { extractTelegramLaunchParams } from "@/lib/telegram-launch-params";
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -96,6 +97,52 @@ describe("startapp routing regression: computeFastWallTarget EXECUTES (boss 2026
 
   it("rental_<id> parses (gated analytics/rental links unaffected by rent_)", () => {
     expect(parseRentalDetailDeepLink(`rental_${RENTAL_ID}`)).toEqual({ rentalId: RENTAL_ID });
+  });
+
+  it("rental_<action>_<id> (api/notify format) resolves the BARE rental id (boss 2026-10-29)", () => {
+    // app/api/notify/route.ts генерит startapp=rental_{action}_{rentalId}
+    // («Подтвердить получение/возврат», «Открыть аренду»). Старый slice(7)
+    // возвращал «confirm-return_<uuid>» целиком → роутер строил
+    // /franchize/<slug>/rental/confirm-return_<uuid> → 404 на странице аренды.
+    // UUID-ы и action-слова не содержат подчёркиваний → последний сегмент
+    // ВСЕГДА id.
+    expect(parseRentalDetailDeepLink(`rental_confirm-return_${RENTAL_ID}`)).toEqual({ rentalId: RENTAL_ID });
+    expect(parseRentalDetailDeepLink(`rental_confirm-pickup_${RENTAL_ID}`)).toEqual({ rentalId: RENTAL_ID });
+    expect(parseRentalDetailDeepLink(`rental_view_${RENTAL_ID}`)).toEqual({ rentalId: RENTAL_ID });
+    expect(parseRentalDetailDeepLink(`rental_accept-hustle_${RENTAL_ID}`)).toEqual({ rentalId: RENTAL_ID });
+    // Edge cases: пустой хвост и чужие префиксы не парсятся.
+    expect(parseRentalDetailDeepLink("rental_")).toBeNull();
+    expect(parseRentalDetailDeepLink(`rent_${RENTAL_ID}`)).toBeNull();
+  });
+});
+
+describe("Telegram Web deep links: hash-carried launch params (boss 2026-10-29)", () => {
+  // Симптом: «ссылки глубокие на аренду через telegram web не работают».
+  // Telegram Web доставляет startapp в URL-ФРАГМЕНТЕ
+  // (#tgWebAppData=…&tgWebAppStartParam=rental_<id>), при этом
+  // initDataUnsafe.start_param может остаться пустым (webk/webz + медленный
+  // SDK). Роутер читал ТОЛЬКО query string (useSearchParams), а AppContext —
+  // ТОЛЬКО сырой initDataUnsafe: на web параметр терялся полностью, на
+  // мобильных работал → «сломано только в web».
+  it("useStartParamRouter falls back to the window hash launch params", () => {
+    const src = read("hooks/useStartParamRouter.ts");
+    expect(src).toContain('import { getTelegramLaunchParamsFromWindow } from "@/lib/telegram-launch-params";');
+    expect(src).toContain("hashStartParam");
+    // query-фоллбеки не потеряны
+    expect(src).toContain('searchParams.get("tgWebAppStartParam")');
+    expect(src).toContain('searchParams.get("startapp")');
+  });
+
+  it("AppContext consumes the merged (SDK + hash) startParam, not raw initDataUnsafe", () => {
+    const src = read("contexts/AppContext.tsx");
+    expect(src).toContain("telegramHookData.startParam ?? null");
+    expect(src).not.toContain("telegramHookData.tg?.initDataUnsafe?.start_param");
+  });
+
+  it("extractTelegramLaunchParams reads tgWebAppStartParam from a web-style launch URL", () => {
+    // Ровно то, что Telegram Web кладёт в адресную строку мини-аппа.
+    const launchUrl = `https://v0-car-test.vercel.app/#tgWebAppData=%7B%22user%22%3A%7B%7D%7D&tgWebAppStartParam=rental_${RENTAL_ID}`;
+    expect(extractTelegramLaunchParams(launchUrl).startParam).toBe(`rental_${RENTAL_ID}`);
   });
 });
 
