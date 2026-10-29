@@ -731,7 +731,7 @@ export default function GeorgElectroLanding() {
                   lightBacking: true,
                 },
                 {
-                  href: "/sly13",
+                  href: "/salavey13",
                   title: "SLY13",
                   tagline: "платформа франшиз проката — каталог, CRM, договоры, лиды и витрина каждого экипажа",
                   logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",

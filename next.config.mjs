@@ -202,6 +202,17 @@ const nextConfig = {
         destination: '/',
         permanent: false,
       },
+      // task167 (2026-10-30): the personal landing's canonical route is
+      // /salavey13 — the owner's handle (the /sly13 name lives on as the
+      // CREW slug at /franchize/sly13, which is a different surface). Every
+      // old link to the showroom keeps working through this redirect; the
+      // accidentally committed /public/salavey13.html was merged into the
+      // real landing and removed.
+      {
+        source: '/sly13',
+        destination: '/salavey13',
+        permanent: false,
+      },
     ]
   },
   // I12 hotfix: REMOVED the beforeFiles rewrite { source: '/', destination: '/franchize/vip-bike' }.

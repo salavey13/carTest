@@ -20,7 +20,7 @@ import { resolve } from "node:path";
 const ROOT = resolve(__dirname, "../..");
 const moto = readFileSync(resolve(ROOT, "app/moto-selection/page.tsx"), "utf8");
 const history = readFileSync(resolve(ROOT, "app/moto-selection/history/page.tsx"), "utf8");
-const sly = readFileSync(resolve(ROOT, "app/sly13/Sly13LandingClient.tsx"), "utf8");
+const sly = readFileSync(resolve(ROOT, "app/salavey13/Sly13LandingClient.tsx"), "utf8");
 
 describe("task141 — /moto-selection bikeland partner card (RE-BASELINED task145 logo-grid)", () => {
   // task145 (parallel commit): partner cards moved into the shared

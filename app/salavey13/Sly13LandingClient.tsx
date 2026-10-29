@@ -1,8 +1,12 @@
 "use client";
 
-// /app/sly13/Sly13LandingClient.tsx
+// /app/salavey13/Sly13LandingClient.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// Клиентская часть витрины SLY13 (task 136; 2026-10-25 — messaging overhaul).
+// Клиентская часть витрины SLY13 (task 136; 2026-10-25 — messaging overhaul;
+// task167 2026-10-30 — маршрут канонизирован на /salavey13, слит контент
+// случайно созданного /public/salavey13.html: секция «07 · автор» с карточками
+// разработчика и боевого экипажа, полоса «как проходит работа» в услугах,
+// контакты (email, бот, площадка) в футере; сам статичный файл удалён).
 // Палитра приходит с RSC-страницы (с фолбэком), всё остальное — здесь:
 // собственные nav+footer (chrome подавлен через THEME_CONFIG.sly13),
 // bento-сетки, framer-motion reveal-ы, счётчики, параллакс фонов,
@@ -187,6 +191,31 @@ const SERVICES = [
   },
 ];
 
+// task167 (2026-10-30): контент, слитый из случайно созданного
+// /public/salavey13.html (статичный лендинг 2026-10-22, версия 20261022a).
+// Правила слияния от босса: полезное — в реальный лендинг, стены текста — нет,
+// ссылки на витрины экипажей ведут на канонический origin (rental-реплой
+// живёт на subdomain — в React-лендинге это относительные ссылки), форму
+// заявки НЕ переносим (на витрине уже есть FeedbackModal → CRM+Telegram).
+// Приватные цифры сезона из статичного HTML (аренды/ДКП/оборот кассы/аудит
+// октября) НЕ слиты — запрещены боссом 2026-10-25, пинит task138; карточка
+// экипажа рассказывает КАК экипаж работает на платформе, а не сколько
+// заработал. Фото карточки — флагман каталога vip-bike из carpix
+// (http 200 проверен при слиянии).
+const AUTHOR_IMG = `${SB}/sequence-zero/image_1.jpg`;
+
+// «Как проходит работа» (из статичного HTML, секция 05 · Процесс) —
+// уложена в компактную полосу внутри услуг, чтобы не раздувать страницу.
+const PROCESS = [
+  { n: "01", title: "Заявка", text: "Напишите в Telegram: бизнес, задача, сроки." },
+  { n: "02", title: "Бриф", text: "Созваниваемся — фиксируем каталог, процессы и бюджет." },
+  { n: "03", title: "Запуск", text: "Брендинг, каталог, корзина, админка, бот — от двух дней." },
+  { n: "04", title: "Рост", text: "Обучение админов, новые фичи, сверка денег — софт растёт вместе с прокатом." },
+];
+
+// Стек разработчика (карточка «автор», слито из статичного HTML).
+const STACK_CHIPS = ["Next.js", "Supabase", "Telegram Mini App", "OCR документов", "Боты заказов"];
+
 // task 141: href — куда ведёт карточка (лендинг, если он есть, иначе
 // каталог экипажа /franchize/{slug}; djorudjov теперь настоящий экипаж
 // в БД — мёртвой ссылки больше нет). Используется в компактном списке
@@ -271,6 +300,7 @@ const NAV_LINKS = [
   { href: "#ai", label: "AI" },
   { href: "#services", label: "Услуги" },
   { href: "#partners", label: "Партнёры" },
+  { href: "#author", label: "Автор" },
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -1342,6 +1372,31 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 </Link>
               </div>
             </Reveal>
+            {/* task167: полоса «как проходит работа» — слита из статичного
+                salavey13.html (там была секция 05 · Процесс), уложена в 4
+                компактные карточки, чтобы не превращать страницу в стену */}
+            <Reveal delay={0.2}>
+              <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {PROCESS.map((s) => (
+                  <div
+                    key={s.n}
+                    className="rounded-2xl border p-5"
+                    style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  >
+                    <span
+                      className="font-jb text-[11px] font-bold uppercase tracking-[0.2em]"
+                      style={{ color: p.accentMain }}
+                    >
+                      {s.n}
+                    </span>
+                    <h3 className="mt-1.5 text-sm font-black uppercase tracking-wide">{s.title}</h3>
+                    <p className="mt-1.5 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                      {s.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
           </section>
 
           {/* ── 06 · ПАРТНЁРЫ (cross-link с /moto-selection) ──────────────── */}
@@ -1466,6 +1521,138 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
           </section>
 
+          {/* ── 07 · АВТОР (task167: слито из /public/salavey13.html) ────────
+              Две карточки в одну историю: платформу строит конкретный человек
+              и обкатывает её на собственном боевом экипаже. Без приватных
+              цифр сезона (task138) и без формы — заявка уже живёт в
+              финальном CTA (FeedbackModal). Фото — флагман каталога vip-bike. */}
+          <section id="author" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="автор" />
+            <Reveal>
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                07 · автор
+              </p>
+              <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                Один за экраном. <span style={{ color: p.accentMain }}>Вся система на месте.</span>
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
+                Платформу строит и обкатывает один человек — на собственном прокате, а не в
+                презентации. Всё, что показано на этой витрине, прямо сейчас работает в бою.
+              </p>
+            </Reveal>
+            <div className="mt-9 grid gap-4 lg:grid-cols-2 lg:gap-6">
+              {/* разработчик: кто и на чём это делает */}
+              <Reveal>
+                <SpotlightCard
+                  className="h-full rounded-2xl border p-6 sm:p-8"
+                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <span
+                      className="font-jb flex h-14 w-14 select-none items-center justify-center rounded-xl text-lg font-black"
+                      style={{
+                        background: `${p.accentMain}1A`,
+                        color: p.accentMain,
+                        border: `1px solid ${p.accentMain}55`,
+                        boxShadow: `0 0 18px ${p.accentMain}33`,
+                      }}
+                      aria-hidden
+                    >
+                      S13
+                    </span>
+                    <span
+                      className="font-jb rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em]"
+                      style={{ borderColor: p.borderSoft, color: p.textSecondary }}
+                    >
+                      Dev · Founder
+                    </span>
+                  </div>
+                  <p className="font-jb mt-6 text-[11px] uppercase tracking-[0.2em]" style={{ color: p.textSecondary }}>
+                    разработчик · основатель SLY13
+                  </p>
+                  <h3 className="mt-1 text-2xl font-black tracking-tight">salavey13</h3>
+                  <p className="mt-3 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                    Строю платформу франшиз проката изнутри живого бизнеса: один контур — от заказа
+                    в каталоге до зарплаты оператора. Люблю, когда цифры сходятся до копейки:
+                    сверка, комиссии и депозиты считаются автоматически, а не в тетрадке.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {STACK_CHIPS.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-full border px-3 py-1 text-[11px]"
+                        style={{ borderColor: p.borderSoft, color: p.textSecondary }}
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <a
+                      href="https://t.me/SALAVEY13"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-10 items-center gap-2 rounded-full px-5 text-xs font-bold uppercase tracking-[0.08em] transition hover:brightness-110"
+                      style={{ background: p.accentMain, color: p.bgBase }}
+                    >
+                      <FaTelegramPlane className="h-3.5 w-3.5" aria-hidden /> @SALAVEY13
+                    </a>
+                    <a
+                      href="mailto:salavey13@gmail.com"
+                      className="font-jb inline-flex h-10 items-center rounded-full border px-5 text-xs font-semibold transition hover:opacity-80"
+                      style={{ borderColor: `${p.textPrimary}44`, color: p.textPrimary }}
+                    >
+                      salavey13@gmail.com
+                    </a>
+                  </div>
+                </SpotlightCard>
+              </Reveal>
+              {/* боевой экипаж: где это уже работает */}
+              <Reveal delay={0.1}>
+                <SpotlightCard
+                  className="sly-svc group relative min-h-[380px] overflow-hidden rounded-2xl border"
+                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                >
+                  <Image
+                    src={AUTHOR_IMG}
+                    alt="Электробайк боевого экипажа VIP BIKE"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-cover"
+                  />
+                  <div className="sly-glass absolute inset-0" aria-hidden />
+                  <span
+                    className="font-jb absolute right-3 top-3 z-10 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={{ background: p.accentMain, color: p.bgBase }}
+                  >
+                    Live
+                  </span>
+                  <div className="relative z-10 flex h-full min-h-[380px] flex-col justify-end p-6 sm:p-8">
+                    <p className="font-jb text-[11px] uppercase tracking-[0.2em]" style={{ color: p.textSecondary }}>
+                      первый клиент платформы · Нижний Новгород
+                    </p>
+                    <h3 className="mt-1 text-2xl font-black tracking-tight">VIP BIKE</h3>
+                    <p className="mt-2 max-w-md text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      Прокат электробайков, работающий на платформе с первого дня: заказы из
+                      Telegram Mini App, договоры с OCR паспорта и ВУ, залоги, касса, смены и
+                      зарплаты операторов.
+                    </p>
+                    <div className="mt-5">
+                      <Link
+                        href="/franchize/vip-bike"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-6 text-xs font-bold uppercase tracking-[0.1em] transition hover:brightness-110"
+                        style={{ background: p.accentMain, color: p.bgBase }}
+                      >
+                        Смотреть экипаж
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                      </Link>
+                    </div>
+                  </div>
+                </SpotlightCard>
+              </Reveal>
+            </div>
+          </section>
+
           {/* ── ФИНАЛЬНЫЙ CTA (picture background) ────────────────────────── */}
           <section
             ref={ctaRef}
@@ -1559,6 +1746,18 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 Личная витрина salavey13. Платформа франшиз проката: витрины экипажей, каталоги,
                 заказы, аналитика — Next.js + Supabase + Telegram Mini App.
               </p>
+              {/* task167: контакты, слитые из статичного salavey13.html —
+                  адрес площадки (реальный hq vip-bike, пл. Комсомольская 2)
+                  ведёт на главный сайт vip-bike.ru (не rental-subdomain) */}
+              <a
+                href="https://vip-bike.ru"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block text-xs transition hover:opacity-80"
+                style={{ color: p.textSecondary }}
+              >
+                пл. Комсомольская, 2 · Нижний Новгород →
+              </a>
             </div>
             <div>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: p.textSecondary }}>
@@ -1599,6 +1798,16 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     Telegram · @SALAVEY13
                   </a>
                 </li>
+                <li>
+                  <a href="mailto:salavey13@gmail.com" className="transition hover:text-[var(--sly-accent)]" style={{ color: p.textSecondary }}>
+                    salavey13@gmail.com
+                  </a>
+                </li>
+                <li>
+                  <a href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener noreferrer" className="transition hover:text-[var(--sly-accent)]" style={{ color: p.textSecondary }}>
+                    Бот заказов · oneBikePlsBot
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
@@ -1616,7 +1825,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           slug="sly13"
           accent={{ brand: p.accentMain, brandSoft: p.accentMainHover }}
           formSource="sly13-feedback-modal"
-          landingPath="/sly13"
+          landingPath="/salavey13"
         />
       </div>
     </MotionConfig>

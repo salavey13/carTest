@@ -1,13 +1,17 @@
-// /app/sly13/page.tsx
+// /app/salavey13/page.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// SLY13 — личная витрина salavey13 (task 136; 2026-10-25 messaging overhaul).
+// SLY13 — личная витрина salavey13 (task 136; 2026-10-25 messaging overhaul;
+// task167 2026-10-30: канонический маршрут /salavey13 — ник владельца;
+// старый /sly13 редиректится в next.config, /public/salavey13.html слит сюда
+// и удалён — секция «07 · автор», процесс работы и контакты в футере).
 //
 // Босс 2026-10-25: «ditch "stats of vip-bike" — these numbers were not
 // actually intended for publication … generalize "the message" — focus on
 // variety of supported/tested features of my platform». Метаданные и контент
 // больше не оперируют приватными цифрами сезона: лендинг рассказывает про
 // платформу (каталог → CRM: 6 контуров, двойная книга денег, мультиарендность,
-// AI-воркер) — детали в Sly13LandingClient.
+// AI-воркер) — детали в Sly13LandingClient. Слитый из статичного HTML блок
+// «автор» тоже без приватных цифр (пины task138/167).
 //
 // Архитектура: этот RSC только тянет палитру экипажа (устойчиво к недоступности
 // БД — фолбэк на sly13-палитру из crewDocs) и отдаёт её клиентскому

@@ -41,7 +41,7 @@ const CREW_TILES = [
     lightBacking: true,
   },
   {
-    href: "/sly13",
+    href: "/salavey13",
     title: "SLY13",
     tagline: "платформа франшиз проката — каталог, CRM, договоры, лиды",
     logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",

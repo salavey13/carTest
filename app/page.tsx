@@ -1419,7 +1419,7 @@ export default function Home() {
               </AnimatedSection>
 
               {/* ══ task 141: interlink all-to-all — витрина экипажей платформы.
-                  Лендинги /sly13, /moto-selection, /georg-electro, /leorus
+                  Лендинги /salavey13, /moto-selection, /georg-electro, /leorus
                   ссылаются сюда (в их партнёрских секциях), мы — на них.
                   task 145 (босс 2026-10-27): «showing only logos at first,
                   and reveal title on longtap/hover» — тот же сквозной
@@ -1437,7 +1437,7 @@ export default function Home() {
                     ariaLabel="Витрины экипажей платформы — партнёры VIP BIKE"
                     partners={[
                       {
-                        href: "/sly13",
+                        href: "/salavey13",
                         title: "SLY13",
                         tagline: "платформа франшиз — каталог, CRM, договоры, лиды",
                         logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",

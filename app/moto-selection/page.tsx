@@ -1049,7 +1049,7 @@ export default function MotoSelectionLanding() {
                 lightBacking: true,
               },
               {
-                href: "/sly13",
+                href: "/salavey13",
                 title: "SLY13",
                 tagline: "платформа франшиз проката — витрина партнёров на одном софте",
                 logoSrc: SLY13_LOGO,
@@ -1179,7 +1179,7 @@ export default function MotoSelectionLanding() {
               </div>
             </Link>
             <Link
-              href="/sly13"
+              href="/salavey13"
               className="group rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-[var(--ms-accent)]/60"
             >
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">партнёры</p>

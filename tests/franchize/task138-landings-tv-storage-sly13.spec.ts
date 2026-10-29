@@ -29,7 +29,7 @@ const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
 const GLOBALS = "app/globals.css";
-const SLY = "app/sly13/Sly13LandingClient.tsx";
+const SLY = "app/salavey13/Sly13LandingClient.tsx";
 const MS = "app/moto-selection/page.tsx";
 const WALL = "app/franchize/[slug]/storage/StorageWallClient.tsx";
 
@@ -60,7 +60,7 @@ describe("task138 · TV-safe accent gradient (boss: colored squares on TV)", () 
 
 describe("task138 · sly13 messaging overhaul (no private vip-bike numbers)", () => {
   const sly = read(SLY);
-  const slyPage = read("app/sly13/page.tsx");
+  const slyPage = read("app/salavey13/page.tsx");
 
   it("vip-bike season numbers are GONE from the landing", () => {
     for (const banned of ["308", "2,0 млн", "16,5 млн", "13,0 млн", "+188", "154", "«sus»", "31 дкп", "109 аренд"]) {

@@ -33,7 +33,7 @@ const catalog = read("app/franchize/components/CatalogClient.tsx");
 const moto = read("app/moto-selection/page.tsx");
 const motoHistory = read("app/moto-selection/history/page.tsx");
 const modal = read("app/moto-selection/FeedbackModal.tsx");
-const sly = read("app/sly13/Sly13LandingClient.tsx");
+const sly = read("app/salavey13/Sly13LandingClient.tsx");
 const paletteAction = read("app/franchize/server-actions/palette.ts");
 
 describe("task140 — catalog full-card hover wash (PC only)", () => {
@@ -198,8 +198,9 @@ describe("task140 — /sly13 neon palette + quality raise", () => {
   });
 
   it("ghost watermark per section — cyan 6% + blur(2px), TV-safe layering", () => {
-    expect((sly.match(/<SlyGhostWord word="/g) ?? []).length).toBe(6);
-    for (const w of ["платформа", "02", "сценарии", "04", "услуги", "партнёры"]) {
+    // task167 re-baseline: 6→7 — new «автор» ghost on the merged bio section
+    expect((sly.match(/<SlyGhostWord word="/g) ?? []).length).toBe(7);
+    for (const w of ["платформа", "02", "сценарии", "04", "услуги", "партнёры", "автор"]) {
       expect(sly).toContain(`<SlyGhostWord word="${w}"`);
     }
     expect(sly).toContain("color-mix(in srgb, var(--sly-accent) 6%, transparent)");

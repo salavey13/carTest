@@ -103,7 +103,7 @@ describe("task148 · interlink all-to-all (5/5 витрин ссылаются �
     ["root landing", "app/page.tsx"],
     ["vipbikerental", "app/vipbikerental/features/PartnersCrewsSection.tsx"],
     ["moto-selection", "app/moto-selection/page.tsx"],
-    ["sly13", "app/sly13/Sly13LandingClient.tsx"],
+    ["sly13", "app/salavey13/Sly13LandingClient.tsx"],
     ["leorus", "app/leorus/LeorusLandingClient.tsx"],
     ["georg-electro", "app/georg-electro/page.tsx"],
   ];
@@ -117,13 +117,14 @@ describe("task148 · interlink all-to-all (5/5 витрин ссылаются �
 
   it("the landing links back to all five sibling vitrines", () => {
     const grid = landing.slice(landing.indexOf("<PartnerLogoGrid"));
-    for (const href of ["/vipbikerental", "/moto-selection", "/sly13", "/leorus", "/georg-electro"]) {
+    // task167 re-baseline: the SLY13 vitrine moved to its canonical /salavey13
+    for (const href of ["/vipbikerental", "/moto-selection", "/salavey13", "/leorus", "/georg-electro"]) {
       expect(grid).toContain(`href: "${href}"`);
     }
   });
 
   it("sly13 pipeline: nn-mototeh-nn now points at /mototehnn (no dead null href)", () => {
-    const sly = src("app/sly13/Sly13LandingClient.tsx");
+    const sly = src("app/salavey13/Sly13LandingClient.tsx");
     expect(sly).toContain('{ slug: "nn-mototeh-nn", href: "/mototehnn"');
     expect(sly).not.toContain('{ slug: "nn-mototeh-nn", href: null');
   });

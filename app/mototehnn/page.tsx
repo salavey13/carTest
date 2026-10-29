@@ -824,7 +824,7 @@ export default async function MotoTehNNLanding() {
                   lightBacking: true,
                 },
                 {
-                  href: "/sly13",
+                  href: "/salavey13",
                   title: "SLY13",
                   tagline: "платформа франшиз проката — каталог, CRM, договоры, лиды и витрина каждого экипажа",
                   logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
@@ -1024,7 +1024,7 @@ export default async function MotoTehNNLanding() {
           </nav>
           <p className="text-xs" style={{ color: p.textSecondary }}>
             © 2026 Мототех НН · экипаж платформы{" "}
-            <Link href="/sly13" className="underline" style={{ color: p.textPrimary }}>
+            <Link href="/salavey13" className="underline" style={{ color: p.textPrimary }}>
               SLY13
             </Link>
           </p>

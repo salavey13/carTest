@@ -121,11 +121,13 @@ const THEME_CONFIG = {
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
   // PATCH: sly13 theme (2026-10-25, task 136) — standalone personal showroom
-  // at /sly13. Renders its own cyan/graphite nav + footer (svarprofi/
-  // nnvolt/motoSelection pattern): the default platform chrome would fight
-  // the personal-brand landing the boss keeps polishing.
+  // at /salavey13 (task167: canonical route is the owner's handle; the old
+  // /sly13 is redirected in next.config and still matched below for any stale
+  // client-side navigations). Renders its own cyan/graphite nav + footer
+  // (svarprofi/nnvolt/motoSelection pattern): the default platform chrome
+  // would fight the personal-brand landing the boss keeps polishing.
   sly13: {
-    paths: ["/sly13"],
+    paths: ["/salavey13", "/sly13"],
     Header: null,           // landing renders its own nav
     Footer: null,           // landing renders its own footer
     BottomNav: null,
@@ -211,7 +213,7 @@ const getThemeForPath = (pathname: string) => {
   if (pathname.startsWith("/moto-selection")) {
     return THEME_CONFIG.motoSelection;
   }
-  if (pathname.startsWith("/sly13")) {
+  if (pathname.startsWith("/salavey13") || pathname.startsWith("/sly13")) {
     return THEME_CONFIG.sly13;
   }
   if (pathname.startsWith("/georg-electro")) {
