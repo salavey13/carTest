@@ -2421,28 +2421,53 @@ function SectionTable({
   // own tint stacked over the scroll container's T.bg — dark-theme tokens are
   // translucent, so without the second layer the cells sliding beneath would
   // bleed through (same recipe as the task132 th fix).
+  //
+  // Task 163 — the boss saw a 1px transparent vertical line between the pinned
+  // columns with the sliding columns shimmering through it. Two stacked causes:
+  //   1. border-collapse: collapse — Chromium paints collapsed cell borders at
+  //      the cell's NATURAL x, and a stuck cell (the right rail especially,
+  //      whose natural position is the far right of a 25-column sheet) does not
+  //      carry its collapsed border-r with it → the pinned columns lost their
+  //      separators entirely.
+  //   2. Fractional measured offsets left sub-pixel slits between pinned cells.
+  // Fix: offsets are floored (table-rails.ts) AND every rail cell now draws its
+  // OWN opaque 1px separator as an inset shadow — it travels with the cell and
+  // does not depend on collapsed-border painting at all. The boundary cell that
+  // faces the sliding content (last left-rail / first right-rail column) adds
+  // an opaque 1px strip of its own background beyond the box edge, so nothing
+  // under the rail boundary can ever shine through.
   const railCellStyle = (
     di: number,
     bg: string,
     shadowIntensity: string,
   ): React.CSSProperties => {
     if (di < stickyLeft) {
+      const facesContent = di === stickyLeft - 1;
       return {
         position: "sticky",
         left: rail.left[di],
         zIndex: 10,
-        boxShadow: `2px 0 4px rgba(0,0,0,${shadowIntensity})`,
+        boxShadow: [
+          `inset -1px 0 0 ${T.border}`,
+          ...(facesContent ? [`1px 0 0 ${bg}`] : []),
+          `2px 0 4px rgba(0,0,0,${shadowIntensity})`,
+        ].join(", "),
         backgroundColor: bg,
         backgroundImage: `linear-gradient(${bg}, ${bg}), linear-gradient(${T.bg}, ${T.bg})`,
       };
     }
     const ri = colCount - 1 - di;
     if (ri >= 0 && ri < stickyRight) {
+      const facesContent = ri === stickyRight - 1;
       return {
         position: "sticky",
         right: rail.right[ri],
         zIndex: 10,
-        boxShadow: `-2px 0 4px rgba(0,0,0,${shadowIntensity})`,
+        boxShadow: [
+          `inset 1px 0 0 ${T.border}`,
+          ...(facesContent ? [`-1px 0 0 ${bg}`] : []),
+          `-2px 0 4px rgba(0,0,0,${shadowIntensity})`,
+        ].join(", "),
         backgroundColor: bg,
         backgroundImage: `linear-gradient(${bg}, ${bg}), linear-gradient(${T.bg}, ${T.bg})`,
       };

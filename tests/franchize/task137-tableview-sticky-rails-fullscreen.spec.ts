@@ -127,8 +127,10 @@ describe("task137 · measured sticky rails", () => {
     expect(modal).toContain("left: rail.left[di]");
     expect(modal).toContain("right: rail.right[ri]");
     // ...left rail shadows right, right rail shadows left
-    expect(modal).toContain("boxShadow: `2px 0 4px rgba(0,0,0,${shadowIntensity})`");
-    expect(modal).toContain("boxShadow: `-2px 0 4px rgba(0,0,0,${shadowIntensity})`");
+    // (task163 re-baseline: the shadows moved into a joined boxShadow list
+    // together with the self-drawn inset separators + boundary strips)
+    expect(modal).toContain("`2px 0 4px rgba(0,0,0,${shadowIntensity})`");
+    expect(modal).toContain("`-2px 0 4px rgba(0,0,0,${shadowIntensity})`");
     // opaque composite = the tint stacked over the scroll container's own bg
     expect(
       modal.match(

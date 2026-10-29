@@ -36,7 +36,7 @@ export const RENTALS_DISPLAY_ORDER: number[] = [
  * auto-layout table.
  *
  * @param widths      rendered header-cell widths, in display order
- *                    (getBoundingClientRect — fractional, no rounding drift)
+ *                    (getBoundingClientRect — fractional)
  * @param stickyLeft  count of leading display columns pinned left
  * @param stickyRight count of trailing display columns pinned right
  * @returns left[i]  — `left` offset for display column i (i < stickyLeft):
@@ -46,6 +46,18 @@ export const RENTALS_DISPLAY_ORDER: number[] = [
  *                    widths after it (right[0] = 0, the rightmost column).
  *
  * Clamped to widths.length — a short/legacy sheet pins whatever it has.
+ *
+ * Task 163 — offsets are integers and each next offset never exceeds the
+ * PREVIOUS CELL'S PAINTED edge. The raw sums are fractional (87.375px-style);
+ * a pinned cell paints [offset, offset + fractionalWidth], so flooring the
+ * raw prefix sum alone still left up to ~1px LAYOUT gaps between consecutive
+ * pinned cells (the painted edge drifted past the next floored offset) — the
+ * see-through slit the boss reported. The accumulation floors RECURSIVELY
+ * (acc = floor(acc + width)): each next offset ≤ floor(prevOffset + width) ≤
+ * prevOffset + width → rail cells always overlap or tile, never gap (the
+ * ≤0.5px error becomes an invisible overlap covered by the later cell's
+ * opaque background). The right rail mirrors the same recursion from the
+ * right edge.
  */
 export function computeRailOffsets(
   widths: number[],
@@ -56,7 +68,7 @@ export function computeRailOffsets(
   let acc = 0;
   for (let i = 0; i < stickyLeft && i < widths.length; i++) {
     left.push(acc);
-    acc += widths[i];
+    acc = Math.floor(acc + widths[i]);
   }
   const right: number[] = [];
   acc = 0;
@@ -64,7 +76,7 @@ export function computeRailOffsets(
     // j positions from the RIGHT edge: offset = sum of the rail widths
     // AFTER it (right[0] = 0 — the rightmost column hugs the edge).
     right[j] = acc;
-    acc += widths[widths.length - 1 - j];
+    acc = Math.floor(acc + widths[widths.length - 1 - j]);
   }
   return { left, right };
 }
