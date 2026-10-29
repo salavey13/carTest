@@ -99,7 +99,7 @@ describe("discovery page — howtos + useful links", () => {
 
   // task154 iter2: the hidden Roman quest cake links /leaderboard on purpose;
   // this contract is about the ORGANIC surface, so strip the quest block.
-  const organicPage = page.replace(/\{\/\* task154 iter2:[\s\S]*?nextLabel=[\s\S]*?\/>/g, "");
+  const organicPage = page.replace(/\{\/\* task[\s\S]*?nextLabel=[\s\S]*?\/>/g, "") // task165: marker-agnostic (any taskNNN quest block);
 
   it("carries the howto strip: six real answers with deep-links", () => {
     expect(page).toContain('id="howto"');

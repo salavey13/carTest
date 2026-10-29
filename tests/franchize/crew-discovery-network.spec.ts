@@ -274,7 +274,7 @@ describe("global discovery page — static route, memberships-only data", () => 
   // hidden overlay, NOT part of the organic discovery surface, so the
   // namespace guards below strip it before checking links.
   const stripQuest = (src: string) =>
-    src.replace(/\{\/\* task154 iter2:[\s\S]*?nextLabel=[\s\S]*?\/>/g, "");
+    src.replace(/\{\/\* task[\s\S]*?nextLabel=[\s\S]*?\/>/g, "") // task165: marker-agnostic (any taskNNN quest block);
 
   it("exists as a static segment (wins over /franchize/[slug] for 'discovery')", () => {
     expect(page.includes("export default async function CrewDiscoveryPage")).toBe(true);

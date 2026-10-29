@@ -36,11 +36,11 @@ const RENT_BIKE = read("app/rent-bike/page.tsx");
 const LEADERBOARD = read("app/leaderboard/page.tsx");
 const DISCOVERY = read("app/franchize/discovery/page.tsx");
 
-describe("task164 · tour catalog — 10 stops, everything from the main menu", () => {
-  it("ten sequential stops with unique keys and stable machine names", () => {
-    expect(TOUR_STOPS_TOTAL).toBe(10);
-    expect(TOUR_FEATURES.map((f) => f.stop)).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
-    expect(new Set(TOUR_FEATURES.map((f) => f.key)).size).toBe(10);
+describe("task164 · tour catalog — 19 stops (task165: the full onboarding quest)", () => {
+  it("nineteen sequential stops with unique keys and stable machine names", () => {
+    expect(TOUR_STOPS_TOTAL).toBe(19);
+    expect(TOUR_FEATURES.map((f) => f.stop)).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
+    expect(new Set(TOUR_FEATURES.map((f) => f.key)).size).toBe(19);
     // boss named these explicitly: «прямо прайс, эту карту, конфигуратор»
     expect(TOUR_FEATURE_KEYS.has("configurator")).toBe(true);
     expect(TOUR_FEATURE_KEYS.has("price_calc")).toBe(true);
@@ -72,13 +72,13 @@ describe("task164 · gate v2 — tour for everyone, birthday for Roman only", ()
     expect(gate).toContain("ROMAN_TG_USER_IDS");
   });
 
-  it("no cookie → public tour guest; roman → birthday; owner → tour+crewSlug; member/guest → tour", () => {
-    expect(gate).toContain('{ show: true, skin: "tour", role: "guest" }');
-    expect(gate).toContain('{ show: true, skin: "birthday", role: "roman" }');
-    expect(gate).toContain('{ show: true, skin: "tour", role: "owner", crewSlug }');
-    expect(gate).toContain('{ show: true, skin: "tour", role: "member" }');
+  it("no cookie → public tour guest; roman → birthday; owner → tour+crewSlug; member/guest → tour (task165: +authenticated flag)", () => {
+    expect(gate).toContain('{ show: true, skin: "tour", role: "guest", authenticated: false }');
+    expect(gate).toContain('{ show: true, skin: "birthday", role: "roman", authenticated: true }');
+    expect(gate).toContain('{ show: true, skin: "tour", role: "owner", crewSlug, authenticated: true }');
+    expect(gate).toContain('{ show: true, skin: "tour", role: "member", authenticated: true }');
     // fail-open degrades to the PUBLIC tour, never hides
-    expect(gate).toContain('{ show: true, skin: "tour", role: "guest" }');
+    expect(gate).toContain('{ show: true, skin: "tour", role: "guest", authenticated: false }');
   });
 
   it("client cache key bumped to v2 — stale v1 «hidden» verdicts can't suppress the tour", () => {
@@ -134,58 +134,53 @@ describe("task164 · stop component — two skins on one trail", () => {
 });
 
 describe("task164 · the trail — 10 wired stops", () => {
-  it("stop 1 landing (десять следов now)", () => {
-    expect(ROOT_PAGE).toContain('stop={1}');
+  it("stop 1 landing (девятнадцать следов now)", () => {
     expect(ROOT_PAGE).toContain('featureKey="landing"');
-    expect(ROOT_PAGE).toContain("десять следов");
+    expect(ROOT_PAGE).toContain("девятнадцать следов");
+    // task165: stop numbers derive from the catalog — no host-page hardcode
+    expect(ROOT_PAGE).not.toContain("stop={1}");
   });
-  it("stop 2 витрина → NOW leads to the configurator", () => {
+  it("stop 2 витрина → leads to the configurator", () => {
     const franchize = read("app/franchize/[slug]/page.tsx");
-    expect(franchize).toContain('stop={2}');
     expect(franchize).toContain('featureKey="storefront"');
     expect(franchize).toContain('nextHref="/franchize/vip-bike/configurator"');
   });
-  it("NEW stop 3 конфигуратор → карта сети", () => {
+  it("stop 3 конфигуратор → NOW leads to electro-enduro", () => {
     const page = hostPage("configurator");
-    expect(page).toContain('stop={3}');
     expect(page).toContain('featureKey="configurator"');
-    expect(page).toContain('nextHref="/franchize/discovery"');
+    expect(page).toContain('nextHref="/franchize/vip-bike/electro-enduro"');
   });
-  it("stop 4 карта сети → зал славы", () => {
-    expect(DISCOVERY).toContain('stop={4}');
+  it("stop 6 карта сети → зал славы", () => {
     expect(DISCOVERY).toContain('featureKey="discovery"');
+    expect(DISCOVERY).toContain('nextHref="/leaderboard"');
   });
-  it("stop 5 зал славы → гараж", () => {
-    expect(LEADERBOARD).toContain('stop={5}');
+  it("stop 7 зал славы → гараж", () => {
     expect(LEADERBOARD).toContain('featureKey="leaderboard"');
+    expect(LEADERBOARD).toContain('nextHref="/rent-bike"');
   });
-  it("stop 6 гараж → NOW leads to the прайс-калькулятор", () => {
-    expect(RENT_BIKE).toContain('stop={6}');
+  it("stop 8 гараж → NOW leads to the мотопарк", () => {
     expect(RENT_BIKE).toContain('featureKey="garage"');
-    expect(RENT_BIKE).toContain('nextHref="/franchize/vip-bike/calc-explainer"');
+    expect(RENT_BIKE).toContain('nextHref="/franchize/vip-bike/bikes"');
   });
-  it("NEW stop 7 прайс-калькулятор in BOTH branches (members-only page)", () => {
+  it("stop 12 прайс-калькулятор in BOTH branches (members-only page)", () => {
     const page = hostPage("calc-explainer");
-    expect(page.match(/stop=\{7\}/g)?.length).toBe(2);
     expect(page.match(/featureKey="price_calc"/g)?.length).toBe(2);
   });
-  it("stop 8 карта райдеров → NOW leads to the стена сообщества", () => {
+  it("stop 13 карта райдеров → стена сообщества", () => {
     const page = hostPage("map-riders");
-    expect(page).toContain('stop={8}');
     expect(page).toContain('featureKey="map_riders"');
     expect(page).toContain('nextHref="/franchize/vip-bike/community"');
   });
-  it("NEW stop 9 стена сообщества → цифры сезона", () => {
+  it("stop 14 стена сообщества → NOW leads to the витрина продаж", () => {
     const page = hostPage("community");
-    expect(page).toContain('stop={9}');
     expect(page).toContain('featureKey="community"');
+    expect(page).toContain('nextHref="/franchize/vip-bike/sales"');
   });
-  it("stop 10 цифры сезона in BOTH branches — the finale stop", () => {
+  it("stop 19 цифры сезона in BOTH branches — the finale stop", () => {
     const page = hostPage("season-stats");
-    expect(page.match(/stop=\{10\}/g)?.length).toBe(2);
     expect(page.match(/featureKey="season_stats"/g)?.length).toBe(2);
   });
-  it("the trail chain is gapless: each stop's nextHref equals the next stop's host href", () => {
+  it("the trail chain is gapless: each stop's nextHref equals the next stop's host href (task165: keyed, not numbered)", () => {
     for (let i = 0; i < TOUR_FEATURES.length - 1; i++) {
       const cur = TOUR_FEATURES[i];
       const next = TOUR_FEATURES[i + 1];
@@ -203,7 +198,7 @@ describe("task164 · the trail — 10 wired stops", () => {
                   ? read("app/franchize/[slug]/page.tsx")
                   : read(`app/franchize/[slug]/${cur.href.split("/").pop()}/page.tsx`);
       const cakeBlock = hostSrc.match(/<RomanQuestCake[\s\S]*?\/>/g) || [];
-      expect(cakeBlock.some((b) => b.includes(`stop={${cur.stop}}`) && b.includes(`nextHref="${next.href}"`))).toBe(true);
+      expect(cakeBlock.some((b) => b.includes(`featureKey="${cur.key}"`) && b.includes(`nextHref="${next.href}"`))).toBe(true);
     }
   });
 });

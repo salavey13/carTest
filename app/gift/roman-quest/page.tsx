@@ -37,6 +37,7 @@ export default function RomanQuestOverviewPage() {
   // owner activation panel state
   const [ownCrewSlug, setOwnCrewSlug] = useState<string | null>(null);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [purchases, setPurchases] = useState<Record<string, { status?: string; applied?: boolean }>>({});
   const [flagsLoading, setFlagsLoading] = useState(false);
   const [flagSaving, setFlagSaving] = useState<string | null>(null);
   const [flagError, setFlagError] = useState(false);
@@ -49,15 +50,18 @@ export default function RomanQuestOverviewPage() {
   }, []);
 
   useEffect(() => {
-    if (gate.status !== "ready" || !isOwner) return;
+    // task165: purchases load for EVERY TG session (guest ⭐ receipts + owner
+    // vouchers); flags still only matter to owners.
+    if (gate.status !== "ready" || !gate.authenticated) return;
     let cancelled = false;
     setFlagsLoading(true);
     fetch("/api/roman-quest/activations", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((payload: { crewSlug: string | null; features: Record<string, boolean> }) => {
+      .then((payload: { crewSlug: string | null; features: Record<string, boolean>; purchases?: Record<string, { status?: string; applied?: boolean }> }) => {
         if (cancelled) return;
         setOwnCrewSlug(payload.crewSlug);
         setFlags(payload.features || {});
+        setPurchases(payload.purchases || {});
       })
       .catch(() => {
         if (!cancelled) setOwnCrewSlug(null);
@@ -68,7 +72,7 @@ export default function RomanQuestOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [gate.status, isOwner]);
+  }, [gate.status, gate.authenticated, isOwner]);
 
   const toggleFlag = useCallback(
     async (featureKey: string, value: boolean) => {
@@ -147,7 +151,7 @@ export default function RomanQuestOverviewPage() {
           <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-stone-300">
             {isBirthday
               ? "Экипаж спрятал подарок и разложил его след по самым интересным страницам приложения. Каждая остановка — не просто страница, а штука, которая тебе пригодится."
-              : "Самый богатый набор фич в проекте — десять остановок, каждая про то, что умеет VIP BIKE. Смотрите, пробуйте, а владельцы экипажей включают фичи для своей команды прямо здесь."}
+              : `Самый богатый набор фич в проекте — ${TOUR_STOPS_TOTAL} остановок: всё главное меню экипажа плюс жемчужины платформы. Смотрите, пробуйте, а владельцы экипажей включают фичи для своей команды прямо здесь.`}
           </p>
 
           {/* progress */}
@@ -257,6 +261,15 @@ export default function RomanQuestOverviewPage() {
                         </span>
                       </div>
                       <p className="mt-1.5 text-sm leading-relaxed text-stone-400">{s.pitch}</p>
+                      {/* task165: the real page preview on every card */}
+                      {s.preview && (
+                        <img
+                          src={s.preview}
+                          alt={`${s.title} — скриншот`}
+                          loading="lazy"
+                          className="mt-3 max-h-44 w-full rounded-xl border border-stone-800 object-cover object-top"
+                        />
+                      )}
                       {/* CTA row on the card */}
                       {tourFeatureHasCta(s.key) && !isBirthday && (
                         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -274,6 +287,11 @@ export default function RomanQuestOverviewPage() {
                           ) : (
                             <span className="rounded-lg border border-sky-400/30 bg-sky-400/10 px-3 py-1.5 text-xs text-sky-200">
                               ⭐ {s.priceStars} · подключить
+                            </span>
+                          )}
+                          {purchases[s.key]?.status === "active" && (
+                            <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-300">
+                              ✓ оплачено{purchases[s.key]?.applied ? " · включено" : " · ваучер"}
                             </span>
                           )}
                         </div>
@@ -307,7 +325,7 @@ export default function RomanQuestOverviewPage() {
                 </h2>
                 <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-stone-400">
                   {questDone
-                    ? "Все десять следов собраны — подарок твой. Заходи."
+                    ? `Все ${TOUR_STOPS_TOTAL} следов собраны — подарок твой. Заходи.`
                     : `Собери все ${TOUR_STOPS_TOTAL} следов — и он откроется.`}
                 </p>
               </button>
@@ -350,7 +368,7 @@ export default function RomanQuestOverviewPage() {
             VIP<span className={isBirthday ? "text-amber-400" : "text-sky-400"}>BIKE</span>
           </div>
           <p className="mt-3 text-[11px] uppercase tracking-[0.3em] text-stone-600">
-            {isBirthday ? "спрятано экипажем · найдено тобой · 2026" : "десять фич · один тур · 2026"}
+            {isBirthday ? "спрятано экипажем · найдено тобой · 2026" : `${TOUR_STOPS_TOTAL} фич · один тур · 2026`}
           </p>
         </footer>
       </div>

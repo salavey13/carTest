@@ -397,14 +397,13 @@ export default function RentBikePage() {
             </div>
         </div>
 
-        {/* task154 iter3: secret birthday quest — stop 5/7, now teasing the
-            live rider map (feature pages per boss); hidden corner cake. */}
+        {/* task165 onboarding tour — stop 8/19 (гараж). Riddle describes the
+            NEXT page (мотопарк). */}
         <RomanQuestCake
-          stop={6}
           featureKey="garage"
-          riddle="Гараж — это железо. А теперь — цифры: прайс-калькулятор, где каждая стоимость объяснена — что входит, что опционально, откуда залог. Ноль вопросов «а почему так дорого»."
-          nextHref="/franchize/vip-bike/calc-explainer"
-          nextLabel="Открыть прайс-калькулятор"
+          riddle="Гараж — это железо. Дальше — мотопарк: стена каждого мото — аренды, сервис, выручка и пробег. Посмотри, как машина помнит каждую поездку."
+          nextHref="/franchize/vip-bike/bikes"
+          nextLabel="Открыть мотопарк"
         />
       </div>
     </div>

@@ -1,19 +1,26 @@
 "use client";
 
-// RomanQuestCake → FEATURE TOUR stop (task154 iter2+iter3 → task164 BESTSELLER)
+// RomanQuestCake → FEATURE TOUR stop (task154 iter2+iter3 → task164 BESTSELLER
+// → task165 onboarding extension).
 // ──────────────────────────────────────────────────────────────────────────
 // A tiny floating marker sits in the bottom-left corner of a host page:
 //   🎂 birthday skin — Roman only (gate role "roman"): the original riddle
 //      trail, «Роман, это для тебя», ends at /gift/roman.
-//   ⭐ tour skin — everyone else (boss audio «BESTSELLER»: «если кто-то
-//      другой заходит вместо Романа — всё покажу, всё также расскажу,
-//      интересно, только он ещё может нажать кнопку»): the SAME trail, but
-//      every stop is a feature pitch with a CTA —
+//   ⭐ tour skin — everyone else (boss audio «BESTSELLER»): the SAME trail,
+//      but every stop is a feature pitch with a CTA —
 //        • crew owners: a real ☑ «Включить для экипажа …» checkbox
 //          (POST /api/roman-quest/activations → crews.metadata.feature_tour
 //          of the crew THEY OWN — even while browsing someone else's page);
-//        • guests/members: «⭐ N · Подключить» — Telegram-Stars demo button
-//          (boss: «фейк-кнопки пока») that routes to the crew's Telegram.
+//        • TG guests/members: «⭐ N · Подключить фичу» — a REAL Telegram-Stars
+//          invoice now (task165, boss: «add real xtr payments»): the server
+//          action issues a sendInvoice, the webhook grants the activation
+//          voucher on successful_payment (paid = applied for owners, a
+//          claimable voucher for crew-less buyers);
+//        • anonymous PC guests: the demo dialog routing to the crew's
+//          Telegram (an invoice needs a chat — honest fallback).
+//   The modal also shows the NEXT hop's compressed screenshot (boss task165:
+//   «screenshots of what to expect in next hop … wire to quest steps
+//   notes/modals») — catalog previews from the tourpix bucket.
 //
 // GATE v2 (see app/api/roman-quest/gate/route.ts): the tour is PUBLIC now —
 // renters/anonymous see the ⭐ sales skin; only the birthday skin is
@@ -23,9 +30,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  TOUR_FEATURES,
+  TOUR_STOPS_TOTAL,
   tourFeatureByKey,
   tourFeatureHasCta,
+  tourNextFeature,
 } from "./tourFeatures";
+import { purchaseTourFeatureAction } from "@/app/roman-quest/actions";
 
 export const ROMAN_QUEST_KEY = "roman-quest-progress";
 
@@ -45,11 +56,13 @@ export interface TourGateState {
   skin: TourGateSkin;
   role: TourGateRole;
   crewSlug?: string;
+  /** TG session present — the ⭐ CTA sends a REAL Stars invoice. */
+  authenticated: boolean;
 }
 
 const GATE_SESSION_KEY = "roman-quest-gate-v2";
 
-const LOADING_GATE: TourGateState = { status: "loading", skin: "tour", role: "guest" };
+const LOADING_GATE: TourGateState = { status: "loading", skin: "tour", role: "guest", authenticated: false };
 
 function readGateFromSession(): TourGateState | null {
   try {
@@ -66,6 +79,7 @@ function readGateFromSession(): TourGateState | null {
         skin: v.skin,
         role: v.role as TourGateRole,
         crewSlug: typeof v.crewSlug === "string" ? v.crewSlug : undefined,
+        authenticated: v.authenticated === true,
       };
     }
     return null;
@@ -78,7 +92,7 @@ function writeGateToSession(state: TourGateState) {
   try {
     window.sessionStorage.setItem(
       GATE_SESSION_KEY,
-      JSON.stringify({ skin: state.skin, role: state.role, crewSlug: state.crewSlug }),
+      JSON.stringify({ skin: state.skin, role: state.role, crewSlug: state.crewSlug, authenticated: state.authenticated }),
     );
   } catch {
     /* private mode — best-effort cache */
@@ -102,7 +116,7 @@ export function useFeatureTourGate(): TourGateState {
     }
     fetch("/api/roman-quest/gate", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((data: { skin?: string; role?: string; crewSlug?: string }) => {
+      .then((data: { skin?: string; role?: string; crewSlug?: string; authenticated?: boolean }) => {
         if (cancelled) return;
         const next: TourGateState = {
           status: "ready",
@@ -112,13 +126,14 @@ export function useFeatureTourGate(): TourGateState {
               ? data.role
               : "guest",
           crewSlug: typeof data?.crewSlug === "string" ? data.crewSlug : undefined,
+          authenticated: data?.authenticated === true,
         };
         writeGateToSession(next);
         setState(next);
       })
       .catch(() => {
         if (cancelled) return;
-        const next: TourGateState = { status: "ready", skin: "tour", role: "guest" };
+        const next: TourGateState = { status: "ready", skin: "tour", role: "guest", authenticated: false };
         writeGateToSession(next);
         setState(next);
       });
@@ -134,30 +149,30 @@ export function useFeatureTourGate(): TourGateState {
 export const useRomanQuestGate = useFeatureTourGate;
 
 interface RomanQuestCakeProps {
-  /** Which stop of the trail this host page is (1..10). */
-  stop: number;
+  /** Catalog key of the feature this stop sells — enables the CTA row. */
+  featureKey?: string;
+  /** @deprecated task165: derived from the catalog via featureKey — kept for
+   *  one release so old imports/tests still resolve. */
+  stop?: number;
   /** Birthday: the riddle. Tour: the feature pitch (same text works for both). */
   riddle: string;
   /** Where the "next" button leads (next stop or the finale). */
   nextHref: string;
   /** Label for the next button. */
   nextLabel: string;
-  /** Catalog key of the feature this stop sells — enables the CTA row. */
-  featureKey?: string;
 }
 
-const STOPS_TOTAL = 10;
-
 /** Total stops in the trail — the gift page reads it for its stamp. */
-export const ROMAN_QUEST_STOPS = STOPS_TOTAL;
+export const ROMAN_QUEST_STOPS = TOUR_STOPS_TOTAL;
 
 const CREW_CONTACT_URL = "https://t.me/I_O_S_NN";
 
-// ── owner activation state (per modal open) ────────────────────────────────
+// ── owner activation + purchase state (per modal open) ────────────────────
 type ActivationState = "unknown" | "on" | "off";
 interface ActivationsPayload {
   crewSlug: string | null;
   features: Record<string, boolean>;
+  purchases?: Record<string, { status?: string; applied?: boolean; price?: string }>;
 }
 
 function useActivations(open: boolean) {
@@ -176,7 +191,7 @@ function useActivations(open: boolean) {
         if (!cancelled) setData(payload);
       })
       .catch(() => {
-        if (!cancelled) setData({ crewSlug: null, features: {} });
+        if (!cancelled) setData({ crewSlug: null, features: {}, purchases: {} });
       });
     return () => {
       cancelled = true;
@@ -195,7 +210,7 @@ function useActivations(open: boolean) {
         });
         if (!r.ok) throw new Error(String(r.status));
         const payload = (await r.json()) as ActivationsPayload & { ok?: boolean };
-        if (payload.features) setData({ crewSlug: payload.crewSlug, features: payload.features });
+        if (payload.features) setData({ crewSlug: payload.crewSlug, features: payload.features, purchases: payload.purchases });
         return true;
       } catch {
         setSaveError(true);
@@ -210,16 +225,23 @@ function useActivations(open: boolean) {
   return { data, saving, saveError, toggle };
 }
 
-export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }: RomanQuestCakeProps) {
+export function RomanQuestCake({ stop: stopProp, riddle, nextHref, nextLabel, featureKey }: RomanQuestCakeProps) {
   const router = useRouter();
   const gate = useFeatureTourGate();
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState(0);
   const [buyDemoOpen, setBuyDemoOpen] = useState(false);
+  const [buyState, setBuyState] = useState<"idle" | "pending" | "sent" | "owned" | "error">("idle");
+  const [buyMessage, setBuyMessage] = useState<string | null>(null);
   const activations = useActivations(open);
 
   const feature = featureKey ? tourFeatureByKey(featureKey) : undefined;
+  // The catalog is the single source of the trail order — the host-page prop
+  // is only a fallback for one release.
+  const stop = feature?.stop ?? stopProp ?? 1;
   const ctaOn = Boolean(feature && tourFeatureHasCta(feature.key));
+  // task165: the NEXT hop's real screenshot — «what to expect in next hop».
+  const nextFeature = tourNextFeature(stop);
 
   useEffect(() => {
     setProgress(readRomanQuestProgress());
@@ -227,8 +249,9 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }
 
   const isBirthday = gate.skin === "birthday" && gate.role === "roman";
   const isOwner = gate.role === "owner";
+  const canPayStars = !isBirthday && !isOwner && gate.authenticated;
   const markerIcon = isBirthday ? "🎂" : "⭐";
-  const modalKicker = isBirthday ? `Подсказка ${stop} из ${STOPS_TOTAL}` : `Фича ${stop} из ${STOPS_TOTAL}`;
+  const modalKicker = isBirthday ? `Подсказка ${stop} из ${TOUR_STOPS_TOTAL}` : `Фича ${stop} из ${TOUR_STOPS_TOTAL}`;
   const modalTitle = isBirthday ? "Роман, это для тебя" : "ФИЧА-ТУР VIP BIKE";
 
   // task164 — the last stop's «Открыть подарок» leads to the birthday letter
@@ -242,6 +265,8 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }
   const handleOpen = useCallback(() => {
     setOpen(true);
     setBuyDemoOpen(false);
+    setBuyState("idle");
+    setBuyMessage(null);
     try {
       const prev = readRomanQuestProgress();
       if (stop > prev) window.localStorage.setItem(ROMAN_QUEST_KEY, String(stop));
@@ -269,6 +294,37 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }
     const nextValue = featureFlag !== "on";
     void activations.toggle(feature.key, nextValue);
   }, [activations, feature, featureFlag]);
+
+  // task165: REAL Telegram-Stars purchase — the server action sends the
+  // invoice; the webhook grants the activation on successful_payment.
+  const handleBuyStars = useCallback(async () => {
+    if (!feature || buyState === "pending") return;
+    setBuyState("pending");
+    setBuyMessage(null);
+    try {
+      const result = await purchaseTourFeatureAction(feature.key);
+      if (result.success) {
+        setBuyState("sent");
+        setBuyMessage(`Счёт на ⭐ ${result.priceStars} отправлен в Telegram — оплатите там, фича включится автоматически.`);
+      } else if (result.error === "already-owned") {
+        setBuyState("owned");
+        setBuyMessage(result.message || "Эта фича уже оплачена.");
+      } else if (result.error === "unauthorized") {
+        setBuyState("error");
+        setBuyMessage(result.message || "Зайдите через Telegram — счёт приходит туда же.");
+      } else {
+        setBuyState("error");
+        setBuyMessage(result.message || "Не получилось отправить счёт — попробуйте ещё раз.");
+      }
+    } catch {
+      setBuyState("error");
+      setBuyMessage("Не получилось отправить счёт — попробуйте ещё раз.");
+    }
+  }, [feature, buyState]);
+
+  const receipt = feature ? activations.data?.purchases?.[feature.key] : undefined;
+  const paidApplied = receipt?.status === "active" && receipt.applied === true;
+  const paidVoucher = receipt?.status === "active" && receipt.applied !== true;
 
   // Render nothing while the verdict loads — no flash for anyone, no layout
   // shift on host pages. (v2: the tour renders for EVERYONE once resolved.)
@@ -345,12 +401,12 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }
             )}
 
             {/* progress dots */}
-            <div className="mt-5 flex items-center justify-center gap-2">
-              {Array.from({ length: STOPS_TOTAL }, (_, i) => i + 1).map((i) => (
+            <div className="mt-5 flex items-center justify-center gap-1.5">
+              {Array.from({ length: TOUR_STOPS_TOTAL }, (_, i) => i + 1).map((i) => (
                 <span
                   key={i}
                   className={
-                    "h-1.5 w-6 rounded-full transition-colors " +
+                    "h-1.5 w-4 rounded-full transition-colors sm:w-5 " +
                     (progress >= i
                       ? isBirthday
                         ? "bg-amber-400"
@@ -381,11 +437,40 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }
                   </label>
                 ) : isOwner ? (
                   <p className="text-xs text-stone-500">Загружаю галочки активации…</p>
+                ) : paidApplied ? (
+                  <p className="text-sm font-medium text-emerald-300">
+                    ✓ Оплачено ({receipt?.price}) — включено для экипажа {activations.data?.crewSlug ? activations.data.crewSlug : ""}
+                  </p>
+                ) : paidVoucher || buyState === "owned" ? (
+                  <p className="text-sm leading-relaxed text-emerald-300">
+                    ✓ Оплачено {receipt?.price ? `(${receipt.price})` : ""} — фича закреплена за вами и включится на экипаже, владельцем которого вы станете.
+                  </p>
+                ) : buyState === "sent" ? (
+                  <p className="text-sm leading-relaxed text-sky-200">
+                    ⭐ Счёт отправлен в Telegram — оплатите там, фича включится автоматически.
+                  </p>
+                ) : buyState === "pending" ? (
+                  <p className="text-sm text-stone-400">Отправляю счёт в Telegram…</p>
+                ) : canPayStars ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleBuyStars()}
+                      className="w-full rounded-xl border border-sky-400/60 bg-gradient-to-b from-sky-400/15 to-sky-600/10 px-5 py-3 font-serif text-base font-medium text-sky-200 transition-all duration-300 hover:from-sky-400/25 hover:text-sky-100"
+                    >
+                      ⭐ {feature.priceStars} · Подключить фичу
+                    </button>
+                    <p className="mt-2 text-[11px] leading-relaxed text-stone-500">
+                      Оплата звёздами Telegram — счёт придёт в бот. Фича закрепится за вами и включится на вашем экипаже.
+                    </p>
+                    {buyState === "error" && buyMessage && (
+                      <p className="mt-2 text-xs text-red-400">{buyMessage}</p>
+                    )}
+                  </>
                 ) : buyDemoOpen ? (
                   <div className="text-sm leading-relaxed text-stone-300">
                     <p>
-                      Демо-режим: оплата звёздами подключается следом. Хотите такую фичу для
-                      своего экипажа — напишите экипажу, включим вручную прямо сейчас.
+                      Оплата звёздами доступна внутри Telegram. Откройте приложение там — или напишите экипажу, включим вручную прямо сейчас.
                     </p>
                     <a
                       href={CREW_CONTACT_URL}
@@ -409,6 +494,21 @@ export function RomanQuestCake({ stop, riddle, nextHref, nextLabel, featureKey }
                   <p className="mt-2 text-xs text-red-400">Не сохранилось — попробуй ещё раз</p>
                 )}
               </div>
+            )}
+
+            {/* task165: the NEXT hop's real screenshot — what to expect next */}
+            {nextFeature?.preview && (
+              <figure className="mt-5 text-left">
+                <img
+                  src={nextFeature.preview}
+                  alt={`Следующая остановка: ${nextFeature.title}`}
+                  loading="lazy"
+                  className="max-h-56 w-full rounded-xl border border-stone-700/70 object-cover object-top"
+                />
+                <figcaption className="mt-2 text-[11px] leading-relaxed text-stone-500">
+                  Дальше: {nextFeature.icon} {nextFeature.title} — {nextFeature.page}
+                </figcaption>
+              </figure>
             )}
 
             <button

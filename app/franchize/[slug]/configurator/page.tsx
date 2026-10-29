@@ -41,16 +41,15 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
       items={items} />
       <ConfiguratorClient crew={crew} slug={slug} />
 
-      {/* task164 BESTSELLER tour — stop 3/10 (конфигуратор). Riddle describes
-          the NEXT page (карта сети); the tour skin is public, the birthday
-          skin is Roman-only (the component self-gates). */}
+      {/* task165 onboarding tour — stop 3/19 (конфигуратор). Riddle describes
+          the NEXT page (каталог electro-enduro); the tour skin is public, the
+          birthday skin is Roman-only (the component self-gates). */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={3}
           featureKey="configurator"
-          riddle="Собрал байк мечты? Теперь глянь, сколько вас вокруг: карта всей сети, где каждый экипаж — круг, а размер круга — это его люди. Глянь со стороны, какой мир вы с Ильёй строите."
-          nextHref="/franchize/discovery"
-          nextLabel="Открыть карту сети"
+          riddle="Собрал байк мечты? Дальше — отдельный вход для любителей бездорожья: каталог electro-enduro, где эндуро и кросс живут на электротяге. Глянь, какие характеры там выставлены."
+          nextHref="/franchize/vip-bike/electro-enduro"
+          nextLabel="Открыть electro-enduro"
         />
       )}
     </main>

@@ -88,11 +88,10 @@ export default async function SeasonStatsPage({ params }: Props) {
             Войдите через Telegram WebApp, чтобы увидеть цифры своего экипажа.
           </p>
         </div>
-        {/* task154 iter3: quest stop 7/7 lives in BOTH branches — the cake is
-            an overlay, so the hunt works even on the locked PC fallback */}
+        {/* task165 onboarding tour — stop 19/19 lives in BOTH branches — the
+            cake is an overlay, so the tour works even on the locked fallback */}
         {slug === "vip-bike" && (
           <RomanQuestCake
-            stop={10}
             featureKey="season_stats"
             riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
             nextHref="/gift/roman"
@@ -114,11 +113,10 @@ export default async function SeasonStatsPage({ params }: Props) {
           tokens={tokens}
         />
       </FranchizePageShell>
-      {/* task154 iter3: secret birthday quest — stop 7/7, the last riddle
-          before the gift (vip-bike crew only; Roman opens logged in) */}
+      {/* task165 onboarding tour — stop 19/19, the last riddle before the
+          finale (vip-bike crew only; Roman opens logged in) */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={10}
           featureKey="season_stats"
           riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
           nextHref="/gift/roman"

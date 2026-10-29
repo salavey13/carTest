@@ -9,6 +9,7 @@ import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface SalesPageProps {
   params: Promise<{ slug: string }>;
@@ -196,6 +197,18 @@ export default async function FranchizeSalesPage({ params }: SalesPageProps) {
           </>
         )}
       </div>
+
+      {/* task165 onboarding tour — stop 15/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="sales"
+          riddle="Продажи — это серьёзно. Дальше — страница «О нас»: история и характер экипажа, то, что превращает посетителя в своего."
+          nextHref="/franchize/vip-bike/about"
+          nextLabel="Открыть страницу «О нас»"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

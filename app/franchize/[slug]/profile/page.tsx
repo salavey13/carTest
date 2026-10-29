@@ -6,6 +6,7 @@ import { FranchizePageShell } from "../../components/FranchizePageShell";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { FranchizeProfileClient } from "./ProfileClient";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -51,6 +52,18 @@ export default async function FranchizeProfilePage({
       >
         <FranchizeProfileClient initialCrew={crew} initialSlug={resolvedSlug} />
       </FranchizePageShell>
+
+      {/* task165 onboarding tour — stop 11/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="profile"
+          riddle="Все брони — в одном месте. Дальше — цифры: прайс-калькулятор, где каждая стоимость объяснена — что входит, что опционально, откуда залог."
+          nextHref="/franchize/vip-bike/calc-explainer"
+          nextLabel="Открыть прайс-калькулятор"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

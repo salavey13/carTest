@@ -10,6 +10,7 @@ import { isLegacyDefaultsCrew } from "../../lib/content-blocks";
 import Link from "next/link";
 import { fallbackBikes } from "../configurator/fallback-catalog";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface ElectroEnduroPageProps {
   params: Promise<{ slug: string }>;
@@ -303,6 +304,18 @@ export default async function ElectroEnduroPage({
           </div>
         </div>
       </section>
+
+      {/* task165 onboarding tour — stop 4/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="electro_enduro"
+          riddle="Эндуро — это характер. А дальше — игра: колесо фортуны, где гость крутит и забирает промокод до 5 000 ₽ или 15%. Испытай удачу сам."
+          nextHref="/franchize/vip-bike/wheel"
+          nextLabel="Открыть колесо фортуны"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

@@ -5,6 +5,7 @@ import { CrewFooter } from "../../components/CrewFooter";
 import { CrewHeader } from "../../components/CrewHeader";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeWheelPageProps {
   params: Promise<{ slug: string }>;
@@ -34,6 +35,18 @@ export default async function FranchizeWheelPage({ params }: FranchizeWheelPageP
         items={items}
       />
       <WheelOfFortuneClient crew={crew} slug={crew.slug || slug} />
+
+      {/* task165 onboarding tour — stop 5/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="wheel"
+          riddle="Промокод — приятность. А теперь посмотри, насколько всё это большое: карта всей сети, где каждый экипаж — круг, а размер круга — его люди."
+          nextHref="/franchize/discovery"
+          nextLabel="Открыть карту сети"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

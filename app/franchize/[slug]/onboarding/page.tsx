@@ -8,6 +8,7 @@ import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteForSurface, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { SubrentFlowClient } from "./SubrentFlowClient";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface PartnerOnboardingPageProps {
   params: Promise<{ slug: string }>;
@@ -158,6 +159,18 @@ export default async function PartnerOnboardingPage({ params }: PartnerOnboardin
           accentText={accentText}
         />
       </div>
+
+      {/* task165 onboarding tour — stop 18/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="onboarding"
+          riddle="Франшиза начинается с цифр. Последний шаг — табло сезона: аренды, продажи, касса и сверка расчётов — весь сезон до рубля."
+          nextHref="/franchize/vip-bike/season-stats"
+          nextLabel="Открыть цифры сезона"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

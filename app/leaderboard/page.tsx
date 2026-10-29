@@ -174,10 +174,9 @@ export default function LeaderboardPage() {
 
         {debugInfo && <DebugInfoSection info={debugInfo} />}
 
-        {/* task154 iter2: secret birthday quest — stop 4/7 (Roman only,
-            hidden corner cake; riddle describes the garage next) */}
+        {/* task165 onboarding tour — stop 7/19 (зал славы). Next hop:
+            гараж (chain unchanged). */}
         <RomanQuestCake
-          stop={5}
           featureKey="leaderboard"
           riddle="Слава — это приятно, но ты человек дела. Следующий след — твой гараж: MOTO-GARAGE, где можно выбрать байк, даты и собрать бронирование. Загляни, как это выглядит изнутри."
           nextHref="/rent-bike"

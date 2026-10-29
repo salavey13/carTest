@@ -52,11 +52,10 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
             Доступ только для участников экипажа
           </p>
         </div>
-        {/* task164 — tour stop 7/10 works even on the locked fallback (the
-            pitch sells the feature; members get the page itself). */}
+        {/* task165 onboarding tour — stop 12/19 works even on the locked
+            fallback (the pitch sells the feature; members get the page). */}
         {slug === "vip-bike" && (
           <RomanQuestCake
-            stop={7}
             featureKey="price_calc"
             riddle="Калькулятор объясняет цену построчно. Следующий след — живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас."
             nextHref="/franchize/vip-bike/map-riders"
@@ -73,10 +72,9 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6 max-w-3xl mx-auto">
         <CalcExplainer />
       </FranchizePageShell>
-      {/* task164 BESTSELLER tour — stop 7/10 (прайс-калькулятор). */}
+      {/* task165 onboarding tour — stop 12/19 (прайс-калькулятор). */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={7}
           featureKey="price_calc"
           riddle="Калькулятор объясняет цену построчно. Следующий след — живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас."
           nextHref="/franchize/vip-bike/map-riders"

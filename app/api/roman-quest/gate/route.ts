@@ -11,6 +11,10 @@
 //   cookie + active vip-bike member (non-owning)    → skin "tour", role "member"
 //   cookie + everyone else        → skin "tour",    role "guest"  (renters: the tour is the funnel)
 //
+// task165: the verdict carries `authenticated` — the ⭐ CTA turns into a REAL
+// Telegram-Stars purchase (app/roman-quest/actions.ts) only for TG sessions;
+// anonymous PC users keep the demo dialog (an invoice needs a chat_id).
+//
 // The client caches the verdict in sessionStorage (roman-quest-gate-v2 —
 // bumped so stale v1 "hidden" verdicts can't suppress the new tour).
 // Roman's id list is env-overridable (ROMAN_TG_USER_IDS, comma-separated);
@@ -31,6 +35,8 @@ type GateVerdict = {
   skin: "birthday" | "tour";
   role: "roman" | "owner" | "member" | "guest";
   crewSlug?: string;
+  /** TG session present — the ⭐ CTA can send a REAL Stars invoice. */
+  authenticated: boolean;
 };
 
 const DEFAULT_ROMAN_TG_IDS = "244736261";
@@ -90,14 +96,14 @@ export async function GET() {
     );
 
     if (!userId) {
-      const verdict: GateVerdict = { show: true, skin: "tour", role: "guest" };
+      const verdict: GateVerdict = { show: true, skin: "tour", role: "guest", authenticated: false };
       return NextResponse.json(verdict, {
         headers: { "Cache-Control": "no-store" },
       });
     }
 
     if (romanIdSet().has(userId)) {
-      const verdict: GateVerdict = { show: true, skin: "birthday", role: "roman" };
+      const verdict: GateVerdict = { show: true, skin: "birthday", role: "roman", authenticated: true };
       return NextResponse.json(verdict, {
         headers: { "Cache-Control": "no-store" },
       });
@@ -105,7 +111,7 @@ export async function GET() {
 
     const crewSlug = await ownedCrewSlug(userId);
     if (crewSlug) {
-      const verdict: GateVerdict = { show: true, skin: "tour", role: "owner", crewSlug };
+      const verdict: GateVerdict = { show: true, skin: "tour", role: "owner", crewSlug, authenticated: true };
       return NextResponse.json(verdict, {
         headers: { "Cache-Control": "no-store" },
       });
@@ -113,15 +119,15 @@ export async function GET() {
 
     const member = await isVipBikeMember(userId);
     const verdict: GateVerdict = member
-      ? { show: true, skin: "tour", role: "member" }
-      : { show: true, skin: "tour", role: "guest" };
+      ? { show: true, skin: "tour", role: "member", authenticated: true }
+      : { show: true, skin: "tour", role: "guest", authenticated: true };
     return NextResponse.json(verdict, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch {
     // Fail-open: the tour is a harmless marketing surface; a gate outage must
     // not blank anything. Guests see the tour.
-    const verdict: GateVerdict = { show: true, skin: "tour", role: "guest" };
+    const verdict: GateVerdict = { show: true, skin: "tour", role: "guest", authenticated: false };
     return NextResponse.json(verdict, {
       headers: { "Cache-Control": "no-store" },
     });

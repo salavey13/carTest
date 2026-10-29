@@ -338,10 +338,9 @@ export default async function CrewDiscoveryPage() {
             Создать свой экипаж
           </Link>
         </p>
-        {/* task154 iter2: secret birthday quest — stop 3/7 (Roman only,
-            hidden corner cake; riddle describes the hall of fame next) */}
+        {/* task165 onboarding tour — stop 6/19 (карта сети). Next hop:
+            зал славы (chain unchanged). */}
         <RomanQuestCake
-          stop={4}
           featureKey="discovery"
           riddle="Карта показала, сколько вас и как вы связаны. Следующий след — про славу: там горят топы экипажей и флотов всего проекта. Найди в зале славы знакомые имена."
           nextHref="/leaderboard"

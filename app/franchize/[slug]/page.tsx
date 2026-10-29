@@ -304,12 +304,10 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       )}
       </DisplayModeProvider>
 
-      {/* task154 iter2: secret birthday quest — stop 2/7. Boss: franchize
-          world is the fun part. Gated to the vip-bike crew only (this page
-          serves every crew slug); hidden corner cake, Roman only. */}
+      {/* task165 onboarding tour — stop 2/19 (витрина). Next hop:
+          конфигуратор (chain unchanged). */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={2}
           featureKey="storefront"
           riddle="Витрина — это только дверца. Дальше интереснее: конфигуратор, где гость собирает свой электромотоцикл по частям — цвета, комплектация, живой предпросмотр. Загляни, как выглядит витрина, которая продаёт мечту."
           nextHref="/franchize/vip-bike/configurator"

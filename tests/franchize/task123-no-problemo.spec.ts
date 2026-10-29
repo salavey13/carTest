@@ -337,7 +337,7 @@ describe("task123 · kill the fake /leaderboard page", () => {
     // task154 iter2: Roman's hidden quest cake links /leaderboard on purpose
     // (birthday overlay, not the organic surface) — strip it for this guard.
     const page = read("app/franchize/discovery/page.tsx")
-      .replace(/\{\/\* task154 iter2:[\s\S]*?nextLabel=[\s\S]*?\/>/g, "");
+      .replace(/\{\/\* task[\s\S]*?nextLabel=[\s\S]*?\/>/g, "") // task165: marker-agnostic;
     expect(page).not.toContain("/leaderboard");
     expect(page).not.toContain("Рейтинг райдеров");
   });

@@ -27,6 +27,7 @@ import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
 import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeAboutPageProps {
   params: Promise<{ slug: string }>;
@@ -290,6 +291,18 @@ export default async function FranchizeAboutPage({ params }: FranchizeAboutPageP
           </div>
         </section>
       </FranchizePageShell>
+
+      {/* task165 onboarding tour — stop 16/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="about"
+          riddle="Теперь ты знаешь, кто мы. Дальше — контакты: шоурум на карте, телефон и мессенджеры — путь до сделки в один тап."
+          nextHref="/franchize/vip-bike/contacts"
+          nextLabel="Открыть контакты"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

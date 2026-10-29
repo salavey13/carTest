@@ -8,6 +8,7 @@ import { inventoryScriptAccessHandler } from "./inventory-script-access";
 import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
 import { protocardPurchaseHandler } from "./protocard-purchase-handler";
+import { featureTourHandler } from "./feature-tour";
 import { wbReferralServiceHandler } from "./wb-referral-service";
 import { qrMerchantHandler } from "./qr-merchant";
 import { bountyHandler } from "./bounty";
@@ -34,6 +35,7 @@ const handlers: WebhookHandler[] = [
   selfDevBoostHandler,
   disableDummyModeHandler,
   protocardPurchaseHandler, 
+  featureTourHandler,
 ];
 
 export async function handleWebhookProxy(update: any) {

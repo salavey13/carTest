@@ -13,6 +13,7 @@ import { getFranchizeRouteCtaPolicy, shouldShowFloatingCart } from "../../lib/ro
 import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeContactsPageProps {
   params: Promise<{ slug: string }>;
@@ -226,6 +227,18 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
         </div>
       </FranchizePageShell>
 
+
+      {/* task165 onboarding tour — stop 17/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="contacts"
+          riddle="Дорогу найдёшь. Дальше — страница для партнёров: как зайти в проект со своим экипажем. То, что ты покажешь будущим со-владельцам."
+          nextHref="/franchize/vip-bike/onboarding"
+          nextLabel="Открыть страницу партнёрам"
+        />
+      )}
       <CrewFooter crew={crew} />
       {showFloatingCart && (
         <FranchizeFloatingCart

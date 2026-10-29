@@ -8,6 +8,7 @@ import { buildFranchizeIntentLinks } from "../../lib/section-links";
 import { crewPaletteWithCssVars } from "../../lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { BikesWallClient } from "./BikesWallClient";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeBikesPageProps {
   params: Promise<{ slug: string }>;
@@ -42,6 +43,18 @@ export default async function FranchizeBikesPage({ params }: FranchizeBikesPageP
           <BikesWallClient initialSlug={resolvedSlug} crew={crew} />
         </FranchizeErrorBoundary>
       </FranchizePageShell>
+
+      {/* task165 onboarding tour — stop 9/19 (boss: ALL header menu links of
+          the golden standard vip-bike crew live in the quest). Riddle describes
+          the NEXT page. */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          featureKey="bikes"
+          riddle="Мотопарк помнит каждый мото. Дальше — корзина: гость собирает заказ из аренды и экипировки и оформляет всё одним чекаутом."
+          nextHref="/franchize/vip-bike/cart"
+          nextLabel="Открыть корзину"
+        />
+      )}
       <CrewFooter crew={crew} />
     </main>
   );

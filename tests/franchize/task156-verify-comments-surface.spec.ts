@@ -180,7 +180,8 @@ describe("task156: roman quest polish (source pins)", () => {
 
   it("overview final card wording updated", () => {
     const overview = src("app/gift/roman-quest/page.tsx");
-    // task164 re-baseline: ten stops now, and the birthday finale stays Roman-only
-    expect(overview).toContain("Все десять следов собраны — подарок твой. Заходи.");
+    // task165 re-baseline: the total is catalog-driven (19 stops now), and the
+    // birthday finale stays Roman-only
+    expect(overview).toContain("следов собраны — подарок твой. Заходи.");
   });
 });

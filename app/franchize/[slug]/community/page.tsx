@@ -133,15 +133,14 @@ export default async function FranchizeCommunityPage(
         bleed
       />
 
-      {/* task164 BESTSELLER tour — stop 9/10 (стена сообщества). Riddle
-          describes the finale stop (цифры сезона). */}
+      {/* task165 onboarding tour — stop 14/19 (стена сообщества). Riddle
+          describes the NEXT page (витрина продаж). */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={9}
           featureKey="community"
-          riddle="Экипаж живёт не только в поездках. Последний след — самое вкусное для со-владельца: весь сезон 2026, посчитанный до рубля — аренды, продажи, касса и сверка. Табло ждёт."
-          nextHref="/franchize/vip-bike/season-stats"
-          nextLabel="Открыть цифры сезона"
+          riddle="Экипаж живёт не только в поездках. Дальше — витрина продаж: байки, которые можно забрать домой. Посмотри, что выставлено прямо сейчас."
+          nextHref="/franchize/vip-bike/sales"
+          nextLabel="Открыть витрину продаж"
         />
       )}
 
