@@ -494,7 +494,11 @@ export function FranchizeRentalLifecycleActions({
           className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto sm:items-center sm:p-4"
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.85)",
-            paddingBottom: closureKeyboardPx > 0 ? closureKeyboardPx : undefined,
+            // 2026-10-29 (owner voice): on Android TG WebView the sheet's
+            // bottom edge sat flush with the screen bottom — right under the
+            // system nav/gesture bar. Lift the WHOLE sheet 12px even without
+            // a keyboard (footer padding adds the rest).
+            paddingBottom: closureKeyboardPx > 0 ? closureKeyboardPx : 12,
           }}
           onClick={() => !isPending && setClosureModalOpen(false)}
         >
@@ -878,20 +882,24 @@ export function FranchizeRentalLifecycleActions({
 
             {/* Task 124 — fixed footer: always visible, out of the scroll flow,
                 safe-area aware. Combined with the quick-bar auto-hide (window
-                event) the «Закрыть аренду» button is reachable on ANY phone. */}
+                event) the «Закрыть аренду» button is reachable on ANY phone.
+                2026-10-29 (owner voice «кнопки под системными кнопками
+                андроида»): env(safe-area-inset-bottom)=0 в Android WebView —
+                теперь --app-safe-bottom (флор 16px) + 8px запаса, кнопки py-3
+                (target ≥44px). Итог: ~28px от футера + 12px лифт оверлея. */}
             <div
               className="flex gap-2 border-t px-5 pt-3"
               style={{
                 borderColor: "var(--lifecycle-border)",
                 backgroundColor: "var(--lifecycle-bg)",
-                paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+                paddingBottom: "calc(var(--app-safe-bottom, 16px) + 0.5rem)",
               }}
             >
               <button
                 type="button"
                 onClick={() => setClosureModalOpen(false)}
                 disabled={isPending}
-                className="flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-85 disabled:opacity-50"
+                className="flex-1 rounded-xl px-3 py-3 text-sm font-semibold transition-opacity hover:opacity-85 disabled:opacity-50"
                 style={{
                   backgroundColor: "color-mix(in srgb, var(--lifecycle-border) 30%, transparent)",
                   color: "var(--lifecycle-text)",
@@ -958,7 +966,7 @@ export function FranchizeRentalLifecycleActions({
                     router.refresh();
                   })
                 }
-                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex-1 rounded-xl px-3 py-3 text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{
                   backgroundColor: "var(--lifecycle-accent)",
                   color: "#16130A",
@@ -978,7 +986,7 @@ export function FranchizeRentalLifecycleActions({
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4"
-          style={{ paddingBottom: abortKeyboardPx > 0 ? abortKeyboardPx : undefined }}
+          style={{ paddingBottom: abortKeyboardPx > 0 ? abortKeyboardPx : 12 }}
           onClick={() => !isPending && setAbortModalOpen(false)}
         >
           <div
@@ -1024,12 +1032,17 @@ export function FranchizeRentalLifecycleActions({
                 color: "var(--lifecycle-text)",
               }}
             />
-            <div className="mt-3 flex gap-2">
+            {/* 2026-10-29: same Android nav-bar clearance as the closure modal
+                (--app-safe-bottom) + taller buttons (py-3). */}
+            <div
+              className="mt-3 flex gap-2"
+              style={{ paddingBottom: "calc(var(--app-safe-bottom, 16px) + 0.25rem)" }}
+            >
               <button
                 type="button"
                 disabled={isPending}
                 onClick={() => !isPending && setAbortModalOpen(false)}
-                className="flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
+                className="flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
                 style={{
                   borderColor: "var(--lifecycle-border)",
                   color: "var(--lifecycle-text)",
@@ -1066,7 +1079,7 @@ export function FranchizeRentalLifecycleActions({
                     router.refresh();
                   })
                 }
-                className="flex-1 rounded-xl px-3 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex-1 rounded-xl px-3 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: "#e11d48" }}
               >
                 {pendingAction === "abort" ? "Отменяем…" : "Подтвердить отмену"}

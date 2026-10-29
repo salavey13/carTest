@@ -267,10 +267,15 @@ export function DrawerStickyFooter({
 }: DrawerStickyFooterProps) {
   return (
     <div
-      className="sticky bottom-0 mt-4 -mx-4 border-t px-4 py-3 sm:-mx-5 sm:px-5"
+      className="sticky bottom-0 mt-4 -mx-4 border-t px-4 pt-3 sm:-mx-5 sm:px-5"
       style={{
         borderColor: T.border,
         backgroundColor: T.bg,
+        // 2026-10-29: sticky rows sit flush with the scrollport bottom edge —
+        // the parent's paddingBottom does NOT lift a STUCK element. Own
+        // safe-area floor keeps the button above the Android system nav bar
+        // (env() reports 0 in the TG WebView).
+        paddingBottom: "calc(var(--app-safe-bottom, 16px) + 0.25rem)",
       }}
     >
       <button

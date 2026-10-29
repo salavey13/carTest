@@ -25,6 +25,17 @@
 
 @layer base {
   :root {
+    /* --- 2026-10-29: нижний отступ для фиксированных/стicky панелей действий ---
+       Telegram на Android рисует страницу ПОД системной навигацией (жестовая
+       полоса / 3 кнопки), но env(safe-area-inset-bottom) при этом отдаёт 0 —
+       кнопки «Отмена / Закрыть аренду» в модалке закрытия аренды прилипали к
+       кромке экрана и попадали в зону системных жестов (владелец: «очень
+       низко, накладываются на кнопки андроида, не всегда нажимаются»).
+       Флор 16px: на Android всегда lift 16px, на iOS/других — реальный inset,
+       если он больше. Использование: paddingBottom: "var(--app-safe-bottom)"
+       или calc(var(--app-safe-bottom) + 0.5rem) для ещё большего зазора. */
+    --app-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+
     /* --- VIP BIKE ELECTRO LIGHT MODE PALETTE --- */
     /* Premium, high-contrast aesthetic */
 

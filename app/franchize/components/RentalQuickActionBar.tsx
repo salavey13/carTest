@@ -233,7 +233,10 @@ export function RentalQuickActionBar({
         aria-label="Показать быстрые действия"
         // goodmorning-polish: floating FAB — gap from edge, rounded-full, shadow.
         // bottom-5 right-5 = 20px gap on mobile, bottom-6 right-6 = 24px on desktop.
-        className="fixed bottom-5 right-5 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-105 md:bottom-6 md:right-6"
+        // 2026-10-29: bottom offsets now include --app-safe-bottom (Android TG
+        // WebView draws under the system nav bar; plain bottom-5 put the FAB
+        // in the gesture zone). Desktop md:bottom-6 unchanged.
+        className="fixed bottom-[calc(var(--app-safe-bottom,16px)_+_0.25rem)] right-5 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full shadow-xl transition-all duration-300 hover:scale-105 md:bottom-6 md:right-6"
         style={{
           backgroundColor: accentColor,
           color: accentTextOn,
@@ -256,10 +259,12 @@ export function RentalQuickActionBar({
       // Mobile: inset-x-4 bottom-5 (16px L/R gap, 20px bottom gap) + rounded-2xl.
       // Desktop: bottom-6 right-6 (24px gap) + max-w-xs + rounded-2xl.
       // Slide-in animation: starts collapsed (opacity-0 translate-y-2) → animates to full.
-      className="fixed inset-x-4 bottom-5 z-50 rounded-2xl border bg-white/95 backdrop-blur-md shadow-xl transition-all duration-300 dark:bg-zinc-900/95 md:inset-x-auto md:bottom-6 md:right-6 md:max-w-xs animate-[slideup_0.3s_ease-out]"
+      className="fixed inset-x-4 bottom-[calc(var(--app-safe-bottom,16px)_+_0.25rem)] z-50 rounded-2xl border bg-white/95 backdrop-blur-md shadow-xl transition-all duration-300 dark:bg-zinc-900/95 md:inset-x-auto md:bottom-6 md:right-6 md:max-w-xs animate-[slideup_0.3s_ease-out]"
       style={{
         borderColor,
-        // No safe-area padding needed — bar floats above native nav with gap
+        // 2026-10-29: bottom offset = safe-area floor + 4px gap (see :root
+        // --app-safe-bottom) — the old flat bottom-5 (20px) landed in the
+        // Android system nav zone.
       }}
     >
       <div className="flex items-center gap-1 p-2 md:gap-2 md:p-3">

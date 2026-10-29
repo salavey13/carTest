@@ -186,7 +186,10 @@ export function AnalyticsMobileSheet({
               borderTop: `1px solid ${T.border}`,
               boxShadow: "0 -10px 40px rgba(0,0,0,0.4)",
               ...(sheetHeightPx > 0 ? { height: `${sheetHeightPx}px` } : {}),
-              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+              // 2026-10-29: env() = 0 in the Android TG WebView → the sheet
+              // glued to the screen bottom under the system nav bar. Floor the
+              // inset (see :root --app-safe-bottom in globals.css).
+              paddingBottom: "var(--app-safe-bottom, 16px)",
             }}
           >
             {/* Drag handle — full-width gesture surface so the user can
