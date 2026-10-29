@@ -1593,3 +1593,19 @@ Documented verdicts (reviewed, no action): verified/disputed snapshots get attri
 Tests: new tests/franchize/task162-role-reassign-polish.spec.ts ×12 (CSV-parity pins incl. the split-cell round-trip, clear re-derives 1/2+1/2 + shift fallback, source pins: both-stamp reset, expectedCrewId, dialect, sentinel, 64-byte guard); task152 WHICH-row pin re-baselined 3→4 (the clear dialog speaks the same pattern). franchize suite 193 files / 3695 passed / 8 skipped; full tsc --noEmit clean (8GB heap); eslint clean on touched files.
 
 Deploy: commit 4862014 → Vercel success (GitHub status API), prod /franchize/vip-bike + /rentals 200; agent-browser pass on the rentals page: zero page errors (TG WebView logs only). The owner-gated tableview UI itself is pinned by the spec set (the dropdowns live behind the owner gate by design).
+
+---
+Task ID: task163-tableview-sticky-rail-seams
+Agent: main (Z.ai CLI)
+Task: boss — «sticky columns in rentals-analytics tableview have no border between them … a transparent vertical line one pixel wide through which scrolling columns below are visible looking like shimmering».
+
+Work Log:
+- Root cause = TWO stacked defects at the pinned-column boundaries. (1) computeRailOffsets returned FRACTIONAL offsets (raw getBoundingClientRect sums, 87.375-style) — adjacent pinned cells painted with independently snapped sub-pixel edges → a genuine ~1px transparent slit between/beside the pinned columns, the sliding columns shimmer through it. (2) border-collapse: collapse — Chromium paints collapsed cell borders at the cell's NATURAL x, so stuck cells (the right rail, natural position = far right of the 25-column sheet) lost their border-r entirely when pinned → «no border between them».
+- First attempt (floor the raw prefix sum) was caught by the new NO-GAP invariant test: a pinned cell paints [offset, offset+fractionalWidth], so floored prefix sums still left up to ~1px LAYOUT gaps. Final fix = RECURSIVE floor (acc = floor(acc + width)): every next offset ≤ the previous cell's PAINTED edge → rail cells overlap or tile, never gap (integer offsets, ≤0.5px/step leftward drift absorbed by the opaque backgrounds).
+- railCellStyle (th/td/tfoot, both rails): each rail cell now draws its OWN opaque 1px separator via inset box-shadow (left rail: inset -1px on the right edge; right rail: inset 1px on the left edge) — travels with the cell, independent of collapsed-border painting. Boundary cells facing the sliding content (last left-rail / first right-rail column) add an opaque 1px strip of their own row bg beyond the box edge — nothing under the rail boundary can shine through. Mobile fallback (sticky Дата only) inherits the same treatment.
+- Tests: new tests/franchize/task163-tableview-sticky-rail-seams.spec.ts ×7 (integer offsets on fractional widths, NO-GAP invariant both rails, separator/strip source pins); task137 shadow pins re-baselined (boxShadow moved into a joined list). franchize suite 194 files / 3702 passed / 8 skipped; full tsc --noEmit clean (8GB heap); eslint clean on touched files.
+- Deploy: commit 20be9b0 → Vercel auto-deploy, verified below.
+
+Stage Summary:
+- Pinned columns now carry a crisp opaque separator and a hole-proof geometry — no more shimmer, the rail reads as a proper bordered panel for tomorrow's polish run.
+- Deploy verification: Vercel live (chunk 1213-3dc5252d925382fd.js replaces f538651d62bd7e4a) — served bundle contains both inset separator literals + the recursive floor in computeRailOffsets; / and /franchize/vip-bike/rentals-analytics 200. The tableview itself is owner-gated (per task161), visual confirmation lands with the crew's polish run tomorrow.
