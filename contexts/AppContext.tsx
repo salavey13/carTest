@@ -222,8 +222,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    const startParam = telegramHookData.tg?.initDataUnsafe?.start_param;
-    if (telegramHookData.tg && startParam) {
+    // FIX (Telegram Web deep links, 2026-10-29): web-клиенты Telegram часто
+    // доставляют startapp ТОЛЬКО через URL-фрагмент
+    // (…#tgWebAppData=…&tgWebAppStartParam=rental_<id>), а
+    // initDataUnsafe.start_param остаётся пустым (quirk webk/webz + медленная
+    // загрузка telegram-web-app.js в iframe). useTelegramAuth уже мержит оба
+    // источника в telegramHookData.startParam (SDK первый, hash-fallback
+    // вторым) — потребляем ЕГО, а не сырой initDataUnsafe, иначе rental_-
+    // ссылки в Telegram Web молча не роутятся (на мобильных работает, поэтому
+    // выглядело как «сломано только в web»).
+    const startParam = telegramHookData.startParam ?? null;
+    if (startParam) {
       if (processedStartParam.current) return;
       processedStartParam.current = true;
 
@@ -236,7 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStartParamPayload(null);
       processedStartParam.current = false;
     }
-  }, [telegramHookData.tg, telegramHookData.tg?.initDataUnsafe?.start_param, startParamPayload]);
+  }, [telegramHookData.startParam, startParamPayload]);
 
   // --- Strikeball boundary: event-driven lobby updates, no timer-only pseudo-realtime ---
   const [activeLobby, setActiveLobby] = useState<ActiveLobbyInfo | null>(null);
