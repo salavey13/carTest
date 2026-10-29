@@ -103,10 +103,11 @@ export default async function MapRidersPage(
           vip-bike crew only — the whole quest is gated client+server side) */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={6}
-          riddle="Карта живая — как и весь экипаж. И последнее, самое вкусное для со-владельца: весь сезон 2026, посчитанный до рубля — аренды, продажи, касса и сверка. Табло ждёт."
-          nextHref="/franchize/vip-bike/season-stats"
-          nextLabel="Открыть цифры сезона"
+          stop={8}
+          featureKey="map_riders"
+          riddle="Карта живая — как и весь экипаж. Дальше — стена сообщества: посты, реакции и обсуждения прямо в приложении. Посмотри, чем живёт экипаж вне поездок."
+          nextHref="/franchize/vip-bike/community"
+          nextLabel="Открыть стену сообщества"
         />
       )}
     </main>

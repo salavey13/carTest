@@ -167,8 +167,9 @@ describe("task156: bot comment-capture hardening (source pins)", () => {
 describe("task156: roman quest polish (source pins)", () => {
   it("hidden overview = neutral wordmark page, not a blank screen", () => {
     const overview = src("app/gift/roman-quest/page.tsx");
+    // task164 re-baseline: the overview is the PUBLIC tour hub now — there is
+    // no "hidden" gate branch at all (v2 gate shows the tour to everyone).
     expect(overview).not.toMatch(/if \(gate === "hidden"\) return null;/);
-    expect(overview).toMatch(/hidden is no longer a BLANK page/);
   });
 
   it("stop-7 riddle lost the redundant second ending (both gated branches)", () => {
@@ -179,6 +180,7 @@ describe("task156: roman quest polish (source pins)", () => {
 
   it("overview final card wording updated", () => {
     const overview = src("app/gift/roman-quest/page.tsx");
-    expect(overview).toContain("Все семь следов собраны — подарок твой. Заходи.");
+    // task164 re-baseline: ten stops now, and the birthday finale stays Roman-only
+    expect(overview).toContain("Все десять следов собраны — подарок твой. Заходи.");
   });
 });

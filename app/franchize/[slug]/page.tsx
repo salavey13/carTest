@@ -310,9 +310,10 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       {slug === "vip-bike" && (
         <RomanQuestCake
           stop={2}
-          riddle="Витрина — это только дверца. Дальше интереснее: карта всей сети, где каждый экипаж — круг, а размер круга — это его люди. Глянь со стороны, какой мир вы с Ильёй строите."
-          nextHref="/franchize/discovery"
-          nextLabel="Открыть карту сети"
+          featureKey="storefront"
+          riddle="Витрина — это только дверца. Дальше интереснее: конфигуратор, где гость собирает свой электромотоцикл по частям — цвета, комплектация, живой предпросмотр. Загляни, как выглядит витрина, которая продаёт мечту."
+          nextHref="/franchize/vip-bike/configurator"
+          nextLabel="Открыть конфигуратор"
         />
       )}
 

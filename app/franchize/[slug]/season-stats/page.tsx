@@ -92,7 +92,8 @@ export default async function SeasonStatsPage({ params }: Props) {
             an overlay, so the hunt works even on the locked PC fallback */}
         {slug === "vip-bike" && (
           <RomanQuestCake
-            stop={7}
+            stop={10}
+            featureKey="season_stats"
             riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
             nextHref="/gift/roman"
             nextLabel="Открыть подарок"
@@ -117,11 +118,12 @@ export default async function SeasonStatsPage({ params }: Props) {
           before the gift (vip-bike crew only; Roman opens logged in) */}
       {slug === "vip-bike" && (
         <RomanQuestCake
-          stop={7}
+          stop={10}
+          featureKey="season_stats"
           riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
           nextHref="/gift/roman"
           nextLabel="Открыть подарок"
-        />
+          />
       )}
       <CrewFooter crew={crew} />
     </main>

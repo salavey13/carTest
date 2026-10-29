@@ -177,7 +177,8 @@ export default function LeaderboardPage() {
         {/* task154 iter2: secret birthday quest — stop 4/7 (Roman only,
             hidden corner cake; riddle describes the garage next) */}
         <RomanQuestCake
-          stop={4}
+          stop={5}
+          featureKey="leaderboard"
           riddle="Слава — это приятно, но ты человек дела. Следующий след — твой гараж: MOTO-GARAGE, где можно выбрать байк, даты и собрать бронирование. Загляни, как это выглядит изнутри."
           nextHref="/rent-bike"
           nextLabel="Открыть гараж"

@@ -16,7 +16,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { readRomanQuestProgress, ROMAN_QUEST_STOPS } from "@/components/roman-gift/RomanQuestCake";
+import { useRouter } from "next/navigation";
+import {
+  readRomanQuestProgress,
+  ROMAN_QUEST_STOPS,
+  useFeatureTourGate,
+} from "@/components/roman-gift/RomanQuestCake";
 
 const ACHIEVEMENTS: Array<{ icon: string; title: string; sub: string }> = [
   { icon: "👑", title: "Со-владелец года", sub: "Половина империи — и ни одного спора за весь сезон" },
@@ -97,8 +102,21 @@ function useConfetti() {
 
 export default function RomanGiftPage() {
   const { canvasRef, burst } = useConfetti();
+  const router = useRouter();
+  const gate = useFeatureTourGate();
   const [questProgress, setQuestProgress] = useState(0);
   const [days, setDays] = useState<number | null>(null);
+
+  // task164 — the birthday letter is ROMAN-ONLY (boss: «если открывать не
+  // романа… это просто фичка для активации или рассказы для покупки»):
+  // everyone else is redirected to the tour finale. Fail-open on gate errors
+  // keeps the easter egg reachable during outages.
+  const isRoman = gate.skin === "birthday" && gate.role === "roman";
+  useEffect(() => {
+    if (gate.status === "ready" && !isRoman) {
+      router.replace("/gift/roman-quest");
+    }
+  }, [gate.status, isRoman, router]);
 
   useEffect(() => {
     setQuestProgress(readRomanQuestProgress());
@@ -108,6 +126,18 @@ export default function RomanGiftPage() {
   }, [burst]);
 
   const questDone = questProgress >= ROMAN_QUEST_STOPS;
+
+  // task164 — non-Roman visitors never even flash the letter: a quiet
+  // splash while the gate resolves and while the redirect runs.
+  if (gate.status !== "ready" || !isRoman) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[#0c0b09] text-stone-700">
+        <div className="font-serif text-2xl font-bold tracking-[0.3em]">
+          VIP<span className="text-amber-400/40">BIKE</span>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#0c0b09] text-amber-50">

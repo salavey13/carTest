@@ -6,6 +6,7 @@ import { CrewHeader } from "../../components/CrewHeader";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { ConfiguratorClient } from "./ConfiguratorClient";
 import { buildFranchizeSectionMetadata } from "../metadata";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface ConfiguratorPageProps {
   params: Promise<{ slug: string }>;
@@ -39,6 +40,19 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
         groupLinks={items.map((item) => item.category)}
       items={items} />
       <ConfiguratorClient crew={crew} slug={slug} />
+
+      {/* task164 BESTSELLER tour — stop 3/10 (конфигуратор). Riddle describes
+          the NEXT page (карта сети); the tour skin is public, the birthday
+          skin is Roman-only (the component self-gates). */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          stop={3}
+          featureKey="configurator"
+          riddle="Собрал байк мечты? Теперь глянь, сколько вас вокруг: карта всей сети, где каждый экипаж — круг, а размер круга — это его люди. Глянь со стороны, какой мир вы с Ильёй строите."
+          nextHref="/franchize/discovery"
+          nextLabel="Открыть карту сети"
+        />
+      )}
     </main>
   );
 }

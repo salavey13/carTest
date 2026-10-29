@@ -4,6 +4,7 @@ import { getFranchizeBySlug } from "../../actions";
 import { crewPaletteForSurface } from "../../lib/theme";
 import { CrewHeader } from "../../components/CrewHeader";
 import { FranchizePageShell } from "../../components/FranchizePageShell";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase-server";
@@ -51,6 +52,17 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
             Доступ только для участников экипажа
           </p>
         </div>
+        {/* task164 — tour stop 7/10 works even on the locked fallback (the
+            pitch sells the feature; members get the page itself). */}
+        {slug === "vip-bike" && (
+          <RomanQuestCake
+            stop={7}
+            featureKey="price_calc"
+            riddle="Калькулятор объясняет цену построчно. Следующий след — живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас."
+            nextHref="/franchize/vip-bike/map-riders"
+            nextLabel="Открыть карту райдеров"
+          />
+        )}
       </main>
     );
   }
@@ -61,6 +73,16 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6 max-w-3xl mx-auto">
         <CalcExplainer />
       </FranchizePageShell>
+      {/* task164 BESTSELLER tour — stop 7/10 (прайс-калькулятор). */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          stop={7}
+          featureKey="price_calc"
+          riddle="Калькулятор объясняет цену построчно. Следующий след — живая карта: райдеры рядом, точки встреч, статусы поездок экипажа. Глянь, кто катает прямо сейчас."
+          nextHref="/franchize/vip-bike/map-riders"
+          nextLabel="Открыть карту райдеров"
+        />
+      )}
     </main>
   );
 }

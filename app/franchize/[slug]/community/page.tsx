@@ -4,6 +4,7 @@ import { getFranchizeBySlug } from "@/app/franchize/actions";
 import { CrewFooter } from "@/app/franchize/components/CrewFooter";
 import { CrewHeader } from "@/app/franchize/components/CrewHeader";
 import { CommunityWallClient } from "./CommunityWallClient";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { buildFranchizeIntentLinks } from "@/app/franchize/lib/section-links";
 import { crewPaletteWithCssVars, readablePaletteTextOnColor, withAlpha } from "@/app/franchize/lib/theme";
 import { buildFranchizeSectionMetadata } from "../metadata";
@@ -131,6 +132,18 @@ export default async function FranchizeCommunityPage(
         // экрана на телефонах (в sliding sheet карты — обычные, bleed=false).
         bleed
       />
+
+      {/* task164 BESTSELLER tour — stop 9/10 (стена сообщества). Riddle
+          describes the finale stop (цифры сезона). */}
+      {slug === "vip-bike" && (
+        <RomanQuestCake
+          stop={9}
+          featureKey="community"
+          riddle="Экипаж живёт не только в поездках. Последний след — самое вкусное для со-владельца: весь сезон 2026, посчитанный до рубля — аренды, продажи, касса и сверка. Табло ждёт."
+          nextHref="/franchize/vip-bike/season-stats"
+          nextLabel="Открыть цифры сезона"
+        />
+      )}
 
       <CrewFooter crew={crew} />
     </main>
