@@ -111,10 +111,10 @@ export function HeaderMenu({ crew, activePath, open, onOpenChange }: HeaderMenuP
         className="pointer-events-auto max-h-[calc(100dvh-max(env(safe-area-inset-top),0.5rem)-1rem)] w-full max-w-sm overflow-y-auto rounded-2xl border border-[var(--header-menu-border)] bg-[var(--header-menu-bg)] p-4 text-[var(--header-menu-text)] shadow-2xl"
         style={{
           marginTop: `calc(max(env(safe-area-inset-top), 0.5rem) + ${nativeTopPx}px + 1.2rem)`,
-          ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
-          ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
-          ["--header-menu-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
-          ["--header-menu-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+          ["--header-menu-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card,#111217)" : palette.bgCard,
+          ["--header-menu-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft,
+          ["--header-menu-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary,
+          ["--header-menu-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain,
         }}
         onClick={(e) => e.stopPropagation()}
       >

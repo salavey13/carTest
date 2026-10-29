@@ -133,7 +133,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     strikeball: null,
     franchizeProfiles: null,
   });
-  const processedStartParam = useRef(false);
+  // task166 hardening: was a boolean one-shot («processedStartParam») — ANY
+  // second start_param delivered into the same SPA life was silently DROPPED
+  // (Telegram Web can refresh the launch params — a new startapp value —
+  // without a full reload). Track the VALUE instead: an identical param is
+  // deduped, a DIFFERENT param is processed like a fresh deep link.
+  const lastProcessedStartParamRef = useRef<string | null>(null);
 
   // ── Task 97: resilient crew-memberships loading ──
   // Boot path used to run snapshot + memberships in ONE Promise.all: a
@@ -233,8 +238,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // выглядело как «сломано только в web»).
     const startParam = telegramHookData.startParam ?? null;
     if (startParam) {
-      if (processedStartParam.current) return;
-      processedStartParam.current = true;
+      if (lastProcessedStartParamRef.current === startParam) return;
+      lastProcessedStartParamRef.current = startParam;
 
       debugLogger.info(`[AppContext] Received start_param: ${startParam}`);
       setStartParamPayload(startParam);
@@ -243,7 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (startParamPayload !== null) {
       setStartParamPayload(null);
-      processedStartParam.current = false;
+      lastProcessedStartParamRef.current = null;
     }
   }, [telegramHookData.startParam, startParamPayload]);
 

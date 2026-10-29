@@ -16,6 +16,7 @@ import { hasRentPrice, hasSalePrice, hasServicePrice, hasEquipmentPrice } from "
 import { FloatingCartIconLinkBySlug } from "./FloatingCartIconLinkBySlug";
 import { CartAddedFlash } from "./CartAddedFlash";
 import { WinterStorageModal } from "./WinterStorageModal";
+import { FranchizeErrorBoundary } from "./ErrorBoundary";
 import { useDisplayMode } from "./DisplayModeContext";
 import { SHOW_CART } from "@/lib/feature-flags";
 import { ItemModal, type FlowType } from "../modals/Item";
@@ -26,6 +27,7 @@ import { todayISO, addMinutesToHhMm, nearestHourHhMm } from "../lib/date-utils";
 import { buildCatalogRentalStrip } from "../lib/catalog-rental-strip";
 import { getCatalogPropulsionSegment } from "../lib/catalog-propulsion";
 import { localImageSrc, handleImageError } from "@/lib/image-fallback";
+import { safeSessionStorage } from "../lib/safe-storage";
 import { logger } from "@/lib/logger";
 import { decodeStartappState, isStartappStateFresh } from "@/lib/startapp-state";
 import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
@@ -408,7 +410,7 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
  * into the solid accent strip below.
  * The BASE layer of the highlight is the article's own background — see
  * catalogCardVariantStyles (task 141 iter4): globals.css flips
- * --card-base-bg to var(--catalog-accent) on [data-catalog-item]:hover, so
+ * --card-base-bg to var(--catalog-accent,#d99a00) on [data-catalog-item]:hover, so
  * the accent covers the whole border-box no matter what inner elements do.
  * md: gate keeps touch hover-lock from stranding a tint on phones. The
  * keyboard/TV focus outline (interactionCardFocusStyle) is a separate
@@ -438,7 +440,7 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
 function CatalogHoverWash() {
   return (
     <>
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent,#d99a00)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block" />
       <div aria-hidden className="catalog-melt pointer-events-none absolute inset-x-0 bottom-0 h-32" />
     </>
   );
@@ -474,7 +476,7 @@ function ComboOfferCard({
       key={item.id}
       data-catalog-item="true"
       data-combo-offer="true"
-      className="group col-span-full overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-colors duration-300 hover:!border-[var(--catalog-accent)]"
+      className="group col-span-full overflow-hidden rounded-2xl border border-[var(--catalog-border,#24262e)] transition-colors duration-300 hover:!border-[var(--catalog-accent,#d99a00)]"
       style={{
         ...catalogCardVariantStyles(crew.theme, crewPaletteSeed(item.id)),
         // task 139 iter2: focus frame on the ARTICLE (outline, negative
@@ -502,17 +504,17 @@ function ComboOfferCard({
               onError={handleImageError(item.imageUrl)}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-[var(--catalog-card-bg)] text-xs" style={{ color: "var(--catalog-muted)" }}>
+            <div className="flex h-full w-full items-center justify-center bg-[var(--catalog-card-bg,#111217)] text-xs" style={{ color: "var(--catalog-muted,#a7abb4)" }}>
               Фото загружается
             </div>
           )}
           <CatalogHoverWash />
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-accent)] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast)] shadow-sm">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[var(--catalog-accent,#d99a00)] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--catalog-accent-contrast,#16130a)] shadow-sm">
             <Layers className="h-3 w-3" aria-hidden />
             Комбо · коллекция
           </span>
           {typeof stockQty === "number" && (
-            <span className="absolute right-2 top-2 inline-flex items-center rounded-full catalog-avail-pill px-2 py-0.5 text-[9px] font-semibold text-[var(--catalog-text)] backdrop-blur-sm">
+            <span className="absolute right-2 top-2 inline-flex items-center rounded-full catalog-avail-pill px-2 py-0.5 text-[9px] font-semibold text-[var(--catalog-text,#f2f2f3)] backdrop-blur-sm">
               {stockQty} шт. в наличии
             </span>
           )}
@@ -523,11 +525,11 @@ function ComboOfferCard({
             flip), so the fill hugs the card silhouette edge-to-edge and no
             inner element can leave an unpainted sliver. */}
         <div className="flex flex-1 flex-col p-4">
-          <h3 className="text-base font-bold leading-6 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
+          <h3 className="text-base font-bold leading-6 text-[var(--catalog-text,#f2f2f3)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]">
             {item.title}
           </h3>
           {item.description && (
-            <p className="mt-1 line-clamp-2 text-xs leading-5 opacity-70" style={{ color: "var(--catalog-muted)" }}>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 opacity-70" style={{ color: "var(--catalog-muted,#a7abb4)" }}>
               {item.description}
             </p>
           )}
@@ -536,17 +538,17 @@ function ComboOfferCard({
           {(sizes.length > 0 || colors.length > 0 || features.length > 0) && (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {sizes.length > 0 && (
-                <span className="inline-flex items-center rounded-lg border border-[var(--catalog-accent)]/40 px-2 py-0.5 text-[10px] font-bold text-[var(--catalog-accent)]">
+                <span className="inline-flex items-center rounded-lg border border-[var(--catalog-accent,#d99a00)]/40 px-2 py-0.5 text-[10px] font-bold text-[var(--catalog-accent,#d99a00)]">
                   {sizes.join(" · ")}
                 </span>
               )}
               {colors.map((c) => (
-                <span key={c} className="rounded-lg bg-[var(--catalog-card-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--catalog-text)]">
+                <span key={c} className="rounded-lg bg-[var(--catalog-card-bg,#111217)] px-2 py-0.5 text-[10px] font-medium text-[var(--catalog-text,#f2f2f3)]">
                   {c}
                 </span>
               ))}
               {features.slice(0, 2).map((f) => (
-                <span key={f} className="rounded-lg bg-[var(--catalog-card-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--catalog-text)]">
+                <span key={f} className="rounded-lg bg-[var(--catalog-card-bg,#111217)] px-2 py-0.5 text-[10px] font-medium text-[var(--catalog-text,#f2f2f3)]">
                   {f}
                 </span>
               ))}
@@ -554,10 +556,10 @@ function ComboOfferCard({
           )}
 
           <div className="mt-auto flex items-end justify-between gap-3 pt-3">
-            <p className="text-lg font-bold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">
+            <p className="text-lg font-bold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]">
               {item.rentPriceLabel}
             </p>
-            <span className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+            <span className="inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent,#d99a00)] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)] active:scale-95">
               {ctaLabel}
             </span>
           </div>
@@ -576,18 +578,18 @@ function crewPaletteSeed(id: string): number {
 
 function CatalogCardSkeleton({ index }: { index: number }) {
   return (
-    <article className="overflow-hidden rounded-2xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)]" aria-hidden="true">
-      <div className="relative aspect-[9/16] overflow-hidden bg-[var(--catalog-card-bg)]">
+    <article className="overflow-hidden rounded-2xl border border-[var(--catalog-border,#24262e)] bg-[var(--catalog-card-bg,#111217)]" aria-hidden="true">
+      <div className="relative aspect-[9/16] overflow-hidden bg-[var(--catalog-card-bg,#111217)]">
         <div
           className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent"
           style={{ animationDelay: `${index * 120}ms` }}
         />
       </div>
       <div className="space-y-3 p-3">
-        <div className="h-4 w-2/3 rounded-full bg-[var(--catalog-muted)]/25" />
-        <div className="h-3 w-full rounded-full bg-[var(--catalog-muted)]/20" />
-        <div className="h-3 w-4/5 rounded-full bg-[var(--catalog-muted)]/20" />
-        <div className="h-10 rounded-xl border-2 border-[var(--catalog-accent)]/30 bg-[var(--catalog-accent)]/10" />
+        <div className="h-4 w-2/3 rounded-full bg-[var(--catalog-muted,#a7abb4)]/25" />
+        <div className="h-3 w-full rounded-full bg-[var(--catalog-muted,#a7abb4)]/20" />
+        <div className="h-3 w-4/5 rounded-full bg-[var(--catalog-muted,#a7abb4)]/20" />
+        <div className="h-10 rounded-xl border-2 border-[var(--catalog-accent,#d99a00)]/30 bg-[var(--catalog-accent,#d99a00)]/10" />
       </div>
     </article>
   );
@@ -1054,7 +1056,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
   // Check for edit context from cart page
   useEffect(() => {
-    const editContextStr = sessionStorage.getItem("franchize-edit-cart-line");
+    // task166: guarded access — storage THROWS on cookie-blocked phones and
+    // one throw in a mount effect kills the whole catalog hydration.
+    const editContextStr = safeSessionStorage.getItem("franchize-edit-cart-line");
     if (!editContextStr) return;
 
     try {
@@ -1078,10 +1082,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       });
 
       // Clear the edit context
-      sessionStorage.removeItem("franchize-edit-cart-line");
+      safeSessionStorage.removeItem("franchize-edit-cart-line");
     } catch (error) {
       console.warn("Failed to parse edit context:", error);
-      sessionStorage.removeItem("franchize-edit-cart-line");
+      safeSessionStorage.removeItem("franchize-edit-cart-line");
     }
   }, [displayItems]);
 
@@ -1203,7 +1207,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
 
     // Show a one-time banner in the modal explaining the deep-link.
     if (typeof window !== "undefined") {
-      sessionStorage.setItem(
+      // task166: guarded write — private/cookie-blocked storage must not crash the effect.
+      safeSessionStorage.setItem(
         "franchize-startapp-banner",
         JSON.stringify({
           ts: Date.now(),
@@ -1275,43 +1280,43 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         className="relative mx-auto min-w-0 w-full max-w-7xl overflow-x-clip px-4 pb-6 pt-8 xl:max-w-[1440px] 2xl:max-w-[1800px]"
         id="catalog-sections"
         style={{
-          ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
-          ["--catalog-accent-hover" as string]: crew.theme.isAuto ? "var(--franchize-accent-hover)" : palette.accentMainHover,
-          ["--catalog-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
-          ["--catalog-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
-          ["--catalog-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
-          ["--catalog-card-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
-          ["--catalog-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-base)" : palette.bgBase,
+          ["--catalog-accent" as string]: crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain,
+          ["--catalog-accent-hover" as string]: crew.theme.isAuto ? "var(--franchize-accent-hover,#e2a812)" : palette.accentMainHover,
+          ["--catalog-border" as string]: crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft,
+          ["--catalog-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary,
+          ["--catalog-muted" as string]: crew.theme.isAuto ? "var(--franchize-text-secondary,#a7abb4)" : palette.textSecondary,
+          ["--catalog-card-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card,#111217)" : palette.bgCard,
+          ["--catalog-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-base,#0b0c10)" : palette.bgBase,
           ["--catalog-accent-contrast" as string]: readableTextOnColor(palette.accentMain),
           ["--catalog-accent-muted-contrast" as string]: withAlpha(readableTextOnColor(palette.accentMain), 0.7),
           ["--catalog-accent-subtle" as string]: crew.theme.isAuto
-            ? "var(--franchize-accent-main)"
+            ? "var(--franchize-accent-main,#d99a00)"
             : withAlpha(palette.accentMain, 0.12),
         }}
       >
         {!crew.isFound && (
-          <p className="mb-4 rounded-xl border border-[var(--catalog-accent)] px-3 py-2 text-sm text-[var(--catalog-accent)]">
+          <p className="mb-4 rounded-xl border border-[var(--catalog-accent,#d99a00)] px-3 py-2 text-sm text-[var(--catalog-accent,#d99a00)]">
             Crew slug was not found. Rendering safe fallback shell.
           </p>
         )}
 
         {isVipBikeRental && paidRentalSegment && (
           <div
-            className="mb-5 rounded-2xl border border-[var(--catalog-border)] bg-[var(--catalog-card-bg)] p-4 sm:p-5"
+            className="mb-5 rounded-2xl border border-[var(--catalog-border,#24262e)] bg-[var(--catalog-card-bg,#111217)] p-4 sm:p-5"
             aria-labelledby="paid-rental-heading"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent,#d99a00)]">
               VIP Bike Rental
             </p>
             <h1
               id="paid-rental-heading"
-              className="mt-1 text-2xl font-bold leading-tight text-[var(--catalog-text)] sm:text-3xl"
+              className="mt-1 text-2xl font-bold leading-tight text-[var(--catalog-text,#f2f2f3)] sm:text-3xl"
             >
               {paidRentalSegment === "electric"
                 ? "Электромотоциклы в аренду в Нижнем Новгороде"
                 : "Бензиновые мотоциклы в аренду в Нижнем Новгороде"}
             </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--catalog-muted)]">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--catalog-muted,#a7abb4)]">
               {paidRentalSegment === "electric"
                 ? "Выбери модель и даты. Требования к категории зависят от модели — менеджер проверит их до подтверждения брони."
                 : "Выбери модель и даты. Для аренды бензинового мотоцикла обязательна категория А."}
@@ -1340,10 +1345,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             style={{
-              boxShadow: `0 0 0 1px ${crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}`,
-              borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
-              backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-card)" : `${palette.bgCard}99`,
-              color: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+              boxShadow: `0 0 0 1px ${crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft}`,
+              borderColor: crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft,
+              backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-card,#111217)" : `${palette.bgCard}99`,
+              color: crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary,
               ...(searchFocused ? interactionRingStyle(crew.theme) : {}),
             }}
           />
@@ -1356,9 +1361,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               onFocus={() => setClearFocused(true)}
               onBlur={() => setClearFocused(false)}
               style={{
-                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base)" : `${palette.bgBase}F0`,
-                color: crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary,
-                border: `1px solid ${crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}`,
+                backgroundColor: crew.theme.isAuto ? "var(--franchize-bg-base,#0b0c10)" : `${palette.bgBase}F0`,
+                color: crew.theme.isAuto ? "var(--franchize-text-secondary,#a7abb4)" : palette.textSecondary,
+                border: `1px solid ${crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft}`,
                 ...(clearFocused ? interactionRingStyle(crew.theme) : {}),
               }}
             >
@@ -1377,7 +1382,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             onFocus={() => setSearchCtaFocused(true)}
             onBlur={() => setSearchCtaFocused(false)}
             style={{
-              backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain,
+              backgroundColor: crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain,
               color: readableTextOnColor(palette.accentMain),
               ...(searchCtaFocused ? interactionRingStyle(crew.theme) : {}),
             }}
@@ -1402,23 +1407,23 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   title={module.title}
                   href={module.href}
                   aria-label={`${module.ctaLabel}: ${module.title}`}
-                  className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)] sm:w-auto"
+                  className="w-[85vw] shrink-0 rounded-2xl border p-3 transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent,#d99a00)] sm:w-auto"
                   style={{
-                    borderColor: crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft,
+                    borderColor: crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft,
                     background: promoGradientByIndex(index),
                   }}
                   prefetch={!isExternal}
                   target={isExternal ? "_blank" : undefined}
                   rel={isExternal ? "noreferrer noopener" : undefined}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent-contrast)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--catalog-accent-contrast,#16130a)]">
                     {module.badge}
                   </p>
-                  <p className="mt-1 text-sm font-semibold leading-5 text-[var(--catalog-accent-contrast)]">
+                  <p className="mt-1 text-sm font-semibold leading-5 text-[var(--catalog-accent-contrast,#16130a)]">
                     {module.title}
                   </p>
-                  {module.subtitle && <p className="mt-1 text-xs text-[var(--catalog-accent-muted-contrast)]">{module.subtitle}</p>}
-                  <p className="mt-2 text-xs font-semibold text-[var(--catalog-accent-contrast)]">
+                  {module.subtitle && <p className="mt-1 text-xs text-[var(--catalog-accent-muted-contrast,rgba(22,19,10,.7))]">{module.subtitle}</p>}
+                  <p className="mt-2 text-xs font-semibold text-[var(--catalog-accent-contrast,#16130a)]">
                     {module.ctaLabel} →
                   </p>
                 </Link>
@@ -1456,14 +1461,14 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 type="button"
                 onClick={() => setQuickFilter(filter.key)}
                 aria-pressed={active}
-                className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+                className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent,#d99a00)]"
                 style={{
                   ["--quick-pill-bg" as string]: active
-                    ? (filter.tierColor || (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain))
-                    : (crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard),
+                    ? (filter.tierColor || (crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain))
+                    : (crew.theme.isAuto ? "var(--franchize-bg-card,#111217)" : palette.bgCard),
                   ["--quick-pill-text" as string]: active
                     ? readableTextOnColor(filter.tierColor || palette.accentMain)
-                    : (crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary),
+                    : (crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary),
                   ...(active && filter.tierColor ? { boxShadow: `0 0 8px ${filter.tierColor}60` } : {}),
                 }}
               >
@@ -1477,10 +1482,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               type="button"
               onClick={() => setWinterStorageOpen(true)}
               aria-haspopup="dialog"
-              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent,#d99a00)]"
               style={{
-                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
-                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary,
+                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card,#111217)" : palette.bgCard,
+                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary,
               }}
             >
               <Snowflake className="mr-1 inline-block h-3 w-3 text-sky-400" aria-hidden="true" />
@@ -1495,10 +1500,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                 setSearchQuery("");
               }}
               aria-label="Сбросить поиск и все быстрые фильтры"
-              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+              className="min-h-11 shrink-0 rounded-full bg-[var(--quick-pill-bg)] px-3 py-1.5 text-xs font-medium text-[var(--quick-pill-text)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent,#d99a00)]"
               style={{
-                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card)" : palette.bgCard,
-                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary
+                ["--quick-pill-bg" as string]: crew.theme.isAuto ? "var(--franchize-bg-card,#111217)" : palette.bgCard,
+                ["--quick-pill-text" as string]: crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary
               }}
             >
               Сбросить всё
@@ -1507,10 +1512,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         </div>
 
         {isTransitioning && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--catalog-bg)]/80 backdrop-blur-sm">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--catalog-bg,#0b0c10)]/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--catalog-accent)] border-t-transparent" />
-              <p className="text-sm text-[var(--catalog-muted)]">Переключаем режим...</p>
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--catalog-accent,#d99a00)] border-t-transparent" />
+              <p className="text-sm text-[var(--catalog-muted,#a7abb4)]">Переключаем режим...</p>
             </div>
           </div>
         )}
@@ -1518,8 +1523,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
         {items.length === 0 ? (
           <section aria-label="Загружаем каталог" className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">Каталог готовых выездов</h2>
-              <span className="inline-flex rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">синхронизируем наличие</span>
+              <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text,#f2f2f3)]">Каталог готовых выездов</h2>
+              <span className="inline-flex rounded-full bg-[var(--catalog-card-bg,#111217)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted,#a7abb4)]">синхронизируем наличие</span>
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-7">
               {[0, 1, 2, 3].map((index) => <CatalogCardSkeleton key={index} index={index} />)}
@@ -1527,11 +1532,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           </section>
         ) : activeGroupsForCarousel.length === 0 && !isTransitioning ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Search className="mb-4 h-14 w-14 text-[var(--catalog-muted)]" aria-hidden />
-            <h3 className="mb-2 text-lg font-semibold text-[var(--catalog-text)]">
+            <Search className="mb-4 h-14 w-14 text-[var(--catalog-muted,#a7abb4)]" aria-hidden />
+            <h3 className="mb-2 text-lg font-semibold text-[var(--catalog-text,#f2f2f3)]">
               {displayMode === "service" ? "Нет услуг" : displayMode === "equipment" ? "Нет экипировки" : displayMode === "rent" ? "Нет байков в аренду" : "Нет байков для продажи"}
             </h3>
-            <p className="mb-4 text-sm text-[var(--catalog-muted)]">
+            <p className="mb-4 text-sm text-[var(--catalog-muted,#a7abb4)]">
               {searchQuery
                 ? "Попробуйте изменить поисковый запрос или сбросить фильтры"
                 : "В этом режиме пока нет доступных байков"}
@@ -1543,7 +1548,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                   setSearchQuery("");
                   setQuickFilter("all");
                 }}
-                className="min-h-11 rounded-full bg-[var(--catalog-accent)] px-6 py-2 text-sm font-semibold text-[var(--catalog-accent-contrast)] transition hover:opacity-90"
+                className="min-h-11 rounded-full bg-[var(--catalog-accent,#d99a00)] px-6 py-2 text-sm font-semibold text-[var(--catalog-accent-contrast,#16130a)] transition hover:opacity-90"
               >
                 Сбросить фильтры
               </button>
@@ -1555,10 +1560,10 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
               <section key={group.title || group.category || "section"} id={toCategoryId(group.title || group.category || "section")} data-category={group.title || group.category} data-count={group.items.length}>
                 {group.title && (
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text)]">
+                  <h2 className="text-2xl font-bold uppercase leading-tight tracking-tight text-[var(--catalog-text,#f2f2f3)]">
                     {group.title || group.category}
                   </h2>
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--catalog-card-bg)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted)]">
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--catalog-card-bg,#111217)] px-2.5 py-1 text-[11px] font-medium text-[var(--catalog-muted,#a7abb4)]">
                     {group.items.length} шт.
                   </span>
                 </div>
@@ -1619,7 +1624,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                       data-catalog-item="true"
                       data-carousel-card="true"
                       data-carousel-index={index}
-                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-colors duration-300 hover:!border-[var(--catalog-accent)] sm:w-[220px] sm:max-w-[240px]"
+                      className="group w-[calc(50vw-14px)] shrink-0 snap-start overflow-hidden rounded-2xl border border-[var(--catalog-border,#24262e)] transition-colors duration-300 hover:!border-[var(--catalog-accent,#d99a00)] sm:w-[220px] sm:max-w-[240px]"
                       style={{
                         ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
                         // task 139 iter2: focus frame lives HERE (outline,
@@ -1651,7 +1656,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                         {/* ── Image area (9:16 for bikes, square for services) ── */}
                         <div className={`relative w-full overflow-hidden ${isService ? 'aspect-square' : 'aspect-[9/16]'}`}>
                           {item.imageUrl && !carouselLoadedByItem[item.id] && (
-                            <div className="absolute inset-0 overflow-hidden bg-[var(--catalog-bg)]/30">
+                            <div className="absolute inset-0 overflow-hidden bg-[var(--catalog-bg,#0b0c10)]/30">
                               <div className="absolute inset-y-0 w-1/2 animate-shimmer bg-gradient-to-r from-transparent via-white/15 to-transparent" />
                             </div>
                           )}
@@ -1667,9 +1672,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               onError={handleImageError(item.imageUrl)}
                             />
                           ) : isService ? (
-                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
-                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" />
-                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</span>
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
+                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" />
+                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]">{item.title}</span>
                             </div>
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
@@ -1685,7 +1690,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               highlighted card the accent melt gradient drowned the accent
                               text. .catalog-spec-chip = real translucent balloon at rest,
                               solid primary black on hover/:focus-within (TV D-pads). */
-                              <span key={`${item.id}-badge-${si}`} className="catalog-spec-chip inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
+                              <span key={`${item.id}-badge-${si}`} className="catalog-spec-chip inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[9px] font-semibold text-[var(--catalog-accent,#d99a00)] backdrop-blur-sm">
                                   {spec.text}
                                 </span>
                               ))}
@@ -1710,35 +1715,35 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             seam»). End state identical: opaque accent strip over
                             the accent article = one solid highlight; the article
                             flip still guarantees whole-card coverage. */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent)]">
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg,#111217)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent,#d99a00)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
-                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
+                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent,#d99a00)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast,#16130a)] group-hover:bg-[var(--catalog-bg,#0b0c10)]/20">
                                 Хит
                               </span>
                             )}
-                            {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
-                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
+                            {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent,#d99a00)] bg-[var(--catalog-bg,#0b0c10)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent,#d99a00)] group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)]">Продажа</span>}
+                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
                           </div>
 
                           {/* Title */}
                           {/* task 149: title reserves a 2-line box — price row (and everything
                               below it) stops shifting between 1-line and 2-line titles. */}
-                          <h3 className="min-h-[2.5rem] text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
+                          <h3 className="min-h-[2.5rem] text-sm font-bold leading-5 text-[var(--catalog-text,#f2f2f3)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]">{item.title}</h3>
 
                           {/* Price — conditional on displayMode */}
                           <div className="mt-1.5">
                             {displayMode === "service" ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
                             ) : displayMode === "rent" || displayMode === "equipment" ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
                             ) : (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={priceGlowStyle}>
                                 {item.salePrice?.toLocaleString("ru-RU")} ₽
                               </p>
                             )}
@@ -1749,7 +1754,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               button no longer jumps with title line count / badge wraps;
                               every card in a row parks it on the same baseline. */}
                           <div className="mt-auto pt-3">
-                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent,#d99a00)] px-2 py-2.5 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)] active:scale-95">
                               {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
                             </span>
                           </div>
@@ -1771,7 +1776,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               type="button"
                               aria-label={`Показать карточку ${index + 1}`}
                               aria-current={isActive ? "true" : undefined}
-                              className="grid h-11 min-w-11 place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent)]"
+                              className="grid h-11 min-w-11 place-items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--catalog-accent,#d99a00)]"
                               onClick={() => {
                                 const root = carouselRefs.current[groupKey];
                                 if (!root) return;
@@ -1785,8 +1790,8 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                                 style={{
                                   width: isActive ? "24px" : "10px",
                                   backgroundColor: isActive
-                                    ? (crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain)
-                                    : (crew.theme.isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary),
+                                    ? (crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain)
+                                    : (crew.theme.isAuto ? "var(--franchize-text-secondary,#a7abb4)" : palette.textSecondary),
                                   opacity: isActive ? 1 : 0.4,
                                 }}
                                 aria-hidden
@@ -1807,7 +1812,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                     <article
                       key={item.id}
                       data-catalog-item="true"
-                      className="group overflow-hidden rounded-2xl border border-[var(--catalog-border)] transition-colors duration-300 hover:!border-[var(--catalog-accent)]"
+                      className="group overflow-hidden rounded-2xl border border-[var(--catalog-border,#24262e)] transition-colors duration-300 hover:!border-[var(--catalog-accent,#d99a00)]"
                       style={{
                         ...catalogCardVariantStyles(crew.theme, item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)),
                         // task 139 iter2: same article-level focus frame as
@@ -1836,9 +1841,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               onError={handleImageError(item.imageUrl)}
                             />
                           ) : isService ? (
-                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
-                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" />
-                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</span>
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)]" style={{ backgroundColor: withAlpha(accentColor, 0.06), color: surface.mutedText.color }}>
+                              <Wrench className="h-10 w-10 opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" />
+                              <span className="text-[10px] font-medium opacity-40 transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]">{item.title}</span>
                             </div>
                           ) : (
                             <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs" style={surface.mutedText}>Фото загружается</div>
@@ -1849,7 +1854,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
                               {visibleSpecs.slice(0, 3).map((spec, index) => (
                                 /* task 149: same balloon fix as the carousel card above. */
-                                <span key={`${item.id}-spec-${index}`} className="catalog-spec-chip inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent)] backdrop-blur-sm">
+                                <span key={`${item.id}-spec-${index}`} className="catalog-spec-chip inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-[var(--catalog-accent,#d99a00)] backdrop-blur-sm">
                                   {spec.text}
                                 </span>
                               ))}
@@ -1877,35 +1882,35 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             as the melt gradient) — desync history in the carousel
                             card comment above; the article flip below stays as the
                             whole-card guarantee for stretched grid rows. */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent)]">
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg,#111217)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent,#d99a00)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
-                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast)] group-hover:bg-[var(--catalog-bg)]/20">
+                              <span className="inline-flex items-center rounded-full bg-[var(--catalog-accent,#d99a00)] px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-[var(--catalog-accent-contrast,#16130a)] group-hover:bg-[var(--catalog-bg,#0b0c10)]/20">
                                 Хит
                               </span>
                             )}
-                            {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent)] bg-[var(--catalog-bg)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent)] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]">Продажа</span>}
-                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
+                            {displayMode === "sale" && hasSalePrice(item) && <span className="inline-flex rounded-full border-2 border-[var(--catalog-accent,#d99a00)] bg-[var(--catalog-bg,#0b0c10)] px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] text-[var(--catalog-accent,#d99a00)] group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)]">Продажа</span>}
+                            {(() => { const tv = tierVisuals(getItemAccessTier(item)); return tv.label ? <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-semibold tracking-[0.02em] group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={{ backgroundColor: `${tv.color}30`, color: tv.color, border: `1px solid ${tv.color}60` }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tv.color }} aria-hidden />{tv.label}</span> : null; })()}
                           </div>
 
                           {/* Title */}
                           {/* task 149: title reserves a 2-line box — price row (and everything
                               below it) stops shifting between 1-line and 2-line titles. */}
-                          <h3 className="min-h-[2.5rem] text-sm font-bold leading-5 text-[var(--catalog-text)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]">{item.title}</h3>
+                          <h3 className="min-h-[2.5rem] text-sm font-bold leading-5 text-[var(--catalog-text,#f2f2f3)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]">{item.title}</h3>
 
                           {/* Price — conditional on displayMode */}
                           <div className="mt-1.5">
                             {displayMode === "service" ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
                             ) : displayMode === "rent" || displayMode === "equipment" ? (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={priceGlowStyle}>
                                 {item.rentPriceLabel}
                               </p>
                             ) : (
-                              <p className="text-base font-semibold text-[var(--catalog-accent)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast)]" style={priceGlowStyle}>
+                              <p className="text-base font-semibold text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:text-[var(--catalog-accent-contrast,#16130a)]" style={priceGlowStyle}>
                                 {item.salePrice?.toLocaleString("ru-RU")} ₽
                               </p>
                             )}
@@ -1916,7 +1921,7 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                               button no longer jumps with title line count / badge wraps;
                               every card in a row parks it on the same baseline. */}
                           <div className="mt-auto pt-3">
-                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent)] group-hover:text-[var(--catalog-accent-contrast)] active:scale-95">
+                            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-[var(--catalog-accent,#d99a00)] px-2 py-2 text-xs font-bold uppercase tracking-[0.04em] text-[var(--catalog-accent,#d99a00)] transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)] group-hover:text-[var(--catalog-accent-contrast,#16130a)] active:scale-95">
                               {displayMode === "service" ? "Выбрать" : displayMode === "rent" || displayMode === "equipment" ? "Забронировать" : "Купить"}
                             </span>
                           </div>
@@ -1942,9 +1947,9 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
           slug={resolvedSlug}
           href={`/franchize/${resolvedSlug}/cart`}
           items={displayItems}
-          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
-          textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
-          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
+          accentColor={crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain}
+          textColor={crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary}
+          borderColor={crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft}
           theme={crew.theme}
           className={ctaPolicy?.floatingCartClassName}
         />
@@ -1964,40 +1969,50 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
       <CartAddedFlash
         flash={cartFlash}
         cartHref={`/franchize/${resolvedSlug}/cart`}
-        accentColor={crew.theme.isAuto ? "var(--franchize-accent-main)" : palette.accentMain}
-        textColor={crew.theme.isAuto ? "var(--franchize-text-primary)" : palette.textPrimary}
-        borderColor={crew.theme.isAuto ? "var(--franchize-border-soft)" : palette.borderSoft}
+        accentColor={crew.theme.isAuto ? "var(--franchize-accent-main,#d99a00)" : palette.accentMain}
+        textColor={crew.theme.isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary}
+        borderColor={crew.theme.isAuto ? "var(--franchize-border-soft,#24262e)" : palette.borderSoft}
         onClose={() => setCartFlash(null)}
       />
 
-      <ItemModal
-        item={selectedItem}
-        items={displayItems}
-        slug={resolvedSlug}
-        theme={crew.theme}
-        telegramBotUsername={crew.contacts.telegramBotUsername || undefined}
-        pickupAddress={crew.contacts.address || crew.hqLocation}
-        workingHours={crew.contacts.workingHours}
-        flowType={displayMode === "service" ? "order" : displayMode === "rent" || displayMode === "equipment" ? "rental" : "order"}
-        displayMode={displayMode}
-        vipBikeRentalTrackingEnabled={
-          isVipBikeRentalTracking && displayItems.length > 0
-        }
-        options={selectedOptions}
-        auctionOptions={auctionTickOptions}
-        onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
-        onBuyItem={() => {
-          if (!selectedItem) return;
-          void recordRentIntent(selectedItem, "configured", {
-            trigger: "modal_buy_cta",
-            options: { ...selectedOptions, action: "buy" },
-          });
-          addItem(selectedItem.id, { action: "buy" }, 1);
-          setCartFlash({ label: selectedItem.title, kind: "cart", at: Date.now() });
-          setSelectedItem(null);
-        }}
-        onClose={() => setSelectedItem(null)}
-        onTestdrive={(slot) => {
+      {/* task166 (street-dude phone): the modal is now self-contained — a
+          crash inside ItemModal used to bubble into the page boundary and
+          replace the WHOLE catalog («modal didn't open, catalog dead»). The
+          boundary keeps the catalog alive; the resetKey re-arms it when the
+          user taps another item. */}
+      <FranchizeErrorBoundary
+        resetKey={selectedItem?.id ?? "closed"}
+        fallbackTitle="Карточка временно недоступна"
+        fallbackMessage="Попробуйте ещё раз — тапните по товару в каталоге."
+      >
+        <ItemModal
+          item={selectedItem}
+          items={displayItems}
+          slug={resolvedSlug}
+          theme={crew.theme}
+          telegramBotUsername={crew.contacts.telegramBotUsername || undefined}
+          pickupAddress={crew.contacts.address || crew.hqLocation}
+          workingHours={crew.contacts.workingHours}
+          flowType={displayMode === "service" ? "order" : displayMode === "rent" || displayMode === "equipment" ? "rental" : "order"}
+          displayMode={displayMode}
+          vipBikeRentalTrackingEnabled={
+            isVipBikeRentalTracking && displayItems.length > 0
+          }
+          options={selectedOptions}
+          auctionOptions={auctionTickOptions}
+          onChangeOption={(key, value) => setSelectedOptions((prev) => ({ ...prev, [key]: value }))}
+          onBuyItem={() => {
+            if (!selectedItem) return;
+            void recordRentIntent(selectedItem, "configured", {
+              trigger: "modal_buy_cta",
+              options: { ...selectedOptions, action: "buy" },
+            });
+            addItem(selectedItem.id, { action: "buy" }, 1);
+            setCartFlash({ label: selectedItem.title, kind: "cart", at: Date.now() });
+            setSelectedItem(null);
+          }}
+          onClose={() => setSelectedItem(null)}
+          onTestdrive={(slot) => {
           if (!selectedItem) return;
           void recordRentIntent(selectedItem, "configured", {
             trigger: "modal_testdrive_cta",
@@ -2026,27 +2041,28 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
             // +10 fallback here if the picker slot somehow lacks it).
             rentEndTime: slot?.endTime || addMinutesToHhMm(slot?.time || fallbackTime, 10),
           }, 1);
-          setCartFlash({ label: selectedItem.title, kind: "testdrive", at: Date.now() });
-          setSelectedItem(null);
-        }}
-        onAddToCart={(extrasStr) => {
-          if (!selectedItem) return;
-          const isServiceItem = hasServicePrice(selectedItem);
-          const cartOptions = {
-            ...selectedOptions,
-            action: isServiceItem ? "service" : "rent",
-            // FIX: extrasStr from handler bypasses stale selectedOptions.perk
-            perk: extrasStr || selectedOptions.perk || "стандарт",
-          };
-          void recordRentIntent(selectedItem, "configured", {
-            trigger: "modal_rent_cta",
-            options: cartOptions,
-          });
-          addItem(selectedItem.id, cartOptions, 1);
-          setCartFlash({ label: selectedItem.title, kind: "cart", at: Date.now() });
-          setSelectedItem(null);
-        }}
-      />
+            setCartFlash({ label: selectedItem.title, kind: "testdrive", at: Date.now() });
+            setSelectedItem(null);
+          }}
+          onAddToCart={(extrasStr) => {
+            if (!selectedItem) return;
+            const isServiceItem = hasServicePrice(selectedItem);
+            const cartOptions = {
+              ...selectedOptions,
+              action: isServiceItem ? "service" : "rent",
+              // FIX: extrasStr from handler bypasses stale selectedOptions.perk
+              perk: extrasStr || selectedOptions.perk || "стандарт",
+            };
+            void recordRentIntent(selectedItem, "configured", {
+              trigger: "modal_rent_cta",
+              options: cartOptions,
+            });
+            addItem(selectedItem.id, cartOptions, 1);
+            setCartFlash({ label: selectedItem.title, kind: "cart", at: Date.now() });
+            setSelectedItem(null);
+          }}
+        />
+      </FranchizeErrorBoundary>
     </>
   );
 }

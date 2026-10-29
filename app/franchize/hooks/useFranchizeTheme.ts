@@ -43,13 +43,13 @@ export function useFranchizeTheme(theme: Partial<FranchizeTheme>) {
 
   return {
     cssVars: {
-      backgroundColor: "var(--franchize-bg-base)",
-      cardBackground: "var(--franchize-bg-card)",
-      accentColor: "var(--franchize-accent-main)",
-      accentHover: "var(--franchize-accent-hover)",
-      textColor: "var(--franchize-text-primary)",
-      mutedColor: "var(--franchize-text-secondary)",
-      borderColor: "var(--franchize-border-soft)",
+      backgroundColor: "var(--franchize-bg-base,#0b0c10)",
+      cardBackground: "var(--franchize-bg-card,#111217)",
+      accentColor: "var(--franchize-accent-main,#d99a00)",
+      accentHover: "var(--franchize-accent-hover,#e2a812)",
+      textColor: "var(--franchize-text-primary,#f2f2f3)",
+      mutedColor: "var(--franchize-text-secondary,#a7abb4)",
+      borderColor: "var(--franchize-border-soft,#24262e)",
     },
   };
 }

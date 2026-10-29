@@ -75,26 +75,26 @@ export function crewPaletteForSurface(theme: FranchizeTheme) {
   if (theme.isAuto) {
     return {
       page: {
-        backgroundColor: "var(--franchize-bg-base)",
-        color: "var(--franchize-text-primary)",
+        backgroundColor: "var(--franchize-bg-base,#0b0c10)",
+        color: "var(--franchize-text-primary,#f2f2f3)",
       },
       card: {
-        backgroundColor: "var(--franchize-bg-card)",
-        borderColor: "var(--franchize-border-soft)",
-        color: "var(--franchize-text-primary)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
+        borderColor: "var(--franchize-border-soft,#24262e)",
+        color: "var(--franchize-text-primary,#f2f2f3)",
       },
       mutedText: {
-        color: "var(--franchize-text-secondary)",
+        color: "var(--franchize-text-secondary,#a7abb4)",
       },
       subtleCard: {
-        backgroundColor: "var(--franchize-bg-card)",
-        borderColor: "var(--franchize-border-soft)",
-        color: "var(--franchize-text-primary)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
+        borderColor: "var(--franchize-border-soft,#24262e)",
+        color: "var(--franchize-text-primary,#f2f2f3)",
       },
       accentPill: {
-        borderColor: "var(--franchize-accent-main)",
-        color: "var(--franchize-accent-main)",
-        backgroundColor: "var(--franchize-accent-subtle)",
+        borderColor: "var(--franchize-accent-main,#d99a00)",
+        color: "var(--franchize-accent-main,#d99a00)",
+        backgroundColor: "var(--franchize-accent-subtle,rgba(217,154,0,.12))",
       },
     };
   }
@@ -141,26 +141,26 @@ export function crewPaletteWithCssVars(theme: FranchizeTheme) {
   if (theme.isAuto) {
     return {
       page: {
-        backgroundColor: "var(--franchize-bg-base)",
-        color: "var(--franchize-text-primary)",
+        backgroundColor: "var(--franchize-bg-base,#0b0c10)",
+        color: "var(--franchize-text-primary,#f2f2f3)",
       },
       card: {
-        backgroundColor: "var(--franchize-bg-card)",
-        borderColor: "var(--franchize-border-soft)",
-        color: "var(--franchize-text-primary)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
+        borderColor: "var(--franchize-border-soft,#24262e)",
+        color: "var(--franchize-text-primary,#f2f2f3)",
       },
       mutedText: {
-        color: "var(--franchize-text-secondary)",
+        color: "var(--franchize-text-secondary,#a7abb4)",
       },
       subtleCard: {
-        backgroundColor: "var(--franchize-bg-card)",
-        borderColor: "var(--franchize-border-soft)",
-        color: "var(--franchize-text-primary)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
+        borderColor: "var(--franchize-border-soft,#24262e)",
+        color: "var(--franchize-text-primary,#f2f2f3)",
       },
       accentPill: {
-        borderColor: "var(--franchize-accent-main)",
-        color: "var(--franchize-accent-main)",
-        backgroundColor: "var(--franchize-accent-main)",
+        borderColor: "var(--franchize-accent-main,#d99a00)",
+        color: "var(--franchize-accent-main,#d99a00)",
+        backgroundColor: "var(--franchize-accent-main,#d99a00)",
       },
     };
   }
@@ -180,7 +180,7 @@ export function crewPaletteWithCssVars(theme: FranchizeTheme) {
  * aspect-ratio rounding, zoom/DPI scaling. The ONLY element that is exactly
  * «the whole card» is the <article data-catalog-item> itself, so the accent
  * fill now happens on the ARTICLE: globals.css redefines --card-base-bg to
- * var(--catalog-accent) on [data-catalog-item]:hover (PC only). Inner layers
+ * var(--catalog-accent,#d99a00) on [data-catalog-item]:hover (PC only). Inner layers
  * (strip → transparent on hover, photo wash) blend on top; any region they
  * fail to cover shows the accent background underneath — a gap is now
  * impossible by construction.
@@ -212,16 +212,16 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
   if (isAuto) {
     const variants = [
       {
-        borderColor: "color-mix(in srgb, var(--franchize-border-soft) 30%, transparent)",
-        backgroundColor: "var(--franchize-bg-card)",
+        borderColor: "color-mix(in srgb, var(--franchize-border-soft,#24262e) 30%, transparent)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
       },
       {
         borderColor: "transparent",
-        backgroundColor: "var(--franchize-bg-card)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
       },
       {
         borderColor: "transparent",
-        backgroundColor: "var(--franchize-bg-card)",
+        backgroundColor: "var(--franchize-bg-card,#111217)",
       },
     ] as const;
     const v = variants[Math.abs(variantIndex) % variants.length];
@@ -263,7 +263,7 @@ export function catalogCardVariantStyles(theme: FranchizeTheme, variantIndex: nu
 export function floatingCartOverlayBackground(theme: FranchizeTheme) {
   // When in auto mode, use CSS variable; otherwise use palette directly
   if (theme.isAuto) {
-    return "var(--franchize-bg-card)";
+    return "var(--franchize-bg-card,#111217)";
   }
   const alpha = theme.mode === "light" ? 0.9 : 0.94;
   return withAlpha(theme.palette.bgCard, alpha);
@@ -272,7 +272,7 @@ export function floatingCartOverlayBackground(theme: FranchizeTheme) {
 export function interactionRingStyle(theme: FranchizeTheme) {
   if (theme.isAuto) {
     return {
-      boxShadow: "0 0 0 2px color-mix(in srgb, var(--franchize-accent-main) 72%, transparent)",
+      boxShadow: "0 0 0 2px color-mix(in srgb, var(--franchize-accent-main,#d99a00) 72%, transparent)",
     };
   }
   return {
@@ -297,7 +297,7 @@ export function interactionRingStyle(theme: FranchizeTheme) {
 export function interactionCardFocusStyle(theme: FranchizeTheme): React.CSSProperties {
   if (theme.isAuto) {
     return {
-      outline: "2px solid color-mix(in srgb, var(--franchize-accent-main) 85%, transparent)",
+      outline: "2px solid color-mix(in srgb, var(--franchize-accent-main,#d99a00) 85%, transparent)",
       outlineOffset: "-1px",
     };
   }
@@ -311,7 +311,7 @@ export function interactionCardFocusStyle(theme: FranchizeTheme): React.CSSPrope
 export function focusRingOutlineStyle(theme: FranchizeTheme) {
   if (theme.isAuto) {
     return {
-      outlineColor: "color-mix(in srgb, var(--franchize-accent-main) 78%, transparent)",
+      outlineColor: "color-mix(in srgb, var(--franchize-accent-main,#d99a00) 78%, transparent)",
     };
   }
   return {

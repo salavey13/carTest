@@ -38,6 +38,13 @@ import {
   resolveDepositRail,
 } from "@/app/franchize/lib/deposit-rail";
 import { formatStorageMonthsLabel as storageSeasonMonthsLabel, storageValidUntilISO } from "@/app/franchize/lib/storage-season";
+// task166 (boss: «i want this flags to control the list of links in header
+// menu (configured in crew metadata;)») — feature_tour flags filter the
+// burger-menu links of crew-scoped tour feature routes. Pure module.
+import {
+  featureTourFlagsOf,
+  filterMenuLinksByFeatureTour,
+} from "@/app/franchize/lib/feature-tour-menu";
 import { storageMonthsCount, storageSeasonDateToIso, storageStartParam, storageIsoToRu } from "@/app/franchize/lib/storage";
 import { resolveStorageConfig, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import { grantStorageRequestCreated } from "@/app/franchize/server-actions/storage-achievements";
@@ -690,7 +697,9 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     tagline: "Витрина готовится",
     logoUrl: "",
     logoHref: `/franchize/${slug}`,
-    menuLinks: fallbackMenuLinks(slug),
+    // task166: the not-found shell obeys the same flag rule — a crew that
+    // does not exist has NO activations, so only non-feature links render.
+    menuLinks: filterMenuLinksByFeatureTour(fallbackMenuLinks(slug), {}, slug),
   },
   contacts: {
     phone: "",
@@ -908,13 +917,17 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       href: withSlug(readPath(link, ["href"], `/franchize/${crew.slug ?? safeSlug}`), crew.slug ?? safeSlug),
     }));
     // map-riders link is not forced
-    const menuLinks = menuLinksRaw/*.some((link) => link.href === `/franchize/${crew.slug ?? safeSlug}/map-riders`)
-      ? menuLinksRaw
-      : [
-          ...menuLinksRaw.slice(0, 1),
-          { label: "Карта райдеров", href: `/franchize/${crew.slug ?? safeSlug}/map-riders` },
-          ...menuLinksRaw.slice(1),
-        ];*/
+    // task166: crews.metadata.feature_tour flags CONTROL the burger menu —
+    // crew-scoped tour-feature links (/configurator, /wheel, /about, …) render
+    // only when the flag is ON; the home link, external/hash links and the
+    // ⭐ tour link always pass. Fresh crews start minimal and GROW the menu
+    // through the onboarding quest's activation checkboxes (or a paid ⭐
+    // activation — the XTR webhook writes the same flag store).
+    const menuLinks = filterMenuLinksByFeatureTour(
+      menuLinksRaw,
+      featureTourFlagsOf(metadata),
+      crew.slug ?? safeSlug,
+    );
 
     const metadataShowcaseGroups = readArrayPath<UnknownRecord>(franchize, ["catalog", "showcaseGroups"]);
     const showcaseGroups = (metadataShowcaseGroups.length > 0

@@ -123,33 +123,33 @@ export function useCrewTokens(theme: FranchizeTheme): CrewTokens {
 
   return useMemo<CrewTokens>(() => {
     const accent = isAuto
-      ? "var(--franchize-accent-main)"
+      ? "var(--franchize-accent-main,#d99a00)"
       : palette.accentMain;
     const accentHover = isAuto
-      ? "var(--franchize-accent-hover, var(--franchize-accent-main))"
+      ? "var(--franchize-accent-hover, var(--franchize-accent-main,#d99a00))"
       : palette.accentMainHover || palette.accentMain;
     const accentSoft = isAuto
-      ? "color-mix(in srgb, var(--franchize-accent-main) 12%, transparent)"
+      ? "color-mix(in srgb, var(--franchize-accent-main,#d99a00) 12%, transparent)"
       : withAlpha(palette.accentMain, 0.12);
     const accentContrast = isAuto
       ? "var(--franchize-accent-contrast, #16130A)"
       : readablePaletteTextOnColor(palette.accentMain, palette);
-    const bg = isAuto ? "var(--franchize-bg-base)" : palette.bgBase;
-    const bgCard = isAuto ? "var(--franchize-bg-card)" : palette.bgCard;
+    const bg = isAuto ? "var(--franchize-bg-base,#0b0c10)" : palette.bgBase;
+    const bgCard = isAuto ? "var(--franchize-bg-card,#111217)" : palette.bgCard;
     const bgElevated = isAuto
-      ? "color-mix(in srgb, var(--franchize-bg-card) 92%, var(--franchize-bg-base))"
+      ? "color-mix(in srgb, var(--franchize-bg-card,#111217) 92%, var(--franchize-bg-base,#0b0c10))"
       : withAlpha(palette.bgCard, 0.88);
     const border = isAuto
-      ? "color-mix(in srgb, var(--franchize-border-soft) 45%, transparent)"
+      ? "color-mix(in srgb, var(--franchize-border-soft,#24262e) 45%, transparent)"
       : withAlpha(palette.borderSoft, 0.45);
     const borderSoft = isAuto
-      ? "color-mix(in srgb, var(--franchize-border-soft) 25%, transparent)"
+      ? "color-mix(in srgb, var(--franchize-border-soft,#24262e) 25%, transparent)"
       : withAlpha(palette.borderSoft, 0.25);
     const borderActive = accent;
-    const text = isAuto ? "var(--franchize-text-primary)" : palette.textPrimary;
-    const textMuted = isAuto ? "var(--franchize-text-secondary)" : palette.textSecondary;
+    const text = isAuto ? "var(--franchize-text-primary,#f2f2f3)" : palette.textPrimary;
+    const textMuted = isAuto ? "var(--franchize-text-secondary,#a7abb4)" : palette.textSecondary;
     const textFaint = isAuto
-      ? "color-mix(in srgb, var(--franchize-text-secondary) 65%, transparent)"
+      ? "color-mix(in srgb, var(--franchize-text-secondary,#a7abb4) 65%, transparent)"
       : withAlpha(palette.textSecondary, 0.65);
 
     // Success / warning colors — in dark theme we reuse accent-tinted

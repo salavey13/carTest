@@ -49,7 +49,8 @@ describe("catalog card focus frame · helper contract", () => {
 
     const auto = interactionCardFocusStyle({ isAuto: true } as never);
     expect(auto.outline).toContain("2px solid");
-    expect(auto.outline).toContain("var(--franchize-accent-main)");
+    // task166: the auto chain carries a concrete fallback for var-less engines
+    expect(auto.outline).toContain("var(--franchize-accent-main,#d99a00)");
     expect(String(auto.outlineOffset)).toMatch(/^-/);
   });
 

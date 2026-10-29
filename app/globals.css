@@ -375,7 +375,7 @@
      their fallback visuals; touch devices are excluded (no sticky hover). */
   @media (min-width: 768px) {
     [data-catalog-item]:hover {
-      --card-base-bg: var(--catalog-accent);
+      --card-base-bg: var(--catalog-accent,#d99a00);
       --card-base-img: none;
     }
   }
@@ -409,18 +409,18 @@
     initial-value: transparent;
   }
   .catalog-melt {
-    --catalog-melt-color: var(--catalog-card-bg);
+    --catalog-melt-color: var(--catalog-card-bg,#111217);
     background: linear-gradient(to top, var(--catalog-melt-color), transparent);
     transition: --catalog-melt-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   @media (min-width: 768px) {
     [data-catalog-item]:hover .catalog-melt {
-      --catalog-melt-color: var(--catalog-accent);
+      --catalog-melt-color: var(--catalog-accent,#d99a00);
     }
   }
 
   /* ── task 149: spec chips + availability pill on the card photo ──
-     The old Tailwind arbitrary classes bg-[var(--catalog-bg)]/65 and /60
+     The old Tailwind arbitrary classes bg-[var(--catalog-bg,#0b0c10)]/65 and /60
      never compiled (TW3 drops the opacity modifier on arbitrary var()
      colors — same class-drop as task148's bg-current/20 scrollbar), so the
      «balloons» were bare accent text over a blur. On a highlighted card

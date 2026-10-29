@@ -694,6 +694,21 @@ export function useStartParamRouter() {
         }
 
         clearStartParam?.();
+      } catch (error) {
+        // task166 hardening (boss: «doublecheck startapprouter for regression»):
+        // this try previously had ONLY a finally — any throw (a failing
+        // dynamic import, a server-action network error, a malformed param)
+        // became a silent unhandled rejection and the start param was never
+        // routed — the exact «deep link didn't open» class of failure with
+        // zero visible evidence. Now: log honestly, mark the param HANDLED so
+        // a poison param cannot loop-retry forever, and clear the active
+        // slot (the finally below still runs).
+        logger.error("[ClientLayout] Failed to process start param:", paramToProcess, error);
+        lastHandledStartParamRef.current = paramToProcess;
+        if (startParamPayload && normalizedUrlStartParam) {
+          ignoredUrlStartParamRef.current = normalizedUrlStartParam;
+        }
+        clearStartParam?.();
       } finally {
         if (activeStartParamRef.current === paramToProcess) {
           activeStartParamRef.current = null;
@@ -722,7 +737,18 @@ export function useStartParamRouter() {
 
 const normalizeStartParamPath = (rawParam: string | null) => {
   if (!rawParam) return null;
-  const decoded = decodeURIComponent(rawParam).trim();
-  if (!decoded) return null;
-  return decoded.replace(/^\/+/, "").replace(/\/+/g, "/");
+  // task166 hardening: decodeURIComponent THROWS URIError on a malformed
+  // escape (a bare «%» — e.g. a copied link «startapp=rental_100%»), and this
+  // helper ran SYNCHRONOUSLY in the effect body BEFORE the try — one bad
+  // param killed the whole routing effect on every render. Degrade to the
+  // raw string instead: routing still works for well-formed params.
+  let decoded = rawParam;
+  try {
+    decoded = decodeURIComponent(rawParam);
+  } catch {
+    // malformed escape — keep the raw param verbatim
+  }
+  const trimmed = decoded.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/^\/+/, "").replace(/\/+/g, "/");
 };

@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { isMockUserModeEnabled } from "@/lib/mockUserMode";
+// task166 (boss bonus: one street dude's phone — catalog dead): WebStorage
+// access ITSELF throws on cookie-blocking phones; one unguarded getItem in a
+// mount effect killed the catalog's whole hydration. All storage touches in
+// this hook go through the guarded wrappers now.
+import { safeLocalStorage, safeSessionStorage } from "../lib/safe-storage";
 
 export type FranchizeCartOptions = {
   package: string;
@@ -191,7 +196,7 @@ export function useFranchizeCart(slug: string) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const rawLocal = window.localStorage.getItem(storageKey);
+    const rawLocal = safeLocalStorage.getItem(storageKey);
     let initialState: FranchizeCartState = {};
 
     if (rawLocal) {
@@ -205,10 +210,10 @@ export function useFranchizeCart(slug: string) {
       if (remoteCart) {
         initialState = sanitizeCartState(remoteCart);
         // Sync retrieved DB state to local storage only if cart content differs.
-        const localEnvelope = parseEnvelope(window.localStorage.getItem(storageKey));
+        const localEnvelope = parseEnvelope(safeLocalStorage.getItem(storageKey));
         if (!areCartStatesEqual(localEnvelope.cart, initialState)) {
           const serialized = JSON.stringify({ updatedAt: Date.now(), cart: initialState });
-          window.localStorage.setItem(storageKey, serialized);
+          safeLocalStorage.setItem(storageKey, serialized);
         }
       }
     }
@@ -221,7 +226,7 @@ export function useFranchizeCart(slug: string) {
   useEffect(() => {
     if (!isHydrated || typeof window === "undefined") return;
 
-    const currentEnvelope = parseEnvelope(window.localStorage.getItem(storageKey));
+    const currentEnvelope = parseEnvelope(safeLocalStorage.getItem(storageKey));
 
     // CRITICAL FIX: compare semantically and skip writes when cart content is identical.
     if (areCartStatesEqual(currentEnvelope.cart, cart)) {
@@ -229,7 +234,7 @@ export function useFranchizeCart(slug: string) {
     }
 
     const nextState = JSON.stringify({ updatedAt: Date.now(), cart });
-    window.localStorage.setItem(storageKey, nextState);
+    safeLocalStorage.setItem(storageKey, nextState);
     window.dispatchEvent(new CustomEvent(CART_SYNC_EVENT, { detail: { storageKey } }));
   }, [cart, storageKey, isHydrated]);
 
@@ -253,17 +258,17 @@ export function useFranchizeCart(slug: string) {
       return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${h.slice(17, 20)}-${h.slice(20, 32)}`;
     };
 
-    const existingCartId = window.localStorage.getItem(TEMP_CART_ID_KEY);
+    const existingCartId = safeLocalStorage.getItem(TEMP_CART_ID_KEY);
     const cartId = existingCartId || `cart_${safeUUID()}`;
     if (!existingCartId) {
-      window.localStorage.setItem(TEMP_CART_ID_KEY, cartId);
+      safeLocalStorage.setItem(TEMP_CART_ID_KEY, cartId);
     }
 
     const syncHash = `franchize-temp-cart-sync:${slug}`;
     const payloadBySlug = { [slug]: cart };
     const nextHash = JSON.stringify(payloadBySlug);
-    if (window.sessionStorage.getItem(syncHash) === nextHash) return;
-    window.sessionStorage.setItem(syncHash, nextHash);
+    if (safeSessionStorage.getItem(syncHash) === nextHash) return;
+    safeSessionStorage.setItem(syncHash, nextHash);
 
     void syncTempFranchizeCart({ cartId, cartBySlug: payloadBySlug });
   }, [cart, dbUser?.user_id, isHydrated, slug, tempCartFeatureEnabled]);
@@ -279,7 +284,7 @@ export function useFranchizeCart(slug: string) {
         if (e.type === CART_SYNC_EVENT && detail?.storageKey !== storageKey) return;
         if (e.type === 'storage' && (e as StorageEvent).key !== storageKey) return;
 
-        const raw = window.localStorage.getItem(storageKey);
+        const raw = safeLocalStorage.getItem(storageKey);
         if (!raw) return;
 
         const newState = parseEnvelope(raw).cart;
@@ -306,7 +311,7 @@ export function useFranchizeCart(slug: string) {
       if (typeof window === "undefined") {
         return updater(prev);
       }
-      const latest = parseEnvelope(window.localStorage.getItem(storageKey)).cart;
+      const latest = parseEnvelope(safeLocalStorage.getItem(storageKey)).cart;
       const next = updater(mergeCartStates(prev, latest));
       return sanitizeCartState(next);
     });
@@ -352,7 +357,7 @@ export function useFranchizeCart(slug: string) {
 
   const clear = useCallback(() => {
     setCart({});
-    window.localStorage.removeItem(storageKey);
+    safeLocalStorage.removeItem(storageKey);
   }, [storageKey]);
 
   const itemCount = useMemo(() => Object.values(cart).reduce((sum, line) => sum + line.qty, 0), [cart]);

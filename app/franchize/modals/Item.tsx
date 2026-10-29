@@ -47,6 +47,7 @@ import {
   type ItemShareFlow,
 } from "../lib/item-share";
 import { upsertFranchizeLead } from "@/app/franchize/lib/leads";
+import { safeSessionStorage } from "@/app/franchize/lib/safe-storage";
 import { useCrewTokens, type CrewTokens } from "@/app/franchize/lib/use-crew-tokens";
 import { addDaysISO, formatRuDateFromISO, todayISO, durationDaysFromDateTime, addMinutesToHhMm, addMinutesToDateTime, nearestHourHhMm } from "@/app/franchize/lib/date-utils";
 import { getBrowserMarketingAttribution } from "@/lib/marketing-attribution";
@@ -159,7 +160,7 @@ const modalFocusableSelector = [
 ].join(",");
 
 // Legacy `--item-*` CSS-var map. Kept so the dozens of existing
-// `style={{ color: 'var(--item-text)' }}` attributes in this file keep
+// `style={{ color: 'var(--item-text,#f2f2f3)' }}` attributes in this file keep
 // working after the migration to `useCrewTokens`. The actual values
 // are populated by the `themeVars` memo inside `ItemModal` below.
 const MODAL_CSS_VAR_KEYS = [
@@ -185,7 +186,7 @@ function OptionChips({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+      <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">
         {title}
       </p>
       <div className="flex flex-wrap gap-2" role="group" aria-label={title}>
@@ -197,10 +198,10 @@ function OptionChips({
               type="button"
               aria-pressed={isActive}
               onClick={() => onSelect(option)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+              className={`rounded-full border px-3 py-1.5 text-xs transition hover:opacity-90 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)] ${
                 isActive
-                  ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
-                  : "border-[var(--item-border)] text-[var(--item-text)]"
+                  ? "border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] text-[var(--item-accent-contrast,#16130a)]"
+                  : "border-[var(--item-border,#24262e)] text-[var(--item-text,#f2f2f3)]"
               }`}
             >
               {option}
@@ -633,10 +634,10 @@ function PricingTable({
 
   return (
     <div
-      className="rounded-2xl border bg-[var(--item-border)]/15 p-3"
+      className="rounded-2xl border bg-[var(--item-border,#24262e)]/15 p-3"
       style={{ borderColor }}
     >
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">
         Долгосрочная аренда
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -646,7 +647,7 @@ function PricingTable({
             className="flex items-center gap-1.5 rounded-full border px-3 py-1"
             style={{ borderColor: `${borderColor}60` }}
           >
-            <span className="text-[11px] text-[var(--item-muted-text)]">{tier.label}</span>
+            <span className="text-[11px] text-[var(--item-muted-text,#a7abb4)]">{tier.label}</span>
             <span className="text-xs font-bold" style={{ color: accentColor }}>
               {fmt(tier.value)} {tier.suffix}
             </span>
@@ -820,12 +821,12 @@ function AdditionalItems({
   rentalHours?: number;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3">
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+    <div className="rounded-2xl border border-[var(--item-border,#24262e)] bg-[var(--item-border,#24262e)]/15 p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">
         <Package className="h-3.5 w-3.5" /> Доп. оборудование
       </p>
       {/* 2026-09-11 gear canon hint: prices pro-rate with the rental window */}
-      <p className="mb-2 text-[10px] leading-4 text-[var(--item-muted-text)] opacity-70">
+      <p className="mb-2 text-[10px] leading-4 text-[var(--item-muted-text,#a7abb4)] opacity-70">
         Меньше суток — половина цены. Со 2-х суток — половина цены за каждые дополнительные сутки.
       </p>
       <div className="space-y-2">
@@ -849,8 +850,8 @@ function AdditionalItems({
                       aria-pressed={count === n}
                       className={`h-7 w-7 rounded-full border text-xs font-bold transition hover:opacity-90 active:scale-[0.95] ${
                         count === n
-                          ? "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
-                          : "border-[var(--item-border)] text-[var(--item-text)]"
+                          ? "border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] text-[var(--item-accent-contrast,#16130a)]"
+                          : "border-[var(--item-border,#24262e)] text-[var(--item-text,#f2f2f3)]"
                       }`}
                     >
                       {n}
@@ -866,7 +867,7 @@ function AdditionalItems({
             <label
               key={item.key}
               className="flex cursor-pointer items-center justify-between rounded-lg border px-2.5 py-1.5 transition hover:opacity-80"
-              style={{ borderColor: checked ? "var(--item-accent)" : "var(--item-border)" }}
+              style={{ borderColor: checked ? "var(--item-accent,#d99a00)" : "var(--item-border,#24262e)" }}
             >
               <span className="text-xs">
                 {item.label}
@@ -877,7 +878,7 @@ function AdditionalItems({
                 type="checkbox"
                 checked={checked}
                 onChange={(e) => onChange({ ...selection, [item.key]: e.target.checked })}
-                className="h-4 w-4 accent-[var(--item-accent)]"
+                className="h-4 w-4 accent-[var(--item-accent,#d99a00)]"
               />
             </label>
           );
@@ -885,7 +886,7 @@ function AdditionalItems({
       </div>
       {/* Total extras cost */}
       {calcExtrasTotal(selection, rentalHours) > 0 && (
-        <p className="mt-2 text-right text-xs font-bold text-[var(--item-accent)]">
+        <p className="mt-2 text-right text-xs font-bold text-[var(--item-accent,#d99a00)]">
           +{calcExtrasTotal(selection, rentalHours).toLocaleString("ru-RU")} ₽
         </p>
       )}
@@ -964,18 +965,18 @@ function PriceCard({
 
   return (
     <div
-      className="rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3"
+      className="rounded-2xl border border-[var(--item-border,#24262e)] bg-[var(--item-border,#24262e)]/15 p-3"
       style={{ borderColor }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <CircleDollarSign className="h-5 w-5 text-[var(--item-accent)]" />
-          <span className="text-lg font-bold text-[var(--item-accent)]">
+          <CircleDollarSign className="h-5 w-5 text-[var(--item-accent,#d99a00)]" />
+          <span className="text-lg font-bold text-[var(--item-accent,#d99a00)]">
             {fmt(grandTotal)} ₽
           </span>
         </div>
         {result.savingsPercent > 0 && (
-          <span className="text-xs text-[var(--item-muted-text)]">
+          <span className="text-xs text-[var(--item-muted-text,#a7abb4)]">
             Экономия {result.savingsPercent}% vs посуточно
           </span>
         )}
@@ -985,7 +986,7 @@ function PriceCard({
         <button
           type="button"
           onClick={onToggleExpand}
-          className="mt-2 text-xs text-[var(--item-accent)] transition hover:opacity-90"
+          className="mt-2 text-xs text-[var(--item-accent,#d99a00)] transition hover:opacity-90"
         >
           Детали стоимости
         </button>
@@ -993,7 +994,7 @@ function PriceCard({
 
       {isExpanded && (
         <div className="mt-3 space-y-2 text-xs">
-          <p className="flex items-center gap-1.5 font-medium text-[var(--item-accent)]">
+          <p className="flex items-center gap-1.5 font-medium text-[var(--item-accent,#d99a00)]">
             <BarChart3 className="h-4 w-4" /> Детали стоимости
           </p>
           <div className="space-y-1">
@@ -1017,14 +1018,14 @@ function PriceCard({
             )}
             <p>• Залог: {fmt(result.depositRub)} ₽</p>
           </div>
-          <div className="border-t border-[var(--item-border)] pt-2">
+          <div className="border-t border-[var(--item-border,#24262e)] pt-2">
             <p className="font-semibold">
               Итого: {fmt(grandTotal)} ₽ (аренда
               {result.helmetRub > 0 ? " + шлем" : ""}
               {nonHelmetExtras > 0 ? " + доп." : ""})
             </p>
             {result.savingsRub > 0 && (
-              <p className="text-[var(--item-muted-text)]">
+              <p className="text-[var(--item-muted-text,#a7abb4)]">
                 Экономия {fmt(result.savingsRub)} ₽ против{
                   result.tier === "multi-day-2-4" ? " трёх" :
                   result.tier === "multi-day-5-10" ? " семи" :
@@ -1150,7 +1151,7 @@ function CallbackRequestForm({
   const inputStyle: React.CSSProperties = {
     backgroundColor: "var(--item-input-bg, var(--franchize-bg-base, #111217))",
     color: "var(--item-text, var(--franchize-text-primary, #fff))",
-    borderColor: "var(--item-accent)",
+    borderColor: "var(--item-accent,#d99a00)",
     borderWidth: "1.5px",
     pointerEvents: "auto",
     // Make sure iOS/Telegram don't auto-zoom or override font
@@ -1159,11 +1160,11 @@ function CallbackRequestForm({
 
   if (submitted) {
     return (
-      <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: "var(--item-accent)", backgroundColor: "color-mix(in srgb, var(--item-accent) 10%, transparent)" }}>
-        <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[var(--item-accent)]">
+      <div className="rounded-2xl border px-3 py-3 text-center" style={{ borderColor: "var(--item-accent,#d99a00)", backgroundColor: "color-mix(in srgb, var(--item-accent,#d99a00) 10%, transparent)" }}>
+        <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[var(--item-accent,#d99a00)]">
           <CheckCircle2 className="h-4 w-4" /> Заявка сохранена
         </p>
-        <p className="mt-1 text-xs text-[var(--item-muted-text)]">
+        <p className="mt-1 text-xs text-[var(--item-muted-text,#a7abb4)]">
           Менеджер VIP BIKE свяжется с вами по указанному номеру.
         </p>
       </div>
@@ -1176,16 +1177,16 @@ function CallbackRequestForm({
       onFocusCapture={handleFormStart}
       onKeyDown={(e) => e.stopPropagation()}
       style={{
-        borderColor: "var(--item-border)",
-        backgroundColor: "color-mix(in srgb, var(--item-border) 15%, transparent)",
+        borderColor: "var(--item-border,#24262e)",
+        backgroundColor: "color-mix(in srgb, var(--item-border,#24262e) 15%, transparent)",
         pointerEvents: "auto",
       }}
       className="rounded-2xl border p-3"
     >
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">
         <Phone className="h-3.5 w-3.5" /> Запросить звонок
       </p>
-      <p className="mb-2 text-[11px] text-[var(--item-muted-text)]">
+      <p className="mb-2 text-[11px] text-[var(--item-muted-text,#a7abb4)]">
         Оставьте контакты — менеджер перезвонит, ответит на вопросы и поможет с оформлением.
         Документы можно показать при встрече.
       </p>
@@ -1198,7 +1199,7 @@ function CallbackRequestForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
-          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent,#d99a00)]"
           style={inputStyle}
           aria-label="Ваше имя"
           required
@@ -1212,7 +1213,7 @@ function CallbackRequestForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
-          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent)]"
+          className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[var(--item-accent,#d99a00)]"
           style={inputStyle}
           aria-label="Номер телефона"
           required
@@ -1229,12 +1230,12 @@ function CallbackRequestForm({
             autoComplete="off"
           />
         </label>
-        <label className="flex min-h-11 cursor-pointer items-start gap-2 py-1 text-[11px] leading-5 text-[var(--item-muted-text)]">
+        <label className="flex min-h-11 cursor-pointer items-start gap-2 py-1 text-[11px] leading-5 text-[var(--item-muted-text,#a7abb4)]">
           <input
             type="checkbox"
             checked={consent}
             onChange={(event) => setConsent(event.target.checked)}
-            className="mt-1 h-4 w-4 shrink-0 accent-[var(--item-accent)]"
+            className="mt-1 h-4 w-4 shrink-0 accent-[var(--item-accent,#d99a00)]"
             required
           />
           <span>
@@ -1252,7 +1253,7 @@ function CallbackRequestForm({
           disabled={submitting || !consent}
           aria-busy={submitting}
           className="min-h-11 w-full rounded-lg px-3 py-2 text-sm font-bold transition hover:brightness-110 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
-          style={{ backgroundColor: "var(--item-accent)", color: "var(--item-accent-contrast)" }}
+          style={{ backgroundColor: "var(--item-accent,#d99a00)", color: "var(--item-accent-contrast,#16130a)" }}
         >
           {submitting ? "Отправляем..." : "Перезвоните мне"}
         </button>
@@ -1491,18 +1492,23 @@ export function ItemModal({
       shareNoteTimerRef.current = null;
     }
     // Detect deep-link from bot (set by CatalogClient) and show a banner.
+    // task166: FULLY guarded — the old catch called sessionStorage.removeItem
+    // UNGUARDED, so on a cookie-blocking phone the SecurityError from getItem
+    // was re-thrown by the removeItem in the catch — the effect crashed and
+    // took the catalog's hydration down with it (page visible from SSR, but
+    // nothing interactive: the exact «random street dude's phone» report).
     if (typeof window !== "undefined") {
       try {
-        const raw = sessionStorage.getItem("franchize-startapp-banner");
+        const raw = safeSessionStorage.getItem("franchize-startapp-banner");
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed?.bikeId && parsed.bikeId === item?.id) {
             setStartappBanner("Продолжаем подбор из Telegram — часть данных уже заполнена");
           }
-          sessionStorage.removeItem("franchize-startapp-banner");
+          safeSessionStorage.removeItem("franchize-startapp-banner");
         }
       } catch {
-        sessionStorage.removeItem("franchize-startapp-banner");
+        safeSessionStorage.removeItem("franchize-startapp-banner");
       }
     }
   }, [item?.id]);
@@ -2080,7 +2086,7 @@ export function ItemModal({
   return (
     <div
       ref={modalRef}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[var(--item-border)]/60 p-2 pb-4 outline-none sm:items-center sm:p-3"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[var(--item-border,#24262e)]/60 p-2 pb-4 outline-none sm:items-center sm:p-3"
       role="dialog"
       aria-modal="true"
       aria-labelledby={`item-modal-title-${item.id}`}
@@ -2100,9 +2106,9 @@ export function ItemModal({
             onNavigate={changeMedia}
             onSelect={setActiveMediaIndex}
             altText={item.title}
-            borderColor="var(--item-border)"
-            accentColor="var(--item-accent)"
-            bgColor="color-mix(in srgb, var(--item-border) 15%, transparent)"
+            borderColor="var(--item-border,#24262e)"
+            accentColor="var(--item-accent,#d99a00)"
+            bgColor="color-mix(in srgb, var(--item-border,#24262e) 15%, transparent)"
             mainAspectRatio="16/11"
             prefer4x3
             disableKeyboardNav={false}
@@ -2125,9 +2131,9 @@ export function ItemModal({
               <div
                 className="flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs"
                   style={{
-                    borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)",
-                    backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
-                    color: "var(--item-accent)",
+                    borderColor: "color-mix(in srgb, var(--item-accent,#d99a00) 25%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--item-accent,#d99a00) 8%, transparent)",
+                    color: "var(--item-accent,#d99a00)",
                   }}
                 role="status"
               >
@@ -2153,10 +2159,10 @@ export function ItemModal({
                   {normalizedSpecs.slice(0, 4).map((spec) => (
                     <span
                       key={`${spec.label}-${spec.value}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--item-border)]/40 px-2.5 py-1.5 text-xs font-semibold text-[var(--item-accent)]"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--item-border,#24262e)]/40 px-2.5 py-1.5 text-xs font-semibold text-[var(--item-accent,#d99a00)]"
                     >
                       <span className="text-[10px] opacity-70">{spec.label}</span>
-                      <span className="text-[var(--item-text)]">{spec.value}</span>
+                      <span className="text-[var(--item-text,#f2f2f3)]">{spec.value}</span>
                     </span>
                   ))}
                 </div>
@@ -2215,7 +2221,7 @@ export function ItemModal({
                         ? `Поделиться ссылкой — ${shareFlows[0] === "rent" ? "аренда" : "покупка"}`
                         : "Поделиться ссылкой на карточку"
                     }
-                    className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold transition hover:opacity-80 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                    className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold transition hover:opacity-80 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                     style={{ backgroundColor: T.accentSoft, color: T.accent, borderColor: T.accent }}
                   >
                     <Share2 className="h-3.5 w-3.5" aria-hidden />
@@ -2233,8 +2239,8 @@ export function ItemModal({
                       key={`share-${flow}`}
                       type="button"
                       onClick={() => handleShareItem(flow)}
-                      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-semibold transition hover:opacity-80 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
-                      style={{ backgroundColor: "color-mix(in srgb, var(--item-accent) 10%, transparent)", color: "var(--item-accent)", borderColor: "color-mix(in srgb, var(--item-accent) 45%, transparent)" }}
+                      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-semibold transition hover:opacity-80 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--item-accent,#d99a00) 10%, transparent)", color: "var(--item-accent,#d99a00)", borderColor: "color-mix(in srgb, var(--item-accent,#d99a00) 45%, transparent)" }}
                     >
                       <Share2 className="h-3.5 w-3.5" aria-hidden />
                       {flow === "rent" ? "Ссылка на аренду" : "Ссылка на покупку"}
@@ -2248,9 +2254,9 @@ export function ItemModal({
                 <p
                   className="mt-2 rounded-xl border px-3 py-2 text-xs"
                   style={{
-                    borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)",
-                    backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
-                    color: "var(--item-accent)",
+                    borderColor: "color-mix(in srgb, var(--item-accent,#d99a00) 25%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--item-accent,#d99a00) 8%, transparent)",
+                    color: "var(--item-accent,#d99a00)",
                   }}
                   role="status"
                 >
@@ -2262,24 +2268,24 @@ export function ItemModal({
             {/* Rental strip — only for rental flow */}
             {isRental && rentalStrip ? (
               <div
-                className="grid gap-2 rounded-2xl border border-[var(--item-border)] bg-[var(--item-border)]/15 p-3 text-xs sm:grid-cols-3"
+                className="grid gap-2 rounded-2xl border border-[var(--item-border,#24262e)] bg-[var(--item-border,#24262e)]/15 p-3 text-xs sm:grid-cols-3"
                 aria-label={`Быстрая аренда ${item.title}`}
               >
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Ближайшее окно</p>
-                  <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.nearestStartWindow}</p>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">Ближайшее окно</p>
+                  <p className="mt-1 font-semibold text-[var(--item-text,#f2f2f3)]">{rentalStrip.nearestStartWindow}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">Выдача</p>
-                  <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.pickupHint}</p>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">Выдача</p>
+                  <p className="mt-1 font-semibold text-[var(--item-text,#f2f2f3)]">{rentalStrip.pickupHint}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text)]">
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--item-muted-text,#a7abb4)]">
                     {isVipBikeRental ? "Тариф" : "Залог / тариф"}
                   </p>
-                  <p className="mt-1 font-semibold text-[var(--item-text)]">{rentalStrip.priceTeaser}</p>
+                  <p className="mt-1 font-semibold text-[var(--item-text,#f2f2f3)]">{rentalStrip.priceTeaser}</p>
                   {item.rawSpecs?.deposit_rub ? (
-                    <p className="mt-0.5 text-[10px] text-[var(--item-muted-text)]">
+                    <p className="mt-0.5 text-[10px] text-[var(--item-muted-text,#a7abb4)]">
                       Залог: {Number(item.rawSpecs.deposit_rub).toLocaleString("ru-RU")} ₽
                     </p>
                   ) : null}
@@ -2297,7 +2303,7 @@ export function ItemModal({
               {descriptionText.length > 200 && (
                 <button
                   type="button"
-                  className="mt-1 text-sm font-medium text-[var(--item-accent)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="mt-1 text-sm font-medium text-[var(--item-accent,#d99a00)] transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                   aria-expanded={descriptionExpanded}
                   aria-controls={`item-modal-description-${item.id}`}
                   onClick={() => setDescriptionExpanded((prev) => !prev)}
@@ -2311,7 +2317,7 @@ export function ItemModal({
               className="rounded-2xl border p-3 text-xs"
               style={surface.subtleCard}
             >
-              <p className="inline-flex items-center gap-1 font-medium text-[var(--item-accent)]">
+              <p className="inline-flex items-center gap-1 font-medium text-[var(--item-accent,#d99a00)]">
                 <Info className="h-3.5 w-3.5" /> Характеристики{isRental ? " и условия" : ""}
               </p>
               <div
@@ -2327,7 +2333,7 @@ export function ItemModal({
                     <p className="text-[10px] uppercase tracking-[0.08em]">
                       {spec.label}
                     </p>
-                    <p className="mt-1 break-words text-sm text-[var(--item-text)]">
+                    <p className="mt-1 break-words text-sm text-[var(--item-text,#f2f2f3)]">
                       {spec.value}
                     </p>
                   </div>
@@ -2341,8 +2347,8 @@ export function ItemModal({
                 aria-label={isRental ? "Отзывы арендаторов" : "Отзывы"}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-[var(--item-text)]">Отзывы</p>
-                  <span className="rounded-full bg-[var(--item-accent)] px-2.5 py-1 text-xs font-bold text-[var(--item-accent-contrast)]">
+                  <p className="text-sm font-semibold text-[var(--item-text,#f2f2f3)]">Отзывы</p>
+                  <span className="rounded-full bg-[var(--item-accent,#d99a00)] px-2.5 py-1 text-xs font-bold text-[var(--item-accent-contrast,#16130a)]">
                     <span className="inline-flex items-center gap-1">
                       <Star className="h-3.5 w-3.5" aria-hidden />
                       {item.reviewSummary.average.toFixed(1)} · {item.reviewSummary.count}
@@ -2352,9 +2358,9 @@ export function ItemModal({
                 <div className="mt-3 space-y-2">
                   {item.reviewSummary.reviews.slice(0, 6).map((review) => (
                     <article key={review.id} className="rounded-xl border px-3 py-2" style={surface.subtleCard}>
-                      <p className="flex items-center gap-1 text-xs font-semibold text-[var(--item-accent)]">
+                      <p className="flex items-center gap-1 text-xs font-semibold text-[var(--item-accent,#d99a00)]">
                         <Star className="h-3.5 w-3.5" aria-hidden />
-                        {review.rating}<span className="text-[var(--item-muted-text)]"> / 5</span>
+                        {review.rating}<span className="text-[var(--item-muted-text,#a7abb4)]"> / 5</span>
                       </p>
                       {review.text && <p className="mt-1 text-sm leading-5" style={surface.mutedText}>{review.text}</p>}
                     </article>
@@ -2366,7 +2372,7 @@ export function ItemModal({
             {showBuyCta && (
               <Link
                 href={`/franchize/${slug}/market/${item.id}/buy`}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-4 py-3 text-sm font-bold uppercase tracking-wide text-[var(--item-accent-contrast)] shadow-lg shadow-[var(--item-accent)]/20 transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] px-4 py-3 text-sm font-bold uppercase tracking-wide text-[var(--item-accent-contrast,#16130a)] shadow-lg shadow-[var(--item-accent,#d99a00)]/20 transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                 aria-label={`Перейти на страницу покупки ${item.title}`}
               >
                 Перейти на страницу покупки
@@ -2380,9 +2386,9 @@ export function ItemModal({
                 onClick={() => onTestdrive?.()}
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold uppercase tracking-wide transition hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 style={{
-                  borderColor: "color-mix(in srgb, var(--item-accent) 40%, transparent)",
-                  color: "var(--item-accent)",
-                  backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--item-accent,#d99a00) 40%, transparent)",
+                  color: "var(--item-accent,#d99a00)",
+                  backgroundColor: "color-mix(in srgb, var(--item-accent,#d99a00) 8%, transparent)",
                 }}
                 aria-label={`Записаться на тест-драйв ${item.title}`}
               >
@@ -2397,7 +2403,7 @@ export function ItemModal({
                 type="button"
                 onClick={() => setShowCallbackForm(true)}
                 className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-medium transition hover:opacity-80 active:scale-[0.99]"
-                style={{ borderColor: "color-mix(in srgb, var(--item-accent) 25%, transparent)", color: "var(--item-accent)" }}
+                style={{ borderColor: "color-mix(in srgb, var(--item-accent,#d99a00) 25%, transparent)", color: "var(--item-accent,#d99a00)" }}
               >
                 <Phone className="h-3 w-3" />
                 Запросить звонок
@@ -2445,16 +2451,16 @@ export function ItemModal({
                 <label
                   className="flex cursor-pointer items-center justify-between rounded-2xl border px-3 py-2.5 transition hover:opacity-90"
                   style={{
-                    borderColor: testdriveMode ? "var(--item-accent)" : "var(--item-border)",
-                    backgroundColor: testdriveMode ? "color-mix(in srgb, var(--item-accent) 10%, transparent)" : "transparent",
+                    borderColor: testdriveMode ? "var(--item-accent,#d99a00)" : "var(--item-border,#24262e)",
+                    backgroundColor: testdriveMode ? "color-mix(in srgb, var(--item-accent,#d99a00) 10%, transparent)" : "transparent",
                   }}
                 >
                   <span>
                     <span className="flex items-center gap-1.5 text-xs font-semibold">
-                      <Bike className="h-3.5 w-3.5" style={{ color: "var(--item-accent)" }} />
+                      <Bike className="h-3.5 w-3.5" style={{ color: "var(--item-accent,#d99a00)" }} />
                       Режим тест-драйва
                     </span>
-                    <span className="mt-0.5 block text-[10px] leading-4 text-[var(--item-muted-text)]">
+                    <span className="mt-0.5 block text-[10px] leading-4 text-[var(--item-muted-text,#a7abb4)]">
                       Бесплатно · 10 минут · старт — текущее время
                     </span>
                   </span>
@@ -2462,7 +2468,7 @@ export function ItemModal({
                     type="checkbox"
                     checked={testdriveMode}
                     onChange={(e) => setTestdriveMode(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--item-accent)]"
+                    className="h-4 w-4 accent-[var(--item-accent,#d99a00)]"
                     aria-label="Переключить режим тест-драйва"
                   />
                 </label>
@@ -2472,11 +2478,11 @@ export function ItemModal({
                   <div
                     className="rounded-2xl border p-3"
                     style={{
-                      borderColor: "var(--item-accent)",
-                      backgroundColor: "color-mix(in srgb, var(--item-accent) 8%, transparent)",
+                      borderColor: "var(--item-accent,#d99a00)",
+                      backgroundColor: "color-mix(in srgb, var(--item-accent,#d99a00) 8%, transparent)",
                     }}
                   >
-                    <p className="text-sm font-bold" style={{ color: "var(--item-accent)" }}>
+                    <p className="text-sm font-bold" style={{ color: "var(--item-accent,#d99a00)" }}>
                       Тест-драйв · 0 ₽
                     </p>
                     {/* 2026-09-11: testdrive date + time picker — defaults to
@@ -2484,26 +2490,26 @@ export function ItemModal({
                         chosen slot lands in the cart line and the generated
                         testdrive doc instead of «по согласованию». */}
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                      <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text)]">
+                      <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text,#a7abb4)]">
                         Дата
                         <input
                           type="date"
                           value={testdriveDate}
                           onChange={(e) => setTestdriveDate(e.target.value)}
                           onClick={openNativePicker}
-                          className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]`}
+                          className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border,#24262e)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text,#f2f2f3)]`}
                           style={{ colorScheme: T.isLight ? "light" : "dark" }}
                           aria-label="Дата тест-драйва"
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text)]">
+                      <label className="flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text,#a7abb4)]">
                         Время
                         <input
                           type="time"
                           value={testdriveTime}
                           onChange={(e) => setTestdriveTime(e.target.value)}
                           onClick={openNativePicker}
-                          className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]`}
+                          className={`fr-native-picker ${T.isLight ? "fr-picker-light" : "fr-picker-dark"} rounded-xl border border-[var(--item-border,#24262e)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text,#f2f2f3)]`}
                           style={{ colorScheme: T.isLight ? "light" : "dark" }}
                           aria-label="Время тест-драйва"
                         />
@@ -2514,18 +2520,18 @@ export function ItemModal({
                         derived from the picked start (+10 minutes) and stored
                         in the cart line (rentEndTime). */}
                     {tdEnd && (
-                      <label className="mt-2 flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text)]">
+                      <label className="mt-2 flex flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-[var(--item-muted-text,#a7abb4)]">
                         Окончание · +10 минут
                         <input
                           type="text"
                           readOnly
                           value={`${formatRuDateFromISO(tdEnd.date)} ${tdEnd.time}`}
-                          className="rounded-xl border border-[var(--item-border)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text)]"
+                          className="rounded-xl border border-[var(--item-border,#24262e)] bg-transparent px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-[var(--item-text,#f2f2f3)]"
                           aria-label="Время окончания тест-драйва"
                         />
                       </label>
                     )}
-                    <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--item-muted-text)]">
+                    <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--item-muted-text,#a7abb4)]">
                       <li>• Бесплатное время тест-драйва — 10 минут</li>
                       <li>• Точное время подтверждаем по телефону</li>
                       <li>• Нужен паспорт или водительское удостоверение</li>
@@ -2560,16 +2566,16 @@ export function ItemModal({
                     dailyPrice={Number(item.rawSpecs?.dailyPrice) || item.pricePerDay || 0}
                     startDate={options.rentStartDate ?? ""}
                     endDate={options.rentEndDate ?? ""}
-                    borderColor="var(--item-border)"
-                    accentColor="var(--item-accent)"
+                    borderColor="var(--item-border,#24262e)"
+                    accentColor="var(--item-accent,#d99a00)"
                     T={T}
                   />
                 ) : (
                   <>
                     <PricingTable
                       specs={item.rawSpecs ?? {}}
-                      borderColor="var(--item-border)"
-                      accentColor="var(--item-accent)"
+                      borderColor="var(--item-border,#24262e)"
+                      accentColor="var(--item-accent,#d99a00)"
                     />
 
                     <DurationShortcuts
@@ -2612,7 +2618,7 @@ export function ItemModal({
                           extrasSelection={extrasSelection}
                           isExpanded={priceCardExpanded}
                           onToggleExpand={() => setPriceCardExpanded((v) => !v)}
-                          borderColor="var(--item-border)"
+                          borderColor="var(--item-border,#24262e)"
                         />
 
                         {pricingResult.rounded && (
@@ -2651,7 +2657,7 @@ export function ItemModal({
                       type="button"
                       onClick={() => setVsBike(bike)}
                       aria-pressed={vsBike?.id === bike.id}
-                      className="rounded-xl border p-2 text-left text-xs transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                      className="rounded-xl border p-2 text-left text-xs transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                       style={surface.subtleCard}
                     >
                       <span className="flex items-center justify-between gap-2">
@@ -2666,14 +2672,14 @@ export function ItemModal({
                     className="mt-3 rounded-2xl border border-white/10 p-3"
                     style={surface.subtleCard}
                   >
-                    <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold text-[var(--item-text)]">
+                    <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold text-[var(--item-text,#f2f2f3)]">
                       <span>
                         {item.title}
                         <span className="mt-0.5 block text-[10px] uppercase tracking-[0.12em] opacity-55">
                           {propulsionLabel}
                         </span>
                       </span>
-                      <Swords className="h-5 w-5 text-[var(--item-accent)]" />
+                      <Swords className="h-5 w-5 text-[var(--item-accent,#d99a00)]" />
                       <span>{vsBike.title}</span>
                     </div>
                     <div className="space-y-2">
@@ -2705,8 +2711,8 @@ export function ItemModal({
         {/* Footer Buttons — dual CTA when both rent + sale available */}
           {/* In browser mode (no TG), CTAs become deep-links to the Telegram bot */}
           {!isInTelegram && (
-            <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: "var(--item-border)" }}>
-              <p className="mb-1 inline-flex items-center gap-1 text-[10px] text-[var(--item-muted-text)]">
+            <div className="shrink-0 border-t p-2 text-center" style={{ ...surface.card, borderColor: "var(--item-border,#24262e)" }}>
+              <p className="mb-1 inline-flex items-center gap-1 text-[10px] text-[var(--item-muted-text,#a7abb4)]">
                 <Zap className="h-3 w-3" aria-hidden /> Бронирование и оплата — в Telegram-боте
               </p>
               <button
@@ -2727,7 +2733,7 @@ export function ItemModal({
                     });
                 }}
                 className="inline-flex items-center gap-1 transition hover:opacity-70 text-[10px]"
-                style={{ color: "var(--item-accent)" }}
+                style={{ color: "var(--item-accent,#d99a00)" }}
               >
                 <FileText className="h-3 w-3" />
                 Образец договора
@@ -2736,13 +2742,13 @@ export function ItemModal({
           )}
           <div
             className={`grid shrink-0 gap-2 border-t p-3 grid-cols-2 ${footerCols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
-            style={{ ...surface.card, borderColor: "var(--item-border)" }}
+            style={{ ...surface.card, borderColor: "var(--item-border,#24262e)" }}
           >
             <button
               type="button"
               onClick={onClose}
               aria-label="Закрыть карточку товара"
-              className="min-h-11 rounded-xl border-2 border-white/20 px-2.5 py-1.5 text-xs font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+              className="min-h-11 rounded-xl border-2 border-white/20 px-2.5 py-1.5 text-xs font-medium transition hover:border-white/40 hover:opacity-90 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
               style={surface.subtleCard}
             >
               Закрыть
@@ -2757,7 +2763,7 @@ export function ItemModal({
                   disabled={isAdding}
                   aria-busy={isAdding}
                   aria-label="Забронировать аренду"
-                  className="min-h-11 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="min-h-11 rounded-xl border-2 border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast,#16130a)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                 >
                   {rentCtaLabel}
                 </button>
@@ -2768,7 +2774,7 @@ export function ItemModal({
                   rel="noopener noreferrer"
                   onClick={() => trackContinueInTgLead("rental")}
                   aria-label="Продолжить бронирование в Telegram"
-                  className="flex min-h-11 items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="flex min-h-11 items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast,#16130a)] transition hover:brightness-110 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                 >
                   {rentCtaLabel}
                 </a>
@@ -2784,10 +2790,10 @@ export function ItemModal({
                   disabled={isBuying}
                   aria-busy={isBuying}
                   aria-label="Купить"
-                  className={`rounded-xl border-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)] ${
+                  className={`rounded-xl border-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)] ${
                     showRentCta
-                      ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
-                      : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                      ? "border-[var(--item-accent,#d99a00)] text-[var(--item-accent,#d99a00)] hover:bg-[var(--item-accent,#d99a00)] hover:text-[var(--item-accent-contrast,#16130a)]"
+                      : "border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] text-[var(--item-accent-contrast,#16130a)]"
                   }`}
                 >
                   {buyCtaLabel}
@@ -2801,8 +2807,8 @@ export function ItemModal({
                   aria-label="Продолжить покупку в Telegram"
                   className={`flex items-center justify-center gap-1 rounded-xl border-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] transition hover:brightness-110 active:scale-[0.99] ${
                     showRentCta
-                      ? "border-[var(--item-accent)] text-[var(--item-accent)] hover:bg-[var(--item-accent)] hover:text-[var(--item-accent-contrast)]"
-                      : "border-[var(--item-accent)] bg-[var(--item-accent)] text-[var(--item-accent-contrast)]"
+                      ? "border-[var(--item-accent,#d99a00)] text-[var(--item-accent,#d99a00)] hover:bg-[var(--item-accent,#d99a00)] hover:text-[var(--item-accent-contrast,#16130a)]"
+                      : "border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] text-[var(--item-accent-contrast,#16130a)]"
                   }`}
                 >
                   {buyCtaLabel}
@@ -2818,7 +2824,7 @@ export function ItemModal({
                   onClick={handleAddToCart}
                   disabled={isAdding}
                   aria-busy={isAdding}
-                  className="rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent)]"
+                  className="rounded-xl border-2 border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast,#16130a)] transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--item-accent,#d99a00)]"
                 >
                   {singleCtaLabel}
                 </button>
@@ -2827,7 +2833,7 @@ export function ItemModal({
                   href={`https://t.me/${botUsername}/app`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent)] bg-[var(--item-accent)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast)] transition hover:brightness-110 active:scale-[0.99]"
+                  className="flex items-center justify-center gap-1 rounded-xl border-2 border-[var(--item-accent,#d99a00)] bg-[var(--item-accent,#d99a00)] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--item-accent-contrast,#16130a)] transition hover:brightness-110 active:scale-[0.99]"
                 >
                   {singleCtaLabel}
                 </a>

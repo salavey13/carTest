@@ -43,7 +43,7 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
     // invisible at rest; task141 iter4: 30% on hover (20% was invisible on
     // the dark studio photos — boss kept reading the highlight as partial)
     expect(catalog).toContain(
-      'className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block"',
+      'className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent,#d99a00)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block"',
     );
     // iter6: ONE melt element whose COLOR transitions (no cross-fade — the
     // iter5 two-gradient cross-fade let the photo bleed through mid-transition
@@ -52,11 +52,14 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
     // globals.css (@property --catalog-melt-color).
     expect(catalog).toContain('className="catalog-melt pointer-events-none absolute inset-x-0 bottom-0 h-32"');
     const css = read("app/globals.css");
+    // task166: every var() carries a concrete dark-brand fallback — engines
+    // without CSS custom property support (lite/proxy browsers, ancient
+    // WebViews) render the accent instead of dropping the declaration.
     expect(css).toContain("@property --catalog-melt-color");
-    expect(css).toContain("--catalog-melt-color: var(--catalog-card-bg)");
+    expect(css).toContain("--catalog-melt-color: var(--catalog-card-bg,#111217)");
     expect(css).toContain("transition: --catalog-melt-color 300ms cubic-bezier(0.4, 0, 0.2, 1)");
     expect(css).toContain("[data-catalog-item]:hover .catalog-melt");
-    expect(css).toContain("--catalog-melt-color: var(--catalog-accent)");
+    expect(css).toContain("--catalog-melt-color: var(--catalog-accent,#d99a00)");
   });
 
   it("task141 iter4: the BASE highlight layer is the ARTICLE background (var flip)", () => {
@@ -74,12 +77,12 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
     // the whole border-box is structural, no inner element can leave a gap
     const css = read("app/globals.css");
     expect(css).toContain("[data-catalog-item]:hover");
-    expect(css).toContain("--card-base-bg: var(--catalog-accent)");
+    expect(css).toContain("--card-base-bg: var(--catalog-accent,#d99a00)");
     expect(css).toContain("--card-base-img: none");
     // info strips transition bg-card → accent DIRECTLY on hover (iter6:
     // same 300ms curve as the melt gradient — the fade-to-transparent
     // recipe blended on an accent² curve and lagged behind the picture)
-    expect(catalog).toContain("md:group-hover:bg-[var(--catalog-accent)]");
+    expect(catalog).toContain("md:group-hover:bg-[var(--catalog-accent,#d99a00)]");
     expect(catalog).not.toContain("md:group-hover:bg-transparent");
   });
 
