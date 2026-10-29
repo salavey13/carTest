@@ -1609,3 +1609,24 @@ Work Log:
 Stage Summary:
 - Pinned columns now carry a crisp opaque separator and a hole-proof geometry — no more shimmer, the rail reads as a proper bordered panel for tomorrow's polish run.
 - Deploy verification: Vercel live (chunk 1213-3dc5252d925382fd.js replaces f538651d62bd7e4a) — served bundle contains both inset separator literals + the recursive floor in computeRailOffsets; / and /franchize/vip-bike/rentals-analytics 200. The tableview itself is owner-gated (per task161), visual confirmation lands with the crew's polish run tomorrow.
+
+---
+Task ID: task164-bestseller-tour
+Agent: main (Z.ai CLI)
+Task: boss audio 29.10 15:36 «BESTSELLER» + 15:41 «BESTESTCONFIGURER» — «overhaul Roman's birthday quest into bestselling/besttelling/bestsetting feature;))) … день рождения сегодня, несколько часов, рисуешь схему, но сделай».
+
+Work Log:
+- Transcribed both briefs (ASR 28s slices; slice-0 re-pass for the mixed-language hallucination). Assembled intent: the quest becomes a SELF-PROMOTING product tour — same trail for everyone, per-stop включить/купить CTA, birthday finale stays Roman-only, crew owners get per-crew activation checkboxes, menu link via metadata; «фейк-кнопки пока» allowed; sprints allowed, but today quality.
+- SCHEME: gate v2 (audience split) → dual-skin stop component (🎂/⭐) → shared feature catalog → activations API (crews.metadata.feature_tour) → tour hub v2 (dual hero + CTA cards + finale split + owner panel) → /gift/roman guard → metadata menu link.
+- Roman identity from prod DB: Роман Воробьёв «Roman_Vip_Bike_Electro» TG 244736261, role co_owner, active (matches «Электро-первопроходец» + «Половина империи» in the letter). Gate pins it as DEFAULT_ROMAN_TG_IDS, env-overridable via ROMAN_TG_USER_IDS.
+- GATE v2: NO hidden mode anymore — everyone sees the ⭐ tour (anonymous PC + TG renters = the sales funnel, boss verbatim); cookie+Roman → birthday skin; cookie+owns-any-crew → role owner + own crewSlug (checkboxes act on HIS crew even while browsing someone else's page); vip-bike member → member; fail-open → public tour. Session cache key bumped to roman-quest-gate-v2 (stale v1 «hidden» verdicts can't suppress the tour).
+- TOUR catalog (components/roman-gift/tourFeatures.ts, single source): 10 stops — boss's named set «прайс, карта, конфигуратор + всё из главного меню»: +NEW конфигуратор (stop 3), прайс-калькулятор calc-explainer (stop 7), стена сообщества (stop 9); landing = free, no CTA; prices in ⭐ 25–75.
+- Trail rewired gapless: / → витрина → configurator → discovery → leaderboard → rent-bike → calc-explainer → map-riders → community → season-stats → finale. Stop modals swap the finale link by skin (tour → /gift/roman-quest, Roman → /gift/roman). calc-explainer + season-stats carry the stop in BOTH branches (members-only pages).
+- CTA: owners = REAL ☑ «Включить для экипажа {slug}» → POST /api/roman-quest/activations (owner-only, TOUR_FEATURE_KEYS validation, re-read + MERGE crews.metadata so franchize UI config survives); guests = «⭐ N · Подключить фичу» demo dialog → «Написать экипажу в Telegram» (t.me/I_O_S_NN). XTR sendInvoice plumbing exists but the external payment proxy defines payload types — real Stars charging is the next sprint.
+- Overview v2: dual hero, progress, per-card CTA chips, owner activation panel (bulk checkboxes + saved counters), finale split (🎁 gift card vs «Хочу такой экипаж» sales block).
+- Menu link: crews.metadata.franchize.header.menuLinks += «⭐ Фичи экипажа» → /gift/roman-quest (metadata-driven HeaderMenu burger — zero code, boss's «прописывается с метаданных; если нет — убираешь» mechanism). DB script scripts/task164-tour-menu-link.mjs (merge-only).
+- Tests: task164 spec ×28 (catalog 10 stops + real routes, gate decision table, activations owner-only+merge, dual-skin pins, GAPLESS trail-chain assertion host-by-host, surfaces); task156 quest pins re-baselined (hidden-branch pin → v2 reality, «семь»→«десять»). franchize suite 195 files / 3730 passed / 8 skipped; tsc clean (8GB); eslint clean.
+- Deploy: 0533554 → Vercel success. Prod E2E (agent-browser, anonymous PC): gate {skin:tour,role:guest}; landing ⭐ marker → «ФИЧА 1 ИЗ 10» no-CTA (free) → stop 2 pitch + «Что это даёт экипажу» + ⭐50 demo dialog → tour hub ФИЧА-ТУР hero, progress 2/10 persisted across pages, sales finale «Хочу такой экипаж», ZERO birthday leak; /gift/roman redirects non-Roman → tour hub; vip-bike burger shows «⭐ Фичи экипажа» href /gift/roman-quest. Zero page errors. Screenshots: my-project/task164-tour-hub.png, task164-stop2-cta.png, task164-crew-menu.png.
+
+Stage Summary:
+- Roman's birthday quest is now VIP BIKE's bestseller pitch: ten real features, star-priced CTAs, owner activation checkboxes backed by crew metadata, and the 🎂 finale preserved for Roman alone. Next sprints (boss-approved stretch): enforce feature_tour flags on surfaces, real Telegram-Stars invoices (create_invoice payload family), per-crew menu driven by activations.
