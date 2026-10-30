@@ -144,7 +144,9 @@ describe("closure modal robustness", () => {
     expect(lifecycle.includes("useKeyboardAwareOverlay(closureOverlayRef, closureModalOpen)")).toBe(true);
     expect(lifecycle.includes("useKeyboardAwareOverlay(abortOverlayRef, abortModalOpen)")).toBe(true);
     expect(lifecycle.includes("items-end justify-center overflow-y-auto sm:items-center sm:p-4")).toBe(true);
-    expect(lifecycle.includes("paddingBottom: closureKeyboardPx > 0 ? closureKeyboardPx : undefined")).toBe(true);
+    // task168 re-baseline: da4b255 (2026-10-29) lifts the sheet 12px above the
+    // Android gesture bar even without a keyboard (env() reports 0 in the TG WebView).
+    expect(lifecycle.includes("paddingBottom: closureKeyboardPx > 0 ? closureKeyboardPx : 12")).toBe(true);
   });
 
   it("hook tracks the visualViewport gap with a noise threshold", () => {

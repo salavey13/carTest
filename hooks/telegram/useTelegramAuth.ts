@@ -44,6 +44,14 @@ const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === "
  * fetchDbUserAction → upsertTelegramUserAction chain (1–2 sequential
  * roundtrips) when the row comes back. `dbUser: null` in the response means
  * «fall back to the legacy actions» — semantics unchanged.
+ *
+ * task168 hardening (boss: «app hanged while i was waiting for deeplink to
+ * trigger routing»): this fetch had NO timeout — on a phone with a stalled
+ * network it can hang for minutes, and isAuthenticating stayed true the whole
+ * time, which froze the startapp router behind the auth gate (the deeplink
+ * «never routed»). AbortSignal.timeout(10s) settles it honestly; old engines
+ * without AbortSignal.timeout throw synchronously → caught → null → the
+ * legacy chain below runs as before.
  */
 async function validateTelegramAuthWithApi(
   initDataString: string,
@@ -54,6 +62,7 @@ async function validateTelegramAuthWithApi(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ initData: initDataString }),
+      signal: AbortSignal.timeout(10_000),
     });
     const result = await response.json();
     if (!response.ok || !result?.isValid || !result?.user?.id) return null;
@@ -199,7 +208,17 @@ export function useTelegramAuth() {
         // Fast path: the validate API already resolved the users row.
         // Legacy chain (fetchDbUser → maybe upsert) runs only when the API
         // couldn't return it (DB hiccup, mock/dev fallback candidates).
-        const persisted = fastDbUser ?? (await handleAuthentication(candidate));
+        // task168: the legacy chain is server actions — unabortable, and a
+        // stalled action previously held isAuthenticating=true for minutes.
+        // Race a 12s timeout against it: on timeout we proceed
+        // unauthenticated (honest error + the finally below releases the
+        // auth gate); the background action still finishes server-side and
+        // the next app open picks the row up.
+        const persisted = fastDbUser ?? (await Promise.race([
+          handleAuthentication(candidate),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 12_000)),
+        ]));
+        if (!persisted) throw new Error("Telegram authentication timed out.");
         if (can()) {
           setUser(candidate);
           setDbUser(persisted);

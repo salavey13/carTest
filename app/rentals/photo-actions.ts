@@ -476,12 +476,52 @@ export async function uploadRentalPhoto(
  * List all photos for a rental (optionally filtered by type).
  * Returns signed URLs (15-minute TTL) since the bucket is private.
  *
- * Caller must be authorized (renter or crew member).
+ * Caller must be authorized (renter or crew member) — or the call comes
+ * through the rental-capability gate (no cookie, task168).
  */
+/**
+ * Per-user photo-view authorization, extracted verbatim from the old inline
+ * block (task168 refactor): renter / owner / subrenter / active crew member.
+ */
+async function isRentalPhotoViewer(
+  rental: { user_id: string | null; owner_id: string | null; vehicle_id: string | null },
+  requesterUserId: string,
+): Promise<boolean> {
+  if (rental.user_id === requesterUserId || rental.owner_id === requesterUserId) {
+    return true;
+  }
+
+  if (!rental.vehicle_id) return false;
+
+  const { data: vehicle } = await supabaseAdmin
+    .from("cars")
+    .select("crew_id, specs")
+    .eq("id", rental.vehicle_id)
+    .maybeSingle();
+  if (!vehicle?.crew_id) return false;
+
+  // ── SUBRENTER FIX: партнёр-владелец байка (specs.subrenter_chat_id)
+  // смотрит галерею ДО/ПОСЛЕ аренды своего байка. Раньше галерея
+  // молча пустовала — доступ был только у арендатора/экипажа.
+  const specs = (vehicle.specs || {}) as Record<string, unknown>;
+  if (specs["subrenter_chat_id"] === requesterUserId) return true;
+
+  const { data: membership } = await supabaseAdmin
+    .from("crew_members")
+    .select("role, membership_status")
+    .eq("crew_id", vehicle.crew_id)
+    .eq("user_id", requesterUserId)
+    .maybeSingle();
+  return Boolean(
+    membership?.membership_status === "active" &&
+      ["owner", "admin", "co_owner", "member"].includes(membership.role),
+  );
+}
+
 export async function listRentalPhotos(
   rentalId: string,
   photoType?: "start" | "end",
-  requesterUserId: string,
+  requesterUserId?: string | null,
 ): Promise<{
   success: boolean;
   photos?: Array<{
@@ -515,39 +555,14 @@ export async function listRentalPhotos(
       return { success: false, error: "Аренда не найдена." };
     }
 
-    let authorized =
-      rental.user_id === requesterUserId || rental.owner_id === requesterUserId;
-
-    if (!authorized && rental.vehicle_id) {
-      const { data: vehicle } = await supabaseAdmin
-        .from("cars")
-        .select("crew_id, specs")
-        .eq("id", rental.vehicle_id)
-        .maybeSingle();
-      if (vehicle?.crew_id) {
-        // ── SUBRENTER FIX: партнёр-владелец байка (specs.subrenter_chat_id)
-        // смотрит галерею ДО/ПОСЛЕ аренды своего байка. Раньше галерея
-        // молча пустовала — доступ был только у арендатора/экипажа.
-        const specs = (vehicle.specs || {}) as Record<string, unknown>;
-        if (specs["subrenter_chat_id"] === requesterUserId) {
-          authorized = true;
-        }
-        if (!authorized) {
-          const { data: membership } = await supabaseAdmin
-            .from("crew_members")
-            .select("role, membership_status")
-            .eq("crew_id", vehicle.crew_id)
-            .eq("user_id", requesterUserId)
-            .maybeSingle();
-          if (
-            membership?.membership_status === "active" &&
-            ["owner", "admin", "co_owner", "member"].includes(membership.role)
-          ) {
-            authorized = true;
-          }
-        }
-      }
-    }
+    // task168 (boss: «show photos in rental page even for not authenticated
+    // users»): NO cookie → the rentalId uuid IS the capability. The rental
+    // page (/franchize/<slug>/rental/<id>) is already public with the same
+    // id and shows more (status, chronology, renter phone) — the gallery
+    // follows the same gate. With an identity → the full per-user check.
+    const authorized = !requesterUserId
+      ? true // capability gate: unguessable rental uuid (same as the public page)
+      : await isRentalPhotoViewer(rental, requesterUserId);
 
     if (!authorized) {
       return { success: false, error: "Недостаточно прав для просмотра фото." };

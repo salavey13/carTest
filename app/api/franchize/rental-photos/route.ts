@@ -19,20 +19,23 @@ export const dynamic = 'force-dynamic';
  * I3 hotfix (C3): caller identity extracted from signed `cartest_tg_actor`
  * cookie — no longer trusts client-supplied `requesterUserId` query param.
  * The server action validates that the caller (from cookie) is authorized.
+ *
+ * task168 (boss: «show photos in rental page even for not authenticated
+ * users — rental page opened on PC from rentals-analytics via password, and
+ * in a nearby tab there are no photos visible»): the actor cookie is now
+ * OPTIONAL for this READ endpoint. With a cookie → the same per-user
+ * authorization as before. Without → callerUserId = null and
+ * listRentalPhotos falls back to the RENTAL-CAPABILITY gate: the rentalId
+ * uuid is unguessable and the rental page itself is already public with it,
+ * so knowing the id is the same level of access the page already grants.
+ * Uploads (POST /api/franchize/rental-photo-upload) still REQUIRE the cookie.
  */
 export async function GET(request: NextRequest) {
   try {
-    // ── C3: Verify caller identity from signed cookie ──
+    // ── C3: caller identity from signed cookie — OPTIONAL since task168 ──
     const cookieStore = request.cookies;
     const actorCookie = cookieStore.get(TELEGRAM_ACTOR_COOKIE)?.value;
     const callerUserId = verifyTelegramActorCookieValue(actorCookie);
-
-    if (!callerUserId) {
-      return NextResponse.json(
-        { error: "Unauthorized — нужен вход через Telegram WebApp." },
-        { status: 401 },
-      );
-    }
 
     const rentalId = request.nextUrl.searchParams.get("rentalId");
     const photoType = request.nextUrl.searchParams.get("photoType") as
@@ -54,7 +57,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // C3: pass callerUserId from cookie (was: from query param)
+    // C3: pass callerUserId from cookie (was: from query param).
+    // task168: null (no cookie) is legal — listRentalPhotos then applies the
+    // rental-capability gate instead of per-user authorization.
     const result = await listRentalPhotos(
       rentalId,
       photoType || undefined,

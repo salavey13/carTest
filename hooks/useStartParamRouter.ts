@@ -24,6 +24,7 @@ import {
   parseAnalyticsDeepLink,
   parseLeadDeepLink,
   parseRentalDetailDeepLink,
+  parseRentalDetailFastParam,
   parseRentDeepLink,
   parseTestdriveDeepLink,
   START_PARAM_PAGE_MAP,
@@ -328,6 +329,59 @@ export function useStartParamRouter() {
           if (fastWallTarget !== pathname) {
             logger.info(`[ClientLayout] FAST routing wall deep link → ${fastWallTarget}`);
             router.replace(fastWallTarget);
+          }
+          clearStartParam?.();
+        }
+        // Handled (or already handled) — never fall through to the gated logic.
+        return;
+      }
+
+      // ── FAST PATH (rental, task168): rental detail pages are PUBLIC — the
+      // crew slug resolves SERVER-SIDE from the rental row
+      // (/api/startapp/rental, mirrors /api/startapp/vehicle). The old flow
+      // routed rental_ params only AFTER the Telegram auth roundtrip (it
+      // wanted userCrewInfo.slug) — on a phone with a stalled network that
+      // auth window stretches for minutes: the deeplink looked dead AND the
+      // app looked hung (boss: «while i was waiting for deeplink to trigger
+      // routing app hanged»). Routing a rental_ param needs ZERO identity —
+      // same guard dance as the static/wall fast paths. ──
+      const rentalFastLink = parseRentalDetailFastParam(paramToProcess, searchParams.get("slug"));
+      if (rentalFastLink) {
+        if (lastHandledStartParamRef.current !== paramToProcess && activeStartParamRef.current !== paramToProcess) {
+          lastHandledStartParamRef.current = paramToProcess;
+          if (startParamPayload && normalizedUrlStartParam) {
+            ignoredUrlStartParamRef.current = normalizedUrlStartParam;
+          }
+
+          let rentalTarget: string | null = null;
+          if (rentalFastLink.kind === "bare") {
+            // rentals_{id} — the renter-facing public rental page.
+            rentalTarget = `/rentals/${encodeURIComponent(rentalFastLink.rentalId)}`;
+          } else if (rentalFastLink.kind === "carried") {
+            rentalTarget = `/franchize/${rentalFastLink.slug}/rental/${encodeURIComponent(rentalFastLink.rentalId)}`;
+          } else {
+            try {
+              const qs = new URLSearchParams({ rentalId: rentalFastLink.rentalId });
+              const response = await fetch(`/api/startapp/rental?${qs.toString()}`, { cache: "no-store" });
+              if (response.ok) {
+                const data = (await response.json()) as { slug?: string };
+                const slug = (data.slug || "vip-bike").trim() || "vip-bike";
+                rentalTarget = `/franchize/${slug}/rental/${encodeURIComponent(rentalFastLink.rentalId)}`;
+              }
+            } catch (error) {
+              logger.warn("[ClientLayout] rental fast-path crew lookup failed", { error });
+            }
+            if (!rentalTarget) {
+              // Lookup unavailable (offline / API down) — the vip-bike rental
+              // page renders an honest «Сделка не найдена» card for a foreign
+              // crew. Still infinitely better than a dead link.
+              rentalTarget = `/franchize/vip-bike/rental/${encodeURIComponent(rentalFastLink.rentalId)}`;
+            }
+          }
+
+          if (rentalTarget && rentalTarget !== pathname) {
+            logger.info(`[ClientLayout] FAST routing rental deep link → ${rentalTarget}`);
+            router.replace(rentalTarget);
           }
           clearStartParam?.();
         }
@@ -644,7 +698,13 @@ export function useStartParamRouter() {
             targetPath = `/franchize/${slug}/leads?leadId=${encodeURIComponent(leadId)}`;
           }
         } else if (paramToProcess.startsWith("rental-") || paramToProcess.startsWith("rentals-") || paramToProcess.startsWith("sale-")) {
-          const rentalId = paramToProcess.split("-").at(-1);
+          // task168 fix: rental ids are UUIDs — FULL of dashes. The old
+          // split("-").at(-1) truncated the id to its last hex group
+          // («rental-3c959da3-…-d1a448f4bf83» → «d1a448f4bf83» → «Сделка не
+          // найдена»). Everything after the FIRST dash is the id. (This
+          // branch is belt & suspenders since the rental fast path — the
+          // parser's dash family — normally claims these first.)
+          const rentalId = paramToProcess.slice(paramToProcess.indexOf("-") + 1).trim();
           const franchizeSlug = searchParams.get("slug") || "vip-bike";
           if (rentalId) {
             targetPath = `/franchize/${franchizeSlug}/rental/${rentalId}`;

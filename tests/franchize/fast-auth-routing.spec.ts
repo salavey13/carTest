@@ -81,8 +81,11 @@ describe("auth in one roundtrip", () => {
   it("useTelegramAuth consumes the inline dbUser and falls back to legacy chain", () => {
     const hook = read("hooks/telegram/useTelegramAuth.ts");
     expect(hook).toContain("apiAuth?.dbUser ?? null");
-    // fast path wins; legacy handleAuthentication only when the row is missing
-    expect(hook).toContain("fastDbUser ?? (await handleAuthentication(candidate))");
+    // fast path wins; legacy handleAuthentication only when the row is missing.
+    // task168: the legacy chain is raced against a 12s timeout so a stalled
+    // server action can no longer wedge isAuthenticating (the router gate).
+    expect(hook).toContain("Promise.race");
+    expect(hook).toMatch(/fastDbUser \?\? \(await Promise\.race\(\[\s*handleAuthentication\(candidate\)/);
   });
 });
 

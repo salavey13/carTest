@@ -718,8 +718,9 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </FranchizeRentalRoleGuard>
         )}
 
+        {(rental.found || rental.startPhotoCount || rental.endPhotoCount) ? (
           <FranchizeRentalRoleGuard
-            allowedRoles={["operator", "admin", "owner", "renter", "subrenter"]}
+            allowedRoles={["operator", "admin", "owner", "renter", "subrenter", "guest"]}
             ownerId={rental.ownerId}
             renterId={rental.renterId}
             renterTelegramChatId={rental.renterTelegramChatId}
@@ -729,17 +730,25 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           >
             {/* I3: Rental Photo Gallery — ДО (start) + ПОСЛЕ (end) photos.
                 v1: non-blocking. Shown for operators + renter (renter can
-                upload their own photos for damage documentation). */}
+                upload their own photos for damage documentation).
+                task168 (boss: «show photos in rental page even for not
+                authenticated users»): "guest" now passes — the rental page
+                is already public with the rentalId uuid (PC password flow →
+                nearby tab), so the gallery follows the same capability gate.
+                Upload stays signed-actor-only: canUpload comes from the
+                cartest_tg_actor cookie server-side, so a guest never sees a
+                dead upload button. */}
             <div id="rental-photo-gallery">
               <RentalPhotoGallery
                 rentalId={rental.rentalId}
                 initialStartCount={rental.startPhotoCount ?? 0}
                 initialEndCount={rental.endPhotoCount ?? 0}
-                canUpload={true}
+                canUpload={Boolean(viewerActorId)}
                 compact={false}
               />
             </div>
           </FranchizeRentalRoleGuard>
+        ) : null}
 
         {/* Message input — only show when renter has a real TG chat_id
             (QR claimed). If QR not scanned, message will fail silently.

@@ -374,3 +374,100 @@ export function computeStaticFastTarget(param: string): string | null {
 
   return null;
 }
+
+/**
+ * RENTAL fast path (task168, boss: «deeplinks like
+ * t.me/oneBikePlsBot/app?startapp=rental_<uuid> stopped working … while i was
+ * waiting for deeplink to trigger routing app hanged»).
+ *
+ * ROOT CAUSE: rental_ params were routed ONLY behind the auth gate — they
+ * needed userCrewInfo.slug for /franchize/<slug>/rental/<id>. On a phone with
+ * a stalled network the auth roundtrip can stretch for minutes: the deeplink
+ * looked dead AND the app looked hung. But the rental page is PUBLIC — the
+ * crew can be resolved SERVER-SIDE from the rental row (new
+ * /api/startapp/rental endpoint, mirroring /api/startapp/vehicle), so the
+ * router fast-paths the param BEFORE the auth gate.
+ *
+ * Shapes captured (mirroring the gated branches they replace):
+ *   rental_{rentalId}              → { kind: "lookup" }   (notify/view links)
+ *   rental_{action}_{rentalId}     → { kind: "lookup" }   (confirm-pickup /
+ *                                     confirm-return links — uuids have no
+ *                                     underscores, so the last segment is the
+ *                                     id; same grammar as
+ *                                     parseRentalDetailDeepLink)
+ *   rental-{rentalId} / rentals-{rentalId} → { kind: "lookup" }
+ *   rentals_{rentalId}             → { kind: "bare" }     (public renter page
+ *                                     /rentals/<id> — no lookup needed)
+ *   rentals_{slug}_{rentalId}      → { kind: "carried" }  (slug in the param)
+ *   …and any of the bare/carried forms promote to "carried" when a ?slug=
+ *   query is present on the launch URL (legacy searchParams.get("slug")
+ *   behaviour of the gated branches).
+ *
+ * NEVER captured (stay on their own gated branches):
+ *   analytics_rental_* / rentals_analytics*  — operator analytics drawer
+ *   rent_* / testdrive_*                     — QR claim family (auth required)
+ *   sale-*                                   — legacy sale family, untouched
+ */
+export type RentalDetailFastLink =
+  | { kind: "lookup"; rentalId: string }
+  | { kind: "bare"; rentalId: string }
+  | { kind: "carried"; slug: string; rentalId: string };
+
+const RENTAL_ID_IS_SLUG = /^[a-z0-9-]{1,64}$/;
+
+export function parseRentalDetailFastParam(
+  param: string,
+  slugQuery: string | null = null,
+): RentalDetailFastLink | null {
+  if (param.startsWith("analytics_") || param.startsWith("rentals_analytics")) return null;
+  if (param.startsWith("rent_") || param.startsWith("testdrive_")) return null;
+  if (param.startsWith("sale-") || param.startsWith("sale_")) return null;
+
+  const carried = (rentalId: string): RentalDetailFastLink | null => {
+    if (!rentalId) return null;
+    const slug = (slugQuery || "").trim().toLowerCase();
+    if (slug && RENTAL_ID_IS_SLUG.test(slug)) return { kind: "carried", slug, rentalId };
+    return { kind: "lookup", rentalId };
+  };
+
+  if (param.startsWith("rental_")) {
+    const rentalId = param.split("_").at(-1)?.trim() ?? "";
+    return carried(rentalId);
+  }
+
+  if (param.startsWith("rentals_")) {
+    const parts = param.split("_");
+    if (parts.length === 2) {
+      // Legacy gated branch: bare rentals_<id> → the PUBLIC renter page
+      // /rentals/<id>. A ?slug= query still promotes to the franchize path.
+      const rentalId = parts[1]?.trim() ?? "";
+      if (!rentalId) return null;
+      const slug = (slugQuery || "").trim().toLowerCase();
+      if (slug && RENTAL_ID_IS_SLUG.test(slug)) return { kind: "carried", slug, rentalId };
+      return { kind: "bare", rentalId };
+    }
+    if (parts.length >= 3) {
+      const rentalId = parts.at(-1)?.trim() ?? "";
+      const slug = parts[1]?.trim() ?? "";
+      if (rentalId && RENTAL_ID_IS_SLUG.test(slug)) {
+        return { kind: "carried", slug, rentalId };
+      }
+      // Malformed slug (uppercase / underscore / empty) — degrade to the
+      // rental-row lookup instead of building a guaranteed-404 URL (slugs
+      // are ALWAYS lowercase via normalizeCrewSlug).
+      return carried(rentalId);
+    }
+    return null;
+  }
+
+  if (param.startsWith("rental-") || param.startsWith("rentals-")) {
+    // ⚠️ rental ids are UUIDs — FULL of dashes. Everything after the FIRST
+    // dash is the id; split("-").at(-1) (the legacy gated branch) truncated
+    // it to the last hex group («rental-3c959da3-…-d1a448f4bf83» →
+    // «d1a448f4bf83» → «Сделка не найдена»).
+    const rentalId = param.slice(param.indexOf("-") + 1).trim();
+    return carried(rentalId);
+  }
+
+  return null;
+}

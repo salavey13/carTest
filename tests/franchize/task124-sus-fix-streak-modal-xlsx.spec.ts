@@ -208,7 +208,10 @@ describe("task124: closure modal", () => {
 
   it("fixed safe-area footer (buttons never at the very screen bottom)", () => {
     const s = modal();
-    expect(s).toContain("max(0.75rem, env(safe-area-inset-bottom))");
+    // task168 re-baseline: da4b255 (2026-10-29) — env(safe-area-inset-bottom)
+    // reports 0 in the Android TG WebView, so the footer now floors the inset
+    // via the :root --app-safe-bottom variable (+0.5rem breathing room).
+    expect(s).toContain("calc(var(--app-safe-bottom, 16px) + 0.5rem)");
     expect(s).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
   });
 
