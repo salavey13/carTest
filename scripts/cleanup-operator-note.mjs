@@ -7,11 +7,15 @@
 // matches any lead after the identity fix, so it's invisible garbage — remove it.
 import { createClient } from "@supabase/supabase-js";
 
-const sb = createClient(
-  "https://inmctohsodgdohamhzag.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM",
-  { auth: { persistSession: false } },
-);
+const SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co";
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY;
+if (!SUPABASE_KEY) {
+  console.error("ENV MISSING: export SUPABASE_SERVICE_ROLE_KEY (legacy JWT or new sb_secret_ key) before running this script");
+  process.exit(1);
+}
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 const CREW_ID = "2d5fde70-1dd3-4f0d-8d72-66ccf6908746";
 
 const { data: before } = await sb.from("lead_notes").select("id, lead_id, text").eq("crew_id", CREW_ID).eq("lead_id", "356282674");

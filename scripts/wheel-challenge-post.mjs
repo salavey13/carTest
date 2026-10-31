@@ -5,15 +5,18 @@
 // vip-bike crew wall announcing the wheel of fortune + the >13-likes challenge.
 // Idempotent: skips when the post (marker tag) already exists.
 //
-// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (also accepts SUPABASE_SERVICE_KEY)
-
+// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (also accepts SUPABASE_SERVICE_KEY;
+// new sb_secret_ keys work as the value too). Env-only: no hardcoded fallbacks.
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM";
+  process.env.SUPABASE_SERVICE_KEY;
+if (!SUPABASE_KEY) {
+  console.error("ENV MISSING: export SUPABASE_SERVICE_ROLE_KEY (legacy JWT or new sb_secret_ key) before running this script");
+  process.exit(1);
+}
 
 // Маркер для идемпотентности (в теле поста) — по нему же админ найдёт пост.
 const MARKER = "#колесофортуны";
