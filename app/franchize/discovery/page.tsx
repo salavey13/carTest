@@ -5,6 +5,7 @@ import { ArrowRight, Bike, ChevronDown, Handshake, Info, MapPin, MessagesSquare,
 import { logger } from "@/lib/logger";
 import { CrewDiscoveryGraph } from "./CrewDiscoveryGraph";
 import { loadNetworkModel } from "./load-network-model";
+import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 // app/franchize/discovery/page.tsx — GLOBAL crew discovery (2026-10-01).
 //
@@ -337,9 +338,19 @@ export default async function CrewDiscoveryPage() {
             Создать свой экипаж
           </Link>
         </p>
-        {/* task173 (boss: ditch legacy non-franchize pages from the tour):
-            /franchize/discovery is a global network surface — no tour host
-            anymore. See components/roman-gift/tourFeatures.ts. */}
+        {/* task174 (boss: «keep /franchize/discovery in feature tour as last
+            step — kinda to show other crews that are being cooked» · Wolf of
+            Wall Street, «sell me this pen»): the network map is the tour's
+            FINALE — stop 16/16. No buy CTA on purpose (a global page can
+            never grow a crew menu flag — feature-tour-menu.ts skips it):
+            this stop SELLS the platform itself. Trail: season-stats (15) →
+            discovery (16) → /gift/roman. */}
+        <RomanQuestCake
+          featureKey="discovery"
+          riddle="Это финал тура. Круг — экипаж, линия — общие люди: сеть варится прямо сейчас, и твой круг здесь следующим. А подарок с самого начала лежит по адресу /gift/roman."
+          nextHref="/gift/roman"
+          nextLabel="Забрать подарок"
+        />
       </div>
     </main>
   );

@@ -36,11 +36,11 @@ const RENT_BIKE = read("app/rent-bike/page.tsx");
 const LEADERBOARD = read("app/leaderboard/page.tsx");
 const DISCOVERY = read("app/franchize/discovery/page.tsx");
 
-describe("task164 · tour catalog — 15 stops (task165: the full onboarding quest; task173: legacy non-franchize pages ditched)", () => {
-  it("fifteen sequential stops with unique keys and stable machine names", () => {
-    expect(TOUR_STOPS_TOTAL).toBe(15);
-    expect(TOUR_FEATURES.map((f) => f.stop)).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
-    expect(new Set(TOUR_FEATURES.map((f) => f.key)).size).toBe(15);
+describe("task164 · tour catalog — 15 crew stops + the finale (task165: the full onboarding quest; task173: legacy non-franchize pages ditched; task174: discovery back as the sell-me-this-pen FINALE)", () => {
+  it("sixteen sequential stops: 15 crew features + the free network finale", () => {
+    expect(TOUR_STOPS_TOTAL).toBe(16);
+    expect(TOUR_FEATURES.map((f) => f.stop)).toEqual(Array.from({ length: TOUR_STOPS_TOTAL }, (_, i) => i + 1));
+    expect(new Set(TOUR_FEATURES.map((f) => f.key)).size).toBe(16);
     // boss named these explicitly: «прямо прайс, эту карту, конфигуратор»
     expect(TOUR_FEATURE_KEYS.has("configurator")).toBe(true);
     expect(TOUR_FEATURE_KEYS.has("price_calc")).toBe(true);
@@ -59,11 +59,14 @@ describe("task164 · tour catalog — 15 stops (task165: the full onboarding que
     }
   });
 
-  it("task173: the landing is gone — every remaining stop sells a real feature with a CTA", () => {
+  it("task173/174: the landing is gone — stops 1..15 sell real features with CTAs, the finale SELLS instead", () => {
     expect(tourFeatureByKey("landing")).toBeUndefined();
-    expect(TOUR_FEATURES.every((f) => tourFeatureHasCta(f.key))).toBe(true);
+    // purchasable = the crew-scoped stops; the finale (16) is free on purpose
+    expect(TOUR_FEATURES.filter((f) => f.stop <= 15).every((f) => tourFeatureHasCta(f.key))).toBe(true);
     expect(tourFeatureByKey("configurator")?.priceStars).toBeGreaterThan(0);
     expect(tourFeatureByKey("season_stats")?.priceStars).toBeGreaterThan(0);
+    expect(tourFeatureByKey("discovery")?.priceStars).toBe(0);
+    expect(tourFeatureHasCta("discovery")).toBe(false);
   });
 });
 
@@ -146,11 +149,11 @@ describe("task164 · the trail — wired stops (task173: 15 stops, crew pages on
     expect(page).toContain('featureKey="configurator"');
     expect(page).toContain('nextHref="/franchize/vip-bike/electro-enduro"');
   });
-  it("task173: карта сети / зал славы / гараж are OUT — no mounts on the legacy hosts", () => {
-    expect(DISCOVERY).not.toContain("<RomanQuestCake");
+  it("task174: карта сети is BACK as the finale (no CTA) — зал славы / гараж stay OUT", () => {
+    expect(DISCOVERY).toContain("<RomanQuestCake");
+    expect(DISCOVERY).toContain('featureKey="discovery"');
     expect(LEADERBOARD).not.toContain("<RomanQuestCake");
     expect(RENT_BIKE).not.toContain("<RomanQuestCake");
-    expect(tourFeatureByKey("discovery")).toBeUndefined();
     expect(tourFeatureByKey("leaderboard")).toBeUndefined();
     expect(tourFeatureByKey("garage")).toBeUndefined();
   });
@@ -168,11 +171,11 @@ describe("task164 · the trail — wired stops (task173: 15 stops, crew pages on
     expect(page).toContain('featureKey="community"');
     expect(page).toContain('nextHref="/franchize/vip-bike/sales"');
   });
-  it("stop 15 цифры сезона in BOTH branches — the finale stop", () => {
+  it("stop 15 цифры сезона in BOTH branches — the money stop that points to the finale", () => {
     const page = hostPage("season-stats");
     expect(page.match(/featureKey="season_stats"/g)?.length).toBe(2);
   });
-  it("the trail chain is gapless: each stop's nextHref equals the next stop's host href (task165: keyed, not numbered; task173: crew pages only)", () => {
+  it("the trail chain is gapless: each stop's nextHref equals the next stop's host href (task165: keyed, not numbered; task173: crew pages only; task174: the chain ends discovery → gift)", () => {
     for (let i = 0; i < TOUR_FEATURES.length - 1; i++) {
       const cur = TOUR_FEATURES[i];
       const next = TOUR_FEATURES[i + 1];

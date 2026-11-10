@@ -289,6 +289,13 @@ export default function RomanQuestOverviewPage() {
                               ⭐ {s.priceStars} · подключить
                             </span>
                           )}
+                          {/* task174: the finale stop (discovery) sells nothing —
+                              it SELLS. A quiet amber badge instead of the star row. */}
+                          {!tourFeatureHasCta(s.key) && !isBirthday && (
+                            <span className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">
+                              🎬 финал тура · не продаётся — продаёт
+                            </span>
+                          )}
                           {purchases[s.key]?.status === "active" && (
                             <span className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-300">
                               ✓ оплачено{purchases[s.key]?.applied ? " · включено" : " · ваучер"}

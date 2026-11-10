@@ -5,11 +5,19 @@
 //    clicked i can't click on buttons in feature-tour modal: so can't
 //    continue».
 //
-// The ditch list = the four hosts that are NOT crew-scoped franchize routes
-// (/, /rent-bike, /leaderboard, /franchize/discovery): the tour sells crew
-// features — a stop must map to a purchasable flag that grows that crew's
-// burger menu, and global pages can never do that (feature-tour-menu.ts
-// already refuses to link them per-crew).
+// The ditch list = the hosts that are NOT crew-scoped franchize routes
+// (/, /rent-bike, /leaderboard): the tour sells crew features — a stop must
+// map to a purchasable flag that grows that crew's burger menu, and global
+// pages can never do that (feature-tour-menu.ts already refuses to link
+// them per-crew).
+//
+// TASK174 twist (boss: «keep /franchize/discovery in feature tour as last
+// step — kinda to show other crews that are being cooked» · Wolf of Wall
+// Street, «sell me this pen»): discovery is BACK as stop 16 — the FINALE.
+// It is priceStars 0 / no buy CTA on purpose: a global page can never grow
+// a crew menu, but the finale never needed one — it SELLS the platform
+// itself after the visitor has walked 15 crew features. Trail:
+// season-stats (15) → discovery (16) → /gift/roman (gift epilogue).
 //
 // The clickability root cause: map-riders keeps the deck drawer (vaul/Radix
 // Dialog) open, so body carries a stuck inline `pointer-events: none` — the
@@ -23,6 +31,7 @@ import {
   TOUR_FEATURES,
   TOUR_STOPS_TOTAL,
   tourFeatureByKey,
+  tourFeatureHasCta,
   tourNextFeature,
 } from "../../components/roman-gift/tourFeatures";
 import { featureKeyForMenuHref } from "../../app/franchize/lib/feature-tour-menu";
@@ -37,32 +46,56 @@ const LEGACY_HOSTS = [
   "app/page.tsx",
   "app/rent-bike/page.tsx",
   "app/leaderboard/page.tsx",
-  "app/franchize/discovery/page.tsx",
 ];
 
-describe("task173 · legacy non-franchize pages are OUT of the tour", () => {
-  it("the catalog has no landing/garage/leaderboard/discovery stops", () => {
-    for (const key of ["landing", "garage", "leaderboard", "discovery"]) {
+describe("task173/174 · legacy pages are OUT of the tour — discovery is the FINALE", () => {
+  it("landing/garage/leaderboard stay out of the catalog", () => {
+    for (const key of ["landing", "garage", "leaderboard"]) {
       expect(tourFeatureByKey(key), key).toBeUndefined();
     }
-    expect(TOUR_STOPS_TOTAL).toBe(15);
+    expect(TOUR_STOPS_TOTAL).toBe(16);
   });
 
-  it("every remaining stop is a crew-scoped franchize route (purchasable → menu link possible)", () => {
-    for (const f of TOUR_FEATURES) {
+  it("discovery is BACK as the finale: global route, free, stop 16", () => {
+    const finale = tourFeatureByKey("discovery");
+    expect(finale).toBeTruthy();
+    expect(finale!.stop).toBe(16);
+    expect(finale!.href).toBe("/franchize/discovery");
+    expect(finale!.priceStars).toBe(0);
+    expect(tourFeatureHasCta("discovery")).toBe(false);
+  });
+
+  it("stops 1..15 are crew-scoped and purchasable (menu flags), the finale is the one global exception", () => {
+    const crewStops = TOUR_FEATURES.filter((f) => f.stop <= 15);
+    expect(crewStops.length).toBe(15);
+    for (const f of crewStops) {
       // storefront = the crew home (no suffix) — still crew-scoped, and the
       // menu filter treats it as kind:"home" (always renders, never sold twice)
       expect(f.href, f.key).toMatch(/^\/franchize\/vip-bike(?:\/[a-z-]+)?$/);
       expect(f.priceStars, f.key).toBeGreaterThan(0);
+      expect(tourFeatureHasCta(f.key), f.key).toBe(true);
     }
+    // the finale breaks BOTH rules on purpose (Wolf of Wall Street pen)
+    expect(tourFeatureByKey("discovery")!.href).not.toMatch(/^\/franchize\/vip-bike/);
+    expect(tourFeatureByKey("discovery")!.priceStars).toBe(0);
   });
 
-  it("the four legacy hosts lost both the mount and the import", () => {
+  it("the three legacy hosts lost both the mount and the import", () => {
     for (const p of LEGACY_HOSTS) {
       const src = legacyHost(p);
       expect(src, p).not.toContain("<RomanQuestCake");
       expect(src, p).not.toContain('from "@/components/roman-gift/RomanQuestCake"');
     }
+  });
+
+  it("task174: the discovery host REGAINED its mount and import (the finale lives there)", () => {
+    const src = legacyHost("app/franchize/discovery/page.tsx");
+    expect(src).toContain('from "@/components/roman-gift/RomanQuestCake"');
+    expect(src).toContain("<RomanQuestCake");
+    expect(src).toContain('featureKey="discovery"');
+    // the finale hands the visitor to the gift epilogue, not to a crew page
+    expect(src).toContain('nextHref="/gift/roman"');
+    expect(src).toMatch(/riddle="[^"]{60,}"/);
   });
 
   it("the trail chain skips the ditched pages: wheel → bikes (was discovery)", () => {
@@ -72,10 +105,38 @@ describe("task173 · legacy non-franchize pages are OUT of the tour", () => {
     expect(wheel).not.toContain('nextHref="/franchize/discovery"');
   });
 
-  it("stop numbers stay contiguous 1..15 (reorder-safe helpers rely on it)", () => {
+  it("stop numbers stay contiguous 1..16 (reorder-safe helpers rely on it)", () => {
     expect(TOUR_FEATURES.map((f) => f.stop)).toEqual(
       Array.from({ length: TOUR_STOPS_TOTAL }, (_, i) => i + 1),
     );
+  });
+});
+
+describe("task173/174 · the finale hop is wired on the money stop", () => {
+  it("season-stats (15) points to the network in BOTH branches", () => {
+    const page = legacyHost("app/franchize/[slug]/season-stats/page.tsx");
+    const cakeBlocks = page.match(/<RomanQuestCake[\s\S]*?\/>/g) || [];
+    expect(cakeBlocks.length).toBe(2);
+    for (const block of cakeBlocks) {
+      expect(block).toContain('featureKey="season_stats"');
+      expect(block).toContain('nextHref="/franchize/discovery"');
+      expect(block).toContain("Посмотреть, кто варится");
+    }
+    expect(tourNextFeature(15)?.key).toBe("discovery");
+  });
+
+  it("the finale is the end of the purchasable trail: nothing follows stop 16", () => {
+    expect(tourNextFeature(TOUR_STOPS_TOTAL)).toBeUndefined();
+    expect(tourNextFeature(16)).toBeUndefined();
+  });
+
+  it("the finale carries no buy CTA in the modal (priceStars 0 → ctaOn false)", () => {
+    // the modal gates the whole buy block behind tourFeatureHasCta
+    expect(component).toContain("tourFeatureHasCta");
+    expect(component).toContain("!isBirthday && ctaOn && feature");
+    // the hub card gets an intentional finale badge instead of a star row
+    const hub = read("app/gift/roman-quest/page.tsx");
+    expect(hub).toContain("не продаётся — продаёт");
   });
 });
 
@@ -104,18 +165,19 @@ describe("task173 · the tour survives the stuck pointer-events on map-riders", 
   });
 });
 
-describe("task173 · catalog invariants after the cut", () => {
+describe("task173 · catalog invariants after the cut (16 stops incl. the finale)", () => {
   it("preview URLs stay in the tourpix bucket (no new raw screenshots needed)", () => {
     expect(catalog).toContain("tourpix/task165");
     expect(catalog).not.toContain(".png");
   });
 
-  it("all 15 keys are unique and slug-agnostic (suffix map feeds the menu filter)", () => {
+  it("all 16 keys are unique; suffix map has no collisions for the menu filter", () => {
     const keys = TOUR_FEATURES.map((f) => f.key);
-    expect(new Set(keys).size).toBe(15);
-    // no href collides on the same suffix — the menu filter maps suffix→key
+    expect(new Set(keys).size).toBe(16);
+    // no href collides after stripping the crew prefix — the menu filter
+    // maps suffix→key (the finale keeps its full global path, also unique)
     const suffixes = TOUR_FEATURES.map((f) => f.href.replace("/franchize/vip-bike", ""));
-    expect(new Set(suffixes).size).toBe(15);
+    expect(new Set(suffixes).size).toBe(16);
   });
 });
 
@@ -134,5 +196,10 @@ describe("task173 · codereview fix — the buy-feature entry is wired for EVERY
   it("the hub href is not a crew-scoped feature — the filter always passes it", () => {
     expect(featureKeyForMenuHref("/gift/roman-quest", "moto-selection")).toBeNull();
     expect(featureKeyForMenuHref("/gift/roman-quest", "vip-bike")).toBeNull();
+  });
+
+  it("the finale is a global route — the filter maps it to no crew flag either", () => {
+    expect(featureKeyForMenuHref("/franchize/discovery", "moto-selection")).toBeNull();
+    expect(featureKeyForMenuHref("/franchize/discovery", "vip-bike")).toBeNull();
   });
 });

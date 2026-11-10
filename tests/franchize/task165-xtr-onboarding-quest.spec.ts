@@ -63,7 +63,7 @@ const GOLDEN_STANDARD_HEADER_ROUTES = [
 ];
 
 describe("task165 · the onboarding quest covers the ENTIRE golden-standard header", () => {
-  it("15 stops (task173: legacy non-franchize pages ditched) — every vip-bike header menu link has a tour stop (the ⭐ hub is the quest)", () => {
+  it("16 stops: every vip-bike header menu link has a tour stop + the network finale (the ⭐ hub is the quest; task174: discovery is stop 16)", () => {
     const stopHrefs = new Set(TOUR_FEATURES.map((f) => f.href));
     const missing: string[] = [];
     for (const link of GOLDEN_STANDARD_HEADER_ROUTES) {
@@ -72,7 +72,7 @@ describe("task165 · the onboarding quest covers the ENTIRE golden-standard head
       if (!stopHrefs.has(concrete)) missing.push(concrete);
     }
     expect(missing).toEqual([]);
-    expect(TOUR_STOPS_TOTAL).toBe(15);
+    expect(TOUR_STOPS_TOTAL).toBe(16);
   });
 
   it("the 9 NEW stops exist with product copy and real prices", () => {
@@ -226,8 +226,9 @@ describe("task165 · CTA surfaces — real stars button for TG sessions, demo fo
 
 describe("task165 · the 9 new host stops are wired (chain and gating)", () => {
   const NEW_STOPS: Array<[string, string, string]> = [
-    // page, featureKey, nextHref (task173: wheel → bikes, discovery/leaderboard/
-    // rent-bike/landing stops are gone — global pages can't grow a crew menu)
+    // page, featureKey, nextHref (task173: wheel → bikes; task174: the chain
+    // continues season-stats → discovery (the sell-me-this-pen network
+    // finale, stop 16) → /gift/roman)
     ["electro-enduro", "electro_enduro", "/franchize/vip-bike/wheel"],
     ["wheel", "wheel", "/franchize/vip-bike/bikes"],
     ["bikes", "bikes", "/franchize/vip-bike/cart"],

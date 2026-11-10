@@ -172,10 +172,12 @@ describe("task156: roman quest polish (source pins)", () => {
     expect(overview).not.toMatch(/if \(gate === "hidden"\) return null;/);
   });
 
-  it("stop-7 riddle lost the redundant second ending (both gated branches)", () => {
+  it("stop-15 riddle kept the concise single ending (both gated branches; task174: pointer → network finale)", () => {
     const stats = src("app/franchize/[slug]/season-stats/page.tsx");
     expect(stats).not.toContain("Осталось нажать одну кнопку");
-    expect(stats.match(/подарок ждёт тебя там с самого начала/g)?.length).toBe(2);
+    // task174 re-baseline: the season-stats riddle now closes with the
+    // /gift/roman pointer inside ONE sentence, and BOTH cake mounts carry it
+    expect(stats.match(/А подарок с самого начала лежит по адресу \/gift\/roman\./g)?.length).toBe(2);
   });
 
   it("overview final card wording updated", () => {

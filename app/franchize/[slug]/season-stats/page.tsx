@@ -88,14 +88,16 @@ export default async function SeasonStatsPage({ params }: Props) {
             Войдите через Telegram WebApp, чтобы увидеть цифры своего экипажа.
           </p>
         </div>
-        {/* task165 onboarding tour — stop 15/15 lives in BOTH branches — the
-            cake is an overlay, so the tour works even on the locked fallback */}
+        {/* task165 onboarding tour — stop 15/16 lives in BOTH branches — the
+            cake is an overlay, so the tour works even on the locked fallback.
+            task174: the finale pointer now goes to the NETWORK (discovery) —
+            «sell me this pen», the gift comes after the network. */}
         {slug === "vip-bike" && (
           <RomanQuestCake
             featureKey="season_stats"
-            riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
-            nextHref="/gift/roman"
-            nextLabel="Открыть подарок"
+            riddle="Вот они, плоды общего дела — весь сезон до рубля. Но экипаж — не только цифры: финал тура ведёт в сеть, где варятся новые экипажи. А подарок с самого начала лежит по адресу /gift/roman."
+            nextHref="/franchize/discovery"
+            nextLabel="Посмотреть, кто варится"
           />
         )}
       </main>
@@ -113,14 +115,15 @@ export default async function SeasonStatsPage({ params }: Props) {
           tokens={tokens}
         />
       </FranchizePageShell>
-      {/* task165 onboarding tour — stop 15/15, the last riddle before the
-          finale (vip-bike crew only; Roman opens logged in) */}
+      {/* task165 onboarding tour — stop 15/16, the pen-selling pointer to the
+          network finale (vip-bike crew only; Roman opens logged in).
+          task174: season-stats → discovery → /gift/roman. */}
       {slug === "vip-bike" && (
         <RomanQuestCake
           featureKey="season_stats"
-          riddle="Вот они, плоды общего дела — весь сезон до рубля. Последний шаг: прибавь к адресу сайта /gift/roman — подарок ждёт тебя там с самого начала."
-          nextHref="/gift/roman"
-          nextLabel="Открыть подарок"
+          riddle="Вот они, плоды общего дела — весь сезон до рубля. Но экипаж — не только цифры: финал тура ведёт в сеть, где варятся новые экипажи. А подарок с самого начала лежит по адресу /gift/roman."
+          nextHref="/franchize/discovery"
+          nextLabel="Посмотреть, кто варится"
           />
       )}
       <CrewFooter crew={crew} />

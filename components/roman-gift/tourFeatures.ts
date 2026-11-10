@@ -13,17 +13,25 @@
 // notes/modals»).
 //
 // TASK173 (boss: «ditch some legacy non-franchize pages from the tour — try
-// to understand which»): the four stops whose host pages are NOT crew-scoped
-// franchize routes are gone — `/` (the legacy single-crew landing),
-// `/franchize/discovery` (global network map), `/leaderboard` (global hall of
-// fame) and `/rent-bike` (the pre-franchize global booking flow, superseded
-// by crew storefronts). Rationale: the tour SELLS crew features — a stop must
-// map to a purchasable crew-scoped flag that grows that crew's burger menu
-// (feature-tour-menu.ts already refuses to link global routes per-crew), so
-// landing/discovery/leaderboard/garage had buy CTAs that could never flip a
-// menu link. 15 crew-scoped stops remain, renumbered 1-15; their host pages
-// (storefront → … → season-stats) are the only FAB hosts besides the quest
-// hub (/gift/roman-quest, /gift/roman).
+// to understand which»): the stops whose host pages are NOT crew-scoped
+// franchize routes were dropped — `/` (the legacy single-crew landing),
+// `/leaderboard` (global hall of fame) and `/rent-bike` (the pre-franchize
+// global booking flow, superseded by crew storefronts). Rationale: the tour
+// SELLS crew features — a stop must map to a purchasable crew-scoped flag
+// that grows that crew's burger menu (feature-tour-menu.ts already refuses
+// to link global routes per-crew), so landing/leaderboard/garage had buy
+// CTAs that could never flip a menu link. 15 crew-scoped stops remain,
+// renumbered 1-15.
+//
+// TASK174 (boss: «keep /franchize/discovery in feature tour as last step —
+// kinda to show other crews that are being cooked: Remember in Wolf of
+// Wall Street - sell me pen? give autograph - no pen? here it is»): the
+// global network map is BACK — as stop 16, the FINALE. It is deliberately
+// priceStars 0 (no buy CTA): a global page can never grow a crew menu, but
+// that was never its job — its job is to CLOSE the sale of the platform
+// itself. The visitor just walked 15 features of one crew; the finale shows
+// the network being cooked and creates the «sell me this pen» want. The
+// trail now ends: season-stats (15) → discovery (16) → /gift/roman (gift).
 //
 // This file is the SINGLE SOURCE for: stop modal CTAs + previews, the
 // /gift/roman-quest overview cards, the activation API key validation and the
@@ -241,6 +249,21 @@ export const TOUR_FEATURES: TourFeature[] = [
     priceStars: 75,
     preview: `${TOURPIX}/season_stats.webp`,
   },
+  {
+    // task174 — the FINALE (Wolf of Wall Street: sell me this pen). Global
+    // route on purpose, priceStars 0 on purpose: nothing to buy here — this
+    // stop SELLS. One crew's features walked, now show the network cooking.
+    key: "discovery",
+    stop: 16,
+    href: "/franchize/discovery",
+    icon: "🌐",
+    title: "Сеть экипажей",
+    page: "/franchize/discovery",
+    pitch: "Финал тура — не фича, а продажа ручки. Круги на карте — экипажи, которые варятся прямо сейчас; линии — общие люди. Твой круг — следующий.",
+    gives: "Соц-доказательство вместо слов: сеть живёт, растёт — и ждёт твой экипаж.",
+    priceStars: 0,
+    preview: `${TOURPIX}/discovery.webp`,
+  },
 ];
 
 export const TOUR_STOPS_TOTAL = TOUR_FEATURES.length;
@@ -251,7 +274,13 @@ export function tourFeatureByKey(key: string): TourFeature | undefined {
   return TOUR_FEATURES.find((f) => f.key === key);
 }
 
-/** Every remaining stop sells a real crew feature — all carry a CTA. */
+/**
+ * Stops 1-15 sell real crew features and carry a buy CTA. The finale
+ * (discovery, stop 16) is priceStars 0 — nothing to buy, it SELLS the
+ * network itself (task174, «sell me this pen»). A global page could never
+ * flip a per-crew menu flag anyway — feature-tour-menu.ts skips it, and the
+ * burger menu keeps only the purchasable crew-scoped features.
+ */
 export function tourFeatureHasCta(key: string): boolean {
   const f = tourFeatureByKey(key);
   return Boolean(f && f.priceStars > 0);
