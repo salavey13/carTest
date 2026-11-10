@@ -1791,3 +1791,19 @@ Work Log:
 
 Stage Summary:
 - Тур = 15 crew-стопов (витрина → … → цифры сезона), глобальные legacy-страницы выкинуты; map-riders FAB кликабелен и модалка работает (PE-гарды по паттерну MapPhotoLightbox); ⭐-вход в тур теперь у КАЖДОГО экипажа в бургере — buy-feature механика «editable menu» реально применима beyond vip-bike, меню vip-bike не тронуто (full demo). Следующие кандидаты: превью tourpix для новых crew-страниц, авто-редемшн ваучеров при создании crew.
+
+---
+Task ID: task174-feature-tour-finale
+Agent: main (Z.ai CLI)
+Task: boss — «Awesome! Though keep /franchize/discovery in feature tour as last step or something, kinda to show other crews that are being cooked: Remember in Wolf of Wall Street - sell me pen? give autograph - no pen? here it is..» (плюс стратегический вопрос про supabase-api-key leverage — отвечен в чате, вне репо).
+
+Work Log:
+- FINALE: discovery вернулся в тур как СТОП 16/16 — priceStars 0, БЕЗ buy-CTA (осознанно: глобальный маршрут никогда не растит burger-menu, финалу это и не нужно — он ПРОДАЁТ саму платформу после того, как гость прошёл 15 crew-фич; «sell me this pen»). Каталог: pitch «Финал тура — не фича, а продажа ручки…», gives «Соц-доказательство вместо слов», preview tourpix/task165/discovery.webp (старый скрин жив, HTTP 200).
+- TRAIL: season-stats (15, оба бранча) → nextHref=/franchize/discovery, nextLabel «Посмотреть, кто варится», riddle переозвучен; discovery-хост снова несёт mount RomanQuestCake (featureKey=discovery) → nextHref=/gift/roman; компонент уже имел task164-логику: /gift/roman для не-Roman редиректит на хаб тура с «К финалу тура →». Дуга: 15 crew-фич → сеть варится → хаб тура → подарок (Roman).
+- HUB: карточка финала вместо звёздной строки получает янтарный бейдж «🎬 финал тура · не продаётся — продаёт» (gated tourFeatureHasCta → старый ugly «⭐ 0 · подключить» не рендерится).
+- SPECS: task173 spec переписан (16 стопов, discovery-финал + regained mount, 3 legacy-хоста, финальный хоп season-stats→discovery в обоих бранчах, отсутствие CTA у финала, featureKeyForMenuHref('/franchize/discovery')=null); task164/165 синхронизированы (toBe(16), CTA только у 1..15, gapless-цепь покрывает 15→16 автоматически); task156 re-baseline под новый riddle («А подарок с самого начала лежит по адресу /gift/roman.» ×2).
+- QA: vitest full 4013 passed / 23 skipped; eslint чист на всех 7 затронутых файлах; tsc локально OOM (4GB) — типы проверит Vercel build.
+- VERIFY prod (d990a83): /franchize/discovery — FAB «Фича-тур» кликабелен (agent-browser 390×844), модалка «ФИЧА 16 ИЗ 16» с финальным riddle, gives на месте, buy-CTA отсутствует (eval: «НЕТ (ок)»), кнопки «К финалу тура →»/«Позже»; /franchize/vip-bike/season-stats несёт «Посмотреть, кто варится» → /franchize/discovery в flight-полезной нагрузке.
+
+Stage Summary:
+- Тур = 16 стопов: 15 покупаемых crew-фич + финал-«продажа ручки» (сеть экипажей, 20 в сети) — глобальная страница возвращена какcloser, который продаёт платформу, а не фичу. Полная дуга: витрина → … → цифры сезона → сеть варится → хаб → подарок. Следующие кандидаты: tourpix-превью для финала посвежее (когда экипажей станет больше 20), авто-редемшн ваучеров при создании crew.
