@@ -1740,3 +1740,20 @@ Work Log:
 
 Stage Summary:
 - К ротации всё готово: 29 скриптов переведены на env-only (SUPABASE_SERVICE_ROLE_KEY принимает и legacy JWT, и новое значение sb_secret_), ни один ремонтный скрипт не отвалится молча после «disable legacy keys». На боссе: disable legacy + новые ключи в Vercel/агенты (имена env не менять — значения заменить), затем контрольный прогон одного скрипта из scripts/.
+
+---
+Task ID: task171-ekipazh-interview-page
+Agent: main (Z.ai CLI)
+Task: boss — «nice interview (transcript attached)… Create an 'interview html page' … add some more pictures to html;) Kinda turn your knowledge about the project and presentations/summaries we did before into interview styled explainer/presenter promo material; avoid specific details about vip-bike… And give your honest opinion about resemblance» → follow-up: «go! thanks for confirmation!:) and we'll see about that divergence!:D».
+
+Work Log:
+- Исходники: транскрипт Generalist Podcast × ex-SpaceX founder of Revel (1708 строк, DownSub) + 2 YouTube-скриншота студии как визуальный референс; голос гостя — из речи SLY13 (task169), пины месседжинга — из task138/167 (статистика экипажей НЕ для публикации).
+- Съёмка 8 прод-скриншотов agent-browser (каталог, конфигуратор, колесо, карта райдеров, витрина SLY13 ×2) — только публичные поверхности; первая попытка поймала «Crew slug was not found» fallback-shell → повтор с cache-buster + reload + sleep 20/15 (известная SSR-флеймость). Конверсия 6 скриншотов PNG→JPG q86 (1.3MB→149KB максимум), неиспользуемые кадры удалены.
+- 3 AI-изображения (z-ai CLI): пустая студия с бобами и бум-микрофонами (hero), микрофон крупно (cold open), ночной рабочий стол с мотоциклетной игрушкой (секция «один за экраном»). Без людей, логотипов и текста. Размер 1440x720 не валиден у API (720 не кратен 32) → 1344x768.
+- /public/interview.html (~515 строк, standalone, zero-deps): шоу-бренд «ЭКИПАЖ · выпуск №1», студийная эстетика Generalist (крем-бумага, деревянные рейки repeating-gradient, оранж-янтарь-лист, Playfair Display + Onest с кириллицей). Структура: hero-студия → карточка гостя → dark cold-open с 3 цитатами → lede с dropcap → 9 Q&A (происхождение/чаты-таблицы/один за экраном/ставка на мультиэкипажность до спроса/«спросили другие»/запуск за один звонок/лучшее предложение побеждает/миссия двоякая) → блиц ×3 → финал с CTA (@SALAVEY13, /saladey13-витрина, живой экипаж) → дисклеймер «факты настоящие, цифры за кадром». Скриншоты оформлены фейковым browser-chrome («студийные снимки»). 9 картинок: 3 AI + 6 прод.
+- vip-bike specifics: ноль цифр сезона, ноль имён экипажей кроме одного упоминания бренда в CTA («живой экипаж в проде»), ноль городов/дат; фичи платформы описаны в терминах речи босса («заливаешь каталог — получаешь экипаж», «деньги сходятся до копейки», «одна платформа — много экипажей»).
+- VERIFY: локально fonts.check Playfair 500/700/900 loaded, body 13631px; деплой 44a22e4 → prod /interview.html HTTP 200, все 9 картинок naturalWidth>0 после скролла (lazy-loading), console errors — ноль.
+- Нюанс: GitHub deployments-API поллинг из песочницы вернул пустые статусы (9 мин) — живой чек prod-URL надёжнее.
+
+Stage Summary:
+- «Экипаж» выпуск №1 жив на /interview.html: интервью-промо, где salavey13 рассказывает, как платформа выросла из одного экипажа и вышла за его пределы, — 12 минут чтения, 9 картинок, ни одной приватной цифры. Следующий шаг (по желанию босса): выпуск №2 или версия-EN для внешнего распространения.
