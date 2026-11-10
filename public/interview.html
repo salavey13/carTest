@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ЭКИПАЖ · salavey13 — «Платформа, которая выросла из проката»</title>
-<meta name="description" content="Большое интервью: salavey13 о платформе SLY13 — как софт, построенный для одного экипажа, захотелся всем остальным. Художественный формат по мотивам реальных разговоров.">
-<meta property="og:title" content="ЭКИПАЖ · salavey13 — «Платформа, которая выросла из проката»">
-<meta property="og:description" content="Один за экраном. Сначала платформа заработала на его экипаже — потом спросили другие. Большое интервью о SLY13.">
+<title>CREW · salavey13 — «Платформа, которая выросла из проката»</title>
+<meta name="description" content="Большое интервью: salavey13 о платформе SLY13 — как софт, построенный для одного crew, захотелся всем остальным. Opensource, армия агентов вместо команды разработки и bookkeepers on steroids.">
+<meta property="og:title" content="CREW · salavey13 — «Платформа, которая выросла из проката»">
+<meta property="og:description" content="Один за экраном. Сначала платформа заработала на его crew — потом спросили другие. Большое интервью о SLY13.">
 <meta property="og:type" content="article">
 <meta property="og:image" content="/images/interview/studio-hero.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700&family=Onest:wght@400;500;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500;1,700;1,900&family=Onest:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper:#F7F2E7;          /* тёплый крем — стены студии */
@@ -31,14 +31,14 @@
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{
-    margin:0; background:var(--paper); color:var(--ink);
+    margin:0; background:linear-gradient(180deg,#F9F5EC,var(--paper) 340px); color:var(--ink);
     font:17px/1.75 "Onest",-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
     -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
   }
   .serif{font-family:"Playfair Display",Georgia,serif}
   .wrap{max-width:880px;margin:0 auto;padding:0 22px}
-  .wrap-wide{max-width:1120px;margin:0 auto;padding:0 22px}
-  img{display:block;max-width:100%}
+  img{display:block;max-width:100%;height:auto}  /* фикс растяжения: height всегда по пропорции */
 
   /* ── верхняя плашка шоу ─────────────────────────────── */
   .showbar{
@@ -61,7 +61,7 @@
   .hero-media img{width:100%;height:min(72vh,620px);object-fit:cover;filter:saturate(1.02)}
   .hero-media::after{
     content:"";position:absolute;inset:0;
-    background:linear-gradient(180deg,rgba(23,19,16,.55) 0%,rgba(23,19,16,.12) 40%,rgba(23,19,16,.82) 100%);
+    background:linear-gradient(180deg,rgba(23,19,16,.55) 0%,rgba(23,19,16,.12) 40%,rgba(23,19,16,.86) 100%);
   }
   .hero-text{position:absolute;left:0;right:0;bottom:0;padding:34px 22px 42px;text-align:center;color:#fff}
   .kicker{
@@ -71,16 +71,22 @@
   .kicker::before,.kicker::after{content:"";height:1px;width:34px;background:#F3D9A0;opacity:.5}
   .hero-text h1{
     font-family:"Playfair Display",Georgia,serif;font-weight:900;
-    font-size:clamp(34px,6vw,64px);line-height:1.08;margin:0 auto 16px;max-width:900px;
+    font-size:clamp(34px,6vw,64px);line-height:1.08;margin:0 auto 16px;max-width:920px;
     text-shadow:0 2px 30px rgba(0,0,0,.35);
   }
-  .hero-text h1 em{font-style:italic;color:#F7B733}
-  .hero-sub{max-width:640px;margin:0 auto;color:#E9DFC9;font-size:clamp(15px,2vw,18px);line-height:1.6}
+  .hero-text h1 em{
+    font-style:italic;
+    background:linear-gradient(92deg,#F7B733 10%,#E85D0C 90%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero-sub{max-width:680px;margin:0 auto;color:#E9DFC9;font-size:clamp(15px,2vw,18px);line-height:1.6}
   .hero-meta{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:26px}
   .chip{
     border:1px solid rgba(243,222,180,.4);border-radius:999px;color:#F3EADA;
     padding:7px 16px;font-size:12.5px;letter-spacing:.08em;font-weight:600;background:rgba(23,19,16,.35);
+    transition:border-color .4s ease, background .4s ease;
   }
+  .chip:hover{border-color:rgba(247,183,51,.8);background:rgba(232,93,12,.25)}
   .chip b{color:#F7B733}
 
   /* ── гость ──────────────────────────────────────────── */
@@ -94,12 +100,14 @@
     border:3px solid var(--wood-deep); box-shadow:0 6px 18px rgba(32,27,20,.25);
   }
   .guest-name{font-family:"Playfair Display",serif;font-weight:700;font-size:22px;margin:0 0 4px}
-  .guest-bio{margin:0;color:var(--ink-soft);font-size:15.5px;max-width:640px}
+  .guest-bio{margin:0;color:var(--ink-soft);font-size:15.5px;max-width:660px}
   .guest-bio b{color:var(--ink)}
 
   /* ── cold open: гаснет свет ─────────────────────────── */
   .cold{background:var(--dark);color:var(--cream);position:relative;overflow:hidden}
-  .cold-in{display:grid;grid-template-columns:1.25fr .75fr;gap:34px;align-items:center;padding:54px 0}
+  .cold::before{content:"";position:absolute;width:520px;height:520px;left:-180px;top:-200px;border-radius:50%;
+    background:radial-gradient(circle,rgba(232,93,12,.16),transparent 65%);pointer-events:none}
+  .cold-in{display:grid;grid-template-columns:1.25fr .75fr;gap:34px;align-items:center;padding:54px 0;position:relative}
   .cold h2{
     font-family:"Playfair Display",serif;font-weight:700;font-size:13px;letter-spacing:.34em;
     text-transform:uppercase;color:#B7A98D;margin:0 0 26px;
@@ -110,7 +118,12 @@
     font-size:clamp(19px,2.6vw,25px);line-height:1.42;margin:0 0 8px;color:#F3EADA;
   }
   .cold blockquote span{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:#8D8168;font-style:normal;font-family:"Onest",sans-serif}
-  .cold img{border-radius:14px;border:1px solid #3A3226;box-shadow:0 20px 50px rgba(0,0,0,.5);transform:rotate(1.6deg)}
+  .cold-img{position:relative;border-radius:14px;overflow:hidden;border:1px solid #3A3226;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);transform:rotate(1.6deg)}
+  .cold-img img{width:100%}
+  .cold-img::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(23,19,16,0) 55%,rgba(23,19,16,.55) 100%),
+               linear-gradient(150deg,rgba(232,93,12,.14),transparent 45%,rgba(124,154,61,.12) 90%);}
 
   /* ── ведущий-интро ──────────────────────────────────── */
   .lede{padding:52px 0 8px}
@@ -122,11 +135,19 @@
   }
 
   /* ── Q&A ────────────────────────────────────────────── */
-  .qa{padding:30px 0 6px}
-  .q{position:relative;margin:0 0 18px;padding:26px 28px 26px 34px;
-    background:var(--paper-deep);border:1px solid var(--line);border-radius:18px;border-left:4px solid var(--orange)}
+  .qa{padding:34px 0 6px;position:relative}
+  .qa::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:min(320px,42%);height:1px;
+    background:linear-gradient(90deg,transparent,rgba(201,164,105,.75),rgba(232,93,12,.35),transparent)}
+  .q{position:relative;margin:0 0 18px;padding:26px 28px 26px 36px;
+    background:var(--paper-deep);border:1px solid var(--line);border-radius:18px}
+  .q::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:18px 0 0 18px;
+    background:linear-gradient(180deg,var(--orange),var(--amber) 58%,var(--leaf))}
+  .q::after{content:attr(data-n);position:absolute;top:14px;right:22px;
+    font-family:"Playfair Display",serif;font-weight:900;font-size:46px;line-height:1;
+    color:transparent;-webkit-text-stroke:1px rgba(201,164,105,.4)}
   .q .who{font-size:11.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--orange);font-weight:800;margin-bottom:8px}
-  .q p{margin:0;font-family:"Playfair Display",serif;font-weight:700;font-size:clamp(20px,2.8vw,26px);line-height:1.34}
+  .q p{margin:0;font-family:"Playfair Display",serif;font-weight:700;font-size:clamp(20px,2.8vw,26px);line-height:1.34;padding-right:44px}
   .a{display:grid;grid-template-columns:64px 1fr;gap:16px;margin:0 0 30px}
   .a-ava{width:64px;height:64px;border-radius:50%;flex:none;margin-top:6px;
     background:radial-gradient(circle at 30% 25%,#3A3226,#171310);color:#F7B733;
@@ -136,10 +157,23 @@
   .a-body p{margin:0 0 16px}
   .a-body p:last-child{margin-bottom:0}
   .a-body .hl{background:linear-gradient(180deg,transparent 62%,rgba(124,154,61,.35) 62%)}
-  .a-body .pull{font-family:"Playfair Display",serif;font-style:italic;font-size:20px;color:var(--ink);padding-left:18px;border-left:3px solid var(--amber);margin:18px 0}
+  .a-body .pull{font-family:"Playfair Display",serif;font-style:italic;font-size:20px;color:var(--ink);padding-left:18px;border-left:3px solid var(--amber);margin:18px 0;line-height:1.55}
+
+  /* ── пин-цитата (тёмная карточка с градиентным свечением) ── */
+  .pin{background:linear-gradient(140deg,#1B1510,#2A2119 60%,#171310);border-radius:24px;
+    padding:44px 40px;margin:46px 0;text-align:center;position:relative;overflow:hidden;
+    box-shadow:0 24px 60px -24px rgba(23,19,16,.55)}
+  .pin::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(circle at 82% -20%,rgba(232,93,12,.35),transparent 55%),
+               radial-gradient(circle at 8% 125%,rgba(124,154,61,.22),transparent 55%)}
+  .pin::after{content:"“";position:absolute;top:-30px;left:22px;font-family:"Playfair Display",serif;
+    font-weight:900;font-size:150px;color:rgba(245,166,35,.14);line-height:1}
+  .pin p{position:relative;font-family:"Playfair Display",serif;font-style:italic;font-weight:700;
+    font-size:clamp(22px,3.4vw,30px);line-height:1.35;color:#F3EADA;margin:0 0 14px}
+  .pin span{position:relative;font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:#B7A98D}
 
   /* ── кадры: «студийные снимки» ──────────────────────── */
-  figure.shot{margin:40px 0}
+  figure.shot{margin:42px 0}
   figure.shot .browser{
     border-radius:14px;overflow:hidden;border:1px solid var(--line);
     box-shadow:0 24px 60px -20px rgba(32,27,20,.35); background:#fff;
@@ -151,25 +185,19 @@
   .chrome .lamp{display:flex;gap:6px}
   .chrome .lamp i{width:11px;height:11px;border-radius:50%;display:block}
   .chrome .lamp i:nth-child(1){background:#FF5F57}.chrome .lamp i:nth-child(2){background:#FEBC2E}.chrome .lamp i:nth-child(3){background:#28C840}
-  .chrome .url{margin-left:10px;background:#1B1712;border-radius:8px;padding:4px 14px;font-size:11.5px;letter-spacing:.04em;color:#8D8168}
-  figure.shot img{width:100%}
+  .chrome .url{margin-left:10px;background:#1B1712;border-radius:8px;padding:4px 14px;font-size:11.5px;letter-spacing:.04em;color:#8D8168;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .media{position:relative;overflow:hidden;background:#fff}
+  .media img{width:100%;height:auto;transition:transform .9s cubic-bezier(.16,1,.3,1)}
+  /* плавный переход картинки в градиент — фирменный приём студии */
+  .media::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(155deg,rgba(232,93,12,.13),rgba(245,166,35,.05) 38%,rgba(124,154,61,.10) 80%),
+               linear-gradient(180deg,rgba(247,242,231,0) 82%,rgba(247,242,231,.28) 100%);}
+  .browser:hover .media img{transform:scale(1.025)}
   figure.shot figcaption{font-size:13.5px;color:var(--ink-soft);text-align:center;margin-top:12px;font-style:italic}
-  .shots2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-  .shots2 figure.shot{margin:0}
-  .shots2 .shot-pair{margin:40px 0;display:grid;gap:22px}
-
-  /* ── тёмная вставка-факт ────────────────────────────── */
-  .darkcard{
-    background:var(--dark-2);color:var(--cream);border-radius:20px;
-    padding:34px 36px;margin:44px 0;position:relative;overflow:hidden;
-  }
-  .darkcard::before{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border-radius:50%;
-    background:radial-gradient(circle,rgba(232,93,12,.35),transparent 65%)}
-  .darkcard h3{font-family:"Playfair Display",serif;font-weight:700;font-size:22px;margin:0 0 10px;color:#F7B733}
-  .darkcard p{margin:0;color:#DDD3BD;font-size:16px;line-height:1.7}
+  .shots2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:42px 0}
 
   /* ── блиц ───────────────────────────────────────────── */
-  .blitz{background:var(--paper-deep);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:52px 0;margin-top:50px}
+  .blitz{background:var(--paper-deep);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:56px 0;margin-top:54px;position:relative;overflow:hidden}
   .blitz h2{font-family:"Playfair Display",serif;font-weight:900;font-size:clamp(26px,4vw,36px);margin:0 0 6px}
   .blitz .sub{color:var(--ink-soft);margin:0 0 30px;font-size:15px}
   .blitz-item{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;padding:18px 0;border-top:1px dashed var(--wood-deep)}
@@ -177,26 +205,61 @@
   .blitz-item .aa{color:var(--ink-soft)}
   .blitz-item .aa b{color:var(--ink)}
 
+  /* ── брейншторм: доска идей ─────────────────────────── */
+  .brain{background:linear-gradient(160deg,#1B1510,#241B10 55%,#1C2410);color:var(--cream);
+    padding:74px 0 66px;position:relative;overflow:hidden}
+  .brain::before{content:"";position:absolute;width:460px;height:460px;left:-150px;top:-160px;border-radius:50%;
+    background:radial-gradient(circle,rgba(232,93,12,.30),transparent 65%)}
+  .brain::after{content:"";position:absolute;width:420px;height:420px;right:-140px;bottom:-180px;border-radius:50%;
+    background:radial-gradient(circle,rgba(124,154,61,.26),transparent 65%)}
+  .brain-in{position:relative}
+  .brain h2{font-family:"Playfair Display",serif;font-weight:900;font-size:clamp(27px,4.2vw,42px);margin:0 0 12px;line-height:1.18}
+  .brain h2 .grad{background:linear-gradient(92deg,#F5A623,#E85D0C 55%,#8FB048);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .brain .sub{color:#B7A98D;max-width:700px;margin:0 0 36px;font-size:16px;line-height:1.7}
+  .ideas{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+  .idea{background:rgba(255,255,255,.055);border:1px solid rgba(243,222,180,.16);border-radius:16px;
+    padding:22px 20px 20px;transition:transform .55s cubic-bezier(.16,1,.3,1),border-color .55s ease,background .55s ease}
+  .idea:hover{transform:translateY(-5px);border-color:rgba(245,166,35,.55);background:rgba(255,255,255,.085)}
+  .idea .num{display:inline-flex;width:30px;height:30px;border-radius:10px;align-items:center;justify-content:center;
+    font-weight:800;font-size:13px;color:#1B1510;background:linear-gradient(135deg,#F5A623,#E85D0C);margin-bottom:12px}
+  .idea h4{font-family:"Playfair Display",serif;font-size:19px;margin:0 0 7px;color:#F3EADA;font-weight:700}
+  .idea p{margin:0;font-size:14.5px;color:#C9BFA8;line-height:1.62}
+  .brain-cta{margin-top:38px;text-align:center}
+  .brain-cta p{color:#B7A98D;max-width:560px;margin:0 auto 22px;font-size:15.5px}
+
   /* ── финал ──────────────────────────────────────────── */
   .finale{padding:56px 0 64px;text-align:center}
   .finale .mic{width:74px;margin:0 auto 20px;opacity:.9}
   .finale h2{font-family:"Playfair Display",serif;font-weight:900;font-size:clamp(26px,4.4vw,40px);margin:0 0 14px;line-height:1.2}
-  .finale p{max-width:620px;margin:0 auto 30px;color:var(--ink-soft)}
+  .finale p{max-width:640px;margin:0 auto 30px;color:var(--ink-soft)}
   .cta-row{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
   .btn{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:15px;
-    padding:14px 26px;border-radius:999px;transition:transform .15s ease, box-shadow .15s ease}
+    padding:14px 26px;border-radius:999px;transition:transform .3s ease, box-shadow .3s ease, filter .3s ease}
   .btn:hover{transform:translateY(-2px);box-shadow:0 12px 26px -10px rgba(32,27,20,.5)}
   .btn-dark{background:var(--dark);color:#F7B733}
   .btn-ghost{border:2px solid var(--ink);color:var(--ink)}
+  .btn-amber{background:linear-gradient(135deg,#F5A623,#E85D0C);color:#1B1510}
+  .btn-amber:hover{filter:brightness(1.08)}
+  .btn-ghost-cream{border:2px solid rgba(243,222,180,.5);color:var(--cream)}
   .disclaimer{max-width:640px;margin:44px auto 0;font-size:13px;color:#8D8168;line-height:1.7;
     border-top:1px dashed var(--wood-deep);padding-top:18px}
 
   footer{background:var(--dark);color:#B7A98D;text-align:center;padding:26px 22px;font-size:12.5px;letter-spacing:.18em;text-transform:uppercase}
   footer b{color:#F3EADA}
 
+  /* ── плавное появление при скролле ──────────────────── */
+  .rv{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.16,1,.3,1)}
+  .rv.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){
+    .rv{opacity:1;transform:none;transition:none}
+    html{scroll-behavior:auto}
+  }
+
+  /* ── мобильная адаптация ────────────────────────────── */
   @media (max-width:760px){
     .cold-in{grid-template-columns:1fr}
-    .cold img{transform:none;max-width:420px;margin:0 auto}
+    .cold-img{transform:none;max-width:420px;margin:0 auto}
     .shots2{grid-template-columns:1fr}
     .a{grid-template-columns:1fr;gap:8px}
     .a-ava{display:none}
@@ -204,13 +267,68 @@
     .guest-in{flex-direction:column;text-align:center}
     .guest-bio{margin:0 auto}
     .hero-media img{height:56vh}
+    .q p{padding-right:8px}
+    .q::after{font-size:32px;top:10px;right:16px}
+    .pin{padding:34px 24px}
+    .showbar{font-size:11px;letter-spacing:.14em}
+  }
+  @media (max-width:540px){
+    .showbar{font-size:10px;letter-spacing:.08em;gap:8px;padding:12px 16px}
+    .showbar .ep{display:none}
+  }
+
+  /* ── большой PC: шире, крупнее, артистичнее ─────────── */
+  @media (min-width:1180px){
+    body{font-size:18px}
+    .wrap{max-width:960px}
+    .hero-text h1{font-size:clamp(46px,5.2vw,84px);max-width:1060px}
+    .hero-sub{max-width:740px;font-size:19px}
+    .hero-media img{height:min(80vh,760px)}
+    .hero-text{padding-bottom:56px}
+    .lede{padding-top:64px}
+    .lede p{font-size:22px;line-height:1.8}
+    .q{padding:32px 36px 32px 42px}
+    .q p{font-size:29px;padding-right:70px}
+    .q::after{font-size:60px;top:20px;right:30px}
+    .a{grid-template-columns:76px 1fr;gap:22px}
+    .a-ava{width:76px;height:76px;font-size:22px}
+    .a-body .pull{font-size:23px;padding-left:22px}
+    .guest-in{padding:44px 0}
+    .guest-name{font-size:27px}
+    .guest-bio{font-size:17px;max-width:840px}
+    .cold-in{padding:80px 0;gap:56px}
+    .cold blockquote p{font-size:29px}
+    .cold-img{max-width:500px;justify-self:end}
+    /* кадры вырываются за текстовую колонку — широкий экран работает */
+    figure.shot{width:min(1280px,94vw);margin:58px 0 58px calc(50% - min(640px,47vw))}
+    .shots2{width:min(1280px,94vw);margin:50px 0 50px calc(50% - min(640px,47vw));gap:26px}
+    .shots2 figure.shot{width:auto;margin:0}
+    figure.shot figcaption{font-size:15px}
+    .pin{padding:54px 60px;margin:56px 0}
+    .pin p{font-size:33px}
+    .blitz-item{grid-template-columns:1fr 1.5fr;gap:26px;padding:24px 0}
+    .blitz-item .qq{font-size:21px}
+    .blitz::after{content:"CREW";position:absolute;right:-24px;bottom:-72px;line-height:1;
+      font-family:"Playfair Display",serif;font-weight:900;font-size:240px;
+      color:transparent;-webkit-text-stroke:1px rgba(201,164,105,.30);pointer-events:none}
+    .finale h2{font-size:48px}
+    .brain h2{font-size:48px}
+    .ideas{gap:20px}
+    .idea h4{font-size:21px}
+    .idea p{font-size:15.5px}
+  }
+  @media (min-width:1600px){
+    .wrap{max-width:1000px}
+    figure.shot,.shots2{width:min(1380px,92vw);margin-left:calc(50% - min(690px,46vw))}
+    .shots2{margin-left:calc(50% - min(690px,46vw))}
+    .shots2 figure.shot{width:auto;margin:0}
   }
 </style>
 </head>
 <body>
 
 <div class="showbar">
-  <span><span class="dot"></span>ЭКИПАЖ · студия ONE SITE PLS</span>
+  <span><span class="dot"></span>CREW · студия ONE SITE PLS</span>
   <span class="ep">Выпуск №1</span>
   <a href="https://t.me/SALAVEY13" target="_blank" rel="noopener">@salavey13</a>
 </div>
@@ -219,14 +337,14 @@
 <header class="hero">
   <div class="wood"></div>
   <div class="hero-media">
-    <img src="/images/interview/studio-hero.png" width="1344" height="768" alt="Студия «Экипажа»: два кресла, два микрофона, тёплый свет">
+    <img src="/images/interview/studio-hero.png" width="1344" height="768" alt="Студия CREW: два кресла, два микрофона, тёплый свет">
     <div class="hero-text">
       <div class="kicker">Большое интервью</div>
       <h1>Платформа, которая <em>выросла из проката</em></h1>
-      <p class="hero-sub">salavey13 — о том, как софт, построенный для одного экипажа, однажды захотелся всем остальным.</p>
+      <p class="hero-sub">salavey13 — о том, как софт, построенный для одного crew, однажды захотелся всем остальным. И почему это совсем не rocket science.</p>
       <div class="hero-meta">
         <span class="chip">Гость · <b>salavey13</b></span>
-        <span class="chip">Читается за <b>12 минут</b></span>
+        <span class="chip">Читается за <b>15 минут</b></span>
         <span class="chip">Формат · <b>интервью-разбор</b></span>
       </div>
     </div>
@@ -239,7 +357,7 @@
     <div class="guest-avatar">S13</div>
     <div>
       <p class="guest-name">salavey13</p>
-      <p class="guest-bio">Строитель платформы <b>SLY13</b>. Один за экраном — и одновременно разработчик, и владелец живого проката: сам живёт на своём софте. Верит, что у каждого микробизнеса должен быть свой цифровой экипаж.</p>
+      <p class="guest-bio">Строитель платформы <b>SLY13</b>. Один за экраном — и одновременно разработчик, и владелец живого проката: сам живёт на своём софте. Верит, что у каждого микробизнеса должен быть свой цифровой crew.</p>
     </div>
   </div>
 </section>
@@ -250,7 +368,7 @@
     <div>
       <h2>Холодное открытие</h2>
       <blockquote>
-        <p>«Продуктом был не софт. Продуктом была работа экипажа, которая каждый день крутится сама».</p>
+        <p>«Продуктом был не софт. Продуктом была работа crew, которая каждый день крутится сама».</p>
         <span>— из разговора</span>
       </blockquote>
       <blockquote>
@@ -258,22 +376,24 @@
         <span>— из разговора</span>
       </blockquote>
       <blockquote style="margin-bottom:0">
-        <p>«Сначала она заработала на одном экипаже. Потом спросили другие».</p>
+        <p>«Сначала она заработала на одном crew. Потом спросили другие».</p>
         <span>— об этом весь выпуск</span>
       </blockquote>
     </div>
-    <img src="/images/interview/studio-mic.png" width="1344" height="768" alt="Микрофон в тёплом свете студии" loading="lazy">
+    <div class="cold-img">
+      <img src="/images/interview/studio-mic.png" width="1344" height="768" alt="Микрофон в тёплом свете студии" loading="lazy">
+    </div>
   </div>
 </section>
 
 <!-- ═══ LEDE ═══ -->
 <section class="wrap lede">
-  <p class="dropcap">Каждому, кто делает софт для бизнеса, говорят одно и то же: собери команду, найди бюджет, подожди полгода. Сегодняшний гость — живое опровержение этого сценария. <b>salavey13 построил платформу, на которой ежедневно работает настоящий прокат</b>, — без команды разработки, без агентства и без полугода ожидания. А потом случилось то, чего он не планировал: платформой заинтересовались другие. Это выпуск о том, как софт, построенный для себя, однажды становится нужен всем.</p>
+  <p class="dropcap">Каждому, кто делает софт для бизнеса, говорят одно и то же: собери команду, найди бюджет, подожди полгода. Сегодняшний гость — живое опровержение этого сценария. <b>salavey13 построил платформу, на которой ежедневно работает настоящий прокат</b>, — без команды разработки, без агентства и без полугода ожидания. А потом случилось то, чего он не планировал: платформой заинтересовались другие. Это выпуск о том, как софт, построенный для себя, однажды становится нужен всем. Спойлер от редакции: это не история про rocket science — и именно поэтому она работает.</p>
 </section>
 
 <!-- ═══ Q1 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="01">
     <div class="who">Ведущий</div>
     <p>Начнём с базы. Если объяснять SLY13 в двух словах — что это?</p>
   </div>
@@ -281,23 +401,28 @@
     <div class="a-ava">S13</div>
     <div class="a-body">
       <div class="who">salavey13</div>
-      <p>Заливаешь каталог — получаешь готовый экипаж. Витрина с корзиной и оплатой, заказы прямо из Telegram, договоры с распознаванием документов, залоги, касса, смены и зарплаты — всё в одном контуре: от заказа клиента до зарплаты оператора.</p>
-      <p>Я называю это «свой CRM», который обычно заказывают у агентств за сотни тысяч. У нас он собран, обкатан и работает каждый день — на живом прокате. И принципиальный момент: <span class="hl">платформе всё равно, что вы сдаёте — байки, лодки или дрели</span>. Меняется каталог и логотип, контур остаётся тот же.</p>
+      <p>Заливаешь каталог — получаешь готовый crew. Витрина с корзиной и оплатой, заказы прямо из Telegram, договоры с распознаванием документов, залоги, касса, смены и зарплаты — всё в одном flow: от заказа клиента до зарплаты оператора.</p>
+      <p>Я называю это «свой CRM», который обычно заказывают у агентств за сотни тысяч. У нас он собран, обкатан и работает каждый день — на живом прокате. И принципиальный момент: <span class="hl">платформе всё равно, что вы сдаёте — байки, лодки или дрели</span>. Меняются каталог и логотип, flow остаётся тот же.</p>
     </div>
+  </div>
+
+  <div class="pin">
+    <p>Это не бот для CRM.<br>Это CRM для ботов.</p>
+    <span>— salavey13, там же</span>
   </div>
 
   <figure class="shot">
     <div class="browser">
-      <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">витрина экипажа — то, с чего всё началось</span></div>
-      <img src="/images/interview/shop-hero.jpg" width="1440" height="900" alt="Витрина экипажа: каталог техники с фильтрами и промо-картами" loading="lazy">
+      <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">витрина crew — то, с чего всё началось</span></div>
+      <div class="media"><img src="/images/interview/shop-hero.jpg" width="1440" height="900" alt="Витрина crew: каталог техники с фильтрами и промо-картами" loading="lazy"></div>
     </div>
-    <figcaption>Витрина экипажа: каталог, категории, промо-карты — живой storefront, не макет.</figcaption>
+    <figcaption>Витрина crew: каталог, категории, промо-карты — живой storefront, не макет.</figcaption>
   </figure>
 </section>
 
 <!-- ═══ Q2 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="02">
     <div class="who">Ведущий</div>
     <p>Откуда всё это вообще взялось? Был ли план «построить платформу»?</p>
   </div>
@@ -305,15 +430,15 @@
     <div class="a-ava">S13</div>
     <div class="a-body">
       <div class="who">salavey13</div>
-      <p>Никакого плана не было. Был экипаж, которому нужно было работать: заказы прилетают, документы складываются, деньги сходятся до копейки. Я сел и построил то, что нужно было нам.</p>
-      <p>Продуктом был не софт — <b>продуктом была ежедневная работа экипажа</b>, которая перестала разваливаться на чаты, таблицы и бумажки. А потом я посмотрел на то, что получилось, и понял: это же формула. Она переносится на любой сервисный микробизнес по аналогии.</p>
+      <p>Никакого плана не было. Был crew, которому нужно было работать: заказы прилетают, документы складываются, деньги сходятся до копейки. Я сел и построил то, что нужно было нам.</p>
+      <p>Продуктом был не софт — <b>продуктом была ежедневная работа crew</b>, которая перестала разваливаться на чаты, таблицы и бумажки. А потом я посмотрел на то, что получилось, и понял: это же формула. Она переносится на любой сервисный микробизнес по аналогии.</p>
     </div>
   </div>
 </section>
 
 <!-- ═══ Q3 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="03">
     <div class="who">Ведущий</div>
     <p>А чем люди пользовались до вас? Почему до сих пор всё держится на чатах и таблицах?</p>
   </div>
@@ -329,8 +454,8 @@
 </section>
 
 <!-- ═══ Q4 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="04">
     <div class="who">Ведущий</div>
     <p>Давай про это напрямую: ты один за экраном. Серьёзно?</p>
   </div>
@@ -340,21 +465,39 @@
       <div class="who">salavey13</div>
       <p>Один. Я одновременно разработчик и владелец проката — сам живу на своём софте. И это лучший тест-стенд, который можно придумать: каждая фича сначала обкатывается на реальной работе, а не в демо. Никаких теорий — только то, что уже крутится.</p>
       <p>Но «один» не значит «в одиночку». У меня армия агентов: они пишут код, гоняют тесты, сверяют цифры, проверяют деплой. Люди спрашивают: как один человек тянет платформу? Ответ простой — <b>никак. Один человек тянет платформу только с армией агентов</b>. В этом весь секрет, если он вообще есть.</p>
+      <p class="pull">Людям железа рычаг дали компиляторы: сорок лет инженерии, чтобы человек говорил с машиной на её языке. Мне повезло родиться позже — я не писал свой язык программирования, я собрал армию, которая понимает обычные слова. Самая короткая сделка в истории инженерии: сорок лет компиляторов в обмен на промпт.</p>
     </div>
   </div>
 
   <figure class="shot">
     <div class="browser">
       <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">рабочее место · один за экраном — и вся система на месте</span></div>
-      <img src="/images/interview/builder-desk.png" width="1344" height="768" alt="Ночной рабочий стол: ноутбук с кодом, настольная лампа, инструмент" loading="lazy">
+      <div class="media"><img src="/images/interview/builder-desk.png" width="1344" height="768" alt="Ночной рабочий стол: ноутбук с кодом, настольная лампа, инструмент" loading="lazy"></div>
     </div>
     <figcaption>Рабочее место. Код — ночью, прокат — днём. Порядок агентов не прерывается.</figcaption>
   </figure>
 </section>
 
-<!-- ═══ Q5 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<!-- ═══ Q5 — дивергенция / самоирония ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="05">
+    <div class="who">Ведущий</div>
+    <p>Мы привыкли, что такие истории — про rocket science. А чем вы занимаетесь, если совсем честно?</p>
+  </div>
+  <div class="a">
+    <div class="a-ava">S13</div>
+    <div class="a-body">
+      <div class="who">salavey13</div>
+      <p>Если совсем честно: мы — bookkeepers on steroids. Учёт на стероидах: заказы, документы, залоги, смены, зарплаты — деньги сходятся до копейки. Плюс картинки, сжатые так, как это физически возможно. Всё это крутится на freemium-аккаунтах, а нагрузка нашего crew — hobby-уровень по сравнению с любым приложением из сторов.</p>
+      <p>И мне нравится эта честность, я её не прячу. Не каждый проект обязан быть rocket science. Маленькому бизнесу не нужен космос — ему нужно, чтобы завтра сработало. Поэтому здесь нет истории «деплой за один день, а потом плати ежемесячно»: <span class="hl">платформа opensource — её можно поднять бесплатно, и дальше она просто работает</span>.</p>
+      <p class="pull">Bookkeepers on steroids — и я говорю это без извинений.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Q6 ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="06">
     <div class="who">Ведущий</div>
     <p>Какой была самая большая ставка — то, что могло не взлететь?</p>
   </div>
@@ -362,73 +505,91 @@
     <div class="a-ava">S13</div>
     <div class="a-body">
       <div class="who">salavey13</div>
-      <p>Начать строить мультиэкипажность до того, как её кто-то попросил. Когда платформа только заработала на моём экипаже, разумнее всего было полировать её для себя. Вместо этого мы заложили архитектуру так, что каждый экипаж — это отдельная витрина: своя палитра, свои правила, свои деньги — и всё на одном движке.</p>
-      <p>Никто не просил. Мне просто казалось, что это правильно. Это как строить вышку до первого полёта: все говорят «рано», а потом оказывается «вовремя». Когда пришли первые чужие экипажи, мы уже были готовы.</p>
+      <p>Начать строить multi-crew архитектуру до того, как её кто-то попросил. Когда платформа только заработала на моём crew, разумнее всего было полировать её для себя. Вместо этого мы заложили архитектуру так, что каждый crew — это отдельная витрина: своя палитра, свои правила, свои деньги — и всё на одном движке.</p>
+      <p>Никто не просил. Мне просто казалось, что это правильно. Это как строить вышку до первого полёта: все говорят «рано», а потом оказывается «вовремя». Когда пришли первые чужие crew, мы уже были готовы.</p>
     </div>
   </div>
 </section>
 
-<!-- ═══ Q6 — ключевой вопрос ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<!-- ═══ Q7 — ключевой вопрос ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="07">
     <div class="who">Ведущий</div>
-    <p>И тогда случилось то, о чём все спрашивают: платформа вышла за пределы первого экипажа. Как это произошло?</p>
+    <p>И тогда случилось то, о чём все спрашивают: платформа вышла за пределы первого crew. Как это произошло?</p>
   </div>
   <div class="a">
     <div class="a-ava">S13</div>
     <div class="a-body">
       <div class="who">salavey13</div>
-      <p>Да, это любимая часть истории. Сначала платформа заработала на моём экипаже — это было единственным честным способом её проверить. А потом начали спрашивать другие. Сервисы, прокаты, мастерские. Не в духе «было бы здорово», а в духе <b>«когда можно зайти?»</b></p>
-      <p>Я понял простую вещь: то, что я построил для себя, другим нужно не меньше. Так появилась франшиза: новый экипаж собирается на том же движке — витрина, каталог, бот, админка. Создание экипажа открыто для всех, витрина собирается за полминуты.</p>
-      <p>Сегодня на платформе стоит уже несколько экипажей — от проката до мотосервиса — и ещё несколько на подходе. Я говорю об этом без пафоса: <span class="hl">сначала софт заработал на одном прокате, и только потом начал продаваться другим</span>. Никаких теорий — только то, что уже работает.</p>
+      <p>Да, это любимая часть истории. Сначала платформа заработала на моём crew — это было единственным честным способом её проверить. А потом начали спрашивать другие. Сервисы, прокаты, мастерские. Не в духе «было бы здорово», а в духе <b>«когда можно зайти?»</b></p>
+      <p>Я понял простую вещь: то, что я построил для себя, другим нужно не меньше. Так появилась франшиза: новый crew собирается на том же движке — витрина, каталог, бот, админка. Создание crew открыто для всех, витрина собирается за полминуты.</p>
+      <p>Сегодня на платформе стоит уже несколько crew — от проката до мотосервиса — и ещё несколько на подходе. Я говорю об этом без пафоса: <span class="hl">сначала софт заработал на одном прокате, и только потом начал продаваться другим</span>. Никаких теорий — только то, что уже работает.</p>
     </div>
   </div>
 
   <figure class="shot">
     <div class="browser">
       <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">личная витрина платформы · /salavey13</span></div>
-      <img src="/images/interview/sly13-landing.jpg" width="1440" height="900" alt="Личная витрина salavey13 — платформа проката и сервисов" loading="lazy">
+      <div class="media"><img src="/images/interview/sly13-landing.jpg" width="1440" height="900" alt="Личная витрина salavey13 — платформа проката и сервисов" loading="lazy"></div>
     </div>
     <figcaption>Витрина платформы. Залил каталог — остальное достроит сама.</figcaption>
   </figure>
 </section>
 
-<!-- ═══ Q7 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<!-- ═══ Q8 ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="08">
     <div class="who">Ведущий</div>
-    <p>Как выглядит запуск нового экипажа? Сколько времени занимает «заход»?</p>
+    <p>Как выглядит запуск нового crew? И что делать тем, кто не хочет ждать звонка?</p>
   </div>
   <div class="a">
     <div class="a-ava">S13</div>
     <div class="a-body">
       <div class="who">salavey13</div>
-      <p>Один разговор. Звонок на пятнадцать минут: как называется экипаж, что в каталоге, какие цвета, какие контакты, как проходит выдача. Дальше платформа собирает всё сама — витрину, каталог, договоры, бота. Недосказанное уезжает в разумные значения по умолчанию, доработки вносятся потом.</p>
-      <p>Я люблю, когда запуск похож на разговор, а не на проект на квартал. Никаких вечных интеграций, никаких пропавших дней.</p>
+      <p>Один разговор. Звонок на пятнадцать минут: как называется crew, что в каталоге, какие цвета, какие контакты, как проходит выдача. Дальше платформа собирает всё сама — витрину, каталог, договоры, бота. Недосказанное уезжает в разумные значения по умолчанию, доработки вносятся потом.</p>
+      <p>А для тех, кто хочет заходить сам: вход открыт. Мастер создания crew ведёт за руку прямо на сайте, readme описывает весь setup, а на главной висит плавающая иконка — тур по возможностям на живой витрине. Платформа должна быть self-explanatory: <span class="hl">чтобы basics не приходилось переобъяснять каждый раз</span>. Это интервью — часть того же плана.</p>
     </div>
   </div>
 
   <div class="shots2">
     <figure class="shot">
       <div class="browser">
-        <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">внутри контура · конфигуратор</span></div>
-        <img src="/images/interview/configurator.jpg" width="1440" height="900" alt="Конфигуратор техники внутри витрины экипажа" loading="lazy">
+        <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">внутри flow · конфигуратор</span></div>
+        <div class="media"><img src="/images/interview/configurator.jpg" width="1440" height="900" alt="Конфигуратор техники внутри витрины crew" loading="lazy"></div>
       </div>
       <figcaption>Конфигуратор: клиент собирает байк сам.</figcaption>
     </figure>
     <figure class="shot">
       <div class="browser">
-        <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">внутри контура · колесо фортуны</span></div>
-        <img src="/images/interview/wheel.jpg" width="1440" height="900" alt="Колесо фортуны с промокодами" loading="lazy">
+        <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">внутри flow · колесо фортуны</span></div>
+        <div class="media"><img src="/images/interview/wheel.jpg" width="1440" height="900" alt="Колесо фортуны с промокодами" loading="lazy"></div>
       </div>
-      <figcaption>Колесо фортуны: праздник — тоже часть контура.</figcaption>
+      <figcaption>Колесо фортуны: праздник — тоже часть flow.</figcaption>
     </figure>
   </div>
 </section>
 
-<!-- ═══ Q8 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<!-- ═══ Q9 — деньги ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="09">
+    <div class="who">Ведущий</div>
+    <p>Где здесь деньги? Это благотворительность или всё-таки бизнес?</p>
+  </div>
+  <div class="a">
+    <div class="a-ava">S13</div>
+    <div class="a-body">
+      <div class="who">salavey13</div>
+      <p>Мой сервис как sly13 — прогон по проекту. Есть readme: как поднять платформу, куда положить ключи, как отдать их своему z.ai, чтобы агент помог вести проект дальше. Для тех, кто readme в жизни не открывал, я провожу этот прогон лично, за руку. Один раз — 69k. Дальше бесплатно: проект твой, код opensource, платформа работает сама. Чаевые приветствуются.</p>
+      <p>Отдельно могу обучить админа — для владельцев, которые хотят управлять crew, не вникая в технику. Это уже за отдельную плату.</p>
+      <p>А если без грима: первые эксперименты с оплатой пока не взлетели. Поэтому работаю spaghetti on wall style — рассказываю про приложение всем возможным enjoyers: от прокатов до единорожков вроде crew из одного человека. Владелец одного мотосервиса на днях пообещал посмотреть. Считаю, это прогресс.</p>
+      <p class="pull">Spaghetti on wall style: бросаешь идеи на стену и смотришь, что прилипло. Пока прилипло хуже, чем хотелось, — но стена уже в спагетти.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Q10 ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="10">
     <div class="who">Ведущий</div>
     <p>Как ты принимаешь решения? Что для тебя неприемлемо?</p>
   </div>
@@ -444,15 +605,15 @@
   <figure class="shot">
     <div class="browser">
       <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">платформа в разрезе · витрина SLY13</span></div>
-      <img src="/images/interview/sly13-bento.jpg" width="1440" height="900" alt="Разделы платформы SLY13 на витрине" loading="lazy">
+      <div class="media"><img src="/images/interview/sly13-bento.jpg" width="1440" height="900" alt="Разделы платформы SLY13 на витрине" loading="lazy"></div>
     </div>
     <figcaption>Платформа в разрезе: витрина, деньги, сценарии, AI — как она устроена.</figcaption>
   </figure>
 </section>
 
-<!-- ═══ Q9 ═══ -->
-<section class="wrap qa">
-  <div class="q">
+<!-- ═══ Q11 ═══ -->
+<section class="wrap qa" data-rv>
+  <div class="q" data-n="11">
     <div class="who">Ведущий</div>
     <p>Что дальше? Каким ты видишь проект через несколько лет?</p>
   </div>
@@ -460,17 +621,17 @@
     <div class="a-ava">S13</div>
     <div class="a-body">
       <div class="who">salavey13</div>
-      <p>Миссия двоякая. Первое: у каждого, кто работает руками — прокат, сервис, мастерская, студия, — должен быть свой цифровой экипаж. Не «софт на заказ за полгода», а готовый контур за дни. По аналогии, без всякой магии.</p>
-      <p>Второе: когда это происходит, микробизнес начинает работать как большая компания. Заказы не теряются, документы складываются, деньги сходятся, команда знает, что делать сегодня. <span class="hl">Одна платформа — много экипажей</span>. Вот и вся формула.</p>
+      <p>Миссия двоякая. Первое: у каждого, кто работает руками — прокат, сервис, мастерская, студия, — должен быть свой цифровой crew. Не «софт на заказ за полгода», а готовый flow за дни. По аналогии, без всякой магии.</p>
+      <p>Второе: когда это происходит, микробизнес начинает работать как большая компания. Заказы не теряются, документы складываются, деньги сходятся, команда знает, что делать сегодня. <span class="hl">One platform — many crews</span>. Вот и вся формула.</p>
     </div>
   </div>
 
   <figure class="shot">
     <div class="browser">
-      <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">сообщество вокруг экипажа · карта райдеров</span></div>
-      <img src="/images/interview/map.jpg" width="1440" height="900" alt="Карта райдеров — сообщество экипажа" loading="lazy">
+      <div class="chrome"><span class="lamp"><i></i><i></i><i></i></span><span class="url">сообщество вокруг crew · карта райдеров</span></div>
+      <div class="media"><img src="/images/interview/map.jpg" width="1440" height="900" alt="Карта райдеров — сообщество crew" loading="lazy"></div>
     </div>
-    <figcaption>Сообщество вокруг экипажа: точки на карте собираются сами.</figcaption>
+    <figcaption>Сообщество вокруг crew: точки на карте собираются сами.</figcaption>
   </figure>
 </section>
 
@@ -481,7 +642,7 @@
     <p class="sub">Три вопроса в конце каждого выпуска. Коротко и без подготовки.</p>
     <div class="blitz-item">
       <div class="qq">Что бы ты построил, если бы ресурсов было бесконечно?</div>
-      <div class="aa"><b>Проверил бы гипотезу до конца:</b> микробизнес собирает свой цифровой экипаж за один телефонный звонок. Всё остальное — детали реализации.</div>
+      <div class="aa"><b>Проверил бы гипотезу до конца:</b> микробизнес собирает свой цифровой crew за один разговор. Всё остальное — детали реализации.</div>
     </div>
     <div class="blitz-item">
       <div class="qq">Что читаешь перед сном?</div>
@@ -489,7 +650,55 @@
     </div>
     <div class="blitz-item">
       <div class="qq">Совет тем, кто хочет так же?</div>
-      <div class="aa"><b>Начни с себя.</b> Построй для своего бизнеса — и не удивляйся, когда спросят другие.</div>
+      <div class="aa"><b>Начни с себя.</b> Построй для своего crew — и не удивляйся, когда спросят другие.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ БРЕЙНШТОРМ ═══ -->
+<section class="brain">
+  <div class="wrap brain-in">
+    <div class="kicker" style="color:#F3D9A0">Вместо послесловия</div>
+    <h2>Брейншторм <span class="grad">прямо в выпуске</span></h2>
+    <p class="sub">История закончилась, вопросы остались. За прогон по readme мы уже придумали ценник — а вот что может идти следом? Доска идей открыта:</p>
+    <div class="ideas">
+      <div class="idea">
+        <span class="num">01</span>
+        <h4>Фичи под заказ</h4>
+        <p>Платят не за развёртывание, а за новые интересные фичи: своя механика, свой сценарий, своя витрина поверх движка.</p>
+      </div>
+      <div class="idea">
+        <span class="num">02</span>
+        <h4>Школа админов</h4>
+        <p>Отдельный урок для ленивых владельцев: как управлять crew, не читая readme. Занятие ведёт sly13 лично.</p>
+      </div>
+      <div class="idea">
+        <span class="num">03</span>
+        <h4>Партнёрский flow</h4>
+        <p>Процент с приведённых crew: рассказал другу-владельцу — получил собственную витрину и повод заглянуть в студию.</p>
+      </div>
+      <div class="idea">
+        <span class="num">04</span>
+        <h4>Отраслевые пресеты</h4>
+        <p>Лодки, дрели, студии, мастерские: каталог под нишу одним тапом — заливаешь прайс, остальное достраивает движок.</p>
+      </div>
+      <div class="idea">
+        <span class="num">05</span>
+        <h4>Подписка на уход</h4>
+        <p>Пока владелец работает руками, агенты следят за витриной, бэкапами и цифрами. Тихая служба доставки спокойствия.</p>
+      </div>
+      <div class="idea">
+        <span class="num">06</span>
+        <h4>Сообщество crew</h4>
+        <p>Обмен сценариями, промптами и настройками между crew на одном движке: чужая находка становится твоей фичей.</p>
+      </div>
+    </div>
+    <div class="brain-cta">
+      <p>Считаешь, что что-то из этого должно быть построено уже завтра? Или у тебя идея, которой здесь нет? Студия читает всё.</p>
+      <div class="cta-row">
+        <a class="btn btn-amber" href="https://t.me/SALAVEY13" target="_blank" rel="noopener">Предложить идею →</a>
+        <a class="btn btn-ghost-cream" href="/salavey13">Посмотреть витрину</a>
+      </div>
     </div>
   </div>
 </section>
@@ -497,19 +706,33 @@
 <!-- ═══ ФИНАЛ ═══ -->
 <section class="wrap finale">
   <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="#E85D0C" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8.5" y1="22" x2="15.5" y2="22"/></svg>
-  <h2>Сначала — свой экипаж.<br>Потом — все остальные.</h2>
-  <p>История этого выпуска — не про проданный софт. Она про то, что лучший продукт рождается там, где им по-настоящему пользуются. Платформа заработала на живом прокате — и только потом начала продаваться другим. Формула простая, и она повторяется.</p>
+  <h2>Сначала — свой crew.<br>Потом — все остальные.</h2>
+  <p>История этого выпуска — не про проданный софт. Она про то, что лучший продукт рождается там, где им по-настоящему пользуются. Платформа заработала на живом прокате — и только потом начала продаваться другим. Дальше по плану: opensource, агенты вместо команды и доска идей выше. Формула простая, и она повторяется.</p>
   <div class="cta-row">
     <a class="btn btn-dark" href="https://t.me/SALAVEY13" target="_blank" rel="noopener">Написать salavey13 →</a>
     <a class="btn btn-ghost" href="/salavey13">Витрина платформы</a>
-    <a class="btn btn-ghost" href="/franchize/vip-bike">Живой экипаж в проде</a>
+    <a class="btn btn-ghost" href="/franchize/vip-bike">Живой crew в проде</a>
   </div>
-  <p class="disclaimer">«Экипаж» — художественный интервью-формат по мотивам реальных разговоров, презентаций и работы платформы. Всё о платформе здесь — правда. Цифры и детали экипажей остались за кадром: таковы правила студии.</p>
+  <p class="disclaimer">«CREW» — художественный интервью-формат по мотивам реальных разговоров, презентаций и работы платформы. Всё о платформе здесь — правда. Цифры и детали crew остались за кадром: таковы правила студии.</p>
 </section>
 
 <footer>
-  <b>ЭКИПАЖ</b> · интервью-студия oneSitePls · выпуск №1 · <b>salavey13</b>
+  <b>CREW</b> · интервью-студия oneSitePls · выпуск №1 · <b>salavey13</b>
 </footer>
+
+<script>
+  // плавное появление секций при скролле (нулевые зависимости)
+  (function(){
+    var els=[].slice.call(document.querySelectorAll('[data-rv],.blitz-item,.idea'));
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.style.opacity=1;e.style.transform='none'});return}
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}
+      });
+    },{threshold:.08,rootMargin:'0px 0px -6% 0px'});
+    els.forEach(function(e){e.classList.add('rv');io.observe(e)});
+  })();
+</script>
 
 </body>
 </html>
