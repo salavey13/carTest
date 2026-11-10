@@ -228,7 +228,7 @@ export default async function FranchizeContactsPage({ params }: FranchizeContact
       </FranchizePageShell>
 
 
-      {/* task165 onboarding tour — stop 17/19 (boss: ALL header menu links of
+      {/* task165 onboarding tour — stop 13/15 (boss: ALL header menu links of
           the golden standard vip-bike crew live in the quest). Riddle describes
           the NEXT page. */}
       {slug === "vip-bike" && (

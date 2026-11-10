@@ -9,7 +9,6 @@ import { FaBug } from "react-icons/fa6";
 import { getTopFleets, getTopCrews } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 type DebugInfo = {
   [key: string]: string | number;
@@ -174,14 +173,9 @@ export default function LeaderboardPage() {
 
         {debugInfo && <DebugInfoSection info={debugInfo} />}
 
-        {/* task165 onboarding tour — stop 7/19 (зал славы). Next hop:
-            гараж (chain unchanged). */}
-        <RomanQuestCake
-          featureKey="leaderboard"
-          riddle="Слава — это приятно, но ты человек дела. Следующий след — твой гараж: MOTO-GARAGE, где можно выбрать байк, даты и собрать бронирование. Загляни, как это выглядит изнутри."
-          nextHref="/rent-bike"
-          nextLabel="Открыть гараж"
-        />
+        {/* task173 (boss: ditch legacy non-franchize pages from the tour):
+            /leaderboard is a global project surface — no tour host anymore.
+            See components/roman-gift/tourFeatures.ts. */}
       </div>
     </div>
   );

@@ -45,6 +45,14 @@ import {
   featureTourFlagsOf,
   filterMenuLinksByFeatureTour,
 } from "@/app/franchize/lib/feature-tour-menu";
+// task173: the ⭐ tour-hub link is RUNTIME-INJECTED into every crew menu —
+// the buy-feature flow («crew members edit their main menu») must be
+// reachable for OTHER crews too, not only for vip-bike whose metadata got
+// the link via the task166 seed script. Codereview finding: TOUR_MENU_LINK
+// was exported but never wired — a fresh crew's fallback menu carried zero
+// tour entry points, so the whole activation/⭐-purchase loop was
+// vip-bike-only in practice.
+import { TOUR_MENU_LINK } from "@/components/roman-gift/tourFeatures";
 import { storageMonthsCount, storageSeasonDateToIso, storageStartParam, storageIsoToRu } from "@/app/franchize/lib/storage";
 import { resolveStorageConfig, type StorageCrewConfig } from "@/app/franchize/lib/storage-config";
 import { grantStorageRequestCreated } from "@/app/franchize/server-actions/storage-achievements";
@@ -592,6 +600,17 @@ const fallbackMenuLinks = (slug: string) => DEFAULT_MENU_LINK_TEMPLATES.map((lin
   href: withSlug(link.href, slug),
 }));
 
+/**
+ * task173 — append the ⭐ tour-hub link to a crew's menu (deduped by href:
+ * crews whose metadata already carries it — vip-bike's seed — keep exactly
+ * one). Injected BEFORE the feature-tour filter; the hub href is not
+ * crew-scoped, so the filter always passes it (kind:"other").
+ */
+function withTourHubLink<T extends { label: string; href: string }>(links: T[]): T[] {
+  if (links.some((l) => l.href === TOUR_MENU_LINK.href)) return links;
+  return [...links, { label: TOUR_MENU_LINK.label, href: TOUR_MENU_LINK.href } as unknown as T];
+}
+
 function normalizeCrewSlug(value: string): string {
   return String(value || "")
     .trim()
@@ -699,7 +718,8 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     logoHref: `/franchize/${slug}`,
     // task166: the not-found shell obeys the same flag rule — a crew that
     // does not exist has NO activations, so only non-feature links render.
-    menuLinks: filterMenuLinksByFeatureTour(fallbackMenuLinks(slug), {}, slug),
+    // task173: the ⭐ tour hub still rides along (the tour is public product).
+    menuLinks: filterMenuLinksByFeatureTour(withTourHubLink(fallbackMenuLinks(slug)), {}, slug),
   },
   contacts: {
     phone: "",
@@ -923,8 +943,10 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     // ⭐ tour link always pass. Fresh crews start minimal and GROW the menu
     // through the onboarding quest's activation checkboxes (or a paid ⭐
     // activation — the XTR webhook writes the same flag store).
+    // task173: the ⭐ hub link is runtime-injected for EVERY crew (deduped) —
+    // this is the buy-feature entry point for crews besides vip-bike.
     const menuLinks = filterMenuLinksByFeatureTour(
-      menuLinksRaw,
+      withTourHubLink(menuLinksRaw),
       featureTourFlagsOf(metadata),
       crew.slug ?? safeSlug,
     );

@@ -41,7 +41,7 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
       items={items} />
       <ConfiguratorClient crew={crew} slug={slug} />
 
-      {/* task165 onboarding tour — stop 3/19 (конфигуратор). Riddle describes
+      {/* task165 onboarding tour — stop 2/15 (конфигуратор). Riddle describes
           the NEXT page (каталог electro-enduro); the tour skin is public, the
           birthday skin is Roman-only (the component self-gates). */}
       {slug === "vip-bike" && (

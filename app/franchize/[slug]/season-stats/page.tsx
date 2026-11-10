@@ -88,7 +88,7 @@ export default async function SeasonStatsPage({ params }: Props) {
             Войдите через Telegram WebApp, чтобы увидеть цифры своего экипажа.
           </p>
         </div>
-        {/* task165 onboarding tour — stop 19/19 lives in BOTH branches — the
+        {/* task165 onboarding tour — stop 15/15 lives in BOTH branches — the
             cake is an overlay, so the tour works even on the locked fallback */}
         {slug === "vip-bike" && (
           <RomanQuestCake
@@ -113,7 +113,7 @@ export default async function SeasonStatsPage({ params }: Props) {
           tokens={tokens}
         />
       </FranchizePageShell>
-      {/* task165 onboarding tour — stop 19/19, the last riddle before the
+      {/* task165 onboarding tour — stop 15/15, the last riddle before the
           finale (vip-bike crew only; Roman opens logged in) */}
       {slug === "vip-bike" && (
         <RomanQuestCake

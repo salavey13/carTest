@@ -144,10 +144,12 @@ describe("task166 · feature_tour flags drive the header menu", () => {
   it("the public VM builder applies the filter (and the not-found shell too)", () => {
     expect(runtime).toContain("filterMenuLinksByFeatureTour(");
     expect(runtime).toContain("featureTourFlagsOf(metadata)");
-    expect(runtime).toContain("filterMenuLinksByFeatureTour(fallbackMenuLinks(slug), {}, slug)");
+    // task173: the ⭐ tour-hub link is injected into the fallback list before
+    // the filter — the buy-feature entry exists for crews beyond vip-bike
+    expect(runtime).toContain("filterMenuLinksByFeatureTour(withTourHubLink(fallbackMenuLinks(slug)), {}, slug)");
     // wired AFTER withSlug resolution — the filter sees resolved hrefs
     expect(runtime.indexOf("const menuLinksRaw = readArrayPath")).toBeGreaterThan(-1);
-    expect(runtime.indexOf("filterMenuLinksByFeatureTour(\n      menuLinksRaw")).toBeGreaterThan(
+    expect(runtime.indexOf("withTourHubLink(menuLinksRaw)")).toBeGreaterThan(
       runtime.indexOf("const menuLinksRaw = readArrayPath"),
     );
   });

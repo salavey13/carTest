@@ -304,7 +304,7 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
       )}
       </DisplayModeProvider>
 
-      {/* task165 onboarding tour — stop 2/19 (витрина). Next hop:
+      {/* task165 onboarding tour — stop 1/15 (витрина). Next hop:
           конфигуратор (chain unchanged). */}
       {slug === "vip-bike" && (
         <RomanQuestCake

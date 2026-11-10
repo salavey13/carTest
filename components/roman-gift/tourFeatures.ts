@@ -10,9 +10,20 @@
 // golden-standard vip-bike crew must be a stop, each stop describes the NEXT
 // hop, and every hop carries a REAL screenshot («create screenshots of what
 // to expect in next hop, upload compressed to storage, wire to quest steps
-// notes/modals»). 19 stops now: 10 original + 9 header links
-// (electro-enduro, колесо фортуны, мотопарк, корзина, мои аренды, продажи,
-// о нас, контакты, партнёрам).
+// notes/modals»).
+//
+// TASK173 (boss: «ditch some legacy non-franchize pages from the tour — try
+// to understand which»): the four stops whose host pages are NOT crew-scoped
+// franchize routes are gone — `/` (the legacy single-crew landing),
+// `/franchize/discovery` (global network map), `/leaderboard` (global hall of
+// fame) and `/rent-bike` (the pre-franchize global booking flow, superseded
+// by crew storefronts). Rationale: the tour SELLS crew features — a stop must
+// map to a purchasable crew-scoped flag that grows that crew's burger menu
+// (feature-tour-menu.ts already refuses to link global routes per-crew), so
+// landing/discovery/leaderboard/garage had buy CTAs that could never flip a
+// menu link. 15 crew-scoped stops remain, renumbered 1-15; their host pages
+// (storefront → … → season-stats) are the only FAB hosts besides the quest
+// hub (/gift/roman-quest, /gift/roman).
 //
 // This file is the SINGLE SOURCE for: stop modal CTAs + previews, the
 // /gift/roman-quest overview cards, the activation API key validation and the
@@ -51,20 +62,8 @@ const TOURPIX = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/publ
 
 export const TOUR_FEATURES: TourFeature[] = [
   {
-    key: "landing",
-    stop: 1,
-    href: "/",
-    icon: "🏠",
-    title: "Главный экран",
-    page: "vip-bike-лендинг",
-    pitch: "Лицо всего проекта: витрина, парк, цены. То, что видит каждый гость — и то, чем вы управляете.",
-    gives: "Гость заходит и сразу видит парк, цены и путь до брони.",
-    priceStars: 0,
-    preview: `${TOURPIX}/landing.webp`,
-  },
-  {
     key: "storefront",
-    stop: 2,
+    stop: 1,
     href: "/franchize/vip-bike",
     icon: "🏍️",
     title: "Витрина экипажа",
@@ -76,7 +75,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "configurator",
-    stop: 3,
+    stop: 2,
     href: "/franchize/vip-bike/configurator",
     icon: "🎨",
     title: "Конфигуратор байка",
@@ -88,7 +87,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "electro_enduro",
-    stop: 4,
+    stop: 3,
     href: "/franchize/vip-bike/electro-enduro",
     icon: "⚡",
     title: "Каталог electro-enduro",
@@ -100,7 +99,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "wheel",
-    stop: 5,
+    stop: 4,
     href: "/franchize/vip-bike/wheel",
     icon: "🎡",
     title: "Колесо фортуны",
@@ -111,44 +110,8 @@ export const TOUR_FEATURES: TourFeature[] = [
     preview: `${TOURPIX}/wheel.webp`,
   },
   {
-    key: "discovery",
-    stop: 6,
-    href: "/franchize/discovery",
-    icon: "🛰",
-    title: "Карта сети",
-    page: "/franchize/discovery",
-    pitch: "Все экипажи проекта — круги, и размер круга — это его люди. Видно, какой мир вы с Ильёй строите.",
-    gives: "Сеть экипажей на одной карте — масштаб проекта глазами гостей.",
-    priceStars: 25,
-    preview: `${TOURPIX}/discovery.webp`,
-  },
-  {
-    key: "leaderboard",
-    stop: 7,
-    href: "/leaderboard",
-    icon: "🏆",
-    title: "Зал славы",
-    page: "/leaderboard",
-    pitch: "Топы экипажей и флотов всего проекта с живыми цифрами. Место vip-bike в большой игре.",
-    gives: "Геймификация: экипажи соревнуются, гости видят азарт.",
-    priceStars: 25,
-    preview: `${TOURPIX}/leaderboard.webp`,
-  },
-  {
-    key: "garage",
-    stop: 8,
-    href: "/rent-bike",
-    icon: "⚙️",
-    title: "MOTO-GARAGE",
-    page: "/rent-bike",
-    pitch: "Гараж изнутри: выбрал байк, тапнул даты — бронирование собрано. Так катают ваши райдеры.",
-    gives: "Самообслуживание райдера: выбор байка и дат без менеджера.",
-    priceStars: 50,
-    preview: `${TOURPIX}/garage.webp`,
-  },
-  {
     key: "bikes",
-    stop: 9,
+    stop: 5,
     href: "/franchize/vip-bike/bikes",
     icon: "🧱",
     title: "Мотопарк",
@@ -160,7 +123,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "cart",
-    stop: 10,
+    stop: 6,
     href: "/franchize/vip-bike/cart",
     icon: "🛒",
     title: "Корзина",
@@ -172,7 +135,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "profile",
-    stop: 11,
+    stop: 7,
     href: "/franchize/vip-bike/profile",
     icon: "🎫",
     title: "Мои аренды",
@@ -184,7 +147,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "price_calc",
-    stop: 12,
+    stop: 8,
     href: "/franchize/vip-bike/calc-explainer",
     icon: "🧮",
     title: "Прайс-калькулятор",
@@ -196,7 +159,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "map_riders",
-    stop: 13,
+    stop: 9,
     href: "/franchize/vip-bike/map-riders",
     icon: "🗺",
     title: "Карта райдеров",
@@ -208,7 +171,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "community",
-    stop: 14,
+    stop: 10,
     href: "/franchize/vip-bike/community",
     icon: "💬",
     title: "Стена сообщества",
@@ -220,7 +183,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "sales",
-    stop: 15,
+    stop: 11,
     href: "/franchize/vip-bike/sales",
     icon: "🏷",
     title: "Витрина продаж",
@@ -232,7 +195,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "about",
-    stop: 16,
+    stop: 12,
     href: "/franchize/vip-bike/about",
     icon: "📖",
     title: "О нас",
@@ -244,7 +207,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "contacts",
-    stop: 17,
+    stop: 13,
     href: "/franchize/vip-bike/contacts",
     icon: "📍",
     title: "Контакты",
@@ -256,7 +219,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "onboarding",
-    stop: 18,
+    stop: 14,
     href: "/franchize/vip-bike/onboarding",
     icon: "🤝",
     title: "Партнёрам",
@@ -268,7 +231,7 @@ export const TOUR_FEATURES: TourFeature[] = [
   },
   {
     key: "season_stats",
-    stop: 19,
+    stop: 15,
     href: "/franchize/vip-bike/season-stats",
     icon: "📈",
     title: "Цифры сезона",
@@ -288,7 +251,7 @@ export function tourFeatureByKey(key: string): TourFeature | undefined {
   return TOUR_FEATURES.find((f) => f.key === key);
 }
 
-/** The landing is the door, not a feature — no buy/activate CTA on stop 1. */
+/** Every remaining stop sells a real crew feature — all carry a CTA. */
 export function tourFeatureHasCta(key: string): boolean {
   const f = tourFeatureByKey(key);
   return Boolean(f && f.priceStars > 0);

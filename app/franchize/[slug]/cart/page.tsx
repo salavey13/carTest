@@ -41,7 +41,7 @@ export default async function FranchizeCartPage({ params, searchParams }: Franch
         initialPromoCode={promo?.trim() || undefined}
       />
 
-      {/* task165 onboarding tour — stop 10/19 (boss: ALL header menu links of
+      {/* task165 onboarding tour — stop 6/15 (boss: ALL header menu links of
           the golden standard vip-bike crew live in the quest). Riddle describes
           the NEXT page. */}
       {slug === "vip-bike" && (

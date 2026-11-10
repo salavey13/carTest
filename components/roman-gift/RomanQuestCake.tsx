@@ -28,7 +28,7 @@
 // (max stop reached) — shared by the gift page and the overview.
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   TOUR_FEATURES,
   TOUR_STOPS_TOTAL,
@@ -227,6 +227,7 @@ function useActivations(open: boolean) {
 
 export function RomanQuestCake({ stop: stopProp, riddle, nextHref, nextLabel, featureKey }: RomanQuestCakeProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const gate = useFeatureTourGate();
   const [open, setOpen] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -326,25 +327,37 @@ export function RomanQuestCake({ stop: stopProp, riddle, nextHref, nextLabel, fe
   const paidApplied = receipt?.status === "active" && receipt.applied === true;
   const paidVoucher = receipt?.status === "active" && receipt.applied !== true;
 
+  // task173 — map-riders keeps the franchize deck nav pinned to the bottom
+  // edge (FranchizeMapBottomNav, mobile-only); lift the marker above it there
+  // so the two never overlap (same route regex as ClientLayout's nav test).
+  const aboveBottomNav = /^\/franchize\/[^/]+\/(map-riders|leaderboard)(?:\/.*)?$/.test(pathname || "");
+
   // Render nothing while the verdict loads — no flash for anyone, no layout
   // shift on host pages. (v2: the tour renders for EVERYONE once resolved.)
   if (gate.status === "loading") return null;
 
   return (
     <>
-      {/* The hidden trigger: a small dim marker in the corner */}
+      {/* The hidden trigger: a small dim marker in the corner.
+          task173: map-riders body carries a STUCK inline `pointer-events: none`
+          while the deck drawer is open (Radix DismissableLayer pattern — see
+          MapPhotoLightbox 21.10 fix). pointer-events is inherited: without the
+          explicit auto in the style below the marker is visually painted
+          (z-70 > nav z-30) but every tap falls through to whatever re-enabled
+          PE below it. */}
       <button
         type="button"
         onClick={handleOpen}
         aria-label={isBirthday ? "Торт" : "Фича-тур"}
         title={markerIcon}
         className={
-          "fixed bottom-4 left-4 z-[70] flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm transition-all duration-300 hover:scale-110 sm:h-11 sm:w-11 " +
+          "fixed left-4 z-[70] flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm transition-all duration-300 hover:scale-110 sm:h-11 sm:w-11 " +
+          (aboveBottomNav ? "bottom-[5.5rem] md:bottom-4 " : "bottom-4 ") +
           (isBirthday
             ? "border-amber-400/40 bg-black/60 text-lg hover:border-amber-300/80 hover:bg-black/80 hover:shadow-amber-500/20"
             : "border-sky-400/30 bg-black/60 text-lg hover:border-sky-300/70 hover:bg-black/80 hover:shadow-sky-500/20")
         }
-        style={{ opacity: 0.55 }}
+        style={{ opacity: 0.55, pointerEvents: "auto" }}
       >
         <span aria-hidden>{markerIcon}</span>
         {progress >= stop && (
@@ -363,7 +376,14 @@ export function RomanQuestCake({ stop: stopProp, riddle, nextHref, nextLabel, fe
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
+          style={{ pointerEvents: "auto" }}
         >
+          {/* task173: same stuck-PE guard as the marker — the whole modal is
+              fixed-position OUTSIDE the deck drawer's PE:auto subtree, so on
+              map-riders it inherited body's pointer-events:none and none of
+              its buttons were clickable (boss: «can't click on buttons in
+              feature-tour modal: so can't continue»). Overlay auto → the
+              whole dialog subtree is interactive again. */}
           <div
             className={
               "relative w-full max-w-md overflow-hidden rounded-2xl border p-7 text-center shadow-[0_0_60px_rgba(120,170,255,0.12)] " +

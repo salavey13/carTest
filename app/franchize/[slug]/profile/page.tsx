@@ -53,7 +53,7 @@ export default async function FranchizeProfilePage({
         <FranchizeProfileClient initialCrew={crew} initialSlug={resolvedSlug} />
       </FranchizePageShell>
 
-      {/* task165 onboarding tour — stop 11/19 (boss: ALL header menu links of
+      {/* task165 onboarding tour — stop 7/15 (boss: ALL header menu links of
           the golden standard vip-bike crew live in the quest). Riddle describes
           the NEXT page. */}
       {slug === "vip-bike" && (

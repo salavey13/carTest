@@ -133,7 +133,7 @@ export default async function FranchizeCommunityPage(
         bleed
       />
 
-      {/* task165 onboarding tour — stop 14/19 (стена сообщества). Riddle
+      {/* task165 onboarding tour — stop 10/15 (стена сообщества). Riddle
           describes the NEXT page (витрина продаж). */}
       {slug === "vip-bike" && (
         <RomanQuestCake

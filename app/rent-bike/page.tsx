@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { useAppContext } from "@/contexts/AppContext";
 import { getVehiclesWithStatus, getVehicleCalendar, createBooking, getUserRentals } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
@@ -397,14 +396,9 @@ export default function RentBikePage() {
             </div>
         </div>
 
-        {/* task165 onboarding tour — stop 8/19 (гараж). Riddle describes the
-            NEXT page (мотопарк). */}
-        <RomanQuestCake
-          featureKey="garage"
-          riddle="Гараж — это железо. Дальше — мотопарк: стена каждого мото — аренды, сервис, выручка и пробег. Посмотри, как машина помнит каждую поездку."
-          nextHref="/franchize/vip-bike/bikes"
-          nextLabel="Открыть мотопарк"
-        />
+        {/* task173 (boss: ditch legacy non-franchize pages from the tour):
+            /rent-bike is the pre-franchize global booking flow — no tour host
+            anymore. See components/roman-gift/tourFeatures.ts. */}
       </div>
     </div>
   );

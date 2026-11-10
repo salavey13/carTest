@@ -52,7 +52,7 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
             Доступ только для участников экипажа
           </p>
         </div>
-        {/* task165 onboarding tour — stop 12/19 works even on the locked
+        {/* task165 onboarding tour — stop 8/15 works even on the locked
             fallback (the pitch sells the feature; members get the page). */}
         {slug === "vip-bike" && (
           <RomanQuestCake
@@ -72,7 +72,7 @@ export default async function CalcExplainerPage({ params }: { params: Promise<{ 
       <FranchizePageShell theme={crew.theme} contentClassName="space-y-6 max-w-3xl mx-auto">
         <CalcExplainer />
       </FranchizePageShell>
-      {/* task165 onboarding tour — stop 12/19 (прайс-калькулятор). */}
+      {/* task165 onboarding tour — stop 8/15 (прайс-калькулятор). */}
       {slug === "vip-bike" && (
         <RomanQuestCake
           featureKey="price_calc"

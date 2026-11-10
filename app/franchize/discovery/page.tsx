@@ -3,7 +3,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, Bike, ChevronDown, Handshake, Info, MapPin, MessagesSquare, Snowflake, Sparkles, Trophy, Users } from "lucide-react";
 import { logger } from "@/lib/logger";
-import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import { CrewDiscoveryGraph } from "./CrewDiscoveryGraph";
 import { loadNetworkModel } from "./load-network-model";
 
@@ -338,14 +337,9 @@ export default async function CrewDiscoveryPage() {
             Создать свой экипаж
           </Link>
         </p>
-        {/* task165 onboarding tour — stop 6/19 (карта сети). Next hop:
-            зал славы (chain unchanged). */}
-        <RomanQuestCake
-          featureKey="discovery"
-          riddle="Карта показала, сколько вас и как вы связаны. Следующий след — про славу: там горят топы экипажей и флотов всего проекта. Найди в зале славы знакомые имена."
-          nextHref="/leaderboard"
-          nextLabel="Войти в зал славы"
-        />
+        {/* task173 (boss: ditch legacy non-franchize pages from the tour):
+            /franchize/discovery is a global network surface — no tour host
+            anymore. See components/roman-gift/tourFeatures.ts. */}
       </div>
     </main>
   );

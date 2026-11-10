@@ -305,7 +305,7 @@ export default async function ElectroEnduroPage({
         </div>
       </section>
 
-      {/* task165 onboarding tour — stop 4/19 (boss: ALL header menu links of
+      {/* task165 onboarding tour — stop 3/15 (boss: ALL header menu links of
           the golden standard vip-bike crew live in the quest). Riddle describes
           the NEXT page. */}
       {slug === "vip-bike" && (

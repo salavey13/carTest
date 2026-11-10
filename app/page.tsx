@@ -13,7 +13,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { useTheme } from "next-themes";
 import FeedbackModal from "@/app/moto-selection/FeedbackModal";
-import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 import { RestBreak } from "@/components/landings/RestBreak";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
@@ -1650,16 +1649,10 @@ export default function Home() {
           world + hall of fame + garage (5 stops instead of 3):
           / → /franchize/vip-bike → /franchize/discovery → /leaderboard
           → /rent-bike → /gift/roman */}
-      {/* task165 onboarding tour — stop 1/19 (landing). Riddle describes the
-          NEXT page (витрина); the tour skin is public, the birthday skin is
-          Roman-only (the component self-gates). Stop number derives from the
-          catalog — see components/roman-gift/tourFeatures.ts. */}
-      <RomanQuestCake
-        featureKey="landing"
-        riddle="Подарок уже спрятан, и экипаж оставил тебе девятнадцать следов. Первый ведёт туда, где твой экипаж встречает гостей: витрина с парком, ценами и корзиной — как у настоящего магазина."
-        nextHref="/franchize/vip-bike"
-        nextLabel="Открыть витрину экипажа"
-      />
+      {/* task173 (boss: ditch legacy non-franchize pages from the tour):
+          the root landing is no longer a tour host — the trail now starts on
+          the crew storefront (/franchize/vip-bike). See
+          components/roman-gift/tourFeatures.ts. */}
     </>
   );
 }

@@ -46,24 +46,24 @@ const hostPage = (p: string) => read(`app/franchize/[slug]/${p}/page.tsx`);
 // onboarding quest». Route template {slug} → the tour stops it via the
 // vip-bike concrete routes; the ⭐ tour-hub link IS the quest itself.
 const GOLDEN_STANDARD_HEADER_ROUTES = [
-  "/franchize/{slug}", // Каталог → storefront (stop 2)
-  "/franchize/{slug}/map-riders", // Карта → map_riders (13)
-  "/franchize/{slug}/wheel", // Колесо фортуны → wheel (5)
-  "/franchize/{slug}/electro-enduro", // Каталог-electro → electro_enduro (4)
-  "/franchize/{slug}/configurator", // Конфигуратор → configurator (3)
-  "/franchize/{slug}/about", // О нас → about (16)
-  "/franchize/{slug}/contacts", // Контакты → contacts (17)
-  "/franchize/{slug}/cart", // Корзина → cart (10)
-  "/franchize/{slug}/profile", // Мои аренды → profile (11)
-  "/franchize/{slug}/bikes", // Мотопарк → bikes (9)
-  "/franchize/{slug}/community", // Сообщество → community (14)
-  "/franchize/{slug}/onboarding", // Партнёрам → onboarding (18)
-  "/franchize/{slug}/sales", // Продажи → sales (15)
+  "/franchize/{slug}", // Каталог → storefront (stop 1)
+  "/franchize/{slug}/map-riders", // Карта → map_riders (9)
+  "/franchize/{slug}/wheel", // Колесо фортуны → wheel (4)
+  "/franchize/{slug}/electro-enduro", // Каталог-electro → electro_enduro (3)
+  "/franchize/{slug}/configurator", // Конфигуратор → configurator (2)
+  "/franchize/{slug}/about", // О нас → about (12)
+  "/franchize/{slug}/contacts", // Контакты → contacts (13)
+  "/franchize/{slug}/cart", // Корзина → cart (6)
+  "/franchize/{slug}/profile", // Мои аренды → profile (7)
+  "/franchize/{slug}/bikes", // Мотопарк → bikes (5)
+  "/franchize/{slug}/community", // Сообщество → community (10)
+  "/franchize/{slug}/onboarding", // Партнёрам → onboarding (14)
+  "/franchize/{slug}/sales", // Продажи → sales (11)
   "/gift/roman-quest", // ⭐ Фичи экипажа — the quest hub itself
 ];
 
 describe("task165 · the onboarding quest covers the ENTIRE golden-standard header", () => {
-  it("19 stops — every vip-bike header menu link has a tour stop (the ⭐ hub is the quest)", () => {
+  it("15 stops (task173: legacy non-franchize pages ditched) — every vip-bike header menu link has a tour stop (the ⭐ hub is the quest)", () => {
     const stopHrefs = new Set(TOUR_FEATURES.map((f) => f.href));
     const missing: string[] = [];
     for (const link of GOLDEN_STANDARD_HEADER_ROUTES) {
@@ -72,7 +72,7 @@ describe("task165 · the onboarding quest covers the ENTIRE golden-standard head
       if (!stopHrefs.has(concrete)) missing.push(concrete);
     }
     expect(missing).toEqual([]);
-    expect(TOUR_STOPS_TOTAL).toBe(19);
+    expect(TOUR_STOPS_TOTAL).toBe(15);
   });
 
   it("the 9 NEW stops exist with product copy and real prices", () => {
@@ -99,9 +99,11 @@ describe("task165 · the onboarding quest covers the ENTIRE golden-standard head
     expect(component).toContain("nextFeature?.preview");
     expect(component).toContain('alt={`Следующая остановка: ${nextFeature.title}`}');
     expect(component).toContain("Дальше: {nextFeature.icon} {nextFeature.title}");
-    // the last stop (19) has no next — the helper returns undefined safely
+    // the last stop (15) has no next — the helper returns undefined safely
     expect(tourNextFeature(TOUR_STOPS_TOTAL)).toBeUndefined();
-    expect(tourNextFeature(1)?.key).toBe("storefront");
+    // task173: the trail now STARTS on the crew storefront (no landing stop)
+    expect(TOUR_FEATURES[0].key).toBe("storefront");
+    expect(tourNextFeature(1)?.key).toBe("configurator");
   });
 });
 
@@ -224,9 +226,10 @@ describe("task165 · CTA surfaces — real stars button for TG sessions, demo fo
 
 describe("task165 · the 9 new host stops are wired (chain and gating)", () => {
   const NEW_STOPS: Array<[string, string, string]> = [
-    // page, featureKey, nextHref
+    // page, featureKey, nextHref (task173: wheel → bikes, discovery/leaderboard/
+    // rent-bike/landing stops are gone — global pages can't grow a crew menu)
     ["electro-enduro", "electro_enduro", "/franchize/vip-bike/wheel"],
-    ["wheel", "wheel", "/franchize/discovery"],
+    ["wheel", "wheel", "/franchize/vip-bike/bikes"],
     ["bikes", "bikes", "/franchize/vip-bike/cart"],
     ["cart", "cart", "/franchize/vip-bike/profile"],
     ["profile", "profile", "/franchize/vip-bike/calc-explainer"],
