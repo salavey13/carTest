@@ -50,7 +50,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { MotionConfig, motion, useScroll, useTransform, useInView, animate } from "framer-motion";
+import { MotionConfig, AnimatePresence, motion, useScroll, useTransform, useInView, animate } from "framer-motion";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { FaTelegramPlane } from "react-icons/fa";
 import FeedbackModal from "@/app/moto-selection/FeedbackModal";
@@ -532,6 +532,10 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
   // ведёт в каталог; грамматика PartnerRevealCard / MsServicesGrid /
   // GlassServiceCard. Клавиатуре — :focus-within.
   const [revealedSvcs, setRevealedSvcs] = useState<Record<string, boolean>>({});
+  // task177 2026-11-12: пасхалка из футера — скрин Cyberpunk TCG «BUILD YOUR CREW»
+  // (boss прислал с комментом «creating crews is going mainstream» — фиксируем
+  // официальное признание мейнстрима в академической сноске).
+  const [eggOpen, setEggOpen] = useState(false);
   const lastPointerWasTouch = useRef(false);
   const svcGate = (key: string) => ({
     "data-reveal-active": revealedSvcs[key] ? "true" : undefined,
@@ -1911,8 +1915,18 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </div>
           <div className="border-t px-4 py-5 sm:px-6" style={{ borderColor: p.borderSoft }}>
-            <p className="mx-auto max-w-7xl text-[11px]" style={{ color: p.textSecondary }}>
-              © 2026 SLY13 · платформа франшиз: витрина, лиды, аренда, деньги, команда — на одном движке
+            <p className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: p.textSecondary }}>
+              <span>
+                © 2026 SLY13 · платформа франшиз: витрина, лиды, аренда, деньги, команда — на одном движке
+              </span>
+              <button
+                type="button"
+                onClick={() => setEggOpen(true)}
+                className="font-jb uppercase tracking-[0.14em] underline decoration-dotted underline-offset-4 transition hover:text-[var(--sly-accent)]"
+                style={{ color: p.textSecondary }}
+              >
+                пасхалка: создание экипажей уже в мейнстриме
+              </button>
             </p>
           </div>
         </footer>
@@ -1926,6 +1940,58 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           formSource="sly13-feedback-modal"
           landingPath="/salavey13"
         />
+
+        {/* task177 2026-11-12: пасхалка — скрин Cyberpunk TCG (новый трейлер):
+            «BUILD YOUR CREW» — создание экипажей официально в мейнстриме.
+            Клик по фону/крестик закрывают. */}
+        <AnimatePresence>
+          {eggOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/90 p-4 sm:p-8"
+              onClick={() => setEggOpen(false)}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Пасхалка: Cyberpunk TCG — Build Your Crew"
+            >
+              <motion.figure
+                initial={{ scale: 0.94, y: 14 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.96, y: 8 }}
+                transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                className="relative my-auto w-full max-w-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setEggOpen(false)}
+                  aria-label="Закрыть пасхалку"
+                  className="absolute -top-3 -right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border text-lg leading-none transition"
+                  style={{ borderColor: p.borderSoft, background: p.bgCard, color: p.textPrimary }}
+                >
+                  ×
+                </button>
+                <Image
+                  src="/images/cyberpunk-tcg-build-your-crew.png"
+                  alt="Cyberpunk TCG — Build Your Crew: скрин нового трейлера"
+                  width={1919}
+                  height={904}
+                  className="h-auto w-full rounded-lg border shadow-2xl"
+                  style={{ borderColor: p.accentMain }}
+                />
+                <figcaption className="mt-3 text-center text-sm" style={{ color: p.textSecondary }}>
+                  Cyberpunk TCG: «BUILD YOUR CREW» — скрин нового трейлера.{" "}
+                  <span style={{ color: p.accentMain }}>
+                    Создание экипажей официально в мейнстриме — добро пожаловать в клуб.
+                  </span>
+                </figcaption>
+              </motion.figure>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </MotionConfig>
   );

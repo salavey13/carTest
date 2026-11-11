@@ -20,6 +20,10 @@
 // AI-воркер) — детали в Sly13LandingClient. Слитый из статичного HTML блок
 // «автор» тоже без приватных цифр (пины task138/167).
 //
+// task177 2026-11-12: в футере лендинга появилась пасхалка (boss: «creating
+// crews is going mainstream») — скрин Cyberpunk TCG «BUILD YOUR CREW» в
+// лайтбоксе; реализация в Sly13LandingClient (футер-триггер + AnimatePresence).
+//
 // Архитектура: этот RSC только тянет палитру экипажа (устойчиво к недоступности
 // БД — фолбэк на sly13-палитру из crewDocs) и отдаёт её клиентскому
 // Sly13LandingClient, где живут framer-motion-анимации, bento-сетки,

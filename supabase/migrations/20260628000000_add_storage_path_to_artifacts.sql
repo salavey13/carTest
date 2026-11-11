@@ -42,8 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_subrent_contract_artifacts_storage_path
   WHERE storage_path IS NOT NULL;
 
 COMMENT ON COLUMN private.rental_contract_artifacts.storage_path IS
-  Path in rental-contracts storage bucket, e.g. vip-bike/rental-xxx-123.docx;
+  'Path in rental-contracts storage bucket, e.g. vip-bike/rental-xxx-123.docx';
 COMMENT ON COLUMN private.sale_contract_artifacts.storage_path IS
-  Path in rental-contracts storage bucket;
+  'Path in rental-contracts storage bucket';
 COMMENT ON COLUMN private.subrent_contract_artifacts.storage_path IS
-  Path in rental-contracts storage bucket;
+  'Path in rental-contracts storage bucket';
