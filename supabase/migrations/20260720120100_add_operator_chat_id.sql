@@ -27,6 +27,13 @@ ALTER TABLE private.rental_contract_artifacts
 COMMENT ON COLUMN private.rental_contract_artifacts.created_by_operator_chat_id
   IS 'Telegram chat_id of the operator/crew member who created this artifact. Set at creation time, never changes.';
 
+-- Chain-repair (task177, fresh-setup): sale artifacts have the same column in prod
+-- (live drift) — backfill migrations 20260722140000 / 20260812000008 reference it.
+ALTER TABLE private.sale_contract_artifacts
+  ADD COLUMN IF NOT EXISTS created_by_operator_chat_id TEXT;
+COMMENT ON COLUMN private.sale_contract_artifacts.created_by_operator_chat_id
+  IS 'Telegram chat_id of the operator/crew member who created this artifact. Set at creation time, never changes.';
+
 
 -- ─── Step 2: Backfill existing data ──────────────────────────────────────
 

@@ -98,7 +98,7 @@ RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
   );
 $$;
 
-COMMENT ON FUNCTION public.has_commission_rates() IS
+COMMENT ON FUNCTION public.has_commission_rates(UUID) IS
 'Priority 1 Fix 3: Helper to check if crew has commission rates configured. Used to determine calculation method.';
 
 -- ── 4. VALIDATE COMMISSION VALUES ─────────────────────────────────────────────
@@ -176,7 +176,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.check_period_overlap() IS
+COMMENT ON FUNCTION public.check_period_overlap(UUID, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, UUID) IS
 'Priority 2 Fix 5: Detects overlapping salary plan periods with detailed conflict messages.';
 
 -- Wrapper function for use in server actions with simple error message
@@ -198,7 +198,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.check_period_overlap_simple() IS
+COMMENT ON FUNCTION public.check_period_overlap_simple(UUID, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) IS
 'Simplified version for existing server actions. Returns true/false.';
 
 -- ── 6. IDEMPOTENCY PROTECTION FOR SALARY CALCULATIONS ───────────────────────
@@ -228,7 +228,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.has_salary_calculation() IS
+COMMENT ON FUNCTION public.has_salary_calculation(UUID, TIMESTAMPTZ, TIMESTAMPTZ) IS
 'Priority 2 Fix 6: Checks for existing salary calculation to prevent duplicates. Allows failed calculations to be retried.';
 
 -- Add comment column to salary_calculations for audit trail
@@ -243,7 +243,7 @@ COMMENT ON COLUMN public.salary_calculations.notes IS
 -- Backfill hourly_rate for existing active shifts from users.metadata
 UPDATE public.crew_member_shifts cms
 SET hourly_rate = COALESCE(
-  (SELECT u.metadata->>'hourly_rate'::NUMERIC FROM public.users u WHERE u.user_id = cms.member_id),
+  (SELECT (u.metadata->>'hourly_rate')::NUMERIC FROM public.users u WHERE u.user_id = cms.member_id),
   500
 )
 WHERE cms.clock_out_time IS NULL  -- Only active shifts
@@ -252,13 +252,12 @@ WHERE cms.clock_out_time IS NULL  -- Only active shifts
 -- Backfill hourly_rate for completed shifts without it
 UPDATE public.crew_member_shifts cms
 SET hourly_rate = COALESCE(
-  (SELECT u.metadata->>'hourly_rate'::NUMERIC FROM public.users u WHERE u.user_id = cms.member_id),
+  (SELECT (u.metadata->>'hourly_rate')::NUMERIC FROM public.users u WHERE u.user_id = cms.member_id),
   500
 )
 WHERE cms.clock_out_time IS NOT NULL  -- Completed shifts
   AND cms.hourly_rate IS NULL  -- Only where not set
-  AND cms.duration_minutes IS NOT NULL  -- Has duration data
-LIMIT 1000;  -- Limit to recent 1000 shifts for performance
+  AND cms.duration_minutes IS NOT NULL;  -- Has duration data (UPDATE has no LIMIT in PG)
 
 -- ── BACKFILL: Recalculate total_accrued for all salary_plans ───────────────
 

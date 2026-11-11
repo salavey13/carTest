@@ -9,6 +9,9 @@ VALUES ('docpix', 'docpix', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- RLS policy: only service role can access (server-side operations only)
+-- task177 chain-repair: storage schema survives schema wipes (public/private only),
+-- so the policy must be re-runnable.
+DROP POLICY IF EXISTS "Service role only access to docpix" ON storage.objects;
 CREATE POLICY "Service role only access to docpix"
 ON storage.objects FOR ALL
 USING (auth.role() = 'service_role');

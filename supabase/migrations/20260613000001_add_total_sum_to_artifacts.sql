@@ -1,14 +1,19 @@
 -- Add total_sum columns to contract artifact tables
 -- This enables faster daily summary calculations without joins
+--
+-- task177/178 chain-repair: original version targeted public.rental_contract_artifacts,
+-- which never exists in the migration chain — 20260612000000 moves the artifacts
+-- table to private (DROP public, CREATE private) and prod carries total_sum there.
+-- Now targets private.rental_contract_artifacts (born in 20260612000000, one step
+-- earlier) and private.sale_contract_artifacts (born in 20260607000000).
 
--- Step 1: Add total_sum to rental_contract_artifacts (with NULL for existing records)
-ALTER TABLE public.rental_contract_artifacts
+-- Step 1: Add total_sum to private.rental_contract_artifacts (idempotent)
+ALTER TABLE private.rental_contract_artifacts
 ADD COLUMN IF NOT EXISTS total_sum NUMERIC;
 
-COMMENT ON COLUMN public.rental_contract_artifacts.total_sum IS 'Total rental value in RUB. NULL for existing contracts, filled for new ones.';
+COMMENT ON COLUMN private.rental_contract_artifacts.total_sum IS 'Total rental value in RUB. NULL for existing contracts, filled for new ones.';
 
--- Step 2: Add total_sum to sale_contract_artifacts (can be calculated from sale_price)
--- First need to add column if it doesn't exist in private schema
+-- Step 2: Add total_sum to private.sale_contract_artifacts (can be calculated from sale_price)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -56,8 +61,8 @@ AS $$
 DECLARE
   updated_count INTEGER := 0;
 BEGIN
-  -- Update rentals where total_sum is NULL by joining with bikes table
-  UPDATE public.rental_contract_artifacts rca
+  -- Update artifacts where total_sum is NULL by joining with bikes table
+  UPDATE private.rental_contract_artifacts rca
   SET total_sum = (
     -- Calculate rough estimate based on bike's daily_price
     -- A more accurate calculation would require parsing rent_start_date and rent_end_date
@@ -66,7 +71,7 @@ BEGIN
       COALESCE(NULLIF(regexp_replace((c.specs->>'price_rub')::TEXT, '\s+', '', 'g'), '')::NUMERIC, 0)
     )
     FROM public.cars c
-    WHERE c.id = rca.resolved_bike_id
+    WHERE c.id = rca.resolved_bike_id::uuid
   )
   WHERE rca.total_sum IS NULL
     AND rca.resolved_bike_id IS NOT NULL;
@@ -85,7 +90,7 @@ WITH today_rentals AS (
   SELECT
     COUNT(*) AS rental_count,
     COALESCE(SUM(total_sum), 0) AS rental_total
-  FROM public.rental_contract_artifacts
+  FROM private.rental_contract_artifacts
   WHERE DATE(created_at) = CURRENT_DATE
 ),
 today_sales AS (
@@ -110,6 +115,7 @@ COMMENT ON VIEW public.daily_contract_summary IS 'Daily summary of rental and sa
 -- Grant permissions
 GRANT SELECT ON public.daily_contract_summary TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.backfill_rental_totals TO authenticated;
+GRANT SELECT ON public.daily_contract_summary TO service_role;
 
 -- Optional: Run backfill once
 -- SELECT public.backfill_rental_totals();

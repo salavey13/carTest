@@ -1,6 +1,10 @@
-INSERT INTO public.cars 
+-- Chain-repair (task177/178, fresh-setup): cars.quantity exists in prod but is never
+-- born in the migration chain — born here (idempotent) before the seed uses it.
+ALTER TABLE public.cars ADD COLUMN IF NOT EXISTS quantity INTEGER;
+
+INSERT INTO public.cars
 (id, make, model, description, daily_price, image_url, type, owner_id, rent_link, quantity, is_test_result, specs)
-VALUES 
+VALUES
 (
   'gear-grenade-01', 
   'Taginn', 

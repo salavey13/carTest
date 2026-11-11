@@ -29,8 +29,14 @@ ALTER TABLE public.live_locations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "riders see only nearby in same crew" ON public.live_locations;
 DROP POLICY IF EXISTS "users can upsert own location" ON public.live_locations;
+DROP POLICY IF EXISTS "users can insert own location" ON public.live_locations;
 DROP POLICY IF EXISTS "users can update own location" ON public.live_locations;
 DROP POLICY IF EXISTS "users can delete own location" ON public.live_locations;
+
+-- Chain-repair (task177/178, fresh-setup): crews.metadata is born late in the chain
+-- (xxxx_update_crews_with_slug.sql, ASCII-sorted after digits) but this file runs
+-- earlier — birth-guard here (idempotent, matches prod type/default).
+ALTER TABLE public.crews ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE POLICY "riders see only nearby in same crew"
 ON public.live_locations

@@ -2,6 +2,10 @@
 -- where vehicles with multiple rentals would appear multiple times in the result.
 -- It also enhances the function to return the start and end dates of the active rental.
 
+-- task177 chain-repair: this redefinition changes the RETURNS TABLE shape
+-- (adds active_booking_start/end) — Postgres forbids changing a function's return
+-- type via CREATE OR REPLACE, so drop the previous version first.
+DROP FUNCTION IF EXISTS get_vehicles_with_status();
 CREATE OR REPLACE FUNCTION get_vehicles_with_status()
 RETURNS TABLE (
     id TEXT,

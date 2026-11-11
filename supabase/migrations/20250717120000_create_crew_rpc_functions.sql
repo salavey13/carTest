@@ -29,6 +29,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- task177 chain-repair: get_public_crew_details was born earlier in the chain
+-- (20240728_harden_crew_lookup.sql) with a different RETURNS shape — drop before redefining.
+DROP FUNCTION IF EXISTS public.get_public_crew_details(TEXT);
 CREATE OR REPLACE FUNCTION get_public_crew_details(p_slug TEXT)
 RETURNS json AS $$
 DECLARE

@@ -1,3 +1,6 @@
+-- task177 chain-repair: redefinition changes RETURNS shape — drop previous version first.
+DROP FUNCTION IF EXISTS public.get_public_crew_details(TEXT);
+
 CREATE OR REPLACE FUNCTION get_public_crew_details(p_slug TEXT)
 RETURNS TABLE (
     id UUID,

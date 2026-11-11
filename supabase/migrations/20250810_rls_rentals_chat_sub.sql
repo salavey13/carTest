@@ -1,7 +1,13 @@
+-- Chain-repair (task177, fresh-setup): prod drift — users.chat_id exists in prod
+-- but was never born in the migration chain. First used here, so born here.
+-- Idempotent re-runs: DROP POLICY IF EXISTS before each CREATE.
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS chat_id TEXT;
+
 -- Включаем RLS
 ALTER TABLE public.rentals ENABLE ROW LEVEL SECURITY;
 
 -- Арендатор — свои сделки
+DROP POLICY IF EXISTS "rentals_select_as_renter_chat_sub" ON public.rentals;
 CREATE POLICY "rentals_select_as_renter_chat_sub"
 ON public.rentals
 FOR SELECT
@@ -9,12 +15,13 @@ USING (
   EXISTS (
     SELECT 1
     FROM public.users u
-    WHERE u.chat_id::text = auth.sub()
+    WHERE u.chat_id::text = (auth.jwt() ->> 'sub')
       AND u.user_id = rentals.user_id
   )
 );
 
 -- Владелец сделки — свои
+DROP POLICY IF EXISTS "rentals_select_as_owner_chat_sub" ON public.rentals;
 CREATE POLICY "rentals_select_as_owner_chat_sub"
 ON public.rentals
 FOR SELECT
@@ -22,12 +29,13 @@ USING (
   EXISTS (
     SELECT 1
     FROM public.users u
-    WHERE u.chat_id::text = auth.sub()
+    WHERE u.chat_id::text = (auth.jwt() ->> 'sub')
       AND u.user_id = rentals.owner_id
   )
 );
 
 -- Владелец экипажа — сделки по своим машинам
+DROP POLICY IF EXISTS "rentals_select_as_crew_owner_chat_sub" ON public.rentals;
 CREATE POLICY "rentals_select_as_crew_owner_chat_sub"
 ON public.rentals
 FOR SELECT
@@ -38,13 +46,14 @@ USING (
     JOIN public.crews cr ON c.crew_id = cr.id
     JOIN public.users u ON cr.owner_id = u.user_id
     WHERE c.id = rentals.vehicle_id
-      AND u.chat_id::text = auth.sub()
+      AND u.chat_id::text = (auth.jwt() ->> 'sub')
   )
 );
 
 -- cars
 ALTER TABLE public.cars ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "cars_select_for_rentals_chat_sub" ON public.cars;
 CREATE POLICY "cars_select_for_rentals_chat_sub"
 ON public.cars
 FOR SELECT
@@ -52,7 +61,7 @@ USING (
   EXISTS (
     SELECT 1
     FROM public.users u
-    WHERE u.chat_id::text = auth.sub()
+    WHERE u.chat_id::text = (auth.jwt() ->> 'sub')
       AND (
         u.user_id = cars.owner_id
         OR u.user_id IN (
@@ -67,6 +76,7 @@ USING (
 -- crews
 ALTER TABLE public.crews ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "crews_select_owner_chat_sub" ON public.crews;
 CREATE POLICY "crews_select_owner_chat_sub"
 ON public.crews
 FOR SELECT
@@ -74,14 +84,14 @@ USING (
   EXISTS (
     SELECT 1
     FROM public.users u
-    WHERE u.chat_id::text = auth.sub()
+    WHERE u.chat_id::text = (auth.jwt() ->> 'sub')
       AND (
         u.user_id = crews.owner_id
         OR u.user_id IN (
           SELECT m.user_id
           FROM public.crew_members m
           WHERE m.crew_id = crews.id
-            AND m.status = 'active'
+            AND m.membership_status = 'active'  -- task177 fix: status renamed to membership_status in 20250805
         )
       )
   )
@@ -90,6 +100,7 @@ USING (
 -- crew_members
 ALTER TABLE public.crew_members ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "crew_members_select_self_chat_sub" ON public.crew_members;
 CREATE POLICY "crew_members_select_self_chat_sub"
 ON public.crew_members
 FOR SELECT
@@ -97,7 +108,7 @@ USING (
   EXISTS (
     SELECT 1
     FROM public.users u
-    WHERE u.chat_id::text = auth.sub()
+    WHERE u.chat_id::text = (auth.jwt() ->> 'sub')
       AND u.user_id = crew_members.user_id
   )
 );

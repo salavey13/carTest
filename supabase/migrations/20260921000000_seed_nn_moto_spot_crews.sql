@@ -24,6 +24,25 @@
 
 begin;
 
+-- Chain-repair (task177, fresh-setup): on a FRESH database crews is empty →
+-- owner_id coalesce returns NULL → NOT NULL violation → migration aborts.
+-- Seeds of this kind (prod-data dependent) must skip gracefully when there is
+-- no owner to inherit from; data.sql import brings the crews afterwards anyway.
+do $$
+declare v_owner uuid;
+begin
+  select coalesce(
+    (select c.owner_id from public.crews c where c.slug = 'vip-bike' limit 1),
+    (select c.owner_id from public.crews c order by c.created_at asc limit 1)
+  ) into v_owner;
+  if v_owner is null then
+    raise notice '════════════════════════════════════════════════════════════════';
+    raise notice 'Migration 20260921000000 SKIPPED: no crews exist yet (fresh DB).';
+    raise notice 'NN moto-spot dummy crews are seeded by the data import / re-run later.';
+    raise notice '════════════════════════════════════════════════════════════════';
+    return;
+  end if;
+
 with data as (
   select
     v.slug,
@@ -114,5 +133,7 @@ on conflict (slug) do update set
   hq_location = excluded.hq_location,
   metadata = excluded.metadata,
   updated_at = now();
+
+end $$;
 
 commit;

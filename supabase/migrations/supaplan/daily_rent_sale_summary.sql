@@ -3,7 +3,20 @@
 -- Usage: SELECT public.send_daily_rent_sale_summary('chat_id_from_db');
 
 -- Step 1: Enable pg_net extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS pg_net;
+-- task177 chain-repair: guard for environments where pg_net is not installed
+-- (local replay sandbox); on Supabase it is always available.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_net') THEN
+    CREATE EXTENSION IF NOT EXISTS pg_net;
+  ELSE
+    RAISE NOTICE 'pg_net not available in this environment — net.http_* calls will fail at runtime';
+  END IF;
+END $$;
+
+-- task177 chain-repair: prod drift — cars.created_at exists in prod but was never
+-- born in the migration chain; the summary function and view below reference it.
+ALTER TABLE public.cars ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
 
 -- Step 2: Create the summary function
 CREATE OR REPLACE FUNCTION public.send_daily_rent_sale_summary(target_chat_id TEXT DEFAULT NULL)
@@ -274,7 +287,7 @@ today_sales AS (
 )
 SELECT
     COALESCE(r.crew_member_id, s.crew_member_id) AS crew_member_id,
-    u.name AS crew_member_name,
+    u.full_name AS crew_member_name, -- task177 fix: public.users has full_name, not name
     COALESCE(r.rental_count, 0) AS rental_count,
     COALESCE(r.rental_total, 0) AS rental_total,
     COALESCE(s.sale_count, 0) AS sale_count,
