@@ -199,8 +199,9 @@ describe("task140 — /sly13 neon palette + quality raise", () => {
 
   it("ghost watermark per section — cyan 6% + blur(2px), TV-safe layering", () => {
     // task167 re-baseline: 6→7 — new «автор» ghost on the merged bio section
-    expect((sly.match(/<SlyGhostWord word="/g) ?? []).length).toBe(7);
-    for (const w of ["платформа", "02", "сценарии", "04", "услуги", "партнёры", "автор"]) {
+    // task175 re-baseline: 7→8 — new «вопросы» ghost on the FAQ section
+    expect((sly.match(/<SlyGhostWord word="/g) ?? []).length).toBe(8);
+    for (const w of ["платформа", "02", "сценарии", "04", "услуги", "партнёры", "автор", "вопросы"]) {
       expect(sly).toContain(`<SlyGhostWord word="${w}"`);
     }
     expect(sly).toContain("color-mix(in srgb, var(--sly-accent) 6%, transparent)");
@@ -238,7 +239,8 @@ describe("task140 — /sly13 neon palette + quality raise", () => {
   });
 
   it("contour + AI cards lift on hover; keyboard focus outline rule present", () => {
-    expect((sly.match(/className="sly-lift /g) ?? []).length).toBe(3);
+    // task175: 3→4 — FAQ cards reuse the same lift treatment
+    expect((sly.match(/className="sly-lift /g) ?? []).length).toBe(4);
     expect(sly).toContain(".sly-lift:hover");
     expect(sly).toContain(".sly-root a:focus-visible, .sly-root button:focus-visible");
     // task139-iter2 lesson: outline with offset, never box-shadow rings

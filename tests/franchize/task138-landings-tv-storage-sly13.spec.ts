@@ -72,9 +72,13 @@ describe("task138 · sly13 messaging overhaul (no private vip-bike numbers)", ()
 
   it("the message is generalized to the platform promo (каталог → CRM)", () => {
     expect(sly).toContain("проката и сервисов"); // generalized display line
-    expect(sly).toContain("Залил каталог"); // PDF idea
+    // task175: императив (урок OpenAI №2 — заголовки с глагола владельца);
+    // «залил каталог» остаётся в тикере бегущей строки.
+    expect(sly).toContain("Залей каталог"); // PDF idea, imperative
+    expect(sly).toContain("залил каталог — получил CRM"); // ticker line
     expect(sly).toContain("Шесть контуров"); // 6 contours bento
-    expect(sly).toContain("Каждый рубль виден"); // double-entry money section
+    // task175: «Считай каждый рубль дважды» (verb-first, урок №2)
+    expect(sly).toContain("Считай каждый рубль"); // double-entry money section
     expect(sly).toContain("Не бот для CRM"); // AI worker headline
     expect(sly).toContain("VERTICALS"); // multi-rental verticals
     expect(sly).toContain("21:00"); // evening bot digests (public product fact)

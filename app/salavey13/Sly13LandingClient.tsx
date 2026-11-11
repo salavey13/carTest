@@ -16,8 +16,25 @@
 // actually intended for publication ... generalize 'the message' — focus on
 // variety of supported/tested features of my platform». Весь контент
 // переведён на публичное промо платформы (Каталог → CRM, PDF босса):
+//
+// task175 2026-11-11 (boss: «apply lessons, but properly»): 10 уроков промо
+// Businesses in ChatGPT вшиты с ПОПРАВКОЙ на реальную архитектуру:
+//   · headline = possession + place: свой бизнес, место — твоя витрина и
+//     репозиторий, НЕ чужой чат (бот — клерк /doc, НЕ client-facing agent);
+//   · заголовки секций начинаются с глагола владельца (Залей / Считай /
+//     Запускай / Выбери / Посмотри / Проверь);
+//   · воронка получает имя «интерес → бронь → договор»;
+//   · онбординг сжат до 3 шагов: Подключил → Проверил → Опубликовал;
+//   · единый CTA «Подключить экипаж» ×3 (герой, FAQ, финал);
+//   · radical honesty: «не гарантирует броней — гарантирует, что бронь
+//     дойдёт до договора»;
+//   · eligibility-scarcity: «первый прокат катает сезон 2026»;
+//   · FAQ = возражения, убитые заранее (новая секция 08);
+//   · «sell being seen»: аналитика как «ты видишь, как тебя находят»;
+//   · секция 04 разложена по ролям: витрина продаёт · бот ведёт бумаги ·
+//     агент строит и деплоит (Supabase/Vercel/GH) — страница = воронка.
 //   · 6 контуров (витрина / лиды / аренда / деньги / команда / аналитика);
-//   · онбординг в 4 шага, freemium FREE/PRO;
+//   · онбординг в 3 шага (task175), freemium FREE/PRO;
 //   · двойная книга денег и зеркало выплат — без приватных цифр;
 //   · «один движок — любой бизнес»: вертикали от байков до катеров,
 //     moto-selection как живой пример услуг без аренды (+ deep links);
@@ -105,16 +122,41 @@ const CONTOURS = [
   {
     id: "analitika",
     title: "Аналитика",
-    text: "Воронка лидов, скорость ответов, выгрузки CSV — цифры, а не ощущения.",
+    // task175 (урок №9 OpenAI «sell being seen»): аналитика продаётся не как
+    // «у нас есть цифры», а как чувство «тебя замечают».
+    text: "Ты видишь, как тебя находят: воронка лидов, скорость ответов, выгрузки CSV — цифры, а не ощущения.",
   },
 ];
 
-// Онбординг: «четыре шага до первой сделки» (промо PDF, СТАРТ И РОСТ).
+// task175 (урок №8 OpenAI: FAQ = возражения, убитые заранее). Четыре
+// вопроса-страха до разговора. Честные ответы, включая роль бота (/doc —
+// клерк, не продавец) и агента (строит и деплоит, владение у владельца).
+const FAQ = [
+  {
+    q: "Нужен программист?",
+    a: "Нет. Каталог, палитра, тарифы и меню — из админки, без кода. Понадобится новая фича — её напишет ИИ-агент, а не штат.",
+  },
+  {
+    q: "У меня один байк — рано?",
+    a: "Начни с одного: система не зависит от размера. Витрина, договор и сверка работают и для одной единицы техники.",
+  },
+  {
+    q: "Кто ведёт документы?",
+    a: "Бот-клерк: договор, залог, напоминания и QR-выдача — плюс сводка за день в 21:00. Канцелярия закрыта без тетрадки.",
+  },
+  {
+    q: "А если что-то сломается?",
+    a: "Бизнес живёт в твоём репозитории: агент деплоит и чинит, правки видны в истории. Деньги считает двойная книга — сверка до копейки.",
+  },
+];
+
+// task175: онбординг по формуле OpenAI — 3 шага, средний = контроль,
+// последний = превью. Глаголы прошедшего времени: «уже сделал» читается
+// быстрее, чем «сделай» (урок №4 их страницы).
 const ONBOARDING = [
-  { n: 1, title: "Заведи экипаж", text: "slug и конфиг в UI: меню, палитра, контакты" },
-  { n: 2, title: "Пригласи команду", text: "инвайты и роли: owner / admin / оператор" },
-  { n: 3, title: "Залей каталог", text: "модели, фото и тарифы через админку или CSV" },
-  { n: 4, title: "Открой витрину", text: "/franchize/<slug> принимает заявки и оплату" },
+  { n: 1, title: "Подключил", text: "экипаж, палитра, контакты и каталог — из админки, без кода" },
+  { n: 2, title: "Проверил", text: "договоры, залоги, роли и двойная книга денег — до первой сделки" },
+  { n: 3, title: "Опубликовал", text: "витрина принимает заказы и оплату: интерес → бронь → договор" },
 ];
 
 // «Один движок — любой бизнес» (промо PDF, ТЕХНОЛОГИИ): вертикали мультиарендности.
@@ -301,6 +343,7 @@ const NAV_LINKS = [
   { href: "#services", label: "Услуги" },
   { href: "#partners", label: "Партнёры" },
   { href: "#author", label: "Автор" },
+  { href: "#faq", label: "FAQ" },
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -708,18 +751,19 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
 
             <Reveal delay={0.35}>
               <p className="mx-auto mt-7 max-w-2xl text-balance text-base leading-relaxed sm:text-lg" style={{ color: p.textPrimary }}>
-                Залил каталог — остальное достроит сама: витрина с корзиной и оплатой,
+                Залей каталог — остальное достроится: витрина с корзиной и оплатой,
                 заявки из Авито и сайта, аренда с договорами и залогами, двойная книга
-                денег, смены и зарплаты команды. Тот самый «свой CRM», который обычно
-                заказывают у агентств за сотни тысяч. Обкатан на живом прокате{" "}
+                денег, бот-клерк для бумаг. Не «бизнес в чужом чате»: витрина, база и
+                репозиторий остаются твоими, а ИИ-агент строит и ведёт систему. Обкатано
+                на живом прокате{" "}
                 <Link
                   href="/franchize/vip-bike"
                   className="underline decoration-dotted underline-offset-4"
                   style={{ color: p.accentMain }}
                 >
                   VIP BIKE
-                </Link>{" "}
-                — и работает для любого экипажа.
+                </Link>
+                .
               </p>
             </Reveal>
 
@@ -734,7 +778,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     boxShadow: `0 0 24px ${p.accentMain}55, 0 0 64px ${p.accentMain}22`,
                   }}
                 >
-                  Каталог услуг и запусков
+                  Подключить экипаж
                   <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
                 </Link>
                 <a
@@ -764,6 +808,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   "6 контуров — одна система",
                   "45+ серверных модулей",
                   "старт за 1 день",
+                  "первый прокат катает сезон 2026",
                   "ai-воркер в команде",
                 ].map((chip) => (
                   <span
@@ -819,20 +864,22 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 01 · что такое платформа
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                Залил каталог — <span style={{ color: p.accentMain }}>это всё</span>
+                Залей каталог — <span style={{ color: p.accentMain }}>остальное достроится</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                Остальное платформа достраивает сама: витрина с корзиной и оплатой, заявки
-                из Авито и сайта, аренда с договорами и залогами, двойная книга денег,
-                зарплаты команды и аналитика. Проблемы, которые она закрывает, знакомы
+                Витрина с корзиной и оплатой, заявки из Авито и сайта, аренда с договорами и залогами,
+                двойная книга денег, зарплаты команды и аналитика. Проблемы, которые она закрывает, знакомы
                 каждому, кто вёл прокат в переписках: заявки тонут в пяти мессенджерах,
                 брони и залоги живут в таблицах, которые врут после первой же смены,
-                зарплаты считаются «на словах», а касса не отделена от личной.
+                зарплаты считаются «на словах», а касса не отделена от личной. Воронка одна
+                и честная: интерес → бронь → договор. И честно, как в readme: платформа не
+                гарантирует броней — она гарантирует, что каждая бронь дойдёт до договора,
+                а каждый рубль — до сверки.
               </p>
             </Reveal>
 
-            {/* онбординг: четыре шага до первой сделки */}
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* онбординг: три шага до первой сделки (task175: Подключил → Проверил → Опубликовал) */}
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {ONBOARDING.map(({ n, title, text }, i) => (
                 <Reveal key={n} delay={0.05 + i * 0.06}>
                   <SpotlightCard
@@ -970,7 +1017,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   02 · деньги
                 </p>
                 <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                  Каждый рубль виден <span style={{ color: p.accentMain }}>дважды</span>
+                  Считай каждый рубль <span style={{ color: p.accentMain }}>дважды</span>
                 </h2>
                 <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
                   Двойная книга денег: живая касса владельца и формальный леджер зарплат —
@@ -1033,7 +1080,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 03 · сценарии
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                Один движок — <span style={{ color: p.accentMain }}>любой бизнес</span>
+                Запускай <span style={{ color: p.accentMain }}>любой бизнес</span> на одном движке
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
                 Байки и мото — только первый сценарий. Каждый экипаж — это slug с полной
@@ -1211,11 +1258,12 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   Не бот для CRM — <span style={{ color: p.accentMain }}>CRM для бота</span>
                 </h2>
                 <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                  Ассистент-бот подключён к тем же серверным модулям, что и веб-приложение,
-                  — весь интерфейс доступен ему напрямую, без кликов и форм. Днём он
-                  принимает команды текстом и голосом, вечером сам присылает сводку по
-                  дню в 21:00. Новый сценарий экипажа — это фраза в чате, а не тикет
-                  разработчику.
+                  Разложим по ролям, как это устроено на самом деле. Витрина — продавец:
+                  каталог, корзина, оплата. Бот — клерк экипажа: командами /doc ведёт договоры, депозиты,
+                  напоминания и QR-выдачу, вечером присылает сводку за день в 21:00. А
+                  настоящий «business agent» — это ИИ-агент, подключённый к Supabase, Vercel
+                  и репозиторию: он строит фичи, деплоит и правит конфиги. Новый сценарий
+                  экипажа — фраза в чате, а не тикет разработчику.
                 </p>
               </Reveal>
 
@@ -1256,7 +1304,8 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                       AI читает вопрос клиента, определяет интент — цена, наличие, залог,
                       документы, доставка — и собирает ответ из библиотеки скриптов
                       экипажа. Оператор правит пару слов и отправляет; источник ответа
-                      честно помечен бейджем ai / hybrid / rules.
+                      честно помечен бейджем ai / hybrid / rules. Продажу закрывает
+                      человек — AI только ускоряет черновик.
                     </p>
                   </SpotlightCard>
                   <SpotlightCard
@@ -1264,14 +1313,14 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     style={{ background: `${p.bgCard}D9`, borderColor: p.borderSoft }}
                   >
                     <h3 className="text-base font-bold" style={{ color: p.textPrimary }}>
-                      Часть каждого экипажа
+                      Агент строит — ты владеешь
                     </h3>
                     <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
-                      AI-воркер на платформе — не плагин, а член команды: у него доступ к
-                      каталогу, витринам и настройкам экипажа. Лендинг партнёра
-                      Moto.selection, витрины экипажей и их каталоги собирались и
-                      правились в диалоге — так же он поможет и вашему экипажу: от
-                      структуры каталога до обучения команды работе с ботом.
+                      Лендинг Moto.selection, витрины экипажей и каталоги собирались и
+                      правились в диалоге — так же агент ведёт и твой экипаж: фича утром,
+                      вечером в проде. Разница с «бизнесом в чужом чате» принципиальна:
+                      репозиторий, база и витрина остаются твоими. Не аренда софта —
+                      цифровой актив.
                     </p>
                   </SpotlightCard>
                 </div>
@@ -1290,7 +1339,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 05 · услуги
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                Услуги и запуск экипажей
+                Выбери <span style={{ color: p.accentMain }}>свой запуск</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
                 Продуктизированный список: от разовой сессии до полного запуска витрины под ключ.
@@ -1407,7 +1456,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 06 · партнёры
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                Партнёры на <span style={{ color: p.accentMain }}>одном софте</span>
+                Посмотри, кто уже <span style={{ color: p.accentMain }}>варится</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
                 Витрины, которые уже живут на платформе или готовятся к запуску. Каждый экипаж — со
@@ -1653,6 +1702,56 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </section>
 
+          {/* ── 08 · FAQ (task175, урок №8 OpenAI: возражения убитые заранее) ─
+              Четыре вопроса-страха ДО разговора; закрывает секция с тем же
+              CTA «Подключить экипаж» (урок №5: один CTA, повторённый ×3). */}
+          <section id="faq" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="вопросы" />
+            <Reveal>
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                08 · вопросы
+              </p>
+              <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                Проверь, что спрашивают <span style={{ color: p.accentMain }}>до тебя</span>
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
+                Четыре ответа, которые экономят один разговор.
+              </p>
+            </Reveal>
+            <div className="mt-9 grid gap-4 md:grid-cols-2">
+              {FAQ.map((f, i) => (
+                <Reveal key={f.q} delay={0.04 + (i % 2) * 0.07}>
+                  <SpotlightCard
+                    className="sly-lift h-full rounded-2xl border p-6"
+                    style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  >
+                    <div className="font-jb text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: p.accentMain }}>
+                      вопрос {String(i + 1).padStart(2, "0")}
+                    </div>
+                    <h3 className="mt-2 text-base font-bold" style={{ color: p.textPrimary }}>
+                      {f.q}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      {f.a}
+                    </p>
+                  </SpotlightCard>
+                </Reveal>
+              ))}
+            </div>
+            <Reveal delay={0.15}>
+              <p className="mt-8 text-center text-sm" style={{ color: p.textSecondary }}>
+                Не нашёл свой вопрос? Один разговор на 15 минут закроет остальные —{" "}
+                <Link
+                  href="/franchize/sly13"
+                  className="underline decoration-dotted underline-offset-4"
+                  style={{ color: p.accentMain }}
+                >
+                  Подключить экипаж
+                </Link>
+              </p>
+            </Reveal>
+          </section>
+
           {/* ── ФИНАЛЬНЫЙ CTA (picture background) ────────────────────────── */}
           <section
             ref={ctaRef}
@@ -1687,7 +1786,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     className="inline-flex h-12 items-center justify-center rounded-full px-8 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:brightness-110 active:scale-95"
                     style={{ background: `linear-gradient(135deg, ${p.accentMainHover} 0%, ${p.accentMain} 65%)` }}
                   >
-                    Оставить заявку
+                    Подключить экипаж
                   </button>
                   <a
                     href="https://t.me/SALAVEY13"

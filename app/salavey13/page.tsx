@@ -5,6 +5,13 @@
 // старый /sly13 редиректится в next.config, /public/salavey13.html слит сюда
 // и удалён — секция «07 · автор», процесс работы и контакты в футере).
 //
+// task175 2026-11-11 (boss: «apply lessons, but properly» — по следам
+// Businesses in ChatGPT): метаданные переписаны под possession+place («свой цифровой
+// бизнес», место = твоя витрина/репозиторий, НЕ чужой чат) и на РЕАЛЬНУЮ
+// архитектуру: витрина продаёт, бот-клерк ведёт бумаги (/doc), ИИ-агент
+// строит и деплоит систему (Supabase/Vercel/GH). Бот — НЕ client-facing
+// sales agent (как у OpenAI Business Agent) — это честное отличие.
+//
 // Босс 2026-10-25: «ditch "stats of vip-bike" — these numbers were not
 // actually intended for publication … generalize "the message" — focus on
 // variety of supported/tested features of my platform». Метаданные и контент
@@ -24,9 +31,9 @@ import { getCrewPaletteBySlug } from "@/app/franchize/actions";
 import Sly13LandingClient from "./Sly13LandingClient";
 
 export const metadata = {
-  title: "SLY13 — платформа для проката, продаж и сервисов · salavey13",
+  title: "SLY13 — свой цифровой бизнес под ключ · платформа проката и сервисов · salavey13",
   description:
-    "Залил каталог — получил готовый CRM: витрину с корзиной и оплатой, лиды и Авито, аренду с договорами и залогами, двойную книгу денег и команду. Один движок — любой бизнес, AI-воркер в каждом экипаже. Витрина salavey13.",
+    "Свой цифровой прокат или сервис: витрина с оплатой, договоры и залоги, двойная книга денег, бот-клерк для бумаг — а ИИ-агент строит и ведёт систему. Не «бизнес в чужом чате»: витрина, база и репозиторий остаются твоими. Обкатано на живом прокате.",
 };
 
 export default async function Sly13Landing() {
