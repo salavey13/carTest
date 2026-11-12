@@ -33,6 +33,18 @@
 //    именами (Цена, ЗП экип, Оператор (ЗП)); числа демо — помечено;
 //  • deep link t.me/onebikeplsbot/app?startapp=comic-book подключён к
 //    статическому fast-path (START_PARAM_PAGE_MAP + regression-тесты).
+// v6 (task186) — CB CINE: движок «кинематографического комикса» (босс:
+//  «new media type, between comics and video», «8fps anime», «each next
+//  section on top of previous», «fullscreen, threshold ≈ screen height»):
+//  • страница больше не скроллится: CineEngine (CineEngine.tsx) держит
+//    кадры fullscreen-секциями; скролл/тач копятся в виртуальную ленту,
+//    порог ≈ пол-экрана — следующий кадр НАКРЫВАЕТ предыдущий;
+//  • переходы steps(8) = 8fps аниме; фон каждого кадра живёт (зум/панорама
+//    steps(8)); HUD-рейка кадров + счётчик + deep-link #hash кадра;
+//  • весь контент v1–v5 сохранён 1:1 (панели, GLITCH, счёт, Ведомость,
+//    пасхалка, тизер, UNIVERSE); no-JS/боты — статичный вебтун (движок спит);
+//  • «бесконечная камера» v4 (useScroll-зум внутри панели) снята — её роль
+//    теперь играет живой фон кадра + камера-отъезд предыдущего кадра.
 // Референс героя — founder-rustam.jpg из /leorus hero (task179).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -44,11 +56,10 @@ import {
   useInView,
   useMotionValue,
   useReducedMotion,
-  useScroll,
-  useSpring,
   useTransform,
 } from "framer-motion";
 import "./comic-book.css";
+import CineEngine, { type CineSceneDef } from "./CineEngine";
 
 type Bubble = {
   text: string;
@@ -79,12 +90,6 @@ type Notify = {
   delay?: number;
 };
 
-type Camera = {
-  scale: [string, string];
-  x?: [string, string];
-  y?: [string, string];
-};
-
 type SoundName = "ching" | "dzin" | "bip" | "boom" | "glitch";
 
 type Panel = {
@@ -101,42 +106,9 @@ type Panel = {
   notify?: Notify;
   sfx?: Sfx;
   terminal?: string[];
-  camera?: Camera;
   sound?: SoundName;
   shake?: boolean;
 };
-
-// ── бесконечная камера: скролл ведёт лёгкий зум/панораму внутри панели ─────
-// Оверлеи (титры, пузыри, SFX) остаются на месте — едет только «съёмка».
-function CameraLayer({
-  enabled,
-  spec,
-  children,
-}: {
-  enabled: boolean;
-  spec: Camera;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"],
-  });
-  const smooth = useSpring(scrollYProgress, { stiffness: 90, damping: 22, mass: 0.4 });
-  const scale = useTransform(smooth, [0, 1], spec.scale);
-  const x = useTransform(smooth, [0, 1], spec.x ?? ["0%", "0%"]);
-  const y = useTransform(smooth, [0, 1], spec.y ?? ["0%", "0%"]);
-  return (
-    <div ref={ref} className="cb-camera">
-      <motion.div
-        className="cb-camera__inner"
-        style={enabled ? { scale, x, y } : undefined}
-      >
-        {children}
-      </motion.div>
-    </div>
-  );
-}
 
 // ── WebAudio-синт для SFX: без ассетов, короткие синтезированные звуки ──────
 function playSound(name: SoundName, ctx: AudioContext) {
@@ -281,7 +253,6 @@ const PANELS: Panel[] = [
         width: "30%",
       },
     ],
-    camera: { scale: ["1.08", "1"], x: ["-2%", "2%"] },
   },
   {
     num: "04",
@@ -309,7 +280,6 @@ const PANELS: Panel[] = [
     img: "/comic-book/panel05.png",
     alt: "Флагман Falcon Lynx на голографическом подиуме среди карточек каталога",
     accent: "cyan",
-    camera: { scale: ["1.12", "1.02"] },
     captionWidth: "46%",
     caption:
       "Фото, цены, залоги, характеристики — каталог собран раньше, чем остыл кофе. Флагман уже на витрине.",
@@ -405,6 +375,7 @@ const GLITCH_PANELS: Panel[] = [
     alt: "Каталог байков распадается на глитч-пиксели и собирается в сцену фестиваля",
     accent: "gold",
     captionWidth: "46%",
+    captionPos: { bottom: "14%" },
     caption:
       "Панель 07 вдруг заискрила. Не баг — фича: каталог — это просто список. Подставь другой список — получишь другой бизнес.",
     terminal: [
@@ -499,8 +470,7 @@ const EP2_PANELS: Panel[] = [
     alt: "Рустам с кружкой кофе смотрит на вибрирующий телефон на стойке",
     accent: "cyan",
     captionWidth: "38%",
-    captionPos: { right: "3%" },
-    camera: { scale: ["1.04", "1.14"], x: ["0%", "2.5%"] },
+    captionPos: { right: "3%", top: "46%" },
     caption:
       "Пока он делал глоток, закрылась ещё одна аренда. Он не нажимал ничего. Кофе тоже.",
     bubbles: [
@@ -540,7 +510,6 @@ const EP2_PANELS: Panel[] = [
         width: "31%",
       },
     ],
-    camera: { scale: ["1.06", "1.06"], x: ["2.5%", "-2.5%"] },
   },
   {
     num: "II·05",
@@ -549,6 +518,7 @@ const EP2_PANELS: Panel[] = [
     alt: "Рустам откинулся в кресле со скрещенными руками, телефон остался на столе",
     accent: "cyan",
     captionWidth: "42%",
+    captionPos: { bottom: "12%" },
     caption:
       "Драматическая пауза. Он кладёт телефон на стол. Взрослый человек. Хозяин своего вечера.",
     bubbles: [
@@ -902,66 +872,21 @@ export default function ComicBookClient() {
   const soundRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const scenesRef = useRef<CineSceneDef[]>([]);
   const reduceMotion = useReducedMotion();
 
-  const { scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 24 });
-
+  // JS жив → включается CB CINE (движок кадров). Без JS — статичный вебтун.
   useEffect(() => {
     setJsReady(true);
-    // Страховка: панели проявляются по CSS-наблюдателю (ниже), а таймер —
-    // гарантия, что боты и полноразмерные скриншоты видят весь комикс.
-    const root = pageRef.current;
-    if (!root) return;
-    const frames = root.querySelectorAll(".cb-panel");
-    const failsafe = setTimeout(() => {
-      frames.forEach((frame) => frame.classList.add("is-visible"));
-    }, 2500);
-    return () => clearTimeout(failsafe);
   }, []);
 
-  // Проявление панелей при скролле: IntersectionObserver + CSS-классы.
-  useEffect(() => {
-    const root = pageRef.current;
-    if (!root) return;
-    const frames = root.querySelectorAll(".cb-panel");
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.12 }
-    );
-    frames.forEach((frame) => io.observe(frame));
-    return () => io.disconnect();
-  }, []);
-
-  // Звук SFX: элементы с data-sound срабатывают один раз при появлении,
-  // но только если читатель включил звук тумблером (жест → AudioContext).
-  useEffect(() => {
-    const root = pageRef.current;
-    if (!root) return;
-    const els = root.querySelectorAll("[data-sound]");
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          io.unobserve(entry.target);
-          const name = entry.target.getAttribute("data-sound") as SoundName | null;
-          if (name && soundRef.current && audioRef.current) {
-            playSound(name, audioRef.current);
-          }
-        });
-      },
-      { threshold: 0.35 }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+  // SFX кадра: движок сообщает о показе кадра — если звук включён, играем.
+  const handleSceneShown = (index: number) => {
+    const s = scenesRef.current[index];
+    if (s?.sound && soundRef.current && audioRef.current) {
+      playSound(s.sound as SoundName, audioRef.current);
+    }
+  };
 
   const toggleSound = () => {
     const next = !soundOn;
@@ -1063,222 +988,201 @@ export default function ComicBookClient() {
     );
   };
 
-  // рендер панели с оверлеями
-  const renderPanel = (panel: Panel) => {
-    const frameCls = `cb-panel__frame cb-halftone${panel.terminal ? " cb-panel__frame--glitch" : ""}${
-      panel.custom === "phone" ? " cb-panel__frame--phone" : ""
-    }`;
-    const captionStyle: React.CSSProperties = {
-      maxWidth: panel.captionWidth,
-      top: panel.captionPos?.top,
-      bottom: panel.captionPos?.bottom,
-      left: panel.captionPos?.left ?? (panel.captionPos?.right ? "auto" : undefined),
-      right: panel.captionPos?.right,
-    };
-    const shakeProps =
-      jsReady && panel.shake && !reduceMotion
-        ? {
-            initial: { rotate: 0 },
-            whileInView: { rotate: [0, -1.4, 1.4, -0.9, 0] },
-            viewport: { once: true, amount: 0.5 },
-            transition: { duration: 0.55, delay: 0.55, times: [0, 0.3, 0.55, 0.8, 1] },
-          }
-        : {};
+  // ── CB CINE v6: текстовый слой кадра (титры/пузыри/SFX поверх fullscreen-фона) ──
+  // позиция титра: дефолт «под заголовком кадра» (CSS), captionPos перекрывает
+  const captionStyle = (panel: Panel): React.CSSProperties => ({
+    maxWidth: panel.captionWidth,
+    top: panel.captionPos?.top ?? (panel.captionPos?.bottom ? "auto" : undefined),
+    bottom: panel.captionPos?.bottom,
+    left: panel.captionPos?.left ?? (panel.captionPos?.right ? "auto" : undefined),
+    right: panel.captionPos?.right,
+  });
 
-    const frameInner = (
-      <>
-        {panel.custom === "phone" ? (
+  const panelNode = (panel: Panel) => (
+    <>
+      {panel.custom === "phone" && (
+        <div className="cb-scene__phonebox">
           <PhoneCounter jsReady={jsReady} label={panel.alt} />
-        ) : panel.camera ? (
-          <CameraLayer enabled={jsReady && !reduceMotion} spec={panel.camera}>
-            <img src={panel.img} alt={panel.alt} loading="lazy" />
-          </CameraLayer>
-        ) : (
-          <img src={panel.img} alt={panel.alt} loading="lazy" />
-        )}
-
-        <Pop className="cb-caption" style={captionStyle}>
-          {panel.caption}
-        </Pop>
-
-        {panel.terminal && (
-          <Pop className="cb-terminal" style={{ top: "26%", left: "9%", width: "33%" }} delay={0.35}>
-            {panel.terminal.map((line) => (
-              <span key={line} className="cb-terminal__line">
-                {line}
-              </span>
-            ))}
-            <span className="cb-terminal__cursor" aria-hidden="true" />
-          </Pop>
-        )}
-
-        {panel.notify && (
-          <Drop
-            delay={panel.notify.delay}
-            style={{
-              top: panel.notify.top,
-              left: panel.notify.left,
-              right: panel.notify.right,
-              width: panel.notify.width,
-            }}
-          >
-            <div className="cb-notify">
-              <span className="cb-notify__app">{panel.notify.app}</span>
-              <span className="cb-notify__title">{panel.notify.title}</span>
-              <span className="cb-notify__body">{panel.notify.body}</span>
-            </div>
-          </Drop>
-        )}
-
-        {panel.bubbles?.map((bubble, i) => (
-          <Pop
-            key={bubble.text}
-            delay={0.15 + i * 0.12}
-            className={`cb-bubble cb-bubble--${bubble.kind}`}
-            style={{ top: bubble.top, left: bubble.left, right: bubble.right, width: bubble.width }}
-          >
-            {bubble.text}
-          </Pop>
-        ))}
-
-        {renderSfx(panel)}
-      </>
-    );
-
-    return (
-      <figure
-        key={`${panel.num}-${panel.title}`}
-        className={`cb-panel cb-panel--${panel.accent}`}
-        data-num={panel.num}
-        data-sound={panel.sound}
-      >
-        <span className="cb-panel__num" aria-hidden="true">
-          {panel.num}
-        </span>
-        <h2 className="cb-panel__title">{panel.title}</h2>
-        {jsReady ? (
-          <motion.div className={frameCls} {...shakeProps}>
-            {frameInner}
-          </motion.div>
-        ) : (
-          <div className={frameCls}>{frameInner}</div>
-        )}
-      </figure>
-    );
-  };
-
-  return (
-    <div className={`cb-root${jsReady ? " cb-js" : ""}`} ref={pageRef}>
-      {/* ── прогресс скролла (webtoon-ритм) ───────────────────────────── */}
-      {jsReady && (
-        <motion.div
-          className="cb-progress"
-          style={{ scaleX: progress }}
-          aria-hidden="true"
-        />
+        </div>
       )}
 
-      {/* ── мачта комикса ─────────────────────────────────────────────── */}
-      <header className="cb-masthead">
-        <a className="cb-masthead__brand" href="/">
-          VIBERIDER<span> · PLATFORM</span>
-        </a>
-        <span className="cb-masthead__issue">ВЫПУСКИ 1–2 · СЕЗОН 2026</span>
-        {jsReady && (
-          <button
-            type="button"
-            className="cb-soundtoggle"
-            onClick={toggleSound}
-            aria-pressed={soundOn}
-          >
-            {soundOn ? "♪ звук вкл" : "♪ звук выкл"}
-          </button>
-        )}
-        <a className="cb-masthead__cta" href="/salavey13">
-          Подключить экипаж
-        </a>
-      </header>
+      <Pop className="cb-caption" style={captionStyle(panel)}>
+        {panel.caption}
+      </Pop>
 
-      {/* ── обложка ───────────────────────────────────────────────────── */}
-      <section className="cb-cover" aria-label="Обложка комикса">
-        <div className="cb-cover__frame cb-halftone">
-          <img
-            src="/comic-book/cover.png"
-            alt="Рустам — герой комикса — стоит с телефоном и электромотоциклом на фоне неонового города"
-            className="cb-cover__art"
-          />
-          <div className="cb-cover__title-wrap">
-            <span className="cb-cover__kicker">VIP BIKE COMICS · сезон 2026 · выпуски 1–2</span>
-            <h1 className="cb-cover__title">
-              {["КАК БАЙКИ", "НАЧАЛИ", "ЗАРАБАТЫВАТЬ"].map((word, i) => (
-                <Pop key={word} delay={0.1 + i * 0.12} className={`cb-cover__line${word === "ЗАРАБАТЫВАТЬ" ? " cb-cover__line--accent" : ""}`}>
-                  {word}
-                </Pop>
-              ))}
-            </h1>
-            <p className="cb-cover__sub">
-              История одного вечера — и одного месяца, когда байки начали
-              зарабатывать. Всё, что нарисовано, — реально работает на платформе.
-            </p>
+      {panel.terminal && (
+        <Pop
+          className="cb-terminal"
+          style={{ top: "24%", left: "6%", width: "min(440px, 42%)" }}
+          delay={0.35}
+        >
+          {panel.terminal.map((line) => (
+            <span key={line} className="cb-terminal__line">
+              {line}
+            </span>
+          ))}
+          <span className="cb-terminal__cursor" aria-hidden="true" />
+        </Pop>
+      )}
+
+      {panel.notify && (
+        <Drop
+          delay={panel.notify.delay}
+          style={{
+            top: panel.notify.top,
+            left: panel.notify.left,
+            right: panel.notify.right,
+            width: panel.notify.width,
+          }}
+        >
+          <div className="cb-notify">
+            <span className="cb-notify__app">{panel.notify.app}</span>
+            <span className="cb-notify__title">{panel.notify.title}</span>
+            <span className="cb-notify__body">{panel.notify.body}</span>
           </div>
+        </Drop>
+      )}
+
+      {panel.bubbles?.map((bubble, i) => (
+        <Pop
+          key={bubble.text}
+          delay={0.15 + i * 0.12}
+          className={`cb-bubble cb-bubble--${bubble.kind}`}
+          style={{ top: bubble.top, left: bubble.left, right: bubble.right, width: bubble.width }}
+        >
+          {bubble.text}
+        </Pop>
+      ))}
+
+      {renderSfx(panel)}
+    </>
+  );
+
+  // панель → кадр (номер/заголовок рисует движок из def)
+  const panelDef = (panel: Panel): CineSceneDef => ({
+    id: `p${panel.num.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+    title: panel.title,
+    num: panel.num,
+    img: panel.img,
+    alt: panel.alt,
+    accent: panel.accent,
+    sound: panel.sound,
+    shake: panel.shake,
+    glitch: Boolean(panel.terminal),
+    node: panelNode(panel),
+  });
+
+  // титульная карточка — «склейка» между эпизодами
+  const dividerDef = (
+    id: string,
+    tag: string,
+    title: string,
+    sub: string,
+    accent: "cyan" | "magenta" | "gold",
+    sound?: SoundName,
+    ghost?: string,
+  ): CineSceneDef => ({
+    id,
+    title,
+    accent,
+    sound,
+    chrome: false,
+    node: (
+      <div className="cb-cinediv" {...(ghost ? { "data-ghost": ghost } : {})}>
+        <span className="cb-cinediv__tag">{tag}</span>
+        <span className="cb-cinediv__title">{title}</span>
+        <span className="cb-cinediv__sub">{sub}</span>
+      </div>
+    ),
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // CB CINE v6: сборка кадров. Порядок = хронометраж выпуска:
+  // обложка → титр I → панели 01–08 → секретный уровень → финал → счёт
+  // → титр II → панели II·01–II·05 → интерактив → пасхалка → тизер →
+  // UNIVERSE → колофон. Весь контент v1–v5 сохранён 1:1.
+  // ════════════════════════════════════════════════════════════════════════
+  const scenes: CineSceneDef[] = [
+    // ── обложка (1:1 — вписываем в кадр, атмосферу даёт блюр-слой) ────────
+    {
+      id: "cover",
+      title: "ОБЛОЖКА",
+      img: "/comic-book/cover.png",
+      alt: "Рустам — герой комикса — стоит с телефоном и электромотоциклом на фоне неонового города",
+      accent: "cyan",
+      contain: true,
+      chrome: false,
+      node: (
+        <div className="cb-cinecover">
+          <span className="cb-cover__kicker">VIP BIKE COMICS · сезон 2026 · выпуски 1–2</span>
+          <h1 className="cb-cover__title">
+            {["КАК БАЙКИ", "НАЧАЛИ", "ЗАРАБАТЫВАТЬ"].map((word, i) => (
+              <Pop
+                key={word}
+                delay={0.1 + i * 0.12}
+                className={`cb-cover__line${word === "ЗАРАБАТЫВАТЬ" ? " cb-cover__line--accent" : ""}`}
+              >
+                {word}
+              </Pop>
+            ))}
+          </h1>
+          <p className="cb-cover__sub">
+            История одного вечера — и одного месяца, когда байки начали
+            зарабатывать. Всё, что нарисовано, — реально работает на платформе.
+          </p>
           <div className="cb-cover__price" aria-hidden="true">
             <span>ЦЕНА ВОПРОСА:</span>
             <b>10 минут вечера</b>
           </div>
         </div>
-      </section>
+      ),
+    },
 
-      {/* ── панели ────────────────────────────────────────────────────── */}
-      <main className="cb-page">
-        {/* ── эпизод I ──────────────────────────────────────────────────── */}
-        <div className="cb-episode cb-episode--calm">
-          <span className="cb-episode__tag">/// ЭПИЗОД I ///</span>
-          <span className="cb-episode__title">КАК БАЙКИ НАЧАЛИ ЗАРАБАТЫВАТЬ</span>
-          <span className="cb-episode__text">
-            один вечер — от звонка в ночь до первой закрытой аренды
-          </span>
-        </div>
+    // ── титр эпизода I ─────────────────────────────────────────────────────
+    dividerDef(
+      "ep1",
+      "/// ЭПИЗОД I ///",
+      "КАК БАЙКИ НАЧАЛИ ЗАРАБАТЫВАТЬ",
+      "один вечер — от звонка в ночь до первой закрытой аренды",
+      "cyan",
+      undefined,
+      "I",
+    ),
 
-        {PANELS.map((panel) => renderPanel(panel))}
+    // ── панели эпизода I ───────────────────────────────────────────────────
+    ...PANELS.map(panelDef),
 
-        {/* ── секретный уровень: глюк в другой бизнес ─────────────────── */}
-        <motion.div
-          className="cb-glitch-strip"
-          {...(jsReady
-            ? {
-                initial: { opacity: 0, x: 0 },
-                whileInView: { opacity: 1, x: [0, -7, 6, -4, 0] },
-                viewport: { once: true, amount: 0.6 },
-                transition: { duration: 0.45, times: [0, 0.3, 0.6, 0.85, 1] },
-              }
-            : {})}
-        >
-          <span className="cb-glitch-strip__tag">/// СЕКРЕТНЫЙ УРОВЕНЬ ///</span>
-          <span className="cb-glitch-strip__text">
-            сигнал потерян... найден другой каталог
-          </span>
-        </motion.div>
+    // ── секретный уровень: глюк в другой бизнес ────────────────────────────
+    dividerDef(
+      "glitch-intro",
+      "/// СЕКРЕТНЫЙ УРОВЕНЬ ///",
+      "СИГНАЛ ПОТЕРЯН...",
+      "найден другой каталог — тот же движок, другой бизнес",
+      "gold",
+      "glitch",
+      "?!",
+    ),
 
-        {GLITCH_PANELS.map((panel) => renderPanel(panel))}
+    ...GLITCH_PANELS.map(panelDef),
 
-        {/* ── финал эпизода I ─────────────────────────────────────────── */}
-        <figure className="cb-panel cb-panel--cyan cb-final">
-          <span className="cb-panel__num" aria-hidden="true">
-            финал
-          </span>
-          <h2 className="cb-panel__title">ТВОЙ ХОД</h2>
-          <div className="cb-panel__frame cb-halftone">
-            <img
-              src="/comic-book/final.png"
-              alt="Рустам ведёт экипаж через мост на рассвете"
-              loading="lazy"
-            />
-            <Pop className="cb-caption" style={{ maxWidth: "44%" }}>
-              Один вечер — две команды: байки катают, сцены гремят. Один движок —
-              любой бизнес. Дальше по сценарию — ты.
-            </Pop>
-          </div>
-          <figcaption className="cb-final__cta">
+    // ── финал эпизода I ────────────────────────────────────────────────────
+    {
+      id: "finale",
+      title: "ТВОЙ ХОД",
+      num: "финал",
+      img: "/comic-book/final.png",
+      alt: "Рустам ведёт экипаж через мост на рассвете",
+      accent: "cyan",
+      node: (
+        <>
+          <Pop
+            className="cb-caption"
+            style={{ maxWidth: "min(560px, 44%)", top: "26%", left: "4%" }}
+          >
+            Один вечер — две команды: байки катают, сцены гремят. Один движок —
+            любой бизнес. Дальше по сценарию — ты.
+          </Pop>
+          <div className="cb-scene__cta">
             <motion.a
               className="cb-final__btn"
               href="/salavey13"
@@ -1294,10 +1198,19 @@ export default function ComicBookClient() {
             <a className="cb-final__ghost" href="/leorus">
               Команда LEORUS
             </a>
-          </figcaption>
-        </figure>
+          </div>
+        </>
+      ),
+    },
 
-        {/* ── вишенка эпизода I: счёт № 0001 (усы списаны на берег) ──── */}
+    // ── вишенка эпизода I: счёт № 0001 ─────────────────────────────────────
+    {
+      id: "invoice",
+      title: "СЧЁТ № 0001",
+      num: "бонус",
+      accent: "gold",
+      scrollable: true,
+      node: (
         <div className="cb-cherry">
           <button
             type="button"
@@ -1360,26 +1273,36 @@ export default function ComicBookClient() {
             готовый ответ.
           </p>
         </div>
+      ),
+    },
 
-        {/* ── эпизод II ────────────────────────────────────────────────── */}
-        <div className="cb-episode cb-episode--glitch" data-sound="glitch">
-          <span className="cb-episode__tag">/// ЭПИЗОД II ///</span>
-          <span className="cb-episode__title">СЧЁТЧИК ДЕНЕГ</span>
-          <span className="cb-episode__text">
-            куда делся мой вечер? — аренды идут сами
-          </span>
-        </div>
+    // ── титр эпизода II ────────────────────────────────────────────────────
+    dividerDef(
+      "ep2",
+      "/// ЭПИЗОД II ///",
+      "СЧЁТЧИК ДЕНЕГ",
+      "куда делся мой вечер? — аренды идут сами",
+      "magenta",
+      "glitch",
+      "II",
+    ),
 
-        {EP2_PANELS.map((panel) => renderPanel(panel))}
+    // ── панели эпизода II ──────────────────────────────────────────────────
+    ...EP2_PANELS.map(panelDef),
 
-        {/* ── выбор приключения: телефон снова в руках ────────────────── */}
-        <section
+    // ── выбор приключения: четыре экрана живой платформы ───────────────────
+    {
+      id: "choose",
+      title: "ЧТО ПРОВЕРИМ ПЕРВЫМ?",
+      num: "интерактив",
+      accent: "cyan",
+      scrollable: true,
+      sound: "bip",
+      node: (
+        <div
           className={`cb-choose${bossTab === "sheet" ? " cb-choose--sheet" : ""}`}
-          data-sound="bip"
           aria-label="Что проверим первым"
         >
-          <span className="cb-choose__tag">/// ТЕЛЕФОН СНОВА В РУКАХ ///</span>
-          <h2 className="cb-choose__title">ЧТО ПРОВЕРИМ ПЕРВЫМ?</h2>
           <div className="cb-choose__tabs" role="tablist" aria-label="Экраны платформы">
             {(
               [
@@ -1452,84 +1375,103 @@ export default function ComicBookClient() {
               </p>
             )}
           </div>
-        </section>
+        </div>
+      ),
+    },
 
-        {/* ── пасхалка эпизода II: экран гаснет, но... ────────────────── */}
-        <section className="cb-easter" data-sound="dzin" aria-label="Пасхалка после финала">
-          <span className="cb-easter__cut">/// ЭКРАН ГАСНЕТ ///</span>
-          <div className="cb-easter__frame">
-            <img
-              src="/comic-book/ep2-hand.png"
-              alt="Рука в темноте хватает светящийся телефон"
-              loading="lazy"
-            />
-            <Drop
-              delay={0.9}
-              style={{ top: "12%", right: "5%", width: "40%" }}
-            >
-              <div className="cb-notify">
-                <span className="cb-notify__app">VIP BIKE · аналитика</span>
-                <span className="cb-notify__title">ЕЩЁ ОДНА АРЕНДА</span>
-                <span className="cb-notify__body">Shiver 750 · 6 часов · +5 000 ₽</span>
-              </div>
-            </Drop>
+    // ── пасхалка эпизода II: экран гаснет, но... ───────────────────────────
+    {
+      id: "easter",
+      title: "ЭКРАН ГАСНЕТ",
+      num: "II·∞",
+      img: "/comic-book/ep2-hand.png",
+      alt: "Рука в темноте хватает светящийся телефон",
+      accent: "magenta",
+      sound: "dzin",
+      node: (
+        <>
+          <Drop delay={0.9} style={{ top: "16%", right: "5%", width: "min(380px, 42%)" }}>
+            <div className="cb-notify">
+              <span className="cb-notify__app">VIP BIKE · аналитика</span>
+              <span className="cb-notify__title">ЕЩЁ ОДНА АРЕНДА</span>
+              <span className="cb-notify__body">Shiver 750 · 6 часов · +5 000 ₽</span>
+            </div>
+          </Drop>
+          <div className="cb-scene__footnote">
+            <span className="cb-easter__score">СЧЁТ ВЕЧЕРА: ТЕЛЕФОН — 4 · РУСТАМ — 0</span>
+            <p className="cb-easter__line">
+              Байки катают, счётчик считает, телефон пишет первым. Так и выглядит
+              бизнес, который не нужно проверять силой воли.
+            </p>
           </div>
-          <span className="cb-easter__score">СЧЁТ ВЕЧЕРА: ТЕЛЕФОН — 4 · РУСТАМ — 0</span>
-          <p className="cb-easter__line">
-            Байки катают, счётчик считает, телефон пишет первым. Так и выглядит
-            бизнес, который не нужно проверять силой воли.
-          </p>
-        </section>
+        </>
+      ),
+    },
 
-        {/* ── тизер выпуска №3: BikeSoul — байки смотрят на читателя ──── */}
-        <section className="cb-teaser" data-sound="dzin" aria-label="Тизер выпуска 3">
-          <span className="cb-teaser__tag">/// ТИЗЕР ВЫПУСКА №3 ///</span>
-          <h2 className="cb-teaser__title">БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ</h2>
-          <div className="cb-teaser__frame">
-            <img
-              src="/comic-book/ep3-bike.png"
-              alt="Чёрный электроспортбайк смотрит прямо на читателя из неонового гаража, Рустам со спины в углу"
-              loading="lazy"
-            />
-            <Pop className="cb-caption" style={{ maxWidth: "40%" }}>
-              Пока Рустам считал деньги, байки начали считать свои.
-            </Pop>
-            <Pop
-              className="cb-bubble cb-bubble--agent"
-              style={{ top: "58%", left: "4%", width: "34%" }}
-              delay={0.2}
-            >
-              Хозяин, я вообще-то уже 12 дней без работы.
-            </Pop>
-            <Pop
-              className="cb-bubble"
-              style={{ top: "80%", right: "4%", width: "30%" }}
-              delay={0.35}
-            >
-              Да я сам без выходных!
-            </Pop>
+    // ── тизер выпуска №3: BikeSoul — байки смотрят на читателя ─────────────
+    {
+      id: "teaser",
+      title: "БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ",
+      num: "тизер · вып. 3",
+      img: "/comic-book/ep3-bike.png",
+      alt: "Чёрный электроспортбайк смотрит прямо на читателя из неонового гаража, Рустам со спины в углу",
+      accent: "gold",
+      sound: "dzin",
+      node: (
+        <>
+          <Pop
+            className="cb-caption"
+            style={{ maxWidth: "min(520px, 40%)", top: "26%", left: "4%" }}
+          >
+            Пока Рустам считал деньги, байки начали считать свои.
+          </Pop>
+          <Pop
+            className="cb-bubble cb-bubble--agent"
+            style={{ top: "50%", left: "4%", width: "min(360px, 34%)" }}
+            delay={0.2}
+          >
+            Хозяин, я вообще-то уже 12 дней без работы.
+          </Pop>
+          <Pop
+            className="cb-bubble"
+            style={{ top: "66%", right: "4%", width: "min(320px, 30%)" }}
+            delay={0.35}
+          >
+            Да я сам без выходных!
+          </Pop>
+          <div className="cb-scene__footnote">
+            <div className="cb-teaser__hud">
+              <span className="cb-teaser__chip cb-teaser__chip--level">
+                УРОВЕНЬ 5 · ГОРОДСКОЙ ВОЛК
+                <i aria-hidden="true">
+                  <b style={{ width: "62%" }} />
+                </i>
+              </span>
+              <span className="cb-teaser__chip cb-teaser__chip--mood">
+                НАСТРОЕНИЕ: СКУЧАЕТ · 12 ДНЕЙ БЕЗ ДОРОГИ
+              </span>
+            </div>
+            <p className="cb-teaser__punch">— Это не мои проблемы.</p>
+            <p className="cb-teaser__note">
+              BikeSoul — геймификация из роадмапа платформы: у каждого мотоцикла
+              появятся свой уровень, характер и настроение, а по утрам — сводка
+              «твой байк вчера заработал». Механика в разработке: комикс просто
+              забежал вперёд.
+            </p>
           </div>
-          <div className="cb-teaser__hud">
-            <span className="cb-teaser__chip cb-teaser__chip--level">
-              УРОВЕНЬ 5 · ГОРОДСКОЙ ВОЛК
-              <i aria-hidden="true">
-                <b style={{ width: "62%" }} />
-              </i>
-            </span>
-            <span className="cb-teaser__chip cb-teaser__chip--mood">
-              НАСТРОЕНИЕ: СКУЧАЕТ · 12 ДНЕЙ БЕЗ ДОРОГИ
-            </span>
-          </div>
-          <p className="cb-teaser__punch">— Это не мои проблемы.</p>
-          <p className="cb-teaser__note">
-            BikeSoul — геймификация из роадмапа платформы: у каждого мотоцикла
-            появятся свой уровень, характер и настроение, а по утрам — сводка
-            «твой байк вчера заработал». Механика в разработке: комикс просто
-            забежал вперёд.
-          </p>
-        </section>
+        </>
+      ),
+    },
 
-        {/* ── VIP BIKE UNIVERSE: сообщение трилогии + дорожная карта ──── */}
+    // ── VIP BIKE UNIVERSE: сообщение трилогии + дорожная карта ─────────────
+    {
+      id: "universe",
+      title: "СТАНЬ ВЛАДЕЛЬЦЕМ ЭКИПАЖА",
+      num: "VIP BIKE UNIVERSE",
+      accent: "magenta",
+      scrollable: true,
+      chrome: false,
+      node: (
         <section className="cb-trilogy" aria-label="Сообщение трилогии">
           <span className="cb-trilogy__kicker">VIP BIKE UNIVERSE · сообщение трилогии</span>
           <h2 className="cb-trilogy__title">
@@ -1588,27 +1530,70 @@ export default function ComicBookClient() {
             </a>
           </div>
         </section>
-      </main>
+      ),
+    },
 
-      {/* ── колофон ───────────────────────────────────────────────────── */}
-      <footer className="cb-colophon">
-        <p>
-          Выпуски 1–2 + счёт · панели нарисованы AI · реплики, титры и SFX
-          наложены кодом, звуки синтезированы WebAudio · счётчик и мотопарк
-          считают по живым тарифам каталога, ни одного выдуманного рубля ·
-          счёт № 0001 — шутливая оценка стоимости разработки, не оферта ·
-          BikeSoul — механика из роадмапа · клиенты не переписываются с ботом —
-          сайт продаёт сам · один движок — любой бизнес: байки, сцены, твой
-          черёд.
-        </p>
-        <nav aria-label="Комикс-навигация">
-          <a href="/">На главную</a>
-          <a href="/salavey13">Как это устроено</a>
-          <a href="/leorus">Команда LEORUS</a>
-          <a href="/franchize/discovery">Кто уже варится</a>
-          <a href="https://t.me/onebikeplsbot/app?startapp=comic-book">Открыть в Telegram</a>
-        </nav>
-      </footer>
+    // ── колофон ────────────────────────────────────────────────────────────
+    {
+      id: "colophon",
+      title: "КОЛОФОН",
+      num: "конец выпуска",
+      scrollable: true,
+      chrome: false,
+      node: (
+        <footer className="cb-colophon">
+          <p>
+            Выпуски 1–2 + счёт · панели нарисованы AI · реплики, титры и SFX
+            наложены кодом, звуки синтезированы WebAudio · счётчик и мотопарк
+            считают по живым тарифам каталога, ни одного выдуманного рубля ·
+            счёт № 0001 — шутливая оценка стоимости разработки, не оферта ·
+            BikeSoul — механика из роадмапа · клиенты не переписываются с ботом —
+            сайт продаёт сам · один движок — любой бизнес: байки, сцены, твой
+            черёд.
+          </p>
+          <nav aria-label="Комикс-навигация">
+            <a href="/">На главную</a>
+            <a href="/salavey13">Как это устроено</a>
+            <a href="/leorus">Команда LEORUS</a>
+            <a href="/franchize/discovery">Кто уже варится</a>
+            <a href="https://t.me/onebikeplsbot/app?startapp=comic-book">Открыть в Telegram</a>
+          </nav>
+        </footer>
+      ),
+    },
+  ];
+  scenesRef.current = scenes;
+
+  return (
+    <div className={`cb-root${jsReady ? " cb-js" : ""}`} ref={pageRef}>
+      {/* ── мачта комикса (в cine — фиксированная плашка над кадрами) ─────── */}
+      <header className="cb-masthead">
+        <a className="cb-masthead__brand" href="/">
+          VIBERIDER<span> · PLATFORM</span>
+        </a>
+        <span className="cb-masthead__issue">ВЫПУСКИ 1–2 · СЕЗОН 2026</span>
+        {jsReady && (
+          <button
+            type="button"
+            className="cb-soundtoggle"
+            onClick={toggleSound}
+            aria-pressed={soundOn}
+          >
+            {soundOn ? "♪ звук вкл" : "♪ звук выкл"}
+          </button>
+        )}
+        <a className="cb-masthead__cta" href="/salavey13">
+          Подключить экипаж
+        </a>
+      </header>
+
+      {/* ── CB CINE: кадры + HUD; без JS — статичный вебтун ──────────────── */}
+      <CineEngine
+        scenes={scenes}
+        active={jsReady}
+        reduceMotion={!!reduceMotion}
+        onSceneShown={handleSceneShown}
+      />
     </div>
   );
 }

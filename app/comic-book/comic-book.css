@@ -2088,3 +2088,833 @@
     padding: 8px 11px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CB CINE v6 (task186) — движок «кинематографического комикса».
+   Два режима одного дерева:
+   • статик (no-JS/боты): .cb-cine__stage — обычная стопка кадров (вебтун),
+     оверлеи сидят на картинке как раньше;
+   • cine (.cb-cine--on): сцены — fullscreen-кадры в fixed-сцене, страница не
+     скроллится, следующий кадр НАКРЫВАЕТ предыдущий, переходы — steps(8)
+     («8fps anime»), фон кадра живёт (медленный зум steps(8)).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── лок скролла страницы в режиме cine ─────────────────────────────────── */
+body.cb-cine-lock {
+  overflow: hidden !important;
+}
+
+/* ── статик-режим (движок спит): кадры стопкой ──────────────────────────── */
+.cb-cine__stage {
+  display: grid;
+  gap: clamp(20px, 3.4vw, 40px);
+  padding: clamp(18px, 3vw, 44px) clamp(12px, 4vw, 36px) 40px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.cb-scene {
+  position: relative;
+  overflow: hidden;
+  background: var(--cb-ink);
+  border: 4px solid var(--cb-paper);
+  border-radius: 6px;
+}
+
+.cb-scene[hidden] {
+  display: none;
+}
+
+.cb-scene__img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cb-scene__blur,
+.cb-scene__scrim {
+  display: none;
+}
+
+.cb-scene__text {
+  position: relative;
+  z-index: 2;
+}
+
+.cb-scene--nopic .cb-scene__text {
+  padding: clamp(20px, 3vw, 44px);
+}
+
+/* титры кадра в статике — поверх картинки */
+.cb-scene__num {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--cb-ink);
+  background: var(--cb-paper);
+  border: 3px solid var(--cb-ink);
+  border-radius: 8px;
+  padding: 6px 12px;
+  transform: rotate(-4deg);
+  box-shadow: 3px 3px 0 var(--cb-cyan);
+}
+
+.cb-scene--magenta .cb-scene__num { box-shadow: 3px 3px 0 var(--cb-magenta); }
+.cb-scene--gold .cb-scene__num { box-shadow: 3px 3px 0 var(--cb-yellow); }
+
+.cb-scene__title {
+  position: absolute;
+  top: 56px;
+  left: 16px;
+  z-index: 4;
+  margin: 0;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 800;
+  font-size: clamp(16px, 2.4vw, 30px);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cb-paper);
+  text-shadow: 0 2px 14px rgba(10, 5, 18, 0.85);
+}
+
+.cb-scene__title::after {
+  content: '';
+  display: block;
+  width: 96px;
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 3px;
+  background: var(--cb-cyan);
+  transform: skewX(-24deg);
+}
+
+.cb-scene--magenta .cb-scene__title::after { background: var(--cb-magenta); }
+.cb-scene--gold .cb-scene__title::after { background: var(--cb-yellow); }
+
+/* кастомные узлы в статике */
+.cb-cinediv {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: clamp(48px, 8vw, 96px) 20px;
+  min-height: 300px;
+}
+
+.cb-cinecover {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: clamp(18px, 3vw, 36px);
+}
+
+.cb-cinecover .cb-cover__price {
+  position: static;
+  margin-top: 4px;
+}
+
+.cb-scene__phonebox {
+  min-height: 480px;
+}
+
+.cb-scene--nopic .cb-phonepanel {
+  position: static;
+  margin: 24px auto;
+}
+
+.cb-scene__footnote,
+.cb-scene__cta {
+  position: static;
+  padding: 14px clamp(4px, 1vw, 10px) 6px;
+}
+
+.cb-scene__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+/* HUD виден только в cine */
+.cb-hud { display: none; }
+
+/* ═════════════════════ CINE-РЕЖИМ ═══════════════════════════════════════ */
+
+.cb-cine--on .cb-cine__stage {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: block;
+  max-width: none;
+  padding: 0;
+  background: var(--cb-bg);
+}
+
+.cb-cine--on .cb-scene {
+  position: absolute;
+  inset: 0;
+  border: none;
+  border-radius: 0;
+  background:
+    radial-gradient(1100px 520px at 85% -5%, rgba(232, 121, 249, 0.1), transparent 60%),
+    radial-gradient(900px 480px at 10% 12%, rgba(34, 211, 238, 0.1), transparent 60%),
+    var(--cb-bg);
+}
+
+.cb-cine--on .cb-scene__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 30%;
+  will-change: transform;
+}
+
+/* слои кадров: текущий — выше соседей по окну виртуализации;
+   входящий (--in, z6) накрывает, уходящий (--under, z1) уходит под низ */
+.cb-cine--on .cb-scene {
+  z-index: 1;
+}
+
+.cb-cine--on .cb-scene--cur {
+  z-index: 2;
+}
+
+/* обложка 1:1 — вписываем, края зашивает блюр-слой */
+.cb-cine--on .cb-scene--contain .cb-scene__img {
+  object-fit: contain;
+  object-position: 50% 46%;
+}
+
+.cb-cine--on .cb-scene__blur {
+  display: block;
+  position: absolute;
+  inset: -6%;
+  z-index: 0;
+  background-size: cover;
+  background-position: center 32%;
+  filter: blur(28px) brightness(0.5) saturate(1.15);
+  transform: scale(1.12);
+  will-change: transform;
+}
+
+.cb-cine--on .cb-scene__scrim {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(10, 5, 18, 0.6) 0%, rgba(10, 5, 18, 0) 26%, rgba(10, 5, 18, 0) 52%, rgba(10, 5, 18, 0.9) 100%),
+    radial-gradient(135% 100% at 50% 42%, transparent 55%, rgba(10, 5, 18, 0.45) 100%);
+}
+
+/* растр поверх кадра + скан-линии глитча — под текстом */
+.cb-cine--on .cb-scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(245, 208, 254, 0.16) 1.2px, transparent 1.3px);
+  background-size: 12px 12px;
+  mix-blend-mode: overlay;
+  opacity: 0.45;
+}
+
+.cb-cine--on .cb-scene--glitch::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(10, 5, 18, 0.24) 0 2px, transparent 2px 6px);
+  mix-blend-mode: multiply;
+}
+
+.cb-cine--on .cb-scene__text {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* титры кадра — под мачтой */
+.cb-cine--on .cb-scene__num {
+  top: 76px;
+  left: clamp(14px, 3.5vw, 52px);
+  font-size: clamp(11px, 1.1vw, 14px);
+}
+
+.cb-cine--on .cb-scene__title {
+  top: 122px;
+  left: clamp(16px, 4vw, 58px);
+  max-width: 78%;
+}
+
+/* титр-коробка по умолчанию ниже заголовка кадра */
+.cb-cine--on .cb-scene .cb-caption {
+  top: 25%;
+}
+
+/* ── живой фон: 8fps зум/панорама (moving pictures) ─────────────────────── */
+.cb-cine--on .cb-scene__img {
+  animation: cb-idle 17s steps(8) infinite alternate;
+  transform-origin: 52% 44%;
+}
+
+.cb-cine--on .cb-scene:nth-child(even) .cb-scene__img {
+  animation-duration: 23s;
+  animation-direction: alternate-reverse;
+}
+
+.cb-cine--on .cb-scene__blur {
+  animation: cb-idle 29s steps(8) infinite alternate-reverse;
+}
+
+@keyframes cb-idle {
+  from { transform: scale(1.06) translate(0.5%, 0.4%); }
+  to { transform: scale(1.13) translate(-0.5%, -0.4%); }
+}
+
+/* ── переходы: следующий кадр накрывает предыдущий, 8 кадров ────────────── */
+.cb-cine--on .cb-scene--in {
+  z-index: 6;
+  animation: cb-scene-in-b 700ms steps(8, end) both;
+}
+
+.cb-cine--on .cb-scene--in.cb-scene--from-t {
+  animation-name: cb-scene-in-t;
+}
+
+@keyframes cb-scene-in-b {
+  from { transform: translateY(102%); }
+  to { transform: translateY(0%); }
+}
+
+@keyframes cb-scene-in-t {
+  from { transform: translateY(-102%); }
+  to { transform: translateY(0%); }
+}
+
+/* предыдущий кадр: камера отъезжает + затемнение (8 кадров) */
+.cb-cine--on .cb-scene--under {
+  z-index: 1;
+  animation: cb-scene-under 700ms steps(8, end) both;
+}
+
+@keyframes cb-scene-under {
+  to {
+    transform: scale(0.92);
+    filter: brightness(0.5) saturate(0.8);
+  }
+}
+
+/* текст кадра проявляется во второй половине склейки (redraw on top) */
+.cb-cine--on .cb-scene--in .cb-scene__text {
+  animation: cb-scene-text 700ms steps(8, end) both;
+}
+
+@keyframes cb-scene-text {
+  0%, 40% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* камера чуть отъезжает на входящем кадре */
+.cb-cine--on .cb-scene--in .cb-scene__img {
+  animation: cb-scene-img 700ms steps(8, end) both;
+}
+
+@keyframes cb-scene-img {
+  from { transform: scale(1.16); }
+  to { transform: scale(1.07); }
+}
+
+/* тряска кадра II·05 — после склейки, дискретно */
+.cb-cine--on .cb-scene--in.cb-scene--shake .cb-scene__text {
+  animation:
+    cb-scene-text 700ms steps(8, end) both,
+    cb-shake 0.5s steps(2, jump-none) 0.78s 1;
+}
+
+@keyframes cb-shake {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-1.3deg); }
+  50% { transform: rotate(1.3deg); }
+  75% { transform: rotate(-0.8deg); }
+}
+
+/* ── reduce motion: резкая склейка, без живого зума ─────────────────────── */
+.cb-cine--rm .cb-scene--in {
+  animation: cb-scene-rm 220ms steps(2, end) both !important;
+}
+
+.cb-cine--rm .cb-scene--in .cb-scene__text {
+  animation: cb-scene-rm 220ms steps(2, end) both !important;
+}
+
+.cb-cine--rm .cb-scene--in .cb-scene__img,
+.cb-cine--rm .cb-scene--under,
+.cb-cine--rm .cb-scene__img,
+.cb-cine--rm .cb-scene__blur {
+  animation: none !important;
+}
+
+@keyframes cb-scene-rm {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── обложка в кадре ────────────────────────────────────────────────────── */
+.cb-cine--on .cb-cinecover {
+  position: absolute;
+  left: clamp(16px, 5vw, 84px);
+  bottom: clamp(64px, 13%, 140px);
+  max-width: min(640px, 58%);
+  padding: 0;
+  z-index: 3;
+}
+
+.cb-cine--on .cb-cinecover .cb-cover__price {
+  position: static;
+  margin-top: 10px;
+}
+
+/* ── титульные карточки-склейки ─────────────────────────────────────────── */
+.cb-cine--on .cb-cinediv {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px;
+  min-height: 0;
+}
+
+.cb-cinediv__tag {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: clamp(12px, 1.6vw, 16px);
+  letter-spacing: 0.2em;
+  color: var(--cb-cyan-soft);
+}
+
+.cb-cinediv--magenta .cb-cinediv__tag { color: var(--cb-magenta-soft); }
+.cb-cinediv--gold .cb-cinediv__tag { color: var(--cb-yellow); }
+
+.cb-cinediv__title {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(26px, 5.2vw, 74px);
+  line-height: 1.05;
+  max-width: 17ch;
+  color: var(--cb-paper);
+  text-shadow:
+    5px 5px 0 rgba(34, 211, 238, 0.28),
+    0 0 44px rgba(232, 121, 249, 0.35);
+}
+
+.cb-cinediv--magenta .cb-cinediv__title {
+  text-shadow:
+    5px 5px 0 rgba(232, 121, 249, 0.3),
+    0 0 44px rgba(34, 211, 238, 0.3);
+}
+
+.cb-cinediv--gold .cb-cinediv__title {
+  text-shadow:
+    5px 5px 0 rgba(253, 224, 71, 0.26),
+    0 0 44px rgba(232, 121, 249, 0.32);
+}
+
+.cb-cinediv__sub {
+  font-size: clamp(13px, 1.6vw, 18px);
+  font-weight: 700;
+  color: rgba(244, 241, 255, 0.82);
+}
+
+.cb-cinediv::before {
+  content: attr(data-ghost);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -54%);
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(200px, 40vh, 430px);
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(244, 241, 255, 0.09);
+  pointer-events: none;
+}
+
+/* ── нижняя плашка кадра (пасхалка/тизер) и CTA финала ──────────────────── */
+.cb-cine--on .cb-scene__footnote {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  gap: 7px;
+  padding: 16px clamp(16px, 4.5vw, 64px) 20px;
+  background: linear-gradient(180deg, transparent, rgba(10, 5, 18, 0.94) 45%);
+}
+
+.cb-cine--on .cb-scene__cta {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(52px, 9vh, 100px);
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* ── интерактивный телефон в кадре II·02 ────────────────────────────────── */
+.cb-cine--on .cb-scene__phonebox {
+  position: absolute;
+  top: 17%;
+  right: clamp(5%, 7vw, 11%);
+  min-height: 0;
+  z-index: 3;
+}
+
+.cb-cine--on .cb-scene__phonebox .cb-phonepanel {
+  position: static;
+  margin: 0;
+}
+
+/* ── кадры со внутренним скроллом (Ведомость, счёт, UNIVERSE, колофон) ──── */
+.cb-cine--on .cb-scene--scroll .cb-scene__text,
+.cb-cine--on .cb-scene__text.cb-has-overflow {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 196px clamp(16px, 6vw, 120px) 132px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 121, 249, 0.5) transparent;
+}
+
+.cb-cine--on .cb-choose,
+.cb-cine--on .cb-cherry,
+.cb-cine--on .cb-trilogy,
+.cb-cine--on .cb-colophon {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+/* короткий блок счёта — ближе к вертикальному центру кадра */
+.cb-cine--on .cb-cherry {
+  margin-top: clamp(30px, 21vh, 240px);
+}
+
+/* ── HUD: рейка кадров + счётчик + подсказка ────────────────────────────── */
+.cb-cine--on .cb-hud {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+
+.cb-hud__rail {
+  position: absolute;
+  right: clamp(10px, 1.6vw, 22px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  pointer-events: auto;
+}
+
+.cb-hud__dot {
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(244, 241, 255, 0.5);
+  background: rgba(10, 5, 18, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cb-hud__dot:hover {
+  transform: scale(1.3);
+}
+
+.cb-hud__dot.is-here {
+  height: 26px;
+  background: var(--cb-yellow);
+  border-color: var(--cb-yellow);
+  box-shadow: 0 0 12px rgba(253, 224, 71, 0.7);
+}
+
+.cb-hud__dot--card {
+  border-radius: 3px;
+}
+
+.cb-hud__count {
+  position: absolute;
+  left: clamp(12px, 2vw, 26px);
+  bottom: clamp(12px, 2.6vh, 28px);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: min(72vw, 640px);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: rgba(244, 241, 255, 0.92);
+  background: rgba(10, 5, 18, 0.74);
+  border: 2px solid rgba(244, 241, 255, 0.22);
+  border-radius: 10px;
+  padding: 8px 14px;
+  backdrop-filter: blur(6px);
+}
+
+.cb-hud__count b {
+  font-size: 18px;
+  color: var(--cb-yellow);
+}
+
+.cb-hud__count span {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.cb-hud__count i {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-left: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cb-hud__hint {
+  position: absolute;
+  bottom: clamp(16px, 3.4vh, 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
+  animation: cb-hint-bob 1.7s steps(2, jump-none) infinite;
+}
+
+.cb-hud__hint span {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: var(--cb-yellow);
+  text-shadow: 0 2px 10px rgba(10, 5, 18, 0.9);
+}
+
+.cb-hud__hint i {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(244, 241, 255, 0.78);
+  text-shadow: 0 2px 10px rgba(10, 5, 18, 0.9);
+}
+
+@keyframes cb-hint-bob {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -8px); }
+}
+
+/* мачта в cine — фиксированная плашка над кадрами */
+.cb-js .cb-masthead {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* чуть крупнее леттеринг на fullscreen-кадре */
+.cb-cine--on .cb-caption {
+  font-size: clamp(12px, 1.45vw, 19px);
+}
+
+.cb-cine--on .cb-bubble {
+  font-size: clamp(16px, 2.1vw, 30px);
+}
+
+.cb-cine--on .cb-sfx {
+  font-size: clamp(34px, 5.6vw, 92px);
+}
+
+.cb-cine--on .cb-terminal__line {
+  font-size: clamp(9px, 1.25vw, 15px);
+}
+
+/* ═══════════ МОБАЙЛ / ПОРТРЕТ: кадр сверху, текст перерисован снизу ═════ */
+
+@media (max-width: 860px) {
+  .cb-cine--on .cb-scene__img {
+    height: 52%;
+    object-position: 50% 26%;
+  }
+
+  .cb-cine--on .cb-scene--contain .cb-scene__img {
+    object-fit: cover;
+    object-position: 50% 24%;
+  }
+
+  .cb-cine--on .cb-scene__blur {
+    display: block;
+    inset: 0;
+  }
+
+  .cb-cine--on .cb-scene__scrim {
+    background:
+      linear-gradient(180deg, rgba(10, 5, 18, 0.55) 0%, rgba(10, 5, 18, 0) 20%, rgba(10, 5, 18, 0.1) 40%, rgba(10, 5, 18, 0.94) 54%, rgba(10, 5, 18, 0.97) 100%);
+  }
+
+  /* нижняя половина — текстовая зона: титры/пузыри становятся потоком */
+  .cb-cine--on .cb-scene__text {
+    top: 52%;
+    bottom: auto;
+    height: 48%;
+    inset: auto 0 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px 14px 96px;
+  }
+
+  .cb-cine--on .cb-scene .cb-caption,
+  .cb-cine--on .cb-scene .cb-bubble,
+  .cb-cine--on .cb-scene .cb-notify-wrap,
+  .cb-cine--on .cb-scene .cb-terminal {
+    position: static !important;
+    width: auto !important;
+    max-width: 100% !important;
+    display: block;
+    margin: 0 0 12px;
+  }
+
+  .cb-cine--on .cb-scene .cb-bubble {
+    margin: 0 0 20px;
+  }
+
+  .cb-cine--on .cb-scene .cb-sfx {
+    position: static !important;
+    display: block;
+    margin: 0 0 14px auto;
+    font-size: clamp(24px, 7.4vw, 36px);
+    text-align: right;
+  }
+
+  .cb-cine--on .cb-scene__num {
+    top: 66px;
+    left: 12px;
+    font-size: 10px;
+    padding: 5px 10px;
+  }
+
+  .cb-cine--on .cb-scene__title {
+    top: 106px;
+    left: 14px;
+    font-size: clamp(14px, 4.4vw, 19px);
+    max-width: 72%;
+  }
+
+  .cb-cine--on .cb-scene__title::after {
+    width: 64px;
+    height: 4px;
+    margin-top: 6px;
+  }
+
+  /* кадры без картинки: текст на весь экран */
+  .cb-cine--on .cb-scene--nopic .cb-scene__text {
+    top: 0;
+    height: 100%;
+    inset: 0;
+    padding: 178px 16px 110px;
+  }
+
+  .cb-cine--on .cb-cinecover {
+    position: static;
+    max-width: none;
+    padding: 12px 2px 0;
+  }
+
+  .cb-cine--on .cb-cinecover .cb-cover__line {
+    font-size: clamp(26px, 8.6vw, 38px);
+  }
+
+  .cb-cine--on .cb-scene__footnote {
+    position: static;
+    background: none;
+    padding: 6px 0 0;
+  }
+
+  .cb-cine--on .cb-scene__cta {
+    position: static;
+    transform: none;
+    justify-content: flex-start;
+    padding: 10px 0 0;
+  }
+
+  .cb-cine--on .cb-scene__phonebox {
+    position: static;
+    display: grid;
+    place-items: center;
+    padding: 6px 0 10px;
+  }
+
+  .cb-cine--on .cb-scene__phonebox .cb-phone {
+    width: clamp(200px, 58vw, 250px);
+  }
+
+  .cb-cine--on .cb-scene--scroll .cb-scene__text {
+    padding: 178px 16px 118px;
+  }
+
+  .cb-hud__rail {
+    display: none;
+  }
+
+  .cb-hud__count i {
+    display: none;
+  }
+
+  .cb-cine--on .cb-caption {
+    font-size: 13.5px;
+  }
+
+  .cb-cine--on .cb-bubble {
+    font-size: 17px;
+  }
+
+  .cb-cine--on .cb-sfx {
+    font-size: clamp(26px, 8vw, 40px);
+  }
+
+  .cb-cine--on .cb-cinediv__title {
+    font-size: clamp(22px, 7.4vw, 34px);
+  }
+
+  .cb-cine--on .cb-cinediv::before {
+    font-size: clamp(130px, 34vh, 240px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-hud__hint { animation: none; }
+}
