@@ -157,6 +157,18 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone landing — no chat needed
   },
+  // PATCH: comicBook theme (2026-11-12, task179) — standalone comic-book page
+  // at /comic-book («Как Рустам свой экипаж собрал»): AI-generated panels +
+  // code-overlaid lettering. Renders its own nav/footer — svarprofi/leorus
+  // pattern; platform chrome would break the comic page illusion.
+  comicBook: {
+    paths: ["/comic-book"],
+    Header: null,           // comic page renders its own masthead
+    Footer: null,           // comic page renders its own colophon
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone page — no chat needed
+  },
   // PATCH: mototehnn theme (2026-10-27, task 148) — standalone landing for
   // the МОТОТЕХ НН crew (мотосалон: техника, запчасти, сервис; mototehnn.ru).
   // Dark navy palette from crews.metadata (bgBase #0a0f1a / accent #3b82f6);
@@ -221,6 +233,9 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/leorus")) {
     return THEME_CONFIG.leorus;
+  }
+  if (pathname.startsWith("/comic-book")) {
+    return THEME_CONFIG.comicBook;
   }
   if (pathname.startsWith("/mototehnn")) {
     return THEME_CONFIG.mototehnn;
