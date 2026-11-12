@@ -23,7 +23,17 @@
 //    scrollable — внутри кадра скроллится контент, сцена не переключается,
 //    пока внутренний скролл не упрётся в край;
 //  • HUD: рейка кадров справа (кликабельна), счётчик «КАДР 03/26» с титром,
-//    подсказка «СКРОЛЛ = КАМЕРА» до первого жеста;
+//    подсказка «СКРОЛЛ = КАМЕРА» до первого жеста + лента-заряд внизу;
+//  • v6.1 peek-отклик: во время жеста следующий кадр физически ВЫЕЗЖАЕТ
+//    из-за края (до ~130px, ступенчато steps(4)), лента-заряд заполняется —
+//    скролл всегда «что-то делает», даже до порога (босс: «user must
+//    understand that when he scroll not "nothing is happening" but almost
+//    next section is shown»); склейка стартует с той позиции, до которой
+//    кадр уже выехал (var --peek-start) — без рывка назад;
+//  • v6.1 последовательное проявление: элементы кадра появляются цепочкой
+//    со своими задержками (--ink-d в CSS, steps-ступени), а не разом;
+//  • v6.1 restartRef: последний кадр («КОНЕЦ ПЕРЕДАЧИ») держит кнопку
+//    «перечитать с обложки» → go(0);
 //  • deep-link: каждый кадр пишет свой #hash (history.replaceState), на входе
 //    прыжок в кадр из hash; no-JS / боты / скриншотеры: движок спит, сцены
 //    лежат обычной стопкой (статичный вебтун) — весь контент виден.
@@ -44,6 +54,7 @@ export type CineSceneDef = {
   glitch?: boolean; // скан-линии поверх кадра
   sound?: string; // SFX при показе кадра
   chrome?: boolean; // титры кадра (номер + заголовок); false — узел рисует своё
+  overlay?: ReactNode; // слой НАД картинкой, но вне скроллящегося текстового слоя (cue обложки на мобиле)
   node: ReactNode; // текстовый слой (титры, пузыри, кастомные блоки)
 };
 
@@ -56,11 +67,13 @@ export default function CineEngine({
   active,
   reduceMotion,
   onSceneShown,
+  restartRef,
 }: {
   scenes: CineSceneDef[];
   active: boolean;
   reduceMotion: boolean;
   onSceneShown?: (index: number) => void;
+  restartRef?: { current: (() => void) | null };
 }) {
   const [idx, setIdx] = useState(0);
   const [moved, setMoved] = useState(false);
@@ -70,6 +83,9 @@ export default function CineEngine({
   const accRef = useRef(0);
   const pendRef = useRef<0 | 1 | -1>(0);
   const touchRef = useRef<{ y: number; scrollEl: HTMLElement | null } | null>(null);
+  const tapeRef = useRef<HTMLDivElement | null>(null);
+  const idleRef = useRef<number | null>(null);
+  const peekRef = useRef<{ dir: 1 | -1; px: number } | null>(null);
   const rmRef = useRef(reduceMotion);
   const shownRef = useRef(onSceneShown);
   const scenesRef = useRef(scenes);
@@ -87,6 +103,8 @@ export default function CineEngine({
     Array.from(stage.children).forEach((el, k) => {
       const node = el as HTMLElement;
       node.hidden = k < i - 1 || k > i + 1;
+      node.style.removeProperty("--peek-start");
+      node.style.removeProperty("--cb-pull");
       node.classList.toggle("cb-scene--cur", k === i);
       node.classList.remove(
         "cb-scene--in",
@@ -96,6 +114,75 @@ export default function CineEngine({
       );
     });
   }, []);
+
+  // ── v6.1 peek: жест вытягивает край следующего кадра из-за границы ───────
+  // до порога переключения скролл уже видимо «что-то делает»: кадр-сосед
+  // выезжает на 2…130px (ступенчатая трансишка steps(4)), текущий чуть
+  // отъезжает камерой (--cb-pull), лента-заряд в HUD заполняется.
+  const resetPeek = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const i = idxRef.current;
+    [i - 1, i + 1].forEach((k) => {
+      const el = stage.children[k] as HTMLElement | undefined;
+      if (!el) return;
+      el.classList.remove("cb-scene--peek");
+      el.style.transform = "";
+    });
+    (stage.children[i] as HTMLElement | undefined)?.style.removeProperty("--cb-pull");
+    if (tapeRef.current) tapeRef.current.style.width = "0%";
+    peekRef.current = null;
+  }, []);
+
+  const showPeek = useCallback(
+    (dir: 1 | -1, ratio: number, px?: number) => {
+      if (lockRef.current) return; // во время склейки не трогаем
+      const stage = stageRef.current;
+      if (!stage) return;
+      const i = idxRef.current;
+      const targetIdx = i + dir;
+      if (targetIdx < 0 || targetIdx >= scenesRef.current.length) {
+        resetPeek(); // дальше кадров нет — заряд уходит в ноль
+        return;
+      }
+      const r = Math.max(0, Math.min(1, ratio));
+      const maxPeek = Math.round(Math.min(window.innerHeight * 0.16, 130));
+      const p = Math.max(2, Math.min(maxPeek, Math.round(px ?? r * maxPeek)));
+      // гасим peek в противоположную сторону, если направление сменилось
+      [i - 1, i + 1].forEach((k) => {
+        if (k === targetIdx) return;
+        const el = stage.children[k] as HTMLElement | undefined;
+        if (!el) return;
+        el.classList.remove("cb-scene--peek");
+        el.style.transform = "";
+      });
+      const el = stage.children[targetIdx] as HTMLElement | undefined;
+      if (el) {
+        if (el.hidden) el.hidden = false;
+        el.classList.add("cb-scene--peek");
+        el.style.transform =
+          dir === 1
+            ? `translateY(calc(100% - ${p}px))`
+            : `translateY(calc(-100% + ${p}px))`;
+        peekRef.current = { dir, px: p };
+      }
+      (stage.children[i] as HTMLElement | undefined)?.style.setProperty(
+        "--cb-pull",
+        (1 - r * 0.035).toFixed(4),
+      );
+      if (tapeRef.current) tapeRef.current.style.width = `${Math.round(r * 100)}%`;
+    },
+    [resetPeek],
+  );
+
+  // жест затих — край кадра уезжает обратно в ступенчатом темпе
+  const idleReset = useCallback(() => {
+    if (idleRef.current) window.clearTimeout(idleRef.current);
+    idleRef.current = window.setTimeout(() => {
+      idleRef.current = null;
+      resetPeek();
+    }, 260);
+  }, [resetPeek]);
 
   const go = useCallback(
     (next: number) => {
@@ -119,6 +206,23 @@ export default function CineEngine({
       setIdx(target);
       setMoved(true);
       if (from && to) {
+        // peek-непрерывность: склейка стартует с того края, до которого кадр
+        // уже выехал во время жеста (иначе виден рывок назад к 102%)
+        const ps = peekRef.current;
+        const fromPeek = ps && ps.dir === dir && target === cur + dir ? ps.px : null;
+        peekRef.current = null;
+        to.style.setProperty(
+          "--peek-start",
+          fromPeek != null
+            ? dir === 1
+              ? `calc(100% - ${fromPeek}px)`
+              : `calc(-100% + ${fromPeek}px)`
+            : dir === 1
+              ? "102%"
+              : "-102%",
+        );
+        to.style.transform = "";
+        to.classList.remove("cb-scene--peek");
         from.classList.remove("cb-scene--cur", "cb-scene--under");
         to.classList.remove("cb-scene--in", "cb-scene--from-b", "cb-scene--from-t");
         void to.offsetWidth; // перезапуск анимации, если кадр уже играл
@@ -146,6 +250,15 @@ export default function CineEngine({
     },
     [prune],
   );
+
+  // v6.1: кнопка «перечитать с обложки» в последнем кадре → go(0)
+  useEffect(() => {
+    if (!restartRef) return;
+    restartRef.current = () => go(0);
+    return () => {
+      restartRef.current = null;
+    };
+  }, [restartRef, go]);
 
   // внутренний вертикальный скролл (Ведомость, UNIVERSE, счёт) живёт своей
   // жизнью: сцена не переключается, пока он не упёрся в край
@@ -177,10 +290,17 @@ export default function CineEngine({
       // порог ≈ пол-экрана жеста (босс: «threshold roughly equal to screen
       // height»); одиночный круткий flick (≥150) переключает сразу
       const th = Math.min(480, Math.max(240, window.innerHeight * 0.5));
+      // до порога кадр-сосед уже выезжает — скролл всегда что-то делает
+      const ratio = Math.min(1, Math.abs(accRef.current) / th);
+      if (ratio > 0.04) {
+        showPeek(accRef.current >= 0 ? 1 : -1, ratio);
+        idleReset();
+      }
       if (Math.abs(e.deltaY) >= 150 || Math.abs(accRef.current) >= th) {
         const dir: 1 | -1 = (Math.abs(e.deltaY) >= 150 ? e.deltaY : accRef.current) > 0 ? 1 : -1;
         go(idxRef.current + dir);
         accRef.current = 0;
+        resetPeek();
       }
     };
 
@@ -197,14 +317,23 @@ export default function CineEngine({
       if (canScrollY(st.scrollEl, dy)) return; // внутри скроллимого блока
       if (Math.abs(dy) < 10) return;
       e.preventDefault();
-      if (Math.abs(dy) >= 64 && !lockRef.current) {
-        go(idxRef.current + (dy > 0 ? 1 : -1));
+      const dir: 1 | -1 = dy > 0 ? 1 : -1;
+      // палец тянет край следующего кадра 1:1 (до ~100px)
+      if (Math.abs(dy) < 64) {
+        showPeek(dir, Math.abs(dy) / 64, Math.round(Math.abs(dy) * 1.6));
+        idleReset();
+        return;
+      }
+      go(idxRef.current + dir);
+      if (!lockRef.current) {
         touchRef.current = { y: e.touches[0].clientY, scrollEl: st.scrollEl };
       }
+      resetPeek();
     };
 
     const onTouchEnd = () => {
       touchRef.current = null;
+      idleReset();
     };
 
     stage.addEventListener("wheel", onWheel, { passive: false });
@@ -212,12 +341,13 @@ export default function CineEngine({
     stage.addEventListener("touchmove", onTouchMove, { passive: false });
     stage.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
+      if (idleRef.current) window.clearTimeout(idleRef.current);
       stage.removeEventListener("wheel", onWheel);
       stage.removeEventListener("touchstart", onTouchStart);
       stage.removeEventListener("touchmove", onTouchMove);
       stage.removeEventListener("touchend", onTouchEnd);
     };
-  }, [active, go]);
+  }, [active, go, showPeek, resetPeek, idleReset]);
 
   // ── клавиатура: стрелки / PgUp / PgDn / Space / Home / End ───────────────
   useEffect(() => {
@@ -325,6 +455,7 @@ export default function CineEngine({
               </>
             )}
             <div className="cb-scene__scrim" aria-hidden="true" />
+            {s.overlay}
             {s.chrome !== false && (
               <>
                 <span className="cb-scene__num" aria-hidden="true">
@@ -362,9 +493,11 @@ export default function CineEngine({
           {!moved && (
             <div className="cb-hud__hint" aria-hidden="true">
               <span>СКРОЛЛ = КАМЕРА</span>
-              <i>один экран — один кадр · 8 fps</i>
+              <i>крути до упора — следующий кадр уже выезжает</i>
             </div>
           )}
+          {/* лента-заряд: заполняется по мере прокрутки, склейка сбрасывает */}
+          <div className="cb-hud__tape" ref={tapeRef} aria-hidden="true" />
         </div>
       )}
     </div>

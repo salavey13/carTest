@@ -2394,12 +2394,12 @@ body.cb-cine-lock {
 }
 
 @keyframes cb-scene-in-b {
-  from { transform: translateY(102%); }
+  from { transform: translateY(var(--peek-start, 102%)); }
   to { transform: translateY(0%); }
 }
 
 @keyframes cb-scene-in-t {
-  from { transform: translateY(-102%); }
+  from { transform: translateY(var(--peek-start, -102%)); }
   to { transform: translateY(0%); }
 }
 
@@ -2469,6 +2469,237 @@ body.cb-cine-lock {
 @keyframes cb-scene-rm {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ═══════════ CB CINE v6.1 — peek + последовательное проявление ═════════════
+   Босс: (1) «8 steps per section flow too fast, feel like everything appears
+   at once — add proper delays in sequence of appearance of each element»;
+   (2) «in first section make user understand that when he scroll not "nothing
+   is happening" but almost next section is shown».
+   ─ Peek: кадр-сосед выезжает из-за края по мере накопления скролла
+     (inline transform от движка, ступенчатая транзишка steps(4)); склейка
+     стартует с var(--peek-start) — с той высоты, до которой кадр уже выехал.
+   ─ Лента-заряд в HUD: ширина = прогресс жеста до порога.
+   ─ Проявление: каждый оверлей кадра — своя ступень steps() со своей
+     задержкой --ink-d (ставится инлайн из ComicBookClient). CSS-анимация
+     перекрывает inline-стили framer — framer остаётся для hover/статика. */
+
+.cb-cine--on:not(.cb-cine--rm) .cb-scene {
+  transition: transform 0.26s steps(4, end);
+}
+
+/* текущий кадр чуть отъезжает камерой по мере заряда (--cb-pull от движка) */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur {
+  transform: scale(var(--cb-pull, 1));
+}
+
+.cb-cine--on .cb-scene--peek {
+  box-shadow: 0 -26px 70px rgba(34, 211, 238, 0.16);
+}
+
+.cb-hud__tape {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--cb-cyan), var(--cb-yellow));
+  box-shadow: 0 0 12px rgba(253, 224, 71, 0.5);
+  transition: width 0.22s steps(4, end);
+  pointer-events: none;
+}
+
+/* ── ступени проявления (8fps): титр → каптион → пузыри → нотиф → SFX ────── */
+@keyframes cb-ink {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cb-ink-sfx {
+  from { opacity: 0; transform: scale(0.4) rotate(calc(var(--rot, 0deg) - 14deg)); }
+  to { opacity: 1; transform: scale(1) rotate(var(--rot, 0deg)); }
+}
+
+@keyframes cb-ink-drop {
+  from { opacity: 0; transform: translateY(-26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* базовая ступень: любой прямой ребёнок текстового слоя кадра */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__text > * {
+  animation: cb-ink 0.4s steps(5, end) var(--ink-d, 0.6s) both;
+}
+
+/* титры кадра (номер + заголовок) — раньше всех */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__num {
+  animation: cb-ink 0.4s steps(5, end) 0.35s both;
+}
+
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__title {
+  animation: cb-ink 0.4s steps(5, end) 0.5s both;
+}
+
+/* нотификация прилетает сверху, ближе к финалу цепочки */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-notify-wrap {
+  animation: cb-ink-drop 0.45s steps(6, end) var(--ink-d, 1.65s) both;
+}
+
+/* SFX — вишенка: панч со вращением в самом конце */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-sfx {
+  animation: cb-ink-sfx 0.42s steps(5, end) var(--ink-d, 1.9s) both;
+}
+
+/* дети составных блоков (обложка/титры/интерактив/UNIVERSE/end slate) —
+   свои --ink-d инлайн; родители получают раннюю ступень (0.12–0.25s) */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-cinecover > *,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-cinecover .cb-cover__line,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-cinediv > *,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-cover__cue--overlay,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-cherry > *,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-choose > *,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-trilogy > *,
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-endslate > * {
+  animation: cb-ink 0.4s steps(5, end) var(--ink-d, 0.8s) both;
+}
+
+/* счёт № 0001 раскрывается по клику — его ведёт framer (spring + exit),
+   CSS-ступень не должна его глушить */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-invoice {
+  animation: none;
+}
+
+/* ── cue на обложке: «скролл — камера едет» ──────────────────────────────── */
+.cb-cover__cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(10px, 1.1vw, 12.5px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cb-yellow);
+  text-shadow: 0 2px 10px rgba(10, 5, 18, 0.9);
+  border: 2px dashed rgba(253, 224, 71, 0.55);
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: rgba(10, 5, 18, 0.55);
+}
+
+.cb-cover__cue i {
+  font-style: normal;
+  font-size: 1.1em;
+  animation: cb-cue-bob 1.1s steps(2, jump-none) infinite;
+}
+
+/* мобильный дубль cue — на уровне сцены, над картинкой; на десктопе скрыт */
+.cb-cover__cue--overlay {
+  display: none;
+}
+
+@keyframes cb-cue-bob {
+  0%, 100% { transform: translateY(-2px); }
+  50% { transform: translateY(3px); }
+}
+
+/* ── end slate: «КОНЕЦ ПЕРЕДАЧИ» вместо скучного колофона ────────────────── */
+.cb-endslate {
+  display: grid;
+  justify-items: center;
+  gap: 20px;
+  text-align: center;
+  padding: clamp(10px, 3vh, 30px) 0 6px;
+}
+
+.cb-endslate__off {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: clamp(13px, 1.5vw, 17px);
+  letter-spacing: 0.32em;
+  color: var(--cb-yellow);
+  text-shadow: 0 0 18px rgba(253, 224, 71, 0.35);
+  animation: cb-offair 3.6s steps(1, end) infinite;
+}
+
+@keyframes cb-offair {
+  0%, 86%, 92%, 100% { opacity: 1; }
+  88% { opacity: 0.18; }
+  90% { opacity: 0.85; }
+  95% { opacity: 0.35; }
+}
+
+.cb-endslate__next {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(11px, 1.3vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--cb-paper);
+  border: 2px solid rgba(232, 121, 249, 0.5);
+  border-radius: 10px;
+  padding: 9px 16px;
+  background: rgba(10, 5, 18, 0.6);
+  box-shadow: 4px 4px 0 rgba(232, 121, 249, 0.22);
+}
+
+.cb-endslate__cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  background: var(--cb-magenta);
+  animation: cb-blink 1s steps(2, jump-none) infinite;
+}
+
+.cb-endslate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.cb-endslate__credits {
+  display: grid;
+  gap: 9px;
+  width: min(600px, 100%);
+  margin: 4px 0 0;
+}
+
+.cb-endslate__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 2px dotted rgba(244, 241, 255, 0.18);
+  padding-bottom: 8px;
+}
+
+.cb-endslate__row dt {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(10px, 1.1vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 255, 0.6);
+  white-space: nowrap;
+}
+
+.cb-endslate__row dd {
+  margin: 0;
+  font-size: clamp(11px, 1.2vw, 13.5px);
+  font-weight: 700;
+  color: var(--cb-paper);
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-cover__cue i,
+  .cb-endslate__off,
+  .cb-endslate__cursor { animation: none; }
 }
 
 /* ── обложка в кадре ────────────────────────────────────────────────────── */
@@ -2917,4 +3148,81 @@ body.cb-cine-lock {
 
 @media (prefers-reduced-motion: reduce) {
   .cb-hud__hint { animation: none; }
+}
+
+/* ═══════════ v6.1: мобильная адаптация новых элементов ════════════════════ */
+@media (max-width: 860px) {
+  /* cue на стыке картинки и реплик — на уровне сцены (текстовая зона с
+     overflow-y:auto его обрезала бы); потоковый cue обложки скрыт */
+  .cb-cine--on .cb-cover__cue--overlay {
+    display: inline-flex;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(52% + 8px);
+    margin: 0 auto;
+    width: max-content;
+    max-width: 94%;
+    z-index: 3;
+    text-align: center;
+  }
+
+  .cb-cine--on .cb-cinecover .cb-cover__cue {
+    display: none;
+  }
+
+  /* обложка на мобиле должна ЦЕЛИКОМ влезать в текстовую зону (48% экрана):
+     иначе первый свайп уйдёт в нативный скролл текста, а не в камеру */
+  .cb-cine--on .cb-cinecover {
+    gap: 8px;
+    padding: 8px 2px 0;
+  }
+
+  .cb-cine--on .cb-cinecover .cb-cover__line {
+    font-size: clamp(24px, 7.6vw, 34px);
+  }
+
+  .cb-cine--on .cb-cover__title {
+    margin: 4px 0 0;
+  }
+
+  .cb-cine--on .cb-cinecover .cb-cover__sub {
+    margin-top: 4px;
+    padding: 7px 12px;
+    font-size: 11.5px;
+  }
+
+  .cb-cine--on .cb-cinecover .cb-cover__price {
+    margin-top: 0;
+    padding: 10px 9px;
+  }
+
+  .cb-endslate {
+    gap: 15px;
+  }
+
+  .cb-endslate__next {
+    max-width: 100%;
+    text-align: left;
+  }
+
+  .cb-endslate__credits {
+    gap: 7px;
+  }
+
+  .cb-endslate__row {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    border-bottom: none;
+    padding-bottom: 2px;
+  }
+
+  .cb-endslate__row dd {
+    text-align: center;
+  }
+
+  .cb-endslate__actions .cb-final__btn {
+    text-align: center;
+  }
 }
