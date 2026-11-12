@@ -978,7 +978,7 @@ export default function ComicBookClient() {
       left,
       right,
       "--rot": `${rotate}deg`,
-      "--ink-d": "1.9s",
+      "--ink-d": "calc(1.9s * var(--ink-pace, 1.6))",
     } as React.CSSProperties;
     if (jsReady) {
       return (
@@ -1017,9 +1017,12 @@ export default function ComicBookClient() {
   });
 
   // v6.1: задержка ступени проявления (--ink-d читает CSS-анимация cb-ink;
-  // цепочка: титр кадра → каптион → терминал/телефон → пузыри → нотификация → SFX)
+  // цепочка: титр кадра → каптион → терминал/телефон → пузыри → нотификация → SFX).
+  // v6.2: каждое число умножается на --ink-pace (единый темп из CSS,
+  // 1.6) — босс: «still too fast»; крутим одну цифру в comic-book.css,
+  // не трогая сорок инлайн-значений здесь.
   const ink = (base: React.CSSProperties, d: string): React.CSSProperties =>
-    ({ ...base, "--ink-d": d }) as React.CSSProperties;
+    ({ ...base, "--ink-d": `calc(${d} * var(--ink-pace, 1.6))` }) as React.CSSProperties;
 
   const panelNode = (panel: Panel) => (
     <>

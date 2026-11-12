@@ -2254,6 +2254,10 @@ body.cb-cine-lock {
   max-width: none;
   padding: 0;
   background: var(--cb-bg);
+  /* v6.2 «медитация»: единый темп проявления — вся цепочка --ink-d
+     умножается на этот коэффициент (босс: «still too fast» — числа
+     растянуты в 1.6 раза; крутим ОДНУ цифру, а не сорок задержек) */
+  --ink-pace: 1.6;
 }
 
 .cb-cine--on .cb-scene {
@@ -2386,7 +2390,9 @@ body.cb-cine-lock {
 /* ── переходы: следующий кадр накрывает предыдущий, 8 кадров ────────────── */
 .cb-cine--on .cb-scene--in {
   z-index: 6;
-  animation: cb-scene-in-b 700ms steps(8, end) both;
+  /* v6.2: 1050ms на склейку = 131ms на суб-кадр (≈7.6fps) — склейка
+     стала заметно кинематографичнее, глаз успевает прочитать каждый шаг */
+  animation: cb-scene-in-b 1050ms steps(8, end) both;
 }
 
 .cb-cine--on .cb-scene--in.cb-scene--from-t {
@@ -2406,7 +2412,7 @@ body.cb-cine-lock {
 /* предыдущий кадр: камера отъезжает + затемнение (8 кадров) */
 .cb-cine--on .cb-scene--under {
   z-index: 1;
-  animation: cb-scene-under 700ms steps(8, end) both;
+  animation: cb-scene-under 1050ms steps(8, end) both;
 }
 
 @keyframes cb-scene-under {
@@ -2418,7 +2424,7 @@ body.cb-cine-lock {
 
 /* текст кадра проявляется во второй половине склейки (redraw on top) */
 .cb-cine--on .cb-scene--in .cb-scene__text {
-  animation: cb-scene-text 700ms steps(8, end) both;
+  animation: cb-scene-text 1050ms steps(8, end) both;
 }
 
 @keyframes cb-scene-text {
@@ -2428,7 +2434,7 @@ body.cb-cine-lock {
 
 /* камера чуть отъезжает на входящем кадре */
 .cb-cine--on .cb-scene--in .cb-scene__img {
-  animation: cb-scene-img 700ms steps(8, end) both;
+  animation: cb-scene-img 1050ms steps(8, end) both;
 }
 
 @keyframes cb-scene-img {
@@ -2439,8 +2445,8 @@ body.cb-cine-lock {
 /* тряска кадра II·05 — после склейки, дискретно */
 .cb-cine--on .cb-scene--in.cb-scene--shake .cb-scene__text {
   animation:
-    cb-scene-text 700ms steps(8, end) both,
-    cb-shake 0.5s steps(2, jump-none) 0.78s 1;
+    cb-scene-text 1050ms steps(8, end) both,
+    cb-shake 0.5s steps(2, jump-none) 1.15s 1;
 }
 
 @keyframes cb-shake {
@@ -2525,28 +2531,33 @@ body.cb-cine-lock {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* базовая ступень: любой прямой ребёнок текстового слоя кадра */
+/* базовая ступень: любой прямой ребёнок текстового слоя кадра.
+   v6.2: каждый элемент проявляется дольше (0.65s, 6 шагов) и позже —
+   все задержки умножены на --ink-pace (единый темп, см. .cb-cine__stage) */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__text > * {
-  animation: cb-ink 0.4s steps(5, end) var(--ink-d, 0.6s) both;
+  animation: cb-ink 0.65s steps(6, end)
+    var(--ink-d, calc(0.6s * var(--ink-pace, 1.6))) both;
 }
 
 /* титры кадра (номер + заголовок) — раньше всех */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__num {
-  animation: cb-ink 0.4s steps(5, end) 0.35s both;
+  animation: cb-ink 0.65s steps(6, end) calc(0.35s * var(--ink-pace, 1.6)) both;
 }
 
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__title {
-  animation: cb-ink 0.4s steps(5, end) 0.5s both;
+  animation: cb-ink 0.65s steps(6, end) calc(0.5s * var(--ink-pace, 1.6)) both;
 }
 
 /* нотификация прилетает сверху, ближе к финалу цепочки */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-notify-wrap {
-  animation: cb-ink-drop 0.45s steps(6, end) var(--ink-d, 1.65s) both;
+  animation: cb-ink-drop 0.7s steps(6, end)
+    var(--ink-d, calc(1.65s * var(--ink-pace, 1.6))) both;
 }
 
 /* SFX — вишенка: панч со вращением в самом конце */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-sfx {
-  animation: cb-ink-sfx 0.42s steps(5, end) var(--ink-d, 1.9s) both;
+  animation: cb-ink-sfx 0.7s steps(6, end)
+    var(--ink-d, calc(1.9s * var(--ink-pace, 1.6))) both;
 }
 
 /* дети составных блоков (обложка/титры/интерактив/UNIVERSE/end slate) —
@@ -2559,7 +2570,8 @@ body.cb-cine-lock {
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-choose > *,
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-trilogy > *,
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-endslate > * {
-  animation: cb-ink 0.4s steps(5, end) var(--ink-d, 0.8s) both;
+  animation: cb-ink 0.65s steps(6, end)
+    var(--ink-d, calc(0.8s * var(--ink-pace, 1.6))) both;
 }
 
 /* счёт № 0001 раскрывается по клику — его ведёт framer (spring + exit),
