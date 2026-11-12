@@ -777,6 +777,9 @@
 /* ── v4: выбор приключения — три экрана живой платформы ────────────────── */
 .cb-choose {
   display: grid;
+  /* task183: minmax(0,1fr) — грид-трек не даёт столу «Ведомости» раздвигать
+     секцию шире мобильного экрана (min-width:auto blowout) */
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: clamp(10px, 1.8vw, 18px);
   text-align: center;
@@ -840,6 +843,8 @@
 
 .cb-choose__stage {
   width: min(460px, 100%);
+  max-width: 100%;
+  min-width: 0;
   min-height: clamp(250px, 42vw, 340px);
   display: grid;
   align-items: center;
@@ -934,6 +939,319 @@
   font-size: clamp(8px, 1.15vw, 10.5px);
   font-weight: 600;
   line-height: 1.4;
+  text-align: center;
+  color: rgba(244, 241, 255, 0.5);
+}
+
+/* ── v5 (task183): ВЕДОМОСТЬ — мини-версия боевой таблицы аналитики аренды ── */
+/* Пара к секции cb-choose: когда открыт таб «Ведомость», сцена шире —
+   таблице нужно место на горизонтальный скролл, как в боевой модалке. */
+.cb-choose--sheet .cb-choose__stage {
+  width: min(760px, 100%);
+}
+
+.cb-miniscreen--sheet {
+  align-items: stretch;
+  padding: clamp(10px, 1.8vw, 16px);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cb-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.4vw, 12px);
+  min-width: 0;
+}
+
+/* чипы сверки — как 🤝-полоса в бою (VerChip): все / ✅ / ⏳ / ⚠️ */
+.cb-sheet__ver {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cb-sheet__ver-label {
+  font-size: clamp(9.5px, 1.3vw, 12px);
+  font-weight: 700;
+  color: rgba(244, 241, 255, 0.6);
+  white-space: nowrap;
+}
+
+.cb-sheet__chip {
+  cursor: pointer;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: clamp(9px, 1.25vw, 11.5px);
+  letter-spacing: 0.02em;
+  color: rgba(244, 241, 255, 0.75);
+  background: rgba(244, 241, 255, 0.06);
+  border: 1.5px solid rgba(244, 241, 255, 0.25);
+  border-radius: 999px;
+  padding: 4px 10px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.cb-sheet__chip:hover {
+  transform: translateY(-1px);
+}
+
+.cb-sheet__chip[aria-pressed='true'] {
+  color: var(--cb-ink);
+  background: var(--cb-paper);
+  border-color: var(--cb-paper);
+}
+
+.cb-sheet__chip--verified {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.cb-sheet__chip--waiting {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.cb-sheet__chip--disputed {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.cb-sheet__chip--verified[aria-pressed='true'] {
+  color: var(--cb-ink);
+  background: #4ade80;
+  border-color: #4ade80;
+}
+
+.cb-sheet__chip--waiting[aria-pressed='true'] {
+  color: var(--cb-ink);
+  background: #fbbf24;
+  border-color: #fbbf24;
+}
+
+.cb-sheet__chip--disputed[aria-pressed='true'] {
+  color: var(--cb-ink);
+  background: #f87171;
+  border-color: #f87171;
+}
+
+/* горизонтальный скролл + sticky-рейка слева (как в боевой модалке) */
+.cb-sheet__scroll {
+  position: relative;
+  overflow-x: auto;
+  border: 1.5px solid rgba(34, 211, 238, 0.28);
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.45) transparent;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.cb-sheet__scrollhint {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 3;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(34, 211, 238, 0.85);
+  background: rgba(10, 5, 18, 0.82);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.cb-sheet__table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: clamp(9.5px, 1.3vw, 12.5px);
+}
+
+.cb-sheet__th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(8px, 1.1vw, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--cb-cyan);
+  background: #0e1626;
+  border-bottom: 2px solid rgba(34, 211, 238, 0.45);
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.cb-sheet__th--num,
+.cb-sheet__td--num {
+  text-align: right;
+}
+
+.cb-sheet__td {
+  color: rgba(244, 241, 255, 0.82);
+  font-weight: 600;
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(244, 241, 255, 0.1);
+  white-space: nowrap;
+}
+
+.cb-sheet__td b {
+  color: var(--cb-paper);
+}
+
+.cb-sheet__td--num {
+  font-variant-numeric: tabular-nums;
+  color: var(--cb-cyan-soft);
+}
+
+.cb-sheet__td--zp {
+  color: #4ade80;
+  font-weight: 800;
+}
+
+/* тонировка строк верификацией — как в боевой таблице (Task 124) */
+.cb-sheet__row--verified td {
+  background: rgba(74, 222, 128, 0.06);
+}
+
+.cb-sheet__row--waiting td {
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.cb-sheet__row--disputed td {
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.cb-sheet__td--ver {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cb-sheet__row--verified .cb-sheet__td--ver {
+  color: #4ade80;
+}
+
+.cb-sheet__row--waiting .cb-sheet__td--ver {
+  color: #fbbf24;
+}
+
+.cb-sheet__row--disputed .cb-sheet__td--ver {
+  color: #f87171;
+}
+
+.cb-sheet__td--empty {
+  text-align: center;
+  color: rgba(244, 241, 255, 0.55);
+  padding: 16px 10px;
+}
+
+/* sticky-рейка: время + марка прилипают слева при горизонтальном скролле */
+.cb-sheet__th--pin,
+.cb-sheet__td--pin {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 108px;
+}
+
+.cb-sheet__th--pin {
+  z-index: 3;
+}
+
+.cb-sheet__td--pin {
+  background: #0d1420;
+  border-right: 1.5px solid rgba(34, 211, 238, 0.3);
+  box-shadow: 3px 0 8px -4px rgba(0, 0, 0, 0.7);
+}
+
+.cb-sheet__pinwrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cb-sheet__row--verified .cb-sheet__td--pin {
+  background: #0f1a14;
+}
+
+.cb-sheet__row--waiting .cb-sheet__td--pin {
+  background: #171307;
+}
+
+.cb-sheet__row--disputed .cb-sheet__td--pin {
+  background: #1a0d0d;
+}
+
+.cb-sheet__time {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(7.5px, 1vw, 9.5px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: rgba(34, 211, 238, 0.8);
+}
+
+.cb-sheet__td--pin b {
+  font-size: clamp(9.5px, 1.3vw, 12.5px);
+}
+
+/* СВОДКА — пересчитывается под фильтр, как бухгалтерский блок в CSV */
+.cb-sheet__summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  border-top: 2.5px solid rgba(232, 121, 249, 0.5);
+  padding-top: clamp(6px, 1.1vw, 10px);
+}
+
+.cb-sheet__summary-title {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(9px, 1.3vw, 11.5px);
+  letter-spacing: 0.14em;
+  color: var(--cb-magenta-soft);
+}
+
+.cb-sheet__summary-block {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(8px, 1.1vw, 10px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(244, 241, 255, 0.55);
+  border: 1px solid rgba(244, 241, 255, 0.25);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+
+.cb-sheet__summary-cell {
+  font-size: clamp(9px, 1.25vw, 12px);
+  font-weight: 600;
+  color: rgba(244, 241, 255, 0.65);
+}
+
+.cb-sheet__summary-cell b {
+  font-variant-numeric: tabular-nums;
+  color: #4ade80;
+  font-weight: 800;
+}
+
+.cb-sheet__note {
+  font-size: clamp(8px, 1.15vw, 10.5px);
+  font-weight: 600;
+  line-height: 1.45;
   text-align: center;
   color: rgba(244, 241, 255, 0.5);
 }

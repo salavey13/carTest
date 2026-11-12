@@ -25,6 +25,7 @@
 | `buy_{bikeId}` | `/franchize/{crewSlug}/market/{bikeId}/buy` | Страница покупки байка |
 | `testdrive_{bikeId}_{docSha256}` | Страница байка с `docSha256` — форма пре-филлится данными тест-драйва | QR тест-драйва: `claimTestdriveSecretsAction` → привязка `user_rental_secrets` по chat_id |
 | `rent-bike` | `/franchize/vip-bike` | Простая ссылка на каталог проката |
+| `comic-book` | `/comic-book` | VIP BIKE COMICS · СЕЗОН 2026 — веб-комикс (публичный, FAST path: маршрутизация до auth). task183 2026-11: `https://t.me/oneBikePlsBot/app?startapp=comic-book` |
 
 > **Резолвер crew-slug:** `/api/startapp/vehicle?vehicle={id}&flow=rent|buy` — ищет `cars` по id,
 > берёт `crew_id` → slug; при отсутствии crew — по `owner_id`; финальный fallback `vip-bike`.
@@ -121,7 +122,7 @@ wb_dashboard → cart_id_* → cart_* → buy_* → rent_* (QR!) → testdrive_*
 
 - `rent_` ловится **раньше** `rental_` — поэтому `rental_{id}` не попадает в QR-ветку.
 - Статический MAP (`hooks/useStartParamRouter.ts:19-44`) содержит страницы типа `settings`, `profile`,
-  `leaderboard`, `crews`, `reports`, `wb`, `wb_dashboard`, `audit-tool`, `rent-bike` и др.
+  `leaderboard`, `crews`, `reports`, `wb`, `wb_dashboard`, `audit-tool`, `rent-bike`, `comic-book` и др.
 
 ---
 

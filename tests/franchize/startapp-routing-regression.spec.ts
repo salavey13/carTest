@@ -27,6 +27,7 @@ import {
   computeStaticFastTarget,
   parseRentDeepLink,
   parseRentalDetailDeepLink,
+  START_PARAM_PAGE_MAP,
 } from "@/hooks/use-start-param-target";
 import {
   bikeRentStartParam,
@@ -195,6 +196,30 @@ describe("wheel-of-fortune deeplinks (boss 2026-10-11)", () => {
     expect(computeStaticFastTarget(startapp)).toBe(`/franchize/${SLUG}/wheel`);
     // Грамматика ссылки остаётся в бюджете Telegram.
     expect(startapp.length).toBeLessThanOrEqual(64);
+  });
+});
+
+describe("comic-book deeplink (boss task183: t.me/onebikeplsbot/app?startapp=comic-book)", () => {
+  it("startapp=comic-book routes to /comic-book on the static fast path (public page, no auth wait)", () => {
+    expect(START_PARAM_PAGE_MAP["comic-book"]).toBe("/comic-book");
+    expect(computeStaticFastTarget("comic-book")).toBe("/comic-book");
+  });
+
+  it("the exact t.me link the boss wrote round-trips into /comic-book", () => {
+    // Босс 2026-11: «i expected deeplink like
+    // https://t.me/onebikeplsbot/app?startapp=comic-book».
+    const url = "https://t.me/onebikeplsbot/app?startapp=comic-book";
+    const startapp = url.split("startapp=")[1];
+    expect(computeStaticFastTarget(startapp)).toBe("/comic-book");
+    // Telegram startapp budget: [A-Za-z0-9_-], ≤ 64.
+    expect(startapp).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+  });
+
+  it("near-miss params stay unrouted (typos fall through, no surprise pages)", () => {
+    expect(computeStaticFastTarget("comic")).toBeNull();
+    expect(computeStaticFastTarget("comics")).toBeNull();
+    expect(computeStaticFastTarget("comic_book")).toBeNull();
+    expect(computeStaticFastTarget("comic-book-x")).toBeNull();
   });
 });
 

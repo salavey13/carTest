@@ -57,6 +57,11 @@ export const START_PARAM_PAGE_MAP: Record<string, string> = {
   wheel: "/franchize/vip-bike/wheel",
   wheel_of_fortune: "/franchize/vip-bike/wheel",
   fortune: "/franchize/vip-bike/wheel",
+  // VIP BIKE COMICS (task183, boss: «i expected deeplink like
+  // t.me/onebikeplsbot/app?startapp=comic-book»): комикс — публичная витрина
+  // без auth-данных → статический fast path, маршрутизация ДО Telegram
+  // roundtrip. Слаг совпадает с путём страницы /comic-book.
+  "comic-book": "/comic-book",
 };
 
 export const BIO30_PRODUCT_PATHS: Record<string, string> = {

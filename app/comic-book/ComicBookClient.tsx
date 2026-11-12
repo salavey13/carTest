@@ -24,6 +24,15 @@
 //  • бесконечная камера: скролл ведёт зум/панораму внутри панелей
 //    (useScroll + useTransform, reduced-motion и no-JS отключают);
 //  • финал: VIP BIKE UNIVERSE — Every bike has a story · RIDE. EARN. EVOLVE.
+// v5 (task183) — босс: «зарплатные листы прямо напрашиваются — yeah, like
+//  tableview in rentals-analytics ;)»:
+//  • вкладка «Ведомость» — мини-версия боевой таблицы «Аналитика аренды →
+//    📋 Таблица и экспорт CSV»: sticky-рейка слева (время + марка), чипы
+//    сверки 🤝 «все / ✅ / ⏳ / ⚠️» с живым фильтром (СВОДКА пересчитывается),
+//    блоки АРЕНДЫ/СВОДКА, тонировка строк верификацией, колонки боевыми
+//    именами (Цена, ЗП экип, Оператор (ЗП)); числа демо — помечено;
+//  • deep link t.me/onebikeplsbot/app?startapp=comic-book подключён к
+//    статическому fast-path (START_PARAM_PAGE_MAP + regression-тесты).
 // Референс героя — founder-rustam.jpg из /leorus hero (task179).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -566,13 +575,47 @@ const EP2_PANELS: Panel[] = [
   },
 ];
 
-// ── «выбор приключения»: три экрана живой платформы после II·05 ────────────
-// Мотопарк — живые тарифы rent-csv; зарплата/статистика — названия из
-// боевых модулей, числа демо (помечено в примечании каждого экрана).
-type BossTab = "salary" | "park" | "stats";
+// ── «выбор приключения»: четыре экрана живой платформы после II·05 ──────────
+// Ведомость (task183) — мини-версия боевой таблицы аналитики; мотопарк —
+// живые тарифы rent-csv; зарплата/статистика — названия из боевых модулей,
+// числа демо (помечено в примечании каждого экрана).
+type BossTab = "sheet" | "salary" | "park" | "stats";
+
+// ── ВЕДОМОСТЬ: данные демо-вечера (та же шестёрка аренд, что в «Статистике»:
+// «Аренды сегодня — 6»). Часы/цены — живой каталог; ЗП экип — демо-процент:
+// боевой модуль считает по закрытым арендам (subrent-сплит: партнёру
+// owner_pct% байк-части, экипажу экип + наценка — rental-price-split.ts).
+type VerState = "verified" | "waiting" | "disputed";
+
+type SheetRow = {
+  time: string;
+  bike: string;
+  hours: string;
+  price: number;
+  zp: number;
+  operator: string;
+  ver: VerState;
+};
+
+const SHEET_ROWS: SheetRow[] = [
+  { time: "14:10", bike: "Falcon GT", hours: "6 ч", price: 5000, zp: 1500, operator: "Рустам", ver: "disputed" },
+  { time: "15:30", bike: "Kayo TSD 110", hours: "сутки", price: 4000, zp: 1200, operator: "Женя", ver: "waiting" },
+  { time: "17:05", bike: "Ninja 650", hours: "сутки", price: 10000, zp: 3000, operator: "Женя", ver: "verified" },
+  { time: "19:40", bike: "Max Pro", hours: "сутки", price: 8000, zp: 2400, operator: "Рустам", ver: "verified" },
+  { time: "21:15", bike: "Falcon Pro", hours: "6 ч", price: 7000, zp: 2100, operator: "Рустам", ver: "verified" },
+  { time: "23:48", bike: "Shiver 750", hours: "сутки", price: 12000, zp: 3600, operator: "Рустам", ver: "verified" },
+];
+
+const VER_META: Record<VerState, { chip: string; label: string }> = {
+  verified: { chip: "✅", label: "сверка сошлась" },
+  waiting: { chip: "⏳", label: "ожидает" },
+  disputed: { chip: "⚠️", label: "вопросы" },
+};
+
+const fmtRub = (n: number) => `${n.toLocaleString("ru-RU")} ₽`;
 
 const BOSS_SCREENS: Record<
-  BossTab,
+  Exclude<BossTab, "sheet">,
   { title: string; time: string; rows: [string, string][]; total: [string, string]; note: string }
 > = {
   salary: {
@@ -706,6 +749,144 @@ function PhoneCounter({ jsReady, label }: { jsReady: boolean; label: string }) {
           </div>
         </motion.div>
       </button>
+    </div>
+  );
+}
+
+// ── ВЕДОМОСТЬ (task183): мини-версия боевой «Таблицы и экспорта CSV» из
+// аналитики аренды (ExportCsvModal). Что взято из боевой модалки один в один:
+//   • горизонтальный скролл со sticky-рейкой слева (время + марка);
+//   • чипы сверки 🤝 «все / ✅ / ⏳ / ⚠️» — клик фильтрует строки,
+//     СВОДКА пересчитывается под фильтр (в бою это quick-filter Task 126);
+//   • секции АРЕНДЫ и СВОДКА (Блок · Записей · Выручка · ЗП);
+//   • тонировка строк статусом сверки (зелёный/янтарный/красный);
+//   • колонки боевыми именами: Часы, Цена, ЗП экип, Оператор (ЗП),
+//     Верификация.
+// Числа демо: боевой модуль ЗП считает по закрытым арендам платформы.
+function SalarySheet({
+  onTap,
+  animate,
+}: {
+  onTap: () => void;
+  animate: boolean;
+}) {
+  const [filter, setFilter] = useState<"all" | VerState>("all");
+  const rows = SHEET_ROWS.filter((r) => filter === "all" || r.ver === filter);
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const revenue = sum(rows.map((r) => r.price));
+  const zp = sum(rows.map((r) => r.zp));
+
+  return (
+    <div className="cb-sheet">
+      <div className="cb-sheet__ver" role="group" aria-label="Фильтр сверки">
+        <span className="cb-sheet__ver-label">🤝 Сверка:</span>
+        {(
+          [
+            ["all", "all"],
+            ["verified", "verified"],
+            ["waiting", "waiting"],
+            ["disputed", "disputed"],
+          ] as const
+        ).map(([key]) => {
+          const n =
+            key === "all"
+              ? SHEET_ROWS.length
+              : SHEET_ROWS.filter((r) => r.ver === key).length;
+          const label =
+            key === "all" ? `все · ${n}` : `${n} ${VER_META[key].chip}`;
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`cb-sheet__chip cb-sheet__chip--${key}`}
+              aria-pressed={filter === key}
+              onClick={() => {
+                setFilter(key);
+                onTap();
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        className="cb-sheet__scroll"
+        tabIndex={0}
+        role="region"
+        aria-label="Таблица ведомости — прокручивается по горизонтали"
+      >
+        <span className="cb-sheet__scrollhint" aria-hidden="true">
+          листай →
+        </span>
+        <table className="cb-sheet__table">
+          <thead>
+            <tr>
+              <th className="cb-sheet__th cb-sheet__th--pin">Время · марка</th>
+              <th className="cb-sheet__th">Часы</th>
+              <th className="cb-sheet__th cb-sheet__th--num">Цена</th>
+              <th className="cb-sheet__th cb-sheet__th--num">ЗП экип</th>
+              <th className="cb-sheet__th">Оператор (ЗП)</th>
+              <th className="cb-sheet__th">Верификация</th>
+            </tr>
+          </thead>
+          <tbody key={filter}>
+            {rows.map((r, i) => (
+              <motion.tr
+                key={r.time}
+                className={`cb-sheet__row cb-sheet__row--${r.ver}`}
+                initial={animate ? { opacity: 0, x: 14 } : undefined}
+                animate={animate ? { opacity: 1, x: 0 } : undefined}
+                transition={animate ? { duration: 0.26, delay: i * 0.05 } : undefined}
+              >
+                <td className="cb-sheet__td cb-sheet__td--pin">
+                  <div className="cb-sheet__pinwrap">
+                    <span className="cb-sheet__time">{r.time}</span>
+                    <b>{r.bike}</b>
+                  </div>
+                </td>
+                <td className="cb-sheet__td">{r.hours}</td>
+                <td className="cb-sheet__td cb-sheet__td--num">{fmtRub(r.price)}</td>
+                <td className="cb-sheet__td cb-sheet__td--num cb-sheet__td--zp">
+                  {fmtRub(r.zp)}
+                </td>
+                <td className="cb-sheet__td">{r.operator}</td>
+                <td className="cb-sheet__td cb-sheet__td--ver">
+                  {VER_META[r.ver].chip} {VER_META[r.ver].label}
+                </td>
+              </motion.tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="cb-sheet__td cb-sheet__td--empty" colSpan={6}>
+                  пусто — как и в бою после чистой сверки :)
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="cb-sheet__summary" aria-label="Сводка по фильтру">
+        <span className="cb-sheet__summary-title">СВОДКА</span>
+        <span className="cb-sheet__summary-block">АРЕНДЫ</span>
+        <span className="cb-sheet__summary-cell">
+          записей <b>{rows.length}</b>
+        </span>
+        <span className="cb-sheet__summary-cell">
+          выручка <b>{fmtRub(revenue)}</b>
+        </span>
+        <span className="cb-sheet__summary-cell">
+          ЗП экип <b>{fmtRub(zp)}</b>
+        </span>
+      </div>
+
+      <span className="cb-sheet__note">
+        колонки, чипы сверки и СВОДКА — из боевой таблицы «Аналитика аренды →
+        📋 Таблица и экспорт CSV» · тарифы и часы — живой каталог · ЗП и сверки
+        — демо: боевой модуль считает по закрытым арендам платформы
+      </span>
     </div>
   );
 }
@@ -1192,12 +1373,17 @@ export default function ComicBookClient() {
         {EP2_PANELS.map((panel) => renderPanel(panel))}
 
         {/* ── выбор приключения: телефон снова в руках ────────────────── */}
-        <section className="cb-choose" data-sound="bip" aria-label="Что проверим первым">
+        <section
+          className={`cb-choose${bossTab === "sheet" ? " cb-choose--sheet" : ""}`}
+          data-sound="bip"
+          aria-label="Что проверим первым"
+        >
           <span className="cb-choose__tag">/// ТЕЛЕФОН СНОВА В РУКАХ ///</span>
           <h2 className="cb-choose__title">ЧТО ПРОВЕРИМ ПЕРВЫМ?</h2>
           <div className="cb-choose__tabs" role="tablist" aria-label="Экраны платформы">
             {(
               [
+                ["sheet", "Ведомость"],
                 ["salary", "Зарплата"],
                 ["park", "Мотопарк"],
                 ["stats", "Статистика"],
@@ -1223,35 +1409,46 @@ export default function ComicBookClient() {
               {bossTab && (
                 <motion.div
                   key={bossTab}
-                  className="cb-miniscreen"
+                  className="cb-miniscreen cb-miniscreen--sheet"
                   initial={{ opacity: 0, y: 18, rotate: -1.5 }}
                   animate={{ opacity: 1, y: 0, rotate: 0 }}
                   exit={{ opacity: 0, y: -14, rotate: 1.5 }}
                   transition={{ duration: 0.28, ease: "easeOut" }}
                 >
-                  <div className="cb-miniscreen__app">
-                    <b>{BOSS_SCREENS[bossTab].title}</b>
-                    <span>{BOSS_SCREENS[bossTab].time}</span>
-                  </div>
-                  {BOSS_SCREENS[bossTab].rows.map(([name, value]) => (
-                    <span key={name} className="cb-miniscreen__row">
-                      <span>{name}</span>
-                      <b>{value}</b>
-                    </span>
-                  ))}
-                  <div className="cb-miniscreen__total">
-                    <span>{BOSS_SCREENS[bossTab].total[0]}</span>
-                    <b>{BOSS_SCREENS[bossTab].total[1]}</b>
-                  </div>
-                  <span className="cb-miniscreen__note">{BOSS_SCREENS[bossTab].note}</span>
+                  {bossTab === "sheet" ? (
+                    <SalarySheet
+                      onTap={() => {
+                        if (soundRef.current && audioRef.current) playSound("bip", audioRef.current);
+                      }}
+                      animate={jsReady && !reduceMotion}
+                    />
+                  ) : (
+                    <>
+                      <div className="cb-miniscreen__app">
+                        <b>{BOSS_SCREENS[bossTab].title}</b>
+                        <span>{BOSS_SCREENS[bossTab].time}</span>
+                      </div>
+                      {BOSS_SCREENS[bossTab].rows.map(([name, value]) => (
+                        <span key={name} className="cb-miniscreen__row">
+                          <span>{name}</span>
+                          <b>{value}</b>
+                        </span>
+                      ))}
+                      <div className="cb-miniscreen__total">
+                        <span>{BOSS_SCREENS[bossTab].total[0]}</span>
+                        <b>{BOSS_SCREENS[bossTab].total[1]}</b>
+                      </div>
+                      <span className="cb-miniscreen__note">{BOSS_SCREENS[bossTab].note}</span>
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
             {!bossTab && (
               <p className="cb-choose__hint">
-                Три экрана из живой платформы. Мотопарк считает по настоящим
-                тарифам каталога — выдуманных рублей здесь нет ни в одном
-                выпуске.
+                Четыре экрана из живой платформы. Ведомость — мини-версия боевой
+                таблицы аналитики аренды, мотопарк считает по настоящим тарифам
+                каталога — выдуманных рублей здесь нет ни в одном выпуске.
               </p>
             )}
           </div>
@@ -1409,6 +1606,7 @@ export default function ComicBookClient() {
           <a href="/salavey13">Как это устроено</a>
           <a href="/leorus">Команда LEORUS</a>
           <a href="/franchize/discovery">Кто уже варится</a>
+          <a href="https://t.me/onebikeplsbot/app?startapp=comic-book">Открыть в Telegram</a>
         </nav>
       </footer>
     </div>
