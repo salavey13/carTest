@@ -318,8 +318,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    // Web-only pages: nnvolt landing and comic-book promo (task186) are meant
+    // to be opened outside Telegram (pitch links sent to clients). TG auth
+    // error/loading toasts are pure noise there.
+    const isWebOnlyPage =
+      pathname?.startsWith("/nnvolt") || pathname?.startsWith("/comic-book");
+
     let loadingTimer: NodeJS.Timeout | null = null;
-    const shouldShowLoading = (isTelegramLoading || isTelegramAuthenticating) && !dbUser;
+    const shouldShowLoading =
+      !isWebOnlyPage && (isTelegramLoading || isTelegramAuthenticating) && !dbUser;
 
     if (shouldShowLoading) {
       appToast.dismiss("auth-success-toast");
@@ -333,7 +340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (loadingTimer) clearTimeout(loadingTimer);
       appToast.dismiss("auth-loading-toast");
       // Skip telegram error toast on nnvolt pages (regular web page, not Telegram WebApp)
-      if (telegramError && !pathname?.startsWith("/nnvolt")) {
+      if (telegramError && !isWebOnlyPage) {
         appToast.error(`Ошибка: ${telegramError.message}`, { id: "auth-error-toast", duration: 5000 });
       }
     }
