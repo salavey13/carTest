@@ -4,7 +4,13 @@
    Скоуп .cb-root. Шрифты: Unbounded (титры/SFX), Caveat (пузыри),
    Manrope (тело), JetBrains Mono (терминал глитча).
    v2: десктоп увеличен (~1080px), clamp-адаптив, gold-акцент LEORUS,
-   глитч-полоса, терминал, MUSTACHE PROTOCOL, прогресс-бар скролла.
+   глитч-полоса, терминал, прогресс-бар скролла.
+   v3 (task181): звуковой тумблер, полосы эпизодов, интерактивный телефон,
+   пасхалка, трилогия.
+   v4 (task182): MUSTACHE PROTOCOL удалён; вместо него — СЧЁТ № 0001
+   (бумажный счёт-шутка с рваным краем и печатью), выбор приключения
+   (табы + мини-экраны платформы), тизер BikeSoul (HUD-чипы уровня/настроения),
+   VIP BIKE UNIVERSE (RIDE. EARN. EVOLVE.), бесконечная камера (скролл-зум).
    ───────────────────────────────────────────────────────────────────────────── */
 
 @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800;900&family=Caveat:wght@600;700&family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -568,21 +574,24 @@
   .cb-terminal__cursor { animation: none; }
 }
 
-/* ── MUSTACHE PROTOCOL ──────────────────────────────────────────────────── */
-.cb-stache-wrap {
-  position: absolute;
-  z-index: 4;
-  pointer-events: none;
-  display: flex;
+/* ── v4: бесконечная камера — скролл ведёт зум/панораму внутри панели ───── */
+.cb-camera {
+  position: relative;
 }
 
-.cb-stache {
-  display: block;
-  height: auto;
-  filter: drop-shadow(2px 3px 0 rgba(244, 241, 255, 0.9));
+.cb-camera__inner {
+  will-change: transform;
+  transform-origin: 52% 46%;
 }
 
-.cb-lastthing {
+@media (prefers-reduced-motion: reduce) {
+  .cb-camera__inner {
+    transform: none !important;
+  }
+}
+
+/* ── v4: вишенка эпизода I — счёт № 0001 (усы списаны на берег) ────────── */
+.cb-cherry {
   display: grid;
   justify-items: center;
   gap: 14px;
@@ -593,7 +602,7 @@
   text-align: center;
 }
 
-.cb-lastthing__btn {
+.cb-cherry__btn {
   cursor: pointer;
   font-family: 'Unbounded', sans-serif;
   font-weight: 900;
@@ -608,18 +617,484 @@
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.cb-lastthing__btn:hover {
+.cb-cherry__btn:hover {
   transform: translate(-2px, -2px);
   box-shadow: 8px 8px 0 var(--cb-magenta), 8px 8px 0 3px var(--cb-ink);
 }
 
-.cb-lastthing__hint {
+.cb-cherry__hint {
   margin: 0;
-  max-width: 56ch;
+  max-width: 52ch;
   font-size: clamp(12px, 1.6vw, 15px);
   font-weight: 700;
   line-height: 1.5;
   color: var(--cb-yellow);
+}
+
+/* бумажный счёт: тёплая бумага, моношрифт, рваный край снизу, печать */
+.cb-invoice {
+  position: relative;
+  width: min(620px, 100%);
+  background: #fdfaf2;
+  color: #17151f;
+  border-radius: 4px;
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.5), 0 4px 0 rgba(253, 224, 71, 0.9);
+  padding: clamp(18px, 3vw, 30px) clamp(16px, 3vw, 32px) clamp(26px, 4vw, 38px);
+  text-align: left;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  transform-origin: 50% 0;
+}
+
+.cb-invoice::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  height: 10px;
+  background:
+    linear-gradient(-45deg, transparent 70%, #fdfaf2 72%) 0 0 / 14px 10px repeat-x,
+    linear-gradient(45deg, transparent 70%, #fdfaf2 72%) 7px 0 / 14px 10px repeat-x;
+}
+
+.cb-invoice__head {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  border-bottom: 2px dashed rgba(23, 21, 31, 0.4);
+  padding-bottom: 12px;
+}
+
+.cb-invoice__head span {
+  font-size: clamp(8px, 1.2vw, 10px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(23, 21, 31, 0.65);
+  text-transform: uppercase;
+}
+
+.cb-invoice__head b {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(18px, 3vw, 26px);
+  letter-spacing: 0.06em;
+}
+
+.cb-invoice__head i {
+  font-style: italic;
+  font-size: clamp(10px, 1.5vw, 13px);
+  font-weight: 600;
+  color: rgba(23, 21, 31, 0.75);
+}
+
+.cb-invoice__rows {
+  display: grid;
+  gap: 7px;
+  padding: 14px 0;
+}
+
+.cb-invoice__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: clamp(10px, 1.5vw, 13px);
+  font-weight: 600;
+  border-bottom: 1.5px dotted rgba(23, 21, 31, 0.28);
+  padding-bottom: 5px;
+}
+
+.cb-invoice__row b {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-invoice__row--total {
+  border-bottom: none;
+  border-top: 2.5px solid #17151f;
+  margin-top: 4px;
+  padding-top: 9px;
+  font-weight: 800;
+  font-size: clamp(12px, 1.8vw, 15px);
+}
+
+.cb-invoice__row--total b {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+}
+
+.cb-invoice__infinity {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin: 6px 0 14px;
+  text-align: center;
+}
+
+.cb-invoice__infinity span {
+  font-size: clamp(9px, 1.3vw, 11px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(23, 21, 31, 0.7);
+}
+
+.cb-invoice__infinity b {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(40px, 7vw, 64px);
+  line-height: 1;
+  color: #17151f;
+  text-shadow: 3px 3px 0 rgba(232, 121, 249, 0.45);
+}
+
+.cb-invoice__stamp {
+  position: absolute;
+  top: 34%;
+  right: 5%;
+  transform: rotate(9deg);
+  font-weight: 700;
+  font-size: clamp(8px, 1.2vw, 10.5px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #c2284a;
+  border: 2.5px solid #c2284a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  opacity: 0.82;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.cb-invoice__ps {
+  margin: 0;
+  font-size: clamp(9px, 1.35vw, 11.5px);
+  line-height: 1.55;
+  color: rgba(23, 21, 31, 0.66);
+  text-align: center;
+}
+
+/* ── v4: выбор приключения — три экрана живой платформы ────────────────── */
+.cb-choose {
+  display: grid;
+  justify-items: center;
+  gap: clamp(10px, 1.8vw, 18px);
+  text-align: center;
+  border: 4px solid var(--cb-paper);
+  border-radius: 12px;
+  background:
+    radial-gradient(700px 260px at 50% 0%, rgba(34, 211, 238, 0.13), transparent 70%),
+    rgba(10, 5, 18, 0.75);
+  padding: clamp(22px, 4vw, 44px) clamp(14px, 3.5vw, 36px);
+}
+
+.cb-choose__tag {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: clamp(10px, 1.4vw, 13px);
+  letter-spacing: 0.22em;
+  color: var(--cb-cyan);
+}
+
+.cb-choose__title {
+  margin: 0;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(17px, 3.2vw, 30px);
+  text-transform: uppercase;
+  color: var(--cb-paper);
+  text-shadow: 3px 3px 0 rgba(11, 11, 15, 0.85);
+}
+
+.cb-choose__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.cb-choose__tab {
+  cursor: pointer;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 800;
+  font-size: clamp(11px, 1.6vw, 14px);
+  color: var(--cb-paper);
+  background: rgba(10, 5, 18, 0.85);
+  border: 2.5px solid rgba(244, 241, 255, 0.5);
+  border-radius: 999px;
+  padding: 10px 18px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.cb-choose__tab:hover {
+  transform: translateY(-2px);
+  border-color: var(--cb-cyan);
+}
+
+.cb-choose__tab[aria-selected='true'] {
+  background: var(--cb-cyan);
+  color: var(--cb-ink);
+  border-color: var(--cb-paper);
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.55);
+}
+
+.cb-choose__stage {
+  width: min(460px, 100%);
+  min-height: clamp(250px, 42vw, 340px);
+  display: grid;
+  align-items: center;
+}
+
+.cb-choose__hint {
+  margin: 0;
+  font-size: clamp(11.5px, 1.6vw, 14px);
+  font-weight: 600;
+  line-height: 1.55;
+  color: rgba(244, 241, 255, 0.7);
+  max-width: 46ch;
+}
+
+.cb-miniscreen {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(5px, 1vw, 9px);
+  border-radius: 22px;
+  border: 2.5px solid rgba(34, 211, 238, 0.6);
+  background: linear-gradient(180deg, #0e1626, #0a0f1a);
+  box-shadow: 0 0 26px rgba(34, 211, 238, 0.25), 6px 8px 0 rgba(11, 11, 15, 0.65);
+  padding: clamp(14px, 2.4vw, 22px);
+  text-align: left;
+}
+
+.cb-miniscreen__app {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--cb-cyan);
+}
+
+.cb-miniscreen__app b {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(11px, 1.7vw, 15px);
+  letter-spacing: 0.06em;
+}
+
+.cb-miniscreen__app span {
+  font-size: clamp(8px, 1.15vw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 255, 0.5);
+}
+
+.cb-miniscreen__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1.5px dotted rgba(244, 241, 255, 0.22);
+  padding-bottom: clamp(3px, 0.7vw, 6px);
+  font-size: clamp(10px, 1.5vw, 13.5px);
+  font-weight: 600;
+  color: rgba(244, 241, 255, 0.82);
+}
+
+.cb-miniscreen__row b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--cb-cyan-soft);
+  font-weight: 800;
+}
+
+.cb-miniscreen__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 2.5px solid rgba(232, 121, 249, 0.5);
+  margin-top: 4px;
+  padding-top: clamp(5px, 1vw, 9px);
+  font-size: clamp(9px, 1.3vw, 12px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cb-magenta-soft);
+}
+
+.cb-miniscreen__total b {
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(13px, 2.1vw, 19px);
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-miniscreen__note {
+  font-size: clamp(8px, 1.15vw, 10.5px);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  color: rgba(244, 241, 255, 0.5);
+}
+
+/* ── v4: тизер выпуска №3 — BikeSoul ────────────────────────────────────── */
+.cb-teaser {
+  display: grid;
+  justify-items: center;
+  gap: clamp(12px, 2vw, 18px);
+  text-align: center;
+  border: 3px dashed var(--cb-yellow);
+  border-radius: 12px;
+  background:
+    radial-gradient(700px 280px at 50% 0%, rgba(253, 224, 71, 0.08), transparent 70%),
+    rgba(10, 5, 18, 0.75);
+  padding: clamp(20px, 3.6vw, 40px) clamp(14px, 3.5vw, 36px);
+}
+
+.cb-teaser__tag {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: clamp(10px, 1.4vw, 13px);
+  letter-spacing: 0.22em;
+  color: var(--cb-yellow);
+}
+
+.cb-teaser__title {
+  margin: 0;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(17px, 3.2vw, 30px);
+  text-transform: uppercase;
+  color: var(--cb-paper);
+  text-shadow: 3px 3px 0 rgba(11, 11, 15, 0.85);
+}
+
+.cb-teaser__frame {
+  position: relative;
+  width: min(860px, 100%);
+  border: 4px solid var(--cb-paper);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 12px 12px 0 var(--cb-yellow), 12px 12px 0 3px var(--cb-ink);
+}
+
+.cb-teaser__frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cb-teaser__hud {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 10px;
+}
+
+.cb-teaser__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(10px, 1.4vw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  padding: 8px 15px;
+}
+
+.cb-teaser__chip--level {
+  color: var(--cb-cyan-soft);
+  border: 2px solid rgba(34, 211, 238, 0.6);
+  background: rgba(34, 211, 238, 0.07);
+}
+
+.cb-teaser__chip--mood {
+  color: var(--cb-magenta-soft);
+  border: 2px solid rgba(232, 121, 249, 0.55);
+  background: rgba(232, 121, 249, 0.07);
+}
+
+.cb-teaser__chip--level i {
+  position: relative;
+  width: 64px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(244, 241, 255, 0.15);
+  overflow: hidden;
+}
+
+.cb-teaser__chip--level i b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--cb-cyan), var(--cb-yellow));
+}
+
+.cb-teaser__punch {
+  margin: 0;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(15px, 2.8vw, 26px);
+  color: var(--cb-yellow);
+  text-shadow: 2px 2px 0 rgba(11, 11, 15, 0.9);
+  transform: rotate(-1.5deg);
+}
+
+.cb-teaser__note {
+  margin: 0;
+  max-width: 60ch;
+  font-size: clamp(11.5px, 1.6vw, 14px);
+  font-weight: 600;
+  line-height: 1.55;
+  color: rgba(244, 241, 255, 0.72);
+}
+
+/* ── v4: VIP BIKE UNIVERSE ─────────────────────────────────────────────── */
+.cb-universe {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.cb-universe__en {
+  margin: 0;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 600;
+  font-size: clamp(11px, 1.8vw, 15px);
+  line-height: 1.5;
+  color: rgba(244, 241, 255, 0.9);
+}
+
+.cb-universe__ru {
+  margin: 0;
+  max-width: 52ch;
+  font-size: clamp(11px, 1.6vw, 14px);
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(244, 241, 255, 0.65);
+}
+
+.cb-universe__motto {
+  display: flex;
+  gap: clamp(10px, 2vw, 22px);
+  margin-top: 6px;
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 900;
+  font-size: clamp(16px, 3vw, 30px);
+  letter-spacing: 0.08em;
+}
+
+.cb-universe__motto span:nth-child(1) {
+  color: var(--cb-cyan);
+}
+
+.cb-universe__motto span:nth-child(2) {
+  color: #4ade80;
+}
+
+.cb-universe__motto span:nth-child(3) {
+  color: var(--cb-magenta);
 }
 
 /* ── финал ──────────────────────────────────────────────────────────────── */
@@ -1230,6 +1705,44 @@
     top: 12% !important;
     right: 2% !important;
     left: auto !important;
+  }
+
+  /* v4: счёт № 0001 — компактнее, печать не уезжает за край */
+  .cb-invoice {
+    padding-bottom: 22px;
+  }
+
+  .cb-invoice__row {
+    font-size: 9.5px;
+  }
+
+  .cb-invoice__stamp {
+    top: 31%;
+    right: 4%;
+  }
+
+  /* v4: пузыри тизера на узких экранах — крупнее, чем в панелях */
+  .cb-teaser .cb-bubble {
+    padding: 7px 10px;
+    font-size: 14px;
+  }
+
+  /* реплика Рустама при 80% вылезает за нижний край низкого кадра — поднимаем */
+  .cb-teaser .cb-bubble:last-of-type {
+    top: 56% !important;
+  }
+
+  .cb-teaser__frame {
+    border-width: 3px;
+    box-shadow: 7px 7px 0 var(--cb-yellow), 7px 7px 0 3px var(--cb-ink);
+  }
+
+  .cb-teaser .cb-caption {
+    max-width: 46% !important;
+  }
+
+  .cb-choose__stage {
+    min-height: 310px;
   }
 
   /* v3: мачта на мобильных — тумблер сжимается до ноты, CTA в одну строку */

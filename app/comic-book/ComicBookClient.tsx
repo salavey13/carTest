@@ -2,28 +2,28 @@
 
 // /app/comic-book/ComicBookClient.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// VIP BIKE COMICS · СЕЗОН 2026 — выпуски 1–2, версия 3.0 (task181).
+// VIP BIKE COMICS · СЕЗОН 2026 — выпуски 1–2 + счёт, версия 4.0 (task182).
 //
 // v1 (task179): 8 панелей про сборку байк-экипажа, текст наложен кодом.
 // v2 (task180): X-Diavel → Falcon Lynx; GLITCH-арка «секретный уровень»
-//   (LEORUS, «арендуй не байк — арендуй меня»); MUSTACHE PROTOCOL; баллоны
-//   с лиц на пустоты; десктоп ~1080px; framer-motion (прогресс, пружины).
-// v3 (task181) — ВЫПУСК №2 «СЧЁТЧИК ДЕНЕГ» по саджестам ChatGPT (босс
-//   переслал): комедийная формула Кевила — Рустам пытается перестать
-//   проверять заработок, уведомления побеждают:
-//  • эпизоды I/II с полосами-разделителями;
-//  • анимированный счётчик денег — ТОЛЬКО реальные тарифы живого каталога
-//    (Shiver 750 сутки 12 000 ₽, Falcon Pro 6ч 7 000 ₽, Max Pro сутки
-//    8 000 ₽ / 6ч 5 600 ₽ — rent-csv), ни одного выдуманного рубля;
-//  • интерактивный телефон: тап → флип → разбивка заработка за сегодня;
-//  • звук SFX: WebAudio-синт (КА-ЧИНГ, ДЗЫНЬ, БИП, БУМ, ГЛЮЧНЫЙ ШУМ),
-//    тумблер в мачте, выключен по умолчанию (жест пользователя);
-//  • пасхалка после финала: экран гаснет → «ЕЩЁ ОДНА АРЕНДА» → рука
-//    тянется к телефону (счёт вечера: телефон — 4, Рустам — 0);
-//  • терминология: «экипаж»/«деплой» ушли из нарратива (команда, байки,
-//    сайт); продукт-термин «экипаж» остался только в CTA платформы;
-//  • финал-теза трилогии: «Зачем просто чувствовать себя владельцем?
-//    Стань владельцем экипажа» + дорожная карта сезона (выпуски 1–4).
+//   (LEORUS, «арендуй не байк — арендуй меня»); баллоны с лиц на пустоты;
+//   десктоп ~1080px; framer-motion (прогресс, пружины).
+// v3 (task181): выпуск №2 «СЧЁТЧИК ДЕНЕГ» — интерактивный телефон на живых
+//   тарифах, WebAudio-SFX, пасхалка «ЕЩЁ ОДНА АРЕНДА», теза трилогии,
+//   «экипаж/деплой» ушли из нарратива.
+// v4 (task182) — второй раунд саджестов ChatGPT:
+//  • MUSTACHE PROTOCOL списан на берег (босс: «0 of mustashes were on point»);
+//  • вместо него вишенка эпизода I — СЧЁТ № 0001: шутливая стоимость
+//    воспроизведения платформы $170 000, специальная цена для первого
+//    владельца — ∞ (не оферта, цифры для разговора с инвестором);
+//  • «выбор приключения» после II·05: телефон снова в руках — что проверим
+//    первым? Зарплата / Мотопарк / Статистика; мотопарк — живые тарифы,
+//    демо-числа помечены честно;
+//  • тизер выпуска №3: BikeSoul — байк смотрит на читателя, уровни и
+//    настроения из PRD (пометка: механика из роадмапа, в разработке);
+//  • бесконечная камера: скролл ведёт зум/панораму внутри панелей
+//    (useScroll + useTransform, reduced-motion и no-JS отключают);
+//  • финал: VIP BIKE UNIVERSE — Every bike has a story · RIDE. EARN. EVOLVE.
 // Референс героя — founder-rustam.jpg из /leorus hero (task179).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -70,11 +70,10 @@ type Notify = {
   delay?: number;
 };
 
-type Stache = {
-  top: string;
-  left: string;
-  width: string;
-  rotate: number;
+type Camera = {
+  scale: [string, string];
+  x?: [string, string];
+  y?: [string, string];
 };
 
 type SoundName = "ching" | "dzin" | "bip" | "boom" | "glitch";
@@ -93,10 +92,42 @@ type Panel = {
   notify?: Notify;
   sfx?: Sfx;
   terminal?: string[];
-  stache?: Stache;
+  camera?: Camera;
   sound?: SoundName;
   shake?: boolean;
 };
+
+// ── бесконечная камера: скролл ведёт лёгкий зум/панораму внутри панели ─────
+// Оверлеи (титры, пузыри, SFX) остаются на месте — едет только «съёмка».
+function CameraLayer({
+  enabled,
+  spec,
+  children,
+}: {
+  enabled: boolean;
+  spec: Camera;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+  const smooth = useSpring(scrollYProgress, { stiffness: 90, damping: 22, mass: 0.4 });
+  const scale = useTransform(smooth, [0, 1], spec.scale);
+  const x = useTransform(smooth, [0, 1], spec.x ?? ["0%", "0%"]);
+  const y = useTransform(smooth, [0, 1], spec.y ?? ["0%", "0%"]);
+  return (
+    <div ref={ref} className="cb-camera">
+      <motion.div
+        className="cb-camera__inner"
+        style={enabled ? { scale, x, y } : undefined}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
 
 // ── WebAudio-синт для SFX: без ассетов, короткие синтезированные звуки ──────
 function playSound(name: SoundName, ctx: AudioContext) {
@@ -193,7 +224,6 @@ const PANELS: Panel[] = [
       },
     ],
     sfx: { text: "ДЗЫНЬ!", color: "cyan", top: "9%", left: "33%", rotate: -8 },
-    stache: { top: "19%", left: "65%", width: "10%", rotate: -8 },
     sound: "dzin",
   },
   {
@@ -242,7 +272,7 @@ const PANELS: Panel[] = [
         width: "30%",
       },
     ],
-    stache: { top: "15%", left: "78%", width: "9%", rotate: 6 },
+    camera: { scale: ["1.08", "1"], x: ["-2%", "2%"] },
   },
   {
     num: "04",
@@ -263,7 +293,6 @@ const PANELS: Panel[] = [
       },
     ],
     sfx: { text: "ВЖУХ!", color: "magenta", top: "6%", right: "4%", rotate: -6 },
-    stache: { top: "20%", left: "61%", width: "11%", rotate: -5 },
   },
   {
     num: "05",
@@ -271,6 +300,7 @@ const PANELS: Panel[] = [
     img: "/comic-book/panel05.png",
     alt: "Флагман Falcon Lynx на голографическом подиуме среди карточек каталога",
     accent: "cyan",
+    camera: { scale: ["1.12", "1.02"] },
     captionWidth: "46%",
     caption:
       "Фото, цены, залоги, характеристики — каталог собран раньше, чем остыл кофе. Флагман уже на витрине.",
@@ -304,7 +334,6 @@ const PANELS: Panel[] = [
       },
     ],
     sfx: { text: "ПУШ!", color: "yellow", top: "66%", left: "30%", rotate: 8 },
-    stache: { top: "18%", left: "77%", width: "10%", rotate: 8 },
     sound: "boom",
   },
   {
@@ -334,7 +363,6 @@ const PANELS: Panel[] = [
       width: "38%",
     },
     sfx: { text: "ДЗЫНЬ!", color: "cyan", top: "68%", right: "4%", rotate: -7 },
-    stache: { top: "25%", left: "59%", width: "10%", rotate: -6 },
     sound: "dzin",
   },
   {
@@ -356,7 +384,6 @@ const PANELS: Panel[] = [
       },
     ],
     sfx: { text: "ЩЁЛК!", color: "yellow", top: "66%", left: "5%", rotate: 6 },
-    stache: { top: "20%", left: "69%", width: "9%", rotate: -10 },
   },
 ];
 
@@ -407,7 +434,6 @@ const GLITCH_PANELS: Panel[] = [
       width: "36%",
     },
     sfx: { text: "БУМ!", color: "magenta", top: "6%", right: "4%", rotate: 8 },
-    stache: { top: "21%", left: "41%", width: "9%", rotate: -6 },
     sound: "boom",
   },
 ];
@@ -435,7 +461,6 @@ const EP2_PANELS: Panel[] = [
         width: "33%",
       },
     ],
-    stache: { top: "26%", left: "62%", width: "9%", rotate: -6 },
   },
   {
     num: "II·02",
@@ -456,7 +481,6 @@ const EP2_PANELS: Panel[] = [
       },
     ],
     sfx: { text: "КА-ЧИНГ!", color: "yellow", top: "26%", right: "4%", rotate: 7 },
-    stache: { top: "38%", left: "45%", width: "8%", rotate: 4 },
     sound: "ching",
   },
   {
@@ -467,6 +491,7 @@ const EP2_PANELS: Panel[] = [
     accent: "cyan",
     captionWidth: "38%",
     captionPos: { right: "3%" },
+    camera: { scale: ["1.04", "1.14"], x: ["0%", "2.5%"] },
     caption:
       "Пока он делал глоток, закрылась ещё одна аренда. Он не нажимал ничего. Кофе тоже.",
     bubbles: [
@@ -486,7 +511,6 @@ const EP2_PANELS: Panel[] = [
       right: "5%",
       width: "34%",
     },
-    stache: { top: "16%", left: "22%", width: "9%", rotate: -5 },
     sound: "bip",
   },
   {
@@ -507,7 +531,7 @@ const EP2_PANELS: Panel[] = [
         width: "31%",
       },
     ],
-    stache: { top: "48%", left: "8%", width: "10%", rotate: -8 },
+    camera: { scale: ["1.06", "1.06"], x: ["2.5%", "-2.5%"] },
   },
   {
     num: "II·05",
@@ -537,38 +561,60 @@ const EP2_PANELS: Panel[] = [
       width: "33%",
       delay: 1.1,
     },
-    stache: { top: "24%", left: "76%", width: "9%", rotate: 7 },
     sound: "dzin",
     shake: true,
   },
 ];
 
-const FINAL_STACHE: Stache = { top: "19%", left: "45%", width: "9%", rotate: 5 };
+// ── «выбор приключения»: три экрана живой платформы после II·05 ────────────
+// Мотопарк — живые тарифы rent-csv; зарплата/статистика — названия из
+// боевых модулей, числа демо (помечено в примечании каждого экрана).
+type BossTab = "salary" | "park" | "stats";
+
+const BOSS_SCREENS: Record<
+  BossTab,
+  { title: string; time: string; rows: [string, string][]; total: [string, string]; note: string }
+> = {
+  salary: {
+    title: "ЛИСТ ЗАРПЛАТЫ",
+    time: "смена закрыта",
+    rows: [
+      ["Смена · 8 часов на выдаче", "4 000 ₽"],
+      ["Стрик · 12 смен подряд", "+1 200 ₽"],
+      ["Премия · отзыв на 5 звёзд", "+500 ₽"],
+    ],
+    total: ["К ВЫПЛАТЕ", "5 700 ₽"],
+    note: "формулы — боевой модуль зарплат платформы · числа демо",
+  },
+  park: {
+    title: "МОТОПАРК · ВИТРИНА",
+    time: "живой каталог",
+    rows: [
+      ["LiveWire ONE · сутки", "24 000 ₽"],
+      ["Falcon GT · сутки", "12 000 ₽"],
+      ["Aprilia Shiver 750 · сутки", "12 000 ₽"],
+      ["Kawasaki Ninja 650 · сутки", "10 000 ₽"],
+      ["Kayo TSD 110 · сутки", "4 000 ₽"],
+    ],
+    total: ["ЗАЛОГ ФЛАГМАНА", "50 000 ₽"],
+    note: "тарифы и залоги — из живого каталога, ни одного выдуманного рубля",
+  },
+  stats: {
+    title: "АНАЛИТИКА АРЕНДЫ",
+    time: "вечерний дашборд",
+    rows: [
+      ["Аренды сегодня", "6"],
+      ["Возвраты по расписанию", "3 / 3"],
+      ["Документы в порядке", "100 %"],
+      ["QR-claim на выдаче", "вкл"],
+    ],
+    total: ["ПРОСРОЧКИ", "0"],
+    note: "названия метрик — из живого дашборда аренды · числа демо",
+  },
+};
 
 // пружины framer-motion
 const SPRING = { type: "spring" as const, stiffness: 210, damping: 17 };
-
-function Mustache({ width, rotate }: { width: string; rotate: number }) {
-  return (
-    <motion.svg
-      viewBox="0 0 100 40"
-      className="cb-stache"
-      style={{ width, rotate }}
-      initial={{ scale: 0, y: -14, opacity: 0 }}
-      animate={{ scale: 1, y: 0, opacity: 1 }}
-      exit={{ scale: 0, y: -10, opacity: 0, rotate: rotate - 25 }}
-      transition={SPRING}
-      aria-hidden="true"
-    >
-      <path
-        d="M50 22 C40 8 20 6 8 16 C2 21 4 30 12 30 C22 30 30 24 38 26 C44 27.5 47 30 50 33 C53 30 56 27.5 62 26 C70 24 78 30 88 30 C96 30 98 21 92 16 C80 6 60 8 50 22 Z"
-        fill="#0b0b0f"
-        stroke="#f4f1ff"
-        strokeWidth="2.5"
-      />
-    </motion.svg>
-  );
-}
 
 // ── интерактивный телефон эпизода II: счётчик + флип к разбивке ────────────
 // Суммы из живого каталога: Shiver 750 сутки 12 000 · Falcon Pro 6ч 7 000 ·
@@ -669,7 +715,8 @@ export default function ComicBookClient() {
   // комикс (и все оверлеи) виден статично — no-JS и скриншотеры не теряют
   // ни панели, ни тексты.
   const [jsReady, setJsReady] = useState(false);
-  const [stacheMode, setStacheMode] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [bossTab, setBossTab] = useState<BossTab | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const soundRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
@@ -835,25 +882,7 @@ export default function ComicBookClient() {
     );
   };
 
-  // SFX в плясу при Mustache Protocol
-  const renderDancingSfx = (panel: Panel) => {
-    const node = renderSfx(panel);
-    if (!node || !stacheMode || !jsReady || !panel.sfx) return node;
-    const { rotate } = panel.sfx;
-    return (
-      <motion.span
-        key="dance"
-        className={(node.props as { className?: string }).className}
-        style={(node.props as { style?: React.CSSProperties }).style}
-        animate={{ rotate: [rotate, rotate + 7, rotate - 7, rotate], scale: [1, 1.08, 0.95, 1] }}
-        transition={{ repeat: Infinity, duration: 0.7, ease: "easeInOut" }}
-        aria-hidden="true"
-      >
-        {panel.sfx.text}
-      </motion.span>
-    );
-  };
-
+  // рендер панели с оверлеями
   const renderPanel = (panel: Panel) => {
     const frameCls = `cb-panel__frame cb-halftone${panel.terminal ? " cb-panel__frame--glitch" : ""}${
       panel.custom === "phone" ? " cb-panel__frame--phone" : ""
@@ -879,6 +908,10 @@ export default function ComicBookClient() {
       <>
         {panel.custom === "phone" ? (
           <PhoneCounter jsReady={jsReady} label={panel.alt} />
+        ) : panel.camera ? (
+          <CameraLayer enabled={jsReady && !reduceMotion} spec={panel.camera}>
+            <img src={panel.img} alt={panel.alt} loading="lazy" />
+          </CameraLayer>
         ) : (
           <img src={panel.img} alt={panel.alt} loading="lazy" />
         )}
@@ -927,15 +960,7 @@ export default function ComicBookClient() {
           </Pop>
         ))}
 
-        {panel.stache && (
-          <div className="cb-stache-wrap" style={{ top: panel.stache.top, left: panel.stache.left }}>
-            <AnimatePresence>
-              {stacheMode && <Mustache width={panel.stache.width} rotate={panel.stache.rotate} />}
-            </AnimatePresence>
-          </div>
-        )}
-
-        {renderDancingSfx(panel)}
+        {renderSfx(panel)}
       </>
     );
 
@@ -1015,11 +1040,6 @@ export default function ComicBookClient() {
               зарабатывать. Всё, что нарисовано, — реально работает на платформе.
             </p>
           </div>
-          <div className="cb-stache-wrap" style={{ top: "28%", left: "45%" }}>
-            <AnimatePresence>
-              {stacheMode && <Mustache width="15%" rotate={-6} />}
-            </AnimatePresence>
-          </div>
           <div className="cb-cover__price" aria-hidden="true">
             <span>ЦЕНА ВОПРОСА:</span>
             <b>10 минут вечера</b>
@@ -1076,11 +1096,6 @@ export default function ComicBookClient() {
               Один вечер — две команды: байки катают, сцены гремят. Один движок —
               любой бизнес. Дальше по сценарию — ты.
             </Pop>
-            <div className="cb-stache-wrap" style={{ top: FINAL_STACHE.top, left: FINAL_STACHE.left }}>
-              <AnimatePresence>
-                {stacheMode && <Mustache width={FINAL_STACHE.width} rotate={FINAL_STACHE.rotate} />}
-              </AnimatePresence>
-            </div>
           </div>
           <figcaption className="cb-final__cta">
             <motion.a
@@ -1101,30 +1116,68 @@ export default function ComicBookClient() {
           </figcaption>
         </figure>
 
-        {/* ── вишенка эпизода I: one last thing ───────────────────────── */}
-        <div className="cb-lastthing">
+        {/* ── вишенка эпизода I: счёт № 0001 (усы списаны на берег) ──── */}
+        <div className="cb-cherry">
           <button
             type="button"
-            className="cb-lastthing__btn"
-            onClick={() => setStacheMode((v) => !v)}
-            aria-pressed={stacheMode}
+            className="cb-cherry__btn"
+            onClick={() => setInvoiceOpen((v) => !v)}
+            aria-expanded={invoiceOpen}
           >
-            {stacheMode ? "сдать усы в депозит" : "...одно последнее дело (привет, Кавилл)"}
+            {invoiceOpen ? "спрятать счёт обратно" : "...одно последнее дело (привет, Стив)"}
           </button>
           <AnimatePresence>
-            {stacheMode && (
-              <motion.p
-                className="cb-lastthing__hint"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
+            {invoiceOpen && (
+              <motion.div
+                className="cb-invoice"
+                initial={{ opacity: 0, y: 46, rotate: -7, scale: 0.88 }}
+                animate={{ opacity: 1, y: 0, rotate: -2, scale: 1 }}
+                exit={{ opacity: 0, y: 30, rotate: 4, scale: 0.92 }}
                 transition={SPRING}
               >
-                MUSTACHE PROTOCOL АКТИВИРОВАН: усы выдаются в VIP BIKE вместе с
-                ключами. SFX танцуют — это норма.
-              </motion.p>
+                <div className="cb-invoice__head">
+                  <span>VIP BIKE · TECHNOLOGY &amp; FRANCHISE DIVISION · 2026</span>
+                  <b>СЧЁТ № 0001</b>
+                  <i>за создание маленького сайта для аренды мотоциклов</i>
+                </div>
+                <div className="cb-invoice__rows">
+                  {[
+                    ["Система аренды и CRM", "$45 000"],
+                    ["Telegram-автоматизация", "$20 000"],
+                    ["Финансы и аналитика", "$25 000"],
+                    ["Документы и цифровые процессы", "$20 000"],
+                    ["Франшизная инфраструктура", "$30 000"],
+                    ["AI и персонализация", "$15 000"],
+                    ["BikeSoul и геймификация", "$15 000"],
+                  ].map(([name, price]) => (
+                    <span key={name} className="cb-invoice__row">
+                      <span>{name}</span>
+                      <b>{price}</b>
+                    </span>
+                  ))}
+                  <span className="cb-invoice__row cb-invoice__row--total">
+                    <span>ИТОГО</span>
+                    <b>$170 000</b>
+                  </span>
+                </div>
+                <div className="cb-invoice__infinity">
+                  <span>специальная цена для первого владельца:</span>
+                  <b>∞</b>
+                </div>
+                <div className="cb-invoice__stamp">оценка стоимости · не оферта</div>
+                <p className="cb-invoice__ps">
+                  Шутливая оценка воспроизведения платформы командой разработки —
+                  цифры для разговора с первым владельцем, не коммерческое
+                  предложение. Инвестиции в развитие принимаются. P.S. Оплата
+                  кофе и топлива в стоимость не включена.
+                </p>
+              </motion.div>
             )}
           </AnimatePresence>
+          <p className="cb-cherry__hint">
+            Первый вопрос нового владельца: «сколько это стоило?» — держите
+            готовый ответ.
+          </p>
         </div>
 
         {/* ── эпизод II ────────────────────────────────────────────────── */}
@@ -1137,6 +1190,72 @@ export default function ComicBookClient() {
         </div>
 
         {EP2_PANELS.map((panel) => renderPanel(panel))}
+
+        {/* ── выбор приключения: телефон снова в руках ────────────────── */}
+        <section className="cb-choose" data-sound="bip" aria-label="Что проверим первым">
+          <span className="cb-choose__tag">/// ТЕЛЕФОН СНОВА В РУКАХ ///</span>
+          <h2 className="cb-choose__title">ЧТО ПРОВЕРИМ ПЕРВЫМ?</h2>
+          <div className="cb-choose__tabs" role="tablist" aria-label="Экраны платформы">
+            {(
+              [
+                ["salary", "Зарплата"],
+                ["park", "Мотопарк"],
+                ["stats", "Статистика"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={bossTab === key}
+                className="cb-choose__tab"
+                onClick={() => {
+                  setBossTab(key);
+                  if (soundRef.current && audioRef.current) playSound("bip", audioRef.current);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="cb-choose__stage">
+            <AnimatePresence mode="wait">
+              {bossTab && (
+                <motion.div
+                  key={bossTab}
+                  className="cb-miniscreen"
+                  initial={{ opacity: 0, y: 18, rotate: -1.5 }}
+                  animate={{ opacity: 1, y: 0, rotate: 0 }}
+                  exit={{ opacity: 0, y: -14, rotate: 1.5 }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
+                >
+                  <div className="cb-miniscreen__app">
+                    <b>{BOSS_SCREENS[bossTab].title}</b>
+                    <span>{BOSS_SCREENS[bossTab].time}</span>
+                  </div>
+                  {BOSS_SCREENS[bossTab].rows.map(([name, value]) => (
+                    <span key={name} className="cb-miniscreen__row">
+                      <span>{name}</span>
+                      <b>{value}</b>
+                    </span>
+                  ))}
+                  <div className="cb-miniscreen__total">
+                    <span>{BOSS_SCREENS[bossTab].total[0]}</span>
+                    <b>{BOSS_SCREENS[bossTab].total[1]}</b>
+                  </div>
+                  <span className="cb-miniscreen__note">{BOSS_SCREENS[bossTab].note}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {!bossTab && (
+              <p className="cb-choose__hint">
+                Три экрана из живой платформы. Мотопарк считает по настоящим
+                тарифам каталога — выдуманных рублей здесь нет ни в одном
+                выпуске.
+              </p>
+            )}
+          </div>
+        </section>
 
         {/* ── пасхалка эпизода II: экран гаснет, но... ────────────────── */}
         <section className="cb-easter" data-sound="dzin" aria-label="Пасхалка после финала">
@@ -1165,13 +1284,77 @@ export default function ComicBookClient() {
           </p>
         </section>
 
-        {/* ── теза трилогии + дорожная карта сезона ───────────────────── */}
+        {/* ── тизер выпуска №3: BikeSoul — байки смотрят на читателя ──── */}
+        <section className="cb-teaser" data-sound="dzin" aria-label="Тизер выпуска 3">
+          <span className="cb-teaser__tag">/// ТИЗЕР ВЫПУСКА №3 ///</span>
+          <h2 className="cb-teaser__title">БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ</h2>
+          <div className="cb-teaser__frame">
+            <img
+              src="/comic-book/ep3-bike.png"
+              alt="Чёрный электроспортбайк смотрит прямо на читателя из неонового гаража, Рустам со спины в углу"
+              loading="lazy"
+            />
+            <Pop className="cb-caption" style={{ maxWidth: "40%" }}>
+              Пока Рустам считал деньги, байки начали считать свои.
+            </Pop>
+            <Pop
+              className="cb-bubble cb-bubble--agent"
+              style={{ top: "58%", left: "4%", width: "34%" }}
+              delay={0.2}
+            >
+              Хозяин, я вообще-то уже 12 дней без работы.
+            </Pop>
+            <Pop
+              className="cb-bubble"
+              style={{ top: "80%", right: "4%", width: "30%" }}
+              delay={0.35}
+            >
+              Да я сам без выходных!
+            </Pop>
+          </div>
+          <div className="cb-teaser__hud">
+            <span className="cb-teaser__chip cb-teaser__chip--level">
+              УРОВЕНЬ 5 · ГОРОДСКОЙ ВОЛК
+              <i aria-hidden="true">
+                <b style={{ width: "62%" }} />
+              </i>
+            </span>
+            <span className="cb-teaser__chip cb-teaser__chip--mood">
+              НАСТРОЕНИЕ: СКУЧАЕТ · 12 ДНЕЙ БЕЗ ДОРОГИ
+            </span>
+          </div>
+          <p className="cb-teaser__punch">— Это не мои проблемы.</p>
+          <p className="cb-teaser__note">
+            BikeSoul — геймификация из роадмапа платформы: у каждого мотоцикла
+            появятся свой уровень, характер и настроение, а по утрам — сводка
+            «твой байк вчера заработал». Механика в разработке: комикс просто
+            забежал вперёд.
+          </p>
+        </section>
+
+        {/* ── VIP BIKE UNIVERSE: сообщение трилогии + дорожная карта ──── */}
         <section className="cb-trilogy" aria-label="Сообщение трилогии">
-          <span className="cb-trilogy__kicker">сообщение трилогии</span>
+          <span className="cb-trilogy__kicker">VIP BIKE UNIVERSE · сообщение трилогии</span>
           <h2 className="cb-trilogy__title">
             ЗАЧЕМ ПРОСТО ЧУВСТВОВАТЬ СЕБЯ ВЛАДЕЛЬЦЕМ?
             <span className="cb-trilogy__title-accent">СТАНЬ ВЛАДЕЛЬЦЕМ ЭКИПАЖА.</span>
           </h2>
+          <div className="cb-universe">
+            <p className="cb-universe__en">
+              Every bike has a story. Every rental creates a moment.
+              <br />
+              Every owner builds something bigger.
+            </p>
+            <p className="cb-universe__ru">
+              У каждого байка своя история. Каждая аренда создаёт момент. Каждый
+              владелец строит что-то большее.
+            </p>
+            <div className="cb-universe__motto" aria-hidden="true">
+              <span>RIDE.</span>
+              <span>EARN.</span>
+              <span>EVOLVE.</span>
+            </div>
+          </div>
           <p className="cb-trilogy__sub">
             Выпуск 1 — байки начали зарабатывать. Выпуск 2 — счётчик доказал.
             Сезон продолжается:
@@ -1184,7 +1367,7 @@ export default function ComicBookClient() {
               Вып. 2 · Счётчик денег — только что ✓
             </span>
             <span className="cb-trilogy__chip cb-trilogy__chip--soon">
-              Вып. 3 · Байки тоже хотят кушать — скоро
+              Вып. 3 · Байки тоже хотят кушать — тизер уже выше
             </span>
             <span className="cb-trilogy__chip cb-trilogy__chip--soon">
               Вып. 4 · Кажется, это бизнес — в сценарии
@@ -1213,11 +1396,13 @@ export default function ComicBookClient() {
       {/* ── колофон ───────────────────────────────────────────────────── */}
       <footer className="cb-colophon">
         <p>
-          Выпуски 1–2 · панели нарисованы AI · реплики, титры и SFX наложены кодом,
-          звуки синтезированы WebAudio · счётчик считает по живым тарифам каталога,
-          ни одного выдуманного рубля · клиенты не переписываются с ботом — сайт
-          продаёт сам, у каждого в команде личный zai-агент · один движок — любой
-          бизнес: байки, сцены, твой черёд.
+          Выпуски 1–2 + счёт · панели нарисованы AI · реплики, титры и SFX
+          наложены кодом, звуки синтезированы WebAudio · счётчик и мотопарк
+          считают по живым тарифам каталога, ни одного выдуманного рубля ·
+          счёт № 0001 — шутливая оценка стоимости разработки, не оферта ·
+          BikeSoul — механика из роадмапа · клиенты не переписываются с ботом —
+          сайт продаёт сам · один движок — любой бизнес: байки, сцены, твой
+          черёд.
         </p>
         <nav aria-label="Комикс-навигация">
           <a href="/">На главную</a>
