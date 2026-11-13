@@ -2,7 +2,7 @@
 
 // /app/comic-book/ComicBookClient.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// VIP BIKE COMICS · СЕЗОН 2026 — выпуски 1–2 + счёт, версия 9.0 (task186).
+// VIP BIKE COMICS · СЕЗОН 2026 — трилогия + счёт, версия 10.0 (task186).
 //
 // v1–v5: панели, GLITCH-арка, счёт № 0001, интерактивный телефон, Ведомость
 //   (история в git; весь контент бережно переносится дальше).
@@ -10,17 +10,24 @@
 // v6.1: peek + цепочка проявления + end slate. v6.2: --ink-pace.
 // v7: развороты (3/2/1 портретных панелей), тексты под цель, автоплей.
 // v8: вертикаль едет по панелям разворота, чип «ещё N», перф (memo-кадры).
-// v9 (текущее) — темп и живость (босс: «slow down appearance, shorten ttl,
-// make background images animated, level it up»):
-//  • каскад проявления МЕДЛЕННЕЕ: панели разъезжаются на 0.42s (было 0.3s),
-//    каждый элемент едет ~1s, старты позже (каптион 1.35s, пузыри 1.85s,
-//    нотиф 2.3s, SFX 2.7s); TTL кадра в автоплее КОРОЧЕ (6.2/3.6/9s);
-//  • Ken Burns: картинки панелей/кадров живут — плавный зум/дрейф (CSS,
-//    только на видимом кадре — перф не страдает);
-//  • перф: картинки PNG→WebP (−38% веса), scenes в useMemo (жесты во время
-//    автоплея больше не пересобирают все 16 кадров), лента автоплея без rAF;
-//  • ФИНАЛ СОКРАЩЁН: UNIVERSE и «КОНЕЦ ПЕРЕДАЧИ» — один кадр вместо двух,
-//    10 ссылок → 3 (босс: «wall of options»); тизер без чипа-дубля.
+// v10 (текущее) — «hollywood preproduction slide deck, animated into rough
+//   demo» (босс: «pacing still fast, ttl too low, deduce proper timings,
+//   on pc show items one by one, animate even cursor, finish the trilogy»):
+//  • панели разворота появляются ПО ОДНОЙ: stagger 0.42 → 1.4s (единая
+//    ручка PANEL_STAGGER_S с движком), пузыри чаще разъезжаются (0.45s);
+//  • хронометраж ПОД КОНТЕНТ: у каждого кадра свой ttl (сплэш 9–10.5s,
+//    развороты 8.6–10.2s, интерактив 12.5–13.5s) — появление медленное,
+//    но кадр держится достаточно долго, чтобы прочитать;
+//  • КУРСОР-АКТЁР в автоплее: скользит по панелям каскада, открывает счёт
+//    №0001, переворачивает телефон, щёлкает вкладки «Что проверить» и
+//    жмёт вкладку «Зимнее хранение» — вся динамика проезжает сама;
+//  • ФИНАЛ ТРИЛОГИИ (true story): эпизод III — голодный байк уходит на
+//    зимовку, Рустам шепчет в диджей-микрофон «implement winter
+//    storage» — и пуф: вкладка на главной каталога с формой заявок и
+//    списком клиентов для владельца;
+//  • Ken Burns стал заметнее (v9 был слишком тихим).
+// v9 — темп и живость: каскад 0.42s, Ken Burns, WebP (−38% веса), scenes
+//   в useMemo, финал в один кадр (10 ссылок → 3).
 // ЦЕЛЬ КОМИКСА (v7): за ~3 минуты показать владельцу мото-экипажа (настоящему
 //   или будущему), что платформа VibeRider собирает сайту экипажа витрину за
 //   один вечер и начинает продавать аренды сама — на живых тарифах каталога,
@@ -39,7 +46,7 @@ import {
 } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./comic-book.css";
-import CineEngine, { PANEL_STAGGER_S, type CinePanelDef, type CineSceneDef } from "./CineEngine";
+import CineEngine, { PANEL_STAGGER_S, type CineAutoAction, type CinePanelDef, type CineSceneDef } from "./CineEngine";
 
 type Bubble = {
   text: string;
@@ -368,6 +375,49 @@ const EP2_PANELS: Panel[] = [
   },
 ];
 
+// ── ЭПИЗОД III «БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ» — финал трилогии (true story) ──────
+// Байк голодает на зимовке → идея: хранение = тоже аренда → Рустам шепчет
+// в диджей-микрофон «implement winter storage» → пуф: вкладка в каталоге.
+const EP3_PANELS: Panel[] = [
+  {
+    num: "III·01",
+    title: "ГОЛОДНЫЙ СЕЗОН",
+    img: "/comic-book/phungry.webp",
+    alt: "Чёрный электроспортбайк с грустными светящимися глазами стоит один в тёмном гараже, из решётки пар",
+    accent: "gold",
+    caption: "Ноябрь. Дождь сдался и выпал снегом. Сезон закрыт — байки загоняют на зимовку, и флагман остаётся один.",
+    bubbles: [{ text: "Хозяин, я вообще-то уже 12 дней без работы…", kind: "agent" }],
+    sfx: { text: "БУУУ…", color: "cyan", rotate: -7 },
+    sound: "dzin",
+  },
+  {
+    num: "III·02",
+    title: "ЗИМНЕЕ ХРАНЕНИЕ",
+    img: "/comic-book/pstorage.webp",
+    alt: "Байк в тёплом зимнем боксе среди полок, пледов и шин, за окном снег",
+    accent: "cyan",
+    caption: "Тёплый бокс, плед, тишина. И тут до него доходит: пустой бокс зимой — это не расход. Это услуга, которую никто не продаёт.",
+    bubbles: [{ text: "Постой… хранение — это же тоже аренда?!", kind: "hero" }],
+    sfx: { text: "ИДЕЯ!", color: "yellow", rotate: 6 },
+  },
+  {
+    num: "III·03",
+    title: "ШЁПОТ В МИКРОФОН",
+    img: "/comic-book/pmic.webp",
+    alt: "Рустам пытает дыханием диджей-микрофон, подключенный проводом к телефону",
+    accent: "magenta",
+    caption: "Рустам подключает диджей-микрофон к телефону и пытает его шёпотом в самое дыхание:",
+    bubbles: [{ text: "implement winter storage…", kind: "hero" }],
+    terminal: [
+      "$ zai crew service add --winter-storage",
+      "> каталог: вкладка создана",
+      "> форма заявок: готова",
+    ],
+    sfx: { text: "ПШШШ…", color: "magenta", rotate: -6 },
+    sound: "dzin",
+  },
+];
+
 // ── «выбор приключения»: четыре экрана живой платформы после II·05 ──────────
 type BossTab = "sheet" | "salary" | "park" | "stats";
 
@@ -666,6 +716,149 @@ function SalarySheet({
   );
 }
 
+// ── ЭПИЗОД III: «И ПУФ!» — вкладка «Зимнее хранение» на главной каталога ───
+// Мок главной страницы каталога: вкладки Аренда / Продажа / Зимнее хранение
+// (NEW). Внутри — форма заявки для клиентов и список заявок для владельца.
+// Форма живая: сабмит добавляет клиента в список (демо). Тарифы — живой каталог.
+type StorageTab = "rent" | "sale" | "winter";
+
+const STORAGE_RENT: [string, string, string][] = [
+  ["Falcon GT", "сутки", "12 000 ₽"],
+  ["Aprilia Shiver 750", "сутки", "12 000 ₽"],
+  ["Max Pro", "сутки", "8 000 ₽"],
+];
+
+function StorageCatalog({
+  jsReady,
+  sfx,
+}: {
+  jsReady: boolean;
+  sfx?: (n: SoundName) => void;
+}) {
+  const [tab, setTab] = useState<StorageTab>("rent");
+  const [clients, setClients] = useState([
+    { name: "Марк", bike: "Falcon GT", period: "дек — мар", status: "оплачено" },
+    { name: "Алина", bike: "Shiver 750", period: "дек — апр", status: "оплачено" },
+    { name: "Тимур", bike: "Max Pro", period: "янв — мар", status: "счёт выставлен" },
+  ]);
+  const [form, setForm] = useState({ name: "", bike: "" });
+
+  const pick = (t: StorageTab) => {
+    setTab(t);
+    sfx?.(t === "winter" ? "dzin" : "bip");
+  };
+
+  return (
+    <div className="cb-storage" aria-label="Главная страница каталога с новой вкладкой «Зимнее хранение»">
+      <div className="cb-storage__bar" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <span>viberider · салон «salavey13» · каталог</span>
+      </div>
+      <div className="cb-storage__tabs" role="tablist" aria-label="Вкладки каталога">
+        {(
+          [
+            ["rent", "Аренда"],
+            ["sale", "Продажа"],
+            ["winter", "Зимнее хранение"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            data-tab={key}
+            aria-selected={tab === key}
+            className={`cb-storage__tab${key === "winter" ? " cb-storage__tab--winter" : ""}`}
+            onClick={() => pick(key)}
+          >
+            {label}
+            {key === "winter" && <i className="cb-storage__new" aria-hidden="true">NEW</i>}
+          </button>
+        ))}
+      </div>
+
+      <div className="cb-storage__pane" role="tabpanel">
+        {tab === "rent" && (
+          <div className="cb-storage__rent">
+            {STORAGE_RENT.map(([bike, per, price]) => (
+              <span key={bike} className="cb-storage__card">
+                <b>{bike}</b>
+                <span>{per}</span>
+                <i>{price}</i>
+              </span>
+            ))}
+            <span className="cb-storage__hint">обычный сезон: каталог продаёт сам · вкладку «Зимнее хранение» ещё не открыли</span>
+          </div>
+        )}
+        {tab === "sale" && (
+          <p className="cb-storage__hint cb-storage__hint--alone">
+            Витрина продажи — в следующем выпуске :)
+          </p>
+        )}
+        {tab === "winter" && (
+          <div className="cb-storage__grid">
+            <form
+              className="cb-storage__form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setClients((cs) => [
+                  ...cs,
+                  {
+                    name: form.name.trim() || "Без имени",
+                    bike: form.bike.trim() || "любой",
+                    period: "по запросу",
+                    status: "только что",
+                  },
+                ]);
+                setForm({ name: "", bike: "" });
+                sfx?.("ching");
+              }}
+            >
+              <b>Заявка на хранение</b>
+              <input
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Имя"
+                aria-label="Имя"
+                maxLength={40}
+              />
+              <input
+                value={form.bike}
+                onChange={(e) => setForm((f) => ({ ...f, bike: e.target.value }))}
+                placeholder="Байк"
+                aria-label="Байк"
+                maxLength={40}
+              />
+              <button type="submit">Оставить заявку</button>
+              <span>форма для клиентов · падает в список владельцу</span>
+            </form>
+            <div className="cb-storage__list" aria-live="polite">
+              <b>Заявки <i>{clients.length}</i></b>
+              <div className="cb-storage__rows">
+                {clients.map((c, i) => (
+                  <span key={`${c.name}-${i}`} className="cb-storage__row">
+                    <b>{c.name}</b>
+                    <span>{c.bike} · {c.period}</span>
+                    <i>{c.status}</i>
+                  </span>
+                ))}
+              </div>
+              <span>список заявок — вид владельца экипажа</span>
+            </div>
+          </div>
+        )}
+      </div>
+      {!jsReady && (
+        <span className="cb-storage__hint">
+          И пуф: вкладка «Зимнее хранение» появилась на главной каталога — форма для клиентов, список заявок для владельца.
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function ComicBookClient() {
   // Класс cb-js ставится только когда JS реально работает: без него весь
   // комикс (и все оверлеи) виден статично — no-JS и скриншотеры не теряют
@@ -713,6 +906,11 @@ export default function ComicBookClient() {
 
   const pauseAuto = useCallback(() => setAuto(false), []);
   const toggleAuto = useCallback(() => setAuto((v) => !v), []);
+
+  // v10: SFX интерфейсных моков (вкладки каталога, форма заявки)
+  const uiSfx = useCallback((n: SoundName) => {
+    if (soundRef.current && audioRef.current) playSound(n, audioRef.current);
+  }, []);
 
   // ── анимированные оверлеи (только при JS; без JS — статичные span) ──────
   const Pop = ({
@@ -770,9 +968,11 @@ export default function ComicBookClient() {
       </div>
     );
 
-  // v9: задержки каскада УВЕЛИЧЕНЫ (босс: «slow down appearance of elements»).
-  // Панель за панелью — PANEL_STAGGER_S (0.42s, единая ручка с движком);
-  // внутри панели каптион 1.35 → пузыри 1.85 → нотиф 2.3 → SFX 2.7.
+  // v10: задержки каскада РАСТЯНУТЫ (босс: «pacing of appearance still fast»
+  // + «ttl of section is too low» — появление медленное, но кадр держится).
+  // Панель за панелью — PANEL_STAGGER_S (1.4s, единая ручка с движком):
+  // на PC три панели разворота появляются ПО ОДНОЙ, с читаемым интервалом.
+  // Внутри панели каптион 1.35 → пузыри 1.85 → нотиф 2.3 → SFX 2.7.
   // Все числа умножаются на --ink-pace из CSS (единый темп, сейчас 1).
   const ink = (base: React.CSSProperties, d: string): React.CSSProperties =>
     ({ ...base, "--ink-d": `calc(${d} * var(--ink-pace, 1))` }) as React.CSSProperties;
@@ -824,7 +1024,7 @@ export default function ComicBookClient() {
         <Pop
           key={bubble.text}
           className={`cb-bubble cb-bubble--${bubble.kind}`}
-          style={ink({}, `${(1.85 + k * PANEL_STAGGER_S + i * 0.32).toFixed(2)}s`)}
+          style={ink({}, `${(1.85 + k * PANEL_STAGGER_S + i * 0.45).toFixed(2)}s`)}
         >
           {bubble.text}
         </Pop>
@@ -860,6 +1060,7 @@ export default function ComicBookClient() {
   });
 
   // титульная карточка — «склейка» между эпизодами (splash)
+  // v10: ttl — хронометраж кадра в автоплее (титру хватает 6s)
   const dividerDef = (
     id: string,
     tag: string,
@@ -868,11 +1069,13 @@ export default function ComicBookClient() {
     accent: "cyan" | "magenta" | "gold",
     sound?: SoundName,
     ghost?: string,
+    ttl = 6000,
   ): CineSceneDef => ({
     id,
     title,
     accent,
     sound,
+    ttl,
     kind: "splash",
     chrome: false,
     node: (
@@ -885,27 +1088,33 @@ export default function ComicBookClient() {
   });
 
   // разворот из панелей (row): 3 колонки на PC, 2 на планшете, 1 на мобиле
+  // v10: ttl — хронометраж под контент (последняя панель каскада + чтение);
+  // auto — сценарные действия курсора (кликает динамику разворота)
   const rowDef = (
     id: string,
     title: string,
     accent: "cyan" | "magenta" | "gold",
     panels: Panel[],
     sound?: SoundName,
+    opts?: { ttl?: number; auto?: CineAutoAction[] },
   ): CineSceneDef => ({
     id,
     title,
     accent,
     sound,
     kind: "row",
+    ...(opts?.ttl ? { ttl: opts.ttl } : {}),
+    ...(opts?.auto ? { auto: opts.auto } : {}),
     chrome: false, // у каждой панели свой бейдж-номер и заголовок
     panels: panels.map(panelDef),
   });
 
   // ════════════════════════════════════════════════════════════════════════
-  // CB CINE v9: сборка кадров. Хронометраж выпуска:
+  // CB CINE v10: сборка кадров + хронометраж. Порядок выпуска:
   // обложка → титр I → развороты A/B/C (панели 01–08) → титр GLITCH →
-  // разворот D (глюк + LEORUS) → финал → счёт → титр II → развороты E/F
-  // (II·01–II·∞) → интерактив → тизер вып. 3 → финал UNIVERSE+КОНЕЦ.
+  // разворот D → финал I → счёт → титр II → развороты E/F → интерактив →
+  // титр III → разворот twist (зимнее хранение) → И ПУФ (вкладка каталога)
+  // → финал трилогии. TTL каждого кадра — под его контент (слайд-дек).
   // Развороты = ряды портретных панелей; splash-кадры = «splash-страницы».
   // v9-перф: массив в useMemo — звук/автоплей-клики не пересобирают 15 кадров
   // (scene = сто+ узлов; каждый пересбор ломал memo SceneView в движке).
@@ -921,6 +1130,7 @@ export default function ComicBookClient() {
       kind: "splash",
       contain: true,
       chrome: false,
+      ttl: 9800,
       overlay: (
         <span className="cb-cover__cue cb-cover__cue--overlay" aria-hidden="true" style={ink({}, "2.9s")}>
           <i>▼</i> скролл — камера едет, следующий кадр уже выезжает
@@ -929,7 +1139,7 @@ export default function ComicBookClient() {
       node: (
         <div className="cb-cinecover" style={ink({}, "0.2s")}>
           <span className="cb-cover__kicker" style={ink({}, "0.6s")}>
-            VIP BIKE COMICS · сезон 2026 · выпуски 1–2
+            VIP BIKE COMICS · сезон 2026 · трилогия
           </span>
           <h1 className="cb-cover__title" style={ink({}, "0.45s")}>
             {["КАК БАЙКИ", "НАЧАЛИ", "ЗАРАБАТЫВАТЬ"].map((word, i) => (
@@ -968,10 +1178,10 @@ export default function ComicBookClient() {
       "I",
     ),
 
-    // ── развороты эпизода I (панели 01–08) ─────────────────────────────────
-    rowDef("p01-03", "ЗВОНОК В НОЧЬ · ОДНА КНОПКА · ЛИЧНЫЙ ZAI", "cyan", PANELS.slice(0, 3)),
-    rowDef("p04-06", "БРЕНД-КУЗНИЦА · КАТАЛОГ · В ПРОДЕ", "magenta", PANELS.slice(3, 6)),
-    rowDef("p07-08", "КЛИЕНТ АРЕНДОВАЛ · ВЫДАЧА", "cyan", PANELS.slice(6, 8)),
+    // ── развороты эпизода I (панели 01–08) — каскад по одной, ttl под контент
+    rowDef("p01-03", "ЗВОНОК В НОЧЬ · ОДНА КНОПКА · ЛИЧНЫЙ ZAI", "cyan", PANELS.slice(0, 3), undefined, { ttl: 10200 }),
+    rowDef("p04-06", "БРЕНД-КУЗНИЦА · КАТАЛОГ · В ПРОДЕ", "magenta", PANELS.slice(3, 6), undefined, { ttl: 10200 }),
+    rowDef("p07-08", "КЛИЕНТ АРЕНДОВАЛ · ВЫДАЧА", "cyan", PANELS.slice(6, 8), undefined, { ttl: 8600 }),
 
     // ── секретный уровень: глюк в другой бизнес ────────────────────────────
     dividerDef(
@@ -983,7 +1193,7 @@ export default function ComicBookClient() {
       "glitch",
       "?!",
     ),
-    rowDef("glitch-leorus", "ТЕСТ НА ГЛЮК · АРЕНДУЙ РУСТАМА", "gold", GLITCH_PANELS),
+    rowDef("glitch-leorus", "ТЕСТ НА ГЛЮК · АРЕНДУЙ РУСТАМА", "gold", GLITCH_PANELS, undefined, { ttl: 8600 }),
 
     // ── финал эпизода I (splash с CTA) ─────────────────────────────────────
     {
@@ -994,6 +1204,7 @@ export default function ComicBookClient() {
       alt: "Рустам ведёт экипаж через мост на рассвете",
       accent: "cyan",
       kind: "splash",
+      ttl: 10500,
       node: (
         <>
           <Pop
@@ -1024,7 +1235,7 @@ export default function ComicBookClient() {
       ),
     },
 
-    // ── вишенка эпизода I: счёт № 0001 (scroll) ────────────────────────────
+    // ── вишенка эпизода I: счёт № 0001 (scroll) — курсор сам открывает ────
     {
       id: "invoice",
       title: "СЧЁТ № 0001",
@@ -1032,6 +1243,8 @@ export default function ComicBookClient() {
       accent: "gold",
       kind: "scroll",
       scrollable: true,
+      ttl: 12500,
+      auto: [{ at: 2400, sel: ".cb-cherry__btn" }],
       node: (
         <div className="cb-cherry" style={ink({}, "0.3s")}>
           <button
@@ -1109,9 +1322,15 @@ export default function ComicBookClient() {
       "II",
     ),
 
-    // ── развороты эпизода II (панели II·01–II·∞) ───────────────────────────
-    rowDef("ep2-a", "ПРОСТО ПРОВЕРЮ · ОПА! · ПОДОЗРИТЕЛЬНО", "cyan", EP2_PANELS.slice(0, 3)),
-    rowDef("ep2-b", "КАЖЕТСЯ, Я ПОНЯЛ · ПОСЛЕДНЯЯ ПРОВЕРКА · ЭКРАН ГАСНЕТ", "magenta", EP2_PANELS.slice(3, 6)),
+    // ── развороты эпизода II (панели II·01–II·∞); телефон переворачивает курсор
+    rowDef("ep2-a", "ПРОСТО ПРОВЕРЮ · ОПА! · ПОДОЗРИТЕЛЬНО", "cyan", EP2_PANELS.slice(0, 3), undefined, {
+      ttl: 10200,
+      auto: [
+        { at: 3600, sel: ".cb-phone" },
+        { at: 6800, sel: ".cb-phone" },
+      ],
+    }),
+    rowDef("ep2-b", "КАЖЕТСЯ, Я ПОНЯЛ · ПОСЛЕДНЯЯ ПРОВЕРКА · ЭКРАН ГАСНЕТ", "magenta", EP2_PANELS.slice(3, 6), undefined, { ttl: 10200 }),
 
     // ── выбор приключения: четыре экрана живой платформы (scroll) ──────────
     {
@@ -1122,6 +1341,12 @@ export default function ComicBookClient() {
       kind: "scroll",
       scrollable: true,
       sound: "bip",
+      ttl: 13500,
+      auto: [
+        { at: 2800, sel: '[data-tab="salary"]' },
+        { at: 7000, sel: '[data-tab="park"]' },
+        { at: 10800, sel: '[data-tab="stats"]' },
+      ],
       node: (
         <div
           className={`cb-choose${bossTab === "sheet" ? " cb-choose--sheet" : ""}`}
@@ -1141,6 +1366,7 @@ export default function ComicBookClient() {
                 key={key}
                 type="button"
                 role="tab"
+                data-tab={key}
                 aria-selected={bossTab === key}
                 className="cb-choose__tab"
                 onClick={() => {
@@ -1203,60 +1429,51 @@ export default function ComicBookClient() {
       ),
     },
 
-    // ── тизер выпуска №3: BikeSoul — байки смотрят на читателя (splash) ────
-    // v9: без чипа-дубля (настроение уже в пузыре) и с однострочной сноской
+    // ── ЭПИЗОД III — финал трилогии (true story, босс: «finish the trilogy
+    // with a twist: starving bike gets into his winter storage… rustam
+    // whispers kinda torturing his dj mic: implement winter storage — and
+    // puff — a tab on the main catalog page appears with a form for clients
+    // and a list of clients for owner») ────────────────────────────────────
+    dividerDef(
+      "ep3",
+      "/// ЭПИЗОД III ///",
+      "БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ",
+      "финал трилогии · и это true story",
+      "gold",
+      "dzin",
+      "III",
+    ),
+
+    // разворот twist: голодный байк → зимнее хранение → шёпот в микрофон
+    rowDef("ep3-twist", "ГОЛОДНЫЙ СЕЗОН · ЗИМНЕЕ ХРАНЕНИЕ · ШЁПОТ", "gold", EP3_PANELS, undefined, { ttl: 10200 }),
+
+    // «И ПУФ!» — вкладка «Зимнее хранение» на главной каталога (scroll);
+    // курсор в автоплее сам жмёт новую вкладку (поп-выезд на 1.15s)
     {
-      id: "teaser",
-      title: "БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ",
-      num: "тизер · вып. 3",
-      img: "/comic-book/ep3-bike.webp",
-      alt: "Чёрный электроспортбайк смотрит прямо на читателя из неонового гаража, Рустам со спины в углу",
+      id: "puff",
+      title: "И ПУФ!",
+      num: "true story",
       accent: "gold",
-      kind: "splash",
+      kind: "scroll",
+      scrollable: true,
       sound: "dzin",
+      ttl: 12500,
+      auto: [{ at: 3300, sel: '[data-tab="winter"]' }],
       node: (
-        <>
-          <Pop
-            className="cb-caption"
-            style={ink({ maxWidth: "min(520px, 40%)", top: "26%", left: "4%" }, "1.2s")}
-          >
-            Пока Рустам считал деньги, байки начали считать свои.
-          </Pop>
-          <Pop
-            className="cb-bubble cb-bubble--agent"
-            style={ink({ top: "50%", left: "4%", width: "min(360px, 34%)" }, "1.75s")}
-          >
-            Хозяин, я вообще-то уже 12 дней без работы.
-          </Pop>
-          <Pop
-            className="cb-bubble"
-            style={ink({ top: "66%", right: "4%", width: "min(320px, 30%)" }, "2.2s")}
-          >
-            Да я сам без выходных!
-          </Pop>
-          <div className="cb-scene__footnote" style={ink({}, "2.7s")}>
-            <div className="cb-teaser__hud">
-              <span className="cb-teaser__chip cb-teaser__chip--level">
-                УРОВЕНЬ 5 · ГОРОДСКОЙ ВОЛК · СКУЧАЕТ
-                <i aria-hidden="true">
-                  <b style={{ width: "62%" }} />
-                </i>
-              </span>
-            </div>
-            <p className="cb-teaser__punch">— Это не мои проблемы.</p>
-            <p className="cb-teaser__note">
-              BikeSoul — уровни, характер и настроение у каждого байка. Роадмап;
-              комикс забежал вперёд.
-            </p>
-          </div>
-        </>
+        <div className="cb-puff" style={ink({}, "0.3s")}>
+          <StorageCatalog jsReady={jsReady} sfx={uiSfx} />
+          <p className="cb-caption cb-puff__caption" style={ink({}, "1.4s")}>
+            И пуф — на главной странице каталога появилась вкладка «Зимнее
+            хранение»: форма для клиентов, список заявок для владельца. Это не
+            сюжет — это релиз.
+          </p>
+        </div>
       ),
     },
 
-    // ── ФИНАЛ v9: UNIVERSE + «КОНЕЦ ПЕРЕДАЧИ» в ОДНОМ кадре (scroll).
-    // Босс: «Shorten stuff at the end, seems wall of options» — было два
-    // кадра и десять ссылок (CTA×2 + chips×4 + credits×5 + nav×4), стал один
-    // кадр и три действия: Подключить · Перечитать · Telegram.
+    // ── ФИНАЛ ТРИЛОГИИ: UNIVERSE + «КОНЕЦ ПЕРЕДАЧИ» в ОДНОМ кадре (scroll).
+    // v10: трилогия завершена выпуском III — тизер больше не нужен,
+    // «Вып. 3» стал «вы только что его прочитали» (twist-aware).
     {
       id: "universe",
       title: "СТАНЬ ВЛАДЕЛЬЦЕМ ЭКИПАЖА",
@@ -1265,9 +1482,10 @@ export default function ComicBookClient() {
       kind: "scroll",
       scrollable: true,
       chrome: false,
+      ttl: 13000,
       node: (
         <section className="cb-trilogy cb-trilogy--end" style={ink({}, "0.4s")} aria-label="Сообщение трилогии и конец выпуска">
-          <span className="cb-trilogy__kicker" style={ink({}, "0.65s")}>VIP BIKE UNIVERSE · конец передачи</span>
+          <span className="cb-trilogy__kicker" style={ink({}, "0.65s")}>VIP BIKE UNIVERSE · конец трилогии</span>
           <h2 className="cb-trilogy__title" style={ink({}, "0.9s")}>
             ЗАЧЕМ ПРОСТО ЧУВСТВОВАТЬ СЕБЯ ВЛАДЕЛЬЦЕМ?
             <span className="cb-trilogy__title-accent">СТАНЬ ВЛАДЕЛЬЦЕМ ЭКИПАЖА.</span>
@@ -1280,10 +1498,11 @@ export default function ComicBookClient() {
             </div>
           </div>
           <span className="cb-endslate__off" style={ink({}, "1.5s")}>
-            /// КОНЕЦ ПЕРЕДАЧИ ///
+            /// КОНЕЦ ТРИЛОГИИ ///
           </span>
           <p className="cb-endslate__next" style={ink({}, "1.8s")}>
-            Вып. 3 · «БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ» — уже в монтаже
+            Вып. 3 · «БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ» — вы его только что прочитали.
+            True story: зимнее хранение появилось ровно так.
             <i className="cb-endslate__cursor" aria-hidden="true" />
           </p>
           <div className="cb-final__cta cb-trilogy__cta" style={ink({}, "2.15s")}>
@@ -1327,7 +1546,6 @@ export default function ComicBookClient() {
     },
   ], [jsReady, invoiceOpen, bossTab, reduceMotion]);
   scenesRef.current = scenes;
-  scenesRef.current = scenes;
 
   return (
     <div className={`cb-root${jsReady ? " cb-js" : ""}`}>
@@ -1336,7 +1554,7 @@ export default function ComicBookClient() {
         <a className="cb-masthead__brand" href="/">
           VIBERIDER<span> · PLATFORM</span>
         </a>
-        <span className="cb-masthead__issue">ВЫПУСКИ 1–2 · СЕЗОН 2026</span>
+        <span className="cb-masthead__issue">ТРИЛОГИЯ · СЕЗОН 2026</span>
         {jsReady && (
           <button
             type="button"

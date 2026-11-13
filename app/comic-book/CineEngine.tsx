@@ -2,12 +2,28 @@
 
 // /app/comic-book/CineEngine.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// CB CINE v9 (task186) — движок «кинематографического комикса», развороты.
+// CB CINE v10 (task186) — движок «кинематографического комикса», развороты.
+//
+// v10 — «slide deck of hollywood movie preproduction, animated into rough
+// demo» (босс: «pacing of appearance still fast, ttl of section is too low;
+// intellectually look at content and deduce proper timings; on pc section
+// appear as all 3 parts at once — show items one by one; go through dynamic
+// elements in auto mode as well, animate even cursor»):
+//  • ПАНЕЛИ РАЗВОРОТА ЕДУТ ПО ОДНОЙ: stagger 0.42s → 1.4s — на PC три панели
+//    каскадом с читаемым интервалом, а не разом;
+//  • ИНТЕЛЛЕКТУАЛЬНЫЙ ХРОНОМЕТРАЖ: у каждого кадра свой TTL под контент
+//    (поле ttl в сценарии), базовые тики: сплэш 9.2s, разворот 10.2s,
+//    панель 6.8s, скролл 11.5s — появление медленное, но кадр ДОСТАТОЧНО
+//    долго на экране, чтобы всё прочитать;
+//  • КУРСОР-АКТЁР: в автоплее по кадру ездит нарисованный курсор — скользит
+//    по панелям каскада, подъезжает к динамическим элементам и «нажимает»
+//    их (счёт №0001 открывается, телефон переворачивается, вкладки «Что
+//    проверить» щёлкаются, вкладка «Зимнее хранение» появляется по щелчку);
+//  • Ken Burns заметнее (v9 был слишком тихим) — см. comic-book.css.
 //
 // v9: Ken Burns на картинках (плавный зум/дрейф вместо steps-idle, только на
 // видимом кадре), прогресс автоплея — CSS-transition вместо rAF (60 записей
-// стиля в секунду → одна на тик), каскад проявления медленнее (stagger 0.42s,
-// ручка PANEL_STAGGER_S), TTL кадра короче (6.2/3.6/9.0s).
+// стиля в секунду → одна на тик), финал сокращён до одного кадра.
 //
 // Эволюция: v6 — fullscreen-кадры, скролл = камера, порог ≈ пол-экрана,
 // следующий кадр накрывает предыдущий (steps-склейка). v6.1 — peek-выезд
@@ -92,6 +108,10 @@ export type CineSceneDef = {
   panels?: CinePanelDef[];
   // scroll — fullscreen-кадр с внутренним скроллом (счёт, Ведомость...):
   scrollable?: boolean;
+  // v10: индивидуальный TTL автоплея (мс) — хронометраж под контент кадра
+  ttl?: number;
+  // v10: сценарные действия автоплея (курсор кликает динамические элементы)
+  auto?: CineAutoAction[];
 };
 
 // синхронно с CSS-переменными анимации (steps(8), 1050ms — v6.2 медленный кадр)
@@ -99,14 +119,20 @@ const TRANS_MS = 1050;
 const RM_MS = 220;
 const COOLDOWN_MS = 550; // анти-проскас: тишина после каждой склейки
 
-// v9: сдвиг каскада между панелями разворота (движок ставит --pd картинке,
+// v10: сдвиг каскада между панелями разворота (движок ставит --pd картинке,
 // ComicBookClient сдвигает на ту же цифру стопку текста). Одна ручка на оба
-// файла — рассинхрон невозможен.
-export const PANEL_STAGGER_S = 0.42;
+// файла — рассинхрон невозможен. 1.4s — панели разворота появляются ПО ОДНОЙ
+// (босс: «on pc section appear as all 3 parts at once — show one by one»).
+export const PANEL_STAGGER_S = 1.4;
 
-// v9: TTL кадра в автоплее (босс: «shorten per section ttl») + лента-заряд
-// рисуется CSS-transition'ом — rAF-цикл 60fps больше не нужен.
-const AUTO_MS = { base: 6200, panel: 3600, scroll: 9000, scrollRide: 6600 };
+// v10: базовые тики автоплея. Философия — слайд-дек презентации фильма:
+// элементы проявляются медленно, но кадр держится на экране достаточно
+// долго, чтобы прочитать контент. Точный TTL конкретного кадра задаётся
+// полем ttl в сценарии (ComicBookClient считает его по контенту).
+const AUTO_MS = { base: 9200, row: 10200, panel: 6800, scroll: 11500, scrollRide: 8200 };
+
+// v10: сценарное действие автоплея — курсор подъезжает к элементу и «кликает»
+export type CineAutoAction = { at: number; sel: string }; // at — мс от старта кадра
 
 // ── v8-перф: кадр вынесен в memo-компонент ──────────────────────────────────
 // Свайп панели / смена кадра перерисовывает только затронутые кадры, а не все
@@ -260,6 +286,8 @@ export default function CineEngine({
     used: boolean; // жест уже привёл к склейке — до touchend тишина
   } | null>(null);
   const tapeRef = useRef<HTMLDivElement | null>(null);
+  const cursorRef = useRef<HTMLDivElement | null>(null);
+  const cursorTimers = useRef<number[]>([]);
   const idleRef = useRef<number | null>(null);
   const peekRef = useRef<{ dir: 1 | -1; px: number } | null>(null);
   const rmRef = useRef(reduceMotion);
@@ -396,7 +424,98 @@ export default function CineEngine({
   }, []);
   const inCooldown = useCallback(() => Date.now() < coolRef.current, []);
 
-  // ── смена кадра (вертикаль) ───────────────────────────────────────────────
+  // ── v10: курсор-актёр — glide / tap ──────────────────────────────────────
+  // Один композитный слой (transform + opacity), никаких layout-эффектов.
+  // Цель зажимается в вьюпорт: на мобиле соседняя панель лежит за краем
+  // экрана — курсор не должен за ней уезжать.
+  const cursorGlide = useCallback((xRaw: number, yRaw: number, dur = 700) => {
+    const el = cursorRef.current;
+    if (!el) return;
+    const x = Math.max(14, Math.min(window.innerWidth - 16, xRaw));
+    const y = Math.max(58, Math.min(window.innerHeight - 74, yRaw));
+    el.style.transition = `transform ${dur}ms cubic-bezier(0.3, 0.7, 0.25, 1), opacity 0.3s`;
+    el.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
+  }, []);
+
+  const cursorTap = useCallback(() => {
+    const el = cursorRef.current;
+    if (!el) return;
+    el.classList.remove("is-tap");
+    void el.offsetWidth;
+    el.classList.add("is-tap");
+  }, []);
+
+  const clearCursorTimers = useCallback(() => {
+    cursorTimers.current.forEach((t) => window.clearTimeout(t));
+    cursorTimers.current = [];
+  }, []);
+
+  // План движения курсора на текущем кадре: по панелям каскада (row) или в
+  // фокус кадра; затем — сценарные действия (подъехал → тапнул → клик).
+  const scheduleSceneCursor = useCallback(() => {
+    clearCursorTimers();
+    if (!autoRef.current || rmRef.current) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const i = idxRef.current;
+    const s = scenesRef.current[i];
+    const sceneEl = stage.children[i] as HTMLElement | undefined;
+    if (!s || !sceneEl) return;
+    const at = (ms: number, fn: () => void) => {
+      cursorTimers.current.push(window.setTimeout(fn, ms));
+    };
+    const actions = s.auto ?? [];
+    if (s.kind === "row") {
+      const vis = visiblePanels(s);
+      const els = Array.from(sceneEl.querySelectorAll<HTMLElement>(".cb-panel"));
+      // если есть сценарные действия — курсор не гуляет по панелям,
+      // а сразу готовится к первому действию (панель 0 — короткий заход)
+      const lastK = actions.length
+        ? pidxRef.current
+        : Math.min(pidxRef.current + vis, els.length) - 1;
+      for (let k = pidxRef.current; k <= lastK; k++) {
+        const el = els[k];
+        if (!el) continue;
+        const t = 750 + (k - pidxRef.current) * PANEL_STAGGER_S * 1000;
+        at(t, () => {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.bottom > 0 && r.top < window.innerHeight) {
+            cursorGlide(r.left + r.width / 2, r.top + Math.min(r.height * 0.42, 320), 900);
+          }
+        });
+      }
+    } else {
+      at(1100, () => {
+        const r = sceneEl.getBoundingClientRect();
+        cursorGlide(
+          r.left + r.width * (s.img ? 0.58 : 0.5),
+          r.top + r.height * (s.img ? 0.4 : 0.52),
+          1000,
+        );
+      });
+    }
+    actions.forEach((a) => {
+      at(a.at, () => {
+        const el = sceneEl.querySelector<HTMLElement>(a.sel);
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        cursorGlide(r.left + r.width / 2, r.top + r.height / 2, 420);
+        cursorTimers.current.push(window.setTimeout(() => cursorTap(), 470));
+        cursorTimers.current.push(window.setTimeout(() => el.click(), 570));
+      });
+    });
+  }, [clearCursorTimers, cursorGlide, cursorTap, visiblePanels]);
+
+  useEffect(() => {
+    if (!active || !auto || reduceMotion) {
+      clearCursorTimers();
+      return;
+    }
+    scheduleSceneCursor();
+    return clearCursorTimers;
+  }, [active, auto, reduceMotion, idx, pidx, scheduleSceneCursor, clearCursorTimers]);
+
+  // ── смена кадра (вертикаль) ───────────────────────────────────────────────────
   const go = useCallback(
     (next: number, opts?: { force?: boolean }) => {
       const total = scenesRef.current.length;
@@ -807,13 +926,16 @@ export default function CineEngine({
     };
     const tickDur = () => {
       const s = scenesRef.current[idxRef.current];
-      if (s?.scrollable) return AUTO_MS.scroll;
       if (s?.kind === "row") {
         // v8: на любой раскладке тик короче, пока в развороте есть скрытые панели
         const vis = visiblePanels(s);
         const total = s.panels?.length ?? 1;
         if (total > vis && pidxRef.current + vis < total) return AUTO_MS.panel;
       }
+      // v10: индивидуальный хронометраж кадра под его контент
+      if (s?.ttl) return s.ttl;
+      if (s?.scrollable) return AUTO_MS.scroll;
+      if (s?.kind === "row") return AUTO_MS.row;
       return AUTO_MS.base;
     };
     const advance = () => {
@@ -895,6 +1017,24 @@ export default function CineEngine({
             eager={i < 2}
           />
         ))}
+      </div>
+
+      {/* v10: курсор-актёр автоплея — скользит по кадру и «нажимает» динамику */}
+      <div
+        className={`cb-cursor${auto && !reduceMotion ? " is-on" : ""}`}
+        ref={cursorRef}
+        aria-hidden="true"
+      >
+        <span className="cb-cursor__ring" />
+        <svg viewBox="0 0 24 24" width="26" height="26">
+          <path
+            d="M2 1 L2 20 L7.4 15.6 L10.8 22.4 L13.9 20.9 L10.6 14.3 L17 14.3 Z"
+            fill="#f4f0fa"
+            stroke="#0b0b0f"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
 
       {active && (

@@ -3421,7 +3421,8 @@ body.cb-cine-lock {
   flex-direction: column;
   justify-content: flex-end;
   gap: 9px;
-  padding: 12px 12px 14px;
+  /* v10: снизу зазор под HUD-плашку (счётчик кадра) — каптионы не прячутся */
+  padding: 12px 12px 52px;
   overflow: hidden;
 }
 
@@ -3749,9 +3750,12 @@ body.cb-cine-lock {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CB CINE v9 (task186) — Ken Burns + темп + перф.
-   Босс: «make background images for comic sections animated a bit, not
-   static — zoom in a bit and make picture drift/zoom/slide slowly».
+   CB CINE v9→v10 (task186) — Ken Burns + темп + перф.
+   v10 босс: «didn't notice pic movement» — зум/дрейф стал ЗАМЕТНЫМ:
+   амплитуда выше (панель 1 → 1.14, кадр 1.07 → 1.22), периоды короче
+   (18–26s): за 6–10s жизни кадра глаз успевает увидеть движение.
+   Было (v9): «make background images animated a bit — zoom in a bit and
+   make picture drift/zoom/slide slowly».
    ─ Плавный Ken Burns ВМЕСТО steps(8)-idle: непрерывный зум/дрейф, глаз
      читает движение, а не рывки раз в 2 секунды.
    ─ ПАНЕЛИ разворота теперь тоже живые (были статичными вовсе).
@@ -3773,32 +3777,32 @@ body.cb-cine-lock {
 /* 2. Ken Burns splash-кадров: текущий + уходящий (пока его накрывают) */
 .cb-cine--on:not(.cb-cine--rm) :is(.cb-scene--cur, .cb-scene--under) .cb-scene__img {
   animation:
-    cb-kb-scene 34s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
+    cb-kb-scene 22s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
     cb-scene-img 1050ms steps(8, end) backwards;
   will-change: transform;
 }
 
 .cb-cine--on:not(.cb-cine--rm) :is(.cb-scene--cur, .cb-scene--under) .cb-scene__blur {
-  animation: cb-kb-blur 41s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+  animation: cb-kb-blur 26s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
   will-change: transform;
 }
 
 /* старт зума = финал склейки (cb-scene-img кончается на scale 1.07) — шва нет */
 @keyframes cb-kb-scene {
-  from { transform: scale(1.07) translate3d(0.4%, 0.3%, 0); }
-  to   { transform: scale(1.15) translate3d(-1.4%, -0.9%, 0); }
+  from { transform: scale(1.07) translate3d(0.7%, 0.5%, 0); }
+  to   { transform: scale(1.22) translate3d(-2.1%, -1.4%, 0); }
 }
 
 /* блюр-подложка обложки: свой дрейф от её статичного scale(1.12) */
 @keyframes cb-kb-blur {
-  from { transform: scale(1.12) translate3d(0.6%, -0.4%, 0); }
-  to   { transform: scale(1.21) translate3d(-0.9%, 0.6%, 0); }
+  from { transform: scale(1.12) translate3d(0.9%, -0.6%, 0); }
+  to   { transform: scale(1.3) translate3d(-1.4%, 0.9%, 0); }
 }
 
-/* 3. Ken Burns панелей разворота + медленный въезд (v9: 1.05s, старт 0.6s) */
+/* 3. Ken Burns панелей разворота + медленный въезд (1.05s, старт 0.6s) */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
   animation:
-    cb-kb-panel 28s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
+    cb-kb-panel 18s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
     cb-panel-in 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
       calc((0.6s + var(--pd, 0s)) * var(--ink-pace, 1)) backwards;
   will-change: transform, opacity;
@@ -3810,10 +3814,10 @@ body.cb-cine-lock {
 }
 
 /* от scale(1) — совпадает с финалом cb-panel-in (transform: none), шва нет;
-   overscan держит запас под дрейф: сдвиг ≤ (scale-1)/2 */
+   overscan держит запас под дрейф: сдвиг ≤ (scale-1)/2 (v10: заметный зум) */
 @keyframes cb-kb-panel {
   from { transform: scale(1) translate3d(0, 0, 0); }
-  to   { transform: scale(1.09) translate3d(1.5%, -1.1%, 0); }
+  to   { transform: scale(1.14) translate3d(2.2%, -1.6%, 0); }
 }
 
 /* 4. мобайл: блюр-подложке хватит статики (GPU бюджет — панелям),
@@ -3848,4 +3852,332 @@ body.cb-cine-lock {
   letter-spacing: 0.03em;
   color: rgba(244, 240, 250, 0.62);
   max-width: 640px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CB CINE v10 (task186) — курсор-актёр + вкладка «Зимнее хранение».
+   ─ КУРСОР: в автоплее по кадру ездит нарисованный указатель. Один
+     композитный слой (transform + opacity), pointer-events: none.
+     is-tap — анимация нажатия + кольцо-рипл. Позицию ведёт движок
+     (inline transform), здесь только внешность и тап-анимации.
+   ─ ХРАНЕНИЕ: мок главной каталога в кадре «И ПУФ!» — вкладка «Зимнее
+     хранение» (NEW) выезжает поп-анимацией при входе в кадр, форма
+     заявки + список клиентов для владельца. Тарифы карточек — живой каталог.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. курсор-актёр автоплея ────────────────────────────────────────────── */
+.cb-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 96;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-80px, -80px, 0);
+  transition: opacity 0.3s;
+  will-change: transform;
+}
+.cb-cursor.is-on { opacity: 1; }
+.cb-cursor svg {
+  display: block;
+  filter: drop-shadow(0 2px 7px rgba(5, 3, 10, 0.6));
+  animation: cb-cur-float 3.4s ease-in-out infinite;
+}
+.cb-cursor__ring {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  width: 46px;
+  height: 46px;
+  border: 2px solid var(--cb-cyan);
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.55);
+}
+.cb-cursor.is-tap svg { animation: cb-cur-tap 0.45s cubic-bezier(0.3, 1.6, 0.4, 1); }
+.cb-cursor.is-tap .cb-cursor__ring { animation: cb-cur-ring 0.62s ease-out; }
+
+@keyframes cb-cur-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-2deg); }
+  50% { transform: translate3d(0, -3px, 0) rotate(2deg); }
+}
+@keyframes cb-cur-tap {
+  40% { transform: scale(0.68) rotate(-7deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes cb-cur-ring {
+  from { opacity: 0.95; transform: scale(0.35); }
+  to { opacity: 0; transform: scale(1.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cb-cursor { display: none; }
+}
+
+/* ── 2. кадр «И ПУФ!»: мок каталога с новой вкладкой ─────────────────────── */
+.cb-puff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 2.2vh, 22px);
+  padding: clamp(8px, 2vh, 26px) clamp(10px, 3vw, 32px) 20px;
+  max-width: 780px;
+  margin: 0 auto;
+}
+.cb-puff__caption {
+  /* cb-caption абсолютен по умолчанию — внутри потока кадра «И ПУФ!» */
+  position: static;
+  margin: 0;
+  max-width: 640px;
+  text-align: center;
+}
+
+.cb-storage {
+  width: 100%;
+  background: rgba(10, 8, 20, 0.92);
+  border: 3px solid var(--cb-ink);
+  border-radius: 12px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.6), 8px 8px 0 rgba(253, 224, 71, 0.22);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.cb-storage__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  background: rgba(244, 240, 250, 0.07);
+  border-bottom: 2px solid var(--cb-ink);
+}
+.cb-storage__bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--cb-magenta);
+  opacity: 0.8;
+}
+.cb-storage__bar i:nth-child(2) { background: var(--cb-yellow); }
+.cb-storage__bar i:nth-child(3) { background: var(--cb-cyan); }
+.cb-storage__bar span {
+  margin-left: 8px;
+  font-size: clamp(9px, 1vw, 11px);
+  letter-spacing: 0.06em;
+  color: rgba(244, 240, 250, 0.55);
+}
+.cb-storage__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+.cb-storage__tab {
+  position: relative;
+  border: 2px solid rgba(244, 240, 250, 0.25);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: rgba(244, 240, 250, 0.05);
+  color: rgba(244, 240, 250, 0.75);
+  font: inherit;
+  font-size: clamp(10px, 1.05vw, 12.5px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 8px 13px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.cb-storage__tab:hover { background: rgba(244, 240, 250, 0.1); color: #f4f0fa; }
+.cb-storage__tab[aria-selected="true"] {
+  background: rgba(34, 211, 238, 0.14);
+  border-color: var(--cb-cyan);
+  color: #f4f0fa;
+  box-shadow: 0 -6px 18px rgba(34, 211, 238, 0.18);
+}
+.cb-storage__tab--winter {
+  border-color: rgba(253, 224, 71, 0.5);
+  color: var(--cb-yellow);
+}
+.cb-storage__tab--winter[aria-selected="true"] {
+  background: rgba(253, 224, 71, 0.14);
+  border-color: var(--cb-yellow);
+  box-shadow: 0 -6px 18px rgba(253, 224, 71, 0.22);
+}
+/* ПУФ: вкладка выскакивает при входе в кадр (каждый раз, когда кадр стал --cur) */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-storage__tab--winter {
+  animation: cb-storage-pop 0.75s cubic-bezier(0.3, 1.5, 0.4, 1) 1.15s backwards;
+}
+@keyframes cb-storage-pop {
+  0% { opacity: 0; transform: scale(0.2) rotate(-8deg); }
+  70% { opacity: 1; transform: scale(1.12) rotate(2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.cb-storage__new {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  font-style: normal;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  color: #0b0b0f;
+  background: var(--cb-yellow);
+  border: 1.5px solid var(--cb-ink);
+  border-radius: 999px;
+  padding: 2px 6px;
+  animation: cb-new-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cb-new-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+
+.cb-storage__pane {
+  padding: 12px 12px 14px;
+  min-height: 190px;
+}
+.cb-storage__rent {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.cb-storage__card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 2px solid rgba(244, 240, 250, 0.16);
+  border-radius: 9px;
+  background: rgba(244, 240, 250, 0.045);
+  padding: 10px;
+}
+.cb-storage__card b { font-size: clamp(10px, 1.05vw, 12.5px); color: #f4f0fa; }
+.cb-storage__card span { font-size: 10px; color: rgba(244, 240, 250, 0.55); }
+.cb-storage__card i {
+  font-style: normal;
+  font-weight: 800;
+  font-size: clamp(11px, 1.15vw, 13.5px);
+  color: var(--cb-cyan);
+}
+.cb-storage__hint {
+  display: block;
+  margin-top: 9px;
+  font-size: clamp(9px, 0.95vw, 11px);
+  line-height: 1.55;
+  color: rgba(244, 240, 250, 0.5);
+}
+.cb-storage__hint--alone { margin: 12px 2px; font-size: clamp(11px, 1.15vw, 13px); }
+
+.cb-storage__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 10px;
+  animation: cb-storage-reveal 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes cb-storage-reveal {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.cb-storage__form,
+.cb-storage__list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border: 2px solid rgba(34, 211, 238, 0.35);
+  border-radius: 10px;
+  background: rgba(34, 211, 238, 0.06);
+  padding: 11px;
+}
+.cb-storage__list {
+  border-color: rgba(253, 224, 71, 0.4);
+  background: rgba(253, 224, 71, 0.05);
+}
+.cb-storage__form b,
+.cb-storage__list b {
+  font-size: clamp(10.5px, 1.1vw, 12.5px);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #f4f0fa;
+}
+.cb-storage__list b i {
+  font-style: normal;
+  color: var(--cb-yellow);
+  margin-left: 4px;
+}
+.cb-storage__form input {
+  font: inherit;
+  font-size: clamp(10px, 1vw, 12px);
+  color: #f4f0fa;
+  background: rgba(10, 8, 20, 0.75);
+  border: 2px solid rgba(244, 240, 250, 0.22);
+  border-radius: 7px;
+  padding: 7px 9px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.cb-storage__form input:focus { border-color: var(--cb-cyan); }
+.cb-storage__form input::placeholder { color: rgba(244, 240, 250, 0.38); }
+.cb-storage__form button {
+  font: inherit;
+  font-size: clamp(10px, 1.05vw, 12px);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #0b0b0f;
+  background: var(--cb-cyan);
+  border: 2px solid var(--cb-ink);
+  border-radius: 7px;
+  padding: 8px 10px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(11, 11, 15, 0.65);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.cb-storage__form button:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 rgba(11, 11, 15, 0.65); }
+.cb-storage__form button:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgba(11, 11, 15, 0.65); }
+.cb-storage__form > span,
+.cb-storage__list > span:last-child {
+  font-size: 9px;
+  line-height: 1.5;
+  color: rgba(244, 240, 250, 0.45);
+}
+.cb-storage__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cb-storage__row {
+  display: grid;
+  grid-template-columns: minmax(52px, auto) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 7px;
+  border: 1.5px solid rgba(244, 240, 250, 0.12);
+  border-radius: 7px;
+  background: rgba(244, 240, 250, 0.04);
+  padding: 6px 8px;
+  animation: cb-storage-reveal 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.cb-storage__row b { font-size: clamp(10px, 1vw, 12px); color: #f4f0fa; }
+.cb-storage__row span {
+  font-size: clamp(9px, 0.95vw, 11px);
+  color: rgba(244, 240, 250, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cb-storage__row i {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cb-cyan);
+  white-space: nowrap;
+}
+.cb-storage__row i { color: rgba(34, 211, 238, 0.85); }
+.cb-storage__row:last-child i { color: var(--cb-yellow); }
+
+@media (max-width: 860px) {
+  .cb-storage__rent { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cb-storage__grid { grid-template-columns: minmax(0, 1fr); }
+  .cb-storage__rows { max-height: 130px; }
+  .cb-storage__pane { min-height: 230px; }
 }
