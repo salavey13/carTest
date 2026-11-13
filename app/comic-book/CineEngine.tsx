@@ -2,7 +2,12 @@
 
 // /app/comic-book/CineEngine.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// CB CINE v8 (task186) — движок «кинематографического комикса», развороты.
+// CB CINE v9 (task186) — движок «кинематографического комикса», развороты.
+//
+// v9: Ken Burns на картинках (плавный зум/дрейф вместо steps-idle, только на
+// видимом кадре), прогресс автоплея — CSS-transition вместо rAF (60 записей
+// стиля в секунду → одна на тик), каскад проявления медленнее (stagger 0.42s,
+// ручка PANEL_STAGGER_S), TTL кадра короче (6.2/3.6/9.0s).
 //
 // Эволюция: v6 — fullscreen-кадры, скролл = камера, порог ≈ пол-экрана,
 // следующий кадр накрывает предыдущий (steps-склейка). v6.1 — peek-выезд
@@ -94,6 +99,15 @@ const TRANS_MS = 1050;
 const RM_MS = 220;
 const COOLDOWN_MS = 550; // анти-проскас: тишина после каждой склейки
 
+// v9: сдвиг каскада между панелями разворота (движок ставит --pd картинке,
+// ComicBookClient сдвигает на ту же цифру стопку текста). Одна ручка на оба
+// файла — рассинхрон невозможен.
+export const PANEL_STAGGER_S = 0.42;
+
+// v9: TTL кадра в автоплее (босс: «shorten per section ttl») + лента-заряд
+// рисуется CSS-transition'ом — rAF-цикл 60fps больше не нужен.
+const AUTO_MS = { base: 6200, panel: 3600, scroll: 9000, scrollRide: 6600 };
+
 // ── v8-перф: кадр вынесен в memo-компонент ──────────────────────────────────
 // Свайп панели / смена кадра перерисовывает только затронутые кадры, а не все
 // 16 (каждый кадр — сто+ узлов; на мобиле это была главная причина джанка).
@@ -136,7 +150,7 @@ const SceneView = memo(function SceneView({
               <figure
                 key={p.key}
                 className={`cb-panel cb-panel--${p.accent}`}
-                style={{ ["--pd" as string]: `${(k * 0.3).toFixed(2)}s` }}
+                style={{ ["--pd" as string]: `${(k * PANEL_STAGGER_S).toFixed(2)}s` }}
               >
                 {p.custom === "phone" && p.phone ? (
                   <div className="cb-panel__custom">{p.phone}</div>
@@ -320,7 +334,7 @@ export default function CineEngine({
       el.style.transform = "";
     });
     (stage.children[i] as HTMLElement | undefined)?.style.removeProperty("--cb-pull");
-    if (tapeRef.current) tapeRef.current.style.width = "0%";
+    if (tapeRef.current) tapeRef.current.style.transform = "scaleX(0)";
     peekRef.current = null;
   }, []);
 
@@ -359,7 +373,11 @@ export default function CineEngine({
         "--cb-pull",
         (1 - r * 0.035).toFixed(4),
       );
-      if (tapeRef.current) tapeRef.current.style.width = `${Math.round(r * 100)}%`;
+      // лента-заряд: scaleX вместо width — композитная операция, без layout
+      if (tapeRef.current) {
+        tapeRef.current.style.transition = "transform 0.18s linear";
+        tapeRef.current.style.transform = `scaleX(${r.toFixed(3)})`;
+      }
     },
     [resetPeek],
   );
@@ -774,21 +792,29 @@ export default function CineEngine({
   // ── АВТОПЛЕЙ: таймер ведёт комикс; лента-заряд = прогресс тика ───────────
   useEffect(() => {
     if (!active || !auto) {
-      if (tapeRef.current) tapeRef.current.style.width = "0%";
+      if (tapeRef.current) tapeRef.current.style.transform = "scaleX(0)";
       return;
     }
-    let raf = 0;
+    let timer = 0;
     let alive = true;
+    // v9: лента через CSS-transition transform'а — одна запись стиля на тик
+    // вместо rAF 60fps (transform = только композит, без layout/paint)
+    const tapeTo = (r: number, dur?: number) => {
+      const el = tapeRef.current;
+      if (!el) return;
+      el.style.transition = dur ? `transform ${dur}ms linear` : "none";
+      el.style.transform = `scaleX(${r})`;
+    };
     const tickDur = () => {
       const s = scenesRef.current[idxRef.current];
-      if (s?.scrollable) return 10500;
+      if (s?.scrollable) return AUTO_MS.scroll;
       if (s?.kind === "row") {
         // v8: на любой раскладке тик короче, пока в развороте есть скрытые панели
         const vis = visiblePanels(s);
         const total = s.panels?.length ?? 1;
-        if (total > vis && pidxRef.current + vis < total) return 4200;
+        if (total > vis && pidxRef.current + vis < total) return AUTO_MS.panel;
       }
-      return 7200;
+      return AUTO_MS.base;
     };
     const advance = () => {
       const s = scenesRef.current[idxRef.current];
@@ -810,26 +836,21 @@ export default function CineEngine({
     };
     const loop = () => {
       if (!alive) return;
-      const t0 = performance.now();
       const dur = tickDur();
-      const step = (t: number) => {
+      tapeTo(0);
+      void tapeRef.current?.offsetWidth; // рефлоу: сброс до старта transition
+      tapeTo(1, dur);
+      timer = window.setTimeout(() => {
         if (!alive) return;
-        const r = Math.min(1, (t - t0) / dur);
-        if (tapeRef.current) tapeRef.current.style.width = `${Math.round(r * 100)}%`;
-        if (r >= 1) {
-          advance();
-          if (alive && idxRef.current < scenesRef.current.length - 1) loop();
-        } else {
-          raf = requestAnimationFrame(step);
-        }
-      };
-      raf = requestAnimationFrame(step);
+        advance();
+        if (alive && idxRef.current < scenesRef.current.length - 1) loop();
+      }, dur);
     };
     loop();
     return () => {
       alive = false;
-      cancelAnimationFrame(raf);
-      if (tapeRef.current) tapeRef.current.style.width = "0%";
+      window.clearTimeout(timer);
+      tapeTo(0);
     };
   }, [active, auto, idx, pidx, go, goPanel, onAutoEnd, visiblePanels]);
 
@@ -842,7 +863,7 @@ export default function CineEngine({
     const el = stage?.children[idx]?.querySelector<HTMLElement>(".cb-scene__text");
     if (!el) return;
     el.scrollTop = 0;
-    const dur = 7800;
+    const dur = AUTO_MS.scrollRide;
     const t0 = performance.now();
     let raf = 0;
     const step = (t: number) => {

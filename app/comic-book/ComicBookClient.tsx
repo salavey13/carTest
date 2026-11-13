@@ -2,38 +2,32 @@
 
 // /app/comic-book/ComicBookClient.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// VIP BIKE COMICS · СЕЗОН 2026 — выпуски 1–2 + счёт, версия 7.0 (task186).
+// VIP BIKE COMICS · СЕЗОН 2026 — выпуски 1–2 + счёт, версия 9.0 (task186).
 //
 // v1–v5: панели, GLITCH-арка, счёт № 0001, интерактивный телефон, Ведомость
 //   (история в git; весь контент бережно переносится дальше).
 // v6 (task186): CB CINE — cinematic engine (fullscreen-кадры, скролл=камера).
 // v6.1: peek + цепочка проявления + end slate. v6.2: --ink-pace.
-// v7 (текущая) — большой раунд от босса:
-//  • «define proper purpose first» — ЦЕЛЬ КОМИКСА:
-//    за ~3 минуты показать владельцу мото-экипажа (настоящему или будущему),
-//    что платформа VibeRider собирает сайту экипажа витрину за один вечер
-//    и начинает продавать аренды сама — на живых тарифах каталога, без
-//    выдуманных рублей — и довести читателя до «Подключить экипаж».
-//    Каждая строка работает на одно из трёх: история-крючок / доказательство
-//    платформы / CTA. Остальное срезано (тексты сжаты ~на треть);
-//  • СУПЕР-УЛУЧШЕНИЕ: развороты — на PC 3 портретные панели в ряд,
-//    на планшете 2, на мобиле 1 (те же картинки!); мобайл листает панели
-//    ГОРИЗОНТАЛЬНЫМ свайпом; splash-кадры (обложка/титры/финал/тизер)
-//    остались fullscreen — как splash-страницы настоящих комиксов;
-//  • картинки панелей пересозданы в портрете 768×1344 (p*.png) под
-//    композицию «текст сверху/снизу, герой в кадре»;
-//  • «8fps reference was mistake» → проявление v7: ПЛАВНЫЙ каскад вместо
-//    steps-ступеней: панель за панелью (--pd 0.3s), внутри панели
-//    каптион → пузыри → нотификация → SFX, каждый элемент едет ~0.8s
-//    ease-out; steps остался только на склейке кадров и живых фонах;
-//  • анти-проскас: кулдаун 550мс после каждой склейки, один жест = один кадр;
-//  • АВТОПЛЕЙ: ▶ в HUD + кнопка звука включает звук И автоплей («maybe
-//    sound button can start autoplay ;))»); любой ручной жест — пауза;
-//    лента-заряд показывает прогресс тика.
+// v7: развороты (3/2/1 портретных панелей), тексты под цель, автоплей.
+// v8: вертикаль едет по панелям разворота, чип «ещё N», перф (memo-кадры).
+// v9 (текущее) — темп и живость (босс: «slow down appearance, shorten ttl,
+// make background images animated, level it up»):
+//  • каскад проявления МЕДЛЕННЕЕ: панели разъезжаются на 0.42s (было 0.3s),
+//    каждый элемент едет ~1s, старты позже (каптион 1.35s, пузыри 1.85s,
+//    нотиф 2.3s, SFX 2.7s); TTL кадра в автоплее КОРОЧЕ (6.2/3.6/9s);
+//  • Ken Burns: картинки панелей/кадров живут — плавный зум/дрейф (CSS,
+//    только на видимом кадре — перф не страдает);
+//  • перф: картинки PNG→WebP (−38% веса), scenes в useMemo (жесты во время
+//    автоплея больше не пересобирают все 16 кадров), лента автоплея без rAF;
+//  • ФИНАЛ СОКРАЩЁН: UNIVERSE и «КОНЕЦ ПЕРЕДАЧИ» — один кадр вместо двух,
+//    10 ссылок → 3 (босс: «wall of options»); тизер без чипа-дубля.
+// ЦЕЛЬ КОМИКСА (v7): за ~3 минуты показать владельцу мото-экипажа (настоящему
+//   или будущему), что платформа VibeRider собирает сайту экипажа витрину за
+//   один вечер и начинает продавать аренды сама — на живых тарифах каталога,
+//   без выдуманных рублей — и довести читателя до «Подключить экипаж».
 // Референс героя — founder-rustam.jpg из /leorus hero (task179).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AnimatePresence,
   animate,
@@ -43,8 +37,9 @@ import {
   useReducedMotion,
   useTransform,
 } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./comic-book.css";
-import CineEngine, { type CinePanelDef, type CineSceneDef } from "./CineEngine";
+import CineEngine, { PANEL_STAGGER_S, type CinePanelDef, type CineSceneDef } from "./CineEngine";
 
 type Bubble = {
   text: string;
@@ -156,7 +151,7 @@ const PANELS: Panel[] = [
   {
     num: "01",
     title: "ЗВОНОК В НОЧЬ",
-    img: "/comic-book/p01.png",
+    img: "/comic-book/p01.webp",
     alt: "Рустам ночью на набережной смотрит в светящийся телефон",
     accent: "cyan",
     caption: "Пятница. 23:47. Смена закрыта. Телефон решает, что на сегодня ещё не всё.",
@@ -170,7 +165,7 @@ const PANELS: Panel[] = [
   {
     num: "02",
     title: "ОДНА КНОПКА",
-    img: "/comic-book/p02.png",
+    img: "/comic-book/p02.webp",
     alt: "Палец нажимает огромную неоновую кнопку на голографическом экране",
     accent: "magenta",
     caption: "Никаких ТЗ и команды разработки. Одна кнопка — и каркас сайта уже строится.",
@@ -181,7 +176,7 @@ const PANELS: Panel[] = [
   {
     num: "03",
     title: "ЛИЧНЫЙ ZAI",
-    img: "/comic-book/p03.png",
+    img: "/comic-book/p03.webp",
     alt: "Рустам пьёт кофе, пока робот-агент собирает сайт",
     accent: "cyan",
     caption: "У каждого — личный zai-агент со своими ключами. Не общий чат-бот на всех.",
@@ -193,7 +188,7 @@ const PANELS: Panel[] = [
   {
     num: "04",
     title: "БРЕНД-КУЗНИЦА",
-    img: "/comic-book/p04.png",
+    img: "/comic-book/p04.webp",
     alt: "Гигантский светящийся логотип влетает в неоновый билборд",
     accent: "magenta",
     caption: "Название, логотип, цвета — всё живёт в его репозитории, а не в чужом конструкторе.",
@@ -203,7 +198,7 @@ const PANELS: Panel[] = [
   {
     num: "05",
     title: "КАТАЛОГ ЗАЛЕТАЕТ",
-    img: "/comic-book/p05.png",
+    img: "/comic-book/p05.webp",
     alt: "Флагман Falcon Lynx на голографическом подиуме среди карточек каталога",
     accent: "cyan",
     caption: "Фото, цены, залоги — каталог собран раньше, чем остыл кофе.",
@@ -213,7 +208,7 @@ const PANELS: Panel[] = [
   {
     num: "06",
     title: "ВЕЧЕРОМ — В ПРОДЕ",
-    img: "/comic-book/p06.png",
+    img: "/comic-book/p06.webp",
     alt: "Ракета стартует с ноутбука, над которым парит дашборд сайта",
     accent: "magenta",
     caption: "Сказал утром — вечером в проде. Витрина уже продаёт.",
@@ -224,7 +219,7 @@ const PANELS: Panel[] = [
   {
     num: "07",
     title: "КЛИЕНТ АРЕНДОВАЛ",
-    img: "/comic-book/p07.png",
+    img: "/comic-book/p07.webp",
     alt: "Клиент жмёт «Арендовать» в веб-приложении — Рустам получает уведомление",
     accent: "cyan",
     caption: "Клиент открыл приложение, выбрал байк, арендовал. Сайт продаёт сам — уведомление летит Рустаму.",
@@ -240,7 +235,7 @@ const PANELS: Panel[] = [
   {
     num: "08",
     title: "ВЫДАЧА",
-    img: "/comic-book/p08.png",
+    img: "/comic-book/p08.webp",
     alt: "Рустам передаёт ключи райдеру, над байком светится QR-код",
     accent: "magenta",
     caption: "QR, ключи, рукопожатие. Договор подписан, депозит на месте — бумаги ведёт бот-клерк.",
@@ -254,7 +249,7 @@ const GLITCH_PANELS: Panel[] = [
   {
     num: "GLITCH",
     title: "ТЕСТ НА ГЛЮК",
-    img: "/comic-book/pglitch.png",
+    img: "/comic-book/pglitch.webp",
     alt: "Каталог байков распадается на глитч-пиксели и собирается в сцену фестиваля",
     accent: "gold",
     caption: "Каталог — это просто список. Подставь другой — получишь другой бизнес.",
@@ -270,7 +265,7 @@ const GLITCH_PANELS: Panel[] = [
   {
     num: "LEORUS",
     title: "АРЕНДУЙ РУСТАМА",
-    img: "/comic-book/pdj.png",
+    img: "/comic-book/pdj.webp",
     alt: "Рустам за диджейским пультом на главном фестивальном экране, толпа внизу",
     accent: "gold",
     caption: "Вторая команда Рустама — ивент-агентство LEORUS. Тот же движок: вместо байков — сцены.",
@@ -293,7 +288,7 @@ const EP2_PANELS: Panel[] = [
   {
     num: "II·01",
     title: "ПРОСТО ПРОВЕРЮ",
-    img: "/comic-book/pcouch.png",
+    img: "/comic-book/pcouch.webp",
     alt: "Рустам лежит на диване ночью, лицо подсвечено экраном телефона",
     accent: "cyan",
     caption: "Месяц спустя. 23:48. Всё работает само. Оставалось не трогать телефон.",
@@ -313,7 +308,7 @@ const EP2_PANELS: Panel[] = [
   {
     num: "II·03",
     title: "ЭТО УЖЕ ПОДОЗРИТЕЛЬНО",
-    img: "/comic-book/pcoffee.png",
+    img: "/comic-book/pcoffee.webp",
     alt: "Рустам с кружкой кофе смотрит на вибрирующий телефон на стойке",
     accent: "cyan",
     caption: "Пока он делал глоток, закрылась ещё одна аренда. Он не нажимал ничего. Кофе тоже.",
@@ -328,7 +323,7 @@ const EP2_PANELS: Panel[] = [
   {
     num: "II·04",
     title: "КАЖЕТСЯ, Я ПОНЯЛ",
-    img: "/comic-book/pgarage.png",
+    img: "/comic-book/pgarage.webp",
     alt: "Рустам со спины смотрит на ряд мотоциклов в неоновом гараже",
     accent: "magenta",
     caption: "Ночной обход ангара: все в работе. Схема видна целиком — и она нравится.",
@@ -337,7 +332,7 @@ const EP2_PANELS: Panel[] = [
   {
     num: "II·05",
     title: "ПОСЛЕДНЯЯ ПРОВЕРКА",
-    img: "/comic-book/pphoneaway.png",
+    img: "/comic-book/pphoneaway.webp",
     alt: "Рустам откинулся в кресле со скрещенными руками, телефон остался на столе",
     accent: "cyan",
     caption: "Он кладёт телефон на стол. Взрослый человек. Хозяин своего вечера.",
@@ -355,7 +350,7 @@ const EP2_PANELS: Panel[] = [
   {
     num: "II·∞",
     title: "ЭКРАН ГАСНЕТ",
-    img: "/comic-book/phand.png",
+    img: "/comic-book/phand.webp",
     alt: "Рука в темноте хватает светящийся телефон",
     accent: "magenta",
     notify: {
@@ -775,15 +770,16 @@ export default function ComicBookClient() {
       </div>
     );
 
-  // v7: задержка каскада проявления. Плавный режим (босс: «8fps reference
-  // was mistake») — каждый элемент едет ~0.8s ease-out, порядок читается.
+  // v9: задержки каскада УВЕЛИЧЕНЫ (босс: «slow down appearance of elements»).
+  // Панель за панелью — PANEL_STAGGER_S (0.42s, единая ручка с движком);
+  // внутри панели каптион 1.35 → пузыри 1.85 → нотиф 2.3 → SFX 2.7.
   // Все числа умножаются на --ink-pace из CSS (единый темп, сейчас 1).
   const ink = (base: React.CSSProperties, d: string): React.CSSProperties =>
     ({ ...base, "--ink-d": `calc(${d} * var(--ink-pace, 1))` }) as React.CSSProperties;
 
   // ── стопка текста ПАНЕЛИ (внутри портретной колонки разворота) ──────────
-  // каскад на панель k: каптион 1.0 → пузыри 1.35+ → нотиф 1.65 → SFX 2.0,
-  // каждая панель сдвинута на +0.3s (--pd выставляет движок для картинки).
+  // каскад на панель k: каптион 1.35 → пузыри 1.85 → нотиф 2.3 → SFX 2.7,
+  // каждая панель сдвинута на +0.42s (--pd выставляет движок для картинки).
   const sfxNode = (panel: Panel, k: number) =>
     panel.sfx ? (
       <span
@@ -791,7 +787,7 @@ export default function ComicBookClient() {
         style={
           ink(
             { "--rot": `${panel.sfx.rotate}deg`, transform: `rotate(${panel.sfx.rotate}deg)` },
-            `${(2 + k * 0.3).toFixed(2)}s`,
+            `${(2.7 + k * PANEL_STAGGER_S).toFixed(2)}s`,
           ) as React.CSSProperties
         }
         aria-hidden="true"
@@ -805,7 +801,7 @@ export default function ComicBookClient() {
       {panel.notify && (
         <Drop
           delay={panel.notify.delay}
-          style={ink({}, `${(1.65 + k * 0.3 + (panel.notify.delay ?? 0)).toFixed(2)}s`)}
+          style={ink({}, `${(2.3 + k * PANEL_STAGGER_S + (panel.notify.delay ?? 0)).toFixed(2)}s`)}
         >
           <div className="cb-notify">
             <span className="cb-notify__app">{panel.notify.app}</span>
@@ -815,7 +811,7 @@ export default function ComicBookClient() {
         </Drop>
       )}
       {panel.terminal && (
-        <div className="cb-terminal" style={ink({}, `${(1.3 + k * 0.3).toFixed(2)}s`)}>
+        <div className="cb-terminal" style={ink({}, `${(1.75 + k * PANEL_STAGGER_S).toFixed(2)}s`)}>
           {panel.terminal.map((line) => (
             <span key={line} className="cb-terminal__line">
               {line}
@@ -828,13 +824,13 @@ export default function ComicBookClient() {
         <Pop
           key={bubble.text}
           className={`cb-bubble cb-bubble--${bubble.kind}`}
-          style={ink({}, `${(1.35 + k * 0.3 + i * 0.25).toFixed(2)}s`)}
+          style={ink({}, `${(1.85 + k * PANEL_STAGGER_S + i * 0.32).toFixed(2)}s`)}
         >
           {bubble.text}
         </Pop>
       ))}
       {panel.foot ?? (
-        <p className="cb-caption" style={ink({}, `${(1 + k * 0.3).toFixed(2)}s`)}>
+        <p className="cb-caption" style={ink({}, `${(1.35 + k * PANEL_STAGGER_S).toFixed(2)}s`)}>
           {panel.caption}
         </p>
       )}
@@ -843,7 +839,7 @@ export default function ComicBookClient() {
 
   // телефон II·02 — отдельный слот «картинки» панели (в стопке текста ему тесно)
   const phoneSlot = (panel: Panel, k: number) => (
-    <div className="cb-scene__phonebox" style={ink({}, `${(0.9 + k * 0.3).toFixed(2)}s`)}>
+    <div className="cb-scene__phonebox" style={ink({}, `${(1.2 + k * PANEL_STAGGER_S).toFixed(2)}s`)}>
       <PhoneCounter jsReady={jsReady} label={panel.alt} />
     </div>
   );
@@ -880,10 +876,10 @@ export default function ComicBookClient() {
     kind: "splash",
     chrome: false,
     node: (
-      <div className="cb-cinediv" style={ink({}, "0.2s")} {...(ghost ? { "data-ghost": ghost } : {})}>
-        <span className="cb-cinediv__tag" style={ink({}, "0.45s")}>{tag}</span>
-        <span className="cb-cinediv__title" style={ink({}, "0.75s")}>{title}</span>
-        <span className="cb-cinediv__sub" style={ink({}, "1.1s")}>{sub}</span>
+      <div className="cb-cinediv" style={ink({}, "0.25s")} {...(ghost ? { "data-ghost": ghost } : {})}>
+        <span className="cb-cinediv__tag" style={ink({}, "0.6s")}>{tag}</span>
+        <span className="cb-cinediv__title" style={ink({}, "1s")}>{title}</span>
+        <span className="cb-cinediv__sub" style={ink({}, "1.45s")}>{sub}</span>
       </div>
     ),
   });
@@ -906,53 +902,55 @@ export default function ComicBookClient() {
   });
 
   // ════════════════════════════════════════════════════════════════════════
-  // CB CINE v7: сборка кадров. Хронометраж выпуска:
+  // CB CINE v9: сборка кадров. Хронометраж выпуска:
   // обложка → титр I → развороты A/B/C (панели 01–08) → титр GLITCH →
   // разворот D (глюк + LEORUS) → финал → счёт → титр II → развороты E/F
-  // (II·01–II·∞) → интерактив → тизер вып. 3 → UNIVERSE → колофон.
+  // (II·01–II·∞) → интерактив → тизер вып. 3 → финал UNIVERSE+КОНЕЦ.
   // Развороты = ряды портретных панелей; splash-кадры = «splash-страницы».
+  // v9-перф: массив в useMemo — звук/автоплей-клики не пересобирают 15 кадров
+  // (scene = сто+ узлов; каждый пересбор ломал memo SceneView в движке).
   // ════════════════════════════════════════════════════════════════════════
-  const scenes: CineSceneDef[] = [
+  const scenes: CineSceneDef[] = useMemo(() => [
     // ── обложка (splash, 1:1 — вписываем в кадр, атмосферу даёт блюр) ──────
     {
       id: "cover",
       title: "ОБЛОЖКА",
-      img: "/comic-book/cover.png",
+      img: "/comic-book/cover.webp",
       alt: "Рустам — герой комикса — стоит с телефоном и электромотоциклом на фоне неонового города",
       accent: "cyan",
       kind: "splash",
       contain: true,
       chrome: false,
       overlay: (
-        <span className="cb-cover__cue cb-cover__cue--overlay" aria-hidden="true" style={ink({}, "2.2s")}>
+        <span className="cb-cover__cue cb-cover__cue--overlay" aria-hidden="true" style={ink({}, "2.9s")}>
           <i>▼</i> скролл — камера едет, следующий кадр уже выезжает
         </span>
       ),
       node: (
-        <div className="cb-cinecover" style={ink({}, "0.15s")}>
-          <span className="cb-cover__kicker" style={ink({}, "0.45s")}>
+        <div className="cb-cinecover" style={ink({}, "0.2s")}>
+          <span className="cb-cover__kicker" style={ink({}, "0.6s")}>
             VIP BIKE COMICS · сезон 2026 · выпуски 1–2
           </span>
-          <h1 className="cb-cover__title" style={ink({}, "0.35s")}>
+          <h1 className="cb-cover__title" style={ink({}, "0.45s")}>
             {["КАК БАЙКИ", "НАЧАЛИ", "ЗАРАБАТЫВАТЬ"].map((word, i) => (
               <Pop
                 key={word}
                 className={`cb-cover__line${word === "ЗАРАБАТЫВАТЬ" ? " cb-cover__line--accent" : ""}`}
-                style={ink({}, `${(0.7 + i * 0.25).toFixed(2)}s`)}
+                style={ink({}, `${(0.95 + i * 0.3).toFixed(2)}s`)}
               >
                 {word}
               </Pop>
             ))}
           </h1>
-          <p className="cb-cover__sub" style={ink({}, "1.5s")}>
+          <p className="cb-cover__sub" style={ink({}, "2s")}>
             Один вечер — и байки начали зарабатывать. Всё нарисованное — реально
             работает на платформе.
           </p>
-          <div className="cb-cover__price" aria-hidden="true" style={ink({}, "1.85s")}>
+          <div className="cb-cover__price" aria-hidden="true" style={ink({}, "2.4s")}>
             <span>ЦЕНА ВОПРОСА:</span>
             <b>10 минут вечера</b>
           </div>
-          <span className="cb-cover__cue" aria-hidden="true" style={ink({}, "2.2s")}>
+          <span className="cb-cover__cue" aria-hidden="true" style={ink({}, "2.9s")}>
             <i>▼</i> скролл — камера едет, следующий кадр уже выезжает
           </span>
         </div>
@@ -992,7 +990,7 @@ export default function ComicBookClient() {
       id: "finale",
       title: "ТВОЙ ХОД",
       num: "финал",
-      img: "/comic-book/final.png",
+      img: "/comic-book/final.webp",
       alt: "Рустам ведёт экипаж через мост на рассвете",
       accent: "cyan",
       kind: "splash",
@@ -1000,12 +998,12 @@ export default function ComicBookClient() {
         <>
           <Pop
             className="cb-caption"
-            style={ink({ maxWidth: "min(560px, 44%)", top: "26%", left: "4%" }, "0.9s")}
+            style={ink({ maxWidth: "min(560px, 44%)", top: "26%", left: "4%" }, "1.2s")}
           >
             Один вечер — две команды: байки катают, сцены гремят. Один движок —
             любой бизнес. Дальше по сценарию — ты.
           </Pop>
-          <div className="cb-scene__cta" style={ink({}, "2.4s")}>
+          <div className="cb-scene__cta" style={ink({}, "2.6s")}>
             <motion.a
               className="cb-final__btn"
               href="/salavey13"
@@ -1206,11 +1204,12 @@ export default function ComicBookClient() {
     },
 
     // ── тизер выпуска №3: BikeSoul — байки смотрят на читателя (splash) ────
+    // v9: без чипа-дубля (настроение уже в пузыре) и с однострочной сноской
     {
       id: "teaser",
       title: "БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ",
       num: "тизер · вып. 3",
-      img: "/comic-book/ep3-bike.png",
+      img: "/comic-book/ep3-bike.webp",
       alt: "Чёрный электроспортбайк смотрит прямо на читателя из неонового гаража, Рустам со спины в углу",
       accent: "gold",
       kind: "splash",
@@ -1219,45 +1218,45 @@ export default function ComicBookClient() {
         <>
           <Pop
             className="cb-caption"
-            style={ink({ maxWidth: "min(520px, 40%)", top: "26%", left: "4%" }, "0.9s")}
+            style={ink({ maxWidth: "min(520px, 40%)", top: "26%", left: "4%" }, "1.2s")}
           >
             Пока Рустам считал деньги, байки начали считать свои.
           </Pop>
           <Pop
             className="cb-bubble cb-bubble--agent"
-            style={ink({ top: "50%", left: "4%", width: "min(360px, 34%)" }, "1.4s")}
+            style={ink({ top: "50%", left: "4%", width: "min(360px, 34%)" }, "1.75s")}
           >
             Хозяин, я вообще-то уже 12 дней без работы.
           </Pop>
           <Pop
             className="cb-bubble"
-            style={ink({ top: "66%", right: "4%", width: "min(320px, 30%)" }, "1.75s")}
+            style={ink({ top: "66%", right: "4%", width: "min(320px, 30%)" }, "2.2s")}
           >
             Да я сам без выходных!
           </Pop>
-          <div className="cb-scene__footnote" style={ink({}, "2.2s")}>
+          <div className="cb-scene__footnote" style={ink({}, "2.7s")}>
             <div className="cb-teaser__hud">
               <span className="cb-teaser__chip cb-teaser__chip--level">
-                УРОВЕНЬ 5 · ГОРОДСКОЙ ВОЛК
+                УРОВЕНЬ 5 · ГОРОДСКОЙ ВОЛК · СКУЧАЕТ
                 <i aria-hidden="true">
                   <b style={{ width: "62%" }} />
                 </i>
               </span>
-              <span className="cb-teaser__chip cb-teaser__chip--mood">
-                НАСТРОЕНИЕ: СКУЧАЕТ · 12 ДНЕЙ БЕЗ ДОРОГИ
-              </span>
             </div>
             <p className="cb-teaser__punch">— Это не мои проблемы.</p>
             <p className="cb-teaser__note">
-              BikeSoul — механика из роадмапа: у каждого байка свой уровень,
-              характер и настроение. В разработке — комикс забежал вперёд.
+              BikeSoul — уровни, характер и настроение у каждого байка. Роадмап;
+              комикс забежал вперёд.
             </p>
           </div>
         </>
       ),
     },
 
-    // ── VIP BIKE UNIVERSE: сообщение трилогии (scroll) ─────────────────────
+    // ── ФИНАЛ v9: UNIVERSE + «КОНЕЦ ПЕРЕДАЧИ» в ОДНОМ кадре (scroll).
+    // Босс: «Shorten stuff at the end, seems wall of options» — было два
+    // кадра и десять ссылок (CTA×2 + chips×4 + credits×5 + nav×4), стал один
+    // кадр и три действия: Подключить · Перечитать · Telegram.
     {
       id: "universe",
       title: "СТАНЬ ВЛАДЕЛЬЦЕМ ЭКИПАЖА",
@@ -1267,43 +1266,27 @@ export default function ComicBookClient() {
       scrollable: true,
       chrome: false,
       node: (
-        <section className="cb-trilogy" style={ink({}, "0.3s")} aria-label="Сообщение трилогии">
-          <span className="cb-trilogy__kicker" style={ink({}, "0.5s")}>VIP BIKE UNIVERSE · сообщение трилогии</span>
-          <h2 className="cb-trilogy__title" style={ink({}, "0.8s")}>
+        <section className="cb-trilogy cb-trilogy--end" style={ink({}, "0.4s")} aria-label="Сообщение трилогии и конец выпуска">
+          <span className="cb-trilogy__kicker" style={ink({}, "0.65s")}>VIP BIKE UNIVERSE · конец передачи</span>
+          <h2 className="cb-trilogy__title" style={ink({}, "0.9s")}>
             ЗАЧЕМ ПРОСТО ЧУВСТВОВАТЬ СЕБЯ ВЛАДЕЛЬЦЕМ?
             <span className="cb-trilogy__title-accent">СТАНЬ ВЛАДЕЛЬЦЕМ ЭКИПАЖА.</span>
           </h2>
-          <div className="cb-universe" style={ink({}, "1.05s")}>
-            <p className="cb-universe__en">
-              Every bike has a story. Every rental creates a moment.
-              <br />
-              Every owner builds something bigger.
-            </p>
+          <div className="cb-universe" style={ink({}, "1.2s")}>
             <div className="cb-universe__motto" aria-hidden="true">
               <span>RIDE.</span>
               <span>EARN.</span>
               <span>EVOLVE.</span>
             </div>
           </div>
-          <p className="cb-trilogy__sub" style={ink({}, "1.4s")}>
-            Выпуск 1 — байки начали зарабатывать. Выпуск 2 — счётчик доказал.
-            Сезон продолжается:
+          <span className="cb-endslate__off" style={ink({}, "1.5s")}>
+            /// КОНЕЦ ПЕРЕДАЧИ ///
+          </span>
+          <p className="cb-endslate__next" style={ink({}, "1.8s")}>
+            Вып. 3 · «БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ» — уже в монтаже
+            <i className="cb-endslate__cursor" aria-hidden="true" />
           </p>
-          <div className="cb-trilogy__season" style={ink({}, "1.65s")}>
-            <span className="cb-trilogy__chip cb-trilogy__chip--done">
-              Вып. 1 · Свой сайт за вечер — прочитан ✓
-            </span>
-            <span className="cb-trilogy__chip cb-trilogy__chip--done">
-              Вып. 2 · Счётчик денег — только что ✓
-            </span>
-            <span className="cb-trilogy__chip cb-trilogy__chip--soon">
-              Вып. 3 · Байки тоже хотят кушать — тизер уже выше
-            </span>
-            <span className="cb-trilogy__chip cb-trilogy__chip--soon">
-              Вып. 4 · Кажется, это бизнес — в сценарии
-            </span>
-          </div>
-          <div className="cb-final__cta cb-trilogy__cta" style={ink({}, "2s")}>
+          <div className="cb-final__cta cb-trilogy__cta" style={ink({}, "2.15s")}>
             <motion.a
               className="cb-final__btn"
               href="/salavey13"
@@ -1313,91 +1296,37 @@ export default function ComicBookClient() {
             >
               Собрать свой экипаж →
             </motion.a>
-            <a className="cb-final__ghost" href="/franchize/discovery">
-              Кто уже варится
+            <a
+              className="cb-final__ghost"
+              href="#cover"
+              onClick={(e) => {
+                e.preventDefault();
+                e.currentTarget
+                  .closest(".cb-scene")
+                  ?.querySelector<HTMLElement>(".cb-scene__text")
+                  ?.scrollTo({ top: 0 });
+                restartRef.current?.();
+              }}
+            >
+              ⟲ Перечитать
             </a>
-            <a className="cb-final__ghost" href="/leorus">
-              Команда LEORUS
+            <a
+              className="cb-final__ghost"
+              href="https://t.me/onebikeplsbot/app?startapp=comic-book"
+            >
+              Telegram
             </a>
           </div>
+          <p className="cb-trilogy__fine" style={ink({}, "2.4s")}>
+            сценарий, код, звук — zai-агент VIP BIKE · панели — AI-иллюстрация ·
+            тарифы — живой каталог, ни одного выдуманного рубля · счёт № 0001 —
+            шутка, не оферта
+          </p>
         </section>
       ),
     },
-
-    // ── колофон → END SLATE «КОНЕЦ ПЕРЕДАЧИ» (scroll) ──────────────────────
-    {
-      id: "colophon",
-      title: "КОНЕЦ ПЕРЕДАЧИ",
-      num: "конец выпуска",
-      accent: "gold",
-      kind: "scroll",
-      scrollable: true,
-      chrome: false,
-      node: (
-        <footer className="cb-colophon" style={ink({}, "0.3s")}>
-          <div className="cb-endslate">
-            <span className="cb-endslate__off" style={ink({}, "0.5s")}>
-              /// КОНЕЦ ПЕРЕДАЧИ ///
-            </span>
-            <p className="cb-endslate__next" style={ink({}, "0.8s")}>
-              Вып. 3 · «БАЙКИ ТОЖЕ ХОТЯТ КУШАТЬ» — уже в монтаже
-              <i className="cb-endslate__cursor" aria-hidden="true" />
-            </p>
-            <div className="cb-endslate__actions" style={ink({}, "1.15s")}>
-              <a
-                className="cb-final__btn"
-                href="#cover"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.currentTarget
-                    .closest(".cb-scene")
-                    ?.querySelector<HTMLElement>(".cb-scene__text")
-                    ?.scrollTo({ top: 0 });
-                  restartRef.current?.();
-                }}
-              >
-                ⟲ Перечитать с обложки
-              </a>
-              <a
-                className="cb-final__ghost"
-                href="https://t.me/onebikeplsbot/app?startapp=comic-book"
-              >
-                Открыть в Telegram
-              </a>
-              <a className="cb-final__ghost" href="/salavey13">
-                Подключить экипаж
-              </a>
-            </div>
-            <dl className="cb-endslate__credits" style={ink({}, "1.45s")}>
-              {[
-                ["сценарий, код, звук", "zai-агент VIP BIKE"],
-                ["панели", "AI-иллюстрация"],
-                ["Рустам", "играет самого себя"],
-                ["тарифы и суммы", "живой каталог — ни одного выдуманного рубля"],
-                ["счёт № 0001", "шутливая оценка, не оферта"],
-              ].map(([role, name]) => (
-                <div key={role} className="cb-endslate__row">
-                  <dt>{role}</dt>
-                  <dd>{name}</dd>
-                </div>
-              ))}
-            </dl>
-            <p style={ink({}, "1.7s")}>
-              Выпуски 1–2 + счёт · панели AI · текст, SFX и счётчик — код ·
-              тарифы из живого каталога · счёт № 0001 — шутка, не оферта ·
-              один движок — любой бизнес: байки, сцены, твой черёд.
-            </p>
-            <nav aria-label="Комикс-навигация" style={ink({}, "1.95s")}>
-              <a href="/">На главную</a>
-              <a href="/salavey13">Как это устроено</a>
-              <a href="/leorus">Команда LEORUS</a>
-              <a href="/franchize/discovery">Кто уже варится</a>
-            </nav>
-          </div>
-        </footer>
-      ),
-    },
-  ];
+  ], [jsReady, invoiceOpen, bossTab, reduceMotion]);
+  scenesRef.current = scenes;
   scenesRef.current = scenes;
 
   return (
@@ -1424,7 +1353,7 @@ export default function ComicBookClient() {
         </a>
       </header>
 
-      {/* ── CB CINE v7: кадры + HUD; без JS — статичный вебтун ───────────── */}
+      {/* ── CB CINE v9: кадры + HUD; без JS — статичный вебтун ───────────── */}
       <CineEngine
         scenes={scenes}
         active={jsReady}

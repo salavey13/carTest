@@ -2514,10 +2514,12 @@ body.cb-cine-lock {
   left: 0;
   bottom: 0;
   height: 3px;
-  width: 0%;
+  width: 100%;
+  /* v9: прогресс через scaleX (композит) — width дёргал layout на каждый кадр */
+  transform: scaleX(0);
+  transform-origin: 0 50%;
   background: linear-gradient(90deg, var(--cb-cyan), var(--cb-yellow));
   box-shadow: 0 0 12px rgba(253, 224, 71, 0.5);
-  transition: width 0.22s steps(4, end);
   pointer-events: none;
 }
 
@@ -2539,32 +2541,33 @@ body.cb-cine-lock {
 
 /* базовая ступень: любой прямой ребёнок текстового слоя кадра.
    v7: ПЛАВНЫЙ каскад (босс: «8fps reference was mistake») — каждый
-   элемент едет 0.8s ease-out, порядок читается; steps остался только
-   на склейке кадров и живых фонах */
+   элемент едет ease-out, порядок читается; steps остался только
+   на склейке кадров. v9: едет ~1s и стартует позже (slow down
+   appearance) */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__text > * {
-  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
-    var(--ink-d, calc(0.9s * var(--ink-pace, 1))) both;
+  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(1.2s * var(--ink-pace, 1))) both;
 }
 
 /* титры кадра (номер + заголовок) — раньше всех */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__num {
-  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) calc(0.4s * var(--ink-pace, 1)) both;
+  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1) calc(0.55s * var(--ink-pace, 1)) both;
 }
 
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__title {
-  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) calc(0.6s * var(--ink-pace, 1)) both;
+  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1) calc(0.8s * var(--ink-pace, 1)) both;
 }
 
 /* нотификация прилетает сверху, ближе к финалу цепочки */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-notify-wrap {
-  animation: cb-ink-drop 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
-    var(--ink-d, calc(1.9s * var(--ink-pace, 1))) both;
+  animation: cb-ink-drop 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(2.3s * var(--ink-pace, 1))) both;
 }
 
 /* SFX — вишенка: панч с лёгким перелётом в самом конце */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-sfx {
-  animation: cb-ink-sfx 0.75s cubic-bezier(0.34, 1.35, 0.64, 1)
-    var(--ink-d, calc(2.2s * var(--ink-pace, 1))) both;
+  animation: cb-ink-sfx 0.9s cubic-bezier(0.34, 1.35, 0.64, 1)
+    var(--ink-d, calc(2.7s * var(--ink-pace, 1))) both;
 }
 
 /* дети составных блоков (обложка/титры/интерактив/UNIVERSE/end slate) —
@@ -2577,8 +2580,8 @@ body.cb-cine-lock {
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-choose > *,
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-trilogy > *,
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-endslate > * {
-  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
-    var(--ink-d, calc(0.8s * var(--ink-pace, 1))) both;
+  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(1.05s * var(--ink-pace, 1))) both;
 }
 
 /* счёт № 0001 раскрывается по клику — его ведёт framer (spring + exit),
@@ -3315,8 +3318,10 @@ body.cb-cine-lock {
   object-position: 50% 30%;
 }
 
-/* проявление панели: картинка въезжает каскадом (--pd от движка: 0/0.3/0.6s)
-   will-change — только у панелей текущего кадра (v8-перф) */
+/* проявление панели: картинка въезжает каскадом (--pd от движка: 0/0.42/0.84s)
+   will-change — только у панелей текущего кадра (v8-перф).
+   v9: въезд медленнее (1.05s, старт 0.6s) и после въезда панель ЖИВЁТ —
+   Ken Burns (см. v9-блок в конце файла; обе анимации описаны там же) */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
   animation: cb-panel-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
     calc((0.45s + var(--pd, 0s)) * var(--ink-pace, 1)) both;
@@ -3489,8 +3494,8 @@ body.cb-cine-lock {
 
 /* проявление стопки панели — тот же плавный каскад */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__text > * {
-  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
-    var(--ink-d, calc(0.9s * var(--ink-pace, 1))) both;
+  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(1.2s * var(--ink-pace, 1))) both;
 }
 
 /* ── планшет: 2 панели в ряд ─────────────────────────────────────────────── */
@@ -3741,4 +3746,106 @@ body.cb-cine-lock {
 
 @media (prefers-reduced-motion: reduce) {
   .cb-hud__more i { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CB CINE v9 (task186) — Ken Burns + темп + перф.
+   Босс: «make background images for comic sections animated a bit, not
+   static — zoom in a bit and make picture drift/zoom/slide slowly».
+   ─ Плавный Ken Burns ВМЕСТО steps(8)-idle: непрерывный зум/дрейф, глаз
+     читает движение, а не рывки раз в 2 секунды.
+   ─ ПАНЕЛИ разворота теперь тоже живые (были статичными вовсе).
+   ─ Перф: анимация ТОЛЬКО у видимого кадра (--cur/--under — уходящий кадр
+     доедает свой зум под накрывающим); у остальных слоёв ноль анимаций
+     (v8 имел cb-idle на всех splash-кадрах окна).
+   ─ Handoff со склейкой: входящая склейка cb-scene-img/cb-panel-in идёт
+     ПОСЛЕ Ken Burns в списке анимаций и с fill backwards — на 1050ms
+     она переопределяет зум, на финише отдаёт кадр ровно на его кейфрейме
+     (старт Ken Burns = финальный масштаб склейки — шва нет).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1. гасим вечно крутящийся steps-idle на ВСЕХ кадрах (перф v9) */
+.cb-cine--on .cb-scene__img,
+.cb-cine--on .cb-scene__blur {
+  animation: none;
+}
+
+/* 2. Ken Burns splash-кадров: текущий + уходящий (пока его накрывают) */
+.cb-cine--on:not(.cb-cine--rm) :is(.cb-scene--cur, .cb-scene--under) .cb-scene__img {
+  animation:
+    cb-kb-scene 34s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
+    cb-scene-img 1050ms steps(8, end) backwards;
+  will-change: transform;
+}
+
+.cb-cine--on:not(.cb-cine--rm) :is(.cb-scene--cur, .cb-scene--under) .cb-scene__blur {
+  animation: cb-kb-blur 41s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+  will-change: transform;
+}
+
+/* старт зума = финал склейки (cb-scene-img кончается на scale 1.07) — шва нет */
+@keyframes cb-kb-scene {
+  from { transform: scale(1.07) translate3d(0.4%, 0.3%, 0); }
+  to   { transform: scale(1.15) translate3d(-1.4%, -0.9%, 0); }
+}
+
+/* блюр-подложка обложки: свой дрейф от её статичного scale(1.12) */
+@keyframes cb-kb-blur {
+  from { transform: scale(1.12) translate3d(0.6%, -0.4%, 0); }
+  to   { transform: scale(1.21) translate3d(-0.9%, 0.6%, 0); }
+}
+
+/* 3. Ken Burns панелей разворота + медленный въезд (v9: 1.05s, старт 0.6s) */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
+  animation:
+    cb-kb-panel 28s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
+    cb-panel-in 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
+      calc((0.6s + var(--pd, 0s)) * var(--ink-pace, 1)) backwards;
+  will-change: transform, opacity;
+}
+
+/* чётные панели дрейфуют в обратную сторону — разворот «дышит» разнонаправленно */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel:nth-child(even) .cb-panel__img {
+  animation-direction: alternate-reverse, alternate;
+}
+
+/* от scale(1) — совпадает с финалом cb-panel-in (transform: none), шва нет;
+   overscan держит запас под дрейф: сдвиг ≤ (scale-1)/2 */
+@keyframes cb-kb-panel {
+  from { transform: scale(1) translate3d(0, 0, 0); }
+  to   { transform: scale(1.09) translate3d(1.5%, -1.1%, 0); }
+}
+
+/* 4. мобайл: блюр-подложке хватит статики (GPU бюджет — панелям),
+   радиус блюра ниже — 28px на маленьком экране бьёт по композитору */
+@media (max-width: 860px) {
+  .cb-cine--on .cb-scene__blur {
+    animation: none !important;
+    filter: blur(16px) brightness(0.5) saturate(1.1);
+  }
+}
+
+/* ═══════════ v9 — финал в один кадр (босс: «wall of options») ═════════════ */
+.cb-trilogy--end {
+  display: grid;
+  justify-items: center;
+  gap: clamp(10px, 2vh, 18px);
+  text-align: center;
+  padding: clamp(24px, 6vh, 64px) clamp(14px, 3vw, 40px) 24px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.cb-trilogy--end .cb-trilogy__title {
+  margin: 0;
+}
+
+.cb-trilogy__fine {
+  margin: 4px 0 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(10px, 1.05vw, 12.5px);
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+  color: rgba(244, 240, 250, 0.62);
+  max-width: 640px;
 }
