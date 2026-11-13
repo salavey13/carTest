@@ -2254,10 +2254,10 @@ body.cb-cine-lock {
   max-width: none;
   padding: 0;
   background: var(--cb-bg);
-  /* v6.2 «медитация»: единый темп проявления — вся цепочка --ink-d
-     умножается на этот коэффициент (босс: «still too fast» — числа
-     растянуты в 1.6 раза; крутим ОДНУ цифру, а не сорок задержек) */
-  --ink-pace: 1.6;
+  /* v7: единый темп проявления — вся цепочка --ink-d умножается на этот
+     коэффициент (сейчас 1: базовый каскад уже медленный и плавный;
+     крутим ОДНУ цифру, а не сорок задержек) */
+  --ink-pace: 1;
 }
 
 .cb-cine--on .cb-scene {
@@ -2532,32 +2532,33 @@ body.cb-cine-lock {
 }
 
 /* базовая ступень: любой прямой ребёнок текстового слоя кадра.
-   v6.2: каждый элемент проявляется дольше (0.65s, 6 шагов) и позже —
-   все задержки умножены на --ink-pace (единый темп, см. .cb-cine__stage) */
+   v7: ПЛАВНЫЙ каскад (босс: «8fps reference was mistake») — каждый
+   элемент едет 0.8s ease-out, порядок читается; steps остался только
+   на склейке кадров и живых фонах */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__text > * {
-  animation: cb-ink 0.65s steps(6, end)
-    var(--ink-d, calc(0.6s * var(--ink-pace, 1.6))) both;
+  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(0.9s * var(--ink-pace, 1))) both;
 }
 
 /* титры кадра (номер + заголовок) — раньше всех */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__num {
-  animation: cb-ink 0.65s steps(6, end) calc(0.35s * var(--ink-pace, 1.6)) both;
+  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) calc(0.4s * var(--ink-pace, 1)) both;
 }
 
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-scene__title {
-  animation: cb-ink 0.65s steps(6, end) calc(0.5s * var(--ink-pace, 1.6)) both;
+  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) calc(0.6s * var(--ink-pace, 1)) both;
 }
 
 /* нотификация прилетает сверху, ближе к финалу цепочки */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-notify-wrap {
-  animation: cb-ink-drop 0.7s steps(6, end)
-    var(--ink-d, calc(1.65s * var(--ink-pace, 1.6))) both;
+  animation: cb-ink-drop 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(1.9s * var(--ink-pace, 1))) both;
 }
 
-/* SFX — вишенка: панч со вращением в самом конце */
+/* SFX — вишенка: панч с лёгким перелётом в самом конце */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-sfx {
-  animation: cb-ink-sfx 0.7s steps(6, end)
-    var(--ink-d, calc(1.9s * var(--ink-pace, 1.6))) both;
+  animation: cb-ink-sfx 0.75s cubic-bezier(0.34, 1.35, 0.64, 1)
+    var(--ink-d, calc(2.2s * var(--ink-pace, 1))) both;
 }
 
 /* дети составных блоков (обложка/титры/интерактив/UNIVERSE/end slate) —
@@ -2570,8 +2571,8 @@ body.cb-cine-lock {
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-choose > *,
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-trilogy > *,
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-endslate > * {
-  animation: cb-ink 0.65s steps(6, end)
-    var(--ink-d, calc(0.8s * var(--ink-pace, 1.6))) both;
+  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(0.8s * var(--ink-pace, 1))) both;
 }
 
 /* счёт № 0001 раскрывается по клику — его ведёт framer (spring + exit),
@@ -3236,5 +3237,427 @@ body.cb-cine-lock {
 
   .cb-endslate__actions .cb-final__btn {
     text-align: center;
+  }
+}
+
+/* ═══════════════ CB CINE v7 — РАЗВОРОТЫ (супер-идея босса) ═════════════════
+   PC: 3 портретные панели в ряд · планшет: 2 · мобайл: 1 (свайп вбок).
+   Те же картинки для всех раскладок; splash-кадры остались fullscreen.
+   Проявление: плавный каскад — панель за панелью (--pd 0.3s), внутри
+   панели каптион → пузыри → нотификация → SFX. */
+
+.cb-scene--row {
+  /* разворот: ряд портретных панелей по центру кадра */
+  --cb-vis: 3;
+  --cb-gap: clamp(10px, 1.5vw, 22px);
+}
+
+.cb-spread {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(14px, 2.4vw, 30px);
+  /* верх — под фиксированную мачту, чтобы бейджи панелей не прятались */
+  padding-top: 78px;
+  overflow: hidden;
+}
+
+.cb-spread__track {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: var(--cb-gap);
+  width: 100%;
+  height: 100%;
+  transform: translate3d(calc(var(--pidx, 0) * (-100% / var(--cb-vis, 3))), 0, 0);
+  transition: transform 0.42s steps(3, end);
+  will-change: transform;
+}
+
+.cb-panel {
+  position: relative;
+  flex: 0 0 calc((100% - (var(--cb-vis, 3) - 1) * var(--cb-gap)) / var(--cb-vis, 3));
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--cb-bg);
+  border: 3px solid var(--cb-ink);
+  border-radius: 8px;
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.55), 6px 6px 0 rgba(11, 11, 15, 0.6);
+}
+
+.cb-panel__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 30%;
+  will-change: transform, opacity;
+}
+
+/* проявление панели: картинка въезжает каскадом (--pd от движка: 0/0.3/0.6s) */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
+  animation: cb-panel-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
+    calc((0.45s + var(--pd, 0s)) * var(--ink-pace, 1)) both;
+}
+
+@keyframes cb-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* телефон II·02 вместо картинки — тёмная панель с неоновой рамкой */
+.cb-panel__custom {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(232, 121, 249, 0.16), transparent 60%),
+    radial-gradient(120% 70% at 50% 100%, rgba(34, 211, 238, 0.14), transparent 60%),
+    var(--cb-bg);
+}
+
+.cb-panel__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 11, 15, 0.42) 0%,
+    rgba(11, 11, 15, 0) 24%,
+    rgba(11, 11, 15, 0) 44%,
+    rgba(11, 11, 15, 0.62) 78%,
+    rgba(11, 11, 15, 0.82) 100%
+  );
+}
+
+/* бейдж-номер и заголовок панели (как в настоящем комиксе);
+   .cb-scene--row — перебивает старые статичные стили v5 */
+.cb-scene--row .cb-panel__num {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 9px;
+  border-radius: 3px;
+  transform: rotate(-2deg);
+  background: rgba(11, 11, 15, 0.8);
+  border: 2px solid currentColor;
+}
+
+.cb-panel--cyan .cb-panel__num { color: var(--cb-cyan); }
+.cb-panel--magenta .cb-panel__num { color: var(--cb-magenta); }
+.cb-panel--gold .cb-panel__num { color: var(--cb-yellow); }
+
+.cb-scene--row .cb-panel__title {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  z-index: 3;
+  margin: 0;
+  padding: 0;
+  max-width: calc(100% - 24px);
+  font-family: 'Unbounded', sans-serif;
+  font-weight: 800;
+  font-size: clamp(13px, 1.25vw, 17px);
+  line-height: 1.12;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(10, 5, 18, 0.95), 0 0 22px rgba(34, 211, 238, 0.25);
+}
+
+.cb-scene--row .cb-panel__title::after {
+  width: 72px;
+  height: 4px;
+  margin-top: 5px;
+}
+
+/* стопка текста панели: нотиф → пузыри → (телефон) → каптион снизу */
+.cb-panel__text {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 12px 12px 14px;
+  overflow: hidden;
+}
+
+/* внутри панели ВСЁ в потоке — никаких абсолютных координат кадра */
+.cb-cine--on .cb-scene--row .cb-caption,
+.cb-cine--on .cb-scene--row .cb-bubble,
+.cb-cine--on .cb-scene--row .cb-notify-wrap,
+.cb-cine--on .cb-scene--row .cb-terminal {
+  position: static !important;
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0;
+}
+
+.cb-cine--on .cb-scene--row .cb-caption {
+  margin-top: 0;
+  font-size: clamp(11.5px, 0.95vw, 14px);
+  line-height: 1.45;
+}
+
+.cb-cine--on .cb-scene--row .cb-bubble {
+  font-size: clamp(11px, 0.9vw, 13.5px);
+}
+
+.cb-cine--on .cb-scene--row .cb-notify-wrap {
+  margin-bottom: 2px;
+}
+
+.cb-cine--on .cb-scene--row .cb-notify {
+  max-width: 100%;
+}
+
+/* SFX-стикер над панелью — абсолют, верхний правый угол */
+.cb-cine--on .cb-scene--row .cb-panel .cb-sfx {
+  position: absolute !important;
+  top: 11%;
+  right: 3%;
+  left: auto;
+  bottom: auto;
+  z-index: 3;
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 34px);
+  text-align: right;
+}
+
+/* счёт вечера (easter) */
+.cb-panel__score {
+  margin-top: 0;
+  background: var(--cb-caption);
+  color: var(--cb-ink);
+  border: 3px solid var(--cb-ink);
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 rgba(11, 11, 15, 0.6);
+  padding: clamp(8px, 1.4vw, 13px) clamp(11px, 1.8vw, 17px);
+}
+
+.cb-panel__score span {
+  display: block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: clamp(10.5px, 0.85vw, 13px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cb-panel__score p {
+  margin: 4px 0 0;
+  font-size: clamp(11px, 0.9vw, 13.5px);
+  line-height: 1.4;
+}
+
+/* проявление стопки панели — тот же плавный каскад */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__text > * {
+  animation: cb-ink 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
+    var(--ink-d, calc(0.9s * var(--ink-pace, 1))) both;
+}
+
+/* ── планшет: 2 панели в ряд ─────────────────────────────────────────────── */
+@media (min-width: 861px) and (max-width: 1099px) {
+  .cb-scene--row {
+    --cb-vis: 2;
+  }
+}
+
+/* ── мобайл: 1 панель, свайп вбок листает панели разворота ───────────────── */
+@media (max-width: 860px) {
+  .cb-scene--row {
+    --cb-vis: 1;
+    --cb-gap: 14px;
+  }
+
+  .cb-spread {
+    padding: 10px;
+    padding-top: 64px;
+  }
+
+  .cb-spread__track {
+    transition: transform 0.4s steps(3, end);
+  }
+
+  .cb-panel {
+    border-width: 2px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 4px 4px 0 rgba(11, 11, 15, 0.6);
+  }
+
+  .cb-panel__title {
+    font-size: clamp(14px, 4.1vw, 18px);
+    padding-top: 22px;
+  }
+
+  .cb-cine--on .cb-scene--row .cb-caption {
+    font-size: clamp(12px, 3.3vw, 14.5px);
+  }
+
+  .cb-cine--on .cb-scene--row .cb-bubble {
+    font-size: clamp(12px, 3.2vw, 14px);
+  }
+
+  /* старый мобильный блок глушит абсолютные позиции с !important —
+     SFX панели всё-таки стикер над картинкой, возвращаем */
+  .cb-cine--on .cb-scene--row .cb-panel .cb-sfx {
+    position: absolute !important;
+    display: inline-block;
+    margin: 0;
+    top: 9%;
+    right: 4%;
+    font-size: clamp(24px, 7.6vw, 38px);
+    text-align: right;
+  }
+}
+
+/* ── reduce motion: панели без каскада ───────────────────────────────────── */
+.cb-cine--rm .cb-panel__img,
+.cb-cine--rm .cb-panel__text > *,
+.cb-cine--rm .cb-panel .cb-sfx {
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+/* ── no-JS / боты: разворот — вертикальный вебтун из портретных панелей ──── */
+.cb-root:not(.cb-js) .cb-scene--row .cb-spread {
+  position: static;
+  height: auto;
+  padding: 10px;
+}
+
+.cb-root:not(.cb-js) .cb-spread__track {
+  flex-direction: column;
+  height: auto;
+  transform: none !important;
+  transition: none;
+}
+
+.cb-root:not(.cb-js) .cb-panel {
+  flex: none;
+  height: auto;
+}
+
+.cb-root:not(.cb-js) .cb-panel__img {
+  position: relative;
+  inset: auto;
+  height: auto;
+  aspect-ratio: 4 / 7;
+  object-position: 50% 32%;
+}
+
+.cb-root:not(.cb-js) .cb-panel__text {
+  position: relative;
+  inset: auto;
+}
+
+.cb-root:not(.cb-js) .cb-panel .cb-caption,
+.cb-root:not(.cb-js) .cb-panel .cb-bubble,
+.cb-root:not(.cb-js) .cb-panel .cb-notify-wrap,
+.cb-root:not(.cb-js) .cb-panel .cb-terminal {
+  position: static !important;
+  width: auto !important;
+  max-width: 100% !important;
+}
+
+.cb-root:not(.cb-js) .cb-panel__text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── HUD: кнопка автоплея (▶/⏸) ──────────────────────────────────────────── */
+.cb-hud__auto {
+  position: absolute;
+  right: 34px;
+  bottom: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cb-cyan);
+  background: rgba(11, 11, 15, 0.72);
+  border: 2px solid rgba(34, 211, 238, 0.55);
+  border-radius: 999px;
+  padding: 8px 14px 8px 11px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.cb-hud__auto:hover {
+  border-color: var(--cb-cyan);
+  color: #fff;
+}
+
+.cb-hud__auto.is-on {
+  color: var(--cb-yellow);
+  border-color: rgba(253, 224, 71, 0.75);
+  background: rgba(253, 224, 71, 0.12);
+  animation: cb-autopulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cb-autopulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(253, 224, 71, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(253, 224, 71, 0.12); }
+}
+
+@media (max-width: 860px) {
+  .cb-hud__auto {
+    right: 14px;
+    bottom: 14px;
+    padding: 7px 12px 7px 10px;
+  }
+}
+
+/* v7-фикс: старый статичный режим v5 прятал .cb-panel до появления
+   .is-visible (обозреватель скролла из v5 больше не существует) — в cine
+   панели проявляет каскад cb-panel-in, призраков гасим */
+.cb-cine--on .cb-scene--row .cb-panel {
+  opacity: 1;
+  translate: none;
+  transition: none;
+}
+
+/* v7-фикс II·02: телефон в слоте «картинки» панели — в верхней зоне,
+   стопка текста (пузырь+каптион) живёт снизу как у всех панелей */
+.cb-scene--row .cb-panel__custom {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 30px 10px 168px;
+}
+
+.cb-scene--row .cb-panel__custom .cb-scene__phonebox {
+  position: static;
+  transform-origin: top center;
+  max-width: 100%;
+}
+
+@media (max-width: 860px) {
+  .cb-scene--row .cb-panel__custom {
+    padding: 18px 8px 176px;
   }
 }

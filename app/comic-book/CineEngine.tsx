@@ -2,68 +2,78 @@
 
 // /app/comic-book/CineEngine.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// CB CINE v6 (task186) — движок «кинематографического комикса».
+// CB CINE v7 (task186) — движок «кинематографического комикса», развороты.
 //
-// Босс: «we are kinda creating new media type, between comics and video —
-// scrolling should feel like "moving pictures that look like 8fps anime";
-// each next section on top of previous; sections adaptive and fullscreen
-// (PC landscape / mobile fullscreen portrait); while scrolling not actually
-// scroll, but after threshold roughly equal to screen height switch section».
-//
-// Как это работает:
-//  • сцены (кадры) — fullscreen-секции; в режиме cine СТРАНИЦА НЕ СКРОЛЛИТСЯ:
-//    колесо/тач копятся в виртуальную позицию, и когда набегает порог
-//    (~пол-экрана, «roughly screen height» по жесту) — следующий кадр
-//    НАКРЫВАЕТ предыдущий (translateY 100%→0);
-//  • переход — CSS steps(8, end): 8 дискретных кадров ≈ 8fps аниме;
-//    предыдущий кадр под ним отъезжает камерой (scale 1→0.92, затемнение);
-//  • каждый кадр «живой»: фон медленно зумится/панорамирует с steps(8)
-//    (moving pictures); reduce-motion → резкая склейка без зума;
-//  • сцены с контентом выше экрана (Ведомость, UNIVERSE, счёт) помечены
-//    scrollable — внутри кадра скроллится контент, сцена не переключается,
-//    пока внутренний скролл не упрётся в край;
-//  • HUD: рейка кадров справа (кликабельна), счётчик «КАДР 03/26» с титром,
-//    подсказка «СКРОЛЛ = КАМЕРА» до первого жеста + лента-заряд внизу;
-//  • v6.1 peek-отклик: во время жеста следующий кадр физически ВЫЕЗЖАЕТ
-//    из-за края (до ~130px, ступенчато steps(4)), лента-заряд заполняется —
-//    скролл всегда «что-то делает», даже до порога (босс: «user must
-//    understand that when he scroll not "nothing is happening" but almost
-//    next section is shown»); склейка стартует с той позиции, до которой
-//    кадр уже выехал (var --peek-start) — без рывка назад;
-//  • v6.1 последовательное проявление: элементы кадра появляются цепочкой
-//    со своими задержками (--ink-d в CSS, steps-ступени), а не разом;
-//  • v6.2 медитация: вся цепочка --ink-d умножается на --ink-pace (1.6),
-//    ступени проявления длиннее (0.65s/6 шагов), склейка 1050ms —
-//    босс: «still too fast» после v6.1;
-//  • v6.1 restartRef: последний кадр («КОНЕЦ ПЕРЕДАЧИ») держит кнопку
-//    «перечитать с обложки» → go(0);
-//  • deep-link: каждый кадр пишет свой #hash (history.replaceState), на входе
-//    прыжок в кадр из hash; no-JS / боты / скриншотеры: движок спит, сцены
-//    лежат обычной стопкой (статичный вебтун) — весь контент виден.
+// Эволюция: v6 — fullscreen-кадры, скролл = камера, порог ≈ пол-экрана,
+// следующий кадр накрывает предыдущий (steps-склейка). v6.1 — peek-выезд
+// следующего кадра до порога + цепочка проявления. v6.2 — --ink-pace.
+// v7 (супер-идея босса) — КОМИКС-СТРАНИЦА:
+//  • кадры двух типов: splash (обложка/титры/финал — fullscreen) и row
+//    («разворот»: ряд ПОРТРЕТНЫХ панелей — 3 в ряд на PC, 2 на планшете,
+//    1 на мобиле); картинки панелей одни и те же для всех раскладок;
+//  • мобайл: панели разворота листаются ГОРИЗОНТАЛЬНЫМ свайпом (трек с
+//    steps-перекаткой, у пальца край следующей панели выезжает 1:1);
+//    у края разворота свайп перекатывается на соседний разворот (кинокадр);
+//  • вертикальный скролл/свайп = следующий разворот (как в v6, с peek и
+//    лентой-зарядом);
+//  • анти-проскас: после каждой склейки кулдаун 550мс — жесты игнорируются
+//    БЕЗ очереди, один жест = один кадр (босс: «sometimes scrolling too fast
+//    i skip more than one frame»);
+//  • АВТОПЛЕЙ: таймер сам ведёт комикс (на мобиле — панель за панелью,
+//    на PC — разворот за разворотом; scroll-кадры дольше и автоскроллятся
+//    до низа); ЛЮБОЙ ручной жест ставит автоплей на паузу (onAutoInterrupt);
+//    прогресс тика рисуется лентой-зарядом в HUD;
+//  • проявление v7: НЕ steps-ступени (босс: «8fps reference was mistake»),
+//    а плавный каскад — панель за панелью (0.3s сдвиг), внутри панели
+//   caption → пузыри → нотификация → SFX, каждый элемент едет ~0.8s
+//    ease-out — глаз успевает прочитать каждое появление; темп всей цепочки
+//    по-прежнему умножается на --ink-pace из CSS;
+//  • клавиатура: ↑/↓/Space/PgUp/PgDn — развороты, ←/→ — панели;
+//  • deep-link #hash кадра, no-JS/боты — статичный вебтун (движок спит).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+
+export type CineAccent = "cyan" | "magenta" | "gold";
+
+export type CinePanelDef = {
+  key: string;
+  num?: string; // бейдж панели (01, II·03, GLITCH...)
+  title?: string; // заголовок панели
+  accent: CineAccent;
+  img?: string;
+  alt?: string;
+  custom?: "phone"; // вместо картинки — интерактивный телефон (узел в phone)
+  phone?: ReactNode; // слот «картинки» для custom-панели
+  node: ReactNode; // стопка текста панели (каптион снизу, пузыри выше)
+  sfx?: ReactNode; // стикер-восклицание поверх панели
+};
 
 export type CineSceneDef = {
   id: string;
   title: string;
   num?: string;
+  accent?: CineAccent;
+  sound?: string;
+  // splash — fullscreen-кадр (обложка, титры, финал, тизер):
   img?: string;
   alt?: string;
-  accent?: "cyan" | "magenta" | "gold";
-  contain?: boolean; // картинка ~1:1 (обложка) — вписать, а не обрезать
-  scrollable?: boolean; // внутри кадра скроллится контент
-  shake?: boolean; // тряска кадра (II·05)
-  glitch?: boolean; // скан-линии поверх кадра
-  sound?: string; // SFX при показе кадра
-  chrome?: boolean; // титры кадра (номер + заголовок); false — узел рисует своё
-  overlay?: ReactNode; // слой НАД картинкой, но вне скроллящегося текстового слоя (cue обложки на мобиле)
-  node: ReactNode; // текстовый слой (титры, пузыри, кастомные блоки)
+  contain?: boolean;
+  chrome?: boolean; // рисовать номер+заголовок кадра
+  overlay?: ReactNode;
+  node?: ReactNode;
+  shake?: boolean;
+  glitch?: boolean;
+  // row — разворот из портретных панелей:
+  panels?: CinePanelDef[];
+  // scroll — fullscreen-кадр с внутренним скроллом (счёт, Ведомость...):
+  scrollable?: boolean;
 };
 
 // синхронно с CSS-переменными анимации (steps(8), 1050ms — v6.2 медленный кадр)
 const TRANS_MS = 1050;
 const RM_MS = 220;
+const COOLDOWN_MS = 550; // анти-проскас: тишина после каждой склейки
 
 export default function CineEngine({
   scenes,
@@ -71,32 +81,72 @@ export default function CineEngine({
   reduceMotion,
   onSceneShown,
   restartRef,
+  auto,
+  onAutoToggle,
+  onAutoInterrupt,
+  onAutoEnd,
 }: {
   scenes: CineSceneDef[];
   active: boolean;
   reduceMotion: boolean;
   onSceneShown?: (index: number) => void;
   restartRef?: { current: (() => void) | null };
+  auto: boolean; // автоплей включён (кнопка/звук)
+  onAutoToggle?: () => void; // клик по кнопке ⏸/▶ в HUD
+  onAutoInterrupt?: () => void; // ручной жест — пауза автоплея
+  onAutoEnd?: () => void; // автоплей дошёл до конца
 }) {
   const [idx, setIdx] = useState(0);
+  const [pidx, setPidx] = useState(0);
   const [moved, setMoved] = useState(false);
+  const [narrow, setNarrow] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const idxRef = useRef(0);
+  const pidxRef = useRef(0);
   const lockRef = useRef(false);
-  const accRef = useRef(0);
-  const pendRef = useRef<0 | 1 | -1>(0);
-  const touchRef = useRef<{ y: number; scrollEl: HTMLElement | null } | null>(null);
+  const coolRef = useRef(0); // until-timestamp кулдауна анти-проскаса
+  const accRef = useRef(0); // накопитель вертикального жеста
+  const hAccRef = useRef(0); // накопитель горизонтального жеста (тачпад dx)
+  const touchRef = useRef<{
+    x: number;
+    y: number;
+    axis: "x" | "y" | null;
+    axisData?: number; // для горизонтали — текущий px-офсет трека
+    lastX?: number; // последний clientX жеста (для решения на touchend)
+    scrollEl: HTMLElement | null;
+    used: boolean; // жест уже привёл к склейке — до touchend тишина
+  } | null>(null);
   const tapeRef = useRef<HTMLDivElement | null>(null);
   const idleRef = useRef<number | null>(null);
   const peekRef = useRef<{ dir: 1 | -1; px: number } | null>(null);
   const rmRef = useRef(reduceMotion);
   const shownRef = useRef(onSceneShown);
   const scenesRef = useRef(scenes);
+  const narrowRef = useRef(false);
+  const autoRef = useRef(auto);
   useEffect(() => {
     rmRef.current = reduceMotion;
     shownRef.current = onSceneShown;
     scenesRef.current = scenes;
+    autoRef.current = auto;
   });
+  useEffect(() => {
+    narrowRef.current = narrow;
+  }, [narrow]);
+
+  // мобайл < 861px — панели по одной (горизонтальная навигация активна)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 860px)");
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  const visiblePanels = useCallback((s: CineSceneDef | undefined) => {
+    if (!s || s.kind !== "row") return 1;
+    return narrowRef.current ? 1 : Math.min(s.panels?.length ?? 1, window.innerWidth < 1100 ? 2 : 3);
+  }, []);
 
   // вне окна [i-1, i+1] кадры скрываются (DOM-атрибут hidden) — экономим
   // память и не даём сотням оверлеев одновременно слушать IO
@@ -115,13 +165,12 @@ export default function CineEngine({
         "cb-scene--from-t",
         "cb-scene--under",
       );
+      const track = node.querySelector<HTMLElement>(".cb-spread__track");
+      if (track) track.style.transform = "";
     });
   }, []);
 
-  // ── v6.1 peek: жест вытягивает край следующего кадра из-за границы ───────
-  // до порога переключения скролл уже видимо «что-то делает»: кадр-сосед
-  // выезжает на 2…130px (ступенчатая трансишка steps(4)), текущий чуть
-  // отъезжает камерой (--cb-pull), лента-заряд в HUD заполняется.
+  // ── v6.1 peek (вертикаль): жест вытягивает край следующего кадра ─────────
   const resetPeek = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -151,7 +200,6 @@ export default function CineEngine({
       const r = Math.max(0, Math.min(1, ratio));
       const maxPeek = Math.round(Math.min(window.innerHeight * 0.16, 130));
       const p = Math.max(2, Math.min(maxPeek, Math.round(px ?? r * maxPeek)));
-      // гасим peek в противоположную сторону, если направление сменилось
       [i - 1, i + 1].forEach((k) => {
         if (k === targetIdx) return;
         const el = stage.children[k] as HTMLElement | undefined;
@@ -187,8 +235,14 @@ export default function CineEngine({
     }, 260);
   }, [resetPeek]);
 
+  const cooldown = useCallback(() => {
+    coolRef.current = Date.now() + COOLDOWN_MS;
+  }, []);
+  const inCooldown = useCallback(() => Date.now() < coolRef.current, []);
+
+  // ── смена кадра (вертикаль) ───────────────────────────────────────────────
   const go = useCallback(
-    (next: number) => {
+    (next: number, opts?: { force?: boolean }) => {
       const total = scenesRef.current.length;
       const cur = idxRef.current;
       const target = Math.max(0, Math.min(total - 1, next));
@@ -196,21 +250,20 @@ export default function CineEngine({
         accRef.current = 0;
         return;
       }
-      if (lockRef.current) {
-        pendRef.current = target > cur ? 1 : -1;
-        return;
-      }
+      if (!opts?.force && (lockRef.current || inCooldown())) return; // анти-проскас: без очереди
+      if (lockRef.current && !opts?.force) return;
       lockRef.current = true;
+      cooldown();
       const dir: 1 | -1 = target > cur ? 1 : -1;
       const stage = stageRef.current;
       const from = stage?.children[cur] as HTMLElement | undefined;
       const to = stage?.children[target] as HTMLElement | undefined;
       idxRef.current = target;
+      pidxRef.current = 0;
       setIdx(target);
+      setPidx(0);
       setMoved(true);
       if (from && to) {
-        // peek-непрерывность: склейка стартует с того края, до которого кадр
-        // уже выехал во время жеста (иначе виден рывок назад к 102%)
         const ps = peekRef.current;
         const fromPeek = ps && ps.dir === dir && target === cur + dir ? ps.px : null;
         peekRef.current = null;
@@ -233,6 +286,8 @@ export default function CineEngine({
         from.classList.add("cb-scene--under");
         to.classList.add("cb-scene--cur");
         to.hidden = false;
+        const text = to.querySelector<HTMLElement>(".cb-scene__text");
+        if (text) text.scrollTop = 0;
       }
       shownRef.current?.(target);
       try {
@@ -244,26 +299,64 @@ export default function CineEngine({
         () => {
           lockRef.current = false;
           prune(idxRef.current);
-          const p = pendRef.current;
-          pendRef.current = 0;
-          if (p !== 0) go(idxRef.current + p);
         },
         rmRef.current ? RM_MS + 40 : TRANS_MS + 40,
       );
     },
-    [prune],
+    [cooldown, inCooldown, prune],
+  );
+
+  // ── смена панели внутри разворота (горизонталь, мобайл/планшет) ───────────
+  const goPanel = useCallback(
+    (delta: 1 | -1, opts?: { force?: boolean }) => {
+      const s = scenesRef.current[idxRef.current];
+      const total = s?.panels?.length ?? 0;
+      if (!s || s.kind !== "row" || total <= 1) {
+        // панелей нет — горизонталь у края перетекает в соседний кадр
+        go(idxRef.current + delta, opts);
+        return;
+      }
+      const vis = visiblePanels(s);
+      const next = pidxRef.current + delta;
+      if (next >= 0 && next + vis <= total && next !== pidxRef.current) {
+        if (!opts?.force && (lockRef.current || inCooldown())) return;
+        lockRef.current = true;
+        cooldown();
+        pidxRef.current = next;
+        setPidx(next);
+        // сброс инлайн-офсета пальца — дальше ведёт CSS (--pidx + steps)
+        const track = stageRef.current
+          ?.children[idxRef.current]
+          ?.querySelector<HTMLElement>(".cb-spread__track");
+        if (track) track.style.transform = "";
+        window.setTimeout(
+          () => {
+            lockRef.current = false;
+          },
+          rmRef.current ? RM_MS + 40 : 460,
+        );
+        return;
+      }
+      // у края панели — перетекаем на соседний разворот (кинокадр)
+      if (next < 0 || next + vis > total) go(idxRef.current + delta, opts);
+    },
+    [go, inCooldown, cooldown, visiblePanels],
   );
 
   // v6.1: кнопка «перечитать с обложки» в последнем кадре → go(0)
   useEffect(() => {
     if (!restartRef) return;
-    restartRef.current = () => go(0);
+    restartRef.current = () => {
+      pidxRef.current = 0;
+      setPidx(0);
+      go(0, { force: true });
+    };
     return () => {
       restartRef.current = null;
     };
   }, [restartRef, go]);
 
-  // внутренний вертикальный скролл (Ведомость, UNIVERSE, счёт) живёт своей
+  // внутренний вертикальный скролл (счёт, Ведомость, UNIVERSE) живёт своей
   // жизнью: сцена не переключается, пока он не упёрся в край
   const canScrollY = (el: HTMLElement | null, dy: number) => {
     if (!el || el.scrollHeight <= el.clientHeight + 1) return false;
@@ -272,28 +365,43 @@ export default function CineEngine({
       : el.scrollTop > 0;
   };
 
-  // ── колесо / тачпад: виртуальная лента кадра ─────────────────────────────
+  // ── колесо / тачпад: вертикаль = кадры, горизонталь = панели ─────────────
   useEffect(() => {
     if (!active) return;
     const stage = stageRef.current;
     if (!stage) return;
 
+    const manual = () => {
+      if (autoRef.current) onAutoInterrupt?.();
+    };
+
     const onWheel = (e: WheelEvent) => {
       const t = e.target as Element | null;
       const sc = t?.closest?.("[data-cb-scroll], .cb-scene__text") as HTMLElement | null;
-      if (canScrollY(sc, e.deltaY)) return; // внутри скроллимого блока — native
+      const dx = e.deltaMode === 1 ? e.deltaX * 24 : e.deltaX;
+      const dyRaw = e.deltaMode === 1 ? e.deltaY * 24 : e.deltaMode === 2 ? e.deltaY * window.innerHeight : e.deltaY;
+      // горизонталь (тачпад dx / shift+wheel): доминирует над вертикалью
+      if (Math.abs(dx) > Math.abs(dyRaw) * 1.2 && Math.abs(dx) > 12) {
+        if (canScrollY(sc, dyRaw)) return;
+        e.preventDefault();
+        manual();
+        hAccRef.current += dx;
+        const th = 140;
+        const ratio = Math.min(1, Math.abs(hAccRef.current) / th);
+        if (ratio > 0.05) idleReset();
+        if (Math.abs(hAccRef.current) >= th || Math.abs(dx) >= 60) {
+          goPanel(hAccRef.current > 0 ? 1 : -1);
+          hAccRef.current = 0;
+        }
+        return;
+      }
+      hAccRef.current = 0;
+      if (canScrollY(sc, dyRaw)) return; // внутри скроллимого блока — native
       e.preventDefault();
-      const dy =
-        e.deltaMode === 1
-          ? e.deltaY * 24
-          : e.deltaMode === 2
-            ? e.deltaY * window.innerHeight
-            : e.deltaY;
+      manual();
+      const dy = dyRaw;
       accRef.current += dy;
-      // порог ≈ пол-экрана жеста (босс: «threshold roughly equal to screen
-      // height»); одиночный круткий flick (≥150) переключает сразу
       const th = Math.min(480, Math.max(240, window.innerHeight * 0.5));
-      // до порога кадр-сосед уже выезжает — скролл всегда что-то делает
       const ratio = Math.min(1, Math.abs(accRef.current) / th);
       if (ratio > 0.04) {
         showPeek(accRef.current >= 0 ? 1 : -1, ratio);
@@ -310,32 +418,87 @@ export default function CineEngine({
     const onTouchStart = (e: TouchEvent) => {
       const t = e.target as Element | null;
       const sc = t?.closest?.("[data-cb-scroll], .cb-scene__text") as HTMLElement | null;
-      touchRef.current = { y: e.touches[0].clientY, scrollEl: sc };
+      touchRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        axis: null,
+        scrollEl: sc,
+        used: false,
+      };
     };
 
     const onTouchMove = (e: TouchEvent) => {
       const st = touchRef.current;
-      if (!st) return;
+      if (!st || st.used) return;
+      const dx = e.touches[0].clientX - st.x;
       const dy = st.y - e.touches[0].clientY;
-      if (canScrollY(st.scrollEl, dy)) return; // внутри скроллимого блока
-      if (Math.abs(dy) < 10) return;
-      e.preventDefault();
-      const dir: 1 | -1 = dy > 0 ? 1 : -1;
-      // палец тянет край следующего кадра 1:1 (до ~100px)
-      if (Math.abs(dy) < 64) {
-        showPeek(dir, Math.abs(dy) / 64, Math.round(Math.abs(dy) * 1.6));
-        idleReset();
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (!st.axis) st.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? "x" : "y";
+      if (st.axis === "y") {
+        if (canScrollY(st.scrollEl, dy)) return;
+        e.preventDefault();
+        manual();
+        const dir: 1 | -1 = dy > 0 ? 1 : -1;
+        if (Math.abs(dy) < 64) {
+          showPeek(dir, Math.abs(dy) / 64, Math.round(Math.abs(dy) * 1.6));
+          idleReset();
+          return;
+        }
+        go(idxRef.current + dir);
+        st.used = true; // один свайп — один кадр (анти-проскас)
+        resetPeek();
         return;
       }
-      go(idxRef.current + dir);
-      if (!lockRef.current) {
-        touchRef.current = { y: e.touches[0].clientY, scrollEl: st.scrollEl };
-      }
-      resetPeek();
+      // горизонталь: панели разворота
+      const s = scenesRef.current[idxRef.current];
+      const total = s?.panels?.length ?? 0;
+      const vis = visiblePanels(s);
+      if (s?.kind !== "row" || total <= vis) return; // листать нечего
+      e.preventDefault();
+      manual();
+      const step = (stage.clientWidth || window.innerWidth) / vis;
+      const track = stage
+        .children[idxRef.current]
+        ?.querySelector<HTMLElement>(".cb-spread__track");
+      if (!track) return;
+      const base = -(pidxRef.current * step);
+      // палец тянет контент за собой: свайп влево (dx<0) уводит трек влево
+      const off = Math.max(-step * (total - vis), Math.min(0, base + dx));
+      track.style.transform = `translate3d(${off}px,0,0)`;
+      st.axisData = off;
+      st.lastX = e.touches[0].clientX;
+      idleReset();
     };
 
     const onTouchEnd = () => {
+      const st = touchRef.current;
       touchRef.current = null;
+      if (st?.axis === "x" && st.lastX !== undefined) {
+        const s = scenesRef.current[idxRef.current];
+        const total = s?.panels?.length ?? 0;
+        const vis = visiblePanels(s);
+        const step = (stage.clientWidth || window.innerWidth) / vis;
+        // решение по сырому свайпу пальца — у края панели трек зажат,
+        // но жест всё равно должен перекатывать на соседний разворот
+        const dxTotal = st.lastX - st.x;
+        const delta = dxTotal < -step * 0.22 ? 1 : dxTotal > step * 0.22 ? -1 : 0;
+        if (delta !== 0) {
+          const next = pidxRef.current + delta;
+          if (next >= 0 && next + vis <= total) {
+            manual();
+            goPanel(delta);
+          } else {
+            manual();
+            go(idxRef.current + delta);
+          }
+        } else {
+          // возврат панели на место
+          const track = stage
+            .children[idxRef.current]
+            ?.querySelector<HTMLElement>(".cb-spread__track");
+          if (track) track.style.transform = "";
+        }
+      }
       idleReset();
     };
 
@@ -350,9 +513,9 @@ export default function CineEngine({
       stage.removeEventListener("touchmove", onTouchMove);
       stage.removeEventListener("touchend", onTouchEnd);
     };
-  }, [active, go, showPeek, resetPeek, idleReset]);
+  }, [active, go, goPanel, showPeek, resetPeek, idleReset, visiblePanels]);
 
-  // ── клавиатура: стрелки / PgUp / PgDn / Space / Home / End ───────────────
+  // ── клавиатура: ↑↓ развороты, ←→ панели ───────────────────────────────────
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
@@ -362,29 +525,39 @@ export default function CineEngine({
         case "ArrowDown":
         case "PageDown":
         case " ":
-        case "ArrowRight":
           e.preventDefault();
+          if (autoRef.current) onAutoInterrupt?.();
           go(idxRef.current + 1);
           break;
         case "ArrowUp":
         case "PageUp":
+          e.preventDefault();
+          if (autoRef.current) onAutoInterrupt?.();
+          go(idxRef.current - 1);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (autoRef.current) onAutoInterrupt?.();
+          goPanel(1);
+          break;
         case "ArrowLeft":
           e.preventDefault();
-          go(idxRef.current - 1);
+          if (autoRef.current) onAutoInterrupt?.();
+          goPanel(-1);
           break;
         case "Home":
           e.preventDefault();
-          go(0);
+          go(0, { force: true });
           break;
         case "End":
           e.preventDefault();
-          go(scenesRef.current.length - 1);
+          go(scenesRef.current.length - 1, { force: true });
           break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, go]);
+  }, [active, go, goPanel, onAutoInterrupt]);
 
   // ── активация: прыжок по #hash, prune окна, лок скролла body ────────────
   useEffect(() => {
@@ -406,13 +579,93 @@ export default function CineEngine({
   // предзагрузка пары следующих кадров — склейка без белых вспышек
   useEffect(() => {
     if (!active) return;
+    const collect = (s?: CineSceneDef) => [s?.img, ...(s?.panels ?? []).map((p) => p.img)];
     for (const s of [scenesRef.current[idx + 1], scenesRef.current[idx + 2]]) {
-      if (s?.img) {
-        const im = new window.Image();
-        im.src = s.img;
+      for (const src of collect(s)) {
+        if (src) {
+          const im = new window.Image();
+          im.src = src;
+        }
       }
     }
   }, [active, idx]);
+
+  // ── АВТОПЛЕЙ: таймер ведёт комикс; лента-заряд = прогресс тика ───────────
+  useEffect(() => {
+    if (!active || !auto) {
+      if (tapeRef.current) tapeRef.current.style.width = "0%";
+      return;
+    }
+    let raf = 0;
+    let alive = true;
+    const tickDur = () => {
+      const s = scenesRef.current[idxRef.current];
+      if (s?.scrollable) return 10500;
+      if (s?.kind === "row" && narrowRef.current && (s.panels?.length ?? 0) > 1) return 4200;
+      return 7200;
+    };
+    const advance = () => {
+      const s = scenesRef.current[idxRef.current];
+      const last = idxRef.current >= scenesRef.current.length - 1;
+      if (last) {
+        onAutoEnd?.();
+        return;
+      }
+      if (s?.kind === "row" && narrowRef.current) {
+        const total = s.panels?.length ?? 1;
+        const next = pidxRef.current + 1;
+        if (next < total) {
+          goPanel(1, { force: true });
+          return;
+        }
+      }
+      go(idxRef.current + 1, { force: true });
+    };
+    const loop = () => {
+      if (!alive) return;
+      const t0 = performance.now();
+      const dur = tickDur();
+      const step = (t: number) => {
+        if (!alive) return;
+        const r = Math.min(1, (t - t0) / dur);
+        if (tapeRef.current) tapeRef.current.style.width = `${Math.round(r * 100)}%`;
+        if (r >= 1) {
+          advance();
+          if (alive && idxRef.current < scenesRef.current.length - 1) loop();
+        } else {
+          raf = requestAnimationFrame(step);
+        }
+      };
+      raf = requestAnimationFrame(step);
+    };
+    loop();
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+      if (tapeRef.current) tapeRef.current.style.width = "0%";
+    };
+  }, [active, auto, idx, pidx, go, goPanel, onAutoEnd]);
+
+  // scroll-кадры при автоплее плавно едут до низа
+  useEffect(() => {
+    if (!active || !auto) return;
+    const s = scenesRef.current[idx];
+    if (!s?.scrollable) return;
+    const stage = stageRef.current;
+    const el = stage?.children[idx]?.querySelector<HTMLElement>(".cb-scene__text");
+    if (!el) return;
+    el.scrollTop = 0;
+    const dur = 7800;
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const r = Math.min(1, (t - t0) / dur);
+      el.scrollTop = (el.scrollHeight - el.clientHeight) * r;
+      if (r < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [active, auto, idx]);
 
   const cur = scenes[idx] ?? scenes[0];
 
@@ -428,10 +681,11 @@ export default function CineEngine({
             data-title={s.title}
             className={[
               "cb-scene",
+              s.kind === "row" ? "cb-scene--row" : "cb-scene--full",
+              s.kind === "scroll" ? "cb-scene--scroll" : "",
               `cb-scene--${s.accent ?? "cyan"}`,
               s.img ? "" : "cb-scene--nopic",
               s.contain ? "cb-scene--contain" : "",
-              s.scrollable ? "cb-scene--scroll" : "",
               s.shake ? "cb-scene--shake" : "",
               s.glitch ? "cb-scene--glitch" : "",
             ]
@@ -440,34 +694,75 @@ export default function CineEngine({
             aria-label={s.title}
             {...(s.scrollable ? { "data-cb-scroll": "" } : {})}
           >
-            {s.img && (
-              <>
+            {s.kind === "row" ? (
+              <div className="cb-spread">
                 <div
-                  className="cb-scene__blur"
-                  style={{ backgroundImage: `url(${s.img})` }}
-                  aria-hidden="true"
-                />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="cb-scene__img"
-                  src={s.img}
-                  alt={s.alt ?? ""}
-                  {...(i < 2 ? {} : { loading: "lazy" as const })}
-                  draggable={false}
-                />
-              </>
-            )}
-            <div className="cb-scene__scrim" aria-hidden="true" />
-            {s.overlay}
-            {s.chrome !== false && (
+                  className="cb-spread__track"
+                  style={{ ["--pidx" as string]: String(pidx) }}
+                >
+                  {(s.panels ?? []).map((p, k) => (
+                    <figure
+                      key={p.key}
+                      className={`cb-panel cb-panel--${p.accent}`}
+                      style={{ ["--pd" as string]: `${(k * 0.3).toFixed(2)}s` }}
+                    >
+                      {p.custom === "phone" && p.phone ? (
+                        <div className="cb-panel__custom">{p.phone}</div>
+                      ) : (
+                        p.img && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            className="cb-panel__img"
+                            src={p.img}
+                            alt={p.alt ?? ""}
+                            loading={i < 2 ? undefined : "lazy"}
+                            draggable={false}
+                          />
+                        )
+                      )}
+                      <span className="cb-panel__scrim" aria-hidden="true" />
+                      <span className="cb-panel__num" aria-hidden="true">
+                        {p.num ?? p.key}
+                      </span>
+                      {p.title && <b className="cb-panel__title">{p.title}</b>}
+                      {p.sfx}
+                      <div className="cb-panel__text">{p.node}</div>
+                    </figure>
+                  ))}
+                </div>
+              </div>
+            ) : (
               <>
-                <span className="cb-scene__num" aria-hidden="true">
-                  {s.num ?? String(i + 1).padStart(2, "0")}
-                </span>
-                <h2 className="cb-scene__title">{s.title}</h2>
+                {s.img && (
+                  <>
+                    <div
+                      className="cb-scene__blur"
+                      style={{ backgroundImage: `url(${s.img})` }}
+                      aria-hidden="true"
+                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className="cb-scene__img"
+                      src={s.img}
+                      alt={s.alt ?? ""}
+                      {...(i < 2 ? {} : { loading: "lazy" as const })}
+                      draggable={false}
+                    />
+                  </>
+                )}
+                <div className="cb-scene__scrim" aria-hidden="true" />
+                {s.overlay}
+                {s.chrome !== false && (
+                  <>
+                    <span className="cb-scene__num" aria-hidden="true">
+                      {s.num ?? String(i + 1).padStart(2, "0")}
+                    </span>
+                    <h2 className="cb-scene__title">{s.title}</h2>
+                  </>
+                )}
+                <div className="cb-scene__text">{s.node}</div>
               </>
             )}
-            <div className="cb-scene__text">{s.node}</div>
           </section>
         ))}
       </div>
@@ -480,26 +775,49 @@ export default function CineEngine({
               <button
                 key={s.id}
                 type="button"
-                className={`cb-hud__dot${i === idx ? " is-here" : ""}${s.img ? "" : " cb-hud__dot--card"}`}
+                className={`cb-hud__dot${i === idx ? " is-here" : ""}${s.panels ? " cb-hud__dot--row" : ""}`}
                 title={`Кадр ${i + 1} · ${s.title}`}
                 aria-label={`Кадр ${i + 1}: ${s.title}`}
                 aria-current={i === idx ? "true" : undefined}
-                onClick={() => go(i)}
+                onClick={() => {
+                  if (autoRef.current) onAutoInterrupt?.();
+                  go(i, { force: true });
+                }}
               />
             ))}
           </div>
+          <button
+            type="button"
+            className={`cb-hud__auto${auto ? " is-on" : ""}`}
+            onClick={() => onAutoToggle?.()}
+            aria-pressed={auto}
+            title={auto ? "Пауза автоплея" : "Автоплей"}
+          >
+            {auto ? "⏸" : "▶"}
+            <span>авто</span>
+          </button>
           <div className="cb-hud__count" role="status">
             <b>{String(idx + 1).padStart(2, "0")}</b>
             <span>/ {String(scenes.length).padStart(2, "0")}</span>
-            <i>{cur?.num ? `${cur.num} · ` : ""}{cur?.title}</i>
+            <i>
+              {cur?.num ? `${cur.num} · ` : ""}
+              {cur?.title}
+              {narrow && cur?.kind === "row" && (cur.panels?.length ?? 0) > 1
+                ? ` · панель ${pidx + 1}/${cur.panels?.length}`
+                : ""}
+            </i>
           </div>
           {!moved && (
             <div className="cb-hud__hint" aria-hidden="true">
               <span>СКРОЛЛ = КАМЕРА</span>
-              <i>крути до упора — следующий кадр уже выезжает</i>
+              <i>
+                {narrow
+                  ? "свайп вбок — панели · скролл — следующий кадр"
+                  : "крути до упора — следующий кадр уже выезжает"}
+              </i>
             </div>
           )}
-          {/* лента-заряд: заполняется по мере прокрутки, склейка сбрасывает */}
+          {/* лента-заряд: жест до порога / прогресс автоплея */}
           <div className="cb-hud__tape" ref={tapeRef} aria-hidden="true" />
         </div>
       )}
