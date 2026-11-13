@@ -2278,6 +2278,13 @@ body.cb-cine-lock {
   height: 100%;
   object-fit: cover;
   object-position: 50% 30%;
+}
+
+/* v8-перф: will-change только на кадрах в переходе/текущем окне — у остальных
+   слои продвигает бесконечная cb-idle-анимация и без подсказки */
+.cb-cine--on .cb-scene--cur .cb-scene__img,
+.cb-cine--on .cb-scene--in .cb-scene__img,
+.cb-cine--on .cb-scene--peek .cb-scene__img {
   will-change: transform;
 }
 
@@ -2306,7 +2313,6 @@ body.cb-cine-lock {
   background-position: center 32%;
   filter: blur(28px) brightness(0.5) saturate(1.15);
   transform: scale(1.12);
-  will-change: transform;
 }
 
 .cb-cine--on .cb-scene__scrim {
@@ -3010,6 +3016,12 @@ body.cb-cine-lock {
 /* ═══════════ МОБАЙЛ / ПОРТРЕТ: кадр сверху, текст перерисован снизу ═════ */
 
 @media (max-width: 860px) {
+  /* v8-фикс босса: фиксированная мачта перекрывала героя — все кадры
+     начинаются ПОД мачтой (у сцены свой фон, шов не виден) */
+  .cb-cine--on .cb-scene {
+    top: 64px;
+  }
+
   .cb-cine--on .cb-scene__img {
     height: 52%;
     object-position: 50% 26%;
@@ -3065,14 +3077,14 @@ body.cb-cine-lock {
   }
 
   .cb-cine--on .cb-scene__num {
-    top: 66px;
+    top: 10px;
     left: 12px;
     font-size: 10px;
     padding: 5px 10px;
   }
 
   .cb-cine--on .cb-scene__title {
-    top: 106px;
+    top: 44px;
     left: 14px;
     font-size: clamp(14px, 4.4vw, 19px);
     max-width: 72%;
@@ -3089,7 +3101,7 @@ body.cb-cine-lock {
     top: 0;
     height: 100%;
     inset: 0;
-    padding: 178px 16px 110px;
+    padding: 96px 16px 110px;
   }
 
   .cb-cine--on .cb-cinecover {
@@ -3127,7 +3139,7 @@ body.cb-cine-lock {
   }
 
   .cb-cine--on .cb-scene--scroll .cb-scene__text {
-    padding: 178px 16px 118px;
+    padding: 96px 16px 118px;
   }
 
   .cb-hud__rail {
@@ -3273,6 +3285,11 @@ body.cb-cine-lock {
   height: 100%;
   transform: translate3d(calc(var(--pidx, 0) * (-100% / var(--cb-vis, 3))), 0, 0);
   transition: transform 0.42s steps(3, end);
+}
+
+/* v8-перф: will-change только у активного кадра — 16 промотированных слоёв
+   жрали GPU-память на мобиле */
+.cb-cine--on .cb-scene--cur .cb-spread__track {
   will-change: transform;
 }
 
@@ -3296,13 +3313,14 @@ body.cb-cine-lock {
   height: 100%;
   object-fit: cover;
   object-position: 50% 30%;
-  will-change: transform, opacity;
 }
 
-/* проявление панели: картинка въезжает каскадом (--pd от движка: 0/0.3/0.6s) */
+/* проявление панели: картинка въезжает каскадом (--pd от движка: 0/0.3/0.6s)
+   will-change — только у панелей текущего кадра (v8-перф) */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
   animation: cb-panel-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
     calc((0.45s + var(--pd, 0s)) * var(--ink-pace, 1)) both;
+  will-change: transform, opacity;
 }
 
 @keyframes cb-panel-in {
@@ -3491,7 +3509,13 @@ body.cb-cine-lock {
 
   .cb-spread {
     padding: 10px;
-    padding-top: 64px;
+    /* v8: сцена уже начинается под мачтой — бейджам хватит обычного отступа */
+    padding-top: 12px;
+  }
+
+  /* v8-фикс босса: HUD (счётчик + АВТО) больше не лежит на тексте панели */
+  .cb-panel__text {
+    padding: 12px 12px 62px;
   }
 
   .cb-spread__track {
@@ -3590,6 +3614,8 @@ body.cb-cine-lock {
   right: 34px;
   bottom: 16px;
   z-index: 10;
+  /* v8-фикс: кнопка наследовала pointer-events:none от .cb-hud и не кликалась */
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -3660,4 +3686,59 @@ body.cb-cine-lock {
   .cb-scene--row .cb-panel__custom {
     padding: 18px 8px 176px;
   }
+}
+
+/* ── v8: чип «→ ещё N» — в развороте есть скрытые части ────────────────────
+   Босс: «make it more visibly obvious that there are additional horizontal
+   parts in section». Чип у правого края (у рейки на PC), пульсирует при
+   вертикальном жесте на развороте; вертикальный скролл сам едет по панелям. */
+.cb-hud__more {
+  position: absolute;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cb-ink);
+  background: var(--cb-yellow);
+  border: 2px solid var(--cb-ink);
+  border-radius: 999px;
+  padding: 8px 13px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 rgba(11, 11, 15, 0.6);
+  transition: transform 0.15s ease;
+}
+
+.cb-hud__more:hover {
+  transform: translateY(-50%) translate(-1px, -1px);
+  box-shadow: 5px 5px 0 rgba(11, 11, 15, 0.6);
+}
+
+.cb-hud__more i {
+  font-style: normal;
+  animation: cb-more-arrow 1.05s steps(2, jump-none) infinite;
+}
+
+@keyframes cb-more-arrow {
+  0%, 100% { transform: translateX(-2px); }
+  50% { transform: translateX(3px); }
+}
+
+@media (max-width: 860px) {
+  .cb-hud__more {
+    right: 10px;
+    padding: 7px 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-hud__more i { animation: none; }
 }

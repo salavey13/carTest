@@ -2,7 +2,7 @@
 
 // /app/comic-book/CineEngine.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// CB CINE v7 (task186) — движок «кинематографического комикса», развороты.
+// CB CINE v8 (task186) — движок «кинематографического комикса», развороты.
 //
 // Эволюция: v6 — fullscreen-кадры, скролл = камера, порог ≈ пол-экрана,
 // следующий кадр накрывает предыдущий (steps-склейка). v6.1 — peek-выезд
@@ -30,9 +30,28 @@
 //    по-прежнему умножается на --ink-pace из CSS;
 //  • клавиатура: ↑/↓/Space/PgUp/PgDn — развороты, ←/→ — панели;
 //  • deep-link #hash кадра, no-JS/боты — статичный вебтун (движок спит).
+//
+// v8 (текущий) — раунд босса после v7:
+//  • ВЕРТИКАЛЬ ЕДЕТ ПО ПАНЕЛЯМ: на развороте со скрытыми панелями вертикальный
+//    скролл/свайп/↓ сначала листает панели, у края перетекает в соседний кадр
+//    («keeping just scrolling down i skipped these horisontal sections»);
+//    вместо peek-выезда соседнего кадра пульсирует чип «ещё N» в HUD;
+//  • чип «→ ещё N» — всегда видно, что в развороте есть скрытые части
+//    (кликабелен), счётчик «панель N/M» теперь на всех раскладках;
+//  • ПЕРФ: кадр вынесен в memo-компонент (свайп панели перерисовывает один
+//    кадр, а не все 16), will-change только на активных кадрах, decoding=async;
+//  • фиксы: .cb-hud__auto не имел pointer-events:auto (кнопка не кликалась —
+//    наследовала none от .cb-hud), на мобиле кадры начинаются под мачтой.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 export type CineAccent = "cyan" | "magenta" | "gold";
 
@@ -75,6 +94,115 @@ const TRANS_MS = 1050;
 const RM_MS = 220;
 const COOLDOWN_MS = 550; // анти-проскас: тишина после каждой склейки
 
+// ── v8-перф: кадр вынесен в memo-компонент ──────────────────────────────────
+// Свайп панели / смена кадра перерисовывает только затронутые кадры, а не все
+// 16 (каждый кадр — сто+ узлов; на мобиле это была главная причина джанка).
+// Классы cb-scene--cur/--in/--under по-прежнему ведёт DOM (prune/go) — здесь
+// только статика кадра и --pidx его трека.
+const SceneView = memo(function SceneView({
+  s,
+  i,
+  pidxFor,
+  eager,
+}: {
+  s: CineSceneDef;
+  i: number;
+  pidxFor: number;
+  eager: boolean;
+}) {
+  return (
+    <section
+      data-scene={s.id}
+      data-title={s.title}
+      className={[
+        "cb-scene",
+        s.kind === "row" ? "cb-scene--row" : "cb-scene--full",
+        s.kind === "scroll" ? "cb-scene--scroll" : "",
+        `cb-scene--${s.accent ?? "cyan"}`,
+        s.img ? "" : "cb-scene--nopic",
+        s.contain ? "cb-scene--contain" : "",
+        s.shake ? "cb-scene--shake" : "",
+        s.glitch ? "cb-scene--glitch" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label={s.title}
+      {...(s.scrollable ? { "data-cb-scroll": "" } : {})}
+    >
+      {s.kind === "row" ? (
+        <div className="cb-spread">
+          <div className="cb-spread__track" style={{ ["--pidx" as string]: String(pidxFor) }}>
+            {(s.panels ?? []).map((p, k) => (
+              <figure
+                key={p.key}
+                className={`cb-panel cb-panel--${p.accent}`}
+                style={{ ["--pd" as string]: `${(k * 0.3).toFixed(2)}s` }}
+              >
+                {p.custom === "phone" && p.phone ? (
+                  <div className="cb-panel__custom">{p.phone}</div>
+                ) : (
+                  p.img && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      className="cb-panel__img"
+                      src={p.img}
+                      alt={p.alt ?? ""}
+                      loading={eager ? undefined : "lazy"}
+                      decoding="async"
+                      draggable={false}
+                    />
+                  )
+                )}
+                <span className="cb-panel__scrim" aria-hidden="true" />
+                <span className="cb-panel__num" aria-hidden="true">
+                  {p.num ?? p.key}
+                </span>
+                {p.title && <b className="cb-panel__title">{p.title}</b>}
+                {p.sfx}
+                <div className="cb-panel__text">{p.node}</div>
+              </figure>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {s.img && (
+            <>
+              <div
+                className="cb-scene__blur"
+                style={{ backgroundImage: `url(${s.img})` }}
+                aria-hidden="true"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="cb-scene__img"
+                src={s.img}
+                alt={s.alt ?? ""}
+                {...(eager
+                  ? { fetchPriority: "high" as const }
+                  : { loading: "lazy" as const })}
+                decoding="async"
+                draggable={false}
+              />
+            </>
+          )}
+          <div className="cb-scene__scrim" aria-hidden="true" />
+          {s.overlay}
+          {s.chrome !== false && (
+            <>
+              <span className="cb-scene__num" aria-hidden="true">
+                {s.num ?? String(i + 1).padStart(2, "0")}
+              </span>
+              <h2 className="cb-scene__title">{s.title}</h2>
+            </>
+          )}
+          <div className="cb-scene__text">{s.node}</div>
+        </>
+      )}
+    </section>
+  );
+});
+
 export default function CineEngine({
   scenes,
   active,
@@ -100,6 +228,7 @@ export default function CineEngine({
   const [pidx, setPidx] = useState(0);
   const [moved, setMoved] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const [mid, setMid] = useState(false); // 861–1099px — две панели в ряд
   const stageRef = useRef<HTMLDivElement>(null);
   const idxRef = useRef(0);
   const pidxRef = useRef(0);
@@ -138,6 +267,15 @@ export default function CineEngine({
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 860px)");
     const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  // планшет 861–1099px — --cb-vis: 2 (для чипа «ещё N» и счётчика панелей)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1099px)");
+    const apply = () => setMid(mq.matches);
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
@@ -306,6 +444,34 @@ export default function CineEngine({
     [cooldown, inCooldown, prune],
   );
 
+  // ── v8: вертикальный жест на развороте со скрытыми панелями ───────────────
+  // Пока в направлении жеста есть скрытые панели — вертикаль листает ПАНЕЛИ
+  // (rowStep=true), у края разворота перетекает в соседний кадр (как раньше).
+  const rowStep = useCallback(
+    (dir: 1 | -1): boolean => {
+      const s = scenesRef.current[idxRef.current];
+      if (!s || s.kind !== "row") return false;
+      const total = s.panels?.length ?? 0;
+      const vis = visiblePanels(s);
+      if (total <= vis) return false;
+      return dir === 1 ? pidxRef.current + vis < total : pidxRef.current > 0;
+    },
+    [visiblePanels],
+  );
+
+  const chipRef = useRef<HTMLButtonElement | null>(null);
+  // вместо peek-выезда соседнего кадра — пульс чипа «ещё N» (жест «что-то делает»)
+  const nudgeChip = useCallback(() => {
+    chipRef.current?.animate(
+      [
+        { transform: "translateY(-50%) scale(1)" },
+        { transform: "translateY(-50%) scale(1.22)" },
+        { transform: "translateY(-50%) scale(1)" },
+      ],
+      { duration: 380, easing: "ease-out" },
+    );
+  }, []);
+
   // ── смена панели внутри разворота (горизонталь, мобайл/планшет) ───────────
   const goPanel = useCallback(
     (delta: 1 | -1, opts?: { force?: boolean }) => {
@@ -404,12 +570,20 @@ export default function CineEngine({
       const th = Math.min(480, Math.max(240, window.innerHeight * 0.5));
       const ratio = Math.min(1, Math.abs(accRef.current) / th);
       if (ratio > 0.04) {
-        showPeek(accRef.current >= 0 ? 1 : -1, ratio);
+        // v8: на развороте со скрытыми панелями peek не показывает соседний
+        // кадр (вертикаль поедет по панелям) — пульсирует чип «ещё N»
+        const dir: 1 | -1 = accRef.current >= 0 ? 1 : -1;
+        if (rowStep(dir)) nudgeChip();
+        else showPeek(dir, ratio);
         idleReset();
       }
       if (Math.abs(e.deltaY) >= 150 || Math.abs(accRef.current) >= th) {
         const dir: 1 | -1 = (Math.abs(e.deltaY) >= 150 ? e.deltaY : accRef.current) > 0 ? 1 : -1;
-        go(idxRef.current + dir);
+        if (rowStep(dir)) {
+          goPanel(dir); // v8: вертикаль листает панели разворота
+        } else {
+          go(idxRef.current + dir);
+        }
         accRef.current = 0;
         resetPeek();
       }
@@ -440,12 +614,17 @@ export default function CineEngine({
         manual();
         const dir: 1 | -1 = dy > 0 ? 1 : -1;
         if (Math.abs(dy) < 64) {
-          showPeek(dir, Math.abs(dy) / 64, Math.round(Math.abs(dy) * 1.6));
+          if (rowStep(dir)) nudgeChip(); // v8: на развороте — пульс чипа вместо peek
+          else showPeek(dir, Math.abs(dy) / 64, Math.round(Math.abs(dy) * 1.6));
           idleReset();
           return;
         }
-        go(idxRef.current + dir);
-        st.used = true; // один свайп — один кадр (анти-проскас)
+        if (rowStep(dir)) {
+          goPanel(dir); // v8: свайп вниз листает панели разворота
+        } else {
+          go(idxRef.current + dir);
+        }
+        st.used = true; // один свайп — один шаг (анти-проскас)
         resetPeek();
         return;
       }
@@ -513,7 +692,7 @@ export default function CineEngine({
       stage.removeEventListener("touchmove", onTouchMove);
       stage.removeEventListener("touchend", onTouchEnd);
     };
-  }, [active, go, goPanel, showPeek, resetPeek, idleReset, visiblePanels]);
+  }, [active, go, goPanel, showPeek, resetPeek, idleReset, visiblePanels, rowStep, nudgeChip]);
 
   // ── клавиатура: ↑↓ развороты, ←→ панели ───────────────────────────────────
   useEffect(() => {
@@ -527,13 +706,15 @@ export default function CineEngine({
         case " ":
           e.preventDefault();
           if (autoRef.current) onAutoInterrupt?.();
-          go(idxRef.current + 1);
+          if (rowStep(1)) goPanel(1); // v8: ↓ едет по панелям разворота
+          else go(idxRef.current + 1);
           break;
         case "ArrowUp":
         case "PageUp":
           e.preventDefault();
           if (autoRef.current) onAutoInterrupt?.();
-          go(idxRef.current - 1);
+          if (rowStep(-1)) goPanel(-1);
+          else go(idxRef.current - 1);
           break;
         case "ArrowRight":
           e.preventDefault();
@@ -557,7 +738,7 @@ export default function CineEngine({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, go, goPanel, onAutoInterrupt]);
+  }, [active, go, goPanel, onAutoInterrupt, rowStep]);
 
   // ── активация: прыжок по #hash, prune окна, лок скролла body ────────────
   useEffect(() => {
@@ -601,7 +782,12 @@ export default function CineEngine({
     const tickDur = () => {
       const s = scenesRef.current[idxRef.current];
       if (s?.scrollable) return 10500;
-      if (s?.kind === "row" && narrowRef.current && (s.panels?.length ?? 0) > 1) return 4200;
+      if (s?.kind === "row") {
+        // v8: на любой раскладке тик короче, пока в развороте есть скрытые панели
+        const vis = visiblePanels(s);
+        const total = s.panels?.length ?? 1;
+        if (total > vis && pidxRef.current + vis < total) return 4200;
+      }
       return 7200;
     };
     const advance = () => {
@@ -611,10 +797,11 @@ export default function CineEngine({
         onAutoEnd?.();
         return;
       }
-      if (s?.kind === "row" && narrowRef.current) {
+      if (s?.kind === "row") {
+        // v8: автоплей едет панель за панелью на всех раскладках
+        const vis = visiblePanels(s);
         const total = s.panels?.length ?? 1;
-        const next = pidxRef.current + 1;
-        if (next < total) {
+        if (total > vis && pidxRef.current + vis < total) {
           goPanel(1, { force: true });
           return;
         }
@@ -644,7 +831,7 @@ export default function CineEngine({
       cancelAnimationFrame(raf);
       if (tapeRef.current) tapeRef.current.style.width = "0%";
     };
-  }, [active, auto, idx, pidx, go, goPanel, onAutoEnd]);
+  }, [active, auto, idx, pidx, go, goPanel, onAutoEnd, visiblePanels]);
 
   // scroll-кадры при автоплее плавно едут до низа
   useEffect(() => {
@@ -668,6 +855,10 @@ export default function CineEngine({
   }, [active, auto, idx]);
 
   const cur = scenes[idx] ?? scenes[0];
+  // v8: сколько панелей текущего разворота ещё скрыто (для чипа и счётчика)
+  const visNow = narrow ? 1 : mid ? 2 : 3;
+  const curPanels = cur?.kind === "row" ? cur.panels?.length ?? 0 : 0;
+  const morePanels = Math.max(0, curPanels - pidx - visNow);
 
   return (
     <div
@@ -675,95 +866,13 @@ export default function CineEngine({
     >
       <div className="cb-cine__stage" ref={stageRef}>
         {scenes.map((s, i) => (
-          <section
+          <SceneView
             key={s.id}
-            data-scene={s.id}
-            data-title={s.title}
-            className={[
-              "cb-scene",
-              s.kind === "row" ? "cb-scene--row" : "cb-scene--full",
-              s.kind === "scroll" ? "cb-scene--scroll" : "",
-              `cb-scene--${s.accent ?? "cyan"}`,
-              s.img ? "" : "cb-scene--nopic",
-              s.contain ? "cb-scene--contain" : "",
-              s.shake ? "cb-scene--shake" : "",
-              s.glitch ? "cb-scene--glitch" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            aria-label={s.title}
-            {...(s.scrollable ? { "data-cb-scroll": "" } : {})}
-          >
-            {s.kind === "row" ? (
-              <div className="cb-spread">
-                <div
-                  className="cb-spread__track"
-                  style={{ ["--pidx" as string]: String(pidx) }}
-                >
-                  {(s.panels ?? []).map((p, k) => (
-                    <figure
-                      key={p.key}
-                      className={`cb-panel cb-panel--${p.accent}`}
-                      style={{ ["--pd" as string]: `${(k * 0.3).toFixed(2)}s` }}
-                    >
-                      {p.custom === "phone" && p.phone ? (
-                        <div className="cb-panel__custom">{p.phone}</div>
-                      ) : (
-                        p.img && (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            className="cb-panel__img"
-                            src={p.img}
-                            alt={p.alt ?? ""}
-                            loading={i < 2 ? undefined : "lazy"}
-                            draggable={false}
-                          />
-                        )
-                      )}
-                      <span className="cb-panel__scrim" aria-hidden="true" />
-                      <span className="cb-panel__num" aria-hidden="true">
-                        {p.num ?? p.key}
-                      </span>
-                      {p.title && <b className="cb-panel__title">{p.title}</b>}
-                      {p.sfx}
-                      <div className="cb-panel__text">{p.node}</div>
-                    </figure>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <>
-                {s.img && (
-                  <>
-                    <div
-                      className="cb-scene__blur"
-                      style={{ backgroundImage: `url(${s.img})` }}
-                      aria-hidden="true"
-                    />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className="cb-scene__img"
-                      src={s.img}
-                      alt={s.alt ?? ""}
-                      {...(i < 2 ? {} : { loading: "lazy" as const })}
-                      draggable={false}
-                    />
-                  </>
-                )}
-                <div className="cb-scene__scrim" aria-hidden="true" />
-                {s.overlay}
-                {s.chrome !== false && (
-                  <>
-                    <span className="cb-scene__num" aria-hidden="true">
-                      {s.num ?? String(i + 1).padStart(2, "0")}
-                    </span>
-                    <h2 className="cb-scene__title">{s.title}</h2>
-                  </>
-                )}
-                <div className="cb-scene__text">{s.node}</div>
-              </>
-            )}
-          </section>
+            s={s}
+            i={i}
+            pidxFor={i === idx ? pidx : 0}
+            eager={i < 2}
+          />
         ))}
       </div>
 
@@ -802,11 +911,27 @@ export default function CineEngine({
             <i>
               {cur?.num ? `${cur.num} · ` : ""}
               {cur?.title}
-              {narrow && cur?.kind === "row" && (cur.panels?.length ?? 0) > 1
-                ? ` · панель ${pidx + 1}/${cur.panels?.length}`
+              {cur?.kind === "row" && curPanels > visNow
+                ? ` · панель ${pidx + 1}/${curPanels}`
                 : ""}
             </i>
           </div>
+          {/* v8: чип «ещё N» — в развороте есть скрытые части; вертикаль их едет */}
+          {morePanels > 0 && (
+            <button
+              type="button"
+              className="cb-hud__more"
+              ref={chipRef}
+              onClick={() => {
+                if (autoRef.current) onAutoInterrupt?.();
+                goPanel(1);
+              }}
+              title="В развороте ещё есть части — вертикальный скролл листает их"
+            >
+              <i>→</i>
+              <span>ещё {morePanels}</span>
+            </button>
+          )}
           {!moved && (
             <div className="cb-hud__hint" aria-hidden="true">
               <span>СКРОЛЛ = КАМЕРА</span>
