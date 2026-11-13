@@ -95,6 +95,8 @@ export type CineSceneDef = {
   num?: string;
   accent?: CineAccent;
   sound?: string;
+  // v10: тип кадра (использовался с v6 — объявлен явно, раньше был дырой в типе)
+  kind?: "row" | "splash" | "scroll";
   // splash — fullscreen-кадр (обложка, титры, финал, тизер):
   img?: string;
   alt?: string;

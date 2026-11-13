@@ -75,7 +75,7 @@ type Panel = {
   custom?: "phone";
   alt: string;
   accent: "cyan" | "magenta" | "gold";
-  caption: string;
+  caption?: string; // v10: опционален — у панели II·∞ вместо каптиона foot
   bubbles?: Bubble[];
   notify?: Notify;
   sfx?: Sfx;
@@ -986,7 +986,7 @@ export default function ComicBookClient() {
         className={`cb-sfx cb-sfx--${panel.sfx.color}`}
         style={
           ink(
-            { "--rot": `${panel.sfx.rotate}deg`, transform: `rotate(${panel.sfx.rotate}deg)` },
+            { "--rot": `${panel.sfx.rotate}deg`, transform: `rotate(${panel.sfx.rotate}deg)` } as React.CSSProperties,
             `${(2.7 + k * PANEL_STAGGER_S).toFixed(2)}s`,
           ) as React.CSSProperties
         }

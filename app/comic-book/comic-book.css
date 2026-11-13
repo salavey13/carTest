@@ -4181,3 +4181,11 @@ body.cb-cine-lock {
   .cb-storage__rows { max-height: 130px; }
   .cb-storage__pane { min-height: 230px; }
 }
+
+/* v10-полировка: на мобиле жёсткая магента-тень заголовка финала наезжает
+   на соседнюю строку (line-height 1.12 + shadow 6px) — на узких экранах
+   оставляем только чернильную тень и дышащий интерлиньяж */
+@media (max-width: 860px) {
+  .cb-trilogy__title { line-height: 1.22; gap: 8px; }
+  .cb-trilogy__title-accent { text-shadow: 3px 3px 0 var(--cb-ink); }
+}
