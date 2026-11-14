@@ -44,7 +44,9 @@ const nextConfig = {
   //   pointless when each compiler process exits).
   experimental: {
     cpus: 1,
-    webpackBuildWorker: true,
+    // v11: на 4GB-песочницах воркер компиляции убивается OOM-киллером —
+    // локальный билд можно гонять с NEXT_DISABLE_BUILD_WORKER=1 (Vercel не задан → true)
+    webpackBuildWorker: !process.env.NEXT_DISABLE_BUILD_WORKER,
     // SSG workers as child processes (not worker threads): their heap is
     // reaped by the OS when the worker exits instead of accumulating in the
     // parent process RSS — safer for small build containers.

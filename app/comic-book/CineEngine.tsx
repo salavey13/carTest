@@ -2,7 +2,13 @@
 
 // /app/comic-book/CineEngine.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// CB CINE v10 (task186) — движок «кинематографического комикса», развороты.
+// CB CINE v11 (task186) — движок «кинематографического комикса», развороты.
+//
+// v11 — «all animations broke» (ревью босса): анимации глушил АВТОМАТ от
+// prefers-reduced-motion (reduceMotion пропом). Комикс — анимированный
+// демо-ролик, поэтому ОС-настройка больше не выключает кино: спокойный
+// режим включается только вручную (?calm=1). Въезд панели — на фигуре,
+// Ken Burns — на img (слои разделены). Остальная механика без изменений.
 //
 // v10 — «slide deck of hollywood movie preproduction, animated into rough
 // demo» (босс: «pacing of appearance still fast, ttl of section is too low;

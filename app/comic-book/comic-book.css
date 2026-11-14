@@ -3282,7 +3282,12 @@ body.cb-cine-lock {
 .cb-spread__track {
   display: flex;
   align-items: stretch;
+  /* v11: разворот с МЕНЬШИМ числом панелей, чем видно (2 из 3 на PC) —
+     по центру, а не прижат влево. safe center: когда панелей больше,
+     чем видно (мобайл-свайп), центрирование откатывается к flex-start —
+     иначе отрицательный free space обрезал бы первую панель слева */
   justify-content: flex-start;
+  justify-content: safe center;
   gap: var(--cb-gap);
   width: 100%;
   height: 100%;
@@ -3318,13 +3323,18 @@ body.cb-cine-lock {
   object-position: 50% 30%;
 }
 
-/* проявление панели: картинка въезжает каскадом (--pd от движка: 0/0.42/0.84s)
-   will-change — только у панелей текущего кадра (v8-перф).
-   v9: въезд медленнее (1.05s, старт 0.6s) и после въезда панель ЖИВЁТ —
-   Ken Burns (см. v9-блок в конце файла; обе анимации описаны там же) */
-.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
-  animation: cb-panel-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
-    calc((0.45s + var(--pd, 0s)) * var(--ink-pace, 1)) both;
+/* проявление панели: КАСКАД ЗАДЕРЖЕК по --pd от движка (0 / 1.4s / 2.8s…).
+   v11: въезд перенесён с img на ФИГУРУ (рамка+контент целиком) — Ken Burns
+   остаётся на img (v10-блок ниже), слои больше не воюют за transform одной
+   аббревиатуры: сломанный calc/var() роняет только въезд, не зум.
+   Задержка longhand'ом — shorthand-парсер не может отсечь всю анимацию.
+   will-change — только у панелей текущего кадра (v8-перф). */
+.cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel {
+  animation-name: cb-panel-in;
+  animation-duration: 1.05s;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-delay: calc((0.6s + var(--pd, 0s)) * var(--ink-pace, 1));
+  animation-fill-mode: backwards;
   will-change: transform, opacity;
 }
 
@@ -3420,7 +3430,8 @@ body.cb-cine-lock {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 9px;
+  /* v11: 10px между пузырями/каптионом — стопка не слипается */
+  gap: 10px;
   /* v10: снизу зазор под HUD-плашку (счётчик кадра) — каптионы не прячутся */
   padding: 12px 12px 52px;
   overflow: hidden;
@@ -3439,12 +3450,20 @@ body.cb-cine-lock {
 
 .cb-cine--on .cb-scene--row .cb-caption {
   margin-top: 0;
-  font-size: clamp(11.5px, 0.95vw, 14px);
-  line-height: 1.45;
+  /* v11: крупнее — на PC 0.95vw давало ~12px, читать тяжело (скрин босса) */
+  font-size: clamp(12px, 1.08vw, 16.5px);
+  line-height: 1.42;
 }
 
 .cb-cine--on .cb-scene--row .cb-bubble {
-  font-size: clamp(11px, 0.9vw, 13.5px);
+  /* v11: пузыри — рукописный Caveat, ему нужно 14+px, иначе «шёпот» */
+  font-size: clamp(13.5px, 1.15vw, 18px);
+  line-height: 1.15;
+}
+
+/* терминал в панели: чуть крупнее, но с запасом до края узкой колонки */
+.cb-cine--on .cb-scene--row .cb-terminal__line {
+  font-size: clamp(9px, 1.05vw, 14px);
 }
 
 .cb-cine--on .cb-scene--row .cb-notify-wrap {
@@ -3482,21 +3501,21 @@ body.cb-cine-lock {
 .cb-panel__score span {
   display: block;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: clamp(10.5px, 0.85vw, 13px);
+  font-size: clamp(11px, 1vw, 14px);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .cb-panel__score p {
   margin: 4px 0 0;
-  font-size: clamp(11px, 0.9vw, 13.5px);
+  font-size: clamp(12px, 1.02vw, 14.5px);
   line-height: 1.4;
 }
 
-/* проявление стопки панели — тот же плавный каскад */
+/* проявление стопки панели — тот же плавный каскад (v11: задержка longhand) */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__text > * {
-  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
-    var(--ink-d, calc(1.2s * var(--ink-pace, 1))) both;
+  animation: cb-ink 1.05s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: var(--ink-d, calc(1.2s * var(--ink-pace, 1)));
 }
 
 /* ── планшет: 2 панели в ряд ─────────────────────────────────────────────── */
@@ -3539,11 +3558,11 @@ body.cb-cine-lock {
   }
 
   .cb-cine--on .cb-scene--row .cb-caption {
-    font-size: clamp(12px, 3.3vw, 14.5px);
+    font-size: clamp(12.5px, 3.4vw, 15px);
   }
 
   .cb-cine--on .cb-scene--row .cb-bubble {
-    font-size: clamp(12px, 3.2vw, 14px);
+    font-size: clamp(13px, 3.4vw, 15.5px);
   }
 
   /* старый мобильный блок глушит абсолютные позиции с !important —
@@ -3559,7 +3578,8 @@ body.cb-cine-lock {
   }
 }
 
-/* ── reduce motion: панели без каскада ───────────────────────────────────── */
+/* ── reduce motion (?calm=1): панели без каскада ─────────────────────────── */
+.cb-cine--rm .cb-panel,
 .cb-cine--rm .cb-panel__img,
 .cb-cine--rm .cb-panel__text > *,
 .cb-cine--rm .cb-panel .cb-sfx {
@@ -3774,10 +3794,11 @@ body.cb-cine-lock {
   animation: none;
 }
 
-/* 2. Ken Burns splash-кадров: текущий + уходящий (пока его накрывают) */
+/* 2. Ken Burns splash-кадров: текущий + уходящий (пока его накрывают).
+   (двух-анимационная аббревиатура без var() в задержке — парсинг надёжен) */
 .cb-cine--on:not(.cb-cine--rm) :is(.cb-scene--cur, .cb-scene--under) .cb-scene__img {
   animation:
-    cb-kb-scene 22s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
+    cb-kb-scene 20s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
     cb-scene-img 1050ms steps(8, end) backwards;
   will-change: transform;
 }
@@ -3790,7 +3811,7 @@ body.cb-cine-lock {
 /* старт зума = финал склейки (cb-scene-img кончается на scale 1.07) — шва нет */
 @keyframes cb-kb-scene {
   from { transform: scale(1.07) translate3d(0.7%, 0.5%, 0); }
-  to   { transform: scale(1.22) translate3d(-2.1%, -1.4%, 0); }
+  to   { transform: scale(1.24) translate3d(-2.3%, -1.6%, 0); }
 }
 
 /* блюр-подложка обложки: свой дрейф от её статичного scale(1.12) */
@@ -3799,25 +3820,24 @@ body.cb-cine-lock {
   to   { transform: scale(1.3) translate3d(-1.4%, 0.9%, 0); }
 }
 
-/* 3. Ken Burns панелей разворота + медленный въезд (1.05s, старт 0.6s) */
+/* 3. Ken Burns панелей разворота — ТОЛЬКО зум/дрейф на img (v11: въезд
+   панели теперь живёт на фигуре, см. v7-блок; в аббревиатуре одна анимация,
+   без var() в задержке — ломаться нечему). 16s/1.16 — движение видно за
+   6–10s жизни кадра */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel__img {
-  animation:
-    cb-kb-panel 18s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate,
-    cb-panel-in 1.05s cubic-bezier(0.22, 0.61, 0.36, 1)
-      calc((0.6s + var(--pd, 0s)) * var(--ink-pace, 1)) backwards;
-  will-change: transform, opacity;
+  animation: cb-kb-panel 16s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+  will-change: transform;
 }
 
 /* чётные панели дрейфуют в обратную сторону — разворот «дышит» разнонаправленно */
 .cb-cine--on:not(.cb-cine--rm) .cb-scene--cur .cb-panel:nth-child(even) .cb-panel__img {
-  animation-direction: alternate-reverse, alternate;
+  animation-direction: alternate-reverse;
 }
 
-/* от scale(1) — совпадает с финалом cb-panel-in (transform: none), шва нет;
-   overscan держит запас под дрейф: сдвиг ≤ (scale-1)/2 (v10: заметный зум) */
+/* overscan держит запас под дрейф: сдвиг ≤ (scale-1)/2 (v11: заметный зум) */
 @keyframes cb-kb-panel {
   from { transform: scale(1) translate3d(0, 0, 0); }
-  to   { transform: scale(1.14) translate3d(2.2%, -1.6%, 0); }
+  to   { transform: scale(1.16) translate3d(2.4%, -1.7%, 0); }
 }
 
 /* 4. мобайл: блюр-подложке хватит статики (GPU бюджет — панелям),
@@ -4189,3 +4209,19 @@ body.cb-cine-lock {
   .cb-trilogy__title { line-height: 1.22; gap: 8px; }
   .cb-trilogy__title-accent { text-shadow: 3px 3px 0 var(--cb-ink); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CB CINE v11 (task186) — ревью босса: «all animations broke» + скрин PC.
+   ДИАГНОЗ: все анимации v9/v10 жили за :not(.cb-cine--rm), а класс
+   cb-cine--rm включался АвТОМАТИЧЕСКИ от prefers-reduced-motion (framer
+   useReducedMotion) — у босса в Windows выключены «animation effects», и
+   движок честно показывал статичное слайд-шоу: панели разом, без Ken Burns,
+   без курсора. Комикс — «animated rough demo video», кино по умолчанию:
+   ↳ ТСХ-файлы: спокойный режим теперь ТОЛЬКО вручную (?calm=1);
+   ↳ въезд панели — на фигуре, Ken Burns — на img (слои разделены,
+     longhand animation-delay — shorthand не может отсечь всё);
+   ↳ Ken Burns сильнее: панели 1 → 1.16 / 16s, кадры 1.07 → 1.24 / 20s;
+   ↳ пузыри/каптионы разворота крупнее (PC ~1.08vw ≈ 14–16px), стопка с
+     зазором 10px; ряды с числом панелей меньше видимого — safe center;
+   ↳ новая картинка III·03: крупный план губ у диджей-микрофона.
+   ═══════════════════════════════════════════════════════════════════════════ */

@@ -10,22 +10,18 @@
 // v6.1: peek + цепочка проявления + end slate. v6.2: --ink-pace.
 // v7: развороты (3/2/1 портретных панелей), тексты под цель, автоплей.
 // v8: вертикаль едет по панелям разворота, чип «ещё N», перф (memo-кадры).
-// v10 (текущее) — «hollywood preproduction slide deck, animated into rough
-//   demo» (босс: «pacing still fast, ttl too low, deduce proper timings,
-//   on pc show items one by one, animate even cursor, finish the trilogy»):
-//  • панели разворота появляются ПО ОДНОЙ: stagger 0.42 → 1.4s (единая
-//    ручка PANEL_STAGGER_S с движком), пузыри чаще разъезжаются (0.45s);
-//  • хронометраж ПОД КОНТЕНТ: у каждого кадра свой ttl (сплэш 9–10.5s,
-//    развороты 8.6–10.2s, интерактив 12.5–13.5s) — появление медленное,
-//    но кадр держится достаточно долго, чтобы прочитать;
-//  • КУРСОР-АКТЁР в автоплее: скользит по панелям каскада, открывает счёт
-//    №0001, переворачивает телефон, щёлкает вкладки «Что проверить» и
-//    жмёт вкладку «Зимнее хранение» — вся динамика проезжает сама;
-//  • ФИНАЛ ТРИЛОГИИ (true story): эпизод III — голодный байк уходит на
-//    зимовку, Рустам шепчет в диджей-микрофон «implement winter
-//    storage» — и пуф: вкладка на главной каталога с формой заявок и
-//    списком клиентов для владельца;
-//  • Ken Burns стал заметнее (v9 был слишком тихим).
+// v10 (task186): финал трилогии (эпизод III), курсор-актёр, ttl под контент.
+// v11 (текущее) — «all animations broke» (ревью босса):
+//  • ГЛАВНОЕ: ОС-настройка prefers-reduced-motion больше не глушит кино —
+//    раньше даже флаг «animation effects» в Windows превращал движок в
+//    статичное слайд-шоу (все каскады/Ken Burns/курсор были за
+//    :not(.cb-cine--rm)); теперь спокойный режим только по ?calm=1;
+//  • панель разворота: въезд перенесён с img на ФИГУРУ (рамка+текст целиком),
+//    Ken Burns остался на img — слои не воюют за transform, одна сломанная
+//    анимация не роняет вторую; задержки каскада — longhand animation-delay;
+//  • пузыри/каптионы разворота крупнее (PC-читаемость), ряды с <3 панелями
+//    центрируются (safe center — свайп на мобиле не ломается);
+//  • новая картинка III·03: крупный план губ у микрофона (zoom on lips).
 // v9 — темп и живость: каскад 0.42s, Ken Burns, WebP (−38% веса), scenes
 //   в useMemo, финал в один кадр (10 ссылок → 3).
 // ЦЕЛЬ КОМИКСА (v7): за ~3 минуты показать владельцу мото-экипажа (настоящему
@@ -41,7 +37,6 @@ import {
   motion,
   useInView,
   useMotionValue,
-  useReducedMotion,
   useTransform,
 } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -404,7 +399,7 @@ const EP3_PANELS: Panel[] = [
     num: "III·03",
     title: "ШЁПОТ В МИКРОФОН",
     img: "/comic-book/pmic.webp",
-    alt: "Рустам пытает дыханием диджей-микрофон, подключенный проводом к телефону",
+    alt: "Крупный план: губы Рустама у самой решётки диджей-микрофона, провод тянется к телефону",
     accent: "magenta",
     caption: "Рустам подключает диджей-микрофон к телефону и пытает его шёпотом в самое дыхание:",
     bubbles: [{ text: "implement winter storage…", kind: "hero" }],
@@ -872,7 +867,16 @@ export default function ComicBookClient() {
   const audioRef = useRef<AudioContext | null>(null);
   const scenesRef = useRef<CineSceneDef[]>([]);
   const restartRef = useRef<(() => void) | null>(null);
-  const reduceMotion = useReducedMotion();
+  // v11: комикс — «animated rough demo video» (формула босса), поэтому
+  // ОС-настройка prefers-reduced-motion БОЛЬШЕ НЕ глушит анимацию: слишком
+  // многие выключают «animation effects» в Windows и вместо кино видят
+  // статичное слайд-шоу (v6–v10: «didn't notice», «all animations broke»).
+  // Спокойный режим включается только вручную: URL ?calm=1.
+  const [calm] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("calm"),
+  );
 
   // JS жив → включается CB CINE (движок кадров). Без JS — статичный вебтун.
   useEffect(() => {
@@ -1394,7 +1398,7 @@ export default function ComicBookClient() {
                       onTap={() => {
                         if (soundRef.current && audioRef.current) playSound("bip", audioRef.current);
                       }}
-                      animate={jsReady && !reduceMotion}
+                      animate={jsReady && !calm}
                     />
                   ) : (
                     <>
@@ -1544,7 +1548,7 @@ export default function ComicBookClient() {
         </section>
       ),
     },
-  ], [jsReady, invoiceOpen, bossTab, reduceMotion]);
+  ], [jsReady, invoiceOpen, bossTab, calm]);
   scenesRef.current = scenes;
 
   return (
@@ -1575,7 +1579,7 @@ export default function ComicBookClient() {
       <CineEngine
         scenes={scenes}
         active={jsReady}
-        reduceMotion={!!reduceMotion}
+        reduceMotion={calm}
         onSceneShown={handleSceneShown}
         restartRef={restartRef}
         auto={auto}
