@@ -2116,6 +2116,8 @@ body.cb-cine-lock {
 .cb-scene {
   position: relative;
   overflow: hidden;
+  /* v12: contain — репейнты/лауйауты кадра не выплёскиваются наружу */
+  contain: layout paint;
   background: var(--cb-ink);
   border: 4px solid var(--cb-paper);
   border-radius: 6px;
@@ -2311,7 +2313,7 @@ body.cb-cine-lock {
   z-index: 0;
   background-size: cover;
   background-position: center 32%;
-  filter: blur(28px) brightness(0.5) saturate(1.15);
+  filter: blur(20px) brightness(0.5) saturate(1.15); /* v12: 28→20 — дешевле на склейках, вид тот же */
   transform: scale(1.12);
 }
 
@@ -3292,7 +3294,8 @@ body.cb-cine-lock {
   width: 100%;
   height: 100%;
   transform: translate3d(calc(var(--pidx, 0) * (-100% / var(--cb-vis, 3))), 0, 0);
-  transition: transform 0.42s steps(3, end);
+  /* v12: глайд панелей ПЛАВНЫЙ (был steps(3) — рубленый) */
+  transition: transform 0.52s cubic-bezier(0.25, 0.7, 0.3, 1);
 }
 
 /* v8-перф: will-change только у активного кадра — 16 промотированных слоёв
@@ -3450,20 +3453,20 @@ body.cb-cine-lock {
 
 .cb-cine--on .cb-scene--row .cb-caption {
   margin-top: 0;
-  /* v11: крупнее — на PC 0.95vw давало ~12px, читать тяжело (скрин босса) */
-  font-size: clamp(12px, 1.08vw, 16.5px);
+  /* v12: ещё крупнее (босс: «increase text font on PC even more») */
+  font-size: clamp(13px, 1.22vw, 18.5px);
   line-height: 1.42;
 }
 
 .cb-cine--on .cb-scene--row .cb-bubble {
-  /* v11: пузыри — рукописный Caveat, ему нужно 14+px, иначе «шёпот» */
-  font-size: clamp(13.5px, 1.15vw, 18px);
+  /* v12: ещё крупнее — рукописный Caveat на PC теперь до 21px */
+  font-size: clamp(14.5px, 1.3vw, 21px);
   line-height: 1.15;
 }
 
-/* терминал в панели: чуть крупнее, но с запасом до края узкой колонки */
+/* терминал в панели: крупнее, но nowrap-строка держится в узкой колонке */
 .cb-cine--on .cb-scene--row .cb-terminal__line {
-  font-size: clamp(9px, 1.05vw, 14px);
+  font-size: clamp(9.5px, 1.1vw, 15px);
 }
 
 .cb-cine--on .cb-scene--row .cb-notify-wrap {
@@ -3501,14 +3504,14 @@ body.cb-cine-lock {
 .cb-panel__score span {
   display: block;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: clamp(11px, 1vw, 14px);
+  font-size: clamp(11.5px, 1.05vw, 15px);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .cb-panel__score p {
   margin: 4px 0 0;
-  font-size: clamp(12px, 1.02vw, 14.5px);
+  font-size: clamp(12.5px, 1.1vw, 15.5px);
   line-height: 1.4;
 }
 
@@ -3558,11 +3561,11 @@ body.cb-cine-lock {
   }
 
   .cb-cine--on .cb-scene--row .cb-caption {
-    font-size: clamp(12.5px, 3.4vw, 15px);
+    font-size: clamp(13px, 3.6vw, 16px);
   }
 
   .cb-cine--on .cb-scene--row .cb-bubble {
-    font-size: clamp(13px, 3.4vw, 15.5px);
+    font-size: clamp(13.5px, 3.6vw, 16.5px);
   }
 
   /* старый мобильный блок глушит абсолютные позиции с !important —
@@ -4213,7 +4216,7 @@ body.cb-cine-lock {
 /* ═══════════════════════════════════════════════════════════════════════════
    CB CINE v11 (task186) — ревью босса: «all animations broke» + скрин PC.
    ДИАГНОЗ: все анимации v9/v10 жили за :not(.cb-cine--rm), а класс
-   cb-cine--rm включался АвТОМАТИЧЕСКИ от prefers-reduced-motion (framer
+   cb-cine--rm включался АВТОМАТИЧЕСКИ от prefers-reduced-motion (framer
    useReducedMotion) — у босса в Windows выключены «animation effects», и
    движок честно показывал статичное слайд-шоу: панели разом, без Ken Burns,
    без курсора. Комикс — «animated rough demo video», кино по умолчанию:
@@ -4224,4 +4227,20 @@ body.cb-cine-lock {
    ↳ пузыри/каптионы разворота крупнее (PC ~1.08vw ≈ 14–16px), стопка с
      зазором 10px; ряды с числом панелей меньше видимого — safe center;
    ↳ новая картинка III·03: крупный план губ у диджей-микрофона.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CB CINE v12 (task186) — «looks almost perfect» (босс) — финальная шлифовка:
+   ↳ интервал между панелями разворота Заметнее: PANEL_STAGGER_S 1.4 → 2.1s;
+   ↳ текст стопки панели теперь СВЕРХУ ВНИЗ (нотиф → терминал → пузыри →
+     каптион, шаг 0.4s, старт 1.15s) — раньше каптион снизу выезжал первым
+     («text appears in reverse order»);
+   ↳ ttl кадров подрезан до «golden middle» (сплэш 8.3–9.5s, развороты
+     7.8–9.4s, интерактив 10.5–12s; AUTO_MS: 8300/9400/6200/10500/7500);
+   ↳ шрифты PC ещё крупнее: пузыри до 21px (1.3vw), каптионы до 18.5px
+     (1.22vw), терминал/счёт подтянуты;
+   ↳ плавность: глайд панелей steps(3) → cubic-bezier(.25,.7,.3,1) 0.52s,
+     blur подложки 28→20px, contain:layout paint на кадре;
+     Pop/Drop больше не framer (их вход и так вёл CSS по --ink-d — JS-спринги
+     на 15+ узлах каждый вход кадра были невидимой работой main thread).
    ═══════════════════════════════════════════════════════════════════════════ */

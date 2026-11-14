@@ -378,7 +378,7 @@ const EP3_PANELS: Panel[] = [
     num: "III·01",
     title: "ГОЛОДНЫЙ СЕЗОН",
     img: "/comic-book/phungry.webp",
-    alt: "Чёрный электроспортбайк с грустными светящимися глазами стоит один в тёмном гараже, из решётки пар",
+    alt: "Чёрный спортбайк совсем один на пустой ночной улице — снег, мокрый асфальт, фонарь",
     accent: "gold",
     caption: "Ноябрь. Дождь сдался и выпал снегом. Сезон закрыт — байки загоняют на зимовку, и флагман остаётся один.",
     bubbles: [{ text: "Хозяин, я вообще-то уже 12 дней без работы…", kind: "agent" }],
@@ -389,7 +389,7 @@ const EP3_PANELS: Panel[] = [
     num: "III·02",
     title: "ЗИМНЕЕ ХРАНЕНИЕ",
     img: "/comic-book/pstorage.webp",
-    alt: "Байк в тёплом зимнем боксе среди полок, пледов и шин, за окном снег",
+    alt: "Байк под пледом в тёплом зимнем боксе: полки с коробками, камин, за окном снег",
     accent: "cyan",
     caption: "Тёплый бокс, плед, тишина. И тут до него доходит: пустой бокс зимой — это не расход. Это услуга, которую никто не продаёт.",
     bubbles: [{ text: "Постой… хранение — это же тоже аренда?!", kind: "hero" }],
@@ -917,73 +917,48 @@ export default function ComicBookClient() {
   }, []);
 
   // ── анимированные оверлеи (только при JS; без JS — статичные span) ──────
+  // v12: Pop/Drop БОЛЬШЕ НЕ framer. Все их входы давно ведёт CSS-каскад
+  // (cb-ink / cb-ink-drop по --ink-d; CSS-анимация всегда сильнее inline-
+  // стилей framer) — JS-спринги на 15+ узлах при каждом входе в кадр были
+  // невидимой работой на main thread (босс: «reduce lagginess»). Остались
+  // framer только там, где он ВИДЕН: счёт, минисcreens, hover CTA.
   const Pop = ({
     children,
-    delay = 0,
     style,
     className,
   }: {
     children: ReactNode;
-    delay?: number;
     style?: React.CSSProperties;
     className?: string;
-  }) =>
-    jsReady ? (
-      <motion.span
-        className={className}
-        style={style}
-        initial={{ opacity: 0, scale: 0.6, y: 12 }}
-        whileInView={{ opacity: 1, scale: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.5 }}
-        transition={{ ...SPRING, delay }}
-      >
-        {children}
-      </motion.span>
-    ) : (
-      <span className={className} style={style}>
-        {children}
-      </span>
-    );
+  }) => (
+    <span className={className} style={style}>
+      {children}
+    </span>
+  );
 
   const Drop = ({
     children,
     style,
-    delay = 0,
   }: {
     children: ReactNode;
     style?: React.CSSProperties;
-    delay?: number;
-  }) =>
-    jsReady ? (
-      <motion.div
-        className="cb-notify-wrap"
-        style={style}
-        role="status"
-        initial={{ opacity: 0, y: -26, rotate: -2 }}
-        whileInView={{ opacity: 1, y: 0, rotate: 0 }}
-        viewport={{ once: true, amount: 0.5 }}
-        transition={{ ...SPRING, delay }}
-      >
-        {children}
-      </motion.div>
-    ) : (
-      <div className="cb-notify-wrap" style={style} role="status">
-        {children}
-      </div>
-    );
+  }) => (
+    <div className="cb-notify-wrap" style={style} role="status">
+      {children}
+    </div>
+  );
 
-  // v10: задержки каскада РАСТЯНУТЫ (босс: «pacing of appearance still fast»
-  // + «ttl of section is too low» — появление медленное, но кадр держится).
-  // Панель за панелью — PANEL_STAGGER_S (1.4s, единая ручка с движком):
-  // на PC три панели разворота появляются ПО ОДНОЙ, с читаемым интервалом.
-  // Внутри панели каптион 1.35 → пузыри 1.85 → нотиф 2.3 → SFX 2.7.
-  // Все числа умножаются на --ink-pace из CSS (единый темп, сейчас 1).
+  // v12: задержки каскада. Панель за панелью — PANEL_STAGGER_S (2.1s, единая
+  // ручка с движком; босс: «add delay between items of 3 item sections»).
+  // ТЕКСТ СТОПКИ — СВЕРХУ ВНИЗ по DOM-порядку (босс: «text appears in
+  // reverse order» — раньше каптион снизу выезжал ПЕРВЫМ, пузыри над ним
+  // позже; теперь нотиф → терминал → пузыри → каптион, шаг 0.4s, старт
+  // 1.15s после въезда панели). SFX — вишенка у заголовка, сразу после
+  // въезда картинки. Все числа умножаются на --ink-pace из CSS.
   const ink = (base: React.CSSProperties, d: string): React.CSSProperties =>
     ({ ...base, "--ink-d": `calc(${d} * var(--ink-pace, 1))` }) as React.CSSProperties;
 
   // ── стопка текста ПАНЕЛИ (внутри портретной колонки разворота) ──────────
-  // каскад на панель k: каптион 1.35 → пузыри 1.85 → нотиф 2.3 → SFX 2.7,
-  // каждая панель сдвинута на +0.42s (--pd выставляет движок для картинки).
   const sfxNode = (panel: Panel, k: number) =>
     panel.sfx ? (
       <span
@@ -991,7 +966,7 @@ export default function ComicBookClient() {
         style={
           ink(
             { "--rot": `${panel.sfx.rotate}deg`, transform: `rotate(${panel.sfx.rotate}deg)` } as React.CSSProperties,
-            `${(2.7 + k * PANEL_STAGGER_S).toFixed(2)}s`,
+            `${(1.0 + k * PANEL_STAGGER_S).toFixed(2)}s`,
           ) as React.CSSProperties
         }
         aria-hidden="true"
@@ -1000,46 +975,48 @@ export default function ComicBookClient() {
       </span>
     ) : null;
 
-  const panelStack = (panel: Panel, k: number) => (
-    <>
-      {panel.notify && (
-        <Drop
-          delay={panel.notify.delay}
-          style={ink({}, `${(2.3 + k * PANEL_STAGGER_S + (panel.notify.delay ?? 0)).toFixed(2)}s`)}
-        >
-          <div className="cb-notify">
-            <span className="cb-notify__app">{panel.notify.app}</span>
-            <span className="cb-notify__title">{panel.notify.title}</span>
-            <span className="cb-notify__body">{panel.notify.body}</span>
+  const panelStack = (panel: Panel, k: number) => {
+    // счётчик ступеней каскада — строго по DOM-порядку (сверху вниз)
+    let step = 0;
+    const d = () => `${(1.15 + k * PANEL_STAGGER_S + step++ * 0.4).toFixed(2)}s`;
+    return (
+      <>
+        {panel.notify && (
+          <Drop style={ink({}, d())}>
+            <div className="cb-notify">
+              <span className="cb-notify__app">{panel.notify.app}</span>
+              <span className="cb-notify__title">{panel.notify.title}</span>
+              <span className="cb-notify__body">{panel.notify.body}</span>
+            </div>
+          </Drop>
+        )}
+        {panel.terminal && (
+          <div className="cb-terminal" style={ink({}, d())}>
+            {panel.terminal.map((line) => (
+              <span key={line} className="cb-terminal__line">
+                {line}
+              </span>
+            ))}
+            <span className="cb-terminal__cursor" aria-hidden="true" />
           </div>
-        </Drop>
-      )}
-      {panel.terminal && (
-        <div className="cb-terminal" style={ink({}, `${(1.75 + k * PANEL_STAGGER_S).toFixed(2)}s`)}>
-          {panel.terminal.map((line) => (
-            <span key={line} className="cb-terminal__line">
-              {line}
-            </span>
-          ))}
-          <span className="cb-terminal__cursor" aria-hidden="true" />
-        </div>
-      )}
-      {panel.bubbles?.map((bubble, i) => (
-        <Pop
-          key={bubble.text}
-          className={`cb-bubble cb-bubble--${bubble.kind}`}
-          style={ink({}, `${(1.85 + k * PANEL_STAGGER_S + i * 0.45).toFixed(2)}s`)}
-        >
-          {bubble.text}
-        </Pop>
-      ))}
-      {panel.foot ?? (
-        <p className="cb-caption" style={ink({}, `${(1.35 + k * PANEL_STAGGER_S).toFixed(2)}s`)}>
-          {panel.caption}
-        </p>
-      )}
-    </>
-  );
+        )}
+        {panel.bubbles?.map((bubble) => (
+          <Pop
+            key={bubble.text}
+            className={`cb-bubble cb-bubble--${bubble.kind}`}
+            style={ink({}, d())}
+          >
+            {bubble.text}
+          </Pop>
+        ))}
+        {panel.foot ?? (
+          <p className="cb-caption" style={ink({}, d())}>
+            {panel.caption}
+          </p>
+        )}
+      </>
+    );
+  };
 
   // телефон II·02 — отдельный слот «картинки» панели (в стопке текста ему тесно)
   const phoneSlot = (panel: Panel, k: number) => (
@@ -1073,7 +1050,7 @@ export default function ComicBookClient() {
     accent: "cyan" | "magenta" | "gold",
     sound?: SoundName,
     ghost?: string,
-    ttl = 6000,
+    ttl = 5400,
   ): CineSceneDef => ({
     id,
     title,
@@ -1134,7 +1111,7 @@ export default function ComicBookClient() {
       kind: "splash",
       contain: true,
       chrome: false,
-      ttl: 9800,
+      ttl: 8800,
       overlay: (
         <span className="cb-cover__cue cb-cover__cue--overlay" aria-hidden="true" style={ink({}, "2.9s")}>
           <i>▼</i> скролл — камера едет, следующий кадр уже выезжает
@@ -1183,9 +1160,9 @@ export default function ComicBookClient() {
     ),
 
     // ── развороты эпизода I (панели 01–08) — каскад по одной, ttl под контент
-    rowDef("p01-03", "ЗВОНОК В НОЧЬ · ОДНА КНОПКА · ЛИЧНЫЙ ZAI", "cyan", PANELS.slice(0, 3), undefined, { ttl: 10200 }),
-    rowDef("p04-06", "БРЕНД-КУЗНИЦА · КАТАЛОГ · В ПРОДЕ", "magenta", PANELS.slice(3, 6), undefined, { ttl: 10200 }),
-    rowDef("p07-08", "КЛИЕНТ АРЕНДОВАЛ · ВЫДАЧА", "cyan", PANELS.slice(6, 8), undefined, { ttl: 8600 }),
+    rowDef("p01-03", "ЗВОНОК В НОЧЬ · ОДНА КНОПКА · ЛИЧНЫЙ ZAI", "cyan", PANELS.slice(0, 3), undefined, { ttl: 9400 }),
+    rowDef("p04-06", "БРЕНД-КУЗНИЦА · КАТАЛОГ · В ПРОДЕ", "magenta", PANELS.slice(3, 6), undefined, { ttl: 9400 }),
+    rowDef("p07-08", "КЛИЕНТ АРЕНДОВАЛ · ВЫДАЧА", "cyan", PANELS.slice(6, 8), undefined, { ttl: 7800 }),
 
     // ── секретный уровень: глюк в другой бизнес ────────────────────────────
     dividerDef(
@@ -1197,7 +1174,7 @@ export default function ComicBookClient() {
       "glitch",
       "?!",
     ),
-    rowDef("glitch-leorus", "ТЕСТ НА ГЛЮК · АРЕНДУЙ РУСТАМА", "gold", GLITCH_PANELS, undefined, { ttl: 8600 }),
+    rowDef("glitch-leorus", "ТЕСТ НА ГЛЮК · АРЕНДУЙ РУСТАМА", "gold", GLITCH_PANELS, undefined, { ttl: 7800 }),
 
     // ── финал эпизода I (splash с CTA) ─────────────────────────────────────
     {
@@ -1208,7 +1185,7 @@ export default function ComicBookClient() {
       alt: "Рустам ведёт экипаж через мост на рассвете",
       accent: "cyan",
       kind: "splash",
-      ttl: 10500,
+      ttl: 9500,
       node: (
         <>
           <Pop
@@ -1247,7 +1224,7 @@ export default function ComicBookClient() {
       accent: "gold",
       kind: "scroll",
       scrollable: true,
-      ttl: 12500,
+      ttl: 11000,
       auto: [{ at: 2400, sel: ".cb-cherry__btn" }],
       node: (
         <div className="cb-cherry" style={ink({}, "0.3s")}>
@@ -1328,13 +1305,13 @@ export default function ComicBookClient() {
 
     // ── развороты эпизода II (панели II·01–II·∞); телефон переворачивает курсор
     rowDef("ep2-a", "ПРОСТО ПРОВЕРЮ · ОПА! · ПОДОЗРИТЕЛЬНО", "cyan", EP2_PANELS.slice(0, 3), undefined, {
-      ttl: 10200,
+      ttl: 9400,
       auto: [
-        { at: 3600, sel: ".cb-phone" },
-        { at: 6800, sel: ".cb-phone" },
+        { at: 4200, sel: ".cb-phone" },
+        { at: 7400, sel: ".cb-phone" },
       ],
     }),
-    rowDef("ep2-b", "КАЖЕТСЯ, Я ПОНЯЛ · ПОСЛЕДНЯЯ ПРОВЕРКА · ЭКРАН ГАСНЕТ", "magenta", EP2_PANELS.slice(3, 6), undefined, { ttl: 10200 }),
+    rowDef("ep2-b", "КАЖЕТСЯ, Я ПОНЯЛ · ПОСЛЕДНЯЯ ПРОВЕРКА · ЭКРАН ГАСНЕТ", "magenta", EP2_PANELS.slice(3, 6), undefined, { ttl: 9400 }),
 
     // ── выбор приключения: четыре экрана живой платформы (scroll) ──────────
     {
@@ -1345,11 +1322,11 @@ export default function ComicBookClient() {
       kind: "scroll",
       scrollable: true,
       sound: "bip",
-      ttl: 13500,
+      ttl: 12000,
       auto: [
-        { at: 2800, sel: '[data-tab="salary"]' },
-        { at: 7000, sel: '[data-tab="park"]' },
-        { at: 10800, sel: '[data-tab="stats"]' },
+        { at: 3000, sel: '[data-tab="salary"]' },
+        { at: 6800, sel: '[data-tab="park"]' },
+        { at: 10200, sel: '[data-tab="stats"]' },
       ],
       node: (
         <div
@@ -1449,7 +1426,7 @@ export default function ComicBookClient() {
     ),
 
     // разворот twist: голодный байк → зимнее хранение → шёпот в микрофон
-    rowDef("ep3-twist", "ГОЛОДНЫЙ СЕЗОН · ЗИМНЕЕ ХРАНЕНИЕ · ШЁПОТ", "gold", EP3_PANELS, undefined, { ttl: 10200 }),
+    rowDef("ep3-twist", "ГОЛОДНЫЙ СЕЗОН · ЗИМНЕЕ ХРАНЕНИЕ · ШЁПОТ", "gold", EP3_PANELS, undefined, { ttl: 9400 }),
 
     // «И ПУФ!» — вкладка «Зимнее хранение» на главной каталога (scroll);
     // курсор в автоплее сам жмёт новую вкладку (поп-выезд на 1.15s)
@@ -1461,7 +1438,7 @@ export default function ComicBookClient() {
       kind: "scroll",
       scrollable: true,
       sound: "dzin",
-      ttl: 12500,
+      ttl: 11000,
       auto: [{ at: 3300, sel: '[data-tab="winter"]' }],
       node: (
         <div className="cb-puff" style={ink({}, "0.3s")}>
@@ -1486,7 +1463,7 @@ export default function ComicBookClient() {
       kind: "scroll",
       scrollable: true,
       chrome: false,
-      ttl: 13000,
+      ttl: 11500,
       node: (
         <section className="cb-trilogy cb-trilogy--end" style={ink({}, "0.4s")} aria-label="Сообщение трилогии и конец выпуска">
           <span className="cb-trilogy__kicker" style={ink({}, "0.65s")}>VIP BIKE UNIVERSE · конец трилогии</span>
