@@ -1,17 +1,22 @@
-# 🏍️ VIP Bike — Telegram Mini App для аренды мото (white-label франшиза)
+# 📖 VIP BIKE · README · ТЕХНИЧЕСКИЙ ВЫПУСК
 
-**VIP Bike** — это Telegram-first платформа аренды мотоциклов: мини-приложение
-(`@oneBikePlsBot`), CRM для экипажа (crews), полный пайплайн аренд с документами,
-аналитика с разделением денег партнёр/компания, и «Мотопарк» — стена историй
-каждого мото как в VK. Плюс Telegram-бот, который закрывает операционку:
-смены, документы, отчёты, `/testdrive`, `/salary` и другое.
+> **ВЫПУСК ЧИТАЕТСЯ КАК КОМИКС** — на движке CB CINE, который мы собрали
+> для комикс-трилогии. Живая версия с кино-склейками, SFX и курсором-актёром:
+> **[`/readme`](https://v0-car-test.vercel.app/readme)** · прародитель жанра: **[`/comic-book`](https://v0-car-test.vercel.app/comic-book)**
+>
+> ```text
+> ╔══════════════════════════════════════════════════════╗
+> ║  VIBERIDER · PLATFORM   ·   README · ТЕХ. ВЫПУСК     ║
+> ║  Telegram · Next.js · Supabase — сезон 2026          ║
+> ╚══════════════════════════════════════════════════════╝
+> ```
 
-Поверх CRM живёт **семейство витрин экипажей** — лендинги в ДНК платформы
-(`/vipbikerental`, `/moto-selection`, `/sly13`, `/leorus`, `/georg-electro`,
-`/mototehnn`): у каждого своя палитра из метаданных экипажа, единая форма
-обратной связи (`/api/franchize/callback-lead` → уведомления в Telegram
-своему экипажу) и сквозная сетка партнёров. Новая витрина = запись в
-THEME_CONFIG + контент, ноль нового серверного кода.
+**SFX:** `ДЗЫНЬ!` 🛵 — это Telegram-first платформа аренды мото и white-label
+франшиза: мини-приложение в `@oneBikePlsBot`, CRM экипажа (crews), полный
+пайплайн аренд с документами, аналитика с честным разделением денег
+партнёр/компания и «Мотопарк» — стена историй каждого мото. Плюс бот,
+который закрывает операционку: смены, документы, отчёты, `/testdrive`,
+`/salary`.
 
 > Репо выросло из песочницы экспериментов — весь легаси (VPR-тесты, sauna,
 > strikeball, arbitrage и т.п.) остался в коде как «debug oldschool mode»,
@@ -19,7 +24,7 @@ THEME_CONFIG + контент, ноль нового серверного код
 
 ---
 
-## Что внутри (продуктовая поверхность)
+## 🎬 КАДР 01 — «ЧТО ВНУТРИ» (продуктовая поверхность)
 
 | Модуль | Где | Что делает |
 |---|---|---|
@@ -34,11 +39,12 @@ THEME_CONFIG + контент, ноль нового серверного код
 | Telegram-бот | `app/api/telegramWebhook` | Смены, документы (docx), отчёты, команды |
 | Документы | `app/franchize/*doc*` | DOCX-генерация: аренда/продажа/тестдрайв/субаренда/КП |
 
-**Дисциплина денег:** один движок расчёта (`computePartnerSplit` +
-`computeBikeStats`), отменённые аренды никогда не считаются в доход (iter27),
-весь геймификационный слой поверх — только отображение (PRD BikeSoul, iter29).
+> **SFX:** `ЧАК!` 💸 **Дисциплина денег:** один движок расчёта
+> (`computePartnerSplit` + `computeBikeStats`), отменённые аренды никогда
+> не считаются в доход (iter27), весь геймификационный слой поверх — только
+> отображение (PRD BikeSoul, iter29).
 
-### Витрины экипажей
+## 🎬 КАДР 02 — «ШЕСТЬ ВИТРИН, ОДНА ДНК»
 
 | Витрина | Экипаж | О чём |
 |---|---|---|
@@ -54,9 +60,15 @@ THEME_CONFIG + контент, ноль нового серверного код
 и уведомляет **свой** экипаж через резолвер по slug — список получателей
 собирается из `crews`/`crew_members` + `ADMIN_CHAT_ID`.
 
+> **SFX:** `ВЖУХ!` 🛰 Поверх CRM живёт **семейство витрин экипажей** —
+> лендинги в ДНК платформы: у каждого своя палитра из метаданных экипажа,
+> единая форма обратной связи (`/api/franchize/callback-lead` → уведомления
+> в Telegram своему экипажу) и сквозная сетка партнёров. Новая витрина =
+> запись в THEME_CONFIG + контент, ноль нового серверного кода.
+
 ---
 
-## Клон → деплой → ребрендинг
+## 🎬 ГЛАВА ФРАНШИЗЫ — «КЛОН → ДЕПЛОЙ → РЕБРЕНДИНГ»
 
 > 🇷🇺 **Гайд для экипажа на русском:** [`docs/OWN_LANDING_OWN_BOT_RU.md`](docs/OWN_LANDING_OWN_BOT_RU.md) —
 > «свой лендинг — свой бот» пошагово: форк → свой Supabase → бот у @BotFather →
@@ -64,14 +76,14 @@ THEME_CONFIG + контент, ноль нового серверного код
 > заявки приходят от **твоего** бота. Есть таблица решений «своя БД vs общая»
 > и разбор граблей (бот не пишет первым, service_role обязателен и т.д.).
 
-### 1) Fork и деплой
+### ПАНЕЛЬ 1) Fork и деплой
 1. **Fork** репозитория.
 2. Импортируй fork в **Vercel** (framework Next.js, `npm run build`).
 3. Создай проект в **Supabase** (free tier хватает для старта).
 4. Создай бота в **@BotFather**, включи Mini App (Menu Button → Web App),
    поставь webhook на `https://<твой-domain>/api/telegramWebhook`.
 
-### 2) База данных
+### ПАНЕЛЬ 2) База данных
 ```bash
 supabase link --project-ref <ref>
 supabase db push          # применит ~184 миграции из supabase/migrations/
@@ -87,7 +99,7 @@ supabase db push          # применит ~184 миграции из supabase
 - `20260304_private_scheme.sql` + `20260508090000_repair_private_crew_secrets.sql` (приватные секреты для документов)
 - далее по порядку — полный список в `supabase/migrations/README.md`.
 
-### 3) Переменные окружения
+### ПАНЕЛЬ 3) Переменные окружения
 
 **Обязательные:**
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -102,14 +114,15 @@ supabase db push          # применит ~184 миграции из supabase
 `VERCEL_PROJECT_NAME`, `VERCEL_PREVIEW_DOMAIN_SUFFIX` — полный список в
 `.env.example`.
 
-> Секреты в Git не коммитим. Никогда. Даже в SQL-миграциях (см. историю — и урок в `supabase/legacy-migrations/README.md`).
+> **SFX:** `БУМ!` 💣 Секреты в Git не коммитим. Никогда. Даже в SQL-миграциях
+> (см. историю — и урок в `supabase/legacy-migrations/README.md`).
 
-### 4) Ребрендинг
+### ПАНЕЛЬ 4) Ребрендинг
 - Название/палитра crews: `docs/sql/update-vip-bike-*-palette.sql` как образец; метаданные crews (`metadata.franchize.*`) правятся SQL-хидрацией (`docs/sql/*-hydration.sql`).
 - Шаблоны документов: `docs/*_DEAL_TEMPLATE.html` + генератор в `app/franchize/`.
 - Бот: имя/аватар в BotFather, команды — в `app/webhook-handlers/commands/`.
 
-### 5) Локальный запуск
+### ПАНЕЛЬ 5) Локальный запуск
 ```bash
 cp .env.example .env.local   # заполни секреты
 npm install && npm run dev
@@ -117,7 +130,7 @@ npm install && npm run dev
 
 ---
 
-## Разработка и гейты
+## 🎬 КАДР ФИНАЛА — «ДНЕВНИК РЕПО» (разработка и гейты)
 
 ```bash
 npx vitest run tests/franchize/   # тесты франшизы (~3600, 140 spec-файлов; есть live-спеки — нужны креды)
@@ -129,7 +142,7 @@ npm run gen:db-types              # перегенерация types/database.ty
 Правила для агентов и контрибьюторов: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`.
 Опыт итераций: `docs/AGENT_DIARY.md`, корневой `worklog.md`.
 
-## Карта документации
+## 🎬 КАДР ПОСЛЕ ТИТРОВ — «КАРТА ДОКУМЕНТАЦИИ»
 
 - 🇷🇺 **Свой лендинг — свой бот** (гайд экипажа): `docs/OWN_LANDING_OWN_BOT_RU.md`
 - Клон проекта одним HTML: `docs/CLONE_PROJECT_GUIDE.html`
@@ -138,7 +151,7 @@ npm run gen:db-types              # перегенерация types/database.ty
 - Плейсхолдеры и планы: `docs/superpowers/plans/`
 - Легаси-архив (vibe-эпоха): `docs/legacy/`
 
-## Sync форка
+## 🎬 POST-CREDIT — «SYNC ФОРКА»
 
 ```bash
 git remote add upstream https://github.com/salavey13/cartest.git
@@ -149,3 +162,13 @@ git fetch upstream && git rebase upstream/main && git push origin main
 ## Лицензия
 
 Apache License 2.0 (`LICENSE.md`). Vibe-лицензия эпохи песочницы — в `docs/legacy/`.
+
+---
+
+> 📖 **Колофон выпуска:** README начитан как комикс на движке CB CINE —
+> живые кадры со склейками, каскадом текста и курсором-актёром смотрите на
+> **[`/readme`](https://v0-car-test.vercel.app/readme)**; там же — камео из комикс-трилогии
+> **[`/comic-book`](https://v0-car-test.vercel.app/comic-book)** (выпуски 1–3: «Свой сайт за вечер»,
+> «Счётчик денег», «Байки тоже хотят кушать»). Панели нарисованы AI,
+> текст и звук наложены кодом, тарифы — живой каталог, ни одного
+> выдуманного рубля.

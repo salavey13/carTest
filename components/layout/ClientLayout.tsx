@@ -169,6 +169,17 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone page — no chat needed
   },
+  // PATCH: readme theme (2026-11-14, task187) — README как выпуск комикса
+  // на движке CB CINE (/readme, брат /comic-book): рендерит свою мачту —
+  // svarprofi/comicBook pattern, платформенный chrome ломает иллюзию кадров.
+  readme: {
+    paths: ["/readme"],
+    Header: null,           // comic page renders its own masthead
+    Footer: null,           // comic page renders its own colophon
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone page — no chat needed
+  },
   // PATCH: mototehnn theme (2026-10-27, task 148) — standalone landing for
   // the МОТОТЕХ НН crew (мотосалон: техника, запчасти, сервис; mototehnn.ru).
   // Dark navy palette from crews.metadata (bgBase #0a0f1a / accent #3b82f6);
