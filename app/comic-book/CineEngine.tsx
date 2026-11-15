@@ -146,6 +146,64 @@ const AUTO_MS = { base: 8300, row: 9400, panel: 6200, scroll: 10500, scrollRide:
 // v10: сценарное действие автоплея — курсор подъезжает к элементу и «кликает»
 export type CineAutoAction = { at: number; sel: string }; // at — мс от старта кадра
 
+// ── v15 (task190): декод-гейт картинок ──────────────────────────────────────
+// Босс поймал «частично чёрные» кадры на мобиле: webp с decoding="async"
+// рисуется ПРОГРЕССИВНО поверх тёмной панели — успевает отрисоваться только
+// часть тайлов (скрин: у панели 14:20 виден лишь фиолетовый угол под стикером
+// ВЖУХ!, остальное — чёрный фон). Гейт: img держится невидимым (opacity:0,
+// только при живом JS — .cb-js), пока decode() не дожмёт пиксели; затем
+// чистый фейд. Ошибка декодирования не оставляет дыру — показываем как есть.
+function CineImg({
+  className,
+  src,
+  alt,
+  eager,
+  fetchHigh,
+}: {
+  className: string;
+  src: string;
+  alt: string;
+  eager?: boolean;
+  fetchHigh?: boolean;
+}) {
+  const ref = useRef<HTMLImageElement | null>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(false);
+    const im = ref.current;
+    if (!im) return;
+    if (im.complete && im.naturalWidth > 0) {
+      setReady(true); // докачалось до гидрации (кэш/прогрев) — без фейда
+      return;
+    }
+    let alive = true;
+    im.decode()
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setReady(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [src]);
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      ref={ref}
+      className={`${className}${ready ? " cb-img--ready" : ""}`}
+      src={src}
+      alt={alt}
+      {...(eager
+        ? fetchHigh
+          ? { fetchPriority: "high" as const }
+          : {}
+        : { loading: "lazy" as const })}
+      decoding="async"
+      draggable={false}
+    />
+  );
+}
+
 // ── v8-перф: кадр вынесен в memo-компонент ──────────────────────────────────
 // Свайп панели / смена кадра перерисовывает только затронутые кадры, а не все
 // 16 (каждый кадр — сто+ узлов; на мобиле это была главная причина джанка).
@@ -194,14 +252,11 @@ const SceneView = memo(function SceneView({
                   <div className="cb-panel__custom">{p.phone}</div>
                 ) : (
                   p.img && (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
+                    <CineImg
                       className="cb-panel__img"
                       src={p.img}
                       alt={p.alt ?? ""}
-                      loading={eager ? undefined : "lazy"}
-                      decoding="async"
-                      draggable={false}
+                      eager={eager}
                     />
                   )
                 )}
@@ -225,16 +280,12 @@ const SceneView = memo(function SceneView({
                 style={{ backgroundImage: `url(${s.img})` }}
                 aria-hidden="true"
               />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <CineImg
                 className="cb-scene__img"
                 src={s.img}
                 alt={s.alt ?? ""}
-                {...(eager
-                  ? { fetchPriority: "high" as const }
-                  : { loading: "lazy" as const })}
-                decoding="async"
-                draggable={false}
+                eager={eager}
+                fetchHigh
               />
             </>
           )}
@@ -334,6 +385,49 @@ export default function CineEngine({
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
+
+  // ── v15 (task190): фоновый прогрев всех кадров ────────────────────────────
+  // Вторая половина того же бага: eager только у сцен i<2 (1028) — в cine
+  // скрытые сцены не пересекаются с вьюпортом, lazy-картинка начинает
+  // закачиваться ТОЛЬКО при показе кадра (секунды чёрного на мобиле; прыжок
+  // по HUD-точкам/End/hash в конец — вообще все кадры впустую). Очередь:
+  // через 1.5s после активации (LCP обложки — первым) качаем и декодируем
+  // все URL по порядку с паузой — когда зритель доходит до кадра, он уже
+  // тёплый. Заодно закрывает известную «белую вспышку» End-клавиши (task188).
+  useEffect(() => {
+    if (!active) return;
+    const urls: string[] = [];
+    const seen = new Set<string>();
+    for (const s of scenes) {
+      if (s.img && !seen.has(s.img)) {
+        seen.add(s.img);
+        urls.push(s.img);
+      }
+      for (const p of s.panels ?? []) {
+        if (p.img && !seen.has(p.img)) {
+          seen.add(p.img);
+          urls.push(p.img);
+        }
+      }
+    }
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const step = (k: number) => {
+      if (!alive || k >= urls.length) return;
+      const im = new Image();
+      im.src = urls[k];
+      const next = () => {
+        if (alive) timer = setTimeout(() => step(k + 1), 120);
+      };
+      if (typeof im.decode === "function") im.decode().catch(() => {}).then(next);
+      else im.onload = next;
+    };
+    timer = setTimeout(() => step(0), 1500);
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [active, scenes]);
 
   const visiblePanels = useCallback((s: CineSceneDef | undefined) => {
     if (!s || s.kind !== "row") return 1;
