@@ -2183,3 +2183,27 @@ Status: DONE (prod verified 38f4181 → Vercel, /readme живой)
 
 Stage Summary:
 - /readme — второй выпуск на движке CB CINE: документация репозитория как комикс (3 главы × 3 панели, все факты README.MD). Корневой README.MD теперь тоже в стиле выпуска и ссылается на живые кадры. Движок подтверждён как РЕУЗАБЕЛЬНЫЙ: новый клиент ReadmeComicClient собран на CineEngine + comic-book.css без правок движка.
+
+---
+Task ID: task188-readme-polish-cine-review (v2, босс: «please polish /readme and codereciew comics engine»)
+Date: 2026-11-15
+Status: DONE (prod verified 88e26e8 → Vercel: /readme v2 + /comic-book 17 кадров целы)
+
+POLISH /readme (по скриншотам v1, которые не смотрел в прошлый раз — урок):
+- Обложка: убраны СВОИ cue-чип и overlay-дубль — на десктопе их было 2, на мобиле 3 рядом с родным HUD-hint движка («крути до упора», CineEngine:1114). Подсказка теперь одна.
+- rcover перегенерирован 2 раза (gen-rcover-v2.sh): v1 рисовал стену одинаковых лиц (читалось как «кастинг трилогии»), v2 — пустой белый баллон; v3 — мотоцикл + комикс-стена с артой внутри + экраны кода + рука-робот, без лиц и белых пятен. Промпт-урок: «no speech balloons, no empty white panels» надо писать явно.
+- Финал: колофон (cb-trilogy__fine) переведён из absolute bottom-left (наезжал на HUD-счётчик 08/08) в поток CTA-стопки — как в эндслейте трилогии.
+- Sfx type: добавлен "yellow" (TS2322 — класс cb-sfx--yellow в CSS ЕСТЬ, это тип дропнул его).
+- Notify гайда: app «Гайд · репо», путь перенесён в body (app-строка апкейсилась — DOCS/...MD смотрелось грязно).
+- ttl рядов 9400→10400 (v12 golden middle: самый длинный тик 10500; 3 каптиона + каскад 3.4s в 9.4 не влезали).
+
+CODE REVIEW CB CINE (прочитаны ВСЕ 1124 строки CineEngine + 4246 CSS + клиент):
+- ФИКС: CineEngine:541 мёртвый дубль lock-чека в go() (строка 540 уже возвращала при !force && (lock||cooldown)).
+- ФИКС: CineEngine:1056 протухший eslint-disable no-img-element над <button> HUD-точек.
+- Отмечено, НЕ трогал (риски > пользы): hash-jump живёт только на активации движка (deps [active]) — софт-навигация по хэшу не прыгает (deep-link на mount, документированное поведение); End-клавиша может дать белую вспышку (прелоад только idx+1/2); на последнем кадре автоплея лента остаётся полной (косметика); .cb-scene__cta объявлена дважды подряд в CSS (2234/2239 — артефакт слияния, не мешает).
+- Что ПОДТВЕРЖДЕНО как ок: таймеры (cursor/idle/auto) чистятся в cleanup'ах; body.cb-cine-lock снимается; visiblePanels (innerWidth<1100) совпадает с mid-MQ (max-width:1099) — без off-by-one; автоплей рестартует тик на смене панели (deps idx/pidx), лента через CSS-transition (1 запись/тик); кулдаун 550ms против проспаска; prefers-reduced-motion в CSS касается только статики — cine гвардится --rm (?calm=1), v11-правило соблюдено.
+- ГРАБЛЯ QA (честно): в task187 «tsc exit: 0» был кодом tail в пайпе, не tsc! Правильный замер (scoped tsconfig comic+readme, full-repo tsc в сандбоксе 4GB RAM убивается OOM): до фикса — 1 реальная ошибка (yellow), после — 0; прочие ошибки в срезе — pre-existing долг вне комикса (bio30/rentals/hooks, тот же набор, что вне allowlist гейта). Гейт репо typecheck:franchize — exit 0.
+- QA: vitest 4016 passed; dev E2E: обложка 1 cue, финал без наезда, мобайл 390 без overflow, консоль чистая; прод: /readme 8 кадров cues=0, /comic-book 17 кадров (регрессии нет).
+
+Stage Summary:
+- /readme v2: обложка-техвыпуск (мотоцикл+код+панели, без лиц), одна подсказка, колофон в потоке, ttl под чтение. Движок CB CINE прошёл полный ревью: 2 безопасных чистки применены, архитектура подтверждена (memo-кадры, DOM-кроссфейд, анти-проскас, курсор-актёр — всё живое, утечек нет).
