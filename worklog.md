@@ -2165,3 +2165,21 @@ Status: DONE (prod verified 06a7f6e → Vercel, CSS 1a933b2402376fbf)
 
 Stage Summary:
 - /comic-book v12: пять прямых ответов боссу — панели разворота с заметным интервалом (2.1s), текст читается сверху вниз как в настоящем комиксе, хронометраж подрезан до «golden middle» (кадры живут 7.8–12s вместо 8.6–13.5s), шрифты PC ещё крупнее (пузыри до 21px), движок плавнее (JS-спринги framer выкинуты из каскада, глайд bezier, blur/contain дешевле). Финал трилогии — три непохожих кадра: холодная улица → тёплый бокс → губы у микрофона.
+
+---
+Task ID: task187-readme-comic (v1, босс: «create README in comics style using comics engine we created ;) /readme»)
+Date: 2026-11-14/15
+Status: DONE (prod verified 38f4181 → Vercel, /readme живой)
+
+- Босс хочет README в стиле комикса НА НАШЕМ движке → сделано двумя слоями:
+  (1) /readme — НОВЫЙ маршрут: README, начитанный как «технический выпуск» на CB CINE (тот же CineEngine + comic-book.css, что у трилогии); (2) корневой README.MD переписан в стиле выпуска: мачта, «КАДР 01–02», «ГЛАВА ФРАНШИЗЫ: КЛОН → ДЕПЛОЙ» (панели 1–5), «ДНЕВНИК РЕПО», «POST-CREDIT», колофон со ссылками на /readme и /comic-book (абсолютные URL — на GitHub относительные ломаются). ВСЕ факты сохранены из прежнего README.MD (таблица модулей, 6 витрин, 184 миграции, env-переменные, гейты ~3600 тестов, sync fork, Apache 2.0) — ни один факт не потерян, стиль наложен поверх.
+- /readme: 8 кадров — обложка rcover → ГЛАВА 1 «ПРИЁМ» (R·01 мини-апп @oneBikePlsBot / R·02 витрина из crews.metadata+THEME_CONFIG / R·03 бот-операционка: /shift /salary /testdrive) → ГЛАВА 2 «КУХНЯ» (R·04 computePartnerSplit, отменённые=0 ₽ / R·05 DOCX-клерк / R·06 аналитика с сверками) → ГЛАВА 3 «ФРАНШИЗА» (R·07 шесть витрин / R·08 клон→Supabase→Vercel+гайд / R·09 КАМЕО pdj «арендуй движок») → финал final.webp с CTA на /comic-book, /salavey13 и docs/OWN_LANDING_OWN_BOT_RU.md.
+- Правила v12 соблюдены: PANEL_STAGGER_S 2.1s, текст стопки СВЕРХУ ВНИЗ (нотиф→терминал→пузыри→каптион, шаг 0.4s, старт 1.15s, SFX 1.0s), ttl golden middle (обложка 8800, титры 5400, ряды 9400, финал 9500), Pop/Drop без framer (CSS-каскад), ?calm=1 хатч. Звука в выпуске нет (тумблер остался в трилогии), HUD ▶ автоплей работает.
+- Арт: 9 НОВЫХ портретов rcover/rmini/rcat/rbotclerk/rmoney/rdocs/ranalytics/rmap/rdeploy (768×1344, webp q85, ДНК стиля трилогии) — у каждого ряда все 3 кадра разные (урок v12); камео pdj.webp + final.webp из выпуска №1 как сквозная непрерывность. Скрипт /home/z/my-project/scripts/gen-readme-pics.sh.
+- Инфра: components/layout/ClientLayout.tsx + тема readme (paths ["/readme"], Header/Footer null, hideStickyChat — svarprofi/comicBook pattern); app/readme/page.tsx с metadata/OG.
+- QA: tsc 0; vitest 4016 passed (23 skipped); dev 3223: fresh-load #r-rowB/#r-rowC прыгает по хэшу (эффект только на mount — soft-nav по хэшу не перепрыгивает, это норма движка), каскад terminal@1.15→caption@1.55 сверху вниз, консоль чистая; мобайл 390×844 без overflow. Prod: 8 кадров, #r-rowA → все 3 картинки loaded (complete=true), скриншоты рядов A/B/C — три разных кадра, большие шрифты, HUD 03/08.
+- Грабли: agent-browser networkidle на проде не наступает (постоянные соединения) — ждать load+фикс. pkill -f с паттерном собственной команды убивает свой шелл (урок v12 — киллить по PID из ss -ltnp).
+- Deploy: 38f4181 → Vercel; /readme отдает метадату «README · технический выпуск — комикс платформы», rcover в HTML.
+
+Stage Summary:
+- /readme — второй выпуск на движке CB CINE: документация репозитория как комикс (3 главы × 3 панели, все факты README.MD). Корневой README.MD теперь тоже в стиле выпуска и ссылается на живые кадры. Движок подтверждён как РЕУЗАБЕЛЬНЫЙ: новый клиент ReadmeComicClient собран на CineEngine + comic-book.css без правок движка.
