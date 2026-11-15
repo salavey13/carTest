@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import CineEngine, { PANEL_STAGGER_S, type CineSceneDef } from "../comic-book/CineEngine";
 import "../comic-book/comic-book.css";
 
-type Sfx = { text: string; color: "cyan" | "magenta" | "gold"; rotate: number };
+type Sfx = { text: string; color: "cyan" | "magenta" | "gold" | "yellow"; rotate: number };
 type Notify = { app: string; title: string; body: string };
 
 type Panel = {
@@ -179,7 +179,7 @@ export default function ReadmeComicClient() {
     title: string,
     accent: "cyan" | "magenta" | "gold",
     panels: Panel[],
-    ttl = 9400,
+    ttl = 10400, // v2: три каптиона + каскад ~3.4s — 9.4s было впритык (v12 golden middle: самый длинный тик 10.5s)
   ): CineSceneDef => ({
     id,
     title,
@@ -211,15 +211,9 @@ export default function ReadmeComicClient() {
         contain: true,
         chrome: false,
         ttl: 8800,
-        overlay: (
-          <span
-            className="cb-cover__cue cb-cover__cue--overlay"
-            aria-hidden="true"
-            style={ink({}, "2.9s")}
-          >
-            <i>▼</i> скролл — камера едет, следующий кадр уже выезжает
-          </span>
-        ),
+        // подсказка про скролл — одна: родной HUD-hint движка (cb-hud__hint).
+        // Свой cue-чип и overlay-дубль убраны (task188: на десктопе их было
+        // видно два, на мобиле три — рядом с HUD-подсказкой).
         node: (
           <div className="cb-cinecover" style={ink({}, "0.2s")}>
             <span className="cb-cover__kicker" style={ink({}, "0.6s")}>
@@ -245,9 +239,6 @@ export default function ReadmeComicClient() {
               <span>СТЕК ВЫПУСКА:</span>
               <b>Telegram · Next.js · Supabase</b>
             </div>
-            <span className="cb-cover__cue" aria-hidden="true" style={ink({}, "2.9s")}>
-              <i>▼</i> скролл — камера едет
-            </span>
           </div>
         ),
       },
@@ -348,9 +339,9 @@ export default function ReadmeComicClient() {
           caption: "Fork репозитория → свой Supabase → бот у @BotFather → Vercel с env → мини-апп в твоём боте. Заявки приходят уже от твоего бота.",
           terminal: ["$ supabase db push", "> 184 миграции … OK", "$ vercel --prod", "> готово к сезону"],
           notify: {
-            app: "Гайд · docs/OWN_LANDING_OWN_BOT_RU.md",
+            app: "Гайд · репо",
             title: "СВОЙ ЛЕНДИНГ — СВОЙ БОТ",
-            body: "пошагово, с таблицей граблей",
+            body: "docs/OWN_LANDING_OWN_BOT_RU.md · пошагово, с граблями",
           },
           sfx: { text: "ПУШ!", color: "gold", rotate: 8 },
         },
@@ -399,15 +390,14 @@ export default function ReadmeComicClient() {
               >
                 Гайд: свой лендинг — свой бот
               </a>
+              {/* колофон в потоке CTA-стопки (task188: absolute bottom-left
+                  наезжал на HUD-счётчик 08/08 — финальный кадр v1) */}
+              <p className="cb-trilogy__fine" style={ink({}, "3.2s")}>
+                выпуск README · сценарий, код, панели — zai-агент VIP BIKE ·
+                иллюстрации — AI · факты — README.MD и worklog, ни одного
+                выдуманного модуля
+              </p>
             </div>
-            <p
-              className="cb-trilogy__fine"
-              style={ink({ position: "absolute", bottom: "3%", left: "4%" }, "3.2s")}
-            >
-              выпуск README · сценарий, код, панели — zai-агент VIP BIKE ·
-              иллюстрации — AI · факты — README.MD и worklog, ни одного
-              выдуманного модуля
-            </p>
           </>
         ),
       },

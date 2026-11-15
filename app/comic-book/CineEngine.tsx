@@ -538,7 +538,6 @@ export default function CineEngine({
         return;
       }
       if (!opts?.force && (lockRef.current || inCooldown())) return; // анти-проскас: без очереди
-      if (lockRef.current && !opts?.force) return;
       lockRef.current = true;
       cooldown();
       const dir: 1 | -1 = target > cur ? 1 : -1;
@@ -1053,7 +1052,6 @@ export default function CineEngine({
         <div className="cb-hud">
           <div className="cb-hud__rail" aria-label="Рейка кадров">
             {scenes.map((s, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
               <button
                 key={s.id}
                 type="button"
