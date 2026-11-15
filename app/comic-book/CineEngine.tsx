@@ -153,17 +153,23 @@ export type CineAutoAction = { at: number; sel: string }; // at — мс от с
 // ВЖУХ!, остальное — чёрный фон). Гейт: img держится невидимым (opacity:0,
 // только при живом JS — .cb-js), пока decode() не дожмёт пиксели; затем
 // чистый фейд. Ошибка декодирования не оставляет дыру — показываем как есть.
+//
+// v15.1 (prod-урок этого же таска): loading="lazy" в cine-режиме НЕ РАБОТАЕТ
+// как «оптимизация» — не-текущие сцены вне вьюпорта, Chrome не начинает их
+// качать даже по вызову decode() на DOM-элементе (промис висит до пересечения),
+// и гейт честно ждал вечно. Поэтому ВСЕ картинки движка — eager: полная
+// закачка выпуска при монтировании (~2–3MB webp на выпуск), гейт прячет до
+// декодирования, очередь ниже греет кэш и разжимает декод по порядку.
+// Статичный вебтун без JS тоже выигрывает: картинки грузятся сразу.
 function CineImg({
   className,
   src,
   alt,
-  eager,
   fetchHigh,
 }: {
   className: string;
   src: string;
   alt: string;
-  eager?: boolean;
   fetchHigh?: boolean;
 }) {
   const ref = useRef<HTMLImageElement | null>(null);
@@ -193,11 +199,7 @@ function CineImg({
       className={`${className}${ready ? " cb-img--ready" : ""}`}
       src={src}
       alt={alt}
-      {...(eager
-        ? fetchHigh
-          ? { fetchPriority: "high" as const }
-          : {}
-        : { loading: "lazy" as const })}
+      {...(fetchHigh ? { fetchPriority: "high" as const } : {})}
       decoding="async"
       draggable={false}
     />
@@ -213,12 +215,10 @@ const SceneView = memo(function SceneView({
   s,
   i,
   pidxFor,
-  eager,
 }: {
   s: CineSceneDef;
   i: number;
   pidxFor: number;
-  eager: boolean;
 }) {
   return (
     <section
@@ -252,12 +252,7 @@ const SceneView = memo(function SceneView({
                   <div className="cb-panel__custom">{p.phone}</div>
                 ) : (
                   p.img && (
-                    <CineImg
-                      className="cb-panel__img"
-                      src={p.img}
-                      alt={p.alt ?? ""}
-                      eager={eager}
-                    />
+                    <CineImg className="cb-panel__img" src={p.img} alt={p.alt ?? ""} />
                   )
                 )}
                 <span className="cb-panel__scrim" aria-hidden="true" />
@@ -280,13 +275,7 @@ const SceneView = memo(function SceneView({
                 style={{ backgroundImage: `url(${s.img})` }}
                 aria-hidden="true"
               />
-              <CineImg
-                className="cb-scene__img"
-                src={s.img}
-                alt={s.alt ?? ""}
-                eager={eager}
-                fetchHigh
-              />
+              <CineImg className="cb-scene__img" src={s.img} alt={s.alt ?? ""} fetchHigh />
             </>
           )}
           <div className="cb-scene__scrim" aria-hidden="true" />
@@ -386,14 +375,15 @@ export default function CineEngine({
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // ── v15 (task190): фоновый прогрев всех кадров ────────────────────────────
-  // Вторая половина того же бага: eager только у сцен i<2 (1028) — в cine
-  // скрытые сцены не пересекаются с вьюпортом, lazy-картинка начинает
-  // закачиваться ТОЛЬКО при показе кадра (секунды чёрного на мобиле; прыжок
-  // по HUD-точкам/End/hash в конец — вообще все кадры впустую). Очередь:
-  // через 1.5s после активации (LCP обложки — первым) качаем и декодируем
-  // все URL по порядку с паузой — когда зритель доходит до кадра, он уже
-  // тёплый. Заодно закрывает известную «белую вспышку» End-клавиши (task188).
+  // ── v15 (task190): прогрев-очередь всех кадров ────────────────────────────
+  // Прыжок по HUD-точкам/End/hash в конец фильма раньше оставлял дальние кадры
+  // незагруженными (зависимость от сети в момент показа). Очередь: через 1.5s
+  // после активации (LCP обложки — первым) качаем и декодируем все URL по
+  // порядку с паузой — картинка в кадре подхватывает кэш и декод мгновенно.
+  // Заодно закрыта известная «белая вспышка» End-клавиши (task188).
+  // v15.1: сами img теперь eager (см. CineImg) — очередь остаётся страховкой
+  // и «уплотнителем» декода, не позволяя 10+ параллельным fetch'ам отбирать
+  // полосу у обложки.
   useEffect(() => {
     if (!active) return;
     const urls: string[] = [];
@@ -1114,13 +1104,7 @@ export default function CineEngine({
     >
       <div className="cb-cine__stage" ref={stageRef}>
         {scenes.map((s, i) => (
-          <SceneView
-            key={s.id}
-            s={s}
-            i={i}
-            pidxFor={i === idx ? pidx : 0}
-            eager={i < 2}
-          />
+          <SceneView key={s.id} s={s} i={i} pidxFor={i === idx ? pidx : 0} />
         ))}
       </div>
 
