@@ -384,6 +384,9 @@ export default function ReadmeComicClient() {
               <a className="cb-final__ghost" href="/salavey13">
                 Витрина флагмана
               </a>
+              <a className="cb-final__ghost" href="/chronicle">
+                Хроника одной аренды · выпуск №3
+              </a>
               <a
                 className="cb-final__ghost"
                 href="https://github.com/salavey13/carTest/blob/main/docs/OWN_LANDING_OWN_BOT_RU.md"

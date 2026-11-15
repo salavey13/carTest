@@ -180,6 +180,18 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone page — no chat needed
   },
+  // PATCH: chronicle theme (2026-11-15, task189) — «Хроника одной аренды»
+  // (/chronicle, выпуск №3 комикс-вселенной): та же схема, что readme/
+  // comicBook — своя мачта; платформенный chrome под fixed-стейджем только
+  // прячется, а StickyChat всё равно вылезает тостом поверх кино.
+  chronicle: {
+    paths: ["/chronicle"],
+    Header: null,           // comic page renders its own masthead
+    Footer: null,           // comic page renders its own colophon
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone page — no chat needed
+  },
   // PATCH: mototehnn theme (2026-10-27, task 148) — standalone landing for
   // the МОТОТЕХ НН crew (мотосалон: техника, запчасти, сервис; mototehnn.ru).
   // Dark navy palette from crews.metadata (bgBase #0a0f1a / accent #3b82f6);
@@ -247,6 +259,16 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/comic-book")) {
     return THEME_CONFIG.comicBook;
+  }
+  // PATCH (task189): /readme существовал с task187, но резолвер про него не
+  // знал — срабатывала default-тема: Header/Footer/BottomNav монтировались
+  // (и прятались только под fixed-стейджем кино), StickyChat вылезал тостом
+  // поверх кадров. Теперь readme и chronicle резолвятся явно.
+  if (pathname.startsWith("/readme")) {
+    return THEME_CONFIG.readme;
+  }
+  if (pathname.startsWith("/chronicle")) {
+    return THEME_CONFIG.chronicle;
   }
   if (pathname.startsWith("/mototehnn")) {
     return THEME_CONFIG.mototehnn;
