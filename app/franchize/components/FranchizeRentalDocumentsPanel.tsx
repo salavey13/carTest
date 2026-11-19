@@ -15,6 +15,10 @@ interface FranchizeRentalDocumentsPanelProps {
   crewSlug?: string;
   /** Bike's partner owner (specs.subrenter_chat_id) — mini admin for this bike */
   subrenterChatId?: string;
+  /** task193.1 — пароль-сессия владельца (ПК, новая вкладка, без Telegram
+   *  WebApp): id пришёл с сервера страницы (cookie против crews.owner_id),
+   *  подставляется вместо TG-dbUser во все handover-экшены. */
+  passwordActorId?: string | null;
   status: string;
   metadata: RentalMetadata;
   /** iter15: specs.last_known_odometer from the bike catalog — terminal
@@ -43,8 +47,12 @@ const freezeChecklistOptions = [
   "Клиент подписал условия",
 ];
 
-export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, status, metadata, specsOdometerKm, pepSignature, currentDocSha, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
+export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewSlug, subrenterChatId, passwordActorId = null, status, metadata, specsOdometerKm, pepSignature, currentDocSha, palette, isAuto = false }: FranchizeRentalDocumentsPanelProps) {
   const { dbUser, userCrewMemberships } = useAppContext();
+  // task193.1 — acting identity: the password-session owner (PC, no Telegram
+  // WebApp context) falls back from the TG-cookie dbUser. Same pattern as
+  // FranchizeRentalLifecycleActions.passwordActorId.
+  const actorId = passwordActorId || dbUser?.user_id || null;
 
   // All themed values — CSS vars for auto, palette values for manual themes
   const theme = useMemo(() => {
@@ -135,7 +143,9 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
   const [damageSeverity, setDamageSeverity] = useState<"minor" | "major">("minor");
   const [damageNotes, setDamageNotes] = useState("");
 
-  const isOwner = dbUser?.user_id === ownerId;
+  // task193.1 — пароль-актор уже доказан сервером (подписанная cookie
+  // против crews.owner_id) — считаем его владельцем без TG-dbUser.
+  const isOwner = dbUser?.user_id === ownerId || Boolean(passwordActorId);
   // FIX (iter9): client-side gate aligned with the server-side
   // canUserOperateRentalHandover chain — crew matching by crewId OR slug
   // (crewId formats sometimes diverge — see FranchizeRentalRoleGuard),
@@ -166,14 +176,14 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
   };
 
   const onSaveFreeze = () => {
-    if (!canFreeze || !dbUser?.user_id) return;
+    if (!canFreeze || !actorId) return;
     const parsedOdometer = Number(odometerKm);
     if (!Number.isFinite(parsedOdometer) || parsedOdometer < 0) {
       toast.error("Укажите пробег (км) — например, подсказку со страницы аренды.");
       return;
     }
     startTransition(async () => {
-      const result = await saveRentalPickupFreeze(rentalId, dbUser.user_id, {
+      const result = await saveRentalPickupFreeze(rentalId, actorId, {
         odometerKm: parsedOdometer,
         fuelLevel,
         checklist,
@@ -190,12 +200,12 @@ export function FranchizeRentalDocumentsPanel({ rentalId, ownerId, crewId, crewS
   };
 
   const onAddDamageReport = () => {
-    if (!dbUser?.user_id) {
-      toast.error("Нужна авторизация в Telegram WebApp.");
+    if (!actorId) {
+      toast.error(passwordActorId ? "Пароль-сессия истекла — обновите страницу." : "Нужна авторизация в Telegram WebApp.");
       return;
     }
     startTransition(async () => {
-      const result = await addRentalDamageReport(rentalId, dbUser.user_id, {
+      const result = await addRentalDamageReport(rentalId, actorId, {
         phase: damagePhase,
         severity: damageSeverity,
         notes: damageNotes,

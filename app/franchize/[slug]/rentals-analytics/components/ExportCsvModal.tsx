@@ -1024,8 +1024,12 @@ export function ExportCsvModal({
       if (!finEdit || !slug || finSaving) return;
       const newPrice = parseMoneyInput(finPrice);
       const newDeposit = parseMoneyInput(finDeposit);
-      if ((finPrice.trim() && (newPrice === undefined || newPrice! < 0)) ||
-          (finDeposit.trim() && (newDeposit === undefined || newDeposit! < 0))) {
+      // task193.1 — Number.isFinite catches NaN too: parseMoneyInput returns
+      // NaN for garbage input, and `NaN < 0` is false — the old guard let NaN
+      // through to the server action (which then bounced it with a generic
+      // server round-trip instead of an instant client-side toast).
+      if ((finPrice.trim() && (newPrice === undefined || !Number.isFinite(newPrice) || newPrice! < 0)) ||
+          (finDeposit.trim() && (newDeposit === undefined || !Number.isFinite(newDeposit) || newDeposit! < 0))) {
         toast.error("Сумма должна быть неотрицательным числом (можно «12 500» или «12500,50»).");
         return;
       }
@@ -1059,10 +1063,19 @@ export function ExportCsvModal({
           toast.error(res.error || "Не удалось сохранить правку");
         }
       } catch (err) {
+        // task193.1 (boss saw «не удалось сделать правку» with zero
+        // diagnostics) — surface the REAL failure text. Typical RPC-layer
+        // causes: a stale post-deploy server-action id (a refresh fixes it,
+        // the deploy swapped the serverless bundle mid-session), network,
+        // serialization. The server's own error texts already arrive via the
+        // res.error branch above.
+        const raw = err instanceof Error ? err.message : "";
         toast.error(
           err instanceof ServerActionTimeoutError
             ? err.message
-            : "Не удалось сохранить правку",
+            : /server action|unexpected response/i.test(raw)
+              ? `${raw} — страница устарела после деплоя, обнови (Ctrl+Shift+R) и повтори`
+              : raw || "Не удалось сохранить правку",
         );
       } finally {
         setFinSaving(false);
@@ -2311,14 +2324,21 @@ export function ExportCsvModal({
                           : {}),
                       }}
                       onClick={rowClickable ? () => openRentalForRow(r) : undefined}
-                      // task193 — middle-click = new tab without autoscroll.
+                      // task193.1 (boss: middle-click ON the «Марка» <a> opened
+                      // nothing) — a middle click on the LINK must keep the
+                      // NATIVE default: the real <a target=_blank> opens a real
+                      // tab. Our blanket preventDefault cancelled that native
+                      // auxclick action (the right-click menu survived, the
+                      // middle click died). Intercept only middle clicks
+                      // OUTSIDE the anchor — the anchor needs nothing from us.
                       onAuxClick={
                         rowClickable
                           ? (e) => {
-                              if (e.button === 1) {
-                                e.preventDefault();
-                                openRentalForRow(r);
-                              }
+                              if (e.button !== 1) return;
+                              const el = e.target as HTMLElement | null;
+                              if (el && el.closest("a")) return;
+                              e.preventDefault();
+                              openRentalForRow(r);
                             }
                           : undefined
                       }
@@ -2949,16 +2969,18 @@ function SectionTable({
                   ...(isGrandTotal ? { fontWeight: 700 } : {}),
                 }}
                 onClick={rowClickable ? () => onOpenRental(rowRentalId) : undefined}
-                // task193 — middle-click opens the rental in a new tab WITHOUT
-                // the autoscroll icon (the boss tried exactly this): swallow
-                // the default auxclick and open the same URL as a plain click.
+                // task193.1 — same fix as the flat renderer above: middle click
+                // ON the «Марка» anchor keeps the NATIVE new-tab default (our
+                // blanket preventDefault killed it); middle click on the row
+                // itself still goes through window.open (no autoscroll icon).
                 onAuxClick={
                   rowClickable
                     ? (e) => {
-                        if (e.button === 1) {
-                          e.preventDefault();
-                          onOpenRental(rowRentalId);
-                        }
+                        if (e.button !== 1) return;
+                        const el = e.target as HTMLElement | null;
+                        if (el && el.closest("a")) return;
+                        e.preventDefault();
+                        onOpenRental(rowRentalId);
                       }
                     : undefined
                 }

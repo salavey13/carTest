@@ -808,6 +808,35 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
         </FranchizeRentalRoleGuard>
         )}
 
+        {/* task193.1 (boss: «allow user to be fully functional when logged in
+            via password on PC on rental page») — та же панель документов для
+            пароль-владельца БЕЗ клиентского RoleGuard (он видит только
+            TG-cookie зрителя и спрятал бы всё): без этой панели нельзя
+            создать pickup-freeze, а без freeze не работает «Подтвердить
+            выдачу» — петля «не выдан → не активировать → не завершить».
+            TG-зрители покрыты блоком выше; !viewerActorId не даёт задвоить
+            панель для TG-стаффа (viewerActorId — тот же cookie-проверенный
+            id, что гейтит верификацию выше). */}
+        {rental.found && status !== "completed" && status !== "cancelled" && passwordAuthOwnerId && !viewerActorId && (
+          <FranchizeErrorBoundary fallbackTitle="Документы временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
+            <FranchizeRentalDocumentsPanel
+              rentalId={rental.rentalId}
+              ownerId={rental.ownerId}
+              crewId={crew.id}
+              crewSlug={resolvedSlug}
+              subrenterChatId={rental.subrenterChatId}
+              status={status}
+              metadata={rental.metadata}
+              passwordActorId={passwordAuthOwnerId}
+              palette={p}
+              isAuto={isAuto}
+              specsOdometerKm={rental.specsOdometer}
+              pepSignature={(rentalMeta?.pep_signature as { telegram_id?: string; username?: string | null; signed_at?: string; doc_sha256?: string } | null) ?? null}
+              currentDocSha={(rentalMeta?.doc_sha256 as string | undefined) ?? null}
+            />
+          </FranchizeErrorBoundary>
+        )}
+
         {/* Single "Продлить" button — operator-only. Opens ExtendModal with date picker.
             Was 2 duplicate buttons (sidebar + action row); now just one. */}
         {rental.found && status === "active" && (
@@ -878,7 +907,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             клиентского RoleGuard (он видит только TG-cookie зрителя и спрятал
             бы всё). Сервер уже доказал ownership cookie-подписью + БД; экшены
             перепроверяют userId сами. */}
-        {rental.found && passwordAuthOwnerId && (
+        {/* task193.1 — !viewerActorId: TG-зритель со своей cookie уже покрыт
+            RoleGuard-блоком выше; без гейта пароль-блок задваивался бы для
+            TG-стаффа на незакрытых арендах (passwordAuthOwnerId резолвится
+            при !isCrewStaff, а isCrewStaff считается только на completed). */}
+        {rental.found && passwordAuthOwnerId && !viewerActorId && (
           <div id="lifecycle-actions">
             <FranchizeErrorBoundary fallbackTitle="Действия временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
               <FranchizeRentalLifecycleActions

@@ -33,7 +33,12 @@ describe("task193 · tableview: new-tab tap-through + persistence", () => {
   it("middle-click opens a new tab WITHOUT the autoscroll icon (both renderers)", () => {
     expect(modal.match(/onAuxClick=/g)?.length).toBe(2); // sectioned + legacy
     expect(modal).toContain("e.preventDefault();");
-    expect(modal).toContain('if (e.button === 1)');
+    // task193.1 (boss: middle-click ON the «Марка» <a> opened nothing) — the
+    // row guard early-returns for non-middle buttons and DEFERS to the native
+    // anchor default (closest("a")), so the real <a target=_blank> keeps its
+    // native middle-click new-tab; only row-area middle clicks window.open.
+    expect(modal).toContain("if (e.button !== 1) return;");
+    expect(modal.match(/if \(el && el\.closest\("a"\)\) return;/g)?.length).toBe(2);
   });
 
   it("«Марка» carries a REAL <a target=_blank> — browser context menu works", () => {
@@ -99,6 +104,31 @@ describe("task193 · ✍️ finance edit (owner-tier, price + deposit + comment)
     expect(card).toContain("currentTotalCost?: number | null;");
     const page = src("app/franchize/[slug]/rental/[id]/page.tsx");
     expect(page.match(/currentTotalCost=\{rental\.totalCost \?\? null\}/g)?.length).toBe(2);
+  });
+
+  it("task193.1 — save failures surface the REAL error text (no blanket toast)", () => {
+    // modal: NaN input is caught client-side before the server round-trip
+    expect(modal).toContain("!Number.isFinite(newPrice) || newPrice! < 0");
+    expect(modal).toContain("!Number.isFinite(newDeposit) || newDeposit! < 0");
+    // modal + card: catch shows err.message (stale action id gets a refresh hint)
+    expect(modal).toContain("err instanceof Error ? err.message : \"\"");
+    expect(card).toContain("err instanceof Error ? err.message : \"\"");
+    expect(card).toContain("страница устарела после деплоя");
+  });
+
+  it("task193.1 — password session gets the FULL documents/handoff flow", () => {
+    const page = src("app/franchize/[slug]/rental/[id]/page.tsx");
+    const docs = src("app/franchize/components/FranchizeRentalDocumentsPanel.tsx");
+    // the freeze is the ONLY gate between «not handed out» and activate/finish —
+    // the password owner must be able to create it (no RoleGuard hiding)
+    expect(page).toContain("passwordAuthOwnerId && !viewerActorId &&");
+    expect(page.match(/passwordActorId=\{passwordAuthOwnerId\}/g)?.length).toBe(2); // lifecycle + documents
+    expect(docs).toContain("passwordActorId?: string | null;");
+    expect(docs).toContain("const actorId = passwordActorId || dbUser?.user_id || null;");
+    expect(docs).toContain("saveRentalPickupFreeze(rentalId, actorId, {");
+    expect(docs).toContain("addRentalDamageReport(rentalId, actorId, {");
+    // TG viewers keep the RoleGuard path — no double panel
+    expect(page.match(/passwordAuthOwnerId && !viewerActorId && \(/g)?.length).toBe(2);
   });
 });
 

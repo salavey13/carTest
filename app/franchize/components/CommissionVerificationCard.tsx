@@ -175,8 +175,17 @@ export function CommissionVerificationCard({
       } else {
         toast.error(res.error || "Не удалось сохранить правку");
       }
-    } catch {
-      toast.error("Не удалось сохранить правку");
+    } catch (err) {
+      // task193.1 — surface the REAL failure instead of a blanket toast
+      // (same rationale as the ExportCsvModal finance save: a stale
+      // post-deploy action id, network, serialization — each has its own
+      // message; the server's own texts arrive via res.error above).
+      const raw = err instanceof Error ? err.message : "";
+      toast.error(
+        /server action|unexpected response/i.test(raw)
+          ? `${raw} — страница устарела после деплоя, обнови и повтори`
+          : raw || "Не удалось сохранить правку",
+      );
     } finally {
       setFinSaving(false);
     }
