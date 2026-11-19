@@ -91,18 +91,22 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
-import { X, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal } from "lucide-react";
+import { X, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal, Pencil } from "lucide-react";
 import { toast } from "sonner";
 // Task 128 — same owner-gated action the rental-page verification card uses.
 // Task 152 — resendVerificationDmsAction powers the per-row «выслать сверку»
 // button (send the verification REQUEST to operator + owner right from the
 // table view, without opening the rental — boss request 2026-10-27).
+// task193 — updateRentalFinanceAction powers the ✍️ price/deposit edit
+// (boss: «add possibility to edit respective rentals right in row — for
+// example edit total price»; modal asks the new value + a comment that is
+// APPENDED to metadata.comments, never overwrites).
 import {
   adminVerifyRentalAction,
   getSalaryOperatorsAction,
   setRentalRoleOperatorAction,
   resendVerificationDmsAction,
+  updateRentalFinanceAction,
   type SalaryOperatorOption,
 } from "@/app/franchize/server-actions/rental-verify-actions";
 import type { RentalRoleKey } from "@/app/franchize/lib/rental-verify-core";
@@ -525,6 +529,64 @@ const verToneFg = (tone: Exclude<VerTone, null>, isDark?: boolean): string =>
 // from the viewport default (desktop expanded / touch collapsed).
 const CONTROLS_STORAGE_KEY = "rentalsAnalytics.csvTableControlsExpanded";
 
+// ── task193 — persistence of the tableview session (boss: «save date range
+// and even "tableview" regime to cookies or something so when tableview of
+// rentals analytics is reopened/refreshed the dates are already [set] and
+// tableview is enabled») ────────────────────────────────────────────────────
+// localStorage (survives refresh AND a new tab — the boss's new-tab rental
+// workflow keeps the analytics tab alive anyway). Two facts, per slug+variant:
+//   1. csvTableState:{slug}:{variant} — the picked «С даты / По даты» range;
+//      the modal restores it on every open (fallback: current month→today).
+//   2. csvTableOpen:{slug} — the modal WAS open: AnalyticsClient re-opens it
+//      automatically after a page refresh (the toggle keeps working both ways).
+const tableStateKey = (slug?: string, variant?: string) =>
+  `rentalsAnalytics.csvTableState:${slug || "x"}:${variant || "rentals"}`;
+const TABLE_OPEN_KEY_BASE = "rentalsAnalytics.csvTableOpen";
+
+export function loadStoredTableRange(slug?: string, variant?: string): { from?: string; to?: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(tableStateKey(slug, variant));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { from?: string; to?: string };
+    if (!parsed || typeof parsed !== "object") return null;
+    const from = typeof parsed.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.from) ? parsed.from : undefined;
+    const to = typeof parsed.to === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.to) ? parsed.to : undefined;
+    return from || to ? { from, to } : null;
+  } catch {
+    return null; // private mode / corrupted JSON — viewport defaults apply
+  }
+}
+
+function writeStoredTableRange(slug: string | undefined, variant: string, from: string, to: string): void {
+  if (typeof window === "undefined" || !slug) return;
+  try {
+    window.localStorage.setItem(tableStateKey(slug, variant), JSON.stringify({ from, to }));
+  } catch {
+    /* private mode — the range just won't persist */
+  }
+}
+
+/** Was the tableview open when the page was last left? (refresh restore) */
+export function isTableviewOpenStored(slug?: string): boolean {
+  if (typeof window === "undefined" || !slug) return false;
+  try {
+    return window.localStorage.getItem(`${TABLE_OPEN_KEY_BASE}:${slug}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setTableviewOpenStored(slug: string | undefined, open: boolean): void {
+  if (typeof window === "undefined" || !slug) return;
+  try {
+    if (open) window.localStorage.setItem(`${TABLE_OPEN_KEY_BASE}:${slug}`, "1");
+    else window.localStorage.removeItem(`${TABLE_OPEN_KEY_BASE}:${slug}`);
+  } catch {
+    /* private mode */
+  }
+}
+
 export function ExportCsvModal({
   isOpen,
   onClose,
@@ -539,8 +601,7 @@ export function ExportCsvModal({
   passwordAuthOwnerId = null,
   canReassign = false,
 }: ExportCsvModalProps) {
-  const router = useRouter();
-  // Task 127 — px of the TG fullscreen native-buttons zone (exact measurement
+  // task127 — px of the TG fullscreen native-buttons zone (exact measurement
   // on Bot API 8.0+, the app-wide 54px comfort floor on mobile otherwise,
   // 0 outside Telegram / on wide viewports). Pushes the header — and its
   // top-right «x» — below the overlapped corner.
@@ -588,6 +649,15 @@ export function ExportCsvModal({
   const [operatorsLoading, setOperatorsLoading] = useState(false);
   const [reassigningIds, setReassigningIds] = useState<Set<string>>(() => new Set());
   const [justRoleEdited, setJustRoleEdited] = useState<Map<string, string>>(() => new Map());
+
+  // task193 — ✍️ finance edit (owner-tier): the pencil in the «Цена» cell
+  // opens a small modal with the new price / deposit + a comment (appended
+  // to metadata.comments → the «Заметки» CSV cell). null = closed.
+  const [finEdit, setFinEdit] = useState<{ rentalId: string; ctx: QuickRowCtx; price: string; deposit: string } | null>(null);
+  const [finPrice, setFinPrice] = useState("");
+  const [finDeposit, setFinDeposit] = useState("");
+  const [finComment, setFinComment] = useState("");
+  const [finSaving, setFinSaving] = useState(false);
 
   // Task 146 — collapsible controls (boss: "keep showing date picker only in
   // collapsed-controls mode"). false folds the header to one compact row:
@@ -938,6 +1008,69 @@ export function ExportCsvModal({
     [slug, reassigningIds, operators, loadTable, verifyActorParams],
   );
 
+  // task193 — save the ✍️ finance edit. Same honesty contract as the other
+  // owner actions: confirm context comes from the row (the modal ITSELF is
+  // the confirmation — it shows the old value next to the new one), the
+  // server action re-gates owner tier, a silent refetch canonicalises the
+  // table. Numbers parse leniently («12 500», «12500,50» → 12500.5).
+  const parseMoneyInput = (raw: string): number | undefined => {
+    const t = raw.trim().replace(/\s|\u00A0/g, "").replace(",", ".");
+    if (!t) return undefined;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const handleFinanceSave = useCallback(
+    async () => {
+      if (!finEdit || !slug || finSaving) return;
+      const newPrice = parseMoneyInput(finPrice);
+      const newDeposit = parseMoneyInput(finDeposit);
+      if ((finPrice.trim() && (newPrice === undefined || newPrice! < 0)) ||
+          (finDeposit.trim() && (newDeposit === undefined || newDeposit! < 0))) {
+        toast.error("Сумма должна быть неотрицательным числом (можно «12 500» или «12500,50»).");
+        return;
+      }
+      if (newPrice === undefined && newDeposit === undefined) {
+        toast.error("Укажи новую цену или залог — иначе править нечего.");
+        return;
+      }
+      setFinSaving(true);
+      try {
+        const res = await withServerTimeout(
+          updateRentalFinanceAction({
+            slug,
+            rentalId: finEdit.rentalId,
+            totalCost: newPrice,
+            depositAmount: newDeposit,
+            comment: finComment.trim() || undefined,
+            ...verifyActorParams,
+          }),
+        );
+        if (res.success && res.data) {
+          const d = res.data;
+          const pricePart = d.newTotalCost != null ? `цена ${d.newTotalCost.toLocaleString("ru-RU")} ₽` : "";
+          toast.success(
+            `Сохранено: ${pricePart || "залог обновлён"} ✅${d.verificationWarning ? ` ⚠️ ${d.verificationWarning}` : ""}`,
+            { duration: d.verificationWarning ? 8000 : 5000 },
+          );
+          setFinEdit(null);
+          setFinComment("");
+          void loadTable({ silent: true });
+        } else {
+          toast.error(res.error || "Не удалось сохранить правку");
+        }
+      } catch (err) {
+        toast.error(
+          err instanceof ServerActionTimeoutError
+            ? err.message
+            : "Не удалось сохранить правку",
+        );
+      } finally {
+        setFinSaving(false);
+      }
+    },
+    [finEdit, slug, finSaving, finPrice, finDeposit, finComment, loadTable, verifyActorParams],
+  );
+
   // Task 129 — «подтвердить все видимые»: ONE confirm, N rows. Available only
   // when BOTH scoping filters are on — the operator pill narrows the blast
   // radius to one crew member, the «без сверки» chip guarantees every visible
@@ -1028,8 +1161,13 @@ export function ExportCsvModal({
 
   useEffect(() => {
     if (isOpen) {
-      setFrom(firstDayOfMonthIso());
-      setTo(todayIso());
+      // task193 — restore the persisted date range (boss: «so when tableview
+      // … is reopened/refreshed the dates are already set»); the current
+      // month→today range stays the fallback for a first-ever open.
+      // (Named storedRange — task146's fold state below owns `stored`.)
+      const storedRange = loadStoredTableRange(slug, variant);
+      setFrom(storedRange?.from || firstDayOfMonthIso());
+      setTo(storedRange?.to || todayIso());
       setRows([]);
       setError(null);
       setDownloading(false);
@@ -1044,6 +1182,12 @@ export function ExportCsvModal({
       setReassigningIds(new Set());
       setJustRoleEdited(new Map());
       setOperators([]);
+      // task193 — the ✍️ finance modal never survives a reopen.
+      setFinEdit(null);
+      setFinPrice("");
+      setFinDeposit("");
+      setFinComment("");
+      setFinSaving(false);
       // Task 129 review fix — a batch still running from BEFORE the close keeps
       // going server-side (idempotent per row); a fresh open must allow a new
       // batch instead of silently no-op-ing on the stale running flag.
@@ -1376,9 +1520,16 @@ export function ExportCsvModal({
   const hideCols = variant === "rentals" ? RENTALS_HIDE_COLS : new Set<number>();
   const visibleColCount = Math.max(headerRow.length - hideCols.size, 0);
 
+  // task193 (boss) — the tap-through must NOT kill the analytics session:
+  // plain click opens the rental in a NEW TAB (the table, dates and filters
+  // stay put), middle-click and the browser context menu work via the real
+  // <a> in the «Марка» cell (see the row renderers below — an anchor is the
+  // only DOM that gives browsers native middle-click / right-click affordances).
+  const rentalUrlFor = (rentalId: string): string =>
+    `/franchize/${slug}/rental/${rentalId}`;
   const openRentalById = (rentalId: string) => {
     if (!slug) return;
-    router.push(`/franchize/${slug}/rental/${rentalId}`);
+    window.open(rentalUrlFor(rentalId), "_blank", "noopener,noreferrer");
   };
   const openRentalForRow = (row: string[]) => {
     if (variant !== "rentals") return;
@@ -1508,7 +1659,11 @@ export function ExportCsvModal({
                 type="date"
                 value={from}
                 max={to}
-                onChange={(e) => setFrom(e.target.value)}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  // task193 — the range persists across refreshes/reopens.
+                  if (e.target.value) writeStoredTableRange(slug, variant, e.target.value, to);
+                }}
                 className="rounded-lg border px-2.5 py-1.5 text-xs tabular-nums"
                 style={inputStyle}
               />
@@ -1526,7 +1681,10 @@ export function ExportCsvModal({
                 type="date"
                 value={to}
                 min={from}
-                onChange={(e) => setTo(e.target.value)}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  if (e.target.value) writeStoredTableRange(slug, variant, from, e.target.value);
+                }}
                 className="rounded-lg border px-2.5 py-1.5 text-xs tabular-nums"
                 style={inputStyle}
               />
@@ -2070,6 +2228,18 @@ export function ExportCsvModal({
                     reassigningIds={reassigningIds}
                     justRoleEdited={justRoleEdited}
                     onRoleEdit={canReassignRows ? handleRoleEdit : undefined}
+                    // task193 — the ✍️ pencil rides the same owner-tier gate
+                    // as the ✓ (canQuickVerify) — one identity, one roster.
+                    onEditFinance={
+                      canQuickVerify
+                        ? (rentalId, ctx, priceCell, depositCell) => {
+                            setFinEdit({ rentalId, ctx: ctx || EMPTY_ROW_CTX, price: priceCell || "", deposit: depositCell || "" });
+                            setFinPrice((priceCell || "").replace(/[^\d,\.]/g, ""));
+                            setFinDeposit((depositCell || "").replace(/[^\d,\.]/g, ""));
+                            setFinComment("");
+                          }
+                        : undefined
+                    }
                   />
                 ))}
               </div>
@@ -2141,7 +2311,18 @@ export function ExportCsvModal({
                           : {}),
                       }}
                       onClick={rowClickable ? () => openRentalForRow(r) : undefined}
-                      title={rowClickable ? "Открыть аренду" : undefined}
+                      // task193 — middle-click = new tab without autoscroll.
+                      onAuxClick={
+                        rowClickable
+                          ? (e) => {
+                              if (e.button === 1) {
+                                e.preventDefault();
+                                openRentalForRow(r);
+                              }
+                            }
+                          : undefined
+                      }
+                      title={rowClickable ? "Открыть аренду в новой вкладке" : undefined}
                     >
                       {headerRow.map((_, ci) => {
                         const cell = r[ci] ?? "";
@@ -2207,7 +2388,20 @@ export function ExportCsvModal({
                                 : {}),
                             }}
                           >
-                            {variant === "rentals" && ci === RENTALS_PHOTOS_COL && cell ? (
+                            {variant === "rentals" && ci === 7 && rowRentalId && slug && cell ? (
+                              // task193 — real anchor for middle/right-click
+                              // (same affordance as the sectioned table).
+                              <a
+                                href={`/franchize/${slug}/rental/${rowRentalId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Открыть аренду в новой вкладке (средняя кнопка / правая кнопка мыши работают)"
+                                className="hover:underline"
+                              >
+                                {cell}
+                              </a>
+                            ) : variant === "rentals" && ci === RENTALS_PHOTOS_COL && cell ? (
                               <span className="inline-flex items-center gap-1">
                                 <Camera className="h-3 w-3" aria-hidden />
                                 {cell}
@@ -2281,12 +2475,129 @@ export function ExportCsvModal({
             {/* iter20: tap-through affordance — rental rows open the rental page */}
             {variant === "rentals" && slug && (isSectioned ? dataRowCount > 0 : dataRows.length > 0) && (
               <span className="text-[10px] opacity-80">
-                Нажмите на строку аренды — откроется страница аренды (фото, депозит, передача)
+                Нажмите на строку аренды — откроется в НОВОЙ ВКЛАДКЕ (фото, депозит, передача); средняя кнопка и правый клик по «Марка» тоже работают
               </span>
             )}
             <span className="tabular-nums">
               {formatDateRu(from)} — {formatDateRu(to)}
             </span>
+          </div>
+        )}
+
+        {/* ── task193 — ✍️ finance-edit modal (Цена / Залог + комментарий) ────
+            Owner-tier only (the pencil renders behind the same gate). Shows
+            the OLD values as placeholders, saves через updateRentalFinanceAction
+            (server re-gates), comment APPENDS to metadata.comments → the
+            «Заметки» cell of the table — nothing is silently overwritten. */}
+        {finEdit && (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm"
+            onClick={() => { if (!finSaving) setFinEdit(null); }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Изменить цену и залог аренды"
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl border p-4 shadow-2xl"
+              style={{ backgroundColor: T.bgCard, borderColor: T.border }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold" style={{ color: T.text }}>
+                  Изменить цену и залог
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => { if (!finSaving) setFinEdit(null); }}
+                  aria-label="Закрыть правку цены"
+                  className="cursor-pointer rounded-lg p-1.5 transition hover:opacity-80"
+                  style={{ color: T.textMuted, minHeight: "36px", minWidth: "36px" }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="mb-3 text-[11px]" style={{ color: T.textMuted }}>
+                {[finEdit.ctx.date, finEdit.ctx.bike].filter(Boolean).join(" · ") || "аренда"}
+                {finEdit.ctx.price ? ` · было: ${finEdit.ctx.price} ₽` : ""}
+              </p>
+              <div className="space-y-2.5">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide" style={{ color: T.textMuted }}>
+                    Цена аренды, ₽ {finEdit.price ? `(было ${finEdit.price})` : ""}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={finPrice}
+                    onChange={(e) => setFinPrice(e.target.value)}
+                    placeholder={finEdit.price || "0"}
+                    disabled={finSaving}
+                    autoFocus
+                    className="w-full rounded-lg border px-3 py-2 text-sm tabular-nums outline-none focus:ring-2"
+                    style={inputStyle}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide" style={{ color: T.textMuted }}>
+                    Залог, ₽ {finEdit.deposit ? `(было ${finEdit.deposit})` : ""} — опционально
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={finDeposit}
+                    onChange={(e) => setFinDeposit(e.target.value)}
+                    placeholder={finEdit.deposit || "не менять"}
+                    disabled={finSaving}
+                    className="w-full rounded-lg border px-3 py-2 text-sm tabular-nums outline-none focus:ring-2"
+                    style={inputStyle}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide" style={{ color: T.textMuted }}>
+                    Комментарий — допишется в «Заметки» (не затирает существующие)
+                  </span>
+                  <textarea
+                    value={finComment}
+                    onChange={(e) => setFinComment(e.target.value)}
+                    rows={2}
+                    placeholder="Например: клиент заплатил 4500 наличными, на витрине была старая цена"
+                    disabled={finSaving}
+                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFinEdit(null)}
+                  disabled={finSaving}
+                  className="flex-1 cursor-pointer rounded-xl border px-3 py-2.5 text-sm font-medium transition hover:opacity-80 disabled:opacity-50"
+                  style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgElevated }}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleFinanceSave()}
+                  disabled={finSaving || (!finPrice.trim() && !finDeposit.trim())}
+                  className="flex-1 inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: T.accent, color: "#0a0a0a" }}
+                >
+                  {finSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      Сохраняю…
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" aria-hidden />
+                      Сохранить
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -2318,6 +2629,10 @@ function SectionTable({
   reassigningIds,
   justRoleEdited,
   onRoleEdit,
+  /** task193 — owner-tier ✍️ finance edit: the pencil in the «Цена» cell
+   *  hands the row context to the parent modal (which owns the edit state
+   *  + the updateRentalFinanceAction call). Present only for owner-tier. */
+  onEditFinance,
 }: {
   section: ParsedCsvSection;
   T: ThemeTokens;
@@ -2349,6 +2664,8 @@ function SectionTable({
    *  until the silent refetch confirms the write, same contract as justVerified). */
   justRoleEdited?: Map<string, string>;
   onRoleEdit?: (rentalId: string, role: RentalRoleKey, operatorUserId: string, ctx?: QuickRowCtx) => Promise<void> | void;
+  /** task193 — owner-tier finance edit trigger (см. поле выше). */
+  onEditFinance?: (rentalId: string, ctx?: QuickRowCtx, priceCell?: string, depositCell?: string) => void;
 }) {
   const cfg = SECTION_COLS[section.key];
   const accent = SECTION_ACCENT[section.key];
@@ -2632,7 +2949,20 @@ function SectionTable({
                   ...(isGrandTotal ? { fontWeight: 700 } : {}),
                 }}
                 onClick={rowClickable ? () => onOpenRental(rowRentalId) : undefined}
-                title={rowClickable ? "Открыть аренду" : undefined}
+                // task193 — middle-click opens the rental in a new tab WITHOUT
+                // the autoscroll icon (the boss tried exactly this): swallow
+                // the default auxclick and open the same URL as a plain click.
+                onAuxClick={
+                  rowClickable
+                    ? (e) => {
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          onOpenRental(rowRentalId);
+                        }
+                      }
+                    : undefined
+                }
+                title={rowClickable ? "Открыть аренду в новой вкладке" : undefined}
               >
                 {displayIdxs.map((dataIdx, di) => {
                   const cell = r[dataIdx] ?? "";
@@ -2765,6 +3095,48 @@ function SectionTable({
                         <span className="inline-flex items-center gap-1">
                           <Camera className="h-3 w-3" aria-hidden />
                           {cell}
+                        </span>
+                      ) : section.key === "rentals" && dataIdx === 7 && rowRentalId && slug && cell ? (
+                        // task193 — a REAL anchor in the sticky «Марка» rail:
+                        // middle-click opens a new tab natively, right-click
+                        // shows the browser's «Открыть ссылку в новой вкладке»
+                        // menu, Ctrl/Cmd+click works too. Plain click is
+                        // stopPropagation'd — the row's own handler (new tab)
+                        // stays the single plain-click path.
+                        <a
+                          href={`/franchize/${slug}/rental/${rowRentalId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Открыть аренду в новой вкладке (средняя кнопка / правая кнопка мыши работают)"
+                          className="hover:underline"
+                        >
+                          {cell}
+                        </a>
+                      ) : section.key === "rentals" && dataIdx === 3 && onEditFinance && rowRentalId ? (
+                        // task193 — ✍️ in the «Цена» cell (owner-tier): opens
+                        // the finance-edit modal (new price / deposit + a
+                        // comment appended to Заметки). The row tap-through is
+                        // suppressed for the button.
+                        <span className="inline-flex items-center gap-1">
+                          <span>{cell || "\u00A0"}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditFinance(rowRentalId, quickCtx, (r[3] || "").trim(), (r[6] || "").trim());
+                            }}
+                            aria-label="Изменить цену и залог аренды"
+                            title="Изменить цену и залог аренды (комментарий допишется в «Заметки»)"
+                            className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border transition hover:opacity-85 focus:outline-none focus-visible:ring-2"
+                            style={{
+                              borderColor: `color-mix(in srgb, ${T.accent} 45%, transparent)`,
+                              backgroundColor: `color-mix(in srgb, ${T.accent} 12%, ${T.bgCard})`,
+                              color: T.accent,
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" aria-hidden />
+                          </button>
                         </span>
                       ) : roleForCell ? (
                         // TASK158 — role cells: the select decides WHO holds

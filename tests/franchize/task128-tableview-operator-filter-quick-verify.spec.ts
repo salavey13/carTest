@@ -115,8 +115,9 @@ describe("task128 · quick verify right in the table view", () => {
     // (the per-row «выслать сверку» button) from the same owner-gated module.
     // TASK158 re-baseline — the roster + ROLE actions joined the import block
     // (the three role dropdowns), so the closing brace moved.
+    // task193 re-baseline — updateRentalFinanceAction (✍️ цена/залог) joined too.
     expect(modal).toContain(
-      "adminVerifyRentalAction,\n  getSalaryOperatorsAction,\n  setRentalRoleOperatorAction,\n  resendVerificationDmsAction,\n  type SalaryOperatorOption,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
+      "adminVerifyRentalAction,\n  getSalaryOperatorsAction,\n  setRentalRoleOperatorAction,\n  resendVerificationDmsAction,\n  updateRentalFinanceAction,\n  type SalaryOperatorOption,\n} from \"@/app/franchize/server-actions/rental-verify-actions\";",
     );
     expect(modal).toContain("adminVerifyRentalAction({ slug, rentalId, ...verifyActorParams });");
     expect(modal).toContain("window.confirm(");

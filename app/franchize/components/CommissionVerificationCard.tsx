@@ -27,9 +27,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
+  Pencil,
   Plus,
   Send,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +43,7 @@ import type {
 import {
   adminVerifyRentalAction,
   resendVerificationDmsAction,
+  updateRentalFinanceAction,
 } from "@/app/franchize/server-actions/rental-verify-actions";
 // Task 126: pure math + status mapping live in the client-safe core.
 import {
@@ -86,6 +89,11 @@ interface CommissionVerificationCardProps {
    *  lets verify/resend act as the crew owner without the TG actor cookie;
    *  the server re-gates the claimed id against crews.owner_id. */
   passwordAuthOwnerId?: string | null;
+  /** task193 (boss: «maybe allow to edit final price on rental page itself») —
+   *  the LIVE rentals.total_cost of this rental: pre-fills the ✍️ price-edit
+   *  input (owner-tier only). The frozen snapshot numbers stay frozen — the
+   *  edit changes the rental itself, the next сверка/CSV rebuild reads it. */
+  currentTotalCost?: number | null;
   /** Parent refetch hook (analytics reload token / router.refresh). */
   onChanged?: () => void;
   T: CommissionCardTheme;
@@ -104,6 +112,7 @@ export function CommissionVerificationCard({
   commentRole,
   canVerify = false,
   passwordAuthOwnerId = null,
+  currentTotalCost = null,
   onChanged,
   T,
 }: CommissionVerificationCardProps) {
@@ -128,6 +137,50 @@ export function CommissionVerificationCard({
   const [verifyFailed, setVerifyFailed] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+
+  // task193 — ✍️ price edit (owner-tier): the «Цена» affordance in the quick
+  // actions. Expands inline (no modal), asks the new value + a comment that
+  // APPENDS to metadata.comments (the «Заметки» CSV cell), then the parent
+  // refetches (the analytics reload token / router.refresh on the page).
+  const [finEditing, setFinEditing] = useState(false);
+  const [finPrice, setFinPrice] = useState("");
+  const [finComment, setFinComment] = useState("");
+  const [finSaving, setFinSaving] = useState(false);
+
+  const handleFinanceSave = async () => {
+    if (finSaving) return;
+    const t = finPrice.trim().replace(/\s|\u00A0/g, "").replace(",", ".");
+    const newPrice = t ? Number(t) : undefined;
+    if (newPrice === undefined || !Number.isFinite(newPrice) || newPrice < 0) {
+      toast.error("Цена должна быть неотрицательным числом (можно «12 500»).");
+      return;
+    }
+    setFinSaving(true);
+    try {
+      const res = await updateRentalFinanceAction({
+        slug,
+        rentalId,
+        totalCost: newPrice,
+        comment: finComment.trim() || undefined,
+        ...verifyActorParams,
+      });
+      if (res.success && res.data) {
+        toast.success(
+          `Цена обновлена: ${res.data.newTotalCost?.toLocaleString("ru-RU")} ₽ ✅${res.data.verificationWarning ? ` ⚠️ ${res.data.verificationWarning}` : ""}`,
+          { duration: res.data.verificationWarning ? 8000 : 5000 },
+        );
+        setFinEditing(false);
+        setFinComment("");
+        notifyChanged();
+      } else {
+        toast.error(res.error || "Не удалось сохранить правку");
+      }
+    } catch {
+      toast.error("Не удалось сохранить правку");
+    } finally {
+      setFinSaving(false);
+    }
+  };
 
   // Codereview fix #1: «confirmed» is a BOOKING awaiting pickup in this app,
   // not a closed deal — a сверка on it would be fiction (and resend rejects
@@ -392,6 +445,85 @@ export function CommissionVerificationCard({
               {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : cardStatus === "none" ? <Plus className="h-4 w-4" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
               {cardStatus === "none" ? "Завести сверку в TG" : "Выслать сверку"}
             </button>
+          )}
+        </div>
+      )}
+
+      {/* task193 — ✍️ цена аренды (owner-tier, ЛЮБОЙ статус): править деньги
+          можно и на активной аренде (заплатили иначе), не только на закрытой.
+          Комментарий дописывается в «Заметки» — старая сумма остаётся в тексте
+          правки, аудит не теряется. */}
+      {canVerify && (
+        <div className="border-t px-3 py-2.5" style={{ borderColor: T.borderSoft }}>
+          {!finEditing ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFinPrice(currentTotalCost != null ? String(currentTotalCost) : "");
+                setFinComment("");
+                setFinEditing(true);
+              }}
+              className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition hover:opacity-85 focus:outline-none focus-visible:ring-2"
+              style={{ backgroundColor: `${T.accent}14`, color: T.accent }}
+              title="Изменить цену аренды — комментарий допишется в «Заметки» таблицы"
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              Изменить цену{currentTotalCost != null ? ` (${fmtRub(currentTotalCost)})` : ""}
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide" style={{ color: T.textMuted }}>
+                  Новая цена, ₽{currentTotalCost != null ? ` (сейчас ${currentTotalCost.toLocaleString("ru-RU")})` : ""}
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={finPrice}
+                  onChange={(e) => setFinPrice(e.target.value)}
+                  disabled={finSaving}
+                  autoFocus
+                  className="w-full rounded-lg border px-3 py-2 text-sm tabular-nums outline-none focus:ring-2"
+                  style={{ backgroundColor: T.bgElevated, borderColor: T.border, color: T.text }}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide" style={{ color: T.textMuted }}>
+                  Комментарий — допишется в «Заметки» (не затирает)
+                </span>
+                <textarea
+                  value={finComment}
+                  onChange={(e) => setFinComment(e.target.value)}
+                  rows={2}
+                  disabled={finSaving}
+                  placeholder="Например: скидка за позднюю выдачу"
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+                  style={{ backgroundColor: T.bgElevated, borderColor: T.border, color: T.text }}
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFinEditing(false)}
+                  disabled={finSaving}
+                  className="inline-flex min-h-[40px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition hover:opacity-85 disabled:opacity-50"
+                  style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgElevated }}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleFinanceSave()}
+                  disabled={finSaving || !finPrice.trim()}
+                  className="inline-flex min-h-[40px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ backgroundColor: "#22c55e1f", color: "#22c55e" }}
+                >
+                  {finSaving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}
+                  Сохранить
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

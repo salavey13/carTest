@@ -239,7 +239,9 @@ describe('iter52: ExportCsvModal block rendering', () => {
   it('tap-through survives: АРЕНДЫ rows open the rental page via hidden ID col', () => {
     const s = src();
     expect(s).toContain('onOpenRental(rowRentalId)');
-    expect(s).toContain('router.push(`/franchize/${slug}/rental/${rentalId}`)');
+    // task193 (boss): router.push → window.open — новая вкладка, сессия
+    // аналитики выживает; средняя/правая кнопки работают через <a> в «Марка».
+    expect(s).toContain('window.open(rentalUrlFor(rentalId), "_blank", "noopener,noreferrer")');
     // legacy fallback keeps the flat-grid path for sales variant / old files
     expect(s).toContain('const RENTALS_HIDE_COLS = new Set([7, 20])');
   });

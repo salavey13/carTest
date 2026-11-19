@@ -54,6 +54,158 @@ export interface AdminVerifyResult {
   status: string;
 }
 
+// ── task193: правка денег аренды прямо из таблицы/карточки (владелец) ──────
+// Босс ведёт сверку комиссий в tableview и хочет там же править цену/залог
+// (заплатили не столько, сколько на витрине; залог собрал не тот оператор).
+// Экшен меняет rentals.total_cost / metadata.deposit_amount и ДОБАВЛЯЕТ
+// комментарий в metadata.comments[] (тот же массив, что читает
+// rentalNotesSummary → колонка «Заметки» в CSV) — правка видна в таблице,
+// а старая сумма остаётся в тексте правки для аудита. Гейт: владелец/
+// глобальный админ (resolveVerifyOwnerActor — обе auth-ветки).
+export interface UpdateRentalFinanceResult {
+  rentalId: string;
+  oldTotalCost: number | null;
+  newTotalCost: number | null;
+  oldDeposit: number | null;
+  newDeposit: number | null;
+  commentAppended: boolean;
+  /** «Сверка подтверждена по старой цене» warning, когда verified-строка уже есть. */
+  verificationWarning?: string;
+}
+
+export async function updateRentalFinanceAction(params: {
+  slug: string;
+  rentalId: string;
+  /** Новая цена аренды (₽). undefined = не менять. */
+  totalCost?: number;
+  /** Новый залог (₽, metadata.deposit_amount). undefined = не менять. */
+  depositAmount?: number;
+  /** Комментарий-причина — дописывается в metadata.comments (не затирает). */
+  comment?: string;
+  actorUserId?: string;
+  isPasswordAuth?: boolean;
+}): Promise<ActionResponse<UpdateRentalFinanceResult>> {
+  try {
+    const actor = await resolveVerifyOwnerActor({
+      slug: params.slug,
+      actorUserId: params.actorUserId,
+      isPasswordAuth: params.isPasswordAuth,
+      ownerOnlyError: "Править деньги аренды может владелец или администратор экипажа.",
+    });
+    if (!actor.ok) return { success: false, error: actor.error };
+
+    const totalCost = typeof params.totalCost === "number" ? Math.round(params.totalCost) : undefined;
+    const depositAmount = typeof params.depositAmount === "number" ? Math.round(params.depositAmount) : undefined;
+    if (totalCost !== undefined && (!Number.isFinite(totalCost) || totalCost < 0)) {
+      return { success: false, error: "Цена должна быть неотрицательным числом." };
+    }
+    if (depositAmount !== undefined && (!Number.isFinite(depositAmount) || depositAmount < 0)) {
+      return { success: false, error: "Залог должен быть неотрицательным числом." };
+    }
+    if (totalCost === undefined && depositAmount === undefined) {
+      return { success: false, error: "Нечего менять — укажи новую цену или залог." };
+    }
+
+    const { data: rentalRow, error: rentalError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id, crew_id, owner_id, total_cost, metadata, status")
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    if (rentalError) throw rentalError;
+    const rental = rentalRow as any;
+    if (!rental) return { success: false, error: "Аренда не найдена." };
+    // Деньги экипажа правит только его владелец — сверка crew_id: ID прилетает
+    // из CSV-ячейки, а не из доверенного источника.
+    const { data: crew } = await supabaseAdmin
+      .from("crews")
+      .select("id, owner_id")
+      .eq("slug", params.slug)
+      .maybeSingle();
+    if (!crew || rental.crew_id !== crew.id) {
+      return { success: false, error: "Аренда принадлежит другому экипажу." };
+    }
+
+    const meta = { ...((rental.metadata || {}) as Record<string, unknown>) };
+    const oldTotal = rental.total_cost != null ? Number(rental.total_cost) : null;
+    const oldDeposit = meta.deposit_amount != null ? Number(meta.deposit_amount) : null;
+    const changes: string[] = [];
+    if (totalCost !== undefined && totalCost !== oldTotal) {
+      changes.push(`цена ${oldTotal ?? "—"}→${totalCost}`);
+    }
+    if (depositAmount !== undefined && depositAmount !== oldDeposit) {
+      changes.push(`залог ${oldDeposit ?? "—"}→${depositAmount}`);
+    }
+    if (changes.length === 0) {
+      return {
+        success: true,
+        data: {
+          rentalId: params.rentalId,
+          oldTotalCost: oldTotal,
+          newTotalCost: totalCost ?? oldTotal,
+          oldDeposit,
+          newDeposit: depositAmount ?? oldDeposit,
+          commentAppended: false,
+        },
+      };
+    }
+
+    const commentText = (params.comment || "").trim();
+    const stamp = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit" });
+    const noteText = `✍️ ${stamp}: ${changes.join(", ")}${commentText ? ` — ${commentText}` : ""}`;
+    const comments = Array.isArray(meta.comments) ? [...(meta.comments as unknown[])] : [];
+    comments.push({
+      text: noteText,
+      at: new Date().toISOString(),
+      by: actor.actorChatId || "owner",
+      kind: "finance_edit",
+    });
+    meta.comments = comments;
+    if (depositAmount !== undefined) meta.deposit_amount = depositAmount;
+
+    const patch: Record<string, unknown> = { metadata: meta };
+    if (totalCost !== undefined) patch.total_cost = totalCost;
+    const { error: patchError } = await supabaseAdmin
+      .from("rentals")
+      .update(patch)
+      .eq("rental_id", params.rentalId);
+    if (patchError) throw patchError;
+
+    // Честность: если сверка уже подтверждена — цифры снапшота устарели,
+    // предупреждаем (не блокируем: владелец вправе править задним числом).
+    let verificationWarning: string | undefined;
+    const { data: verRow } = await supabaseAdmin
+      .from("rental_verifications")
+      .select("status")
+      .eq("rental_id", params.rentalId)
+      .maybeSingle();
+    if (verRow?.status === "verified") {
+      verificationWarning = "Сверка по этой аренде уже подтверждена по старой цене — проверь расчёт комиссии.";
+    }
+
+    logger.info("[updateRentalFinanceAction] rental finance edited", {
+      rentalId: params.rentalId,
+      changes: changes.join(", "),
+      comment: commentText || null,
+    });
+
+    return {
+      success: true,
+      data: {
+        rentalId: params.rentalId,
+        oldTotalCost: oldTotal,
+        newTotalCost: totalCost ?? oldTotal,
+        oldDeposit,
+        newDeposit: depositAmount ?? oldDeposit,
+        commentAppended: true,
+        verificationWarning,
+      },
+    };
+  } catch (err) {
+    logger.error("[updateRentalFinanceAction]", err);
+    return { success: false, error: handleError(err, "updateRentalFinanceAction") };
+  }
+}
+
 // ── Password-auth path for the verify family (task151) ─────────────────────
 // The analytics page opened on PC via the emailed /analytics_pass password
 // has NO Telegram actor cookie — verifyCrewAccess bounces with «Не

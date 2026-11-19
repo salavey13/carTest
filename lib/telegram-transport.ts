@@ -27,6 +27,13 @@ import { logger } from "@/lib/logger";
 
 const FORWARD_URL = (process.env.FORWARD_TELEGRAM_URL || "https://v0-car-test.vercel.app/api/forward-telegram").trim();
 const FORWARD_ORIGIN = (process.env.FORWARD_TELEGRAM_ORIGIN || "https://v0-car-test.vercel.app").trim();
+// task193 (boss: «vip-bike.ru domain is unpaid and may be down — use
+// v0-car-test.vercel.app default vercel deployment as backup»): когда
+// FORWARD_TELEGRAM_URL указывает на вторичный домен/VPS, его падение
+// (истёкший домен, down-сервер, таймаут) больше НЕ роняет доставку —
+// транспорт ретраит тот же вызов через дефолтный Vercel-деплой.
+const BACKUP_FORWARD_URL = "https://v0-car-test.vercel.app/api/forward-telegram";
+const BACKUP_FORWARD_ORIGIN = "https://v0-car-test.vercel.app";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const FORWARD_TIMEOUT_MS = Number(process.env.FORWARD_TELEGRAM_TIMEOUT_MS || 20000);
 // Code review 2026-10-02: the direct path previously had NO timeout — one hung
@@ -81,21 +88,23 @@ function forwardDisabled(): boolean {
   return (process.env.TELEGRAM_SEND_MODE || "forward").trim().toLowerCase() === "direct";
 }
 
-/** Call the forwarding API on the Vercel deployment. */
-async function callForward(
+/** One POST to a specific forwarding endpoint. */
+async function callForwardOnce(
+  url: string,
+  origin: string,
   method: TelegramDeliveryMethod,
   chatId: string | number,
   payload: Record<string, unknown>,
   files?: Record<string, ForwardFile>,
 ): Promise<TelegramTransportResult> {
   try {
-    const response = await fetch(FORWARD_URL, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         // The endpoint whitelists browser origins (CORS) — server-to-server
         // callers simply present an allowed origin.
-        "Origin": FORWARD_ORIGIN,
+        "Origin": origin,
       },
       body: JSON.stringify({ chat_id: chatId, method, payload, files }),
       signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
@@ -114,13 +123,37 @@ async function callForward(
       };
     }
     const description = json?.telegram?.description || json?.error || `HTTP ${response.status}`;
-    logger.warn("[telegram-transport] forward call failed", { method, chatId: String(chatId), description: String(description).slice(0, 300) });
+    logger.warn("[telegram-transport] forward call failed", { url, method, chatId: String(chatId), description: String(description).slice(0, 300) });
     return { ok: false, via: "forward", error: String(description), retryAfter: parseTelegramRetryAfter(json) ?? undefined };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn("[telegram-transport] forward call threw", { method, chatId: String(chatId), message });
+    logger.warn("[telegram-transport] forward call threw", { url, method, chatId: String(chatId), message });
     return { ok: false, via: "forward", error: message };
   }
+}
+
+/** Call the forwarding API; on failure retry через backup-деплой (task193). */
+async function callForward(
+  method: TelegramDeliveryMethod,
+  chatId: string | number,
+  payload: Record<string, unknown>,
+  files?: Record<string, ForwardFile>,
+): Promise<TelegramTransportResult> {
+  const first = await callForwardOnce(FORWARD_URL, FORWARD_ORIGIN, method, chatId, payload, files);
+  if (first.ok) return first;
+  // Backup retry only when the backup is a DIFFERENT endpoint — the default
+  // config already points at the deployment itself.
+  if (BACKUP_FORWARD_URL === FORWARD_URL) return first;
+  logger.info("[telegram-transport] primary forward endpoint failed — retrying via backup deployment", {
+    method,
+    chatId: String(chatId),
+    primaryError: String(first.error || "").slice(0, 200),
+  });
+  const backup = await callForwardOnce(BACKUP_FORWARD_URL, BACKUP_FORWARD_ORIGIN, method, chatId, payload, files);
+  if (backup.ok) return backup;
+  // Both paths down — report the primary error (it is the configured one),
+  // the backup error is already in the logs above.
+  return first;
 }
 
 /** Classic direct Telegram Bot API call (multipart when files present). */

@@ -391,7 +391,10 @@ describe("iter20 · source guards", () => {
     const src = read("app/franchize/[slug]/rentals-analytics/components/ExportCsvModal.tsx");
     expect(src).toContain("const RENTALS_HIDE_COLS = new Set([7, 20])");
     expect(src).toContain("RENTALS_ID_COL");
-    expect(src).toContain("router.push(`/franchize/${slug}/rental/${rentalId}`)");
+    // task193 (boss): the tap-through opens the rental in a NEW TAB — the
+    // analytics session (table + dates + filters) survives the click; the
+    // real <a> in «Марка» covers middle-click / right-click natively.
+    expect(src).toContain('window.open(rentalUrlFor(rentalId), "_blank", "noopener,noreferrer")');
     expect(src).toContain("Camera");
     expect(src).toContain("`${visibleColCount} столбцов`");
   });

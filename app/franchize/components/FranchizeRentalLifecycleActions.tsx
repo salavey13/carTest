@@ -53,6 +53,13 @@ interface FranchizeRentalLifecycleActionsProps {
   status: string;
   paymentStatus: string;
   hasPickupFreeze: boolean;
+  // task193 (boss: PC/password viewer must be able to CLOSE/finish old
+  // rentals from a new-tab rental page) — the analytics password session's
+  // owner id. The server page resolved it via the signed httpOnly cookie
+  // (resolveAnalyticsPasswordOwnerForSlug → owner of THIS crew only); the
+  // lifecycle server actions (confirmVehiclePickup / confirmVehicleReturn /
+  // abort) take the explicit userId and re-gate ownership themselves.
+  passwordActorId?: string | null;
   // Fix: show how much cash/bank was collected at rental start
   paymentSplit?: { cash: number; bank: number; cardDestination?: string | null } | null;
   // 2026-09-11: odometer moved to the main rental page — the closure modal is
@@ -86,6 +93,7 @@ export function FranchizeRentalLifecycleActions({
   paymentSplit,
   odometerBefore,
   odometerAfterDraft,
+  passwordActorId = null,
   palette,
   isAuto = false,
 }: FranchizeRentalLifecycleActionsProps) {
@@ -94,7 +102,14 @@ export function FranchizeRentalLifecycleActions({
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // task193 — the acting identity: the password-session owner (PC, no
+  // Telegram WebApp context) falls back from the TG-cookie dbUser.
+  const actorId = passwordActorId || dbUser?.user_id || null;
+
   const role = useMemo(() => {
+    // Password-session owner — the server already proved ownership (signed
+    // cookie re-gated against crews.owner_id), so the full operator UI shows.
+    if (passwordActorId) return "owner" as const;
     if (!dbUser?.user_id) return "guest" as const;
     // If user is authed but memberships haven't loaded yet, show "loading"
     // instead of "guest" — prevents the "наблюдатель" flash.
@@ -115,7 +130,7 @@ export function FranchizeRentalLifecycleActions({
     if (membership && ["owner", "admin", "co_owner"].includes(membership.role)) return "owner" as const;
     if (membership) return "member" as const;
     return "guest" as const;
-  }, [dbUser?.user_id, ownerId, renterId, renterTelegramChatId, userCrewMemberships, crewId, crewSlug]);
+  }, [passwordActorId, dbUser?.user_id, ownerId, renterId, renterTelegramChatId, userCrewMemberships, crewId, crewSlug]);
 
   const withAction = (name: string, callback: () => Promise<void>) => {
     setPendingAction(name);
@@ -300,15 +315,15 @@ export function FranchizeRentalLifecycleActions({
             disabled={isPending || pickupNeedsFreezeFirst}
             onClick={() =>
               withAction("pickup", async () => {
-                if (!dbUser?.user_id) {
-                  toast.error("Нужна авторизация в Telegram WebApp.");
+                if (!actorId) {
+                  toast.error(passwordActorId ? "Пароль-сессия истекла — обновите страницу." : "Нужна авторизация в Telegram WebApp.");
                   return;
                 }
                 if (!hasPickupFreeze) {
                   toast.error("Сначала сохраните выдачу в документах аренды.");
                   return;
                 }
-                const result = await confirmVehiclePickup(rentalId, dbUser.user_id);
+                const result = await confirmVehiclePickup(rentalId, actorId);
                 if (!result?.success) {
                   toast.error(result?.error || "Не удалось подтвердить получение.");
                   return;
@@ -425,11 +440,11 @@ export function FranchizeRentalLifecycleActions({
             disabled={isPending}
             onClick={() =>
               withAction("photo-start", async () => {
-                if (!dbUser?.user_id) {
-                  toast.error("Нужна авторизация в Telegram WebApp.");
+                if (!actorId) {
+                  toast.error(passwordActorId ? "Пароль-сессия истекла — обновите страницу." : "Нужна авторизация в Telegram WebApp.");
                   return;
                 }
-                const result = await initiateTelegramRentalPhotoUpload(rentalId, dbUser.user_id, "start");
+                const result = await initiateTelegramRentalPhotoUpload(rentalId, actorId, "start");
                 if (!result?.success || !result.deepLink) {
                   toast.error(result?.error || "Не удалось открыть сценарий фото ДО.");
                   return;
@@ -449,11 +464,11 @@ export function FranchizeRentalLifecycleActions({
             disabled={isPending}
             onClick={() =>
               withAction("photo-end", async () => {
-                if (!dbUser?.user_id) {
-                  toast.error("Нужна авторизация в Telegram WebApp.");
+                if (!actorId) {
+                  toast.error(passwordActorId ? "Пароль-сессия истекла — обновите страницу." : "Нужна авторизация в Telegram WebApp.");
                   return;
                 }
-                const result = await initiateTelegramRentalPhotoUpload(rentalId, dbUser.user_id, "end");
+                const result = await initiateTelegramRentalPhotoUpload(rentalId, actorId, "end");
                 if (!result?.success || !result.deepLink) {
                   toast.error(result?.error || "Не удалось открыть сценарий фото ПОСЛЕ.");
                   return;
@@ -912,15 +927,15 @@ export function FranchizeRentalLifecycleActions({
                 disabled={isPending}
                 onClick={() =>
                   withAction("return", async () => {
-                    if (!dbUser?.user_id) {
-                      toast.error("Нужна авторизация в Telegram WebApp.");
+                    if (!actorId) {
+                      toast.error(passwordActorId ? "Пароль-сессия истекла — обновите страницу." : "Нужна авторизация в Telegram WebApp.");
                       return;
                     }
                     // I2: parse penalty amount (empty string → 0)
                     const penaltyAmt = closurePenaltyAmount
                       ? parseInt(closurePenaltyAmount, 10)
                       : 0;
-                    const result = await confirmVehicleReturn(rentalId, dbUser.user_id, {
+                    const result = await confirmVehicleReturn(rentalId, actorId, {
                       odometerAfter: closureOdometer ? Math.round(Number(closureOdometer)) : null,
                       damageNotes: closureDamageLevel !== "none"
                         ? `[${closureDamageLevel === "heavy" ? "Серьёзные повреждения" : "Лёгкие повреждения"}] ${closureDamageNotes.trim()}`
@@ -1055,13 +1070,13 @@ export function FranchizeRentalLifecycleActions({
                 disabled={isPending}
                 onClick={() =>
                   withAction("abort", async () => {
-                    if (!dbUser?.user_id) {
-                      toast.error("Нужна авторизация в Telegram WebApp.");
+                    if (!actorId) {
+                      toast.error(passwordActorId ? "Пароль-сессия истекла — обновите страницу." : "Нужна авторизация в Telegram WebApp.");
                       return;
                     }
                     const result = await abortRental({
                       rentalId,
-                      actorUserId: dbUser.user_id,
+                      actorUserId: actorId,
                       reason: abortReason.trim() || undefined,
                       crewSlug,
                     });

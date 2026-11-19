@@ -308,10 +308,20 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
   // перегейчивается по БД (resolveAnalyticsPasswordOwnerForSlug), серверные
   // экшены карточки дополнительно проверяют claimed id. Рендерим сверку
   // (с комментарием переговоров) без клиентского RoleGuard.
+  // task193 (boss: «make sure that authenticated by password user that
+  // opened rental in new tab can also close/finish old rentals») — сессия
+  // резолвится на ЛЮБОМ статусе: lifecycle-кнопки (Завершить/Подтвердить
+  // выдачу/Отменить) работают у пароль-владельца и на незакрытых арендах
+  // (та самая «сверка не заводится — аренда не закрыта» петля), а карточка
+  // сверки ниже по-прежнему рендерится только на completed.
   let passwordAuthOwnerId: string | null = null;
-  if (rental.found && status === "completed" && !isCrewStaff) {
+  if (rental.found && !isCrewStaff) {
     passwordAuthOwnerId = await resolveAnalyticsPasswordOwnerForSlug(resolvedSlug);
   }
+  // task193 — сверка-комиссии снапшот/frozen-цифры остаются completed-only,
+  // но для lifecycle-заголовков пароль-вьювера на active-арендах cookie
+  // должен резолвиться и там (см. комментарий выше). verBrief не трогаем:
+  // он нужен только карточке сверки (completed).
   const verBrief = rental.found && (isCrewStaff || passwordAuthOwnerId)
     ? (await getVerificationStatusMap([rental.rentalId]).catch((e) => {
         console.warn("[rental page] verification brief fetch failed (non-fatal):", e);
@@ -827,8 +837,11 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
           </FranchizeRentalRoleGuard>
         )}
 
-        {/* Lifecycle actions — OPERATOR ONLY.
-            Wrapped in div#lifecycle-actions for QuickActionBar scroll target. */}
+        {/* Lifecycle actions — OPERATOR ONLY (TG-сессия) или пароль-владелец
+            (task193: ПК-сессия аналитики, открытая в новой вкладке, тоже
+            закрывает/завершает аренды — серверные экшены принимают явный
+            userId и сами перепроверяют ownership). Wrapped in
+            div#lifecycle-actions for QuickActionBar scroll target. */}
         <FranchizeRentalRoleGuard
           allowedRoles={["operator", "admin", "owner"]}
           ownerId={rental.ownerId}
@@ -861,6 +874,32 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             </FranchizeErrorBoundary>
           </div>
         </FranchizeRentalRoleGuard>
+        {/* task193 — пароль-владелец (ПК, новая вкладка): тот же блок БЕЗ
+            клиентского RoleGuard (он видит только TG-cookie зрителя и спрятал
+            бы всё). Сервер уже доказал ownership cookie-подписью + БД; экшены
+            перепроверяют userId сами. */}
+        {rental.found && passwordAuthOwnerId && (
+          <div id="lifecycle-actions">
+            <FranchizeErrorBoundary fallbackTitle="Действия временно недоступны" fallbackMessage="Попробуйте перезагрузить.">
+              <FranchizeRentalLifecycleActions
+                rentalId={rental.rentalId}
+                ownerId={rental.ownerId}
+                renterId={rental.renterId}
+                crewId={crew.id}
+                crewSlug={resolvedSlug}
+                status={status}
+                paymentStatus={rental.paymentStatus}
+                hasPickupFreeze={Boolean((rental.metadata as { pickup_freeze?: { frozen_at?: unknown } } | null)?.pickup_freeze?.frozen_at)}
+                paymentSplit={(rental.metadata as { payment_split?: { cash: number; bank: number; card_destination?: string | null } } | null)?.payment_split ?? null}
+                odometerBefore={odometerBefore}
+                odometerAfterDraft={odometerAfterDraft}
+                passwordActorId={passwordAuthOwnerId}
+                palette={p}
+                isAuto={isAuto}
+              />
+            </FranchizeErrorBoundary>
+          </div>
+        )}
 
         {/* Сверка комиссии — Task 126: the transparent frozen math (the same
             digits the Telegram DM carried) + the verification state + quick
@@ -890,6 +929,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
               comment={verBrief?.comment ?? null}
               commentRole={verBrief?.commentRole ?? null}
               canVerify={verAccess?.isOwner === true}
+              currentTotalCost={rental.totalCost ?? null}
               T={{
                 bg: "transparent",
                 bgCard: isAuto ? "var(--franchize-bg-card, #1a1a1a)" : (p?.bgCard || "#1a1a1a"),
@@ -919,6 +959,7 @@ export default async function FranchizeRentalPage({ params }: FranchizeRentalPag
             commentRole={verBrief?.commentRole ?? null}
             canVerify
             passwordAuthOwnerId={passwordAuthOwnerId}
+            currentTotalCost={rental.totalCost ?? null}
             T={{
               bg: "transparent",
               bgCard: isAuto ? "var(--franchize-bg-card, #1a1a1a)" : (p?.bgCard || "#1a1a1a"),

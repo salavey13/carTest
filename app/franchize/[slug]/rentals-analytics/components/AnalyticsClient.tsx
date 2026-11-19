@@ -11,7 +11,7 @@
 // FIX (F9): CSV export button (always visible, mobile included) + date-range
 // modal wired by the parent wrapper.
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updateRentalStatus } from "@/app/franchize/server-actions/rentals-dashboard";
@@ -45,7 +45,7 @@ import { AnalyticsMobileSheet } from "./AnalyticsMobileSheet";
 import { RentalDetailDrawer } from "./RentalDetailDrawer";
 import { SaleDetailDrawer } from "./SaleDetailDrawer";
 import { ServiceDetailDrawer } from "./ServiceDetailDrawer";
-import { ExportCsvModal } from "./ExportCsvModal";
+import { ExportCsvModal, isTableviewOpenStored, setTableviewOpenStored } from "./ExportCsvModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { CalendarDays, Table2 } from "lucide-react";
 
@@ -142,6 +142,21 @@ export function AnalyticsClient({
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(initialSaleId ?? null);
   // FIX (F9): CSV export modal state
   const [csvModalOpen, setCsvModalOpen] = useState(false);
+  // task193 (boss) — the tableview «regime» persists: if the modal was open
+  // when the page was last left (refresh / a new analytics visit), it re-opens
+  // automatically with the SAME date range (restored inside ExportCsvModal).
+  // One flag per slug in localStorage; toggled by every open/close below.
+  useEffect(() => {
+    if (isTableviewOpenStored(initialSlug)) setCsvModalOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSlug]);
+  const handleCsvModalChange = useCallback(
+    (open: boolean) => {
+      setCsvModalOpen(open);
+      setTableviewOpenStored(initialSlug, open);
+    },
+    [initialSlug],
+  );
   // iter26: drawer status-action in flight (Отменить) — disables re-entry.
   const [actionPending, setActionPending] = useState(false);
 
@@ -539,7 +554,7 @@ export function AnalyticsClient({
         {onExportCsv && (
           <button
             type="button"
-            onClick={() => setCsvModalOpen(true)}
+            onClick={() => handleCsvModalChange(true)}
             className="inline-flex shrink-0 items-center justify-center rounded-xl border px-2.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2"
             style={{
               borderColor: "#3b82f64d",
@@ -562,7 +577,7 @@ export function AnalyticsClient({
       {onExportCsv && (
         <ExportCsvModal
           isOpen={csvModalOpen}
-          onClose={() => setCsvModalOpen(false)}
+          onClose={() => handleCsvModalChange(false)}
           onExport={onExportCsv}
           onSendTelegram={onSendCsvToTelegram}
           fetchCsvText={onFetchCsvText}
