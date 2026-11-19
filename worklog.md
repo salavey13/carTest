@@ -2396,3 +2396,21 @@ Stage Summary:
 - /interview.html v4 — короткий мемуар-выпуск: 5 вопросов, 4 результата,
   3 идеи, 6 картинок, ~3 минуты чтения; ноль повторов и ноль англ. Готов
   для распространения среди владельцев экипажей.
+
+---
+Task ID: task193-tableview-newtab-finance-edit (босс: blockers расчёта ЗП — 4 фикса tableview аренд-аналитики + transport fallback)
+Date: 2026-11-19
+Status: DONE locally @ <hash> (commit+tests+lint+dev-compile ✅). PUSH PENDING: в песочнице нет GitHub PAT (re-clone salavey13/carTest @ 7877fb0 после recycle; push «could not read Username»). Патч: download/carTest-task193.patch (git am). Нужен PAT от босса либо пуш с его машины.
+
+ЧТО СДЕЛАНО (11 файлов, +952/-45):
+1) NEW-TAB tap-through (ExportCsvModal): plain click → window.open(_blank,noopener) — таблица+даты+фильтры выживают; СРЕДНЯЯ кнопка → tr onAuxClick(button===1)+preventDefault (иконка автоскролла ушла), оба рендерера (секционный SectionTable + легаси-грид); ПРАВЫЙ КЛИК → настоящий <a target=_blank rel=noopener> вокруг «Марки» (липкая левая рейка) — родное браузерное меню, Ctrl+click работает. Футер-подсказка обновлена.
+2) PERSIST (localStorage): csvTableState:{slug}:{variant} — from/to пишутся в onChange date-инпутов, восстанавливаются при каждом открытии модала (fallback месяц→сегодня); csvTableOpen:{slug} — флаг «модал был открыт»: AnalyticsClient на монтировании переоткрывает tableview сам (босс: «so when reopened/refreshed the dates are already set and tableview is enabled»).
+3) ✍️ FINANCE EDIT: новый server action updateRentalFinanceAction (rental-verify-actions.ts) — гейт resolveVerifyOwnerActor (обе auth-ветки: TG-cookie owner-tier + пароль-сессия), сверка crew_id, правит rentals.total_cost и/или metadata.deposit_amount, комментарий ДОПИСЫВАЕТСЯ в metadata.comments[] (kind:finance_edit — читается rentalNotesSummary → колонка «Заметки» CSV), при уже-verified сверке — честный verificationWarning (не блокирует). UI: карандаш в «Цене» (owner-tier, гейт canQuickVerify) → модал (новая цена + залог опц. + комментарий) → silent refetch; НА КАРТОЧКЕ АРЕНДЫ: блок «Изменить цену» в CommissionVerificationCard (canVerify, currentTotalCost prefilled, оба TG/пароль-варианта, notifyChanged → router.refresh/reload-token).
+4) ПАРОЛЬ-СЕССИЯ (task159 cookie и так шарится между вкладками) — НО резолв был completed-only: passwordAuthOwnerId теперь резолвится на ЛЮБОМ статусе; lifecycle-кнопки рендерятся пароль-владельцу без клиентского RoleGuard (сервер уже доказал ownership cookie-подписью+БД); FranchizeRentalLifecycleActions принял passwordActorId: role=owner + actorId-fallback во ВСЕХ 5 call sites (confirmVehiclePickup / confirmVehicleReturn / abortRental / initiateTelegramRentalPhotoUpload ×2) — владелец на ПК может ЗАКРЫТЬ/завершить старую аренду из новой вкладки → петля «сверка не заводится — аренда не закрыта» разомкнута. Сверка осталась completed-only (правило верное — босс согласен).
+5) TELEGRAM FALLBACK (telegram-transport.ts): callForward при падении основного endpoint ретраит через BACKUP_FORWARD_URL=https://v0-car-test.vercel.app/api/forward-telegram (+его Origin), no-double-retry когда primary уже = backup (дефолт-конфиг). Сверка-DM/раунды/фото-сообщения доставляются, даже если FORWARD_TELEGRAM_URL (vip-bike.ru — домен не оплачен) лежит.
+
+QA: vitest tests/franchize — 201 файлов, 3862 passed ✅ (4 source-гварда re-baseline: iter20/iter52 на window.open вместо router.push, task128 import-block +updateRentalFinanceAction, task127 «ровно 2 Закрыть» сохранён — фин-модал носит aria-label «Закрыть правку цены»); НОВЫЙ спек tests/franchize/task193-tableview-newtab-finance-edit.spec.ts — 12 source-guard тестов; next lint 7 файлов — 0 warnings; dev-компиляция /rentals-analytics и /rental/[id] — 200 (дев-сервер поймал коллизию stored/storedRange в isOpen-effect — исправлено rename); полный tsc --noEmit в песочнице — OOM (2GB cap контейнера, известная грабля) — типы прогонит Vercel build на деплое.
+KNOWN: prod-verify (Vercel) и e2e сверка-DM — после пуша (нет PAT в песочнице).
+
+Stage Summary:
+- Tableview аренд-аналитики: клик/средняя/правая → новая вкладка, даты и режим сохраняются, цена/залог правятся на месте с комментарием в Заметки; пароль-владелец на ПК закрывает старые аренды из новой вкладки и правит цену на карточке; сверка-уведомления переживают падение vip-bike.ru через vercel-фолбэк.
