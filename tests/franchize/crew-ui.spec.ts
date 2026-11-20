@@ -123,7 +123,9 @@ describe('crew-ui wiring', () => {
     // BEHAVIORAL contract is unit-tested in crew-rail.spec.ts (source-string
     // assertions can't catch an inverted condition); here we only pin the
     // wiring (helper import + loaded-catalog flag threading).
-    expect(crewHeaderSrc).toContain('isRailPillVisible(pill, { itemsLoaded: Array.isArray(items), hiddenTabs, storageEnabled })');
+    // 2026-11-20 (boss): the flag threading now also carries partsAvailable —
+    // «Запчасти» pill is vip-bike-only (or a crew with own Supabase parts).
+    expect(crewHeaderSrc).toContain('isRailPillVisible(pill, { itemsLoaded: Array.isArray(items), hiddenTabs, storageEnabled, partsAvailable })');
     // no hardcoded rail labels left in the component
     expect(crewHeaderSrc).not.toContain('label: "Аренда"');
   });

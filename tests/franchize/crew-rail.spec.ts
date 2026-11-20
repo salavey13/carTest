@@ -5,11 +5,16 @@
 // unit-tested here: boss task = services-only crews (moto-selection) must not
 // show empty «Аренда»/«Продажа» balloons, while callers without a loaded
 // catalog keep the classic rail.
+// 2026-11-20 (boss): «Запчасти» additionally gated on partsAvailable — the
+// hardcoded Surge CSV list is vip-bike-only; other crews need their own
+// Supabase parts (cars.type="parts") to see the pill.
 import { describe, expect, it } from "vitest";
 import { COUNTABLE_RAIL_KEYS, isRailPillVisible, type RailPillLike } from "@/app/franchize/lib/crew-rail";
 
 const NO_HIDDEN = new Set<string>();
-const openOptions = { itemsLoaded: false, hiddenTabs: NO_HIDDEN, storageEnabled: true };
+// partsAvailable mirrors the CrewHeader computation for vip-bike (or a crew
+// with partsCount > 0); tests below without it cover the conservative default.
+const openOptions = { itemsLoaded: false, hiddenTabs: NO_HIDDEN, storageEnabled: true, partsAvailable: true };
 
 const pill = (key: string, count = 0): RailPillLike => ({ key, count });
 
@@ -23,7 +28,7 @@ describe("isRailPillVisible", () => {
   });
 
   it("hides empty countable balloons when the catalog IS loaded", () => {
-    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true };
+    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true, partsAvailable: true };
     expect(isRailPillVisible(pill("rent", 0), options)).toBe(false);
     expect(isRailPillVisible(pill("sale", 0), options)).toBe(false);
     expect(isRailPillVisible(pill("service", 0), options)).toBe(false);
@@ -31,14 +36,14 @@ describe("isRailPillVisible", () => {
   });
 
   it("keeps loaded countable pills with a non-zero count", () => {
-    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true };
+    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true, partsAvailable: true };
     expect(isRailPillVisible(pill("rent", 12), options)).toBe(true);
     expect(isRailPillVisible(pill("service", 8), options)).toBe(true);
   });
 
   it("services-only catalog: service stays, rent/sale/equipment disappear", () => {
     // The moto-selection case from the boss report (2026-10-18).
-    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true };
+    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true, partsAvailable: true };
     expect(isRailPillVisible(pill("service", 8), options)).toBe(true);
     expect(isRailPillVisible(pill("rent", 0), options)).toBe(false);
     expect(isRailPillVisible(pill("sale", 0), options)).toBe(false);
@@ -49,13 +54,13 @@ describe("isRailPillVisible", () => {
   });
 
   it("hides the storage pill when storage is disabled for the crew", () => {
-    const options = { itemsLoaded: false, hiddenTabs: NO_HIDDEN, storageEnabled: false };
+    const options = { itemsLoaded: false, hiddenTabs: NO_HIDDEN, storageEnabled: false, partsAvailable: true };
     expect(isRailPillVisible(pill("storage"), options)).toBe(false);
     expect(isRailPillVisible(pill("rent"), options)).toBe(true);
   });
 
   it("hiddenTabs (crew.ui hydration) wins over everything", () => {
-    const options = { itemsLoaded: false, hiddenTabs: new Set(["rent", "parts"]), storageEnabled: true };
+    const options = { itemsLoaded: false, hiddenTabs: new Set(["rent", "parts"]), storageEnabled: true, partsAvailable: true };
     expect(isRailPillVisible(pill("rent", 5), options)).toBe(false);
     expect(isRailPillVisible(pill("parts"), options)).toBe(false);
     expect(isRailPillVisible(pill("sale", 0), options)).toBe(true);
@@ -63,5 +68,30 @@ describe("isRailPillVisible", () => {
 
   it("countable key list is exactly rent/sale/service/equipment", () => {
     expect([...COUNTABLE_RAIL_KEYS].sort()).toEqual(["equipment", "rent", "sale", "service"]);
+  });
+});
+
+describe("isRailPillVisible — «Запчасти» gate (boss 2026-11-20)", () => {
+  it("hides parts by default: no partsAvailable flag = not applicable", () => {
+    // CrewHeader passes partsAvailable = (slug === "vip-bike" || partsCount > 0).
+    // A crew without Supabase parts (partsCount 0, slug ≠ vip-bike) computes
+    // false → the hardcoded Surge list never leaks onto a foreign crew.
+    const options = { itemsLoaded: false, hiddenTabs: NO_HIDDEN, storageEnabled: true };
+    expect(isRailPillVisible(pill("parts"), options)).toBe(false);
+    // The conservative default must not nuke the rest of the rail.
+    expect(isRailPillVisible(pill("rent", 3), options)).toBe(true);
+    expect(isRailPillVisible(pill("service", 8), options)).toBe(true);
+    expect(isRailPillVisible(pill("storage"), options)).toBe(true);
+  });
+
+  it("explicit false hides the parts pill too", () => {
+    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true, partsAvailable: false };
+    expect(isRailPillVisible(pill("parts"), options)).toBe(false);
+  });
+
+  it("a crew with its own Supabase parts keeps the pill (even with an empty catalog)", () => {
+    const options = { itemsLoaded: true, hiddenTabs: NO_HIDDEN, storageEnabled: true, partsAvailable: true };
+    expect(isRailPillVisible(pill("parts", 0), options)).toBe(true);
+    expect(isRailPillVisible(pill("rent", 0), options)).toBe(false);
   });
 });

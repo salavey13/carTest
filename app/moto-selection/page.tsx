@@ -466,14 +466,24 @@ export default function MotoSelectionLanding() {
               стойки «И»/«С» — слово выглядело каркасным и рваным. Теперь у
               контурного слоя фирменная оранжевая обводка (связка с палитрой,
               читается на синем дыму) + едва заметная белая подложка (7%),
-              которая возвращает гличаме массу — штрих перестал «жрать» буквы. */}
+              которая возвращает гличаме массу — штрих перестал «жрать» буквы.
+
+              Итерация 3 (boss 2026-11-20: «stroke seems off»): центрированный
+              2px штрих рисует ОБЕ кромки каждой широкой стойки Archivo Black —
+              слово читалось двойным каркасом с рваными стыками «СС»/«ТВ».
+              Лечение: подложка стала тёмной «дымчатой» пластиной (72% чёрного),
+              а штрих красится ПОД заливку (paint-order: stroke — Chrome 123+,
+              Safari/Firefox; старый TV-WebKit деградирует в цельную букву с
+              ободком, но тоже без каркаса). Итог: одна чистая оранжевая
+              кромка снаружи, узнаваемый силуэт глифов сохранён. */}
           <h1 className="select-none text-[11vw] font-black uppercase leading-[0.92] tracking-tight sm:text-7xl lg:text-8xl">
             <span className="block text-white">Высокое</span>
             <span
               className="block"
               style={{
-                color: "rgba(255,255,255,0.07)",
+                color: "rgba(10,12,16,0.72)",
                 WebkitTextStroke: `2px ${BRAND}`,
+                paintOrder: "stroke",
               }}
             >
               искусство
@@ -513,6 +523,16 @@ export default function MotoSelectionLanding() {
             >
               Наши услуги
             </a>
+            {/* 2026-11-20 (boss): ссылка из витрины внизу страницы («Каталог
+                и заказ услуг онлайн») дублируется в герое как полноценный CTA —
+                тот же WEB_CATALOG_HREF (?mode=service — экипаж услуговый).
+                Двойная навигация Telegram/браузер остаётся в нижней карточке. */}
+            <Link
+              href={WEB_CATALOG_HREF}
+              className="inline-flex h-12 items-center justify-center rounded-full border-2 border-[var(--ms-accent)] px-7 text-sm font-bold uppercase tracking-[0.08em] text-[var(--ms-accent)] transition hover:bg-[var(--ms-accent)]/10 active:scale-95"
+            >
+              Каталог услуг
+            </Link>
             {/* Заявка открывает модальную форму (feedback form оригинала,
                 механика — существующий callback-lead → CRM экипажа + бот
                 владельцу и salavey13); WhatsApp остаётся в контактах/подвале. */}

@@ -12,6 +12,7 @@ import { JoinCrewBanner } from "../components/JoinCrewBanner";
 import { getFranchizeBySlug } from "../actions";
 import { getFranchizeRouteCtaPolicy } from "../lib/route-cta-policy";
 import { crewPaletteWithCssVars } from "../lib/theme";
+import { firstNonEmptyCatalogMode } from "../lib/catalog-utils";
 import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 
 interface FranchizeSlugPageProps {
@@ -58,7 +59,15 @@ export default async function FranchizeSlugPage({ params }: FranchizeSlugPagePro
         bubbling up to the page-level error.tsx which shows the full-screen
         "Экипаж временно недоступен" fallback.
       */}
-      <DisplayModeProvider lockMode={isVipBikeRentalHost ? "rent" : undefined}>
+      {/* 2026-11-20 (boss): services-only crews (moto-selection) must not open
+          on a properly empty «Аренда» tab after a crew_<slug> deep link — the
+          initial mode is the first non-empty mode in rail order. An explicit
+          ?mode= URL param still wins (DisplayModeContext re-reads it on mount),
+          and the vip-bike rental host stays locked to rent. */}
+      <DisplayModeProvider
+        initialMode={firstNonEmptyCatalogMode(items)}
+        lockMode={isVipBikeRentalHost ? "rent" : undefined}
+      >
       <FranchizeErrorBoundary
         resetKey={slug}
         fallbackTitle="Шапка недоступна"

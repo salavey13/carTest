@@ -94,6 +94,10 @@ export function CrewHeader({
   // config — the VM hydrates it through resolveStorageConfig, which keeps the
   // legacy rule (vip-bike ON unless the crew explicitly opts out) built in.
   const storageEnabled = crew.storage?.enabled ?? false;
+  // 2026-11-20 (boss): «Запчасти» is a hardcoded vip-bike list (Surge CSV).
+  // Another crew sees the pill only when it owns parts in Supabase
+  // (public.cars type="parts", counted by the hydration query → partsCount).
+  const partsAvailable = crew.slug === "vip-bike" || (crew.partsCount ?? 0) > 0;
 
   // ── Logo loading state machine ──
   const [brokenLogoUrls, setBrokenLogoUrls] = useState<Record<string, true>>({});
@@ -422,7 +426,7 @@ export function CrewHeader({
               // moto-selection's services-only rail must not show empty «Аренда»
               // /«Продажа» pills. Contract lives in lib/crew-rail.ts (unit-tested):
               // an UNLOADED catalog (`items === undefined`) keeps the classic rail.
-              .filter((pill) => isRailPillVisible(pill, { itemsLoaded: Array.isArray(items), hiddenTabs, storageEnabled }))
+              .filter((pill) => isRailPillVisible(pill, { itemsLoaded: Array.isArray(items), hiddenTabs, storageEnabled, partsAvailable }))
               .map((pill) => {
               // Equipment/Parts/Storage use pathname-based active state (separate
               // routes); rent/sale/service use displayMode-based active state

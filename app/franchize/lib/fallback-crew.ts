@@ -80,4 +80,7 @@ export const fallbackCrew: FranchizeCrewVM = {
   },
   // Legacy rule: without a metadata.storage block, storage is vip-bike-only.
   storage: resolveStorageConfig(null, "vip-bike"),
+  // Fallback crew never carries Supabase parts; the vip-bike slug itself keeps
+  // the hardcoded CSV list (see lib/parts-data.ts + CrewHeader rail gate).
+  partsCount: 0,
 };

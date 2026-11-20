@@ -10,6 +10,7 @@ import { PartsCatalogClient, type PartsCategoryVM } from "../../components/Parts
 import { buildFranchizeSectionMetadata } from "../metadata";
 import { getFranchizeRouteCtaPolicy } from "../../lib/route-cta-policy";
 import { loadPartsData } from "../../lib/parts-data";
+import { loadCrewPartsData } from "../../lib/crew-parts";
 
 // 2026-10-18 review: metadata must resolve the REAL crew slug — the static
 // "vip-bike" export pointed every crew's /parts canonical at vip-bike.
@@ -30,7 +31,14 @@ export default async function PartsPage({ params }: PartsPageProps) {
   const { slug } = await params;
   // Bike items feed the CrewHeader category rail (rent/sale/service counts).
   const { crew, items } = await getFranchizeBySlug(slug);
-  const categories = await loadPartsData();
+  // 2026-11-20 (boss): the hardcoded Surge CSV list is vip-bike-only. Every
+  // other crew renders its OWN parts from Supabase (cars.type="parts") —
+  // with nothing added the client falls through to its «Каталог запчастей
+  // пока пуст» empty state (the rail pill is hidden for them too).
+  const usesDefaultHardcodedList = (crew.slug || slug) === "vip-bike";
+  const categories = usesDefaultHardcodedList
+    ? await loadPartsData()
+    : await loadCrewPartsData(crew.id);
   const surface = crewPaletteWithCssVars(crew.theme);
   const ctaPolicy = getFranchizeRouteCtaPolicy("catalog");
 

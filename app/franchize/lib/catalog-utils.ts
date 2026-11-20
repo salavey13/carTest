@@ -64,6 +64,25 @@ export const hasSalePrice = (item: CatalogItemVM): boolean => {
   return item.saleAvailable && Boolean(item.salePrice && item.salePrice > 0);
 };
 
+/** The four countable catalog display modes, in header-rail order. */
+export type CatalogDisplayMode = "rent" | "sale" | "service" | "equipment";
+
+/**
+ * 2026-11-20 (boss): the catalog used to open in «Аренда» by default even for
+ * crews without a single rentable item — a deep link into a services-only
+ * crew (moto-selection) landed on a properly empty tab. The default mode is
+ * now the FIRST NON-EMPTY mode in rail order (rent → sale → service →
+ * equipment); classic «Аренда» stays when the catalog is empty so every crew
+ * renders something familiar rather than a blank section.
+ */
+export function firstNonEmptyCatalogMode(items: CatalogItemVM[]): CatalogDisplayMode {
+  if (items.some(hasRentPrice)) return "rent";
+  if (items.some(hasSalePrice)) return "sale";
+  if (items.some(hasServicePrice)) return "service";
+  if (items.some(hasEquipmentPrice)) return "equipment";
+  return "rent";
+}
+
 /**
  * Russian plural form for "день" (day).
  * Handles the full Slavic plural rule:

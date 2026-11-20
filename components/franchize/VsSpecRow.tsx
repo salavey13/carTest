@@ -47,6 +47,25 @@ export const CATALOG_VS_SPECS: CatalogVsSpec[] = [
   },
 ];
 
+// 2026-11-20 (boss): the modal comparator on the services tab used the bike
+// spec keys (power/range/weight) — service items carry none of them, so the
+// block rendered four rows of «—». Services compare by what they actually
+// have in specs: a numeric price (specs.dailyPrice) and the price-label
+// string («по запросу» / «по записи» / «2 000 ₽/мес»). Non-numeric rows
+// render without winner highlighting — VsSpecRow ignores unparseable values.
+export const CATALOG_SERVICE_VS_SPECS: CatalogVsSpec[] = [
+  {
+    label: "Цена",
+    keys: ["dailyPrice", "daily_price", "price_rub", "price", "sale_price"],
+    unit: "₽",
+    lowerIsBetter: true,
+  },
+  {
+    label: "Условия",
+    keys: ["rent_price_label", "price_label"],
+  },
+];
+
 export const getCatalogVsSpecValue = (
   rawSpecs: Record<string, unknown> | undefined,
   keys: string[],

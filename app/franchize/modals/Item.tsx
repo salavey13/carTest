@@ -21,9 +21,10 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
-import { hasRentPrice, hasSalePrice, ruPluralDays } from "../lib/catalog-utils";
+import { hasRentPrice, hasSalePrice, hasServicePrice, ruPluralDays } from "../lib/catalog-utils";
 import { getDisplayPriceTier, type BikePricingSpecs } from "../lib/pricing-calculator";
 import {
+  CATALOG_SERVICE_VS_SPECS,
   CATALOG_VS_SPECS,
   VsSpecRow,
   getCatalogVsSpecValue,
@@ -1706,17 +1707,27 @@ export function ItemModal({
     onChangeOption("rentEndDate", options.rentStartDate || ""); // Same day for hourly
   }, [pricingResult, rentStartTime, options.rentStartDate, onChangeOption]);
 
+  // 2026-11-20 (boss): candidates must be the SAME KIND of catalog item — a
+  // service compares against services (never against bikes, whose power/
+  // range specs it doesn't carry, and vice versa). Within a kind the
+  // propulsion pairing still applies to bikes/gear.
   const comparableBikes = useMemo(() => {
     if (!item) return [];
+    const itemIsService = hasServicePrice(item);
     return items
       .filter(
         (candidate) =>
           candidate.id !== item.id &&
           candidate.availabilityStatus === "available" &&
+          hasServicePrice(candidate) === itemIsService &&
           isSameCatalogPropulsion(item, candidate),
       )
       .slice(0, 6);
   }, [item, items]);
+
+  // Service items have no power/range/weight — they compare by price and
+  // price-label (CATALOG_SERVICE_VS_SPECS); bikes keep the classic set.
+  const vsSpecs = isServiceItem ? CATALOG_SERVICE_VS_SPECS : CATALOG_VS_SPECS;
 
   // ── Bot username for deep-links (from crew config) ──
   // 2026-09-22: приоритет — явный проп из crew VM (contacts.telegramBotUsername),
@@ -2645,10 +2656,12 @@ export function ItemModal({
                 style={surface.subtleCard}
               >
                 <summary className="cursor-pointer list-none text-sm font-semibold">
-                  Сравнить с другой моделью
-                  <span className="ml-2 text-xs font-normal opacity-60">
-                    {propulsionLabel}
-                  </span>
+                  {isServiceItem ? "Сравнить с другой услугой" : "Сравнить с другой моделью"}
+                  {!isServiceItem && (
+                    <span className="ml-2 text-xs font-normal opacity-60">
+                      {propulsionLabel}
+                    </span>
+                  )}
                 </summary>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {comparableBikes.map((bike) => (
@@ -2675,15 +2688,17 @@ export function ItemModal({
                     <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold text-[var(--item-text,#f2f2f3)]">
                       <span>
                         {item.title}
-                        <span className="mt-0.5 block text-[10px] uppercase tracking-[0.12em] opacity-55">
-                          {propulsionLabel}
-                        </span>
+                        {!isServiceItem && (
+                          <span className="mt-0.5 block text-[10px] uppercase tracking-[0.12em] opacity-55">
+                            {propulsionLabel}
+                          </span>
+                        )}
                       </span>
                       <Swords className="h-5 w-5 text-[var(--item-accent,#d99a00)]" />
                       <span>{vsBike.title}</span>
                     </div>
                     <div className="space-y-2">
-                      {CATALOG_VS_SPECS.map((spec) => (
+                      {vsSpecs.map((spec) => (
                         <VsSpecRow
                           key={spec.label}
                           label={spec.label}

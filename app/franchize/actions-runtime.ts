@@ -281,6 +281,10 @@ export interface FranchizeCrewVM {
   // «Зимнее хранение» per-crew config (metadata.franchize.storage) — resolved
   // via resolveStorageConfig (legacy vip-bike fallback when the block is absent).
   storage?: StorageCrewConfig;
+  // 2026-11-20 (boss): rows the crew owns in public.cars with type="parts".
+  // Gates the «Запчасти» rail pill — the hardcoded Surge CSV list applies only
+  // to vip-bike; any other crew must either own Supabase parts or see no pill.
+  partsCount: number;
 }
 
 export interface CtaBlock {
@@ -766,6 +770,7 @@ const emptyCrew = (slug: string): FranchizeCrewVM => ({
     buttonLabel: "Записаться",
     buttonHref: "",
   },
+  partsCount: 0,
 });
 
 export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugResult> {
@@ -915,6 +920,19 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
     const reviewRowsRaw = ((reviewRows ?? []) as UnknownRecord[]);
     const reviewsByBike = groupReviewsByBike(reviewRowsRaw);
     const crewRatingSummary = buildCrewRatingSummary(reviewRowsRaw);
+
+    // 2026-11-20 (boss): the crew's OWN parts catalogue size (public.cars,
+    // type="parts"). The hardcoded Surge CSV /parts list is vip-bike-only —
+    // other crews get the «Запчасти» rail pill (and their own parts page)
+    // only when they own rows here. Lightweight head-count query, no rows.
+    const { count: crewPartsCount, error: partsCountError } = await supabaseAdmin
+      .from("cars")
+      .select("id", { count: "exact", head: true })
+      .eq("crew_id", crew.id)
+      .eq("type", "parts");
+    if (partsCountError) {
+      logger.warn("[franchize] failed to count crew parts", { safeSlug, partsCountError: partsCountError.message });
+    }
 
     const metadata = ((crew as UnknownRecord).metadata ?? {}) as UnknownRecord;
     const franchize = (metadata.franchize ?? metadata) as UnknownRecord;
@@ -1081,6 +1099,8 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
       // «Зимнее хранение» config — metadata.franchize.storage, legacy vip-bike
       // fallback when the block is absent (resolveStorageConfig).
       storage: resolveStorageConfig(franchize, crew.slug ?? safeSlug, { fallbackAddress: crewDefaultAddress }),
+      // The crew's own Supabase parts count — gates the «Запчасти» rail pill.
+      partsCount: crewPartsCount ?? 0,
     };
 
     const items: CatalogItemVM[] = (cars ?? [])
