@@ -440,7 +440,10 @@ function isComboOfferItem(item: CatalogItemVM): boolean {
 function CatalogHoverWash() {
   return (
     <>
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent,#d99a00)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block" />
+      {/* task195: wash no longer md-gated — on touch the tap must paint the
+          photo tint too (the old md:block left the wash invisible on phones
+          while the text/CTA flips fired → half-highlighted card). */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[var(--catalog-accent,#d99a00)] opacity-0 transition-opacity duration-300 group-hover:opacity-30" />
       <div aria-hidden className="catalog-melt pointer-events-none absolute inset-x-0 bottom-0 h-32" />
     </>
   );
@@ -1715,7 +1718,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             seam»). End state identical: opaque accent strip over
                             the accent article = one solid highlight; the article
                             flip still guarantees whole-card coverage. */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg,#111217)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent,#d99a00)]">
+                        {/* task195: strip flip ungated (was md:group-hover) —
+                            touch parity with the text/CTA flips: on a phone
+                            tap the info strip must go accent WITH the black
+                            title/price, not after them. */}
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg,#111217)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (
@@ -1882,7 +1889,11 @@ export function CatalogClient({ crew, slug, items, mode = "rental", ctaPolicy }:
                             as the melt gradient) — desync history in the carousel
                             card comment above; the article flip below stays as the
                             whole-card guarantee for stretched grid rows. */}
-                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg,#111217)] p-3 transition-colors duration-300 md:group-hover:bg-[var(--catalog-accent,#d99a00)]">
+                        {/* task195: strip flip ungated (was md:group-hover) —
+                            touch parity with the text/CTA flips: on a phone
+                            tap the info strip must go accent WITH the black
+                            title/price, not after them. */}
+                        <div className="flex flex-1 flex-col bg-[var(--catalog-card-bg,#111217)] p-3 transition-colors duration-300 group-hover:bg-[var(--catalog-accent,#d99a00)]">
                           {/* Badges row */}
                           <div className="mb-1 flex flex-wrap gap-1">
                             {item.isHot && (

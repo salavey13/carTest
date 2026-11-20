@@ -39,12 +39,15 @@ const paletteAction = read("app/franchize/server-actions/palette.ts");
 describe("task140 — catalog full-card hover wash (PC only)", () => {
   it("wash component: accent tint + SYNCED melt gradient (iter6)", () => {
     expect(catalog).toContain("function CatalogHoverWash()");
-    // tint layer: PC only (md:block — touch hover-lock can't strand a tint),
-    // invisible at rest; task141 iter4: 30% on hover (20% was invisible on
-    // the dark studio photos — boss kept reading the highlight as partial)
+    // tint layer: invisible at rest, 30% on hover. task141 iter4: 30% (20%
+    // was invisible on the dark studio photos). task195 (boss 2026-11-20,
+    // mobile): the wash is NO LONGER md-gated — the old `hidden md:block`
+    // left phones with text/CTA flips but no photo tint (half-highlight);
+    // touch parity is now the contract, sticky hover included.
     expect(catalog).toContain(
-      'className="pointer-events-none absolute inset-0 hidden bg-[var(--catalog-accent,#d99a00)] opacity-0 transition-opacity duration-300 group-hover:opacity-30 md:block"',
+      'className="pointer-events-none absolute inset-0 bg-[var(--catalog-accent,#d99a00)] opacity-0 transition-opacity duration-300 group-hover:opacity-30"',
     );
+    expect(catalog).not.toContain('hidden bg-[var(--catalog-accent');
     // iter6: ONE melt element whose COLOR transitions (no cross-fade — the
     // iter5 two-gradient cross-fade let the photo bleed through mid-transition
     // and lagged behind the strip: boss «the card part kinda lags a
@@ -82,7 +85,10 @@ describe("task140 — catalog full-card hover wash (PC only)", () => {
     // info strips transition bg-card → accent DIRECTLY on hover (iter6:
     // same 300ms curve as the melt gradient — the fade-to-transparent
     // recipe blended on an accent² curve and lagged behind the picture)
-    expect(catalog).toContain("md:group-hover:bg-[var(--catalog-accent,#d99a00)]");
+    // task195: strip flip UNGATED (was md:group-hover) — touch parity, the
+    // strip must go accent WITH the black title/price on a phone tap
+    expect(catalog).toContain("group-hover:bg-[var(--catalog-accent,#d99a00)]");
+    expect(catalog).not.toContain("md:group-hover:bg-[var(--catalog-accent,#d99a00)]");
     expect(catalog).not.toContain("md:group-hover:bg-transparent");
   });
 

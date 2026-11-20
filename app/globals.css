@@ -383,12 +383,23 @@
      CONSTRUCTION; inner layers (transparent strip, photo wash + gradient)
      blend on top and cannot leave a gap. Cards outside the catalog root
      (parts cards, skeletons) never resolve --catalog-accent here and keep
-     their fallback visuals; touch devices are excluded (no sticky hover). */
-  @media (min-width: 768px) {
-    [data-catalog-item]:hover {
-      --card-base-bg: var(--catalog-accent,#d99a00);
-      --card-base-img: none;
-    }
+     their fallback visuals.
+
+     task195 (boss 2026-11-20, mobile screenshots): the old
+     `@media (min-width: 768px)` gate + the old «touch devices are excluded
+     (no sticky hover)» decision produced a HALF-state on phones — Tailwind
+     `group-hover:` title/price/CTA flips DO fire on a tap (and :hover sticks
+     after it), but the card background stayed dark → black-on-dark ghost
+     text on the tapped card. The boss wants the accent highlight + melt
+     gradient BACK on touch. Now hover/active/focus-within ALL drive the
+     accent fill at every width: on touch the highlight follows the tap
+     (hover-sticky/focus-within = the old mobile look), `:active` covers the
+     press frame, and desktop hover is unchanged. */
+  [data-catalog-item]:hover,
+  [data-catalog-item]:active,
+  [data-catalog-item]:focus-within {
+    --card-base-bg: var(--catalog-accent,#d99a00);
+    --card-base-img: none;
   }
 
   /* ── task 144 iter6: SYNCED melt gradient (boss: «slight delay in transition
@@ -424,10 +435,12 @@
     background: linear-gradient(to top, var(--catalog-melt-color), transparent);
     transition: --catalog-melt-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
   }
-  @media (min-width: 768px) {
-    [data-catalog-item]:hover .catalog-melt {
-      --catalog-melt-color: var(--catalog-accent,#d99a00);
-    }
+  /* task195: touch parity with the card fill above — the melt gradient
+     follows hover/active/focus-within at every width (was 768px-gated). */
+  [data-catalog-item]:hover .catalog-melt,
+  [data-catalog-item]:active .catalog-melt,
+  [data-catalog-item]:focus-within .catalog-melt {
+    --catalog-melt-color: var(--catalog-accent,#d99a00);
   }
 
   /* ── task 149: spec chips + availability pill on the card photo ──
@@ -450,14 +463,15 @@
   .catalog-avail-pill {
     background-color: rgba(10, 10, 10, 0.6);
   }
-  @media (min-width: 768px) {
-    [data-catalog-item]:hover .catalog-spec-chip,
-    [data-catalog-item]:focus-within .catalog-spec-chip {
+  /* task195: touch parity — the balloon flip follows the card highlight at
+     every width (was 768px-gated); :active added for the press frame. */
+  [data-catalog-item]:hover .catalog-spec-chip,
+  [data-catalog-item]:active .catalog-spec-chip,
+  [data-catalog-item]:focus-within .catalog-spec-chip {
       /* task 147 (parallel batch) intent absorbed: the balloon flips to the
          theme's own primary/contrast color (near-black for vip-bike gold),
          not a hardcoded hex — stays correct for every crew palette. */
       background-color: var(--catalog-accent-contrast, #0a0a0a);
-    }
   }
 }
 

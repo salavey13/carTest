@@ -91,7 +91,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal, Pencil } from "lucide-react";
+import { X, CalendarDays, Download, Loader2, Send, Search, Table2, Camera, Check, ChevronUp, SlidersHorizontal, Pencil } from "lucide-react";
+import { buildRecentMonths } from "../lib/recent-months";
 import { toast } from "sonner";
 // Task 128 — same owner-gated action the rental-page verification card uses.
 // Task 152 — resendVerificationDmsAction powers the per-row «выслать сверку»
@@ -608,6 +609,77 @@ export function ExportCsvModal({
   const tgSafeTop = useTelegramContentSafeTop();
   const [from, setFrom] = useState(firstDayOfMonthIso());
   const [to, setTo] = useState(todayIso());
+  // task195 (boss) — quick recent-month selector: one icon button next to the
+  // date pickers (visible in BOTH expanded and collapsed controls — the
+  // collapsed-controls contract keeps the pickers, so the shortcut rides
+  // along), tapping a month sets from=1st day / to=last day and persists the
+  // range through the same writeStoredTableRange path as manual edits.
+  const [monthsOpen, setMonthsOpen] = useState(false);
+  const recentMonths = useMemo(() => buildRecentMonths(new Date()), []);
+  const applyQuickMonth = (m: { fromIso: string; toIso: string }) => {
+    setFrom(m.fromIso);
+    setTo(m.toIso);
+    writeStoredTableRange(slug, variant, m.fromIso, m.toIso);
+    setMonthsOpen(false);
+  };
+  // task195 — the shared icon button + dropdown panel, rendered next to the
+  // date pickers in BOTH controls modes (the pickers persist when collapsed,
+  // so the shortcut rides the same row). Minimal footprint: one 36px icon;
+  // the panel is a 3-column grid of the last 12 months, the active month
+  // (exact from/to match) tinted with the accent.
+  const monthQuickSelector = (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setMonthsOpen((v) => !v)}
+        aria-expanded={monthsOpen}
+        aria-label="Быстрый выбор месяца"
+        title="Быстрый выбор месяца — тап ставит первое и последнее число месяца в даты"
+        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+        style={{
+          borderColor: monthsOpen ? T.accent : T.border,
+          color: monthsOpen ? T.accent : T.text,
+          backgroundColor: T.bgCard,
+        }}
+      >
+        <CalendarDays className="h-4 w-4" aria-hidden />
+      </button>
+      {monthsOpen && (
+        <div
+          role="menu"
+          aria-label="Выбор месяца"
+          /* right-0: the button sits to the RIGHT of the date pickers (both
+             controls modes) — anchoring left dropped a 288px panel off the
+             phone viewport; right-0 opens it leftward over the summary. */
+          className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border p-2 shadow-xl"
+          style={{ borderColor: T.border, backgroundColor: T.bgCard }}
+        >
+          <div className="grid grid-cols-3 gap-1">
+            {recentMonths.map((m) => {
+              const active = from === m.fromIso && to === m.toIso;
+              const label = m.label.charAt(0).toUpperCase() + m.label.slice(1);
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => applyQuickMonth(m)}
+                  className="cursor-pointer rounded-lg px-1.5 py-2 text-[11px] font-medium leading-tight transition hover:opacity-80 focus:outline-none focus-visible:ring-2"
+                  style={
+                    active
+                      ? { backgroundColor: `color-mix(in srgb, ${T.accent} 18%, transparent)`, color: T.accent }
+                      : { color: T.text }
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
   const [rows, setRows] = useState<string[][]>([]);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -1703,6 +1775,10 @@ export function ExportCsvModal({
               />
             </div>
 
+            {/* task195 — quick month selector lives NEXT to the pickers in the
+                expanded row too (same shortcut, one placement rule both modes). */}
+            {monthQuickSelector}
+
             <div className="ml-auto flex items-end gap-2">
               {/* Search input — fuzzy filter across all cells */}
               <div
@@ -1804,6 +1880,11 @@ export function ExportCsvModal({
                   style={inputStyle}
                 />
               </div>
+
+              {/* task195 — boss: the month shortcut must stay reachable in the
+                  COLLAPSED controls row as well (the pickers persist there, so
+                  does the icon; the panel drops over the summary region). */}
+              {monthQuickSelector}
 
               <div className="ml-auto flex items-center gap-1.5">
                 {/* Search: inline input where the row has room (sm+), a
