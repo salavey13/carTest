@@ -40,6 +40,13 @@
 //     moto-selection как живой пример услуг без аренды (+ deep links);
 //   · AI-воркер в каждом экипаже (лендинги и настройки — фразой в чате,
 //     «не бот для CRM — CRM для бота»).
+//
+// task196 2026-11-21 (boss: artmebius.com — конкурент-студия из лид-листа,
+// лендинг от 30к / каталог от 50к): новая секция «06 · метод» — roast
+// старого метода (бриф → ТЗ → PSD → вёрстка → счёт vs форма
+// /franchize/create → готовая витрина за вечер, 0 ₽); «партнёры» стали
+// «07 · портфолио» (живые витрины на платформе), автор → 08, FAQ → 09,
+// NAV: + «Метод», «Партнёры» → «Портфолио».
 // Приватные цифры сезона vip-bike со страницы сняты (полный список запрещённых
 // строк пинит спека task138). «Crank it to 13» — тренды-2026 остаются:
 // kinetic display type (solid/outline/gradient), bento, scroll-parallax
@@ -255,6 +262,25 @@ const PROCESS = [
   { n: "04", title: "Рост", text: "Обучение админов, новые фичи, сверка денег — софт растёт вместе с прокатом." },
 ];
 
+// task196: roast-секция «метод» (boss: лид-лист завален сайтами от
+// artmebius.com — студия с 2008-го, лендинг от 30 000 ₽, каталог от
+// 50 000 ₽, бриф = имя/телефон/e-mail, в ответ счёт). Две колонки:
+// классический процесс студии против формы /franchize/create, которая
+// возвращает готовую витрину, а не счёт. Команду из семи специальностей
+// здесь заменяют бот-клерк и ИИ-агент.
+const OLD_METHOD = [
+  { n: "01", title: "Бриф", text: "Созвон, анализ конкурентов, ТЗ на десяток страниц." },
+  { n: "02", title: "Дизайн", text: "Дизайнер рисует макет вручную — правки по почте." },
+  { n: "03", title: "Вёрстка и код", text: "Верстальщик, затем программист привязывает CMS." },
+  { n: "04", title: "Наполнение", text: "Контент вносит заказчик — вручную, по инструкции." },
+  { n: "05", title: "Счёт", text: "Тестирование, перенос на хостинг, договор на поддержку." },
+];
+const NEW_METHOD = [
+  { n: "01", title: "Форма", text: "franchize/create: название, слоган, контакты, каталог." },
+  { n: "02", title: "Сборка", text: "Бот поднимает витрину: лого, описание, каталог, CRM — без кода." },
+  { n: "03", title: "Публикация", text: "Вечером ссылка живая: каталог, корзина, договоры, бот-клерк." },
+];
+
 // Стек разработчика (карточка «автор», слито из статичного HTML).
 const STACK_CHIPS = ["Next.js", "Supabase", "Telegram Mini App", "OCR документов", "Боты заказов"];
 
@@ -341,7 +367,8 @@ const NAV_LINKS = [
   { href: "#any", label: "Сценарии" },
   { href: "#ai", label: "AI" },
   { href: "#services", label: "Услуги" },
-  { href: "#partners", label: "Партнёры" },
+  { href: "#method", label: "Метод" },
+  { href: "#partners", label: "Портфолио" },
   { href: "#author", label: "Автор" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -1452,19 +1479,163 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
           </section>
 
-          {/* ── 06 · ПАРТНЁРЫ (cross-link с /moto-selection) ──────────────── */}
-          <section id="partners" className="relative isolate scroll-mt-20 overflow-hidden">
-            <SlyGhostWord word="партнёры" />
+          {/* ── 06 · МЕТОД (task196: roast старого метода. Лид-лист завален
+              сайтами от artmebius.com — студия с 2008-го: бриф → ТЗ → PSD →
+              вёрстка → программист → наполнение → тест → счёт; лендинг от
+              30 000 ₽, сайт-каталог от 50 000 ₽; бриф = имя/телефон/e-mail.
+              Здесь: форма /franchize/create спрашивает то же, что нужно
+              сайту (название, слоган, контакты, каталог), и возвращает
+              готовую витрину с лого, описанием и каталогом — а не счёт.
+              Команда из семи специальностей = бот-клерк + ИИ-агент. ──────── */}
+          <section id="method" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="метод" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                06 · партнёры
+                06 · метод
+              </p>
+              <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                Веб-студия продаёт <span style={{ color: p.accentMain }}>процесс</span>. Здесь процесс — это форма.
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
+                Классический путь: бриф, ТЗ, дизайн-макет, вёрстка, программист, наполнение,
+                тестирование — и счёт в конце. Наш путь: заполняешь форму — бот собирает витрину.
+                Обсуждать почти нечего, и это не упрощение, а весь смысл.
+              </p>
+            </Reveal>
+            <div className="mt-9 grid gap-4 lg:grid-cols-2 lg:gap-6">
+              {/* старый метод — классическая студия */}
+              <Reveal delay={0.06}>
+                <div
+                  className="h-full rounded-2xl border p-7 sm:p-9"
+                  style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                >
+                  <p className="font-jb text-[11px] font-bold uppercase tracking-[0.24em]" style={{ color: p.textSecondary }}>
+                    старый метод · веб-студия с 2008-го
+                  </p>
+                  <h3 className="mt-3 text-xl font-black uppercase tracking-tight sm:text-2xl">
+                    Шесть недель до счёта
+                  </h3>
+                  <div className="mt-5 space-y-2.5">
+                    {OLD_METHOD.map((s) => (
+                      <div
+                        key={s.n}
+                        className="flex items-start gap-3 rounded-xl border px-4 py-3"
+                        style={{ borderColor: p.borderSoft }}
+                      >
+                        <span
+                          className="font-jb text-[11px] font-bold uppercase tracking-[0.2em]"
+                          style={{ color: p.textSecondary }}
+                        >
+                          {s.n}
+                        </span>
+                        <p className="text-xs leading-relaxed sm:text-sm" style={{ color: p.textSecondary }}>
+                          <span className="font-bold" style={{ color: p.textPrimary }}>
+                            {s.title}.
+                          </span>{" "}
+                          {s.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 grid gap-2 text-sm">
+                    <p className="flex justify-between gap-3">
+                      <span style={{ color: p.textSecondary }}>лендинг</span>
+                      <span className="font-black">от 30 000 ₽</span>
+                    </p>
+                    <p className="flex justify-between gap-3">
+                      <span style={{ color: p.textSecondary }}>сайт-каталог</span>
+                      <span className="font-black">от 50 000 ₽</span>
+                    </p>
+                    <p className="flex justify-between gap-3">
+                      <span style={{ color: p.textSecondary }}>поддержка и доработки</span>
+                      <span className="font-black">по договору</span>
+                    </p>
+                  </div>
+                  <p className="mt-5 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                    В ответ на бриф ты получаешь счёт. Команда: маркетологи, дизайнеры, верстальщики,
+                    программисты, менеджеры, SEO — семь специальностей на один сайт.
+                  </p>
+                </div>
+              </Reveal>
+              {/* новый метод — платформа + бот */}
+              <Reveal delay={0.12}>
+                <SpotlightCard
+                  className="h-full rounded-2xl border p-7 sm:p-9"
+                  style={{ background: p.bgCard, borderColor: `${p.accentMain}55` }}
+                >
+                  <p className="font-jb text-[11px] font-bold uppercase tracking-[0.24em]" style={{ color: p.accentMain }}>
+                    новый метод · платформа + бот
+                  </p>
+                  <h3 className="mt-3 text-xl font-black uppercase tracking-tight sm:text-2xl">
+                    Один вечер до <span style={{ color: p.accentMain }}>витрины</span>
+                  </h3>
+                  <div className="mt-5 space-y-2.5">
+                    {NEW_METHOD.map((s) => (
+                      <div
+                        key={s.n}
+                        className="flex items-start gap-3 rounded-xl border px-4 py-3"
+                        style={{ borderColor: `${p.accentMain}33` }}
+                      >
+                        <span
+                          className="font-jb text-[11px] font-bold uppercase tracking-[0.2em]"
+                          style={{ color: p.accentMain }}
+                        >
+                          {s.n}
+                        </span>
+                        <p className="text-xs leading-relaxed sm:text-sm" style={{ color: p.textSecondary }}>
+                          <span className="font-bold" style={{ color: p.textPrimary }}>
+                            {s.title}.
+                          </span>{" "}
+                          {s.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 grid gap-2 text-sm">
+                    <p className="flex justify-between gap-3">
+                      <span style={{ color: p.textSecondary }}>витрина с каталогом</span>
+                      <span className="font-black" style={{ color: p.accentMain }}>0 ₽</span>
+                    </p>
+                    <p className="flex justify-between gap-3">
+                      <span style={{ color: p.textSecondary }}>бот-клерк и CRM</span>
+                      <span className="font-black" style={{ color: p.accentMain }}>включено</span>
+                    </p>
+                    <p className="flex justify-between gap-3">
+                      <span style={{ color: p.textSecondary }}>правки</span>
+                      <span className="font-black" style={{ color: p.accentMain }}>фразой в чат</span>
+                    </p>
+                  </div>
+                  <Link
+                    href="/franchize/create"
+                    className="group mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-8 text-sm font-bold uppercase tracking-[0.08em] transition hover:brightness-110 active:scale-95"
+                    style={{ background: p.accentMain, color: p.bgBase, boxShadow: `0 0 24px ${p.accentMain}44` }}
+                  >
+                    Создать такой же сайт
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                  <p className="mt-3 text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                    Форма спрашивает то же, что нужно сайту: название, слоган, контакты, каталог.
+                    У студии в ответ придёт счёт — здесь готовый сайт с лого, описанием и каталогом.
+                  </p>
+                </SpotlightCard>
+              </Reveal>
+            </div>
+          </section>
+
+          {/* ── 07 · ПОРТФОЛИО (бывш. 06 · партнёры; cross-link с /moto-selection) ── */}
+          <section id="partners" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="портфолио" />
+            <Reveal>
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                07 · портфолио
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Посмотри, кто уже <span style={{ color: p.accentMain }}>варится</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                Витрины, которые уже живут на платформе или готовятся к запуску. Каждый экипаж — со
-                своим брендом, каталогом и бот, но цифры, договоры и сверка — общие.
+                Портфолио без фотошопа: каждая витрина ниже собрана на этой платформе и работает
+                прямо сейчас — не скриншоты в PDF, а живые лендинги и каталоги. Каждый экипаж — со
+                своим брендом, каталогом и ботом, но цифры, договоры и сверка — общие.
               </p>
             </Reveal>
 
@@ -1574,7 +1745,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
           </section>
 
-          {/* ── 07 · АВТОР (task167: слито из /public/salavey13.html) ────────
+          {/* ── 08 · АВТОР (task167: слито из /public/salavey13.html) ────────
               Две карточки в одну историю: платформу строит конкретный человек
               и обкатывает её на собственном боевом экипаже. Без приватных
               цифр сезона (task138) и без формы — заявка уже живёт в
@@ -1583,7 +1754,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             <SlyGhostWord word="автор" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                07 · автор
+                08 · автор
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Один за экраном. <span style={{ color: p.accentMain }}>Вся система на месте.</span>
@@ -1706,14 +1877,14 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </section>
 
-          {/* ── 08 · FAQ (task175, урок №8 OpenAI: возражения убитые заранее) ─
+          {/* ── 09 · FAQ (task175, урок №8 OpenAI: возражения убитые заранее) ─
               Четыре вопроса-страха ДО разговора; закрывает секция с тем же
               CTA «Подключить экипаж» (урок №5: один CTA, повторённый ×3). */}
           <section id="faq" className="relative isolate scroll-mt-20 overflow-hidden">
             <SlyGhostWord word="вопросы" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                08 · вопросы
+                09 · вопросы
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Проверь, что спрашивают <span style={{ color: p.accentMain }}>до тебя</span>
