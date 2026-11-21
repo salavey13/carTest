@@ -47,6 +47,12 @@
 // /franchize/create → готовая витрина за вечер, 0 ₽); «партнёры» стали
 // «07 · портфолио» (живые витрины на платформе), автор → 08, FAQ → 09,
 // NAV: + «Метод», «Партнёры» → «Портфолио».
+//
+// task197 2026-11-21 (boss: №15 лид-листа — Motoclub, франшиза эндуро с
+// сайтом от той же студии, motoclub-buisness.ru): секция «08 · франшиза» —
+// стадии запуска филиала на платформе (4 этапа за вечер) и левелы масштаба
+// (точка / сеть городов / федеральная) по 0 ₽ против пайков LOW/BASE/PRO
+// 3–5 млн ₽; автор → 09, FAQ → 10, NAV + «Франшиза».
 // Приватные цифры сезона vip-bike со страницы сняты (полный список запрещённых
 // строк пинит спека task138). «Crank it to 13» — тренды-2026 остаются:
 // kinetic display type (solid/outline/gradient), bento, scroll-parallax
@@ -281,6 +287,49 @@ const NEW_METHOD = [
   { n: "03", title: "Публикация", text: "Вечером ссылка живая: каталог, корзина, договоры, бот-клерк." },
 ];
 
+// task197: секция «франшиза» — против франшиз-продавцов (кейс №15 из
+// лид-листа: Motoclub, motoclub-buisness.ru — сайт франшизы от той же
+// студии): пайки LOW/BASE/PRO до 3 / от 3,5 / от 5 млн ₽, окупаемость
+// 12–18 мес, этапы «договор → смета → помещение → запуск». Наш ответ:
+// цифровые стадии запуска филиала за вечер и левелы масштаба по 0 ₽.
+// Экипаж на платформе = филиал франшизы.
+const FRANCHIZE_STAGES = [
+  { n: "01", title: "Форма", text: "franchize/create: название, слоган, контакты, палитра бренда." },
+  { n: "02", title: "Бренд и каталог", text: "Лого, описание, позиции каталога — без дизайнера и вёрстки." },
+  { n: "03", title: "Процессы", text: "Заказы и бронь, договоры с залогами, бот-клерк, двойная книга денег." },
+  { n: "04", title: "Запуск", text: "Вечером ссылка живая. Поддержка — фразой в чат, а не тикетом." },
+];
+const FRANCHIZE_LEVELS = [
+  {
+    name: "Одна точка",
+    text: "Своя витрина с каталогом, заказами и бот-клерком — вас находят в поиске, а не в ленте Авито.",
+    price: "0 ₽",
+    ref: "паёк «LOW» у франшиз-продавцов — до 3 000 000 ₽",
+  },
+  {
+    name: "Сеть городов",
+    text: "Несколько экипажей на одной платформе: свой бренд и каталог в каждом, деньги, договоры и стандарты — общие.",
+    price: "0 ₽",
+    ref: "паёк «BASE» — от 3 500 000 ₽",
+  },
+  {
+    name: "Федеральная сеть",
+    text: "Мультиарендность из коробки: панель сети, аналитика и регламенты для всех точек сразу.",
+    price: "0 ₽",
+    ref: "паёк «PRO» — от 5 000 000 ₽",
+  },
+];
+const FRANCHIZE_INCLUDES = [
+  "витрина под бренд",
+  "каталог 24/7",
+  "заказы и бронь",
+  "договоры и залоги",
+  "бот-клерк",
+  "двойная книга денег",
+  "панель сети",
+  "аналитика",
+];
+
 // Стек разработчика (карточка «автор», слито из статичного HTML).
 const STACK_CHIPS = ["Next.js", "Supabase", "Telegram Mini App", "OCR документов", "Боты заказов"];
 
@@ -369,6 +418,7 @@ const NAV_LINKS = [
   { href: "#services", label: "Услуги" },
   { href: "#method", label: "Метод" },
   { href: "#partners", label: "Портфолио" },
+  { href: "#franchize", label: "Франшиза" },
   { href: "#author", label: "Автор" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -1745,7 +1795,121 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </Reveal>
           </section>
 
-          {/* ── 08 · АВТОР (task167: слито из /public/salavey13.html) ────────
+          {/* ── 08 · ФРАНШИЗА (task197: босс нашёл №15 из лид-листа — Motoclub,
+              франшиза эндуро-проката, сайт франшизы от той же студии
+              (motoclub-buisness.ru): пайки LOW/BASE/PRO — до 3 / от 3,5 /
+              от 5 млн ₽, окупаемость 12–18 мес, этапы «договор → смета →
+              помещение → запуск», форма «имя + телефон». Наш ответ: цифровая
+              инфраструктура франшизы (витрина, каталог, договоры, бот, панель
+              сети) — 0 ₽, обкатана на VIP BIKE и витринах платформы. ─────── */}
+          <section id="franchize" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="франшиза" />
+            <Reveal>
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                08 · франшиза
+              </p>
+              <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                Франшиза — это <span style={{ color: p.accentMain }}>экипаж на платформе</span>. Не паёк за 5 миллионов.
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
+                Классическая франшиза продаёт бренд и регламенты: паёк 3–5 млн ₽, окупаемость
+                12–18 месяцев, сайт филиала — отдельно у студии. Цифровую половину франшизы мы
+                отдаём бесплатно: витрина под бренд, каталог, договоры и бот уже обкатаны на
+                живом прокате VIP BIKE.
+              </p>
+            </Reveal>
+            {/* стадии запуска — как «этапы открытия филиала», только за вечер */}
+            <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+              {FRANCHIZE_STAGES.map((s, i) => (
+                <Reveal key={s.n} delay={0.05 + (i % 4) * 0.06}>
+                  <div
+                    className="h-full rounded-2xl border p-6"
+                    style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  >
+                    <span
+                      className="font-jb text-[11px] font-bold uppercase tracking-[0.2em]"
+                      style={{ color: p.accentMain }}
+                    >
+                      этап {s.n}
+                    </span>
+                    <h3 className="mt-2 text-lg font-black uppercase tracking-tight">{s.title}</h3>
+                    <p className="mt-2 text-xs leading-relaxed sm:text-sm" style={{ color: p.textSecondary }}>
+                      {s.text}
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            {/* левелы масштаба — против пайков LOW/BASE/PRO */}
+            <div className="mt-6 grid gap-4 lg:grid-cols-3 lg:gap-5">
+              {FRANCHIZE_LEVELS.map((lvl, i) => (
+                <Reveal key={lvl.name} delay={0.08 + i * 0.07}>
+                  <div
+                    className="h-full rounded-2xl border p-7"
+                    style={{ background: p.bgCard, borderColor: i === 2 ? `${p.accentMain}55` : p.borderSoft }}
+                  >
+                    <h3 className="text-lg font-black uppercase tracking-tight">{lvl.name}</h3>
+                    <p className="mt-2 text-xs leading-relaxed sm:text-sm" style={{ color: p.textSecondary }}>
+                      {lvl.text}
+                    </p>
+                    <p className="mt-4 flex items-baseline gap-2">
+                      <span className="text-2xl font-black" style={{ color: p.accentMain }}>
+                        {lvl.price}
+                      </span>
+                      <span className="text-xs" style={{ color: p.textSecondary }}>
+                        вход на платформе
+                      </span>
+                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed" style={{ color: p.textSecondary }}>
+                      {lvl.ref}
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            {/* что входит + живые франшизы + CTA */}
+            <Reveal delay={0.16}>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {FRANCHIZE_INCLUDES.map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-full border px-3 py-1 text-[11px]"
+                    style={{ borderColor: p.borderSoft, color: p.textSecondary }}
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-5 max-w-3xl text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                Живые франшизы платформы — в{" "}
+                <Link
+                  href="#partners"
+                  className="underline decoration-dotted underline-offset-4"
+                  style={{ color: p.accentMain }}
+                >
+                  портфолио выше
+                </Link>
+                : VIP BIKE Rental, Moto.selection, МотоТех НН, LEORUS, georg-electro — у каждой
+                свой бренд и каталог на общем движке.
+              </p>
+              <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                <Link
+                  href="/franchize/create"
+                  className="group inline-flex h-12 items-center justify-center gap-2 rounded-full px-8 text-sm font-bold uppercase tracking-[0.08em] transition hover:brightness-110 active:scale-95"
+                  style={{ background: p.accentMain, color: p.bgBase, boxShadow: `0 0 24px ${p.accentMain}44` }}
+                >
+                  Открыть филиал
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                </Link>
+                <p className="max-w-md text-xs leading-relaxed" style={{ color: p.textSecondary }}>
+                  Паёк 0 ₽ и окупается мгновенно — окупать нечего. Помещение, технику и людей
+                  придётся докупить самостоятельно: с этим бессильна даже ИИ.
+                </p>
+              </div>
+            </Reveal>
+          </section>
+
+          {/* ── 09 · АВТОР (task167: слито из /public/salavey13.html) ────────
               Две карточки в одну историю: платформу строит конкретный человек
               и обкатывает её на собственном боевом экипаже. Без приватных
               цифр сезона (task138) и без формы — заявка уже живёт в
@@ -1754,7 +1918,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             <SlyGhostWord word="автор" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                08 · автор
+                09 · автор
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Один за экраном. <span style={{ color: p.accentMain }}>Вся система на месте.</span>
@@ -1877,14 +2041,14 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
             </div>
           </section>
 
-          {/* ── 09 · FAQ (task175, урок №8 OpenAI: возражения убитые заранее) ─
+          {/* ── 10 · FAQ (task175, урок №8 OpenAI: возражения убитые заранее) ─
               Четыре вопроса-страха ДО разговора; закрывает секция с тем же
               CTA «Подключить экипаж» (урок №5: один CTA, повторённый ×3). */}
           <section id="faq" className="relative isolate scroll-mt-20 overflow-hidden">
             <SlyGhostWord word="вопросы" />
             <Reveal>
               <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
-                09 · вопросы
+                10 · вопросы
               </p>
               <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
                 Проверь, что спрашивают <span style={{ color: p.accentMain }}>до тебя</span>
