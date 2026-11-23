@@ -21,7 +21,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItemVM, FranchizeTheme } from "../actions";
-import { hasRentPrice, hasSalePrice, hasServicePrice, ruPluralDays } from "../lib/catalog-utils";
+import { hasRentPrice, hasSalePrice, hasServicePrice, isVehicleItem, ruPluralDays } from "../lib/catalog-utils";
 import { getDisplayPriceTier, type BikePricingSpecs } from "../lib/pricing-calculator";
 import {
   CATALOG_SERVICE_VS_SPECS,
@@ -1330,6 +1330,12 @@ export function ItemModal({
   const isRental = displayMode ? displayMode === "rent" : effectiveFlowType === "rental";
   const isVipBikeRental = slug === "vip-bike" && isRental;
   const isEquipment = displayMode === "equipment" || (item?.type === "equipment");
+  // task207b (boss: «fix modal by not showing bike equipment for non-bike
+  // stuff in other crews like renta-flat»): vehicle gate for MOTO blocks.
+  // Flats (vehicle_class="flat" in specs) get no gear section, no
+  // test-drive mode, no propulsion pairing — a квартира has no rider.
+  // Unmarked rows keep the full legacy modal (bikes, historical default).
+  const isVehicle = item ? isVehicleItem(item) : true;
   const modalRef = useRef<HTMLDivElement>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -2458,7 +2464,9 @@ export function ItemModal({
                 {/* ── Test-drive MODE switch (2026-09-11) ──
                     ON: dates / equipment / pricing disappear — the ride is
                     free (10 minutes), mirrors the bot /testdrive flow. The
-                    same «В корзину» button adds a testdrive-marked line. */}
+                    same «В корзину» button adds a testdrive-marked line.
+                    task207b: vehicle-only — a flat has nothing to test-drive. */}
+                {isVehicle && (
                 <label
                   className="flex cursor-pointer items-center justify-between rounded-2xl border px-3 py-2.5 transition hover:opacity-90"
                   style={{
@@ -2483,6 +2491,7 @@ export function ItemModal({
                     aria-label="Переключить режим тест-драйва"
                   />
                 </label>
+                )}
 
                 {/* Simplified test-drive card — replaces the rental config */}
                 {testdriveMode && (
@@ -2608,6 +2617,9 @@ export function ItemModal({
                       specs={item.rawSpecs ?? {}}
                     />
 
+                    {/* task207b: «Доп. оборудование» (шлемы/куртки/боты) —
+                        vehicle-only; у квартир нет райдера и нет гира. */}
+                    {isVehicle && (
                     <AdditionalItems
                       selection={extrasSelection}
                       rentalHours={pricingResult?.displayHours}
@@ -2616,6 +2628,7 @@ export function ItemModal({
                         setHelmetCount(typeof sel.helmet === "number" ? sel.helmet : 0);
                       }}
                     />
+                    )}
 
                     {pricingResult && (
                       <>
@@ -2657,7 +2670,7 @@ export function ItemModal({
               >
                 <summary className="cursor-pointer list-none text-sm font-semibold">
                   {isServiceItem ? "Сравнить с другой услугой" : "Сравнить с другой моделью"}
-                  {!isServiceItem && (
+                  {!isServiceItem && isVehicle && (
                     <span className="ml-2 text-xs font-normal opacity-60">
                       {propulsionLabel}
                     </span>
@@ -2688,7 +2701,7 @@ export function ItemModal({
                     <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center text-xs font-semibold text-[var(--item-text,#f2f2f3)]">
                       <span>
                         {item.title}
-                        {!isServiceItem && (
+                        {!isServiceItem && isVehicle && (
                           <span className="mt-0.5 block text-[10px] uppercase tracking-[0.12em] opacity-55">
                             {propulsionLabel}
                           </span>

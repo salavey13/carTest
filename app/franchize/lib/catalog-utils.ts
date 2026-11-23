@@ -68,6 +68,23 @@ export const hasSalePrice = (item: CatalogItemVM): boolean => {
 export type CatalogDisplayMode = "rent" | "sale" | "service" | "equipment";
 
 /**
+ * task207b (boss: «fix modal by not showing bike equipment for non-bike
+ * stuff in other crews like renta-flat»): the item modal's MOTO blocks
+ * (helmet/jacket/pants gear «Доп. оборудование», the «Режим тест-драйва»
+ * switch, propulsion pairing) must not render for non-bike verticals.
+ * A vertical is a VEHICLE when the item rides on the road: bikes (default,
+ * no marker), cars (vehicle_class="car")… Flats (vehicle_class="flat") and
+ * anything else non-vehicle do not carry a rider → no gear, no test-drive.
+ * Default: true — every legacy bike row (no marker) keeps the full modal.
+ */
+export const isVehicleItem = (item: CatalogItemVM): boolean => {
+  const rs = item.rawSpecs as Record<string, unknown> | undefined;
+  const vc = typeof rs?.vehicle_class === "string" ? rs.vehicle_class.toLowerCase().trim() : "";
+  if (!vc) return true; // unmarked rows are bikes (historical default)
+  return vc === "bike" || vc === "car" || vc === "moto" || vc === "scooter" || vc === "snowmobile";
+};
+
+/**
  * 2026-11-20 (boss): the catalog used to open in «Аренда» by default even for
  * crews without a single rentable item — a deep link into a services-only
  * crew (moto-selection) landed on a properly empty tab. The default mode is
