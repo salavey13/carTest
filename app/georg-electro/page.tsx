@@ -755,6 +755,40 @@ export default function GeorgElectroLanding() {
                   backing: "#e8edf6",
                   lightBacking: true,
                 },
+                // task205: зелёные экипажи лид-листа — двусторонний линкинг
+                // витрин (PartnerLogoGrid на каждом ведёт сюда и на соседей).
+                {
+                  href: "/renta-car",
+                  title: "Рента-Кар НН",
+                  tagline: "автопрокат в Нижнем — подача бесплатно, круглосуточно",
+                  logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-car-logo.png",
+                  logoAlt: "Рента-Кар НН",
+                  backing: "#0b0f14",
+                },
+                {
+                  href: "/motoprokat1",
+                  title: "МотоПрокат1",
+                  tagline: "мотопрокат — от BMW до Ducati, бронь в Telegram",
+                  logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motoprokat1-logo.png",
+                  logoAlt: "МотоПрокат1",
+                  backing: "#0b0f14",
+                },
+                {
+                  href: "/snowmobile-nn",
+                  title: "Snowmobile NN",
+                  tagline: "снегоходы — катания и обучение, бронь в Telegram",
+                  logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snowmobile-nn-logo.png",
+                  logoAlt: "Snowmobile NN",
+                  backing: "#0b0f14",
+                },
+                {
+                  href: "/snegoprokat-nn",
+                  title: "СнегоПрокат НН",
+                  tagline: "снегоходы — одиночные и тандемные катания",
+                  logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snegoprokat-nn-logo.png",
+                  logoAlt: "СнегоПрокат НН",
+                  backing: "#0b0f14",
+                },
               ]}
             />
           </div>

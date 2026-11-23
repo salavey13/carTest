@@ -23,7 +23,29 @@
 // компонент без "use client": анимации — чистый CSS (<style> + keyframes,
 // prefers-reduced-motion гейт), ноль клиентского JS, быстрый LCP.
 //
-// CTA-пара в каждом блоке:
+// task205 (босс: «polish landings once more, make working CTAs like
+// moto-selection form, make sure everything is properly interlinked via
+// "partners" sections on landings; more compressed pictures»):
+//  · Working CTA: CrewLeadModal (1:1 механика moto-selection FeedbackModal)
+//    → POST /api/franchize/callback-lead: lead в franchize_intents + ботом
+//    владельцу экипажа и админу. Триггер — клик-делегация
+//    [data-lead-modal-open]: nav «Забронировать», hero «Оставить заявку»,
+//    финальный CTA.
+//  · Partners-секция: сквозной PartnerLogoGrid (тот же, что на 7 лендингах
+//    платформы) — все витрины экосистемы ссылаются друг на друга; карточки
+//    зелёных экипажей добавлены в сетки salavey13/moto-selection/mototehnn/
+//    georg-electro/leorus (двусторонний линкинг).
+//  · Фото перерезаны из raw task203: 1024px/q62 (было 1280/q80), −49%
+//    суммарно; лого PNG quantize. Те же пути Storage — URL в БД не менялись.
+//
+// Контент data-driven: crews.metadata (branding/palette/contacts/cta/
+// contentBlocks) + каталог public.cars через getFranchizeBySlug (memoized,
+// emptyCrew при сбое БД — лендинг деградирует в фолбэк, не 500). Серверный
+// компонент: анимации — чистый CSS (<style> + keyframes,
+// prefers-reduced-motion гейт); единственный клиентский кусок — CrewLeadModal.
+//
+// CTA-тройка в каждом блоке:
+//  · «Оставить заявку» → CrewLeadModal → CRM экипажа (working CTA);
 //  · «Открыть каталог» → /franchize/<slug> — веб-витрина с корзиной;
 //  · «Забронировать в Telegram» → t.me/<bot>/app?startapp=crew_<slug> —
 //    fast path crew_<slug> до auth-гейта (use-start-param-target.ts:321).
@@ -33,6 +55,10 @@ import type { FranchizeBySlugResult } from "@/app/franchize/actions-runtime";
 import type { CatalogItemVM } from "@/app/franchize/actions-runtime";
 import { withAlpha } from "@/app/franchize/lib/theme";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
+import PartnerLogoGrid, {
+  type PartnerLogoItem,
+} from "@/components/landing/PartnerLogoGrid";
+import CrewLeadModal from "./CrewLeadModal";
 import { ArrowRight, Check, Clock3, MapPin, Phone, Send } from "lucide-react";
 
 const FALLBACK_PALETTE = {
@@ -46,6 +72,80 @@ const FALLBACK_PALETTE = {
 };
 
 const DEFAULT_BOT = "oneBikePlsBot";
+
+// Сквозной реестр витрин платформы для partners-секций (task205; босс:
+// «properly interlinked via partners sections»). Лого — как в сетках
+// salavey13/moto-selection: зелёные — about/{slug}-logo.png (Storage),
+// moto-selection — tildacdn, sly13 — carpix/sly13_logo.jpg, остальные —
+// /logos/*.png из public. Тэглайны — формулировки из существующих сеток.
+const CREW_PARTNERS: PartnerLogoItem[] = [
+  {
+    href: "/salavey13",
+    title: "SLY13",
+    tagline: "платформа франшиз проката — витрина партнёров на одном софте",
+    logoSrc:
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
+  },
+  {
+    href: "/moto-selection",
+    title: "Moto.Selection",
+    tagline: "мотосервис — обучение, подбор мото, ТО, детейлинг, хранение 24/7",
+    logoSrc:
+      "https://static.tildacdn.com/tild6335-3266-4164-b461-363834666561/__.png",
+  },
+  {
+    href: "/renta-car",
+    title: "Рента-Кар НН",
+    tagline: "автопрокат в Нижнем — подача бесплатно, круглосуточно",
+    logoSrc:
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-car-logo.png",
+  },
+  {
+    href: "/motoprokat1",
+    title: "МотоПрокат1",
+    tagline: "мотопрокат — от BMW до Ducati, бронь в Telegram",
+    logoSrc:
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motoprokat1-logo.png",
+  },
+  {
+    href: "/snowmobile-nn",
+    title: "Snowmobile NN",
+    tagline: "снегоходы — катания и обучение, бронь в Telegram",
+    logoSrc:
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snowmobile-nn-logo.png",
+  },
+  {
+    href: "/snegoprokat-nn",
+    title: "СнегоПрокат НН",
+    tagline: "снегоходы — одиночные и тандемные катания",
+    logoSrc:
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snegoprokat-nn-logo.png",
+  },
+  {
+    href: "/mototehnn",
+    title: "МотоТех НН",
+    tagline: "мотосалон — техника, 10 000+ запчастей, мотосервис, хранение и эвакуация",
+    logoSrc: "/logos/mototehnn-logo.png",
+  },
+  {
+    href: "/georg-electro",
+    title: "georg-electro",
+    tagline: "электрик электробайков — диагностика, контроллеры, проводка, свет",
+    logoSrc: "/logos/georg-electro-logo.png",
+  },
+  {
+    href: "/leorus",
+    title: "LEORUS · djorudjov",
+    tagline: "ивент-агентство — фестивали под ключ, DJ и шоу-программы, видео",
+    logoSrc: "/logos/leorus-logo.png",
+  },
+  {
+    href: "/vipbikerental",
+    title: "VIP BIKE Rental",
+    tagline: "аренда электромото в Нижнем Новгороде — флагман платформы",
+    logoSrc: "/leorus/partner-vipbike.png",
+  },
+];
 
 /** Подписной контент экипажа, который нельзя вытащить из crews.metadata. */
 export interface CrewLandingCopy {
@@ -197,14 +297,31 @@ export default function CrewLandingClient({
     { href: "#contacts", label: "Контакты" },
   ];
 
-  const primaryBtn = (label: string) => (
-    <a
-      href={vitrineHref}
+  // Working CTA (task205) — открывает CrewLeadModal → /api/franchize/
+  // callback-lead → franchize_intents + ботом владельцу и админу.
+  const leadBtn = (label: string) => (
+    <button
+      type="button"
+      data-lead-modal-open
       className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
       style={{ backgroundColor: pal.accentMain, color: pal.bgBase }}
     >
       {label}
       <ArrowRight className="h-4 w-4" aria-hidden />
+    </button>
+  );
+
+  const vitrineBtn = (label: string) => (
+    <a
+      href={vitrineHref}
+      className="inline-flex items-center gap-2 rounded-xl border px-6 py-3.5 text-sm font-bold backdrop-blur-sm transition-colors hover:bg-white/5"
+      style={{
+        borderColor: withAlpha(pal.textPrimary, 0.35),
+        color: pal.textPrimary,
+        backgroundColor: withAlpha(pal.bgBase, 0.35),
+      }}
+    >
+      {label}
     </a>
   );
 
@@ -286,15 +403,14 @@ export default function CrewLandingClient({
               <Phone className="h-4 w-4 text-black/60" aria-hidden />
               {phone}
             </a>
-            <a
-              href={deeplink}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              data-lead-modal-open
               className="inline-flex h-10 items-center rounded-full bg-white px-4 text-xs font-black uppercase tracking-[0.1em] transition hover:brightness-95 active:scale-95"
               style={{ color: pal.bgBase }}
             >
               Забронировать
-            </a>
+            </button>
           </div>
         </div>
       </header>
@@ -382,7 +498,8 @@ export default function CrewLandingClient({
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            {primaryBtn("Открыть каталог")}
+            {leadBtn("Оставить заявку")}
+            {vitrineBtn("Открыть каталог")}
             {tgBtn("Забронировать в Telegram")}
           </div>
 
@@ -598,8 +715,34 @@ export default function CrewLandingClient({
               "Откройте каталог, выберите позицию, даты и формат — бронь фиксируется в Telegram-боте экипажа."}
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            {primaryBtn(cta?.buttonLabel || "Открыть каталог")}
+            {leadBtn("Оставить заявку")}
+            {vitrineBtn(cta?.buttonLabel || "Открыть каталог")}
             {tgBtn("Забронировать в Telegram", true)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ПАРТНЁРЫ ── сквозной PartnerLogoGrid (task205): все витрины
+          экосистемы ссылаются друг на друга — лого в покое, название+
+          тэглайн на hover/долгом тапе. Сам экипаж из сетки убран. */}
+      <section id="partners" className="relative scroll-mt-20 border-t px-4 py-16 sm:px-6 sm:py-20" style={{ borderColor: pal.borderSoft }}>
+        <div className="mx-auto w-full max-w-7xl">
+          <p className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: pal.accentMain }}>
+            Экосистема SLY13
+          </p>
+          <h2 className="mt-3 max-w-2xl text-3xl font-black tracking-tight md:text-5xl">
+            Витрины партнёров платформы
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed md:text-base" style={{ color: pal.textSecondary }}>
+            Разные ниши — один движок: прокат, мотосервис, салон, электрик, ивенты. Каждый экипаж получает собственный бренд, каталог и бота.
+          </p>
+          <div className="mt-8">
+            <PartnerLogoGrid
+              partners={CREW_PARTNERS.filter((p) => p.href !== `/${slug}`)}
+              accent={pal.accentMain}
+              columns={5}
+              ariaLabel="Витрины партнёров платформы SLY13"
+            />
           </div>
         </div>
       </section>
@@ -670,6 +813,14 @@ export default function CrewLandingClient({
           />
         </div>
       </footer>
+
+      {/* Working CTA-форма (task205) — открытие по [data-lead-modal-open]. */}
+      <CrewLeadModal
+        slug={slug}
+        name={name}
+        accent={pal.accentMain}
+        accentSoft={pal.accentMainHover}
+      />
     </main>
   );
 }
