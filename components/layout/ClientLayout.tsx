@@ -215,6 +215,20 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true, // Secret page — no chat, no nav, just the gift
   },
+  // PATCH: crewLandings theme (2026-11-23, task202) — верхнеуровневые лендинги
+  // зелёных экипажей лид-листа (/renta-car, /motoprokat1, /snowmobile-nn,
+  // /snegoprokat-nn; босс: «create landings … like /salavey13 or /renta-car»).
+  // Один общий data-driven компонент CrewLandingClient (контент из
+  // crews.metadata + каталог через getFranchizeBySlug); палитра у каждого своя
+  // из БД. Собственные nav+footer — svarprofi/sly13/leorus pattern.
+  crewLandings: {
+    paths: ["/renta-car", "/motoprokat1", "/snowmobile-nn", "/snegoprokat-nn"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
