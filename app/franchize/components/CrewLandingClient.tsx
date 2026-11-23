@@ -23,6 +23,25 @@
 // компонент без "use client": анимации — чистый CSS (<style> + keyframes,
 // prefers-reduced-motion гейт), ноль клиентского JS, быстрый LCP.
 //
+// task206 (босс: «continue polishing landings, adaptivity, content — take a
+// look at different subpage franchize links for main menu, header menu,
+// footer set of social links — insert subpages applicable; investigate gap vs
+// gold standard /moto-selection, apply corrections»):
+//  · Nav 6 пунктов как у эталона (moto-selection NAV_LINKS): +Партнёры,
+//    +Хранение (подстраница /franchize/{slug}/storage — мото/снегоходным
+//    экипажам; у автопроката хранение не услуга).
+//  · Mobile nav: якоря горизонтальным скроллом под шапкой (lg:hidden) —
+//    бургер не нужен, одностраничник.
+//  · Header: Telegram-иконка (бот экипажа) рядом с телефоном — ДНК
+//    moto-selection t228 rightside.
+//  · Footer 4 колонки: бренд / контакты+соцряд (Telegram-бот, WhatsApp по
+//    primary_phone — механика moto-selection WHATSAPP_HREF, менеджер
+//    @salavey13) / Разделы (подстраницы витрины: каталог, контакты, стена
+//    хранения) / платформа+копирайт. Только реальные каналы — не выдумываем
+//    VK/Instagram у экипажей, у которых их нет.
+//  · Секция «Сезонное хранение техники» + бренд-тикер (ДНК MsBrandTicker)
+//    перед партнёрами.
+//
 // task205 (босс: «polish landings once more, make working CTAs like
 // moto-selection form, make sure everything is properly interlinked via
 // "partners" sections on landings; more compressed pictures»):
@@ -59,7 +78,7 @@ import PartnerLogoGrid, {
   type PartnerLogoItem,
 } from "@/components/landing/PartnerLogoGrid";
 import CrewLeadModal from "./CrewLeadModal";
-import { ArrowRight, Check, Clock3, MapPin, Phone, Send } from "lucide-react";
+import { ArrowRight, Check, Clock3, MapPin, MessageCircle, Phone, Send } from "lucide-react";
 
 const FALLBACK_PALETTE = {
   bgBase: "#0B1220",
@@ -262,6 +281,21 @@ export default function CrewLandingClient({
 
   const deeplink = `https://t.me/${botUsername}/app?startapp=crew_${slug}`;
   const vitrineHref = `/franchize/${slug}`;
+  // Подстраницы витрины франшизы (task206; босс: «take a look at different
+  // subpage franchize links for main menu, header menu, footer set of social
+  // links — use these list appropriately»). Публичные (проверено 200 на
+  // проде): /franchize/{slug} (каталог), /contacts, /storage (стена хранения,
+  // deeplink storage_<slug> маршрутизируется use-start-param-target.ts:321).
+  const contactsHref = `/franchize/${slug}/contacts`;
+  const storageHref = `/franchize/${slug}/storage`;
+  const storageDeep = `https://t.me/${botUsername}/app?startapp=storage_${slug}`;
+  // Соцряд — только из реальных данных экипажа (WhatsApp механика по
+  // primary_phone, как у moto-selection WHATSAPP_HREF = wa.me/<digits>).
+  const phoneDigits = phone.replace(/\D/g, "");
+  const whatsappHref = `https://wa.me/${phoneDigits}`;
+  // Хранение — услуга мото/снегоходных экипажей (сезонная техника); у
+  // автопроката не услуга, пункты nav/footer для него не рисуем.
+  const storageEnabled = ["motoprokat1", "snowmobile-nn", "snegoprokat-nn"].includes(slug);
 
   const catalog = (items ?? []).filter((i) => i.title);
   const showcase = catalog.slice(0, 12);
@@ -300,10 +334,13 @@ export default function CrewLandingClient({
     },
   ];
 
+  // Порядок и состав как у эталона (moto-selection NAV_LINKS: 6 пунктов).
   const navLinks = [
     { href: "#catalog", label: "Каталог" },
     { href: "#how", label: "Как проходит аренда" },
+    ...(storageEnabled ? [{ href: storageHref, label: "Хранение" }] : []),
     { href: "#platform", label: "Платформа" },
+    { href: "#partners", label: "Партнёры" },
     { href: "#contacts", label: "Контакты" },
   ];
 
@@ -406,8 +443,19 @@ export default function CrewLandingClient({
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 lg:ml-0">
+            {/* соцряд в шапке — ДНК moto-selection (t228 rightside: Telegram +
+                телефон): Telegram-бот экипажа иконкой, телефон текстом */}
             <a
-              href={`tel:${phone.replace(/[^+\d]/g, "")}`}
+              href={deeplink}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Telegram-бот экипажа"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-white transition hover:bg-white/15"
+            >
+              <Send className="h-4 w-4" aria-hidden />
+            </a>
+            <a
+              href={`tel:${phoneDigits}`}
               className="hidden items-center gap-1.5 text-sm font-bold text-white transition hover:opacity-90 sm:inline-flex"
             >
               <Phone className="h-4 w-4 text-black/60" aria-hidden />
@@ -423,6 +471,23 @@ export default function CrewLandingClient({
             </button>
           </div>
         </div>
+        {/* mobile nav (task206): якоря горизонтальным скроллом под шапкой —
+            одностраничник, бургер не нужен; скрыт скроллбар, тап без зацепов */}
+        <nav
+          aria-label="Мобильная навигация"
+          className="flex items-center gap-5 overflow-x-auto px-4 pb-2.5 pt-1.5 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.22)" }}
+        >
+          {navLinks.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-white/85 transition hover:text-white"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
       </header>
 
       {/* ── HERO ── ДНК moto-selection:413: min-h-[92svh], ken-burns фото,
@@ -732,6 +797,72 @@ export default function CrewLandingClient({
         </div>
       </section>
 
+      {/* ── ХРАНЕНИЕ ── подстраница витрины (task206): стена хранения
+          /franchize/{slug}/storage + deeplink storage_<slug> (fast path до
+          auth-гейта). Только мото/снегоходные экипажи — у автопроката
+          хранение не услуга. */}
+      {storageEnabled && (
+        <section
+          id="storage"
+          className="relative scroll-mt-20 overflow-hidden border-t px-4 py-16 sm:px-6 sm:py-20"
+          style={{ borderColor: pal.borderSoft }}
+        >
+          <GhostWord word="хранение" pal={pal} />
+          <div className="relative mx-auto w-full max-w-7xl">
+            <p className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: pal.accentMain }}>
+              Межсезонье
+            </p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-black tracking-tight md:text-5xl">
+              Сезонное хранение техники
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed md:text-base" style={{ color: pal.textSecondary }}>
+              Каждая единица на хранении — юнит в витрине экипажа: статус, фото и история обслуживания. Запись на консервацию и выдачу — в один тап: на стене хранения или в Telegram-боте.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {vitrineBtn("Стена хранения")}
+              <a
+                href={storageDeep}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl border px-6 py-3.5 text-sm font-bold backdrop-blur-sm transition-colors hover:bg-white/5"
+                style={{
+                  borderColor: accentBorder,
+                  color: pal.textPrimary,
+                }}
+              >
+                <Send className="h-4 w-4" style={{ color: pal.accentMain }} aria-hidden />
+                Хранение в Telegram
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── БРЕНД-ТИКЕР ── ДНК moto-selection (MsBrandTicker): акцентная
+          бегущая строка перед партнёрами; CSS marquee уже заведён. */}
+      <div
+        aria-hidden
+        className="overflow-hidden border-t py-3"
+        style={{ backgroundColor: pal.accentMain, borderColor: pal.borderSoft }}
+      >
+        <div
+          className="crew-marquee-track flex w-max items-center gap-10 whitespace-nowrap pr-10"
+          style={{ animation: "crewMarquee 22s linear infinite" }}
+        >
+          {Array.from({ length: 16 }, (_, i) => (
+            <span
+              key={i}
+              className="flex items-center gap-10 text-sm font-black uppercase tracking-[0.28em] text-white"
+            >
+              {name}
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/70" />
+              SLY13 PLATFORM
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/70" />
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* ── ПАРТНЁРЫ ── сквозной PartnerLogoGrid (task205): все витрины
           экосистемы ссылаются друг на друга — лого в покое, название+
           тэглайн на hover/долгом тапе. Сам экипаж из сетки убран. */}
@@ -760,7 +891,7 @@ export default function CrewLandingClient({
       {/* ── FOOTER + GhostWordmark ── бренд-вордмарк на всю ширину (тот же
           компонент, что у moto-selection — SVG textLength гарантирует фит). */}
       <footer id="contacts" className="border-t" style={{ borderColor: pal.borderSoft }}>
-        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-3">
+        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="flex items-center gap-2.5 text-base font-black">
               {logoUrl && (
@@ -776,7 +907,7 @@ export default function CrewLandingClient({
           <div className="space-y-2.5 text-sm" style={{ color: pal.textSecondary }}>
             <p className="inline-flex items-center gap-2">
               <Phone className="h-4 w-4" aria-hidden />
-              <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+              <a href={`tel:${phoneDigits}`} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
                 {phone}
               </a>
             </p>
@@ -790,14 +921,65 @@ export default function CrewLandingClient({
                 {workingHours}
               </p>
             )}
-            <p className="inline-flex items-center gap-2">
-              <Send className="h-4 w-4" aria-hidden />
-              <a href={deeplink} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
-                Telegram-бот экипажа
+            {/* соцряд (task206) — ДНК moto-selection footer: только реальные
+                каналы экипажа — бот, WhatsApp по номеру, менеджер */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <a
+                href={deeplink}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Telegram-бот экипажа"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border transition hover:bg-white/5"
+                style={{ borderColor: pal.borderSoft, color: pal.accentMain }}
+              >
+                <Send className="h-4 w-4" aria-hidden />
               </a>
-            </p>
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border transition hover:bg-white/5"
+                style={{ borderColor: pal.borderSoft, color: pal.accentMain }}
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden />
+              </a>
+              <span className="text-xs" style={{ color: pal.textSecondary }}>
+                менеджер · {isLive ? "@salavey13" : ""}
+              </span>
+            </div>
           </div>
-          <div className="text-sm md:text-right" style={{ color: pal.textSecondary }}>
+          {/* Разделы (task206) — подстраницы витрины франшизы */}
+          <div className="text-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: pal.textSecondary }}>
+              Разделы
+            </p>
+            <ul className="mt-3 space-y-2">
+              <li>
+                <a href={vitrineHref} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Каталог витрины
+                </a>
+              </li>
+              <li>
+                <a href={contactsHref} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Контакты
+                </a>
+              </li>
+              {storageEnabled && (
+                <li>
+                  <a href={storageHref} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                    Стена хранения
+                  </a>
+                </li>
+              )}
+              <li>
+                <a href="#partners" className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Партнёры платформы
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div className="text-sm lg:text-right" style={{ color: pal.textSecondary }}>
             <p>
               Работает на платформе{" "}
               <a
