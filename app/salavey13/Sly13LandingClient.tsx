@@ -453,6 +453,17 @@ const PARTNER_LOGOS = [
     backing: "#eef1f6",
     lightBacking: true,
   },
+  // task207: демо-вертикаль «аренда квартир» — платформа не привязана к
+  // технике; та же цепочка каталог→бронь→договор работает на жилом фонде.
+  {
+    href: "/renta-flat",
+    title: "Рента-Флэт НН",
+    tagline: "аренда квартир посуточно — демо-вертикаль за пределы техники",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+    logoAlt: "Рента-Флэт НН",
+    backing: "#eef1f6",
+    lightBacking: true,
+  },
 ];
 
 const TICKER = [
@@ -790,6 +801,26 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   style={{ color: p.textSecondary }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = p.accentMain)}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "")}
+                >
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+            {/* task207: mobile nav — горизонтальный скролл-ряд якорей под
+                шапкой (md:hidden; тот же паттерн, что у зелёных лендингов
+                CrewLandingClient). 10 якорей с desktоп-меню иначе
+                недостижимы на мобиле. */}
+            <nav
+              aria-label="Мобильная навигация"
+              className="absolute inset-x-0 top-full hidden items-center gap-5 overflow-x-auto px-4 pb-2.5 pt-1.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+              style={{ borderTop: `1px solid ${p.borderSoft}`, background: `${p.bgBase}E6` }}
+            >
+              {NAV_LINKS.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className="whitespace-nowrap font-jb text-[11px] font-semibold uppercase tracking-[0.12em]"
+                  style={{ color: p.textSecondary }}
                 >
                   {l.label}
                 </a>

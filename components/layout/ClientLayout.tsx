@@ -222,7 +222,10 @@ const THEME_CONFIG = {
   // crews.metadata + каталог через getFranchizeBySlug); палитра у каждого своя
   // из БД. Собственные nav+footer — svarprofi/sly13/leorus pattern.
   crewLandings: {
-    paths: ["/renta-car", "/motoprokat1", "/snowmobile-nn", "/snegoprokat-nn"],
+    // task207: + /renta-flat — демо-витрина «аренда квартир» (вертикальное
+    // расширение платформы за пределы техники; босс: «create demo crew with
+    // 5 item catalogue set for "аренда квартир" theme»).
+    paths: ["/renta-car", "/motoprokat1", "/snowmobile-nn", "/snegoprokat-nn", "/renta-flat"],
     Header: null,           // landing renders its own nav
     Footer: null,           // landing renders its own footer
     BottomNav: null,

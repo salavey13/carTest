@@ -174,6 +174,14 @@ const CREW_PARTNERS: PartnerLogoItem[] = [
     tagline: "аренда электромото в Нижнем Новгороде — флагман платформы",
     logoSrc: "/leorus/partner-vipbike.png",
   },
+  // task207: демо-вертикаль «аренда квартир» — та же цепочка
+  // каталог→бронь→договор работает за пределами техники.
+  {
+    href: "/renta-flat",
+    title: "Рента-Флэт НН",
+    tagline: "аренда квартир посуточно — демо-вертикаль за пределы техники",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+  },
 ];
 
 /** Подписной контент экипажа, который нельзя вытащить из crews.metadata. */
@@ -281,13 +289,17 @@ export default function CrewLandingClient({
 
   const deeplink = `https://t.me/${botUsername}/app?startapp=crew_${slug}`;
   const vitrineHref = `/franchize/${slug}`;
-  // Подстраницы витрины франшизы (task206; босс: «take a look at different
-  // subpage franchize links for main menu, header menu, footer set of social
-  // links — use these list appropriately»). Публичные (проверено 200 на
-  // проде): /franchize/{slug} (каталог), /contacts, /storage (стена хранения,
-  // deeplink storage_<slug> маршрутизируется use-start-param-target.ts:321).
-  const contactsHref = `/franchize/${slug}/contacts`;
-  const storageHref = `/franchize/${slug}/storage`;
+  // task207: подстраницы витрины (босс: «add more links to crew main menus
+  // for franchize subpages»). Все URL проверены 200 на проде 2026-11-23:
+  // /{slug}, /about, /community, /configurator, /equipment, /wheel, /parts,
+  // /contacts, /storage, /season-stats, /calc-explainer. В nav — суть
+  // арендного бизнеса (каталог/хранение/платформа/партнёры/контакты),
+  // в footer «Разделы» — расширенный набор. task206: /contacts, /storage
+  // (стена хранения; deeplink storage_<slug> маршрутизируется
+  // use-start-param-target.ts:321).
+  const subpage = (p: string) => `/franchize/${slug}${p ? `/${p}` : ""}`;
+  const contactsHref = subpage("contacts");
+  const storageHref = subpage("storage");
   const storageDeep = `https://t.me/${botUsername}/app?startapp=storage_${slug}`;
   // Соцряд — только из реальных данных экипажа (WhatsApp механика по
   // primary_phone, как у moto-selection WHATSAPP_HREF = wa.me/<digits>).
@@ -338,7 +350,7 @@ export default function CrewLandingClient({
   const navLinks = [
     { href: "#catalog", label: "Каталог" },
     { href: "#how", label: "Как проходит аренда" },
-    ...(storageEnabled ? [{ href: storageHref, label: "Хранение" }] : []),
+    ...(storageEnabled ? [{ href: subpage("storage"), label: "Хранение" }] : []),
     { href: "#platform", label: "Платформа" },
     { href: "#partners", label: "Партнёры" },
     { href: "#contacts", label: "Контакты" },
@@ -515,11 +527,17 @@ export default function CrewLandingClient({
               }}
             />
           )}
-          {/* скрим 1: подушка под типографику */}
+          {/* скрим 1: подушка под типографику. task207: усилен контраст
+              заголовка — на светлых фото (белые авто, светлые интерьеры
+              квартир) старая кривая (0.82→0.28 на 34%→62%) оставляла
+              правый край H1/подзаголовка на почти чистом фото. Теперь
+              непрозрачность держится до 55% и гасится только к правому
+              краю, поверх — читабельная тень для гарантированного
+              separation от белых объектов. */}
           <div
             className="absolute inset-0"
             style={{
-              background: `linear-gradient(100deg, ${withAlpha(pal.bgBase, 0.94)} 0%, ${withAlpha(pal.bgBase, 0.82)} 34%, ${withAlpha(pal.bgBase, 0.28)} 62%, ${withAlpha(pal.bgBase, 0.5)} 100%)`,
+              background: `linear-gradient(100deg, ${withAlpha(pal.bgBase, 0.96)} 0%, ${withAlpha(pal.bgBase, 0.9)} 40%, ${withAlpha(pal.bgBase, 0.55)} 62%, ${withAlpha(pal.bgBase, 0.42)} 100%)`,
             }}
           />
           {/* скрим 2: акцентный радиальный глушитель */}
@@ -543,13 +561,18 @@ export default function CrewLandingClient({
           >
             Витрина на платформе SLY13
           </p>
-          <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[1.02] tracking-tight sm:text-6xl md:text-7xl">
+          {/* task207: текст-тень (0/60% blur 18) — гарантированный separation
+              светлой типографики от белых объектов фото при любом паттерне
+              скрима; дублирует подход эталона (moto-selection H1). */}
+          <h1
+            className="mt-5 max-w-4xl text-5xl font-black leading-[1.02] tracking-tight [text-shadow:0_2px_18px_rgba(0,0,0,0.6)] sm:text-6xl md:text-7xl"
+          >
             {name}
           </h1>
-          <p className="mt-5 max-w-2xl text-xl font-medium leading-relaxed text-white/90 md:text-2xl">
+          <p className="mt-5 max-w-2xl text-xl font-medium leading-relaxed text-white/95 [text-shadow:0_1px_12px_rgba(0,0,0,0.5)] md:text-2xl">
             {tagline}
           </p>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/70">
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.45)]">
             {copy.hookLine}
           </p>
 
@@ -582,8 +605,8 @@ export default function CrewLandingClient({
           <dl className="mt-12 grid max-w-3xl grid-cols-3 gap-4 border-t pt-6" style={{ borderColor: withAlpha(pal.textPrimary, 0.16) }}>
             {stats.map((s) => (
               <div key={s.label}>
-                <dt className="text-2xl font-black tracking-tight md:text-3xl">{s.value}</dt>
-                <dd className="mt-1 text-xs leading-snug text-white/60 md:text-sm">{s.label}</dd>
+                <dt className="text-2xl font-black tracking-tight [text-shadow:0_1px_12px_rgba(0,0,0,0.55)] md:text-3xl">{s.value}</dt>
+                <dd className="mt-1 text-xs leading-snug text-white/75 [text-shadow:0_1px_8px_rgba(0,0,0,0.5)] md:text-sm">{s.label}</dd>
               </div>
             ))}
           </dl>
@@ -949,7 +972,9 @@ export default function CrewLandingClient({
               </span>
             </div>
           </div>
-          {/* Разделы (task206) — подстраницы витрины франшизы */}
+          {/* Разделы (task207) — расширенный набор подстраниц витрины
+              (все 200 на проде): каталог, запчасти, о экипаже, хранение,
+              комьюнити, сезонная статистика, контакты, партнёры. */}
           <div className="text-sm">
             <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: pal.textSecondary }}>
               Разделы
@@ -960,18 +985,38 @@ export default function CrewLandingClient({
                   Каталог витрины
                 </a>
               </li>
+              {storageEnabled && (
+                <li>
+                  <a href={subpage("storage")} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                    Стена хранения
+                  </a>
+                </li>
+              )}
+              <li>
+                <a href={subpage("parts")} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Запчасти и шины
+                </a>
+              </li>
+              <li>
+                <a href={subpage("about")} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Об экипаже
+                </a>
+              </li>
+              <li>
+                <a href={subpage("community")} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Комьюнити
+                </a>
+              </li>
+              <li>
+                <a href={subpage("season-stats")} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
+                  Сезонная статистика
+                </a>
+              </li>
               <li>
                 <a href={contactsHref} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
                   Контакты
                 </a>
               </li>
-              {storageEnabled && (
-                <li>
-                  <a href={storageHref} className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
-                    Стена хранения
-                  </a>
-                </li>
-              )}
               <li>
                 <a href="#partners" className="font-semibold hover:underline" style={{ color: pal.textPrimary }}>
                   Партнёры платформы

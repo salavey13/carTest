@@ -1147,6 +1147,18 @@ export default function MotoSelectionLanding() {
                 backing: "#eef1f6",
                 lightBacking: true,
               },
+              // task207: демо-вертикаль «аренда квартир» — платформа не
+              // привязана к технике; та же цепочка каталог→бронь→договор
+              // работает и на жилом фонде.
+              {
+                href: "/renta-flat",
+                title: "Рента-Флэт НН",
+                tagline: "аренда квартир посуточно — демо-вертикаль за пределы техники",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+                logoAlt: "Рента-Флэт НН",
+                backing: "#eef1f6",
+                lightBacking: true,
+              },
             ]}
           />
         </div>
@@ -1328,6 +1340,28 @@ export default function MotoSelectionLanding() {
                 <a key={l.href} href={l.href} className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold text-white/60 transition hover:border-[var(--ms-accent)]/60 hover:text-white">
                   {l.label}
                 </a>
+              ))}
+            </div>
+            {/* task207: разделы витрины экипажа (босс: «add more links to
+                crew main menus for franchize subpages») — все URL 200 на
+                проде: каталог/запчасти/об экипаже/хранение/статистика. */}
+            <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#707070]">разделы витрины</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                { href: "/franchize/moto-selection?mode=service", label: "Каталог" },
+                { href: "/franchize/moto-selection/parts", label: "Запчасти" },
+                { href: "/franchize/moto-selection/about", label: "Об экипаже" },
+                { href: "/franchize/moto-selection/storage", label: "Хранение" },
+                { href: "/franchize/moto-selection/season-stats", label: "Статистика" },
+                { href: "/franchize/moto-selection/contacts", label: "Контакты" },
+              ].map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold text-white/60 transition hover:border-[var(--ms-accent)]/60 hover:text-white"
+                >
+                  {l.label}
+                </Link>
               ))}
             </div>
           </div>
