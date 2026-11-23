@@ -287,6 +287,14 @@ const getThemeForPath = (pathname: string) => {
   if (pathname.startsWith("/mototehnn")) {
     return THEME_CONFIG.mototehnn;
   }
+  // PATCH (task204): crewLandings существовали в THEME_CONFIG с task202, но
+  // сам резолвер про них не знал — срабатывала default-тема: BikeHeader/
+  // BikeFooter/BottomNavigationBike монтировались поверх собственных nav+
+  // footer лендингов. Босс: «disable default header/footer like it's disabled
+  // on moto-selection». Ресолвим явно — svarprofi/motoSelection pattern.
+  if (THEME_CONFIG.crewLandings.paths.some((p) => pathname.startsWith(p))) {
+    return THEME_CONFIG.crewLandings;
+  }
   if (pathname.startsWith("/gift/roman")) {
     return THEME_CONFIG.romanGift;
   }
