@@ -763,7 +763,8 @@ export default function GeorgElectroLanding() {
                   tagline: "автопрокат в Нижнем — подача бесплатно, круглосуточно",
                   logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-car-logo.png",
                   logoAlt: "Рента-Кар НН",
-                  backing: "#0b0f14",
+                  backing: "#eef1f6",
+                  lightBacking: true,
                 },
                 {
                   href: "/motoprokat1",
@@ -771,7 +772,8 @@ export default function GeorgElectroLanding() {
                   tagline: "мотопрокат — от BMW до Ducati, бронь в Telegram",
                   logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motoprokat1-logo.png",
                   logoAlt: "МотоПрокат1",
-                  backing: "#0b0f14",
+                  backing: "#eef1f6",
+                  lightBacking: true,
                 },
                 {
                   href: "/snowmobile-nn",
@@ -779,7 +781,8 @@ export default function GeorgElectroLanding() {
                   tagline: "снегоходы — катания и обучение, бронь в Telegram",
                   logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snowmobile-nn-logo.png",
                   logoAlt: "Snowmobile NN",
-                  backing: "#0b0f14",
+                  backing: "#eef1f6",
+                  lightBacking: true,
                 },
                 {
                   href: "/snegoprokat-nn",
@@ -787,7 +790,8 @@ export default function GeorgElectroLanding() {
                   tagline: "снегоходы — одиночные и тандемные катания",
                   logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snegoprokat-nn-logo.png",
                   logoAlt: "СнегоПрокат НН",
-                  backing: "#0b0f14",
+                  backing: "#eef1f6",
+                  lightBacking: true,
                 },
               ]}
             />

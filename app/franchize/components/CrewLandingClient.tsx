@@ -99,6 +99,10 @@ const CREW_PARTNERS: PartnerLogoItem[] = [
     tagline: "автопрокат в Нижнем — подача бесплатно, круглосуточно",
     logoSrc:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-car-logo.png",
+    // Лого зелёных — тёмный арт на прозрачном PNG: на светлой подложке
+    // (паттерн moto-selection/mototehnn карточек) читаются, на тёмной гаснут.
+    backing: "#eef1f6",
+    lightBacking: true,
   },
   {
     href: "/motoprokat1",
@@ -106,6 +110,8 @@ const CREW_PARTNERS: PartnerLogoItem[] = [
     tagline: "мотопрокат — от BMW до Ducati, бронь в Telegram",
     logoSrc:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motoprokat1-logo.png",
+    backing: "#eef1f6",
+    lightBacking: true,
   },
   {
     href: "/snowmobile-nn",
@@ -113,6 +119,8 @@ const CREW_PARTNERS: PartnerLogoItem[] = [
     tagline: "снегоходы — катания и обучение, бронь в Telegram",
     logoSrc:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snowmobile-nn-logo.png",
+    backing: "#eef1f6",
+    lightBacking: true,
   },
   {
     href: "/snegoprokat-nn",
@@ -120,6 +128,8 @@ const CREW_PARTNERS: PartnerLogoItem[] = [
     tagline: "снегоходы — одиночные и тандемные катания",
     logoSrc:
       "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snegoprokat-nn-logo.png",
+    backing: "#eef1f6",
+    lightBacking: true,
   },
   {
     href: "/mototehnn",
