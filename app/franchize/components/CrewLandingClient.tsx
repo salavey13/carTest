@@ -153,13 +153,19 @@ export default function CrewLandingClient({
 
   const catalog = (items ?? []).filter((i) => i.title);
   const showcase = catalog.slice(0, 12);
-  // Hero — флагман каталога: фото самой дорогой позиции (у Рента-Кар это
-  // Camry/K5, у МотоПроката — литр-байки; первый по списку оказался задком
-  // самой дешёвой Гранты — не лицо витрины). Fallback — первая с фото.
+  // Hero — флагман каталога: фото самой дорогой позиции. У зелёных экипажей
+  // daily_price NULL (цены текстом в specs.rent_price_label, task200), поэтому
+  // парсим первое число из лейбла; нечисловая цена = 0. Первый по списку был
+  // задком дешёвой Гранты — не лицо витрины.
+  const heroPrice = (i: CatalogItemVM) => {
+    if (i.pricePerDay > 0) return i.pricePerDay;
+    const m = (i.rentPriceLabel || "").match(/\d[\d\s\xA0]{2,}/);
+    return m ? parseInt(m[0].replace(/[\s\xA0]/g, ""), 10) || 0 : 0;
+  };
   const heroItem =
     [...catalog]
-      .filter((i) => i.imageUrl && i.pricePerDay > 0)
-      .sort((a, b) => b.pricePerDay - a.pricePerDay)[0] ||
+      .filter((i) => i.imageUrl)
+      .sort((a, b) => heroPrice(b) - heroPrice(a))[0] ||
     catalog.find((i) => i.imageUrl) ||
     catalog[0];
   const heroImage = heroItem?.imageUrl || "";
