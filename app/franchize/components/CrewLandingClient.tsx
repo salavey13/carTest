@@ -53,6 +53,8 @@ export interface CrewLandingCopy {
   hookLine: string;
   /** Платформенные пункты «что добавляет платформа» (без приватных цифр). */
   features: string[];
+  /** id позиции для hero-фона («лицо витрины»). Не задан — первый с фото. */
+  heroItemId?: string;
 }
 
 export interface CrewLandingFallback {
@@ -153,19 +155,12 @@ export default function CrewLandingClient({
 
   const catalog = (items ?? []).filter((i) => i.title);
   const showcase = catalog.slice(0, 12);
-  // Hero — флагман каталога: фото самой дорогой позиции. У зелёных экипажей
-  // daily_price NULL (цены текстом в specs.rent_price_label, task200), поэтому
-  // парсим первое число из лейбла; нечисловая цена = 0. Первый по списку был
-  // задком дешёвой Гранты — не лицо витрины.
-  const heroPrice = (i: CatalogItemVM) => {
-    if (i.pricePerDay > 0) return i.pricePerDay;
-    const m = (i.rentPriceLabel || "").match(/\d[\d\s\xA0]{2,}/);
-    return m ? parseInt(m[0].replace(/[\s\xA0]/g, ""), 10) || 0 : 0;
-  };
+  // Hero — «лицо витрины»: copy.heroItemId (явный выбор экипажа) или первая
+  // позиция с фото. Числовой «флагман» не работает у зелёных экипажей: цены
+  // в БД сознательно не выставлены (price_note «Цена по тарифной сетке»,
+  // task200) — все daily_price NULL, лейблы «0 ₽ / день».
   const heroItem =
-    [...catalog]
-      .filter((i) => i.imageUrl)
-      .sort((a, b) => heroPrice(b) - heroPrice(a))[0] ||
+    (copy.heroItemId && catalog.find((i) => i.id === copy.heroItemId && i.imageUrl)) ||
     catalog.find((i) => i.imageUrl) ||
     catalog[0];
   const heroImage = heroItem?.imageUrl || "";
