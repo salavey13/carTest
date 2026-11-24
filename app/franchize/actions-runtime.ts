@@ -999,7 +999,24 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         menuLinks,
       },
       contacts: {
-        phone: readPath(franchize, ["contacts", "phone"], readPath(franchize, ["footer", "phone"], "")),
+        // task208: fallback к корню metadata для частичных гидраций.
+        // menuLinks-hydration task207b («vip-bike standard») создала у зелёных
+        // экипажей частичный metadata.franchize {contacts,header,version} —
+        // реальные контакты (шейп task200) остались в КОРНЕ metadata:
+        // contacts.primary_phone / contacts.working_hours (snake_case). Без
+        // этого фолбэка VM резолвил пустые phone/workingHours: лендинги
+        // рисовали стат «онлайн» вместо часов, а витринная подстраница
+        // /franchize/{slug}/contacts — вообще без телефона. Полный шейп
+        // (vip-bike, renta-flat) не затронут: вложенное значение приоритетно.
+        phone: readPath(
+          franchize,
+          ["contacts", "phone"],
+          readPath(
+            franchize,
+            ["footer", "phone"],
+            readPath(metadata, ["contacts", "primary_phone"], ""),
+          ),
+        ),
         email: readPath(franchize, ["contacts", "email"], readPath(franchize, ["footer", "email"], "")),
         address: readPath(
           franchize,
@@ -1008,7 +1025,11 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         ),
         telegram: readPath(franchize, ["contacts", "telegram"], ""),
         telegramBotUsername: readPath(franchize, ["contacts", "telegramBotUsername"], ""),
-        workingHours: readPath(franchize, ["contacts", "workingHours"], ""),
+        workingHours: readPath(
+          franchize,
+          ["contacts", "workingHours"],
+          readPath(metadata, ["contacts", "working_hours"], ""),
+        ),
         map: {
           gps: readPath(franchize, ["contacts", "map", "gps"], ""),
           publicTransport: readPath(franchize, ["contacts", "map", "publicTransport"], ""),
