@@ -10,6 +10,9 @@
 // + подавление хрома в ClientLayout THEME_CONFIG.crewLandings; контент
 // data-driven из crews.metadata (палитра/контакты/CTA/чеклист) + каталог
 // public.cars через getFranchizeBySlug. Уникальное — только COPY.
+//
+// task208: metadata → crewLandingMetadata (canonical + og:image евроремонта
+// + twitter/VK-карточки); JSON-LD @type VacationRental (schema.org).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -18,24 +21,26 @@ import CrewLandingClient, {
   type CrewLandingCopy,
   type CrewLandingFallback,
 } from "@/app/franchize/components/CrewLandingClient";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "renta-flat",
+  siteName: "Рента-Флэт НН · SLY13",
   title: "Рента-Флэт НН — аренда квартир посуточно в Нижнем Новгороде · SLY13",
   description:
     "Аренда квартир в Нижнем Новгороде посуточно и на месяц: студии от 2 400 ₽, 1-2-комнатные, пентхаус-лофт. Онлайн-заявка, договор брони и заезд по QR — на витрине и в Telegram-боте.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "Рента-Флэт НН · SLY13",
-    title: "Рента-Флэт НН — аренда квартир посуточно",
-    description:
-      "Студии от 2 400 ₽, 1-2-комнатные, пентхаус-лофт. Бронь — на витрине или в Telegram, договор брони генерируется автоматически.",
-  },
-};
+  ogTitle: "Рента-Флэт НН — аренда квартир посуточно",
+  ogDescription:
+    "Студии от 2 400 ₽, 1-2-комнатные, пентхаус-лофт. Бронь — на витрине или в Telegram, договор брони генерируется автоматически.",
+  ogImage:
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/renta-flat-2k-euro.jpg",
+  ogImageAlt: "2-комнатная квартира евроремонта — Рента-Флэт НН",
+});
 
 const COPY: CrewLandingCopy = {
   heroItemId: "renta-flat-2k-euro",
+  // task208: schema.org @type для JSON-LD — посуточная аренда жилья.
+  schemaType: "VacationRental",
   hookLine:
     "Демо-витрина аренды квартир на платформе SLY13: каталог с фото и метражом, онлайн-бронь и договор — как в технике, но для жилого фонда.",
   features: [

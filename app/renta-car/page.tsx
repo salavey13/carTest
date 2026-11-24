@@ -10,6 +10,9 @@
 // getFranchizeBySlug (memoized, emptyCrew при сбое БД → фолбэк-карточка).
 // Уникальное здесь — только COPY (платформенные пункты из пича task200 v2:
 // формальный тон, оплата = нал/перевод флагом, без «онлайн-оплаты при брони»).
+//
+// task208: metadata → crewLandingMetadata (canonical + og:image hero-фото
+// Camry + twitter/VK-карточки); JSON-LD @type AutoRental (schema.org).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -18,26 +21,28 @@ import CrewLandingClient, {
   type CrewLandingCopy,
   type CrewLandingFallback,
 } from "@/app/franchize/components/CrewLandingClient";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "renta-car",
+  siteName: "Рента-Кар НН · SLY13",
   title: "Рента-Кар НН — аренда авто без водителя в Нижнем Новгороде · SLY13",
   description:
     "Аренда автомобилей в Нижнем Новгороде без водителя: эконом и комфорт класс, посуточно и на месяц. Подача по адресу бесплатно, круглосуточно. Каталог, тарифные ступени и бронирование — на витрине и в Telegram-боте.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "Рента-Кар НН · SLY13",
-    title: "Рента-Кар НН — аренда авто без водителя",
-    description:
-      "Подача по адресу бесплатно, круглосуточно. Тарифы 1–3 дня, 4–7 дней, 8–30 дней, уикэнд. Бронь — на витрине или в Telegram.",
-  },
-};
+  ogTitle: "Рента-Кар НН — аренда авто без водителя",
+  ogDescription:
+    "Подача по адресу бесплатно, круглосуточно. Тарифы 1–3 дня, 4–7 дней, 8–30 дней, уикэнд. Бронь — на витрине или в Telegram.",
+  ogImage:
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/renta-car-camry/image_1.jpg",
+  ogImageAlt: "Toyota Camry — витринный автомобиль Рента-Кар НН",
+});
 
 const COPY: CrewLandingCopy = {
   // «Лицо витрины»: синяя Camry — самый витринный кадр парка (task204; цены
   // в БД сознательно не выставлены, числовой «флагман» тут не определим).
   heroItemId: "renta-car-camry",
+  // task208: schema.org @type для JSON-LD — автопрокат.
+  schemaType: "AutoRental",
   hookLine:
     "Витрина Рента-Кар НН на платформе SLY13: каталог, тарифные ступени и оформление заявки — в одном интерфейсе, без телефонных согласований.",
   features: [

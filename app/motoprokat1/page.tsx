@@ -5,6 +5,9 @@
 // Паттерн и механика — в шапке app/franchize/components/CrewLandingClient.tsx.
 // Уникальное здесь — только COPY (пич task200 v2: «бронь без денег» = заявка
 // фиксируется в боте; без ограничения по пробегу; ремонт — в каталоге).
+//
+// task208: metadata → crewLandingMetadata (canonical + og:image флагмана
+// парка BMW S1000R + twitter/VK-карточки); JSON-LD @type LocalBusiness.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -13,21 +16,22 @@ import CrewLandingClient, {
   type CrewLandingCopy,
   type CrewLandingFallback,
 } from "@/app/franchize/components/CrewLandingClient";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "motoprokat1",
+  siteName: "МотоПрокат №1 СПб · SLY13",
   title: "МотоПрокат №1 СПб — прокат мотоциклов без ограничения по пробегу · SLY13",
   description:
     "Аренда и прокат мотоциклов в Санкт-Петербурге: нейкеды, спортбайки, туреры и нео-ретро (BMW, Yamaha, Kawasaki, Ducati). Без ограничения по пробегу, полный бак и чистый байк на выдаче. Каталог и бронирование — на витрине и в Telegram-боте.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "МотоПрокат №1 СПб · SLY13",
-    title: "МотоПрокат №1 СПб — прокат мотоциклов",
-    description:
-      "Без ограничения по пробегу. BMW, Yamaha, Kawasaki, Ducati — выбор модели, дата и бронирование в один поток.",
-  },
-};
+  ogTitle: "МотоПрокат №1 СПб — прокат мотоциклов",
+  ogDescription:
+    "Без ограничения по пробегу. BMW, Yamaha, Kawasaki, Ducati — выбор модели, дата и бронирование в один поток.",
+  // og:image — флагман парка (логика «лицо витрины» task204: BMW S1000R).
+  ogImage:
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/motoprokat1-bmw-s1000r/image_1.jpg",
+  ogImageAlt: "BMW S1000R — флагман парка МотоПрокат №1",
+});
 
 const COPY: CrewLandingCopy = {
   hookLine:

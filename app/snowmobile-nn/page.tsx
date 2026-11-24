@@ -5,6 +5,9 @@
 // Паттерн и механика — в шапке app/franchize/components/CrewLandingClient.tsx.
 // Уникальное здесь — только COPY (пич task200 v2: сеансы 1/1,5/2 часа,
 // сезон короткий, сертификаты как промокоды).
+//
+// task208: metadata → crewLandingMetadata (canonical + og:image катания +
+// twitter/VK-карточки); JSON-LD @type LocalBusiness.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -13,21 +16,21 @@ import CrewLandingClient, {
   type CrewLandingCopy,
   type CrewLandingFallback,
 } from "@/app/franchize/components/CrewLandingClient";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "snowmobile-nn",
+  siteName: "Snowmobile-NN · SLY13",
   title: "Snowmobile-NN — катания на снегоходах в Нижнем Новгороде · SLY13",
   description:
     "Катания на снегоходах в Нижнем Новгороде: сеансы по длительности — 1 час, 1,5 часа и 2 часа. Бронь онлайн 24/7, договор и залоговые документы автогенерацией, выдача по QR-коду с фотоотчётом.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "Snowmobile-NN · SLY13",
-    title: "Snowmobile-NN — катания на снегоходах",
-    description:
-      "Сеансы 1, 1,5 и 2 часа. Бронь фиксируется в Telegram-боте, документы — за минуту.",
-  },
-};
+  ogTitle: "Snowmobile-NN — катания на снегоходах",
+  ogDescription:
+    "Сеансы 1, 1,5 и 2 часа. Бронь фиксируется в Telegram-боте, документы — за минуту.",
+  ogImage:
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/snowmobile-nn-ride-1h/image_1.jpg",
+  ogImageAlt: "Катание на снегоходе — Snowmobile-NN",
+});
 
 const COPY: CrewLandingCopy = {
   hookLine:

@@ -57,6 +57,28 @@
 //  · Фото перерезаны из raw task203: 1024px/q62 (было 1280/q80), −49%
 //    суммарно; лого PNG quantize. Те же пути Storage — URL в БД не менялись.
 //
+// task208 (2026-11-24, «polish super properly» — SEO/social hardening):
+//  · JSON-LD schema.org: LocalBusiness (+вертикальные @type из
+//    copy.schemaType: AutoRental у автопроката, VacationRental у квартир)
+//    с hasOfferCatalog из живого каталога (Offer: цена только когда она
+//    реально есть в БД, availability из статуса позиции). Строится из тех
+//    же данных, что рендер — ноль ручных правок при смене каталога.
+//  · Честный статус часов в stats-полосе: раньше ЛЮБАЯ непустая строка
+//    workingHours рендерила «24/7» — у motoprokat1, обоих снегоходных и
+//    renta-flat цифра «24/7» противоречила подписи под ней («Ежедневно
+//    9:00–21:00» и т.п.). Теперь «24/7» только для реально круглосуточных
+//    (контент-hours match), «по сезону» для сезонных, иначе «ежедневно».
+//  · Nav «Каталог» рисуется только когда секция каталога реально
+//    рендерится (fallback-режим при сбое БД секцию не печатает — якорь
+//    вёл в никуда).
+//  · LCP: hero-фото fetchPriority="high" + decoding="async"; карточки
+//    каталога decoding="async" (loading=lazy уже был).
+//  · Footer: WhatsApp-иконка и строка «менеджер · @salavey13» только в
+//    live-режиме (только реальные каналы; в fallback не рисуем хвост
+//    «менеджер · » с пустым хэндлом).
+//  · Карточка renta-flat в CREW_PARTNERS получила светлое лого-backing —
+//    тот же вывод, что task205 для зелёных (тёмный арт прозрачных PNG).
+//
 // Контент data-driven: crews.metadata (branding/palette/contacts/cta/
 // contentBlocks) + каталог public.cars через getFranchizeBySlug (memoized,
 // emptyCrew при сбое БД — лендинг деградирует в фолбэк, не 500). Серверный
@@ -73,6 +95,7 @@
 import type { FranchizeBySlugResult } from "@/app/franchize/actions-runtime";
 import type { CatalogItemVM } from "@/app/franchize/actions-runtime";
 import { withAlpha } from "@/app/franchize/lib/theme";
+import { resolveFranchizeSiteUrl } from "@/app/franchize/[slug]/metadata";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
 import PartnerLogoGrid, {
   type PartnerLogoItem,
@@ -181,6 +204,10 @@ const CREW_PARTNERS: PartnerLogoItem[] = [
     title: "Рента-Флэт НН",
     tagline: "аренда квартир посуточно — демо-вертикаль за пределы техники",
     logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+    // task208: светлый backing — как у остальных зелёных (task205): тёмный
+    // арт прозрачного PNG на тёмной карточке гаснет во всех сетках.
+    backing: "#eef1f6",
+    lightBacking: true,
   },
 ];
 
@@ -192,6 +219,10 @@ export interface CrewLandingCopy {
   features: string[];
   /** id позиции для hero-фона («лицо витрины»). Не задан — первый с фото. */
   heroItemId?: string;
+  /** @type для JSON-LD (schema.org): вертикаль экипажа. По умолчанию
+      LocalBusiness; AutoRental — автопрокат, VacationRental — посуточные
+      квартиры (реальные типы schema.org,task208). */
+  schemaType?: "LocalBusiness" | "AutoRental" | "VacationRental";
 }
 
 export interface CrewLandingFallback {
@@ -334,27 +365,101 @@ export default function CrewLandingClient({
           { title: "Документы за минуту", text: "Договор и залог генерируются автоматически, выдача по QR." },
         ];
 
+  // task208: честный режим работы. Раньше любая непустая строка
+  // workingHours рендерила «24/7» — у motoprokat1 («Ежедневно, бронирование
+  // онлайн»), snowmobile-nn («Каждый день при устойчивом снежном покрове»),
+  // snegoprokat-nn («Сезонные катания, запись онлайн») и renta-flat
+  // («Ежедневно 9:00–21:00 (демо)») цифра «24/7» прямо противоречила
+  // подписи под ней. Теперь «24/7» — только для реально круглосуточных,
+  // «по сезону» — для сезонных, иначе «ежедневно»; label всегда = фактическая
+  // строка часов из crews.metadata.
+  const hoursStat = !workingHours
+    ? { value: "онлайн", label: "заявки с сайта и из Telegram — в один поток" }
+    : /круглосуточно|24\s*[\/‑–—-]\s*7/i.test(workingHours)
+      ? { value: "24/7", label: workingHours }
+      : /сезон/i.test(workingHours)
+        ? { value: "по сезону", label: workingHours }
+        : { value: "ежедневно", label: workingHours };
+
   const stats: Array<{ value: string; label: string }> = [
     {
       value: `${catalog.length || "—"}`,
       label: `${pluralRu(catalog.length || 0, ["позиция", "позиции", "позиций"])} в каталоге`,
     },
     { value: "1 мин", label: "договор и залог — автогенерация docx" },
-    {
-      value: workingHours ? "24/7" : "онлайн",
-      label: workingHours || "заявки с сайта и из Telegram — в один поток",
-    },
+    hoursStat,
   ];
 
   // Порядок и состав как у эталона (moto-selection NAV_LINKS: 6 пунктов).
+  // task208: «Каталог» — только когда секция реально рендерится: в
+  // fallback-режиме (сбой БД) каталог не печатается, якорь вёл в никуда.
   const navLinks = [
-    { href: "#catalog", label: "Каталог" },
+    ...(isLive && showcase.length > 0
+      ? [{ href: "#catalog", label: "Каталог" }]
+      : []),
     { href: "#how", label: "Как проходит аренда" },
     ...(storageEnabled ? [{ href: subpage("storage"), label: "Хранение" }] : []),
     { href: "#platform", label: "Платформа" },
     { href: "#partners", label: "Партнёры" },
     { href: "#contacts", label: "Контакты" },
   ];
+
+  // task208: JSON-LD (schema.org) для SEO-сниппетов и агрегаторов.
+  // LocalBusiness (+вертикальный @type из copy.schemaType) с адресом,
+  // телефоном и hasOfferCatalog из живого каталога: цена кладётся только
+  // когда она реально есть в БД (daily_price NULL → у позиции цена по
+  // тарифной сетке, Offer без price — валидно), availability — из статуса.
+  // URL — resolveFranchizeSiteUrl() (та же механика, что у canonical витрин:
+  // NEXT_PUBLIC_SITE_URL || VERCEL_PROJECT_PRODUCTION_URL).
+  const siteUrl = resolveFranchizeSiteUrl();
+  const pricedPerDay = catalog
+    .map((i) => i.pricePerDay)
+    .filter((p) => p > 0);
+  const priceMin = pricedPerDay.length > 0 ? Math.min(...pricedPerDay) : 0;
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": copy.schemaType || "LocalBusiness",
+    "@id": `${siteUrl}/${slug}#business`,
+    name,
+    description: tagline,
+    url: `${siteUrl}/${slug}`,
+    telephone: phone,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: city,
+      addressCountry: "RU",
+    },
+  };
+  if (logoUrl || heroImage) {
+    jsonLd.image = logoUrl || heroImage;
+  }
+  if (priceMin > 0) {
+    jsonLd.priceRange = `от ${fmtRub(priceMin)} ₽/сутки`;
+  }
+  if (isLive && showcase.length > 0) {
+    jsonLd.hasOfferCatalog = {
+      "@type": "OfferCatalog",
+      name: `Каталог ${name}`,
+      itemListElement: showcase.map((item) => ({
+        "@type": "Offer",
+        priceCurrency: "RUB",
+        ...(item.pricePerDay > 0 ? { price: String(item.pricePerDay) } : {}),
+        availability:
+          item.availabilityStatus === "available"
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+        url: `${siteUrl}${vitrineHref}`,
+        itemOffered: {
+          "@type": "Product",
+          name: item.title,
+          ...(item.imageUrl ? { image: item.imageUrl } : {}),
+        },
+      })),
+    };
+  }
+  // Экранируем «<» — защита от </script> в данных (титулы позиций наши, но
+  // стандартная гигиена для inline JSON).
+  const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
 
   // Working CTA (task205) — открывает CrewLeadModal → /api/franchize/
   // callback-lead → franchize_intents + ботом владельцу и админу.
@@ -516,6 +621,8 @@ export default function CrewLandingClient({
               <img
                 src={heroImage}
                 alt=""
+                fetchPriority="high"
+                decoding="async"
                 className="h-full w-full object-cover object-center"
               />
             </div>
@@ -646,6 +753,7 @@ export default function CrewLandingClient({
                         src={item.imageUrl}
                         alt={item.title}
                         loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
                       />
                     ) : (
@@ -734,6 +842,7 @@ export default function CrewLandingClient({
                 src={p.src!}
                 alt=""
                 loading="lazy"
+                decoding="async"
                 className="h-40 w-72 shrink-0 rounded-xl object-cover md:h-48 md:w-80"
                 style={{ border: `1px solid ${pal.borderSoft}` }}
               />
@@ -945,7 +1054,11 @@ export default function CrewLandingClient({
               </p>
             )}
             {/* соцряд (task206) — ДНК moto-selection footer: только реальные
-                каналы экипажа — бот, WhatsApp по номеру, менеджер */}
+                каналы экипажа — бот, WhatsApp по номеру, менеджер.
+                task208: WhatsApp-иконка и менеджер — только в live-режиме:
+                в fallback (сбой БД) телефон — статичный из FALLBACK, каналы
+                по нему не «реальные»; хвост «менеджер ·» без хэндла тоже
+                не рисуем. */}
             <div className="flex items-center gap-2.5 pt-1">
               <a
                 href={deeplink}
@@ -957,19 +1070,23 @@ export default function CrewLandingClient({
               >
                 <Send className="h-4 w-4" aria-hidden />
               </a>
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border transition hover:bg-white/5"
-                style={{ borderColor: pal.borderSoft, color: pal.accentMain }}
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden />
-              </a>
-              <span className="text-xs" style={{ color: pal.textSecondary }}>
-                менеджер · {isLive ? "@salavey13" : ""}
-              </span>
+              {isLive && (
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="WhatsApp"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border transition hover:bg-white/5"
+                  style={{ borderColor: pal.borderSoft, color: pal.accentMain }}
+                >
+                  <MessageCircle className="h-4 w-4" aria-hidden />
+                </a>
+              )}
+              {isLive && (
+                <span className="text-xs" style={{ color: pal.textSecondary }}>
+                  менеджер · @salavey13
+                </span>
+              )}
             </div>
           </div>
           {/* Разделы (task207) — расширенный набор подстраниц витрины
@@ -1050,6 +1167,14 @@ export default function CrewLandingClient({
           />
         </div>
       </footer>
+
+      {/* task208: schema.org JSON-LD — LocalBusiness (+AutoRental/
+          VacationRental по вертикали) с OfferCatalog живого каталога.
+          Серверный рендер, данные те же, что в разметке выше. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdHtml }}
+      />
 
       {/* Working CTA-форма (task205) — открытие по [data-lead-modal-open]. */}
       <CrewLeadModal
