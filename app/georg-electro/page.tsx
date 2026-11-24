@@ -46,6 +46,8 @@ import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 import { GlassServiceCard, GlassServiceCardStyle } from "@/components/landings/GlassServiceCard";
 import { RestBreak } from "@/components/landings/RestBreak";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
+import { resolveFranchizeSiteUrl } from "@/app/franchize/[slug]/metadata";
 
 // task 144: фирменный дым moto-selection.ru (прозрачный PNG, alpha 0…176,
 // 1680×625) — на тёмных секциях нашей витрины тоже («use everywhere
@@ -53,20 +55,23 @@ import { GhostWordmark } from "@/components/landings/GhostWordmark";
 const SMOKE_TEXTURE =
   "https://static.tildacdn.com/tild6131-6233-4862-b732-323433396136/1-20220209_004453.png";
 
-export const metadata: Metadata = {
+// task210 (2026-11-24): SEO/social parity — task208 закрыл canonical+
+// og:image+twitter+vk у пяти экипажных лендингов, task209 — у /salavey13 и
+// /moto-selection; /georg-electro оставался без превью в Telegram/VK и без
+// canonical при дублях хостов. Та же механика («reuse our existing
+// mechanics»): crewLandingMetadata поверх resolveFranchizeSiteUrl.
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "georg-electro",
+  siteName: "GEORG ELECTRO",
   title: "GEORG ELECTRO — электрик электробайков · Нижний Новгород",
   description:
     "Диагностика и ремонт электросистем, перепрошивка контроллеров, установка доп. оборудования на любой электромот. Один мастер — Георгий, без менеджеров и колл-центра. Рядом с VIP BIKE, Нижний Новгород.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "GEORG ELECTRO",
-    title: "GEORG ELECTRO — электрик электробайков",
-    description:
-      "Один мастер. Любой электромот. Диагностика, контроллеры, проводка, свет и доп. оборудование. Нижний Новгород, рядом с VIP BIKE.",
-  },
-};
+  ogTitle: "GEORG ELECTRO — электрик электробайков",
+  ogDescription:
+    "Один мастер. Любой электромот. Диагностика, контроллеры, проводка, свет и доп. оборудование. Нижний Новгород, рядом с VIP BIKE.",
+  ogImage: "/images/georg/hero.png",
+  ogImageAlt: "GEORG ELECTRO — мастерская электрика электробайков",
+});
 
 // ── Палитра экипажа (crews.metadata.franchize.theme.palette, georg-electro) ──
 const P = {
@@ -276,6 +281,24 @@ export default function GeorgElectroLanding() {
             </button>
           </div>
         </div>
+        {/* task210: мобильный скролл-ряд якорей (паритет с task209: десктоп-
+            меню скрыто до md — на телефонах 5 якорей были недостижимы) */}
+        <nav
+          aria-label="Мобильная навигация"
+          className="flex gap-4 overflow-x-auto px-4 pb-2 md:hidden"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {NAV_LINKS.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ color: P.textSecondary }}
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
       </header>
 
       {/* ── HERO ────────────────────────────────────────────────────────── */}
@@ -928,6 +951,56 @@ export default function GeorgElectroLanding() {
         accent={{ brand: P.accent, brandSoft: P.accentHover }}
         formSource="georg-electro-landing"
         landingPath="/georg-electro"
+      />
+
+      {/* task210: JSON-LD LocalBusiness — один мастер, услуги дословно с
+          лендинга, часы из БД экипажа. Та же гигиена экранирования, что у
+          CrewLandingClient (task208). */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            "@id": `${resolveFranchizeSiteUrl()}/georg-electro#business`,
+            name: "GEORG ELECTRO",
+            description:
+              "Электрик электробайков: диагностика и ремонт электросистем, перепрошивка контроллеров, установка доп. оборудования. Один мастер — без менеджеров и колл-центра.",
+            url: `${resolveFranchizeSiteUrl()}/georg-electro`,
+            image: `${resolveFranchizeSiteUrl()}/images/georg/hero.png`,
+            priceRange: "по запросу после диагностики",
+            address: {
+              "@type": "PostalAddress",
+              addressLocality: "Нижний Новгород",
+              addressCountry: "RU",
+            },
+            openingHoursSpecification: [
+              {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: [
+                  "Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                  "Sunday",
+                ],
+                opens: "10:00",
+                closes: "20:00",
+              },
+            ],
+            areaServed: "Нижний Новгород",
+            hasOfferCatalog: {
+              "@type": "OfferCatalog",
+              name: "Услуги GEORG ELECTRO",
+              itemListElement: SERVICES.map((s) => ({
+                "@type": "Offer",
+                itemOffered: { "@type": "Service", name: s.title, description: s.text },
+              })),
+            },
+          }).replace(/</g, "\\u003c"),
+        }}
       />
     </div>
   );

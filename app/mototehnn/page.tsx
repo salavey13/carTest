@@ -57,21 +57,23 @@ import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 import { GlassServiceCard, GlassServiceCardStyle } from "@/components/landings/GlassServiceCard";
 import { RestBreak } from "@/components/landings/RestBreak";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
+import { resolveFranchizeSiteUrl } from "@/app/franchize/[slug]/metadata";
 
-export const metadata: Metadata = {
+// task210 (2026-11-24): SEO/social parity — как task208/209 у остальных
+// витрин: canonical + og:image + twitter + vk через crewLandingMetadata.
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "mototehnn",
+  siteName: "МОТОТЕХ НН",
   title: "МОТОТЕХ НН — мотосалон, мотозапчасти и мотосервис · Нижний Новгород",
   description:
     "Официальный дилер BENDA: 100+ единиц мототехники и 10 000+ запчастей в наличии. Мотосервис, сезонное хранение и эвакуация мото по городу за 30–60 минут. Кредит, рассрочка, лизинг. Нижний Новгород, ул. Артельная, 15б.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "МОТОТЕХ НН",
-    title: "МОТОТЕХ НН — мотосалон полного цикла",
-    description:
-      "Техника, запчасти, сервис. Официальный дилер BENDA: 100+ единиц техники, 10 000+ запчастей в наличии, эвакуация 30–60 минут. Нижний Новгород, ул. Артельная, 15б.",
-  },
-};
+  ogTitle: "МОТОТЕХ НН — мотосалон полного цикла",
+  ogDescription:
+    "Техника, запчасти, сервис. Официальный дилер BENDA: 100+ единиц техники, 10 000+ запчастей в наличии, эвакуация 30–60 минут. Нижний Новгород, ул. Артельная, 15б.",
+  ogImage: "/images/mototehnn/hero.jpg",
+  ogImageAlt: "МОТОТЕХ НН — мотосалон полного цикла, дилер BENDA",
+});
 
 // ── Палитра экипажа (crews.metadata.franchize.theme.palette, nn-mototeh-nn) ──
 const P = {
@@ -314,6 +316,25 @@ export default async function MotoTehNNLanding() {
             </button>
           </div>
         </div>
+        {/* task210: мобильный скролл-ряд якорей (десктоп-меню скрыто до lg —
+            на телефонах и планшетах 6 якорей были недостижимы; паритет с
+            task209-рядами /salavey13 и /moto-selection) */}
+        <nav
+          aria-label="Мобильная навигация"
+          className="flex gap-4 overflow-x-auto px-4 pb-2 lg:hidden"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {NAV_LINKS.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ color: p.textSecondary }}
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
       </header>
 
       {/* ── HERO ────────────────────────────────────────────────────────── */}
@@ -1075,6 +1096,56 @@ export default async function MotoTehNNLanding() {
         accent={{ brand: p.accent, brandSoft: p.accentHover }}
         formSource="mototehnn-landing"
         landingPath="/mototehnn"
+      />
+
+      {/* task210: JSON-LD LocalBusiness — мотосалон полного цикла, услуги
+          дословно с лендинга, часы/адрес/телефон из mototehnn.ru (source of
+          truth в шапке файла). Та же гигиена, что у CrewLandingClient. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            "@id": `${resolveFranchizeSiteUrl()}/mototehnn#business`,
+            name: "МОТОТЕХ НН",
+            description:
+              "Мотосалон полного цикла: техника, запчасти, мотосервис. Официальный дилер BENDA: 100+ единиц мототехники и 10 000+ запчастей в наличии.",
+            url: `${resolveFranchizeSiteUrl()}/mototehnn`,
+            image: `${resolveFranchizeSiteUrl()}/images/mototehnn/hero.jpg`,
+            telephone: "+7-831-242-90-00",
+            priceRange: "от стоимости техники до лизинга",
+            address: {
+              "@type": "PostalAddress",
+              streetAddress: "ул. Артельная, 15б",
+              addressLocality: "Нижний Новгород",
+              addressCountry: "RU",
+            },
+            openingHoursSpecification: [
+              {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+                opens: "10:00",
+                closes: "19:00",
+              },
+              {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: "Sunday",
+                opens: "10:00",
+                closes: "16:00",
+              },
+            ],
+            areaServed: "Нижний Новгород и область",
+            hasOfferCatalog: {
+              "@type": "OfferCatalog",
+              name: "Услуги МОТОТЕХ НН",
+              itemListElement: SERVICES.map((s) => ({
+                "@type": "Offer",
+                itemOffered: { "@type": "Service", name: s.title, description: s.text },
+              })),
+            },
+          }).replace(/</g, "\\u003c"),
+        }}
       />
     </div>
   );
