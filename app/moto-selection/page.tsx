@@ -38,21 +38,29 @@ import { MsServicesGrid } from "./ServicesGrid";
 import PartnerLogoGrid from "@/components/landing/PartnerLogoGrid";
 import { RestBreak } from "@/components/landings/RestBreak";
 import { GhostWordmark } from "@/components/landings/GhostWordmark";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
+import { resolveFranchizeSiteUrl } from "@/app/franchize/[slug]/metadata";
 
-export const metadata: Metadata = {
+// task209 (2026-11-25): SEO/social parity — /moto-selection остался единственным
+// расшариваемым лендингом без og:image/canonical/twitter/vk (task208 закрыл
+// это только для пяти экипажных /{slug}). Механика та же («reuse our
+// existing mechanics»): crewLandingMetadata поверх resolveFranchizeSiteUrl;
+// og:image — hero-обложка (stunt rider в синем дыму, carpix). Плюс JSON-LD
+// LocalBusiness с hasOfferCatalog из SERVICES ниже и мобильный скролл-ряд
+// якорей (паритет с зелёными лендингами и /salavey13).
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "moto-selection",
+  siteName: "Moto.selection · SLY13",
   title: "Moto.selection — высокое искусство мотосервиса | Нижний Новгород",
   description:
-    "Обучение вождению, подбор и покупка мотоцикла, экипировка, ТО и ремонт, зимнее хранение, детейлинг, эвакуация и аренда мототехники. Нижний Новгород и ещё 5 городов. Работаем 24/7.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "Moto.selection",
-    title: "Moto.selection — высокое искусство мотосервиса",
-    description:
-      "Обучение, подбор, обслуживание, хранение и детейлинг мотоциклов. Нижний Новгород, Санкт-Петербург, Владимир, Иваново, Краснодар, Севастополь.",
-  },
-};
+    "Обучение вождению, подбор и покупка мотоцикла, экипировка, ТО и ремонт, зимнее хранение, детейлинг, эвакуация и аренда мототехники. Нижний Новгород и ещё 6 городов. Работаем 24/7.",
+  ogTitle: "Moto.selection — высокое искусство мотосервиса",
+  ogDescription:
+    "Обучение, подбор, обслуживание, хранение и детейлинг мотоциклов. Нижний Новгород, Москва, Санкт-Петербург, Владимир, Иваново, Краснодар, Севастополь.",
+  ogImage:
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/moto-selection-svc-01/image_1.jpg",
+  ogImageAlt: "Moto.selection — каскадёр на мотоцикле в синем дыму",
+});
 
 // ── Original tildacdn asset URLs (kept verbatim per boss request) ────────────
 const T = "https://static.tildacdn.com";
@@ -308,6 +316,50 @@ function MsBrandTicker({ reverse = false }: { reverse?: boolean }) {
 }
 
 export default function MotoSelectionLanding() {
+  // task209: JSON-LD schema.org — LocalBusiness с hasOfferCatalog из SERVICES
+  // (те же данные, что в разметке выше; цена в Offer только когда заявлена на
+  // лендинге, «от N ₽» → N — как у экипажных лендингов task208). Поля — только
+  // из заявленного на странице: телефон/почта/соцсети/городы из шапки и
+  // подвала, hours 24/7 — заявлено и в контактах, и в секции эвакуации.
+  // Экранирование «<» — гигиена inline JSON (CrewLandingClient, task208).
+  const siteUrl = resolveFranchizeSiteUrl();
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${siteUrl}/moto-selection#business`,
+    name: "Moto.selection",
+    description:
+      "Обучение вождению, подбор и покупка мотоцикла, экипировка, ТО и ремонт, зимнее хранение, детейлинг, эвакуация и аренда мототехники.",
+    url: `${siteUrl}/moto-selection`,
+    telephone: "+79875570444",
+    email: EMAIL,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Нижний Новгород",
+      addressCountry: "RU",
+    },
+    areaServed: CITIES,
+    openingHours: "Mo-Su 00:00-24:00",
+    image: IMG.hero,
+    sameAs: [SOCIAL_INSTAGRAM, SOCIAL_YOUTUBE, SOCIAL_VK],
+    priceRange: "от 2 000 ₽",
+    hasOfferCatalog: {
+      "@type": "OfferCatalog",
+      name: "Услуги Moto.selection",
+      itemListElement: SERVICES.map((s) => ({
+        "@type": "Offer",
+        priceCurrency: "RUB",
+        ...(s.price ? { price: s.price.replace(/[^0-9]/g, "") } : {}),
+        url: `${siteUrl}/moto-selection${s.anchor}`,
+        itemOffered: {
+          "@type": "Service",
+          name: s.title,
+        },
+      })),
+    },
+  };
+  const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+
   return (
     <div className="ms-root min-h-screen bg-black text-white" style={{ ["--ms-accent" as string]: BRAND }}>
       {/* smooth scroll for anchor nav; ken-burns + marquee for hero */}
@@ -407,6 +459,27 @@ export default function MotoSelectionLanding() {
             </button>
           </div>
         </div>
+        {/* task209: mobile nav — горизонтальный скролл-ряд якорей под
+            оранжевой шапкой (md:hidden; паритет с зелёными экипажными
+            лендингами CrewLandingClient и /salavey13): 6 якорей секций
+            иначе недостижимы на мобиле — десктоп-меню скрыто до md.
+            Чёрная стеклянная подложка — та же, что у бегущей строки
+            городов в герое (bg-black/40 + backdrop-blur), белые линки
+            с оранжевым ховером читаются и на оранжевом, и на чёрном. */}
+        <nav
+          aria-label="Мобильная навигация"
+          className="flex items-center gap-5 overflow-x-auto border-t border-black/25 bg-black/85 px-4 pb-2.5 pt-2 backdrop-blur [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+        >
+          {NAV_LINKS.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.14em] text-white/75 transition hover:text-[var(--ms-accent)]"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
       </header>
 
       {/* ── HERO ────────────────────────────────────────────────────────── */}
@@ -1408,6 +1481,10 @@ export default function MotoSelectionLanding() {
         formSource="ms-feedback-modal"
         landingPath="/moto-selection"
       />
+
+      {/* task209: schema.org JSON-LD — LocalBusiness + OfferCatalog услуг
+          (серверный рендер, данные те же, что в разметке выше). */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
     </div>
   );
 }

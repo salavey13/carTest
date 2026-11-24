@@ -157,8 +157,8 @@ const CONTOURS = [
   },
 ];
 
-// task175 (урок №8 OpenAI: FAQ = возражения, убитые заранее). Четыре
-// вопроса-страха до разговора. Честные ответы, включая роль бота (/doc —
+// task175 (урок №8 OpenAI: FAQ = возражения, убитые заранее). Пять
+// вопросов-страха до разговора. Честные ответы, включая роль бота (/doc —
 // клерк, не продавец) и агента (строит и деплоит, владение у владельца).
 const FAQ = [
   {
@@ -782,7 +782,10 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           style={{ borderColor: p.borderSoft, background: `${p.bgBase}CC` }}
         >
           <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-            <Link href="/sly13" className="flex items-center gap-2 whitespace-nowrap">
+            {/* task209: лого ведёт на канонический /salavey13 (task167),
+                а не на редирект-маршрут /sly13 — минус хоп на каждый клик
+                из шапки и консистентность с canonical в metadata. */}
+            <Link href="/salavey13" className="flex items-center gap-2 whitespace-nowrap">
               <span
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ background: p.accentMain, boxShadow: `0 0 10px ${p.accentMain}` }}
@@ -806,13 +809,15 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 </a>
               ))}
             </nav>
-            {/* task207: mobile nav — горизонтальный скролл-ряд якорей под
-                шапкой (md:hidden; тот же паттерн, что у зелёных лендингов
-                CrewLandingClient). 10 якорей с desktоп-меню иначе
-                недостижимы на мобиле. */}
+            {/* task209 v2: BUG FIX мобильной навигации — класс был
+                `hidden … md:hidden` (display:none на ВСЕХ брейкпоинтах, ни
+                один из них не включает flex): ряд якорей из task207 физически
+                не рендерился, 10 якорей оставались недостижимыми на мобиле.
+                Правильный паттерн — `flex md:hidden`, как у зелёных
+                CrewLandingClient. */}
             <nav
               aria-label="Мобильная навигация"
-              className="absolute inset-x-0 top-full hidden items-center gap-5 overflow-x-auto px-4 pb-2.5 pt-1.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+              className="absolute inset-x-0 top-full flex items-center gap-5 overflow-x-auto px-4 pb-2.5 pt-1.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
               style={{ borderTop: `1px solid ${p.borderSoft}`, background: `${p.bgBase}E6` }}
             >
               {NAV_LINKS.map((l) => (
@@ -2186,7 +2191,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
           </section>
 
           {/* ── 10 · FAQ (task175, урок №8 OpenAI: возражения убитые заранее) ─
-              Четыре вопроса-страха ДО разговора; закрывает секция с тем же
+              Пять вопросов-страха ДО разговора; закрывает секция с тем же
               CTA «Подключить экипаж» (урок №5: один CTA, повторённый ×3). */}
           <section id="faq" className="relative isolate scroll-mt-20 overflow-hidden">
             <SlyGhostWord word="вопросы" />
@@ -2198,7 +2203,7 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                 Проверь, что спрашивают <span style={{ color: p.accentMain }}>до тебя</span>
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
-                Четыре ответа, которые экономят один разговор.
+                Пять ответов, которые экономят один разговор.
               </p>
             </Reveal>
             <div className="mt-9 grid gap-4 md:grid-cols-2">
