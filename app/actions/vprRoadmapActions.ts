@@ -1,33 +1,25 @@
 "use server";
 
-// task212c: VPR Roadmap — геймификация 8 класса.
+// task212c/213: VPR Roadmap — геймификация 8 класса.
 // Прогресс разблокировки предметов хранится в users.metadata.vprProgress:
 //   { "unlocked": ["algebra"], "completed": { "algebra": { score, total, at } } }
 // Порядок дорожки (первый открыт, остальные под замком до сдачи теста ≥70%):
 //   algebra → geometry → probability → russian → history → literature
+// ВАЖНО: только async-экспорты ("use server" ограничение next build);
+// константы живут в lib/vprRoadmap.ts.
 
 import { fetchUserData, updateUserMetadata } from "@/lib/supabase-server";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger";
-
-export const VPR_ROADMAP_ORDER = [
-  "algebra",
-  "geometry",
-  "probability",
-  "russian",
-  "history",
-  "literature",
-] as const;
-
-export type VprRoadmapSlug = (typeof VPR_ROADMAP_ORDER)[number];
-
-export interface VprRoadmapProgress {
-  unlocked: string[];
-  completed: Record<string, { score: number; total: number; at: string }>;
-}
-
-/** Порог сдачи: не больше 30% ошибок. */
-export const VPR_PASS_RATIO = 0.7;
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import {
+  VPR_ROADMAP_ORDER,
+  VPR_PASS_RATIO,
+  VPR_TG_DEEPLINK,
+  VPR_ROADMAP_LABELS,
+  type VprRoadmapSlug,
+  type VprRoadmapProgress,
+} from "@/lib/vprRoadmap";
 
 function readProgress(meta: Record<string, any> | null | undefined): VprRoadmapProgress {
   const raw = meta?.vprProgress;
@@ -36,6 +28,67 @@ function readProgress(meta: Record<string, any> | null | undefined): VprRoadmapP
   }
   // пустой профиль = только первый предмет дорожки
   return { unlocked: [VPR_ROADMAP_ORDER[0]], completed: raw?.completed || {} };
+}
+
+/**
+ * Уведомление игроку о прогрессе дорожки (task213): шлём в TG через
+ * форвардинг-API. Кнопка-deeplink открывает WebApp (t.me/oneBikePlsBot/vpr).
+ * Ошибка отправки не валит основной flow — только лог.
+ */
+async function notifyRoadmapProgress(params: {
+  userId: string;
+  kind: "unlocked" | "passed" | "almost" | "finished";
+  slug: string;
+  score: number;
+  total: number;
+  nextSlug?: string | null;
+}): Promise<void> {
+  const { userId, kind, slug, score, total, nextSlug } = params;
+  try {
+    const subjectLabel = VPR_ROADMAP_LABELS[slug] ?? slug;
+    const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+    const deepLinkButton = [[{ text: "🎮 Продолжить тренировку", url: VPR_TG_DEEPLINK }]];
+
+    let text = "";
+    let buttons = deepLinkButton;
+
+    if (kind === "unlocked" && nextSlug) {
+      const nextLabel = VPR_ROADMAP_LABELS[nextSlug] ?? nextSlug;
+      text =
+        `🔓 *Уровень открыт!*\n\n` +
+        `*${subjectLabel}* — сдана на *${pct}%* (${score}/${total}).\n` +
+        `Следующий уровень дорожки: *${nextLabel}*. Шпаргалка уже прогружена, тест ждёт.\n\n` +
+        `Feed → Fight → Fail → Repeat → Upgrade 💊`;
+    } else if (kind === "finished") {
+      text =
+        `🏆 *ДОРОЖКА ПРОЙДЕНА!*\n\n` +
+        `*${subjectLabel}* — финальный уровень сдан (${score}/${total}, ${pct}%).\n` +
+        `Все 6 предметов 8 класса разблокированы и сданы. Середина года дешифрована — I know kung fu и теорему Пифагора 😎`;
+      buttons = [[{ text: "🎮 В Матрицу", url: VPR_TG_DEEPLINK }]];
+    } else if (kind === "almost") {
+      const need = Math.max(1, Math.ceil(VPR_PASS_RATIO * total) - score);
+      text =
+        `⚡ *Почти получилось!*\n\n` +
+        `*${subjectLabel}* — ${score}/${total} (${pct}%).\n` +
+        `До разблокировки следующего уровня не хватило *${need}* ${need === 1 ? "ответа" : "ответов"}. ` +
+        `Перечитай шпаргалку по слабым местам и вернись — второй заход всегда точнее.\n\n` +
+        `Fail → Repeat → Upgrade. Это часть протокола 🔁`;
+    } else {
+      text =
+        `✅ *Уровень сдан!*\n\n` +
+        `*${subjectLabel}* — ${score}/${total} (${pct}%).\n` +
+        `Порог пройден. Дорожка 8 класса ждёт продолжения.`;
+    }
+
+    const result = await sendComplexMessage(userId, text, buttons, { parseMode: "Markdown" });
+    if (!result.success) {
+      logger.warn(`[VprRoadmap] TG notify failed for ${userId}: ${result.error}`);
+    } else {
+      debugLogger.log(`[VprRoadmap] TG notify (${kind}) sent to ${userId}`);
+    }
+  } catch (e) {
+    logger.warn(`[VprRoadmap] TG notify error for ${userId}: ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 export async function getVprRoadmapProgressAction(
@@ -56,12 +109,14 @@ export async function getVprRoadmapProgressAction(
  * Записать результат теста и разблокировать следующий предмет, если сдано.
  * Вызывается с тестовой страницы после завершения попытки. Идемпотентно:
  * повторный вызов не блокирует уже открытые предметы.
+ * task213: шлёт игроку TG-уведомление (unlock / почти / сдан / финал).
  */
 export async function recordVprRoadmapResultAction(params: {
   userId: string;
   slug: string;
   score: number;
   total: number;
+  notify?: boolean;
 }): Promise<{
   success: boolean;
   passed?: boolean;
@@ -69,7 +124,7 @@ export async function recordVprRoadmapResultAction(params: {
   progress?: VprRoadmapProgress;
   error?: string;
 }> {
-  const { userId, slug, score, total } = params;
+  const { userId, slug, score, total, notify = true } = params;
   if (!userId || !slug) return { success: false, error: "userId и slug обязательны." };
   if (!VPR_ROADMAP_ORDER.includes(slug as VprRoadmapSlug)) {
     return { success: false, error: `Неизвестный предмет дорожки: ${slug}` };
@@ -82,11 +137,12 @@ export async function recordVprRoadmapResultAction(params: {
     const user = await fetchUserData(userId);
     const meta = (user?.metadata as Record<string, any> | null) || {};
     const progress = readProgress(user?.metadata);
-    const passed = score / total >= VPR_PASS_RATIO;
+    const ratio = score / total;
+    const passed = ratio >= VPR_PASS_RATIO;
 
     // обновляем рекорд предмета
     const prev = progress.completed?.[slug];
-    const better = !prev || score / total > prev.score / prev.total;
+    const better = !prev || ratio > prev.score / prev.total;
     if (passed && better) {
       progress.completed = {
         ...progress.completed,
@@ -113,6 +169,21 @@ export async function recordVprRoadmapResultAction(params: {
       });
       if (!updated.success) {
         return { success: false, error: updated.error || "Не удалось сохранить прогресс." };
+      }
+    }
+
+    // TG-уведомление о прогрессе (task213), только если это новый результат
+    const isNewResult = Boolean(newlyUnlocked || (passed && better));
+    if (notify && isNewResult) {
+      const allDone = VPR_ROADMAP_ORDER.every((s) => progress.completed?.[s]);
+      if (passed && allDone) {
+        await notifyRoadmapProgress({ userId, kind: "finished", slug, score, total });
+      } else if (passed && newlyUnlocked) {
+        await notifyRoadmapProgress({ userId, kind: "unlocked", slug, score, total, nextSlug: newlyUnlocked });
+      } else if (passed) {
+        await notifyRoadmapProgress({ userId, kind: "passed", slug, score, total });
+      } else if (ratio >= 0.6) {
+        await notifyRoadmapProgress({ userId, kind: "almost", slug, score, total });
       }
     }
 

@@ -403,7 +403,7 @@ export default function VprTestPage() {
                 toast.success("Тест завершен!", { duration: 4000 });
                 // Admin notification handled by server action
 
-                // task212c: запись результата в дорожку разблокировки (8 класс)
+                // task212c/213: запись результата в дорожку разблокировки (8 класс)
                 const finishScore = result.updatedAttempt.score ?? 0;
                 const finishTotal = totalQ;
                 const finishSlug = getVprSubjectSlug(subject?.name);
@@ -412,9 +412,11 @@ export default function VprTestPage() {
                         const rr = await recordRoadmapResult(finishSlug.replace("-8", ""), finishScore, finishTotal);
                         setRoadmapUnlock(rr);
                         if (rr.newlyUnlocked) {
-                            toast.success(`🔓 Новый предмет разблокирован: ${rr.newlyUnlocked}!`, { duration: 6000 });
+                            toast.success(`🔓 Новый предмет разблокирован!`, { duration: 6000 });
                         } else if (rr.passed) {
-                            toast.info("✅ Предмет сдан! Дорожка продлена, если был следующий.", { duration: 4000 });
+                            toast.info("✅ Предмет сдан! Порог 70% пройден.", { duration: 4000 });
+                        } else if (finishTotal > 0 && finishScore / finishTotal >= 0.6) {
+                            toast.warning("⚡ Почти! Ещё чуть-чуть до разблокировки следующего уровня", { duration: 6000 });
                         }
                     } catch (e) {
                         debugLogger.warn("[VprRoadmap] record failed", e);

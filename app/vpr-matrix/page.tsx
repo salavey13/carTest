@@ -184,6 +184,17 @@ export default function VprMatrixLanding() {
           <div className="mt-10 text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-600">
             Free // Без регистрации // Первый уровень уже открыт
           </div>
+          <div className="mt-3 text-[11px] text-zinc-500 font-mono">
+            Лучше в Telegram: прогресс сохраняется, а бот присылает уведомления об открытых уровнях —{" "}
+            <a
+              href="https://t.me/oneBikePlsBot/vpr"
+              className="text-green-400 hover:text-green-300 underline underline-offset-4"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              t.me/oneBikePlsBot/vpr
+            </a>
+          </div>
         </motion.div>
 
         {/* Стрелка вниз */}

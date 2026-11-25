@@ -8,10 +8,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getVprRoadmapProgressAction,
   recordVprRoadmapResultAction,
+} from "@/app/actions/vprRoadmapActions";
+import {
+  VPR_ROADMAP_ORDER,
   VPR_PASS_RATIO,
   type VprRoadmapProgress,
-} from "@/app/actions/vprRoadmapActions";
-import { VPR_ROADMAP_ORDER } from "@/app/actions/vprRoadmapActions";
+} from "@/lib/vprRoadmap";
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger } from "@/lib/debugLogger";
 
