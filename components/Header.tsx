@@ -97,6 +97,13 @@ const allPages: PageInfo[] = [
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: "FaLandmarkDome", group: "Misc", color: 'yellow', minLevel: 0 },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: "FaLeaf", group: "Misc", color: 'lime', minLevel: 0 },
   { path: "/vpr/informatics/7/cheatsheet", name: "Informatics Cheat", icon: "FaTerminal", group: "Misc", color: 'cyan', minLevel: 0 },
+  // task212: 8 класс в навигации — шпаргалки по слабым предметам дневника 8 «Е»
+  { path: "/vpr/algebra/8/cheatsheet", name: "Algebra Cheat 8", icon: "FaCalculator", group: "Misc", color: 'cyan', minLevel: 0 },
+  { path: "/vpr/geometry/8/cheatsheet", name: "Geometry Cheat 8", icon: "FaRulerCombined", group: "Misc", color: 'cyan', minLevel: 0 },
+  { path: "/vpr/russian/8/cheatsheet", name: "Russian Cheat 8", icon: "FaLanguage", group: "Misc", color: 'purple', minLevel: 0 },
+  { path: "/vpr/history/8/cheatsheet", name: "History Cheat 8", icon: "FaLandmarkDome", group: "Misc", color: 'yellow', minLevel: 0 },
+  { path: "/vpr/literature/8/cheatsheet", name: "Literature Cheat 8", icon: "FaBookOpen", group: "Misc", color: 'red', minLevel: 0 },
+  { path: "/vpr/probability/8/cheatsheet", name: "Probability Cheat 8", icon: "FaChartLine", group: "Misc", color: 'green', minLevel: 0 },
   { path: "/topdf", name: "XLSX-2-PDF Converter", icon: "FaFilePdf", group: "Misc", color: "red", isHot: true, minLevel: 0 },
 
   // Admin Zone
@@ -156,6 +163,8 @@ const translations: Record<string, Record<string, string>> = {
     "Vibe Schematics": "Схемы Вайба", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Озарения Veritasium": "Veritasium Insights", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности", "XLSX-2-PDF Converter": "XLSX-2-PDF Конвертер",
     "Cyber Garage": "Кибер Гараж", "Crews": "Экипажи", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Donate", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
+    // task212: 8 класс в навигации
+    "Algebra Cheat 8": "Шпаргалка Алгебра 8", "Geometry Cheat 8": "Шпаргалка Геометрия 8", "Russian Cheat 8": "Шпаргалка Русский 8", "History Cheat 8": "Шпаргалка История 8", "Literature Cheat 8": "Шпаргалка Литература 8", "Probability Cheat 8": "Шпаргалка Вероятн. 8",
     "Admin Panel": "Админ Панель", "Alpha Engine Deck": "Пульт Альфа-Движка", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
     "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥", "Missions": "Миссии",
     "Vibe HQ": "Штаб Vibe", "Core Vibe": "Ядро", "GTA Vibe Missions": "GTA Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Инструменты", "Misc": "Разное", "Admin Zone": "Админка"
