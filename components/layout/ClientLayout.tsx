@@ -192,6 +192,19 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true,   // Standalone page — no chat needed
   },
+  // PATCH: vpr theme (task215) — учебный контур ВПР (/vpr-tests хаб,
+  // /vpr-test/[id] тесты, /vpr/* шпаргалки, /vpr-matrix лендинг): тёмная
+  // «матричная» вселенная с собственными hero-бэндами и футерами на каждой
+  // странице. Платформенный Header/Footer/StickyChat ломали кибер-стиль —
+  // svarprofi/chronicle pattern.
+  vpr: {
+    paths: ["/vpr"],
+    Header: null,           // vpr pages render their own headers
+    Footer: null,           // vpr pages render their own footers
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone learning universe — no chat needed
+  },
   // PATCH: mototehnn theme (2026-10-27, task 148) — standalone landing for
   // the МОТОТЕХ НН crew (мотосалон: техника, запчасти, сервис; mototehnn.ru).
   // Dark navy palette from crews.metadata (bgBase #0a0f1a / accent #3b82f6);
@@ -286,6 +299,12 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/chronicle")) {
     return THEME_CONFIG.chronicle;
+  }
+  // task215: /vpr* — учебный контур ВПР (vpr-tests/vpr-test/vpr/vpr-matrix).
+  // ВАЖНО: до общих проверок — /vpr-test* и /vpr-matrix* не должны
+  // проваливаться в default-тему с платформенным футером.
+  if (pathname === "/vpr-tests" || pathname.startsWith("/vpr-test/") || pathname.startsWith("/vpr/") || pathname.startsWith("/vpr-matrix")) {
+    return THEME_CONFIG.vpr;
   }
   if (pathname.startsWith("/mototehnn")) {
     return THEME_CONFIG.mototehnn;

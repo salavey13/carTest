@@ -1142,7 +1142,8 @@ function LeaderboardCard({ entry, index }: { entry: LeaderboardEntry; index: num
 
 export default function VprTestsListPage() {
   const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
-  const [selectedGrade, setSelectedGrade] = useState<number>(7);
+  // task215: 8 класс — дефолт (фокус продукта: Матрица 8 класса, дорожка task212c)
+  const [selectedGrade, setSelectedGrade] = useState<number>(8);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllSubjects, setShowAllSubjects] = useState(false);

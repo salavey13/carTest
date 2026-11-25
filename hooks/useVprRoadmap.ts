@@ -22,6 +22,8 @@ const LS_KEY = "vpr-roadmap-progress";
 export const DEFAULT_PROGRESS: VprRoadmapProgress = {
   unlocked: [VPR_ROADMAP_ORDER[0]],
   completed: {},
+  achievements: [],
+  fails: {},
 };
 
 function readLS(): VprRoadmapProgress | null {
@@ -30,7 +32,16 @@ function readLS(): VprRoadmapProgress | null {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.unlocked)) return parsed as VprRoadmapProgress;
+    // task215: старый кэш (до task214) не имеет achievements/fails —
+    // достраиваем пустыми, чтобы UI не падал на undefined-полях.
+    if (parsed && Array.isArray(parsed.unlocked)) {
+      return {
+        unlocked: parsed.unlocked,
+        completed: parsed.completed || {},
+        achievements: parsed.achievements || [],
+        fails: parsed.fails || {},
+      };
+    }
   } catch {
     // ignore
   }

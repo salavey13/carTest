@@ -1,13 +1,21 @@
-export function getVprSubjectSlug(subjectName?: string): string {
+/**
+ * Слаг предмета для шпаргалки.
+ * task215: grade-aware — класс берём из subject.grade_level (в БД имя часто
+ * просто «История» без цифры; старый код искал «8» в имени и вёл
+ * 8-классников на шпаргалку 7 класса). gradeLevel опционален: без него
+ * сохраняется старое поведение по имени.
+ */
+export function getVprSubjectSlug(subjectName?: string, gradeLevel?: number | null): string {
   const raw = (subjectName || "").trim().toLowerCase();
   if (!raw) return "general";
+  const isGrade8 = gradeLevel === 8;
   // 8 класс (task212): предмет дорожки 8-го класса
-  if (raw.includes("вероят")) return "probability-8";
-  if (raw.includes("алгебр")) return "algebra-8";
-  if (raw.includes("геометр")) return "geometry-8";
-  if (raw.includes("литерат")) return "literature-8";
-  if (raw.includes("русский")) return "russian-8";
-  if (raw.includes("истор")) return raw.includes("8") ? "history-8" : "history-7";
+  if (isGrade8 || raw.includes("вероят")) return "probability-8";
+  if (isGrade8 || raw.includes("алгебр")) return "algebra-8";
+  if (isGrade8 || raw.includes("геометр")) return "geometry-8";
+  if (isGrade8 || raw.includes("литерат")) return "literature-8";
+  if (isGrade8 || raw.includes("русский")) return "russian-8";
+  if (raw.includes("истор")) return isGrade8 || raw.includes("8") ? "history-8" : "history-7";
   // 7 класс и прочее
   if (raw.includes("информ")) return "informatics-7";
   if (raw.includes("физ")) return "physics-7";

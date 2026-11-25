@@ -45,6 +45,15 @@ function readProgress(meta: Record<string, any> | null | undefined): VprRoadmapP
   };
 }
 
+/**
+ * Экранирование Markdown-спецсимволов (task215): имена геймеров с _ * ` [
+ * ломали parse_mode=Markdown — Telegram отклонял всю отправку. Экранируем
+ * только пользовательские вставки (имя), остальной текст — наш, контролируем.
+ */
+function escapeTgMarkdown(s: string): string {
+  return s.replace(/([_*`\[\]])/g, "\\$1");
+}
+
 /** Отправка сообщения игроку: фото (hero предмета) + caption + inline-кнопки. */
 async function sendVprPhotoMessage(params: {
   chatId: string;
@@ -66,10 +75,24 @@ async function sendVprPhotoMessage(params: {
     }
     const result = await telegramDeliver(photoUrl ? "sendPhoto" : "sendMessage", chatId, payload);
     if (!result.ok) {
-      logger.warn(`[VprRoadmap] TG sendPhoto failed for ${chatId}: ${result.error}`);
-    } else {
-      debugLogger.log(`[VprRoadmap] TG photo message sent to ${chatId}`);
+      // Edge case (task215): битый Markdown (незакрытая * или _ в имени
+      // геймера) валяет всю отправку — ретрай без форматирования лучше,
+      // чем потерянное уведомление.
+      debugLogger.log(`[VprRoadmap] TG Markdown failed (${result.error}), retrying plain`);
+      const plain: Record<string, unknown> = { reply_markup: payload.reply_markup };
+      if (photoUrl) {
+        plain.photo = photoUrl;
+        plain.caption = text.replace(/[*_`]/g, "");
+      } else {
+        plain.text = text.replace(/[*_`]/g, "");
+      }
+      const retry = await telegramDeliver(photoUrl ? "sendPhoto" : "sendMessage", chatId, plain);
+      if (!retry.ok) {
+        logger.warn(`[VprRoadmap] TG plain retry failed for ${chatId}: ${retry.error}`);
+        return;
+      }
     }
+    debugLogger.log(`[VprRoadmap] TG photo message sent to ${chatId}`);
   } catch (e) {
     logger.warn(`[VprRoadmap] TG sendPhoto error for ${chatId}: ${e instanceof Error ? e.message : e}`);
   }
@@ -291,7 +314,9 @@ export async function recordVprRoadmapResultAction(params: {
       }
     };
 
-    if (passed && !wasCompleted && Object.keys(progress.completed).length === 1) claim("first_blood");
+    // first_blood: первый сданный предмет ЛИБО ретро (task215) — юзер, сдавший
+    // предметы до появления ачивок, получает first_blood при следующей сдаче.
+    if (passed && Object.keys(progress.completed).length >= 1) claim("first_blood");
     if (passed && score === total) claim("flawless");
     if (passed && !wasCompleted && (progress.fails?.[slug] || 0) > 0) claim("iron_will");
     if (Object.keys(progress.completed).length >= 3) claim("half_matrix");
@@ -335,7 +360,7 @@ export async function recordVprRoadmapResultAction(params: {
       if (parentChatId && parentChatId !== userId && (passed || isCloseFail)) {
         await notifyParentSummary({
           parentId: parentChatId,
-          gamerName: tgDisplayName(user),
+          gamerName: escapeTgMarkdown(tgDisplayName(user)),
           kind,
           slug,
           score,

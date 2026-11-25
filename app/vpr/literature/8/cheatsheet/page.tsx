@@ -275,6 +275,43 @@ export default function Literature8Cheatsheet() {
           </div>
         </section>
 
+        {/* TOPIC 3.5: РОДЫ И ЖАНРЫ (task215) */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <BookOpen className="text-emerald-400" /> 3.5. Роды литературы и жанры
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+              <div className="font-bold text-emerald-400 text-sm mb-2">Эпос (рассказывают)</div>
+              <div className="text-xs text-zinc-400 leading-relaxed space-y-1">
+                <div>• Есть рассказчик и сюжет</div>
+                <div>• Жанры: роман, повесть, рассказ, басня</div>
+                <div className="text-zinc-600">Пример: «Капитанская дочка»</div>
+              </div>
+            </div>
+            <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+              <div className="font-bold text-emerald-400 text-sm mb-2">Лирика (переживают)</div>
+              <div className="text-xs text-zinc-400 leading-relaxed space-y-1">
+                <div>• Субъективные чувства, лирический герой</div>
+                <div>• Жанры: стихотворение, ода, элегия</div>
+                <div className="text-zinc-600">Пример: оды Державина</div>
+              </div>
+            </div>
+            <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+              <div className="font-bold text-emerald-400 text-sm mb-2">Драма (показывают)</div>
+              <div className="text-xs text-zinc-400 leading-relaxed space-y-1">
+                <div>• Диалоги и ремарки, для сцены</div>
+                <div>• Жанры: комедия, трагедия, драма</div>
+                <div className="text-zinc-600">Пример: «Недоросль» Фонвизина</div>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-400">
+            <p className="mb-2 text-zinc-200">// Как отличить на ВПР за 5 секунд:</p>
+            <p>Видишь <b>строфы и переживания</b> → лирика. <b>Повествование от лица автора/рассказчика</b> → эпос. <b>Имена героев + слова в скобках (ремарки) и тире-реплики</b> → драма.</p>
+          </div>
+        </section>
+
         {/* CTA */}
         <div className="bg-white text-black p-8 rounded-none mb-20 flex flex-col md:flex-row items-center gap-8 shadow-[10px_10px_0_rgba(244,63,94,1)]">
           <div className="w-20 h-20 bg-rose-500 flex items-center justify-center rounded-full shrink-0">

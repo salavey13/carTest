@@ -320,6 +320,37 @@ export default function Russian8Cheatsheet() {
           </div>
         </section>
 
+        {/* TOPIC 3.5: ЧЕРЕДОВАНИЯ И ПРИСТАВКИ (task215) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <SpellCheck className="text-rose-400" /> 3.5. Чередования и словарные ловушки
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-rose-400">Корни с чередованием</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1 font-mono">
+                <div>· ГОР/ГАР: под ударением А, без — О</div>
+                <div>· ЗАР/ЗОР: без ударения А (заря́)</div>
+                <div>· РАСТ/РОС: перед СТ и Щ → А (расти, выращивать)</div>
+                <div>· ЛАГ/ЛОЖ: перед Г → А, перед Ж → О</div>
+                <div>· КАС/КОС: есть А → КАСАться</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-rose-400">Приставки ПРЕ/ПРИ</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1">
+                <div>• <b>ПРИ-</b>: приближение (приехал), близость (пришкольный), неполное действие (приоткрыл)</div>
+                <div>• <b>ПРЕ-</b> = «очень» (прекрасный) или = «пере-» (прервать)</div>
+                <div className="text-zinc-500 text-xs">Лайфхак: попробуй заменить словом «очень» или «пере».</div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono text-zinc-400">
+            <p className="mb-2 text-zinc-200">// Словарные ловушки ВПР (не подчиняются правилам — только память):</p>
+            <p>стакан, сара<span className="text-rose-400">ф</span>ан, фут<span className="text-rose-400">б</span>ол, ко<span className="text-rose-400">мб</span>айн, акваланг, в<b>о</b>кзал.</p>
+          </div>
+        </section>
+
         {/* TOPIC 4: ДИКТАНТ-ТРЕНАЖЁР */}
         <section className="mb-16">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">

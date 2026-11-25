@@ -258,6 +258,38 @@ export default function Probability8Cheatsheet() {
           </Card>
         </section>
 
+        {/* TOPIC 2.5: ЧАСТОТА И ЭКСПЕРИМЕНТЫ (task215) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Dices className="text-orange-400" /> 2.5. Частота vs вероятность
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-orange-400">Частота (из опыта)</CardTitle></CardHeader>
+              <CardContent className="text-sm font-mono space-y-1">
+                <div>f = m / n</div>
+                <div className="text-zinc-500 text-xs">// сколько раз событие выпало, делённое на число опытов</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-orange-400">Вероятность (из теории)</CardTitle></CardHeader>
+              <CardContent className="text-sm font-mono space-y-1">
+                <div>P = m / n</div>
+                <div className="text-zinc-500 text-xs">// сколько благоприятных исходов из всех возможных</div>
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="bg-orange-900/10 border-orange-500/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-orange-400 w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Закон больших чисел</p>
+                <p>Чем больше экспериментов, тем ближе <b>частота</b> к <b>вероятности</b>. Подбрось монету 10 раз — может быть 7 орлов (частота 0.7). Подбрось 1000 раз — получится почти 0.5. Типичная задача ВПР: «сколько примерно раз выпадет X из N бросков» → N · P.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
         {/* TOPIC 3: ТАБЛИЦА И ДИАГРАММЫ */}
         <section className="mb-16">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">

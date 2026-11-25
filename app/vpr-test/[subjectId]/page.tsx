@@ -406,7 +406,7 @@ export default function VprTestPage() {
                 // task212c/213/214: запись результата в дорожку разблокировки (8 класс)
                 const finishScore = result.updatedAttempt.score ?? 0;
                 const finishTotal = totalQ;
-                const finishSlug = getVprSubjectSlug(subject?.name);
+                const finishSlug = getVprSubjectSlug(subject?.name, subject?.grade_level);
                 if (finishSlug.endsWith("-8")) {
                     try {
                         const rr = await recordRoadmapResult(finishSlug.replace("-8", ""), finishScore, finishTotal);
@@ -587,7 +587,7 @@ export default function VprTestPage() {
                     totalQuestions={currentAttempt.total_questions ?? questions.length}
                     onReset={resetTest}
                     onGoToList={() => router.push('/vpr-tests')}
-                    subjectSlug={getVprSubjectSlug(subject?.name)}
+                    subjectSlug={getVprSubjectSlug(subject?.name, subject?.grade_level)}
                     roadmapUnlock={roadmapUnlock} /> );
     }
 
@@ -609,7 +609,7 @@ export default function VprTestPage() {
     }
 
     // Prepare render variables
-    const subjectSlug = getVprSubjectSlug(subject.name);
+    const subjectSlug = getVprSubjectSlug(subject.name, subject.grade_level);
     const answersForCurrent = currentQuestionData.vpr_answers || [];
     const showSavingOverlay = isSaving;
     const shouldShowExplanation = (isDummyModeActive && !isCurrentQuestionNonAnswerable) || showFeedback;

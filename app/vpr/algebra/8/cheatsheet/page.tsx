@@ -357,12 +357,146 @@ export default function Algebra8FriendlyCheatsheet() {
             </div>
         </section>
 
-        {/* TOPIC 4: VIETA'S THEOREM (BONUS) */}
+        {/* TOPIC 4: СТЕПЕНИ (task215) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <Layers className="text-green-400" /> 4. Степени и свойства
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {[
+                    { f: "aᵐ · aⁿ", r: "aᵐ⁺ⁿ", l: "умножение" },
+                    { f: "aᵐ : aⁿ", r: "aᵐ⁻ⁿ", l: "деление" },
+                    { f: "(aᵐ)ⁿ", r: "aᵐ·ⁿ", l: "степень степени" },
+                    { f: "(ab)ⁿ", r: "aⁿbⁿ", l: "произведение" },
+                ].map((item) => (
+                    <div key={item.f} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                        <div className="text-sm text-zinc-500 mb-1">{item.f}</div>
+                        <div className="text-xl font-bold text-white font-mono">{item.r}</div>
+                        <div className="text-[10px] text-zinc-600 uppercase mt-1">{item.l}</div>
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader><CardTitle className="text-sm text-green-400">Отрицательная степень</CardTitle></CardHeader>
+                    <CardContent className="text-sm font-mono space-y-1">
+                        <div>a⁻ⁿ = 1 / aⁿ</div>
+                        <div className="text-zinc-500 text-xs">// 2⁻³ = 1/8 — минус в степени ≠ минус в ответе</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader><CardTitle className="text-sm text-green-400">Нулевая и первая</CardTitle></CardHeader>
+                    <CardContent className="text-sm font-mono space-y-1">
+                        <div>a⁰ = 1 (a ≠ 0)</div>
+                        <div className="text-zinc-500 text-xs">// любое число в нулевой = единица</div>
+                    </CardContent>
+                </Card>
+            </div>
+        </section>
+
+        {/* TOPIC 5: НЕРАВЕНСТВА (task215) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <TrendingUp className="text-brand-pink" /> 5. Неравенства
+            </h2>
+            <Card className="bg-zinc-900/50 border-brand-pink/30 mb-4">
+                <CardHeader className="border-b border-brand-pink/10">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-brand-pink" /> Главное правило
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 text-sm leading-relaxed">
+                    При делении/умножении обеих частей на <b>отрицательное</b> число — знак неравенства <b className="text-brand-pink">разворачивается</b>.<br />
+                    <span className="font-mono text-zinc-400">−2x {'>'} 6 → x {'<'} −3</span> (делили на −2, знак развернулся).
+                </CardContent>
+            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-zinc-900 rounded-xl border-l-4 border-brand-pink">
+                    <div className="font-bold text-white text-sm">Строгие</div>
+                    <div className="text-xs text-zinc-500 mt-1 font-mono">a {'<'} b → (a; b)</div>
+                    <div className="text-[11px] text-zinc-600 mt-1">Скобки круглые, точка выколота</div>
+                </div>
+                <div className="p-4 bg-zinc-900 rounded-xl border-l-4 border-brand-cyan">
+                    <div className="font-bold text-white text-sm">Нестрогие</div>
+                    <div className="text-xs text-zinc-500 mt-1 font-mono">a ≤ b → [a; b]</div>
+                    <div className="text-[11px] text-zinc-600 mt-1">Скобка квадратная, точка закрашена</div>
+                </div>
+                <div className="p-4 bg-zinc-900 rounded-xl border-l-4 border-yellow-500">
+                    <div className="font-bold text-white text-sm">Двойные</div>
+                    <div className="text-xs text-zinc-500 mt-1 font-mono">−1 {'<'} x ≤ 3</div>
+                    <div className="text-[11px] text-zinc-600 mt-1">Пересечение двух ответов</div>
+                </div>
+            </div>
+        </section>
+
+        {/* TOPIC 6: ЛИНЕЙНАЯ ФУНКЦИЯ (task215) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <Zap className="text-brand-cyan" /> 6. Линейная функция y = kx + b
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader><CardTitle className="text-sm text-brand-cyan">Коэффициент k — наклон</CardTitle></CardHeader>
+                    <CardContent className="text-sm leading-relaxed space-y-1">
+                        <div>• k {'>'} 0 → прямая <b>возрастает</b> (вправо-вверх)</div>
+                        <div>• k {'<'} 0 → <b>убывает</b> (вправо-вниз)</div>
+                        <div>• k = 0 → горизонталь y = b</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader><CardTitle className="text-sm text-brand-cyan">Коэффициент b — сдвиг</CardTitle></CardHeader>
+                    <CardContent className="text-sm leading-relaxed space-y-1">
+                        <div>• b — точка пересечения с осью Y: (0; b)</div>
+                        <div>• y = kx (b=0) — прямая через начало координат</div>
+                        <div>• Параллельные прямые: k₁ = k₂, b₁ ≠ b₂</div>
+                    </CardContent>
+                </Card>
+            </div>
+            <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono text-zinc-400">
+                <p className="mb-2 text-zinc-200">// Хак: принадлежит ли точка графику?</p>
+                <p>Точка (2; 7) и y = 3x + 1 → подставь: 3·2 + 1 = 7 ✓ — принадлежит.</p>
+            </div>
+        </section>
+
+        {/* TOPIC 7: МОДУЛЬ (task215) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <Hash className="text-indigo-400" /> 7. Модуль числа
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                    <div className="text-xs text-zinc-500 mb-1">Определение</div>
+                    <div className="text-lg font-bold text-white font-mono">|x| = x, x ≥ 0</div>
+                    <div className="text-lg font-bold text-white font-mono">|x| = −x, x {'<'} 0</div>
+                </div>
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                    <div className="text-xs text-zinc-500 mb-1">Всегда</div>
+                    <div className="text-xl font-bold text-white font-mono">|x| ≥ 0</div>
+                    <div className="text-[11px] text-zinc-600">модуль не бывает отрицательным</div>
+                </div>
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                    <div className="text-xs text-zinc-500 mb-1">Уравнение</div>
+                    <div className="text-xl font-bold text-white font-mono">|x| = a → x = ±a</div>
+                    <div className="text-[11px] text-zinc-600">два корня при a {'>'} 0</div>
+                </div>
+            </div>
+            <Card className="bg-indigo-900/10 border-indigo-500/20">
+                <CardContent className="p-4 flex items-start gap-3">
+                    <Lightbulb className="text-indigo-400 w-10 h-10 flex-shrink-0" />
+                    <div className="text-sm">
+                        <p className="font-bold text-white mb-1">Хак: |x| = −5 не имеет корней</p>
+                        <p>Модуль — это расстояние, а расстояние не бывает отрицательным. Видишь минус справа в уравнении с модулем — сразу пиши «нет решений», не считай.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        </section>
+
+        {/* TOPIC 8: ВИЕТА (BONUS) */}
         <section className="mb-16">
             <div className="p-6 bg-gradient-to-br from-indigo-900/20 to-zinc-900 border border-indigo-500/30 rounded-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-5"><Brain className="w-32 h-32" /></div>
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Zap className="text-indigo-400 w-5 h-5" /> Теорема Виета (Чит-код)
+                    <Zap className="text-indigo-400 w-5 h-5" /> 8. Теорема Виета (Чит-код)
                 </h3>
                 <p className="text-sm text-zinc-400 mb-6 max-w-xl">
                     Для уравнений, где <code className="text-white">a = 1</code> (приведённых), корни можно найти в уме!

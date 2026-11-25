@@ -317,6 +317,39 @@ export default function Geometry8Cheatsheet() {
           </div>
         </section>
 
+        {/* TOPIC 3.5: ОКРУЖНОСТЬ (task215) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Ruler className="text-indigo-400" /> 3.5. Окружность и касательная
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-xs text-zinc-500 mb-1">Касательная</div>
+              <div className="text-lg font-bold text-white font-mono">r ⊥ касательной</div>
+              <div className="text-[11px] text-zinc-600 mt-1">в точке касания всегда 90°</div>
+            </div>
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-xs text-zinc-500 mb-1">Вписанный угол</div>
+              <div className="text-lg font-bold text-white font-mono">∠ = ½ ∪</div>
+              <div className="text-[11px] text-zinc-600 mt-1">равен половине дуги, на которую опирается</div>
+            </div>
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-xs text-zinc-500 mb-1">Длина и площадь</div>
+              <div className="text-lg font-bold text-white font-mono">C = 2πr, S = πr²</div>
+              <div className="text-[11px] text-zinc-600 mt-1">d = 2r</div>
+            </div>
+          </div>
+          <Card className="bg-indigo-900/10 border-indigo-500/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-indigo-400 w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: угол на диаметр</p>
+                <p>Вписанный угол, опирающийся на диаметр, всегда <b>90°</b>. Это прямой угол «бесплатно» — без вычислений. Любая задача с треугольником в окружности — проверь сначала его.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
         {/* TOPIC 4: КВИЗ */}
         <section className="mb-16">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
