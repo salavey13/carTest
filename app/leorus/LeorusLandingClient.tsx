@@ -704,6 +704,56 @@ export default function LeorusLandingClient() {
                 backing: "#e8edf6",
                 lightBacking: true,
               },
+              // task205: зелёные экипажи лид-листа — двусторонний линкинг
+              // витрин (PartnerLogoGrid на каждом ведёт сюда и на соседей).
+              {
+                href: "/renta-car",
+                title: "Рента-Кар НН",
+                tagline: "автопрокат в Нижнем — подача бесплатно, круглосуточно",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-car-logo.png",
+                logoAlt: "Рента-Кар НН",
+                backing: "#eef1f6",
+                lightBacking: true,
+              },
+              {
+                href: "/motoprokat1",
+                title: "МотоПрокат1",
+                tagline: "мотопрокат — от BMW до Ducati, бронь в Telegram",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motoprokat1-logo.png",
+                logoAlt: "МотоПрокат1",
+                backing: "#eef1f6",
+                lightBacking: true,
+              },
+              {
+                href: "/snowmobile-nn",
+                title: "Snowmobile NN",
+                tagline: "снегоходы — катания и обучение, бронь в Telegram",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snowmobile-nn-logo.png",
+                logoAlt: "Snowmobile NN",
+                backing: "#eef1f6",
+                lightBacking: true,
+              },
+              {
+                href: "/snegoprokat-nn",
+                title: "СнегоПрокат НН",
+                tagline: "снегоходы — одиночные и тандемные катания",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snegoprokat-nn-logo.png",
+                logoAlt: "СнегоПрокат НН",
+                backing: "#eef1f6",
+                lightBacking: true,
+              },
+              // task211: полный двусторонний линкинг — renta-flat (демо
+              // «та же цепочка за пределами техники») был последней
+              // дырой: все сетки ⇄ все витрины.
+              {
+                href: "/renta-flat",
+                title: "Рента-Флэт НН",
+                tagline: "аренда квартир посуточно — та же цепочка каталог→бронь→договор",
+                logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+                logoAlt: "Рента-Флэт НН",
+                backing: "#eef1f6",
+                lightBacking: true,
+              },
             ]}
           />
         </div>

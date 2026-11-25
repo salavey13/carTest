@@ -215,6 +215,23 @@ const THEME_CONFIG = {
     isTransparent: false,
     hideStickyChat: true, // Secret page — no chat, no nav, just the gift
   },
+  // PATCH: crewLandings theme (2026-11-23, task202) — верхнеуровневые лендинги
+  // зелёных экипажей лид-листа (/renta-car, /motoprokat1, /snowmobile-nn,
+  // /snegoprokat-nn; босс: «create landings … like /salavey13 or /renta-car»).
+  // Один общий data-driven компонент CrewLandingClient (контент из
+  // crews.metadata + каталог через getFranchizeBySlug); палитра у каждого своя
+  // из БД. Собственные nav+footer — svarprofi/sly13/leorus pattern.
+  crewLandings: {
+    // task207: + /renta-flat — демо-витрина «аренда квартир» (вертикальное
+    // расширение платформы за пределы техники; босс: «create demo crew with
+    // 5 item catalogue set for "аренда квартир" theme»).
+    paths: ["/renta-car", "/motoprokat1", "/snowmobile-nn", "/snegoprokat-nn", "/renta-flat"],
+    Header: null,           // landing renders its own nav
+    Footer: null,           // landing renders its own footer
+    BottomNav: null,
+    isTransparent: false,
+    hideStickyChat: true,   // Standalone landing — no chat needed
+  },
   franchize: {
     paths: ["/franchize/"],
     Header: null,           // Franchize pages render their own CrewHeader
@@ -272,6 +289,14 @@ const getThemeForPath = (pathname: string) => {
   }
   if (pathname.startsWith("/mototehnn")) {
     return THEME_CONFIG.mototehnn;
+  }
+  // PATCH (task204): crewLandings существовали в THEME_CONFIG с task202, но
+  // сам резолвер про них не знал — срабатывала default-тема: BikeHeader/
+  // BikeFooter/BottomNavigationBike монтировались поверх собственных nav+
+  // footer лендингов. Босс: «disable default header/footer like it's disabled
+  // on moto-selection». Ресолвим явно — svarprofi/motoSelection pattern.
+  if (THEME_CONFIG.crewLandings.paths.some((p) => pathname.startsWith(p))) {
+    return THEME_CONFIG.crewLandings;
   }
   if (pathname.startsWith("/gift/roman")) {
     return THEME_CONFIG.romanGift;

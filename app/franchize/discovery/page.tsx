@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, Bike, ChevronDown, Handshake, Info, MapPin, MessagesSquare, Snowflake, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowRight, Bike, Building2, Car, ChevronDown, Handshake, Home, Info, MapPin, MessagesSquare, Snowflake, Sparkles, Trophy, Users, Wrench } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { CrewDiscoveryGraph } from "./CrewDiscoveryGraph";
 import { loadNetworkModel } from "./load-network-model";
 import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
 
 // app/franchize/discovery/page.tsx — GLOBAL crew discovery (2026-10-01).
 //
@@ -45,16 +46,42 @@ import { RomanQuestCake } from "@/components/roman-gift/RomanQuestCake";
 // The canvas regression (label pile-up on phones) is fixed in
 // CrewDiscoveryGraph — phones now render a 640-unit viewBox.
 
-export const metadata: Metadata = {
-  title: "Сеть экипажей — что умеют люди рядом",
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "franchize/discovery",
+  siteName: "Сеть экипажей · SLY13",
+  title: "Сеть экипажей — что умеют люди рядом · SLY13",
   description:
-    "Все экипажи сети на одной карте: круги — экипажи, размер — люди, линии — общие люди. Услуги каждого экипажа: аренда мото, зимнее хранение. Как арендовать, как сдать байк на зимовку, как создать свой экипаж.",
-};
+    "Все экипажи сети на одной карте: круги — экипажи, размер — люди, линии — общие люди. Аренда мото, авто и квартир, снегоходы, мотосервис, зимнее хранение. Как арендовать, как сдать байк на зимовку, как создать свой экипаж.",
+  ogTitle: "Сеть экипажей SLY13 — 25 экипажей на одной карте",
+  ogDescription:
+    "Мото, авто, квартиры, снегоходы, сервис — одна сеть людей. Круг — экипаж, линия — общие люди: тапай и ныряй по рукопожатиям.",
+  ogImage: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/sly13_logo.jpg",
+  ogImageAlt: "Сеть экипажей платформы SLY13",
+});
 
 // Always render per-request: crews/_services change when the boss edits them
 // and the page must show the network AS IT IS NOW (no build-time prerender,
 // no stale ISR snapshot — the empty-state must never get cached either).
 export const dynamic = "force-dynamic";
+
+// task211 (2026-11-25): многие экипажи сети получили собственные ТОП-лендинги
+// (task202–210: /renta-car, /renta-flat, /georg-electro, /leorus, /mototehnn,
+// /salavey13, /moto-selection…). Карточка ниже ведёт на лендинг, когда он
+// есть (это «лицо» экипажа для поисковиков и шеров), и на витрину
+// /franchize/{slug}, когда лендинга нет. Слаги — экипажные, из БД.
+const LANDING_BY_SLUG: Readonly<Record<string, string>> = {
+  "sly13": "/salavey13",
+  "moto-selection": "/moto-selection",
+  "renta-car": "/renta-car",
+  "motoprokat1": "/motoprokat1",
+  "snowmobile-nn": "/snowmobile-nn",
+  "snegoprokat-nn": "/snegoprokat-nn",
+  "renta-flat": "/renta-flat",
+  "georg-electro": "/georg-electro",
+  "nn-mototeh-nn": "/mototehnn",
+  "djorudjov": "/leorus",
+  "vip-bike": "/vipbikerental",
+};
 
 function initialsOf(name: string): string {
   const parts = name.replace(/^@/, "").trim().split(/\s+/).slice(0, 2);
@@ -100,7 +127,8 @@ export default async function CrewDiscoveryPage() {
           <p className="text-xs font-black uppercase tracking-[0.28em] text-sky-300/80">Сеть экипажей</p>
           <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Что умеют люди рядом</h1>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-white/70 md:text-base">
-            Круг — экипаж, размер — люди, линия — общие люди. Тапай, тащи, ныряй по рукопожатиям —{" "}
+            Мото, авто, квартиры, снегоходы, сервис — круги-экипажи одной сети, линии — общие люди.
+            Тапай, тащи, ныряй по рукопожатиям —{" "}
             <a href="#howto" className="underline decoration-sky-300/40 underline-offset-2 hover:text-white">
               как всё это работает
             </a>
@@ -138,13 +166,48 @@ export default async function CrewDiscoveryPage() {
                   ctaLabel={flagship ? `Каталог · ${flagship.name}` : "Каталог экипажа"}
                   ctaHref={flagship ? `/franchize/${slugOf(flagship)}` : "/franchize/create"}
                 />
+                {/* task211: сеть давно не только мото — howto-полоса показывает
+                    вертикали, которые реально живут (task204/207/210:
+                    renta-car, renta-flat, georg/mototehnn/leorus). */}
+                <HowtoCard
+                  icon={<Car className="h-5 w-5" aria-hidden />}
+                  accent="#fca5a5"
+                  title="Взять авто напрокат"
+                  body="Рента-Кар НН: эконом и комфорт без водителя, посуточно и на месяц, подача по адресу бесплатно и круглосуточно — бронь на витрине или в боте."
+                  ctaLabel="Автопрокат · Рента-Кар"
+                  ctaHref="/renta-car"
+                />
+                <HowtoCard
+                  icon={<Home className="h-5 w-5" aria-hidden />}
+                  accent="#fcd34d"
+                  title="Квартира посуточно"
+                  body="Рента-Флэт НН: студии и квартиры на сутки и месяц — та же цепочка витрины: каталог, бронь, договор, залог. Движок один, ниша другая."
+                  ctaLabel="Квартиры · Рента-Флэт"
+                  ctaHref="/renta-flat"
+                />
                 <HowtoCard
                   icon={<Snowflake className="h-5 w-5" aria-hidden />}
                   accent="#93c5fd"
-                  title="Сдать байк на зимовку"
-                  body="Экипажи со снежинкой принимают мото на сезон: тёплый бокс, обслуживание, фотоотчёты — весной байк ждёт тебя в полной готовности."
-                  ctaLabel={storageCrew ? `Хранение · ${storageCrew.name}` : "Найти экипаж"}
-                  ctaHref={storageCrew ? `/franchize/${slugOf(storageCrew)}/storage` : "/franchize/create"}
+                  title="Снегоходы и зимовка"
+                  body="Снегоходные экипажы катают и учат круглый сезон, а экипажи со снежинкой принимают мото на зимовку: тёплый бокс, обслуживание, фотоотчёты."
+                  ctaLabel={storageCrew ? `Хранение · ${storageCrew.name}` : "Снегоходы сети"}
+                  ctaHref={storageCrew ? `/franchize/${slugOf(storageCrew)}/storage` : "/snowmobile-nn"}
+                />
+                <HowtoCard
+                  icon={<Wrench className="h-5 w-5" aria-hidden />}
+                  accent="#86efac"
+                  title="Сервис и запчасти"
+                  body="Мотосалон полного цикла, электрик электробайков, мотосервис — сервисные экипажи сети чинят, шьют контроллеры и держат 10 000+ запчастей."
+                  ctaLabel="МотоТех НН · салон"
+                  ctaHref="/mototehnn"
+                />
+                <HowtoCard
+                  icon={<Building2 className="h-5 w-5" aria-hidden />}
+                  accent="#c4b5fd"
+                  title="Ивенты под ключ"
+                  body="LEORUS: фестивали, шоу-программы, видео-продакшн и корпоративы — 20 лет, 300+ проектов. Сеть сильна не только техникой."
+                  ctaLabel="LEORUS · ивенты"
+                  ctaHref="/leorus"
                 />
                 <HowtoCard
                   icon={<Sparkles className="h-5 w-5" aria-hidden />}
@@ -235,13 +298,20 @@ export default async function CrewDiscoveryPage() {
                           {initialsOf(node.name)}
                         </span>
                       )}
-                      <div className="min-w-0">
-                        <h3 className="truncate text-base font-bold text-white">{node.name}</h3>
-                        <p className="flex items-center gap-1 text-xs text-white/60">
-                          <Users className="h-3 w-3" aria-hidden /> {node.memberCount}{" "}
-                          {pluralPeople(node.memberCount)}
-                        </p>
-                      </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-bold text-white">{node.name}</h3>
+                      <p className="flex items-center gap-1 text-xs text-white/60">
+                        {/* task211: у новых экипажей люди ещё не заведены
+                            (владелец-заглушка скрыта display-фильтром сети) —
+                            «0 человек» читалось как мёртвая витрина. Считаем
+                            бэдж иначе: люди есть → сколько; нет → витрина
+                            жива, просто операторы работают в боте. */}
+                        <Users className="h-3 w-3" aria-hidden />
+                        {node.memberCount > 0
+                          ? `${node.memberCount} ${pluralPeople(node.memberCount)}`
+                          : "витрина экипажа"}
+                      </p>
+                    </div>
                     </div>
 
                     {node.description && (
@@ -298,11 +368,14 @@ export default async function CrewDiscoveryPage() {
                       </div>
                     )}
 
+                    {/* task211: у экипажа с собственным топ-лендингом кнопка
+                        ведёт на НЕГО (это лицо экипажа), у остальных — на
+                        витрину /franchize/{slug} как раньше. */}
                     <Link
-                      href={`/franchize/${node.slug}`}
+                      href={LANDING_BY_SLUG[node.slug] ?? `/franchize/${node.slug}`}
                       className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20"
                     >
-                      Открыть экипаж <ArrowRight className="h-4 w-4" aria-hidden />
+                      {LANDING_BY_SLUG[node.slug] ? "Открыть лендинг" : "Открыть экипаж"} <ArrowRight className="h-4 w-4" aria-hidden />
                     </Link>
                   </article>
                 ))}

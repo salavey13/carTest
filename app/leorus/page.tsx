@@ -18,21 +18,23 @@
 
 import type { Metadata } from "next";
 import LeorusLandingClient from "./LeorusLandingClient";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
 
-export const metadata: Metadata = {
+// task210 (2026-11-24): SEO/social parity — как task208/209 у остальных
+// витрин: canonical + og:image + twitter + vk через crewLandingMetadata
+// («reuse our existing mechanics»). og:image — hero-фон лендинга.
+export const metadata: Metadata = crewLandingMetadata({
+  slug: "leorus",
+  siteName: "LEORUS",
   title: "LEORUS — Создание интригующих мероприятий · Ивент-агентство · Нижний Новгород",
   description:
     "LEORUS — агентство мероприятий Рустама Оруджова и Влада Иващенко. 20 лет, 300+ проектов: топовые корпоративы для крупных компаний, фестивали, шоу и продакшн под ключ. Нижний Новгород и вся Россия.",
-  robots: { index: true, follow: true },
-  openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: "LEORUS",
-    title: "LEORUS — Создание интригующих мероприятий",
-    description:
-      "Ивент-агентство Рустама Оруджова × Влада Иващенко: фестивали, шоу-программы, видео-продакшн и корпоративы под ключ. 20 лет, 300+ проектов, 1 000 000 зрителей.",
-  },
-};
+  ogTitle: "LEORUS — Создание интригующих мероприятий",
+  ogDescription:
+    "Ивент-агентство Рустама Оруджова × Влада Иващенко: фестивали, шоу-программы, видео-продакшн и корпоративы под ключ. 20 лет, 300+ проектов, 1 000 000 зрителей.",
+  ogImage: "/leorus/hero-bg.jpg",
+  ogImageAlt: "LEORUS — ивент-агентство мероприятий",
+});
 
 export default function LeorusLanding() {
   return <LeorusLandingClient />;

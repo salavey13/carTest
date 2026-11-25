@@ -32,13 +32,33 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getCrewPaletteBySlug } from "@/app/franchize/actions";
+import { crewLandingMetadata } from "@/app/franchize/lib/landing-meta";
+import { resolveFranchizeSiteUrl } from "@/app/franchize/[slug]/metadata";
 import Sly13LandingClient from "./Sly13LandingClient";
 
-export const metadata = {
+// task209 (2026-11-25): SEO/social parity с экипажными лендингами (task208
+// закрыл canonical+og:image+twitter+vk только для пяти /{slug} лендингов —
+// /salavey13 и /moto-selection, две самые расшариваемые витрины, оставались
+// без превью в Telegram/VK и без canonical при дублях хостов). Механика —
+// та же, что у task208: crewLandingMetadata поверх resolveFranchizeSiteUrl
+// («reuse our existing mechanics»), og:image — hero-фото витрины (carpix).
+// Отличие от экипажных лендингов: сущность здесь — человек + платформа,
+// поэтому JSON-LD — Person + WebSite (а не LocalBusiness).
+const HERO_OG =
+  "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg";
+
+export const metadata = crewLandingMetadata({
+  slug: "salavey13",
+  siteName: "SLY13",
   title: "SLY13 — свой цифровой бизнес под ключ · платформа проката и сервисов · salavey13",
   description:
     "Свой цифровой прокат или сервис: витрина с оплатой, договоры и залоги, двойная книга денег, бот-клерк для бумаг — а ИИ-агент строит и ведёт систему. Франшиза без пайка: филиалы на одной платформе — точка, сеть городов, федеральная сеть. Не «бизнес в чужом чате»: витрина, база и репозиторий остаются твоими. Обкатано на живом прокате.",
-};
+  ogTitle: "SLY13 — платформа франшиз проката и сервисов",
+  ogDescription:
+    "Витрина с корзиной и оплатой, заявки из Авито, договоры и залоги, двойная книга денег, бот-клерк. Старт за вечер, паёк 0 ₽ — витрина, база и репозиторий остаются твоими.",
+  ogImage: HERO_OG,
+  ogImageAlt: "SLY13 — платформа франшиз проката и сервисов",
+});
 
 export default async function Sly13Landing() {
   // Resilience: supabaseAdmin THROWS synchronously when Supabase is
@@ -61,5 +81,47 @@ export default async function Sly13Landing() {
     };
   }
 
-  return <Sly13LandingClient palette={p} />;
+  // task209: JSON-LD schema.org — витрина физлица-основателя: Person
+  // (salavey13, контакты) + WebSite (сама витрина). Рендерится на сервере,
+  // экранирование «<» — та же гигиена, что у CrewLandingClient (task208).
+  const siteUrl = resolveFranchizeSiteUrl();
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/salavey13#website`,
+        name: "SLY13",
+        inLanguage: "ru-RU",
+        url: `${siteUrl}/salavey13`,
+        description:
+          "Платформа франшиз проката и сервисов: витрина с оплатой, лиды и Авито, аренда с договорами и залогами, двойная книга денег, бот-клерк, ИИ-агент.",
+        publisher: { "@id": `${siteUrl}/salavey13#person` },
+      },
+      {
+        "@type": "Person",
+        "@id": `${siteUrl}/salavey13#person`,
+        name: "salavey13",
+        alternateName: "SLY13",
+        jobTitle: "Разработчик и основатель платформы SLY13",
+        url: "https://t.me/SALAVEY13",
+        email: "salavey13@gmail.com",
+        knowsAbout: [
+          "Next.js",
+          "Supabase",
+          "Telegram Mini App",
+          "CRM для проката",
+          "франшизы проката",
+        ],
+      },
+    ],
+  };
+  const jsonLdHtml = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
+      <Sly13LandingClient palette={p} />
+    </>
+  );
 }

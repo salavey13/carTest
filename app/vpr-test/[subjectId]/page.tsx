@@ -28,6 +28,7 @@ import { VprQuestionContent } from "@/components/vpr/VprQuestionContent";
 import { VprAnswerList } from "@/components/vpr/VprAnswerList";
 import { VprTimeUpModal } from "@/components/vpr/VprTimeUpModal";
 import { getVprSubjectSlug } from "@/lib/vprCheatsheet";
+import { useVprRoadmap } from "@/hooks/useVprRoadmap";
 
 import { toast } from "sonner";
 // Import Server Actions
@@ -82,11 +83,14 @@ export interface VprTestAttempt {
 
 export default function VprTestPage() {
     // --- States ---
-    const { user, dbUser, isLoading: isUserLoading } = useAppContext(); // Removed token, no longer needed directly here
+    const { user, dbUser, isLoading: isUserLoading } = useAppContext(); // Removed token, no longer needed directly
     const params = useParams();
     const router = useRouter();
     const subjectIdParam = params.subjectId as string;
     const [subjectId, setSubjectId] = useState<number | null>(null);
+    // task212c: дорожка разблокировки 8 класса
+    const { recordResult: recordRoadmapResult } = useVprRoadmap();
+    const [roadmapUnlock, setRoadmapUnlock] = useState<{ passed: boolean; newlyUnlocked: string | null; earnedAchievements?: string[] } | null>(null);
 
     // Component States (mostly UI related now)
     const [subject, setSubject] = useState<SubjectData | null>(null);
@@ -398,9 +402,33 @@ export default function VprTestPage() {
                 debugLogger.log("Test marked as complete locally. Final Score:", result.updatedAttempt.score);
                 toast.success("Тест завершен!", { duration: 4000 });
                 // Admin notification handled by server action
+
+                // task212c/213/214: запись результата в дорожку разблокировки (8 класс)
+                const finishScore = result.updatedAttempt.score ?? 0;
+                const finishTotal = totalQ;
+                const finishSlug = getVprSubjectSlug(subject?.name);
+                if (finishSlug.endsWith("-8")) {
+                    try {
+                        const rr = await recordRoadmapResult(finishSlug.replace("-8", ""), finishScore, finishTotal);
+                        setRoadmapUnlock(rr);
+                        if (rr.newlyUnlocked) {
+                            toast.success(`🔓 Новый предмет разблокирован!`, { duration: 6000 });
+                        } else if (rr.passed) {
+                            toast.info("✅ Предмет сдан! Порог 70% пройден.", { duration: 4000 });
+                        } else if (finishTotal > 0 && finishScore / finishTotal >= 0.6) {
+                            toast.warning("⚡ Почти! Ещё чуть-чуть до разблокировки следующего уровня", { duration: 6000 });
+                        }
+                        // task214: ачивки — отдельными тостами поверх основного
+                        for (const ach of rr.earnedAchievements || []) {
+                            toast.success(`🏅 АЧИВКА: ${ach}`, { duration: 8000 });
+                        }
+                    } catch (e) {
+                        debugLogger.warn("[VprRoadmap] record failed", e);
+                    }
+                }
             }
         }
-    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, isDummyModeActive, isDummyModeGloballyDisabled]);
+    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, isDummyModeActive, isDummyModeGloballyDisabled, subject, recordRoadmapResult]);
 
 
     // --- Reset Logic (Refactored to use Server Action) ---
@@ -559,7 +587,8 @@ export default function VprTestPage() {
                     totalQuestions={currentAttempt.total_questions ?? questions.length}
                     onReset={resetTest}
                     onGoToList={() => router.push('/vpr-tests')}
-                    subjectSlug={getVprSubjectSlug(subject?.name)} /> );
+                    subjectSlug={getVprSubjectSlug(subject?.name)}
+                    roadmapUnlock={roadmapUnlock} /> );
     }
 
     // Critical Data Check - needs attempt, subject, questions, variant *after* loading/error checks passed
