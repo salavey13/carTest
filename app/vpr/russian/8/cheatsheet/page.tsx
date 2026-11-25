@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
   PenTool, SpellCheck, BookOpen, Lightbulb, Brain, Code,
-  Sparkles, CheckCircle2, XCircle, AlertTriangle, Languages,
+  Sparkles, CheckCircle2, XCircle, AlertTriangle, Languages, MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,11 +35,31 @@ const BOND_GAME = [
   { phrase: "интересная книга", answer: "согласование", hint: "Прилагательное согласуется в роде, числе, падеже" },
 ];
 
+// --- ИГРА: ВИДЫ ОДНОСОСТАВНЫХ ПРЕДЛОЖЕНИЙ (1-е полугодие) ---
+const ONESUBJ_GAME = [
+  { phrase: "Светает.", answer: "безличное", hint: "Нет и не может быть подлежащего: действие само по себе, без деятеля" },
+  { phrase: "Люблю грозу в начале мая.", answer: "определённо-личное", hint: "Глагол 1-го/2-го лица: люблю, любишь, любим — деятеля легко подставить (я)" },
+  { phrase: "По лесу стреляют.", answer: "неопределённо-личное", hint: "Глагол 3-го лица мн. ч. — важен факт, а не кто именно" },
+  { phrase: "Тишина.", answer: "назывное", hint: "Только подлежащее, сказуемого нет — «называет» сцену" },
+  { phrase: "Ветра нет, и небо чистое.", answer: "двусоставное", hint: "Есть и подлежащее «ветер», и сказуемое «нет» (категория состояния)" },
+];
+
+// --- ПАМЯТКА: ТИПЫ ОДНОСОСТАВНЫХ ---
+const ONESUBJ_TYPES = [
+  { name: "Назывное", formula: "Кто? Что?", example: "Ночь. Улица. Фонарь. Аптека.", color: "text-violet-300" },
+  { name: "Определённо-личное", formula: "Я/ты/мы/вы + глагол", example: "Иду по знакомой улице.", color: "text-blue-300" },
+  { name: "Неопределённо-личное", formula: "Они (кто-то) + глагол 3 л. мн.ч.", example: "В деревне говорят о дожде.", color: "text-green-300" },
+  { name: "Безличное", formula: "Действия без деятеля", example: "Мне нездоровится. Смеркается.", color: "text-orange-300" },
+];
+
 export default function Russian8Cheatsheet() {
   const [gapAnswers, setGapAnswers] = useState<Record<number, number>>({});
   const [gapChecked, setGapChecked] = useState(false);
   const [bondIdx, setBondIdx] = useState(0);
   const [bondPicked, setBondPicked] = useState<string | null>(null);
+  const [oneIdx, setOneIdx] = useState(0);
+  const [onePicked, setOnePicked] = useState<string | null>(null);
+  const [oneScore, setOneScore] = useState(0);
 
   const gapsCorrect = GAPS.filter((g) => gapAnswers[g.id] === g.correct).length;
   const allAnswered = GAPS.every((g) => gapAnswers[g.id] !== undefined);
@@ -54,6 +74,22 @@ export default function Russian8Cheatsheet() {
       />
 
       <div className="max-w-4xl mx-auto relative z-10">
+        {/* HERO BAND */}
+        <div className="relative mb-10 rounded-2xl overflow-hidden border border-violet-500/20 h-48 md:h-64 shadow-[0_0_40px_rgba(168,85,247,0.08)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/russian-hero.jpg"
+            alt="Неоновая каллиграфия русского языка"
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">
+            <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-violet-400 mb-1">Русский Мастер // 8 класс</div>
+            <div className="text-white font-black text-2xl md:text-4xl drop-shadow-lg">Язык как код — дешифруй правила</div>
+          </div>
+        </div>
+
         {/* HEADER */}
         <header className="mb-12 text-center">
           <motion.div
@@ -138,6 +174,78 @@ export default function Russian8Cheatsheet() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* TOPIC 1.5: ОДНОСОСТАВНЫЕ ПРЕДЛОЖЕНИЯ (1-е полугодие) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <MessageSquare className="text-cyan-400" /> 1.5. Односоставные предложения
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-cyan-400/80 bg-cyan-950/40 border border-cyan-500/20 px-2 py-1 rounded-full">1-е полугодие</span>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            {ONESUBJ_TYPES.map((t) => (
+              <div key={t.name} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+                <div className={cn("font-bold text-sm", t.color)}>{t.name}</div>
+                <div className="text-xs text-zinc-500 mt-1 font-mono">{t.formula}</div>
+                <div className="text-sm text-zinc-300 mt-2 italic">«{t.example}»</div>
+              </div>
+            ))}
+          </div>
+          <Card className="bg-zinc-900 border-cyan-500/30 shadow-xl">
+            <CardHeader className="bg-cyan-500/5 border-b border-cyan-500/10">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Brain className="w-5 h-5" /> Определитель: что за предложение?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold text-center font-mono text-white mb-6 italic">«{ONESUBJ_GAME[oneIdx].phrase}»</div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {["назывное", "определённо-личное", "неопределённо-личное", "безличное", "двусоставное"].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      if (onePicked) return;
+                      setOnePicked(opt);
+                      if (opt === ONESUBJ_GAME[oneIdx].answer) setOneScore((s) => s + 1);
+                    }}
+                    className={cn(
+                      "px-4 py-2 rounded-lg border text-sm font-bold transition-all",
+                      onePicked === null
+                        ? "bg-zinc-800 border-zinc-700 hover:border-cyan-400 hover:text-white"
+                        : opt === ONESUBJ_GAME[oneIdx].answer
+                          ? "border-green-500 text-green-400 bg-green-500/5"
+                          : opt === onePicked
+                            ? "border-red-500 text-red-400 bg-red-500/5"
+                            : "bg-zinc-800/30 border-zinc-800 text-zinc-500",
+                    )}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              {onePicked && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 text-center">
+                  <div className={cn("inline-flex items-center gap-2 text-sm mb-2", onePicked === ONESUBJ_GAME[oneIdx].answer ? "text-green-400" : "text-red-400")}>
+                    {onePicked === ONESUBJ_GAME[oneIdx].answer ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {onePicked === ONESUBJ_GAME[oneIdx].answer ? "Верно!" : `Это ${ONESUBJ_GAME[oneIdx].answer}`}
+                  </div>
+                  <div className="text-sm text-zinc-400 max-w-lg mx-auto">{ONESUBJ_GAME[oneIdx].hint}</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 border-cyan-500/30 text-cyan-400"
+                    onClick={() => {
+                      setOneIdx((i) => (i + 1) % ONESUBJ_GAME.length);
+                      setOnePicked(null);
+                    }}
+                  >
+                    Следующее предложение →
+                  </Button>
+                </motion.div>
+              )}
+              <div className="text-center mt-4 text-xs text-zinc-500">Счёт: {oneScore}</div>
+            </CardContent>
+          </Card>
         </section>
 
         {/* TOPIC 2: СЛОВОСОЧЕТАНИЯ (ИГРА) */}

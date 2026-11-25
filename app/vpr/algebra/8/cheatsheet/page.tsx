@@ -65,7 +65,22 @@ export default function Algebra8FriendlyCheatsheet() {
       </div>
 
       <div className="max-w-4xl mx-auto relative z-10">
-        
+        {/* HERO BAND */}
+        <div className="relative mb-10 rounded-2xl overflow-hidden border border-cyan-500/20 h-48 md:h-64 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/algebra-hero.jpg"
+            alt="Неоновые формулы и параболы"
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">
+            <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-cyan-400 mb-1">Algebra Master // 8 класс</div>
+            <div className="text-white font-black text-2xl md:text-4xl drop-shadow-lg">Корни, дискриминант, свобода</div>
+          </div>
+        </div>
+
         {/* HEADER */}
         <header className="mb-12 text-center">
           <motion.div 

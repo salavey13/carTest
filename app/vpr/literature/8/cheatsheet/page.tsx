@@ -28,13 +28,18 @@ const ANSWER_STEPS = [
   { id: 4, title: "Вывод", example: "«Таким образом, фрагмент раскрывает…»", note: "Вернись к тезису другими словами — и всё, точка" },
 ];
 
-// --- ПРОИЗВЕДЕНИЯ 8 КЛАССА ---
+// --- ПРОИЗВЕДЕНИЯ 8 КЛАССА (по программе года) ---
+// Семестр I: древнерусская литература, Державин, «Недоросль», Крылов
+// Семестр II: «Капитанская дочка», «Мцыри», «Ревизор», «Обломов»
 const WORKS = [
-  { title: "«Капитанская дочка» А. С. Пушкин", theme: "Честь и долг: Гринёв не клянётся Пугачёву, рискуя жизнью. Пугачёв — бунт, «бессмысленный и беспощадный»", quote: "«Береги честь смолоду» — эпиграф всего романа" },
-  { title: "«Мцыри» М. Ю. Лермонтов", theme: "Свобода против неволи: три дня побега стоят целой жизни в монастыре. Исповедь-монолог", quote: "«Я мало жил, и жил в плену…» — тоска по родине и воле" },
-  { title: "«Ревизор» Н. В. Гоголь", theme: "Страх и чинопочитание: город принимает Хлестакова за ревизора. Сатира на бюрократию", quote: "«Чему смеётесь? Над собою смеётесь!» — ремарка в конце" },
-  { title: "«Обломов» И. А. Гончаров", theme: "Апатия против деятельности: диван Обломова vs энергия Штольца. «Обломовщина» как диагноз", quote: "«Лежанье у Ильи Ильича не было ни необходимостью… это было его нормальным состоянием»" },
-  { title: "Отзывы и начальные страницы", theme: "«Письмо к деревенскому другу» Державина, «Певец во стане русских воинов» Жуковского — разнообразие жанров века", quote: "Знай 1–2 факта об авторе — это плюс к ответу" },
+  { title: "«Слово о полку Игореве» (XII век)", theme: "Призыв к единству Руси: поход Игоря против половцев завершается поражением, но путь автор видит в объединении князей. Плач Ярославны — вершина лирики", quote: "«Тяжко голове без плеч, беда телу без головы» — метафора единства князя и дружины", semester: 1 },
+  { title: "«Недоросль» Д. И. Фонвизин (1782)", theme: "Первая русская социально-политическая комедия. Митрофанушка — невежда; «недоросль» — дворянин, не поступивший на службу. Простакова — грубая власть помещицы", quote: "«Вот злонравия достойные плоды!» — Стародум в финале", semester: 1 },
+  { title: "Оды Г. Р. Державина", theme: "«Фелица» — ироничный портрет Екатерины II; «Памятник» — поэт выше царей. Смешение высокого и низкого стилей — новаторство", quote: "«Я царь — я раб — я червь — я Бог» («Бог») — антитеза человеческой природы", semester: 1 },
+  { title: "Басни И. А. Крылова", theme: "Мораль в лицах: «Обоз» — о осторожности в переменах (отголосок 1812 года), «Лягушки, просящие царя» — о цене свободы", quote: "«А вы, друзья, как ни садитесь, всё в музыканты не годитесь» («Квартет»)", semester: 1 },
+  { title: "«Капитанская дочка» А. С. Пушкин", theme: "Честь и долг: Гринёв не клянётся Пугачёву, рискуя жизнью. Пугачёв — бунт, «бессмысленный и беспощадный»", quote: "«Береги честь смолоду» — эпиграф всего романа", semester: 2 },
+  { title: "«Мцыри» М. Ю. Лермонтов", theme: "Свобода против неволи: три дня побега стоят целой жизни в монастыре. Исповедь-монолог", quote: "«Я мало жил, и жил в плену…» — тоска по родине и воле", semester: 2 },
+  { title: "«Ревизор» Н. В. Гоголь", theme: "Страх и чинопочитание: город принимает Хлестакова за ревизора. Сатира на бюрократию", quote: "«Чему смеётесь? Над собою смеётесь!» — ремарка в конце", semester: 2 },
+  { title: "«Обломов» И. А. Гончаров", theme: "Апатия против деятельности: диван Обломова vs энергия Штольца. «Обломовщина» как диагноз", quote: "«Лежанье у Ильи Ильича не было ни необходимостью… это было его нормальным состоянием»", semester: 2 },
 ];
 
 export default function Literature8Cheatsheet() {
@@ -43,6 +48,7 @@ export default function Literature8Cheatsheet() {
   const [gameScore, setGameScore] = useState(0);
   const [workIdx, setWorkIdx] = useState(0);
   const [stepIdx, setStepIdx] = useState(0);
+  const [semester, setSemester] = useState(1);
 
   const current = DEVICES_GAME[gameIdx];
   const options = ["олицетворение", "метафора", "сравнение", "оксюморон", "анафора"];
@@ -57,6 +63,22 @@ export default function Literature8Cheatsheet() {
       />
 
       <div className="max-w-4xl mx-auto relative z-10">
+        {/* HERO BAND */}
+        <div className="relative mb-10 rounded-2xl overflow-hidden border border-rose-500/20 h-48 md:h-64 shadow-[0_0_40px_rgba(244,63,94,0.08)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/literature-hero.jpg"
+            alt="Неоновая книга с частицами света"
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">
+            <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-rose-400 mb-1">Lit Compass // 8 класс</div>
+            <div className="text-white font-black text-2xl md:text-4xl drop-shadow-lg">Смыслы между строк</div>
+          </div>
+        </div>
+
         {/* HEADER */}
         <header className="mb-12 text-center">
           <motion.div
@@ -180,27 +202,53 @@ export default function Literature8Cheatsheet() {
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
             <BookOpen className="text-green-400" /> 2. Произведения года
           </h2>
-          <div className="space-y-3">
-            {WORKS.map((w, i) => (
+          {/* Семестровый переключатель */}
+          <div className="flex gap-2 mb-5 p-1 bg-zinc-900/60 border border-zinc-800 rounded-xl w-fit mx-auto md:mx-0">
+            {[
+              { v: 1, label: "I полугодие", hint: "«Слово», Державин, «Недоросль», Крылов" },
+              { v: 2, label: "II полугодие", hint: "Пушкин, Лермонтов, Гоголь, Гончаров" },
+            ].map((t) => (
               <button
-                key={w.title}
-                onClick={() => setWorkIdx(i)}
+                key={t.v}
+                onClick={() => { setSemester(t.v); setWorkIdx(0); }}
                 className={cn(
-                  "w-full text-left p-4 rounded-xl border transition-all",
-                  workIdx === i ? "bg-zinc-900 border-green-500/40" : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-600",
+                  "px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                  semester === t.v ? "bg-green-500/15 text-green-400 border border-green-500/30" : "text-zinc-500 hover:text-zinc-300 border border-transparent",
                 )}
               >
-                <div className="font-bold text-white text-sm">{w.title}</div>
-                {workIdx === i && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-3 space-y-2 overflow-hidden">
-                    <div className="text-sm text-zinc-400">{w.theme}</div>
-                    <div className="text-xs text-green-400/80 flex items-start gap-2">
-                      <Quote className="w-3 h-3 mt-0.5 shrink-0" /> {w.quote}
-                    </div>
-                  </motion.div>
-                )}
+                {t.label}
               </button>
             ))}
+          </div>
+          <div className="space-y-3">
+            {WORKS.filter((w) => w.semester === semester).map((w) => {
+              const i = WORKS.indexOf(w);
+              return (
+                <button
+                  key={w.title}
+                  onClick={() => setWorkIdx(i)}
+                  className={cn(
+                    "w-full text-left p-4 rounded-xl border transition-all",
+                    workIdx === i ? "bg-zinc-900 border-green-500/40" : "bg-zinc-900/40 border-zinc-800 hover:border-zinc-600",
+                  )}
+                >
+                  <div className="font-bold text-white text-sm flex items-center justify-between gap-2">
+                    <span>{w.title}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 border border-zinc-800 px-1.5 py-0.5 rounded-full shrink-0">
+                      {w.semester === 1 ? "I сем" : "II сем"}
+                    </span>
+                  </div>
+                  {workIdx === i && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-3 space-y-2 overflow-hidden">
+                      <div className="text-sm text-zinc-400">{w.theme}</div>
+                      <div className="text-xs text-green-400/80 flex items-start gap-2">
+                        <Quote className="w-3 h-3 mt-0.5 shrink-0" /> {w.quote}
+                      </div>
+                    </motion.div>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <div className="text-xs text-zinc-600 text-center mt-3">Тапни по названию — раскроется тема и цитата</div>
         </section>

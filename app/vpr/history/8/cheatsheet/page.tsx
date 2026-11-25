@@ -12,17 +12,20 @@ import {
 import { cn } from "@/lib/utils";
 
 // --- ТИМЛАЙН: ХРОНОЛОГИЯ XIX ВЕКА ---
+// Семестр I (1-е полугодие 8 класса): Александр I → декабристы → Николай I → Крымская война
+// Семестр II: великие реформы Александра II и далее
 const TIMELINE = [
-  { year: "1801", event: "Взойдение Александра I на престол", detail: "После убийства Павла I. «Негласный комитет» и либеральные начинания" },
-  { year: "1812", event: "Отечественная война", detail: "Бородино (сентябрь), совет в Филях, пожар Москвы, гибель армии Наполеона" },
-  { year: "1825", event: "Восстание декабристов", detail: "14 декабря, Сенатская площадь. Программы: «Конституция» Муравьёва и «Русская правда» Пестеля" },
-  { year: "1837", event: "Открытие первой железной дороги", detail: "Петербург — Царское Село. Начало индустриализации" },
-  { year: "1861", event: "Отмена крепостного права", detail: "Манифест 19 февраля. Александр II — «Царь-Освободитель». Временнообязанные и выкупные платежи" },
-  { year: "1864", event: "Земская и судебная реформы", detail: "Выборные земства, гласный состязательный суд, присяжные заседатели" },
-  { year: "1881", event: "Убийство Александра II", detail: "1 марта, народовольцы. Конец реформ, контрреформы Александра III" },
+  { year: "1801", event: "Взойдение Александра I на престол", detail: "После убийства Павла I. «Негласный комитет» и либеральные начинания", semester: 1 },
+  { year: "1812", event: "Отечественная война", detail: "Бородино (сентябрь), совет в Филях, пожар Москвы, гибель армии Наполеона", semester: 1 },
+  { year: "1825", event: "Восстание декабристов", detail: "14 декабря, Сенатская площадь. Программы: «Конституция» Муравьёва и «Русская правда» Пестеля", semester: 1 },
+  { year: "1837", event: "Первая железная дорога", detail: "Петербург — Царское Село. Кодификация Сперанского, теория «официальной народности» Уварова", semester: 1 },
+  { year: "1853–56", event: "Крымская война", detail: "Синоп, оборона Севастополя (349 дней), Парижский мир. Поражение = толчок к реформам", semester: 1 },
+  { year: "1861", event: "Отмена крепостного права", detail: "Манифест 19 февраля. Александр II — «Царь-Освободитель». Временнообязанные и выкупные платежи", semester: 2 },
+  { year: "1864", event: "Земская и судебная реформы", detail: "Выборные земства, гласный состязательный суд, присяжные заседатели", semester: 2 },
+  { year: "1881", event: "Убийство Александра II", detail: "1 марта, народовольцы. Конец реформ, контрреформы Александра III", semester: 2 },
 ];
 
-// --- КВИЗ: ЛИЧНОСТИ И СОБЫТИЯ ---
+// --- КВИЗ: ЛИЧНОСТИ И СОБЫТИЯ (фокус 1-го полугодия) ---
 const HISTORY_QUIZ = [
   {
     q: "Кто возглавлял Южное общество декабристов и разработал «Русскую правду»?",
@@ -31,28 +34,40 @@ const HISTORY_QUIZ = [
     hint: "Автор радикальной программы — республика, ликвидация самодержавия и крепостничества",
   },
   {
-    q: "Что такое «временнообязанные крестьяне» после 1861 года?",
-    options: ["Крестьяне, продолжавшие нести повинности до полного выкупа земли", "Крестьяне, сразу получившие землю бесплатно", "Городские рабочие", "Разряд казаков"],
+    q: "«Теория официальной народности» Уварова — это формула:",
+    options: ["Православие, самодержавие, народность", "Свобода, равенство, братство", "Москва — третий Рим", "Бог, царь и Отечество в законе"],
     correct: 0,
-    hint: "До заключения выкупной сделки крестьяне обязаны были платить оброк и отбывать барщину",
+    hint: "Идеология эпохи Николая I (1830-е): религия + власть + народ как три опоры государства",
   },
   {
-    q: "Какая реформа была проведена в 1874 году?",
-    options: ["Военная (всеобщая повинность вместо рекрутчины)", "Судебная", "Земская", "Финансовая"],
+    q: "Кто руководил кодификацией законов при Николае I?",
+    options: ["М. М. Сперанский", "А. А. Аракчеев", "С. С. Уваров", "П. Д. Киселёв"],
     correct: 0,
-    hint: "Служить стали все мужчины с 21 года, жребий определял срок — 6 лет",
+    hint: "Полное собрание законов (1830) и Свод законов (1832) — итог его работы",
   },
   {
-    q: "Кто такой С. Ю. Витте?",
-    options: ["Министр финансов, индустриализация и золотой рубль", "Народоволец, убивший Александра II", "Герой войны 1812 года", "Автор судебной реформы"],
+    q: "Оборона Севастополя в Крымской войне длилась:",
+    options: ["349 дней", "100 дней", "2 месяца", "3 года"],
     correct: 0,
-    hint: "Его реформа денежного обращения (1897) ввела золотое обеспечение рубля",
+    hint: "Сентябрь 1854 — август 1855. Позиции на Малаховом кургане, адмиралы Нахимов, Корнилов, Истомин",
   },
   {
-    q: "Что произошло 1 марта 1881 года?",
-    options: ["Убийство Александра II народовольцами", "Отмена крепостного права", "Бородинское сражение", "Восстание декабристов"],
+    q: "Что стало главным итогом Крымской войны для России?",
+    options: ["Поражение и толчок к великим реформам Александра II", "Победа и присоединение Крыма", "Присоединение Прибалтики", "Отмена крепостного права в 1856"],
     correct: 0,
-    hint: "Взрыв на набережной Екатерининского канала — царь-реформатор погиб от второй бомбы",
+    hint: "Парижский мир 1856 г. лишил России флота на Чном море; военная отсталость заставила модернизироваться",
+  },
+  {
+    q: "Синопское сражение (1853) — чем знаменито?",
+    options: ["Последней крупной победой парусного флота (Нахимов)", "Первым применением танков", "Гибелью Нельсона", "Высадкой в Крыму"],
+    correct: 0,
+    hint: "Нахимов разгромил турецкую эскадру в Синопской бухте; Англия и Франция тут же вступили в войну",
+  },
+  {
+    q: "Идейное течение 1830–40-х: «самобытный путь» России vs «учись у Европы»?",
+    options: ["Славянофилы vs западники", "Декабристы vs масоны", "Народники vs марксисты", "Консерваторы vs либералы"],
+    correct: 0,
+    hint: "Спор о путях развития: славянофилы (Хомяков, Аксаков) — община и вера; западники (Грановский, Герцен) — европейский путь",
   },
 ];
 
@@ -73,6 +88,22 @@ export default function History8Cheatsheet() {
       />
 
       <div className="max-w-4xl mx-auto relative z-10">
+        {/* HERO BAND */}
+        <div className="relative mb-10 rounded-2xl overflow-hidden border border-yellow-500/20 h-48 md:h-64 shadow-[0_0_40px_rgba(234,179,8,0.08)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/history-hero.jpg"
+            alt="Неоновый XIX век: бронзовые всадники"
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">
+            <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-brand-yellow mb-1">Chrono Archive // 8 класс</div>
+            <div className="text-white font-black text-2xl md:text-4xl drop-shadow-lg">XIX век: от Бородино до реформ</div>
+          </div>
+        </div>
+
         {/* HEADER */}
         <header className="mb-12 text-center">
           <motion.div
@@ -102,8 +133,14 @@ export default function History8Cheatsheet() {
             </CardHeader>
             <CardContent className="p-6">
               <div className="mb-6 p-4 bg-black border border-blue-500/20 rounded-xl">
-                <div className="text-center mb-2">
+                <div className="text-center mb-2 flex items-center justify-center gap-3">
                   <span className="text-3xl font-black text-brand-yellow font-mono">{ev.year}</span>
+                  <span className={cn(
+                    "text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border",
+                    ev.semester === 1 ? "text-orange-400 border-orange-500/30 bg-orange-950/40" : "text-zinc-400 border-zinc-700 bg-zinc-900",
+                  )}>
+                    {ev.semester === 1 ? "I полугодие" : "II полугодие"}
+                  </span>
                 </div>
                 <div className="text-lg font-bold text-center text-white mb-2">{ev.event}</div>
                 <div className="text-sm text-center text-zinc-400">{ev.detail}</div>
@@ -159,6 +196,7 @@ export default function History8Cheatsheet() {
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
             <Crown className="text-violet-400" /> 2. Декабристы: две программы
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-900 border border-zinc-800 px-2 py-1 rounded-full">1-е полугодие</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div className="p-5 bg-zinc-900 border border-violet-500/20 rounded-xl">
@@ -187,10 +225,52 @@ export default function History8Cheatsheet() {
           </div>
         </section>
 
+        {/* TOPIC 2.5: НИКОЛАЙ I И КРЫМСКАЯ (ядро 1-го полугодия) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Train className="text-orange-400" /> 2.5. Николай I и Крымская война
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-orange-400/80 bg-orange-950/40 border border-orange-500/20 px-2 py-1 rounded-full">1-е полугодие</span>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader>
+                <CardTitle className="text-sm text-orange-400">Эпоха Николая I (1825–1855)</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm space-y-1.5">
+                <div>• Кодификация законов — Сперанский (Свод, 1832)</div>
+                <div>• III Отделение — политическая полиция Бенкендорфа</div>
+                <div>• Теория официальной народности Уварова: православие, самодержавие, народность</div>
+                <div>• Реформа гос. крестьян Киселёва, цензурный устав «чугунный»</div>
+                <div>• Славянофилы vs западники — спор о пути России</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader>
+                <CardTitle className="text-sm text-orange-400">Крымская война (1853–1856)</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm space-y-1.5">
+                <div>• Причина: спор о «палестинских святынях» и проливах</div>
+                <div>• Синоп (ноябрь 1853) — последняя победа парусного флота, Нахимов</div>
+                <div>• Оборона Севастополя — 349 дней, Малахов курган</div>
+                <div>• Герои: Нахимов, Корнилов, Истомин, матрос Пётр Кошка, Дарья Севастопольская, хирург Пирогов</div>
+                <div>• Парижский мир 1856: нейтрализация Чёрного моря, поражение</div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="p-4 bg-yellow-900/10 border border-brand-yellow/20 rounded-xl flex items-start gap-3">
+            <Lightbulb className="text-brand-yellow w-8 h-8 shrink-0" />
+            <div className="text-sm">
+              <p className="font-bold text-white mb-1">Связь эпох — вопрос ВПР №1</p>
+              <p>Крымская война вскрыла отсталость (кремнёвые ружья против нарезных, парусный флот против парового). Итог: поражение → необходимость реформ → Александр II и Манифест 1861. Запомни эту причинно-следственную цепочку — она отвечает сразу на несколько вопросов ВПР.</p>
+            </div>
+          </div>
+        </section>
+
         {/* TOPIC 3: РЕФОРМЫ АЛЕКСАНДРА II */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
             <Factory className="text-green-400" /> 3. Великие реформы 1860–70-х
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-900 border border-zinc-800 px-2 py-1 rounded-full">2-е полугодие</span>
           </h2>
           <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono space-y-3">
             <div className="text-zinc-500">// Даты реформ — машина для памяти:</div>
