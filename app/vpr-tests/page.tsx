@@ -15,6 +15,7 @@ import {
   Languages, Hash, ArrowRight, Radar, Shield, Flame, Star, Users, Lock
 } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { useVprRoadmap } from "@/hooks/useVprRoadmap";
 import type { Database } from "@/types/database.types";
 import { AdBreak } from "@/components/AdBreak";
 
@@ -711,6 +712,192 @@ function SectionHeader({ icon, title, subtitle, accent }: {
 }
 
 /* ================================================================
+   ROADMAP DECK — task212c: геймифицированная дорожка 8 класса.
+   Предметы открываются по цепочке: тест сдан (≥70%) → следующий unlocked.
+   ================================================================ */
+
+const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'activity' | 'languages' | 'landmark' | 'hash'; color: string; testId: number; cheatsheet: string }> = {
+  algebra: { label: "Алгебра", icon: "calculator", color: "#22d3ee", testId: 71, cheatsheet: "/vpr/algebra/8/cheatsheet" },
+  geometry: { label: "Геометрия", icon: "ruler", color: "#0bf2f6", testId: 75, cheatsheet: "/vpr/geometry/8/cheatsheet" },
+  probability: { label: "Вероятность и статистика", icon: "activity", color: "#4ade80", testId: 79, cheatsheet: "/vpr/probability/8/cheatsheet" },
+  russian: { label: "Русский язык", icon: "languages", color: "#a855f7", testId: 76, cheatsheet: "/vpr/russian/8/cheatsheet" },
+  history: { label: "История", icon: "landmark", color: "#eab308", testId: 77, cheatsheet: "/vpr/history/8/cheatsheet" },
+  literature: { label: "Литература", icon: "hash", color: "#f43f5e", testId: 78, cheatsheet: "/vpr/literature/8/cheatsheet" },
+};
+
+const ROADMAP_ORDER = ["algebra", "geometry", "probability", "russian", "history", "literature"] as const;
+
+function RoadmapDeck() {
+  const { progress, isUnlocked, isCompleted } = useVprRoadmap();
+  const unlockedCount = ROADMAP_ORDER.filter((s) => isUnlocked(s)).length;
+  const completedCount = ROADMAP_ORDER.filter((s) => isCompleted(s)).length;
+  const nextSlug = ROADMAP_ORDER.find((s) => !isCompleted(s));
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.15 }}
+      className="mb-16 sm:mb-24"
+    >
+      <SectionHeader
+        icon={<Flame className="w-6 h-6" />}
+        title="Дорожка 8 класса // Mission_Road"
+        subtitle={`Уровней открыто: ${unlockedCount}/${ROADMAP_ORDER.length} · Сдано: ${completedCount}/${ROADMAP_ORDER.length}`}
+        accent
+      />
+
+      {/* Прогресс-бар дорожки */}
+      <div className="mb-8 px-1">
+        <div className="relative h-3 rounded-full bg-zinc-900 border border-zinc-800 overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${(completedCount / ROADMAP_ORDER.length) * 100}%` }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-cyan-500 via-green-500 to-yellow-400"
+          />
+          {/* Насечки уровней */}
+          {ROADMAP_ORDER.map((slug, i) => (
+            <div
+              key={slug}
+              className="absolute top-0 bottom-0 w-px bg-zinc-950"
+              style={{ left: `${((i + 1) / ROADMAP_ORDER.length) * 100}%` }}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between mt-2 text-[9px] font-mono uppercase tracking-wider text-zinc-600">
+          <span>Level 1 · Алгебра</span>
+          <span>Финал · Литература</span>
+        </div>
+      </div>
+
+      {/* Карточки дорожки */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+        {ROADMAP_ORDER.map((slug, i) => {
+          const meta = ROADMAP_META[slug];
+          const unlocked = isUnlocked(slug);
+          const completed = isCompleted(slug);
+          const rec = progress.completed?.[slug];
+          const isNext = nextSlug === slug && unlocked;
+          return (
+            <motion.div
+              key={slug}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-30px" }}
+              transition={{ duration: 0.4, delay: i * 0.07 }}
+              className="relative"
+            >
+              {unlocked ? (
+                <div
+                  className={cn(
+                    "relative h-full rounded-2xl border overflow-hidden transition-all duration-500",
+                    completed
+                      ? "border-green-500/40 bg-green-950/10"
+                      : isNext
+                        ? "border-yellow-500/50 bg-zinc-950/80 shadow-[0_0_30px_rgba(234,179,8,0.1)]"
+                        : "border-zinc-800/60 bg-zinc-950/80 hover:border-zinc-700/80"
+                  )}
+                >
+                  {/* Номер уровня */}
+                  <div className="absolute top-3 left-3 text-[10px] font-mono font-bold text-zinc-600">
+                    LVL {i + 1}
+                  </div>
+                  {completed && (
+                    <div className="absolute top-3 right-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-green-400 bg-green-950/40 border border-green-500/30 px-2 py-0.5 rounded-full">
+                      <Trophy className="w-3 h-3" /> Сдан {rec ? `${rec.score}/${rec.total}` : ""}
+                    </div>
+                  )}
+                  {!completed && isNext && (
+                    <div className="absolute top-3 right-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-yellow-400 bg-yellow-950/40 border border-yellow-500/30 px-2 py-0.5 rounded-full">
+                      <Zap className="w-3 h-3" /> Твой уровень
+                    </div>
+                  )}
+
+                  <div className="p-5 sm:p-6 pt-10">
+                    <div className="flex items-start gap-4">
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center border shrink-0"
+                        style={{ backgroundColor: `${meta.color}10`, borderColor: `${meta.color}25` }}
+                      >
+                        <CheatIconSVG type={meta.icon} color={meta.color} size={36} />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-base font-black tracking-tight" style={{ color: meta.color }}>
+                          {meta.label}
+                        </h3>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed mt-1">
+                          {completed
+                            ? `Лучший результат: ${rec?.score ?? 0}/${rec?.total ?? 0}. Можно перездать для рекорда.`
+                            : "Сдай тест с ≤30% ошибок — откроется следующий уровень."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-5">
+                      <Link href={meta.cheatsheet} className="flex-1">
+                        <Button variant="outline" size="sm" className={cn("w-full border-zinc-700 text-zinc-300 hover:text-white font-bold", completed && "border-green-500/30 text-green-400 hover:text-green-300")}>
+                          <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Шпаргалка
+                        </Button>
+                      </Link>
+                      <Link href={`/vpr-test/${meta.testId}`} className="flex-1">
+                        <Button size="sm" className="w-full font-bold" style={{ backgroundColor: meta.color, color: "#030712" }}>
+                          <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative h-full rounded-2xl border border-zinc-800/40 bg-zinc-950/40 overflow-hidden p-5 sm:p-6 pt-10 cursor-not-allowed select-none">
+                  <div className="absolute inset-0 backdrop-blur-[2px] bg-black/30 z-10 flex flex-col items-center justify-center gap-3">
+                    <div className="w-14 h-14 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-zinc-500" />
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest font-mono">LOCKED</div>
+                      <div className="text-[10px] text-zinc-600 mt-1 max-w-[180px]">
+                        Сдай «{ROADMAP_META[ROADMAP_ORDER[i - 1]]?.label}» на ≥70%, чтобы открыть
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute top-3 left-3 text-[10px] font-mono font-bold text-zinc-700">LVL {i + 1}</div>
+                  <div className="opacity-30 blur-[1px]">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
+                        <CheatIconSVG type={meta.icon} color="#52525b" size={36} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black tracking-tight text-zinc-500">{meta.label}</h3>
+                        <p className="text-[11px] text-zinc-600 leading-relaxed mt-1">???</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-5">
+                      <div className="flex-1 h-8 rounded-md bg-zinc-900 border border-zinc-800" />
+                      <div className="flex-1 h-8 rounded-md bg-zinc-900 border border-zinc-800" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Пояснение правил */}
+      <div className="mt-6 p-4 rounded-xl border border-zinc-800/60 bg-zinc-950/50 text-[11px] text-zinc-500 leading-relaxed flex items-start gap-3">
+        <Shield className="w-4 h-4 text-cyan-500/60 shrink-0 mt-0.5" />
+        <p>
+          <b className="text-zinc-300">Как это работает:</b> первый уровень (Алгебра) открыт сразу.
+          Проглоти шпаргалку → сразись с тестом → не больше 30% ошибок → следующий предмет разблокирован.
+          Провалил — шпаргалка никуда не денется: feed, fight, fail, repeat, upgrade. Прогресс хранится в твоём профиле.
+        </p>
+      </div>
+    </motion.section>
+  );
+}
+
+/* ================================================================
    CHEAT CARD — completely redesigned
    ================================================================ */
 
@@ -1238,6 +1425,47 @@ export default function VprTestsListPage() {
               </div>
             </div>
           </motion.section>
+
+          {/* ============================================
+              MATRIX LANDING CTA (task212c)
+              ============================================ */}
+          {selectedGrade === 8 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-8 sm:mb-10 relative rounded-2xl overflow-hidden border border-green-500/25 group"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/matrix-hero.jpg"
+                alt="Матрица подготовки 8 класса"
+                className="w-full h-44 md:h-60 object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#030712] via-[#030712]/55 to-transparent" />
+              <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-10">
+                <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-green-400 mb-2">
+                  Wake up, восьмиклассник…
+                </div>
+                <div className="text-2xl md:text-4xl font-black text-white mb-3 max-w-lg leading-tight">
+                  Матрица середины года
+                </div>
+                <div className="text-sm text-zinc-300 max-w-md mb-5 hidden sm:block">
+                  Feed → Fight → Fail → Repeat → Upgrade. Пройди дорожку из 6 уровней к контрольным за полугодие.
+                </div>
+                <Link href="/vpr-matrix" className="w-fit">
+                  <Button className="bg-green-500 hover:bg-green-400 text-black font-black px-6 py-5 rounded-xl shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                    Начать тренировку <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ============================================
+              ROADMAP DECK (task212c) — только для 8 класса
+              ============================================ */}
+          {selectedGrade === 8 && <RoadmapDeck />}
 
           {/* ============================================
               CHEATSHEETS GRID
