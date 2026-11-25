@@ -26,10 +26,12 @@ import { Handshake, PhoneCall } from "lucide-react";
 
 const ACCENT = "#d99a00";
 
-// Те же витрины экипажей, что в партнёрских сетках остальных
-// лендингов (5/5: каждая витрина ссылается на каждую, task 148 добавил
-// МотоТех НН). Логотипы и подложки совпадают 1:1 с сетками на других
-// лендингах.
+// Те же витрины экипажей, что в партнёрских сетках остальных лендингов.
+// task211 (2026-11-25): сетка флагмана отстала от сети — в ней 5 плиток при
+// 11 живых витринах (зелёные экипажи task205 + renta-flat task207 не
+// попали, заголовок обещал «четыре витрины»). Теперь полный реестр — как в
+// CREW_PARTNERS у CrewLandingClient (task205): каждая витрина ссылается
+// на каждую, флагман не исключение. Логотипы и подложки совпадают 1:1.
 const CREW_TILES = [
   {
     href: "/moto-selection",
@@ -73,6 +75,53 @@ const CREW_TILES = [
     backing: "#e8edf6",
     lightBacking: true,
   },
+  // task211: зелёные экипажи лид-листа (task205) + демо-вертикаль квартир
+  // (task207) — двусторонний линкинг: их сетки ссылаются на флагман.
+  {
+    href: "/renta-car",
+    title: "Рента-Кар НН",
+    tagline: "автопрокат в Нижнем — подача бесплатно, круглосуточно",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-car-logo.png",
+    logoAlt: "Рента-Кар НН",
+    backing: "#eef1f6",
+    lightBacking: true,
+  },
+  {
+    href: "/motoprokat1",
+    title: "МотоПрокат1",
+    tagline: "мотопрокат — от BMW до Ducati, бронь в Telegram",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motoprokat1-logo.png",
+    logoAlt: "МотоПрокат1",
+    backing: "#eef1f6",
+    lightBacking: true,
+  },
+  {
+    href: "/snowmobile-nn",
+    title: "Snowmobile NN",
+    tagline: "снегоходы — катания и обучение, бронь в Telegram",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snowmobile-nn-logo.png",
+    logoAlt: "Snowmobile NN",
+    backing: "#eef1f6",
+    lightBacking: true,
+  },
+  {
+    href: "/snegoprokat-nn",
+    title: "СнегоПрокат НН",
+    tagline: "снегоходы — одиночные и тандемные катания",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/snegoprokat-nn-logo.png",
+    logoAlt: "СнегоПрокат НН",
+    backing: "#eef1f6",
+    lightBacking: true,
+  },
+  {
+    href: "/renta-flat",
+    title: "Рента-Флэт НН",
+    tagline: "аренда квартир посуточно — та же цепочка каталог→бронь→договор",
+    logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+    logoAlt: "Рента-Флэт НН",
+    backing: "#eef1f6",
+    lightBacking: true,
+  },
 ];
 
 export function PartnersCrewsSection() {
@@ -97,13 +146,14 @@ export function PartnersCrewsSection() {
           экипажи платформы
         </p>
         <h2 className="mt-3 font-orbitron text-2xl font-black uppercase leading-tight text-white sm:text-3xl">
-          Один софт — <span className="text-amber-400">четыре витрины</span>
+          Один софт — <span className="text-amber-400">десять витрин</span>
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/70 sm:text-base">
-          VIP BIKE работает на той же платформе, что и партнёрские экипажи:
-          каталог с тарифами, CRM лидов, договоры, карта райдеров и витрина под
-          своим именем. Наведите (или удерживайте палец) на логотипе — откроется
-          название и описание, повторный тап ведёт на витрину.
+          VIP BIKE работает на той же платформе, что и экипажи сети: мото,
+          авто, квартиры, снегоходы, сервис и ивенты. Каталог с тарифами,
+          CRM лидов, договоры, карта райдеров и витрина под своим именем.
+          Наведите (или удерживайте палец) на логотипе — откроется название
+          и описание, повторный тап ведёт на витрину.
         </p>
 
         <div className="mt-8">

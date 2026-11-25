@@ -906,6 +906,17 @@ export default async function MotoTehNNLanding() {
                   backing: "#eef1f6",
                   lightBacking: true,
                 },
+                // task211: полный двусторонний линкинг — была последней
+                // недостающей плиткой во всех сетках платформы.
+                {
+                  href: "/renta-flat",
+                  title: "Рента-Флэт НН",
+                  tagline: "аренда квартир посуточно — та же цепочка каталог→бронь→договор",
+                  logoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/renta-flat-logo.png",
+                  logoAlt: "Рента-Флэт НН",
+                  backing: "#eef1f6",
+                  lightBacking: true,
+                },
               ]}
             />
           </div>

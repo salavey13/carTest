@@ -11,6 +11,11 @@
 // NEXT_PUBLIC_SITE_URL || VERCEL_PROJECT_PRODUCTION_URL || default.
 // Витринные подстраницы экипажей (about/storage/contacts/…) уже имеют свои
 // canonical — сюда их не дублируем, карта отвечает за верхний уровень.
+//
+// task211 (2026-11-25): досы́пан задел task210 — /georg-electro, /mototehnn,// /leorus получили собственные топ-лендинги с canonical+og (e4ece20), но в
+// карту не попали: боты не знали о трёх живых страницах. Плюс сюда же —
+// /franchize/discovery (карта сети, data-driven, 25 экипажей) и /sly13
+// (редирект на /salavey13 — в карте НЕ нужен, canonical укажет канон).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { MetadataRoute } from "next";
@@ -26,6 +31,10 @@ const LANDING_PAGES: Array<{ path: string; priority: number }> = [
   { path: "/moto-selection", priority: 0.8 },
   { path: "/franchize/vip-bike", priority: 0.8 },
   { path: "/renta-flat", priority: 0.7 },
+  { path: "/georg-electro", priority: 0.7 },
+  { path: "/mototehnn", priority: 0.7 },
+  { path: "/leorus", priority: 0.7 },
+  { path: "/franchize/discovery", priority: 0.6 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
