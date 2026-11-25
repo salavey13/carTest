@@ -90,7 +90,7 @@ export default function VprTestPage() {
     const [subjectId, setSubjectId] = useState<number | null>(null);
     // task212c: дорожка разблокировки 8 класса
     const { recordResult: recordRoadmapResult } = useVprRoadmap();
-    const [roadmapUnlock, setRoadmapUnlock] = useState<{ passed: boolean; newlyUnlocked: string | null } | null>(null);
+    const [roadmapUnlock, setRoadmapUnlock] = useState<{ passed: boolean; newlyUnlocked: string | null; earnedAchievements?: string[] } | null>(null);
 
     // Component States (mostly UI related now)
     const [subject, setSubject] = useState<SubjectData | null>(null);
@@ -403,7 +403,7 @@ export default function VprTestPage() {
                 toast.success("Тест завершен!", { duration: 4000 });
                 // Admin notification handled by server action
 
-                // task212c/213: запись результата в дорожку разблокировки (8 класс)
+                // task212c/213/214: запись результата в дорожку разблокировки (8 класс)
                 const finishScore = result.updatedAttempt.score ?? 0;
                 const finishTotal = totalQ;
                 const finishSlug = getVprSubjectSlug(subject?.name);
@@ -417,6 +417,10 @@ export default function VprTestPage() {
                             toast.info("✅ Предмет сдан! Порог 70% пройден.", { duration: 4000 });
                         } else if (finishTotal > 0 && finishScore / finishTotal >= 0.6) {
                             toast.warning("⚡ Почти! Ещё чуть-чуть до разблокировки следующего уровня", { duration: 6000 });
+                        }
+                        // task214: ачивки — отдельными тостами поверх основного
+                        for (const ach of rr.earnedAchievements || []) {
+                            toast.success(`🏅 АЧИВКА: ${ach}`, { duration: 8000 });
                         }
                     } catch (e) {
                         debugLogger.warn("[VprRoadmap] record failed", e);

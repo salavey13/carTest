@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { VPR_TG_DEEPLINK } from "@/lib/vprRoadmap";
+import { telegramDeliver } from "@/lib/telegram-transport";
+import { VPR_TG_DEEPLINK, VPR_HERO_IMAGES } from "@/lib/vprRoadmap";
 import { logger } from "@/lib/logger";
 
-// task213: отправка инвайт-уведомления в Матрицу ВПР через форвардинг-API.
+// task213/214: отправка инвайт-уведомления в Матрицу ВПР через форвардинг-API.
 // Юзер (родитель/организатор) получает сообщение у себя в TG и форвардит
-// его геймеру. GET/POST с ?chat_id= (по умолчанию ADMIN_CHAT_ID).
+// его геймеру. task214: hero-фото алгебры + inline URL-кнопки — они
+// переживают пересылку, в отличие от reply-клавиатуры.
+// GET/POST с ?chat_id= (по умолчанию ADMIN_CHAT_ID).
 
 const INVITE_TEXT =
   `🎮 *МАТРИЦА 8 КЛАССА — тренировочная программа*\n\n` +
@@ -14,10 +16,11 @@ const INVITE_TEXT =
   `🔓 6 уровней-предметов: Алгебра → Геометрия → Вероятность → Русский → История → Литература\n` +
   `📖 Шпаргалки-загрузки: мини-игры, пошаговые разборы, квизы\n` +
   `⚔️ Тесты-бои: реальные ВПР-варианты с разбором каждого удара\n` +
-  `🔓 Замки: следующий предмет открывается только после сдачи предыдущего (≥70%)\n\n` +
+  `🏅 Ачивки: First Blood, Flawless Victory, Iron Will, The One\n` +
+  `🔒 Замки: следующий предмет открывается только после сдачи предыдущего (≥70%)\n\n` +
   `Протокол прокачки: _Feed → Fight → Fail → Repeat → Upgrade_\n` +
   `Провалился — не страшно: это просто итерация. Второй заход всегда точнее.\n\n` +
-  `Прогресс сохраняется, бот присылает уведомления об открытых уровнях 🏆\n\n` +
+  `Прогресс сохраняется, бот присылает уведомления об открытых уровнях и ачивках 🏆\n\n` +
   `Wake up, восьмиклассник… 💊`;
 
 export async function GET(req: NextRequest) {
@@ -33,16 +36,22 @@ async function handleInvite(req: NextRequest) {
     const url = new URL(req.url);
     const chatId = url.searchParams.get("chat_id") || process.env.ADMIN_CHAT_ID || "413553377";
 
+    // inline-кнопки (URL) — работают как ссылки и переживают пересылку
     const buttons = [
       [{ text: "🔴 Начать тренировку", url: VPR_TG_DEEPLINK }],
       [{ text: "🌐 Открыть в браузере", url: "https://v0-car-test.vercel.app/vpr-matrix" }],
     ];
 
-    const result = await sendComplexMessage(chatId, INVITE_TEXT, buttons, {
-      parseMode: "Markdown",
-    });
+    const payload: Record<string, unknown> = {
+      photo: VPR_HERO_IMAGES.algebra,
+      caption: INVITE_TEXT,
+      parse_mode: "Markdown",
+      reply_markup: { inline_keyboard: buttons },
+    };
 
-    if (!result.success) {
+    const result = await telegramDeliver("sendPhoto", chatId, payload);
+
+    if (!result.ok) {
       logger.error(`[VprInvite] failed for ${chatId}: ${result.error}`);
       return NextResponse.json({ success: false, error: result.error }, { status: 500 });
     }

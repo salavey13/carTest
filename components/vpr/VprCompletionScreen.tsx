@@ -18,7 +18,7 @@ interface VprCompletionScreenProps {
   onReset: () => void;
   onGoToList: () => void;
   subjectSlug?: string;
-  roadmapUnlock?: { passed: boolean; newlyUnlocked: string | null } | null; // task212c
+  roadmapUnlock?: { passed: boolean; newlyUnlocked: string | null; earnedAchievements?: string[] } | null; // task212c/214
 }
 
 export function VprCompletionScreen({
@@ -171,6 +171,33 @@ export function VprCompletionScreen({
               );
             })}
           </div>
+        )}
+
+        {/* task214: полученные ачивки — золотой блок над кнопками */}
+        {isRoadmapSubject && roadmapUnlock?.earnedAchievements && roadmapUnlock.earnedAchievements.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.9, type: "spring" }}
+            className="mb-6 p-4 rounded-xl border border-yellow-500/40 bg-gradient-to-r from-yellow-950/40 to-amber-950/30"
+          >
+            <div className="font-bold text-yellow-400 text-sm mb-2 text-center uppercase tracking-wider">
+              🏅 Новая ачивка
+            </div>
+            <div className="space-y-1.5">
+              {roadmapUnlock.earnedAchievements.map((ach, i) => (
+                <motion.div
+                  key={ach}
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 1.1 + i * 0.15 }}
+                  className="text-sm text-yellow-200 font-semibold text-center"
+                >
+                  {ach}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         )}
 
         <div className="space-y-4">

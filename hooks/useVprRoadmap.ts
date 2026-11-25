@@ -79,12 +79,13 @@ export function useVprRoadmap() {
     };
   }, [dbUser?.user_id, isUserLoading]);
 
-  /** Записать результат теста. Возвращает открылся ли следующий предмет. */
+  /** Записать результат теста. Возвращает открылся ли следующий предмет + ачивки. */
   const recordResult = useCallback(
-    async (slug: string, score: number, total: number): Promise<{ passed: boolean; newlyUnlocked: string | null }> => {
+    async (slug: string, score: number, total: number): Promise<{ passed: boolean; newlyUnlocked: string | null; earnedAchievements: string[] }> => {
       const userId = dbUser?.user_id ? String(dbUser.user_id) : null;
       if (!userId) {
         // гость: считаем локально, чтобы UX работал и без авторизации
+        // (ачивки гостю не начисляются — нет TG-доставки и постоянного профиля)
         const passed = total > 0 && score / total >= VPR_PASS_RATIO;
         if (passed) {
           const idx = VPR_ROADMAP_ORDER.indexOf(slug as (typeof VPR_ROADMAP_ORDER)[number]);
@@ -93,17 +94,17 @@ export function useVprRoadmap() {
             const updated = { ...progress, unlocked: [...progress.unlocked, next] };
             setProgress(updated);
             writeLS(updated);
-            return { passed, newlyUnlocked: next };
+            return { passed, newlyUnlocked: next, earnedAchievements: [] };
           }
         }
-        return { passed, newlyUnlocked: null };
+        return { passed, newlyUnlocked: null, earnedAchievements: [] };
       }
       const res = await recordVprRoadmapResultAction({ userId, slug, score, total });
       if (res.success && res.progress) {
         setProgress(res.progress);
         writeLS(res.progress);
       }
-      return { passed: res.passed ?? false, newlyUnlocked: res.newlyUnlocked ?? null };
+      return { passed: res.passed ?? false, newlyUnlocked: res.newlyUnlocked ?? null, earnedAchievements: res.earnedAchievements ?? [] };
     },
     [dbUser?.user_id, progress]
   );
