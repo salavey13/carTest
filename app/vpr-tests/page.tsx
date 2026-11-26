@@ -33,6 +33,12 @@ type LeaderboardEntry = {
   total_score: number | null;
 };
 
+// task215b: avatar_url идёт в <img src> — допускаем только http(s).
+// javascript:/data:/blob: в src аватара (поля заполняются юзерами) — вектор
+// поломки/трекинга; некорректный URL рендерим как дефолтную иконку.
+const safeAvatar = (u: string | null | undefined) =>
+  u && /^https?:\/\//i.test(u) ? u : null;
+
 type CheatData = {
   href: string;
   title: string;
@@ -1093,8 +1099,8 @@ function LeaderboardCard({ entry, index }: { entry: LeaderboardEntry; index: num
 
           {/* Avatar */}
           <div className="w-11 h-11 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden grayscale group-hover:grayscale-0 transition-all duration-500 shrink-0">
-            {entry.avatar_url ? (
-              <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
+            {safeAvatar(entry.avatar_url) ? (
+              <img src={safeAvatar(entry.avatar_url)!} alt="" className="w-full h-full object-cover" />
             ) : (
               <Terminal className="w-5 h-5 text-zinc-700 group-hover:text-zinc-400 transition-colors" />
             )}
@@ -1665,8 +1671,8 @@ export default function VprTestsListPage() {
                     {/* 2nd place */}
                     <div className="flex flex-col items-center pt-6">
                       <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 border-zinc-500/30 mb-3 grayscale hover:grayscale-0 transition-all">
-                        {leaderboard[1].avatar_url
-                          ? <img src={leaderboard[1].avatar_url} alt="" className="w-full h-full object-cover" />
+                        {safeAvatar(leaderboard[1].avatar_url)
+                          ? <img src={safeAvatar(leaderboard[1].avatar_url)} alt="" className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-zinc-900 flex items-center justify-center"><Terminal className="w-6 h-6 text-zinc-600" /></div>
                         }
                       </div>
@@ -1689,8 +1695,8 @@ export default function VprTestsListPage() {
                           </svg>
                         </div>
                         <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 border-yellow-500/40 mb-3 grayscale hover:grayscale-0 transition-all shadow-[0_0_20px_rgba(234,179,8,0.15)]">
-                          {leaderboard[0].avatar_url
-                            ? <img src={leaderboard[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                          {safeAvatar(leaderboard[0].avatar_url)
+                            ? <img src={safeAvatar(leaderboard[0].avatar_url)} alt="" className="w-full h-full object-cover" />
                             : <div className="w-full h-full bg-zinc-900 flex items-center justify-center"><Terminal className="w-7 h-7 text-zinc-600" /></div>
                           }
                         </div>
@@ -1707,8 +1713,8 @@ export default function VprTestsListPage() {
                     {/* 3rd place */}
                     <div className="flex flex-col items-center pt-8">
                       <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 border-orange-700/30 mb-3 grayscale hover:grayscale-0 transition-all">
-                        {leaderboard[2].avatar_url
-                          ? <img src={leaderboard[2].avatar_url} alt="" className="w-full h-full object-cover" />
+                        {safeAvatar(leaderboard[2].avatar_url)
+                          ? <img src={safeAvatar(leaderboard[2].avatar_url)} alt="" className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-zinc-900 flex items-center justify-center"><Terminal className="w-5 h-5 text-zinc-600" /></div>
                         }
                       </div>

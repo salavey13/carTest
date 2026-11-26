@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ReadProgress } from "@/components/vpr/ReadProgress";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export default function Literature8Cheatsheet() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans p-4 md:p-8 selection:bg-rose-500/30 relative overflow-hidden">
+      <ReadProgress />
       <div
         className="absolute inset-0 pointer-events-none opacity-5"
         style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "30px 30px" }}
@@ -310,6 +312,55 @@ export default function Literature8Cheatsheet() {
             <p className="mb-2 text-zinc-200">// Как отличить на ВПР за 5 секунд:</p>
             <p>Видишь <b>строфы и переживания</b> → лирика. <b>Повествование от лица автора/рассказчика</b> → эпос. <b>Имена героев + слова в скобках (ремарки) и тире-реплики</b> → драма.</p>
           </div>
+        </section>
+
+        {/* TOPIC 3.6: АНАЛИЗ СТИХА (task215b) */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Feather className="text-sky-400" /> 3.6. Анализ стихотворения: размер и рифма
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+            {[
+              { name: "Ямб", scheme: "та-ТА", ex: "«Мой дя́-дя са́-мых че́ст-ных…» (Пушкин)" },
+              { name: "Хорей", scheme: "ТА-та", ex: "«Бу́-ря мгло́-ю не́-бо кро́-ет…» (Пушкин)" },
+              { name: "Дактиль", scheme: "ТА-та-та", ex: "у́дар на 1-м слоге из трёх" },
+              { name: "Анапест", scheme: "та-та-ТА", ex: "у́дар на 3-м слоге из трёх" },
+            ].map((m) => (
+              <div key={m.name} className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-center">
+                <div className="font-bold text-sky-400 text-sm">{m.name}</div>
+                <div className="font-mono text-xs text-white mt-1">{m.scheme}</div>
+                <div className="text-[10px] text-zinc-600 mt-1">{m.ex}</div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-sky-400">Виды рифмы (по положению)</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1 font-mono">
+                <div>· смежная AABB: месяц/рассвет</div>
+                <div>· перекрёстная ABAB: самая частая</div>
+                <div>· опоясывающая ABBA</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-sky-400">Скелет анализа лирики</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1">
+                <div>1. Тема и настроение (радость/тоска…)</div>
+                <div>2. Образ лирического героя</div>
+                <div>3. Средства: эпитеты, метафоры, размер</div>
+                <div>4. Идея: что поэт хотел сказать</div>
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="bg-sky-900/10 border-sky-500/20 mt-4">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-sky-400 w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: определить размер за 10 секунд</p>
+                <p>Поставь ударения и расставь паузы слогами: ударение на <b>чётном</b> слоге — ямб, на <b>нечётном</b> — хорей. «У-ДАР на второй» = ямб (та-ТА). «УДАР на первой» = хорей (ТА-та).</p>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         {/* CTA */}

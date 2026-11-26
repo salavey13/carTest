@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { ReadProgress } from "@/components/vpr/ReadProgress";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ export default function Algebra8FriendlyCheatsheet() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans p-4 md:p-8 selection:bg-brand-cyan/30 relative overflow-hidden">
+      <ReadProgress />
       {/* Background Decor */}
       <div className="absolute inset-0 pointer-events-none opacity-5" 
            style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
@@ -491,12 +493,80 @@ export default function Algebra8FriendlyCheatsheet() {
             </Card>
         </section>
 
-        {/* TOPIC 8: ВИЕТА (BONUS) */}
+        {/* TOPIC 8: ДРОБНО-РАЦИОНАЛЬНЫЕ УРАВНЕНИЯ (task215b) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <BookOpen className="text-brand-yellow" /> 8. Дробно-рациональные уравнения и ОДЗ
+            </h2>
+            <Card className="bg-zinc-900/50 border-brand-yellow/30 mb-4">
+                <CardHeader className="border-b border-brand-yellow/10">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-brand-yellow" /> Правило №1: сначала ОДЗ
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 text-sm leading-relaxed">
+                    Знаменатель ≠ 0 — выпиши это <b>до</b> решения: <span className="font-mono text-zinc-400">x/(x−3) = 2/(x−3) → ОДЗ: x ≠ 3</span>.<br />
+                    После приведения к квадратному уравнению отбрось корни из ОДЗ — это <b className="text-brand-yellow">половина баллов</b> на ВПР.
+                </CardContent>
+            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-zinc-900 rounded-xl border-l-4 border-brand-yellow">
+                    <div className="font-bold text-white text-sm">1. ОДЗ</div>
+                    <div className="text-xs text-zinc-500 mt-1">знаменатели ≠ 0</div>
+                </div>
+                <div className="p-4 bg-zinc-900 rounded-xl border-l-4 border-brand-cyan">
+                    <div className="font-bold text-white text-sm">2. Общий знаменатель</div>
+                    <div className="text-xs text-zinc-500 mt-1">всё в одну дробь, числитель = 0</div>
+                </div>
+                <div className="p-4 bg-zinc-900 rounded-xl border-l-4 border-green-500">
+                    <div className="font-bold text-white text-sm">3. Фильтр</div>
+                    <div className="text-xs text-zinc-500 mt-1">корни ∉ ОДЗ → в ответ</div>
+                </div>
+            </div>
+            <div className="mt-4 p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono text-zinc-400">
+                <p className="mb-2 text-zinc-200">// Классика: (x² − 9) дробь = 0</p>
+                <p>Числитель 0 при x = ±3, но x = 3 обнуляет знаменатель → ответ только x = −3.</p>
+            </div>
+        </section>
+
+        {/* TOPIC 9: КВАДРАТНЫЙ ТРЁХЧЛЕН (task215b) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <Layers className="text-purple-400" /> 9. Квадратный трёхчлен: разложение
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader><CardTitle className="text-sm text-purple-400">Формула разложения</CardTitle></CardHeader>
+                    <CardContent className="text-sm leading-relaxed space-y-1 font-mono">
+                        <div>ax² + bx + c = a(x − x₁)(x − x₂)</div>
+                        <div className="text-zinc-500 text-xs">где x₁, x₂ — корни через дискриминант</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader><CardTitle className="text-sm text-purple-400">Сокращение дроби</CardTitle></CardHeader>
+                    <CardContent className="text-sm leading-relaxed space-y-1">
+                        <div>Разложи числитель и знаменатель → одинаковые скобки <b>сокращаются</b></div>
+                        <div className="font-mono text-zinc-400 text-xs">(x²−5x+6)/(x−2) = (x−2)(x−3)/(x−2) = x−3</div>
+                    </CardContent>
+                </Card>
+            </div>
+            <Card className="bg-purple-900/10 border-purple-500/20">
+                <CardContent className="p-4 flex items-start gap-3">
+                    <Lightbulb className="text-purple-400 w-10 h-10 flex-shrink-0" />
+                    <div className="text-sm">
+                        <p className="font-bold text-white mb-1">Хак: проверка разложения</p>
+                        <p>Раскрой скобки обратно — должен получиться исходный трёхчлен. И помни: если D = 0, то a(x − x₁)² — корень «двойной», в разложении одна скобка в квадрате.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        </section>
+
+        {/* TOPIC 10: ВИЕТА (BONUS) */}
         <section className="mb-16">
             <div className="p-6 bg-gradient-to-br from-indigo-900/20 to-zinc-900 border border-indigo-500/30 rounded-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-5"><Brain className="w-32 h-32" /></div>
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Zap className="text-indigo-400 w-5 h-5" /> 8. Теорема Виета (Чит-код)
+                    <Zap className="text-indigo-400 w-5 h-5" /> 10. Теорема Виета (Чит-код)
                 </h3>
                 <p className="text-sm text-zinc-400 mb-6 max-w-xl">
                     Для уравнений, где <code className="text-white">a = 1</code> (приведённых), корни можно найти в уме!

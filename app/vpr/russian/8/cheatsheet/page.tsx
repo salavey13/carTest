@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ReadProgress } from "@/components/vpr/ReadProgress";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export default function Russian8Cheatsheet() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans p-4 md:p-8 selection:bg-brand-cyan/30 relative overflow-hidden">
+      <ReadProgress />
       <div
         className="absolute inset-0 pointer-events-none opacity-5"
         style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "30px 30px" }}
@@ -348,6 +350,35 @@ export default function Russian8Cheatsheet() {
           <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono text-zinc-400">
             <p className="mb-2 text-zinc-200">// Словарные ловушки ВПР (не подчиняются правилам — только память):</p>
             <p>стакан, сара<span className="text-rose-400">ф</span>ан, фут<span className="text-rose-400">б</span>ол, ко<span className="text-rose-400">мб</span>айн, акваланг, в<b>о</b>кзал.</p>
+          </div>
+        </section>
+
+        {/* TOPIC 3.6: ОБОБЩАЮЩИЕ СЛОВА (task215b) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <PenTool className="text-amber-400" /> 3.6. Обобщающие слова: двоеточие или тире
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-amber-400">Двоеточие «:»</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1">
+                <div>Обобщающее <b>перед</b> однородными → двоеточие</div>
+                <div className="font-mono text-xs text-zinc-400 mt-1">В корзине лежали <b>грибы</b>: маслята, рыжики и волнушки.</div>
+                <div className="text-zinc-500 text-xs">Схема: [обобщ.]: О, О и О.</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-amber-400">Тире «—»</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1">
+                <div>Обобщающее <b>после</b> однородных → тире</div>
+                <div className="font-mono text-xs text-zinc-400 mt-1">Маслята, рыжики и волнушки — <b>всё это</b> грибы.</div>
+                <div className="text-zinc-500 text-xs">Схема: О, О и О — [обобщ.].</div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-400">
+            <p className="mb-2 text-zinc-200">// Ловушка: «всё это», «и такое», «никто» после ряда — всегда тире:</p>
+            <p>Мальчики, девочки, родители — все замерли. Двоеточие тут <b className="text-rose-400">ошибка</b>.</p>
           </div>
         </section>
 

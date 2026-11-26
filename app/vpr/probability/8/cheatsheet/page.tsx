@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ReadProgress } from "@/components/vpr/ReadProgress";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ export default function Probability8Cheatsheet() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans p-4 md:p-8 selection:bg-green-500/30 relative overflow-hidden">
+      <ReadProgress />
       <div
         className="absolute inset-0 pointer-events-none opacity-5"
         style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "30px 30px" }}
@@ -285,6 +287,42 @@ export default function Probability8Cheatsheet() {
               <div className="text-sm">
                 <p className="font-bold text-white mb-1">Закон больших чисел</p>
                 <p>Чем больше экспериментов, тем ближе <b>частота</b> к <b>вероятности</b>. Подбрось монету 10 раз — может быть 7 орлов (частота 0.7). Подбрось 1000 раз — получится почти 0.5. Типичная задача ВПР: «сколько примерно раз выпадет X из N бросков» → N · P.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* TOPIC 2.6: НЕЗАВИСИМЫЕ СОБЫТИЯ (task215b) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <TrendingUp className="text-violet-400" /> 2.6. Независимые события и дерево
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-violet-400">Правило умножения</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1 font-mono">
+                <div>P(A и B) = P(A) · P(B)</div>
+                <div className="text-zinc-500 text-xs">события независимы: монета и кубик не влияют друг на друга</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader><CardTitle className="text-sm text-violet-400">Дерево вариантов</CardTitle></CardHeader>
+              <CardContent className="text-sm leading-relaxed space-y-1">
+                <div>Каждое ветвление = один исход; путь = событие</div>
+                <div className="font-mono text-zinc-400 text-xs">2 броска монеты: 2×2 = 4 исхода (ОО, ОР, РО, РР)</div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono text-zinc-400 mb-4">
+            <p className="mb-2 text-zinc-200">// Классика ВПР: два кубика, сумма = 8?</p>
+            <p>Благоприятные пары: (2;6),(3;5),(4;4),(5;3),(6;2) → 5 из 36 → P = 5/36 ≈ 0.14</p>
+          </div>
+          <Card className="bg-violet-900/10 border-violet-500/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-violet-400 w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: «хотя бы один»</p>
+                <p>«Хотя бы один орёл из трёх бросков» = 1 − P(ни одного орла) = 1 − (1/2)³ = 7/8. Через противоположное событие всегда быстрее перебора.</p>
               </div>
             </CardContent>
           </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ReadProgress } from "@/components/vpr/ReadProgress";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ export default function History8Cheatsheet() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans p-4 md:p-8 selection:bg-brand-yellow/30 relative overflow-hidden">
+      <ReadProgress />
       <div
         className="absolute inset-0 pointer-events-none opacity-5"
         style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "30px 30px" }}
@@ -304,6 +306,40 @@ export default function History8Cheatsheet() {
               </CardContent>
             </Card>
           </div>
+        </section>
+
+        {/* TOPIC 3.5: ВНЕШНЯЯ ПОЛИТИКА (task215b) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Scroll className="text-cyan-400" /> 3.5. Внешняя политика: войны XIX века
+          </h2>
+          <div className="space-y-3">
+            {[
+              { name: "Русско-турецкая война 1877–78", res: "Победа! Сан-Стефано: независимость Сербии, Румынии, Черногории; Болгария — автономия" },
+              { name: "Присоединение Средней Азии (1860–80-е)", res: "Туркестан: Коканд, Бухара, Хива — вассалы/протектораты" },
+              { name: "Продажа Аляски (1867)", res: "США за $7,2 млн — содержание неосвоенной территории дороже выгод" },
+            ].map((war, i) => (
+              <motion.div
+                key={war.name}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.1 }}
+                className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl"
+              >
+                <div className="font-bold text-white text-sm mb-1">{war.name}</div>
+                <div className="text-xs text-zinc-400"><span className="text-cyan-400">Итог:</span> {war.res}</div>
+              </motion.div>
+            ))}
+          </div>
+          <Card className="bg-cyan-900/10 border-cyan-500/20 mt-4">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-cyan-400 w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: почему Крымская ≠ Русско-турецкая</p>
+                <p>Крымская (1853–56) — <b>поражение</b>, потеря выхода к Чёрному морю, толчок реформам. Русско-турецкая (1877–78) — <b>победа</b>, освобождение балканских славян. На ВПР их путают постоянно: помни порядок «поражение → реформы → победа».</p>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         {/* TOPIC 4: КВИЗ */}

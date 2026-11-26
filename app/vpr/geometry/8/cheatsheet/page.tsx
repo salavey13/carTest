@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ReadProgress } from "@/components/vpr/ReadProgress";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,7 @@ export default function Geometry8Cheatsheet() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-300 font-sans p-4 md:p-8 selection:bg-brand-cyan/30 relative overflow-hidden">
+      <ReadProgress />
       {/* Background Decor */}
       <div
         className="absolute inset-0 pointer-events-none opacity-5"
@@ -345,6 +347,40 @@ export default function Geometry8Cheatsheet() {
               <div className="text-sm">
                 <p className="font-bold text-white mb-1">Хак: угол на диаметр</p>
                 <p>Вписанный угол, опирающийся на диаметр, всегда <b>90°</b>. Это прямой угол «бесплатно» — без вычислений. Любая задача с треугольником в окружности — проверь сначала его.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* TOPIC 3.6: SIN/COS/TG (task215b) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Triangle className="text-brand-pink" /> 3.6. Прямоугольный треугольник: sin, cos, tg
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-xs text-zinc-500 mb-1">Синус</div>
+              <div className="text-lg font-bold text-white font-mono">sin = против/гип</div>
+            </div>
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-xs text-zinc-500 mb-1">Косинус</div>
+              <div className="text-lg font-bold text-white font-mono">cos = приле/гип</div>
+            </div>
+            <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-xs text-zinc-500 mb-1">Тангенс</div>
+              <div className="text-lg font-bold text-white font-mono">tg = против/приле</div>
+            </div>
+          </div>
+          <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-sm font-mono text-zinc-400 mb-4">
+            <p className="mb-2 text-zinc-200">// Таблица 30° / 45° / 60° (только эти спрашивают):</p>
+            <p>sin: 1/2 · √2/2 · √3/2 — cos те же в обратном порядке — tg: √3/3 · 1 · √3</p>
+          </div>
+          <Card className="bg-brand-pink/5 border-brand-pink/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-brand-pink w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: как не перепутать</p>
+                <p><b>sin</b> — «против» и «sin» оба короткие (противолежащий). cos — прилежащий. И помни: sin² + cos² = 1 — проверка любого значения.</p>
               </div>
             </CardContent>
           </Card>

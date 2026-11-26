@@ -23,6 +23,25 @@ const INVITE_TEXT =
   `Прогресс сохраняется, бот присылает уведомления об открытых уровнях и ачивках 🏆\n\n` +
   `Wake up, восьмиклассник… 💊`;
 
+// task215b: экранирование пользовательских вставок (ключ доступа) в Markdown
+const escapeMd = (s: string) => s.replace(/([_*`\[\]])/g, "\\$1");
+
+async function sendTo(chatId: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  const buttons = [
+    [{ text: "🔴 Начать тренировку", url: VPR_TG_DEEPLINK }],
+    [{ text: "🌐 Открыть в браузере", url: "https://v0-car-test.vercel.app/vpr-matrix" }],
+  ];
+  const result = await telegramDeliver("sendPhoto", chatId, {
+    photo: VPR_HERO_IMAGES.algebra,
+    caption: text,
+    parse_mode: "Markdown",
+    reply_markup: { inline_keyboard: buttons },
+  });
+  if (!result.ok) logger.error(`[VprInvite] failed for ${chatId}: ${result.error}`);
+  else logger.info(`[VprInvite] sent to ${chatId}`);
+  return result;
+}
+
 export async function GET(req: NextRequest) {
   return handleInvite(req);
 }
@@ -35,29 +54,33 @@ async function handleInvite(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const chatId = url.searchParams.get("chat_id") || process.env.ADMIN_CHAT_ID || "413553377";
+    // task215b: личный ключ доступа (append к инвайту) + копия админу
+    const code = (url.searchParams.get("code") || "").trim().slice(0, 64);
+    const cc = url.searchParams.get("cc") === "admin";
 
-    // inline-кнопки (URL) — работают как ссылки и переживают пересылку
-    const buttons = [
-      [{ text: "🔴 Начать тренировку", url: VPR_TG_DEEPLINK }],
-      [{ text: "🌐 Открыть в браузере", url: "https://v0-car-test.vercel.app/vpr-matrix" }],
-    ];
+    const text = code
+      ? `${INVITE_TEXT}\n🔑 Твой ключ доступа: \`${code}\`\n`
+      : INVITE_TEXT;
 
-    const payload: Record<string, unknown> = {
-      photo: VPR_HERO_IMAGES.algebra,
-      caption: INVITE_TEXT,
-      parse_mode: "Markdown",
-      reply_markup: { inline_keyboard: buttons },
-    };
-
-    const result = await telegramDeliver("sendPhoto", chatId, payload);
-
+    const result = await sendTo(chatId, text);
     if (!result.ok) {
-      logger.error(`[VprInvite] failed for ${chatId}: ${result.error}`);
       return NextResponse.json({ success: false, error: result.error }, { status: 500 });
     }
 
-    logger.info(`[VprInvite] sent to ${chatId}`);
-    return NextResponse.json({ success: true, chatId });
+    // CC: копия в админ-чат с пометкой, кому ушёл инвайт (босс «me in CC»)
+    let ccResult: { ok: boolean; error?: string } | null = null;
+    if (cc) {
+      const adminId = process.env.ADMIN_CHAT_ID || "413553377";
+      if (adminId && adminId !== chatId) {
+        const ccText =
+          `📋 *CC: инвайт отправлен* \`${chatId}\`${code ? ` (ключ: \`${code}\`)` : ""}\n\n` +
+          INVITE_TEXT +
+          (code ? `\n🔑 Ключ доступа получателя: \`${code}\`\n` : "");
+        ccResult = await sendTo(adminId, ccText);
+      }
+    }
+
+    return NextResponse.json({ success: true, chatId, cc: ccResult ? (ccResult.ok ? "sent" : "failed") : "skipped" });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "invite failed";
     logger.error(`[VprInvite] error: ${msg}`);
