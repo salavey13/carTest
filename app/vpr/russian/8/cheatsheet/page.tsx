@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
   PenTool, SpellCheck, BookOpen, Lightbulb, Brain, Code,
-  Sparkles, CheckCircle2, XCircle, AlertTriangle, Languages, MessageSquare,
+  Sparkles, CheckCircle2, XCircle, AlertTriangle, Languages, MessageSquare, GitCompare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -440,6 +440,42 @@ export default function Russian8Cheatsheet() {
                     {gapsCorrect} / {GAPS.length}
                   </span>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* TOPIC 3.7: ПАРОНИМЫ-ЛОВУШКИ (task218) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <GitCompare className="text-purple-400" /> 3.7. Паронимы: не перепутай
+          </h2>
+          <p className="text-sm text-zinc-400 mb-4">
+            Паронимы — похожие по звучанию, но разные по смыслу слова. В ВПР это задание на выбор одного слова из пары.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {[
+              { w: "одеть / надеть", r: "одеть КОГО (сестру), надеть ЧТО (пальто)" },
+              { w: "представить / предоставить", r: "представить (познакомить, вообразить), предоставить (дать право: отпуск)" },
+              { w: "эффектный / эффективный", r: "эффектный (яркий, впечатляющий), эффективный (полезный, результативный)" },
+              { w: "абонент / абонемент", r: "абонент (человек), абонемент (документ, билет)" },
+              { w: "дипломат / дипломант", r: "дипломат (профессия), дипломант (лауреат конкурса)" },
+              { w: "невежа / невежда", r: "невежа (грубиян), невежда (малообразованный)" },
+              { w: "подпись / роспись", r: "подпись (фамилия под документом), роспись (живопись стен)" },
+              { w: "комплимент / комплемент", r: "правильно: комплимент (похвала)" },
+            ].map((r) => (
+              <div key={r.w} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
+                <div className="text-sm font-bold text-white mb-1">{r.w}</div>
+                <div className="text-[11px] text-zinc-400 leading-relaxed">{r.r}</div>
+              </div>
+            ))}
+          </div>
+          <Card className="bg-yellow-900/10 border-brand-yellow/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-brand-yellow w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: подставь вопрос</p>
+                <p>Сомневаешься — подставь к слову вопрос. «Одеть <b>кого?</b>» — человека, «надеть <b>что?</b>» — вещь. «Предоставить <b>что?</b>» — право/отпуск. Вопрос снимает 90% паронимических ловушек.</p>
               </div>
             </CardContent>
           </Card>

@@ -599,6 +599,44 @@ export default function Algebra8FriendlyCheatsheet() {
             </div>
         </section>
 
+        {/* TOPIC 6: СИСТЕМЫ УРАВНЕНИЙ (task218) */}
+        <section className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                <Hash className="text-brand-cyan" /> 7. Системы уравнений
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+                    <div className="text-xs text-zinc-500 mb-2 font-mono">// Способ 1: Графический</div>
+                    <div className="text-sm text-zinc-300 leading-relaxed">Строишь оба графика → точка пересечения = ответ. Прямые параллельны — решений нет, совпадают — бесконечно много.</div>
+                </div>
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+                    <div className="text-xs text-zinc-500 mb-2 font-mono">// Способ 2: Подстановка</div>
+                    <div className="text-sm text-zinc-300 leading-relaxed">Из одного уравнения выражаешь y (или x) и подставляешь во второе. Универсален, но бывает громоздким.</div>
+                </div>
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+                    <div className="text-xs text-zinc-500 mb-2 font-mono">// Способ 3: Сложение</div>
+                    <div className="text-sm text-zinc-300 leading-relaxed">Складываешь уравнения так, чтобы одна переменная исчезла. Быстрый путь, когда коэффициенты противоположны.</div>
+                </div>
+            </div>
+            <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl font-mono text-xs text-zinc-400 mb-4">
+                <p className="mb-2 text-zinc-200">// Классика сложением: уничтожаем y</p>
+                <p className="mb-1">x + y = 7 &nbsp;·(-3) → -3x - 3y = -21</p>
+                <p className="mb-1">3x + 5y = 27</p>
+                <p className="mb-1">───────────────── сложение</p>
+                <p className="mb-1">2y = 6 → y = 3, тогда x = 7 - 3 = 4</p>
+                <p className="text-zinc-500">Ответ: (4; 3). Проверка: 4 + 3 = 7 ✓, 12 + 15 = 27 ✓</p>
+            </div>
+            <Card className="bg-yellow-900/10 border-brand-yellow/20">
+                <CardContent className="p-4 flex items-start gap-3">
+                    <Lightbulb className="text-brand-yellow w-10 h-10 flex-shrink-0" />
+                    <div className="text-sm">
+                        <p className="font-bold text-white mb-1">Хак: когда какой способ</p>
+                        <p>Коэффициенты при одной переменной противоположны (3 и −3) → сложение. Одна переменная уже выражена (y = ...) → подстановка. ВПР просит «построй графики» → графический. В ответ всегда пиши пару в скобках: (x; y).</p>
+                    </div>
+                </CardContent>
+            </Card>
+        </section>
+
         {/* CTA: тест-бой предмета + межлинковка (task217, legacy-промо убрано) */}
         <VprCtaTest
           slug="algebra-8"

@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useVprRoadmap } from "@/hooks/useVprRoadmap";
+import { getVprSubjectSlug, getVprCheatsheetHref } from "@/lib/vprCheatsheet";
 import type { Database } from "@/types/database.types";
-import { AdBreak } from "@/components/AdBreak";
 
 /* ================================================================
    TYPES
@@ -48,7 +48,7 @@ type CheatData = {
   glowColor: string;
   borderColor: string;
   bgAccent: string;
-  icon: 'globe' | 'languages' | 'terminal' | 'bug' | 'hash' | 'atom' | 'landmark' | 'leaf' | 'calculator' | 'ruler';
+  icon: 'globe' | 'languages' | 'terminal' | 'bug' | 'hash' | 'atom' | 'landmark' | 'leaf' | 'calculator' | 'ruler' | 'flask' | 'activity';
   tag: string;
   tagColor: string;
 };
@@ -236,7 +236,7 @@ const gradeCheats: Record<number, CheatData[]> = {
       href: "/vpr/algebra/8/cheatsheet",
       title: "Algebra_Core",
       subtitle: "Root Extraction",
-      desc: "Дешифровка дискриминанта. Протокол извлечения квадратных корней. Полный арсенал.",
+      desc: "Дискриминант, корни, системы уравнений, дроби и неравенства. Конструктор формул + полный арсенал.",
       color: "#22d3ee",
       glowColor: "rgba(34, 211, 238, 0.3)",
       borderColor: "border-cyan-500/30",
@@ -253,7 +253,7 @@ const gradeCheats: Record<number, CheatData[]> = {
       href: "/vpr/geometry/8/cheatsheet",
       title: "Geometry_Vector",
       subtitle: "Quadrilateral Protocol",
-      desc: "Четырёхугольники, площади фигур, теорема Пифагора и подобие. Пошаговый разбор + конструктор формул.",
+      desc: "Четырёхугольники, Пифагор, sin/cos/tg, подобие и вся таблица площадей. Пошаговый разбор + конструктор формул.",
       color: "#0bf2f6",
       glowColor: "rgba(5, 230, 246, 0.3)",
       borderColor: "border-cyan-500/30",
@@ -266,7 +266,7 @@ const gradeCheats: Record<number, CheatData[]> = {
       href: "/vpr/russian/8/cheatsheet",
       title: "Русский_Код",
       subtitle: "Orthography Engine",
-      desc: "Н/НН, НЕ с частями речи, словосочетания, обособления. Мини-диктант с разбором правил.",
+      desc: "Н/НН, НЕ с частями речи, обособления, паронимы-ловушки. Мини-диктант с разбором правил.",
       color: "#a855f7",
       glowColor: "rgba(168, 85, 247, 0.3)",
       borderColor: "border-violet-500/30",
@@ -313,6 +313,19 @@ const gradeCheats: Record<number, CheatData[]> = {
       icon: "activity",
       tag: "Probability",
       tagColor: "text-green-300 bg-green-900/40 border-green-500/20",
+    },
+    {
+      href: "/vpr/chemistry/8/cheatsheet",
+      title: "Chem_Lab",
+      subtitle: "Molecular Protocol",
+      desc: "Вещества и явления, атомы и молекулы, валентность, Mr и массовая доля. Конструктор формул + квиз.",
+      color: "#34d399",
+      glowColor: "rgba(52, 211, 153, 0.3)",
+      borderColor: "border-emerald-500/30",
+      bgAccent: "bg-emerald-500/5",
+      icon: "flask",
+      tag: "Chemistry",
+      tagColor: "text-emerald-300 bg-emerald-900/40 border-emerald-500/20",
     },
   ],
 };
@@ -538,6 +551,22 @@ function CheatIconSVG({ type, color, size = 40 }: { type: string; color: string;
           <circle cx="34" cy="10" r="2" fill={color} opacity="0.3" />
         </svg>
       );
+    case 'flask':
+      // task218: химия — колба с пузырьками
+      return (
+        <svg viewBox="0 0 40 40" width={s} height={s} xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 6 L16 16 L8 32 Q7 34 9 34 L31 34 Q33 34 32 32 L24 16 L24 6"
+                fill="none" stroke={color} strokeWidth="1.8" opacity="0.7" strokeLinejoin="round" />
+          <line x1="14" y1="6" x2="26" y2="6" stroke={color} strokeWidth="1.8" opacity="0.7" />
+          <path d="M13.5 26 L26.5 26 L30 33 L10 33 Z" fill={color} opacity="0.2" />
+          <circle cx="18" cy="29" r="1.6" fill={color} opacity="0.6">
+            <animate attributeName="cy" values="30;24;30" dur="3s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="23" cy="31" r="1.2" fill={color} opacity="0.5">
+            <animate attributeName="cy" values="31;26;31" dur="2.4s" repeatCount="indefinite" />
+          </circle>
+        </svg>
+      );
     default:
       return (
         <svg viewBox="0 0 40 40" width={s} height={s} xmlns="http://www.w3.org/2000/svg">
@@ -697,7 +726,7 @@ function SectionHeader({ icon, title, subtitle, accent }: {
   icon: React.ReactNode;
   title: string;
   subtitle: string;
-  accent?: string;
+  accent?: boolean;
 }) {
   return (
     <div className="flex items-center gap-4 mb-8">
@@ -722,7 +751,7 @@ function SectionHeader({ icon, title, subtitle, accent }: {
    Предметы открываются по цепочке: тест сдан (≥70%) → следующий unlocked.
    ================================================================ */
 
-const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'activity' | 'languages' | 'landmark' | 'hash'; color: string; testId: number; cheatsheet: string }> = {
+const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'flask' | 'activity' | 'languages' | 'landmark' | 'hash'; color: string; testId: number; cheatsheet: string }> = {
   algebra: { label: "Алгебра", icon: "calculator", color: "#22d3ee", testId: 71, cheatsheet: "/vpr/algebra/8/cheatsheet" },
   geometry: { label: "Геометрия", icon: "ruler", color: "#0bf2f6", testId: 75, cheatsheet: "/vpr/geometry/8/cheatsheet" },
   probability: { label: "Вероятность и статистика", icon: "activity", color: "#4ade80", testId: 79, cheatsheet: "/vpr/probability/8/cheatsheet" },
@@ -1005,6 +1034,12 @@ function CheatCard({ data, index }: { data: CheatData; index: number }) {
    ================================================================ */
 
 function SubjectMissionCard({ subject, index }: { subject: Subject; index: number }) {
+  // task218: если для предмета есть страница шпаргалки — показываем кнопку
+  const slug = getVprSubjectSlug(subject.name, subject.grade_level ?? undefined);
+  const knownSlugs = new Set([...ROADMAP_ORDER.map((o) => `${o}-8`)]);
+  const cheatsheetHref =
+    slug !== "general" ? getVprCheatsheetHref(slug) : null;
+  const cheatsheetExists = cheatsheetHref && (knownSlugs.has(slug) || slug.endsWith("-7") || slug === "chemistry-8");
   return (
     <Link href={`/vpr-test/${subject.id}`} passHref legacyBehavior>
       <motion.a
@@ -1045,6 +1080,18 @@ function SubjectMissionCard({ subject, index }: { subject: Subject; index: numbe
                 <span className="text-[9px] font-mono text-green-500/60 uppercase tracking-wider">Active</span>
               </div>
             </div>
+            {cheatsheetExists && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = cheatsheetHref; }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); window.location.href = cheatsheetHref; } }}
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-zinc-700/60 bg-zinc-900/80 text-[9px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white hover:border-cyan-500/40 transition-all"
+                title="Шпаргалка по предмету"
+              >
+                <BookOpen className="w-3.5 h-3.5" /> Шпаргалка
+              </span>
+            )}
             <ChevronRight className="w-5 h-5 text-zinc-700 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all duration-300 shrink-0" />
           </div>
         </div>
@@ -1178,7 +1225,18 @@ export default function VprTestsListPage() {
   }, []);
 
   const displayedSubjects = useMemo(() => {
-    return allSubjects.filter(subject => subject.grade_level === selectedGrade);
+    // task218: для 8 класса тесты уже представлены карточками RoadmapDeck
+    // (кнопки «Шпаргалка» + «Тест»), отдельный список «Миссий» дублировал их.
+    // Оставляем только предметы без карточки дорожки (например, Химия-8).
+    const roadmapped = new Set<string>(ROADMAP_ORDER);
+    return allSubjects.filter((subject) => {
+      if (subject.grade_level !== selectedGrade) return false;
+      if (selectedGrade === 8) {
+        const slug = getVprSubjectSlug(subject.name, subject.grade_level).replace("-8", "");
+        return !roadmapped.has(slug);
+      }
+      return true;
+    });
   }, [allSubjects, selectedGrade]);
 
   const visibleSubjects = showAllSubjects ? displayedSubjects : displayedSubjects.slice(0, 6);
@@ -1525,7 +1583,7 @@ export default function VprTestsListPage() {
                 </div>
               )}
 
-              {/* Studio conversion / VibeCode teaser */}
+              {/* task218: SuperVibe-промо убрано → навигация по шпаргалкам */}
               <motion.div
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
@@ -1533,38 +1591,36 @@ export default function VprTestsListPage() {
                 transition={{ delay: 0.3 }}
                 className="mt-12 sm:mt-16"
               >
-                <div className="relative rounded-2xl overflow-hidden">
-                  {/* Gradient border */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-zinc-800/50 via-cyan-500/20 to-zinc-800/50 p-px rounded-2xl">
-                    <div className="w-full h-full bg-[#030712] rounded-2xl" />
+                <div className="relative rounded-2xl border border-cyan-500/20 bg-zinc-950/60 p-6 sm:p-8">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BookOpen className="w-4 h-4 text-cyan-400" />
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.3em]">
+                      Quick_Navigation
+                    </span>
                   </div>
-
-                  <div className="relative bg-[#030712] p-6 sm:p-8 rounded-2xl">
-                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-                      <div className="text-center lg:text-left">
-                        <div className="flex items-center justify-center lg:justify-start gap-2 mb-3">
-                          <Zap className="w-4 h-4 text-cyan-400" />
-                          <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.3em]">
-                            Engineering_Origin
-                          </span>
-                        </div>
-                        <h3 className="text-xl sm:text-2xl font-black text-white mb-2 tracking-tight">
-                          SuperVibe_<span className="text-cyan-400">Studio</span>
-                        </h3>
-                        <p className="text-zinc-500 text-xs sm:text-sm max-w-xl leading-relaxed">
-                          Все эти протоколы были сгенерированы AI-Ассистентом на обычном смартфоне.
-                          Мы не тратили месяцы на разработку — мы просто &quot;Вайбили&quot;.
-                          Твоя математика — это база для такого софта.
-                        </p>
-                      </div>
-                      <Link href="/repo-xml">
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                          <Button className="bg-white text-black font-black uppercase italic px-10 sm:px-12 py-6 sm:py-7 rounded-xl hover:bg-cyan-400 transition-all duration-300 shadow-[6px_6px_0_rgba(0,194,255,0.3)] hover:shadow-[2px_2px_0_rgba(0,194,255,0.3)] hover:translate-x-1 hover:translate-y-1 text-sm sm:text-base">
-                            Start_Vibe_Coding <ChevronRight className="ml-2 w-4 h-4" />
-                          </Button>
-                        </motion.div>
+                  <h3 className="text-lg sm:text-xl font-black text-white mb-2 tracking-tight">
+                    Все шпаргалки {selectedGrade} класса — одной сеткой
+                  </h3>
+                  <p className="text-zinc-500 text-xs sm:text-sm max-w-xl leading-relaxed mb-5">
+                    Перед тестом — десять минут по шпаргалке: правила, ловушки и мини-игры на запоминание.
+                    Открывай нужную и возвращайся сдавать миссию.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {currentCheats.map((cheat) => (
+                      <Link
+                        key={cheat.href}
+                        href={cheat.href}
+                        className="px-4 py-2 rounded-lg border border-zinc-700/60 bg-zinc-900/60 text-xs font-bold text-zinc-300 hover:text-white hover:border-cyan-500/40 transition-all"
+                      >
+                        {cheat.tag} <ChevronRight className="w-3 h-3 inline ml-0.5" />
                       </Link>
-                    </div>
+                    ))}
+                    <Link
+                      href="/vpr-matrix"
+                      className="px-4 py-2 rounded-lg border border-green-500/30 bg-green-950/20 text-xs font-bold text-green-400 hover:text-green-300 hover:border-green-500/60 transition-all"
+                    >
+                      Матрица <ChevronRight className="w-3 h-3 inline ml-0.5" />
+                    </Link>
                   </div>
                 </div>
               </motion.div>
@@ -1633,7 +1689,8 @@ export default function VprTestsListPage() {
             )}
           </motion.section>
 
-          <AdBreak />
+          {/* task218: AdBreak (промо strikeball/wb/repo) убран —
+              страница рабочая, без рекламы на образовательном контенте */}
 
           {/* ============================================
               LEADERBOARD
@@ -1672,7 +1729,7 @@ export default function VprTestsListPage() {
                     <div className="flex flex-col items-center pt-6">
                       <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 border-zinc-500/30 mb-3 grayscale hover:grayscale-0 transition-all">
                         {safeAvatar(leaderboard[1].avatar_url)
-                          ? <img src={safeAvatar(leaderboard[1].avatar_url)} alt="" className="w-full h-full object-cover" />
+                          ? <img src={safeAvatar(leaderboard[1].avatar_url) ?? undefined} alt="" className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-zinc-900 flex items-center justify-center"><Terminal className="w-6 h-6 text-zinc-600" /></div>
                         }
                       </div>
@@ -1696,7 +1753,7 @@ export default function VprTestsListPage() {
                         </div>
                         <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border-2 border-yellow-500/40 mb-3 grayscale hover:grayscale-0 transition-all shadow-[0_0_20px_rgba(234,179,8,0.15)]">
                           {safeAvatar(leaderboard[0].avatar_url)
-                            ? <img src={safeAvatar(leaderboard[0].avatar_url)} alt="" className="w-full h-full object-cover" />
+                            ? <img src={safeAvatar(leaderboard[0].avatar_url) ?? undefined} alt="" className="w-full h-full object-cover" />
                             : <div className="w-full h-full bg-zinc-900 flex items-center justify-center"><Terminal className="w-7 h-7 text-zinc-600" /></div>
                           }
                         </div>
@@ -1714,7 +1771,7 @@ export default function VprTestsListPage() {
                     <div className="flex flex-col items-center pt-8">
                       <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 border-orange-700/30 mb-3 grayscale hover:grayscale-0 transition-all">
                         {safeAvatar(leaderboard[2].avatar_url)
-                          ? <img src={safeAvatar(leaderboard[2].avatar_url)} alt="" className="w-full h-full object-cover" />
+                          ? <img src={safeAvatar(leaderboard[2].avatar_url) ?? undefined} alt="" className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-zinc-900 flex items-center justify-center"><Terminal className="w-5 h-5 text-zinc-600" /></div>
                         }
                       </div>

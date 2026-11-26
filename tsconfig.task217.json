@@ -17,6 +17,7 @@
     "app/vpr/probability/8/cheatsheet/page.tsx",
     "app/vpr/russian/8/cheatsheet/page.tsx",
     "app/vpr/history/8/cheatsheet/page.tsx",
-    "app/vpr/literature/8/cheatsheet/page.tsx"
+    "app/vpr/literature/8/cheatsheet/page.tsx",
+    "app/vpr-tests/page.tsx"
   ]
 }

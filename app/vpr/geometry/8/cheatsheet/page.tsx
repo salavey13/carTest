@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Triangle, Ruler, Zap, BookOpen, RotateCcw, CheckCircle2,
-  AlertTriangle, Lightbulb, Brain, Code, Sparkles, Shapes, Square,
+  AlertTriangle, Lightbulb, Brain, Code, Sparkles, Shapes, Square, Grid3X3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -442,6 +442,40 @@ export default function Geometry8Cheatsheet() {
                 <Button onClick={nextQuiz} disabled={quizAnswer === null || quizIdx === QUIZ_ITEMS.length - 1} size="sm" className="bg-brand-cyan text-black font-bold ml-auto">
                   Далее →
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* TOPIC 5: ПЛОЩАДИ ВСЕХ ФИГУР (task218) */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+            <Grid3X3 className="text-cyan-400" /> 5. Площади: вся таблица
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            {[
+              { f: "Треугольник", formula: "S = ½ a·h", note: "h — высота К стороне a" },
+              { f: "Прямоугольный", formula: "S = ½ a·b", note: "a, b — катеты" },
+              { f: "Трапеция", formula: "S = ½(a+b)·h", note: "a, b — основания" },
+              { f: "Ромб", formula: "S = ½ d₁·d₂", note: "диагонали" },
+              { f: "Прямоугольник", formula: "S = a·b", note: "и параллелограмм: a·h" },
+              { f: "Квадрат", formula: "S = a²", note: "или d²/2" },
+              { f: "По Герону", formula: "S = √(p(p−a)(p−b)(p−c))", note: "p = полупериметр" },
+              { f: "Через sin", formula: "S = ½ a·b·sin γ", note: "две стороны и угол между" },
+            ].map((r) => (
+              <div key={r.f} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                <div className="text-[11px] text-zinc-500 mb-1">{r.f}</div>
+                <div className="text-sm font-bold text-white font-mono">{r.formula}</div>
+                <div className="text-[9px] text-cyan-400/60 mt-1">{r.note}</div>
+              </div>
+            ))}
+          </div>
+          <Card className="bg-yellow-900/10 border-brand-yellow/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Lightbulb className="text-brand-yellow w-10 h-10 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-bold text-white mb-1">Хак: «половинка»</p>
+                <p>Почти все площади треугольных семейств — это <b>половина</b> чего-то: ½a·h, ½d₁d₂, ½a·b·sin γ. Только прямоугольник/квадрат/параллелограмм — «полные». Забыл формулу на ВПР — дострой фигуру до прямоугольника и вычти лишнее.</p>
               </div>
             </CardContent>
           </Card>
