@@ -9,12 +9,15 @@ export function getVprSubjectSlug(subjectName?: string, gradeLevel?: number | nu
   const raw = (subjectName || "").trim().toLowerCase();
   if (!raw) return "general";
   const isGrade8 = gradeLevel === 8;
-  // 8 класс (task212): предмет дорожки 8-го класса
-  if (isGrade8 || raw.includes("вероят")) return "probability-8";
-  if (isGrade8 || raw.includes("алгебр")) return "algebra-8";
-  if (isGrade8 || raw.includes("геометр")) return "geometry-8";
-  if (isGrade8 || raw.includes("литерат")) return "literature-8";
-  if (isGrade8 || raw.includes("русский")) return "russian-8";
+  // task217 FIX: ранний return `isGrade8 || raw.includes(...)` отдавал
+  // probability-8 для ЛЮБОГО 8-классного предмета («Алгебра» → вероятность).
+  // Матчим ИМЯ предмета; класс — только тибрейкер history-8/history-7.
+  if (raw.includes("вероят")) return "probability-8";
+  if (raw.includes("хими")) return "chemistry-8";
+  if (raw.includes("алгебр")) return "algebra-8";
+  if (raw.includes("геометр")) return "geometry-8";
+  if (raw.includes("литерат")) return "literature-8";
+  if (raw.includes("русский")) return "russian-8";
   if (raw.includes("истор")) return isGrade8 || raw.includes("8") ? "history-8" : "history-7";
   // 7 класс и прочее
   if (raw.includes("информ")) return "informatics-7";
@@ -35,6 +38,7 @@ export function getVprCheatsheetHref(subjectSlug: string): string {
     "literature-8": "/vpr/literature/8/cheatsheet",
     "russian-8": "/vpr/russian/8/cheatsheet",
     "history-8": "/vpr/history/8/cheatsheet",
+    "chemistry-8": "/vpr/chemistry/8/cheatsheet",
     // 7 класс
     "informatics-7": "/vpr/informatics/7/cheatsheet",
     "physics-7": "/vpr/physics/7/cheatsheet",

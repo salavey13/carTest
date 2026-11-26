@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "lib/vprCheatsheet.ts",
+    "app/api/vpr-roadmap/subjects/route.ts",
+    "app/api/vpr-roadmap/invite/route.ts",
+    "components/vpr/VprCtaTest.tsx",
+    "components/vpr/VprAnswerList.tsx",
+    "components/vpr/ReadProgress.tsx",
+    "app/vpr/algebra/8/cheatsheet/page.tsx",
+    "app/vpr/chemistry/8/cheatsheet/page.tsx",
+    "app/vpr/geometry/8/cheatsheet/page.tsx",
+    "app/vpr/probability/8/cheatsheet/page.tsx",
+    "app/vpr/russian/8/cheatsheet/page.tsx",
+    "app/vpr/history/8/cheatsheet/page.tsx",
+    "app/vpr/literature/8/cheatsheet/page.tsx"
+  ]
+}

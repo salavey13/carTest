@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { ReadProgress } from "@/components/vpr/ReadProgress";
+import { VprCtaTest } from "@/components/vpr/VprCtaTest";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -401,32 +402,14 @@ export default function History8Cheatsheet() {
           </Card>
         </section>
 
-        {/* CTA */}
-        <div className="bg-white text-black p-8 rounded-none mb-20 flex flex-col md:flex-row items-center gap-8 shadow-[10px_10px_0_rgba(234,179,8,1)]">
-          <div className="w-20 h-20 bg-brand-yellow flex items-center justify-center rounded-full shrink-0">
-            <Code className="w-10 h-10 text-black" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-black uppercase mb-2">Как создана эта страница?</h3>
-            <p className="text-zinc-700 text-sm leading-relaxed mb-6">
-              Эта «шпаргалка» была полностью написана искусственным интеллектом в нашей <b>SuperVibe Studio</b>.
-              История учит видеть причинно-следственные связи — тот же скилл, что нужен аналитику данных и разработчику.
-            </p>
-            <div className="flex gap-4">
-              <Link href="/repo-xml">
-                <Button className="bg-black text-white hover:bg-zinc-800 font-bold px-6 py-4 rounded-none uppercase text-xs tracking-widest">
-                  Попробовать Вайб-Кодинг
-                </Button>
-              </Link>
-              <Link href="/vpr-tests">
-                <Button variant="outline" className="border-black text-black font-bold px-6 py-4 rounded-none uppercase text-xs tracking-widest">
-                  Все ВПР-тесты
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-
+        {/* CTA: тест-бой предмета + межлинковка (task217, legacy-промо убрано) */}
+        <VprCtaTest
+          slug="history-8"
+          subjectTitle="История"
+          nextHref="/vpr/literature/8/cheatsheet"
+          nextTitle="Литература"
+          accentShadow="rgba(234,179,8,1)"
+        />
         <footer className="text-center pb-20 text-zinc-700 text-[10px] font-mono uppercase tracking-widest">
           Generated with AI in CyberVibe Studio // 8th Grade History: XIX century // No copyright, just Vibe.
         </footer>

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ReadProgress } from "@/components/vpr/ReadProgress";
+import { VprCtaTest } from "@/components/vpr/VprCtaTest";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,18 @@ const FRAGMENTS = [
 ];
 const CORRECT_SEQ = [1, 2, 3, 4, 5, 6];
 
+// task217: конструктор раньше рендерил фрагменты в постоянном порядке —
+// игрок запоминал позицию «b²» вместо формулы. Fisher-Yates; в useState —
+// исходный порядок, перемешивание в useEffect (SSR/hydration-safe).
+const shuffleFrags = () => {
+  const a = [...FRAGMENTS];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 // --- НОВАЯ МИНИ-ИГРА: РЕШЕНИЕ ЛИНЕЙНОГО УРАВНЕНИЯ ---
 const EQUATION_STEPS = [
   { id: 1, eq: "2x + 5 = 13", action: "Начальное уравнение" },
@@ -39,6 +52,8 @@ export default function Algebra8FriendlyCheatsheet() {
   const [seq, setSeq] = useState<number[]>([]);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [stepIndex, setStepIndex] = useState(0);
+  const [shuffledFrags, setShuffledFrags] = useState(FRAGMENTS);
+  useEffect(() => { setShuffledFrags(shuffleFrags()); }, []);
 
   const handleFragClick = (id: number) => {
     if (status === 'success') return;
@@ -320,7 +335,7 @@ export default function Algebra8FriendlyCheatsheet() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-center mb-8">
-                    {FRAGMENTS.map(f => (
+                    {shuffledFrags.map(f => (
                         <button
                             key={f.id}
                             onClick={() => handleFragClick(f.id)}
@@ -336,7 +351,7 @@ export default function Algebra8FriendlyCheatsheet() {
                 </div>
 
                 <div className="flex justify-center gap-4">
-                    <Button variant="ghost" onClick={() => {setSeq([]); setStatus('idle');}} size="sm">Сброс</Button>
+                    <Button variant="ghost" onClick={() => {setSeq([]); setStatus('idle'); setShuffledFrags(shuffleFrags());}} size="sm">Сброс</Button>
                     <Button onClick={checkResult} disabled={seq.length === 0 || status === 'success'} className="bg-brand-cyan text-black font-bold">Проверить</Button>
                 </div>
               </CardContent>
@@ -584,32 +599,14 @@ export default function Algebra8FriendlyCheatsheet() {
             </div>
         </section>
 
-        {/* TROJAN HORSE: STUDIO INVITE */}
-        <div className="bg-white text-black p-8 rounded-none mb-20 flex flex-col md:flex-row items-center gap-8 shadow-[10px_10px_0_rgba(0,194,255,1)]">
-            <div className="w-20 h-20 bg-brand-cyan flex items-center justify-center rounded-full shrink-0">
-                <Code className="w-10 h-10 text-white" />
-            </div>
-            <div>
-                <h3 className="text-2xl font-black uppercase mb-2">Как создана эта страница?</h3>
-                <p className="text-zinc-700 text-sm leading-relaxed mb-6">
-                    Эта «шпаргалка» была полностью написана искусственным интеллектом в нашей <b>SuperVibe Studio</b>. 
-                    Математика — это база для программирования. Хочешь перестать просто учить формулы и начать создавать свои приложения, игры и ботов прямо со смартфона?
-                </p>
-                <div className="flex gap-4">
-                    <Link href="/repo-xml">
-                        <Button className="bg-black text-white hover:bg-zinc-800 font-bold px-6 py-4 rounded-none uppercase text-xs tracking-widest">
-                            Попробовать Вайб-Кодинг
-                        </Button>
-                    </Link>
-                    <Link href="/start-training">
-                        <Button variant="outline" className="border-black text-black font-bold px-6 py-4 rounded-none uppercase text-xs tracking-widest">
-                            Обучение
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-        </div>
-
+        {/* CTA: тест-бой предмета + межлинковка (task217, legacy-промо убрано) */}
+        <VprCtaTest
+          slug="algebra-8"
+          subjectTitle="Алгебра"
+          nextHref="/vpr/geometry/8/cheatsheet"
+          nextTitle="Геометрия"
+          accentShadow="rgba(0,194,255,1)"
+        />
         {/* FOOTER */}
         <footer className="text-center pb-20 text-zinc-700 text-[10px] font-mono uppercase tracking-widest">
             Generated with AI in CyberVibe Studio // Full 8th Grade Curriculum // No copyright, just Vibe.
