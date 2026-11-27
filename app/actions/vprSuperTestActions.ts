@@ -230,7 +230,7 @@ export async function finishSuperTestAction(params: {
     const user = await fetchUserData(userId);
     const meta = (user?.metadata as Record<string, any> | null) || {};
     const history: SuperTestResult[] = Array.isArray(meta.vprSuperTestHistory) ? meta.vprSuperTestHistory : [];
-    const newMeta = {
+    const newMeta: Record<string, any> = {
       ...meta,
       vprSuperTest: result,
       vprSuperTestHistory: [...history.slice(-9), result], // последние 10 прогонов

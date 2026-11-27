@@ -45,6 +45,8 @@ import {
 
 export type SuperPhase = "welcome" | "running" | "finished";
 
+type Phase = SuperPhase;
+
 interface SuperTestFlowProps {
   /** embedded: без welcome-фазы и без min-h-screen — для вставки в Матрицу */
   embedded?: boolean;
@@ -63,9 +65,6 @@ interface AnsweredRow {
 }
 
 export function SuperTestFlow({ embedded = false, defaultMode = "standard", onFinished, onExit }: SuperTestFlowProps) {
-  const router = useRouter();
-  const { dbUser, isLoading: isUserLoading } = useAppContext();
-
   const router = useRouter();
   const { dbUser, isLoading: isUserLoading } = useAppContext();
 
