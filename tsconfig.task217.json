@@ -30,6 +30,12 @@
     "app/vpr/socialstudies/7/cheatsheet/page.tsx",
     "app/vpr/math/6/cheatsheet/page.tsx",
     "app/vpr/geometry/7/cheatsheet/page.tsx",
-    "app/vpr/history/6/cheatsheet/page.tsx"
+    "app/vpr/history/6/cheatsheet/page.tsx",
+    "app/vpr/physics/8/cheatsheet/page.tsx",
+    "app/vpr/biology/8/cheatsheet/page.tsx",
+    "app/vpr/geography/8/cheatsheet/page.tsx",
+    "app/vpr/english/8/cheatsheet/page.tsx",
+    "app/vpr/socialstudies/8/cheatsheet/page.tsx",
+    "app/vpr/informatics/8/cheatsheet/page.tsx"
   ]
 }

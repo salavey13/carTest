@@ -32,9 +32,8 @@ export function getVprSubjectSlug(subjectName?: string, gradeLevel?: number | nu
   // вхождению: «всеобщ» важнее общего «истор».
   if (raw.includes("всеобщ") && raw.includes("истор")) return "worldhistory-8";
   if (raw.includes("истор")) return g ? `history-${g}` : "history-8";
-  // точные предметы без мультикласса
-  if (raw.includes("информ")) return "informatics-7";
-  if (raw.includes("физ")) return "physics-7";
+  if (raw.includes("информ")) return g === 8 ? "informatics-8" : "informatics-7";
+  if (raw.includes("физ")) return g === 8 ? "physics-8" : "physics-7";
   if (raw.includes("географ")) return g ? `geography-${g}` : "geography-7";
   if (raw.includes("биолог")) return g ? `biology-${g}` : "biology-7";
   return "general";
@@ -51,6 +50,13 @@ export function getVprCheatsheetHref(subjectSlug: string): string {
     "worldhistory-8": "/vpr/worldhistory/8/cheatsheet",
     "history-8": "/vpr/history/8/cheatsheet",
     "chemistry-8": "/vpr/chemistry/8/cheatsheet",
+    // 8 класс — полный набор школьной программы (task220b)
+    "physics-8": "/vpr/physics/8/cheatsheet",
+    "biology-8": "/vpr/biology/8/cheatsheet",
+    "geography-8": "/vpr/geography/8/cheatsheet",
+    "english-8": "/vpr/english/8/cheatsheet",
+    "socialstudies-8": "/vpr/socialstudies/8/cheatsheet",
+    "informatics-8": "/vpr/informatics/8/cheatsheet",
     // 7 класс
     "informatics-7": "/vpr/informatics/7/cheatsheet",
     "physics-7": "/vpr/physics/7/cheatsheet",
