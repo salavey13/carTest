@@ -15,15 +15,15 @@ export const SUPER_SUBJECTS = [...VPR_ROADMAP_ORDER] as string[];
  *  здесь — только офсеты для описаний. Подписи/цвета — единый источник. */
 export const SUPER_SUBJECT_META: Record<
   string,
-  { label: string; short: string; color: string; icon: "atom" | "ruler" | "activity" | "languages" | "globe" | "hash" | "landmark" | "calculator" }
+  { label: string; short: string; color: string }
 > = {
-  algebra: { label: "Алгебра", short: "АЛГ", color: "#22d3ee", icon: "calculator" },
-  geometry: { label: "Геометрия", short: "ГЕО", color: "#0bf2f6", icon: "ruler" },
-  probability: { label: "Вероятность и статистика", short: "ВЕС", color: "#4ade80", icon: "activity" },
-  russian: { label: "Русский язык", short: "РУС", color: "#a855f7", icon: "languages" },
-  worldhistory: { label: "Всеобщая история", short: "ВСИ", color: "#f59e0b", icon: "globe" },
-  literature: { label: "Литература", short: "ЛИТ", color: "#f43f5e", icon: "hash" },
-  history: { label: "История России", short: "ИСТ", color: "#eab308", icon: "landmark" },
+  algebra: { label: "Алгебра", short: "АЛГ", color: "#22d3ee" },
+  geometry: { label: "Геометрия", short: "ГЕО", color: "#0bf2f6" },
+  probability: { label: "Вероятность и статистика", short: "ВЕС", color: "#4ade80" },
+  russian: { label: "Русский язык", short: "РУС", color: "#a855f7" },
+  worldhistory: { label: "Всеобщая история", short: "ВСИ", color: "#f59e0b" },
+  literature: { label: "Литература", short: "ЛИТ", color: "#f43f5e" },
+  history: { label: "История России", short: "ИСТ", color: "#eab308" },
 };
 
 /** Режимы длины супертеста (task221): quick = 4 предмета × 3 вопроса,

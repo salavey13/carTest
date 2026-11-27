@@ -17,7 +17,8 @@ import {
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger } from "@/lib/debugLogger";
 
-const LS_KEY = "vpr-roadmap-progress";
+/** LS-ключ прогресса дорожки (task222: экспортирован — его пишет и гостевой супертест). */
+export const VPR_ROADMAP_LS_KEY = "vpr-roadmap-progress";
 
 export const DEFAULT_PROGRESS: VprRoadmapProgress = {
   unlocked: [VPR_ROADMAP_ORDER[0]],
@@ -29,7 +30,7 @@ export const DEFAULT_PROGRESS: VprRoadmapProgress = {
 function readLS(): VprRoadmapProgress | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(VPR_ROADMAP_LS_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // task215: старый кэш (до task214) не имеет achievements/fails —
@@ -52,7 +53,7 @@ function readLS(): VprRoadmapProgress | null {
 
 function writeLS(p: VprRoadmapProgress) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(p));
+    localStorage.setItem(VPR_ROADMAP_LS_KEY, JSON.stringify(p));
   } catch {
     // ignore
   }

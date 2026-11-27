@@ -7,6 +7,7 @@
 // константы живут в lib/vprSuperTest.ts.
 
 import { supabaseAnon } from "@/hooks/supabase";
+import { getVprSubjectSlug } from "@/lib/vprCheatsheet";
 import { fetchUserData, updateUserMetadata } from "@/lib/supabase-server";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger";
@@ -54,21 +55,36 @@ export interface FinishSuperResult {
   error?: string;
 }
 
-/** слаг предмета дорожки по id предмета в БД (71..80 → algebra..history). */
-const SUBJECT_SLUG_BY_ID: Record<number, string> = {
-  71: "algebra",
-  75: "geometry",
-  76: "russian",
-  77: "history",
-  78: "literature",
-  79: "probability",
-  80: "worldhistory",
-};
+/**
+ * task222 codereview: хардкод id предметов (71..80) удалён — id нестабильны
+ * между контурами (урок task217: «Алгебра-8 = 71 здесь» ломалось на других
+ * деплоях). Резолвим id→слаг одним запросом к subjects через официальный
+ * маппер имён getVprSubjectSlug; кэшируем на время жизни лямбды.
+ */
+let subjectIdMapCache: { slugToId: Map<string, number>; idToSlug: Map<number, string> } | null = null;
 
-/** id предмета дорожки по слагу (обратная карта). */
-const SUBJECT_ID_BY_SLUG: Record<string, number> = Object.fromEntries(
-  Object.entries(SUBJECT_SLUG_BY_ID).map(([id, slug]) => [slug, Number(id)])
-);
+async function getSubjectIdMaps(): Promise<{ slugToId: Map<string, number>; idToSlug: Map<number, string> }> {
+  if (subjectIdMapCache) return subjectIdMapCache;
+  const { data, error } = await supabaseAnon
+    .from("subjects")
+    .select("id, name, grade_level")
+    .eq("grade_level", 8);
+  if (error || !data) {
+    throw new Error(`Не удалось загрузить предметы 8 класса: ${error?.message || "no data"}`);
+  }
+  const slugToId = new Map<string, number>();
+  const idToSlug = new Map<number, string>();
+  for (const sub of data) {
+    // слаг дорожки = слаг шпаргалки без суффикса класса («algebra-8» → «algebra»)
+    const slug = getVprSubjectSlug(sub.name, sub.grade_level).replace(/-8$/, "");
+    if (SUPER_SUBJECTS.includes(slug) && !slugToId.has(slug)) {
+      slugToId.set(slug, sub.id);
+      idToSlug.set(sub.id, slug);
+    }
+  }
+  subjectIdMapCache = { slugToId, idToSlug };
+  return subjectIdMapCache;
+}
 
 /** Fisher–Yates: перемешивание без мутации входа. */
 function shuffled<T>(arr: T[]): T[] {
@@ -103,27 +119,46 @@ export async function startSuperTestAction(mode: SuperModeKey = "standard"): Pro
       pickedSubjects = ring.slice(0, cfg.subjects);
     }
 
+    // динамический резолв id (task222: без хардкода — контуры БД различаются)
+    const { slugToId, idToSlug } = await getSubjectIdMaps();
+    const pickedIds = pickedSubjects
+      .map((slug) => slugToId.get(slug))
+      .filter((id): id is number => typeof id === "number");
+    if (pickedIds.length === 0) {
+      return { success: false, error: "Предметы 8 класса не найдены в базе." };
+    }
+
+    // task222 codereview: один батч-запрос вместо N+1 по предметам —
+    // 8 класс маленький, .in() по id предметов тянет всё разом.
+    const { data, error } = await supabaseAnon
+      .from("vpr_questions")
+      .select(`id, subject_id, text, explanation, vpr_answers ( id, question_id, text, is_correct )`)
+      .in("subject_id", pickedIds)
+      .limit(500);
+    if (error) {
+      return { success: false, error: `Ошибка загрузки вопросов: ${error.message}` };
+    }
+    if (!data || data.length === 0) {
+      return { success: false, error: "Пул вопросов пуст — супертест недоступен." };
+    }
+
+    // группируем по предмету и берём perSubject случайных от каждого
+    const bySubject = new Map<number, typeof data>();
+    for (const q of data) {
+      const arr = bySubject.get(q.subject_id) ?? [];
+      arr.push(q);
+      bySubject.set(q.subject_id, arr);
+    }
     const questions: SuperQuestionData[] = [];
-    for (const slug of pickedSubjects) {
-      const subjectId = SUBJECT_ID_BY_SLUG[slug];
-      if (!subjectId) continue;
-      const { data, error } = await supabaseAnon
-        .from("vpr_questions")
-        .select(`id, subject_id, text, explanation, vpr_answers ( id, question_id, text, is_correct )`)
-        .eq("subject_id", subjectId)
-        .limit(60);
-      if (error || !data || data.length === 0) {
-        debugLogger.warn(`[SuperTest] no questions for ${slug} (${subjectId}): ${error?.message || "empty"}`);
-        continue;
-      }
-      const chosen = shuffled(data).slice(0, cfg.perSubject);
+    for (const [, arr] of bySubject) {
+      const chosen = shuffled(arr).slice(0, cfg.perSubject);
       for (const q of chosen) {
         questions.push({
           id: q.id,
           subject_id: q.subject_id,
           text: q.text,
           explanation: q.explanation ?? null,
-          subjectSlug: SUBJECT_SLUG_BY_ID[q.subject_id] ?? "algebra",
+          subjectSlug: idToSlug.get(q.subject_id) ?? "algebra",
           vpr_answers: shuffled((q as { vpr_answers: SuperAnswerData[] }).vpr_answers ?? []),
         });
       }

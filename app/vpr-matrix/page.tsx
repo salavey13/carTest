@@ -6,8 +6,10 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Brain, Swords, RotateCcw, TrendingUp, ArrowRight, Zap,
-  Terminal, Lock, Unlock, Trophy, Sparkles,
+  Terminal, Lock, Unlock, Trophy, Sparkles, Radar,
 } from "lucide-react";
+import { SuperTestFlow } from "@/components/vpr/SuperTestFlow";
+import { SUPER_SUBJECT_META } from "@/lib/vprSuperTest";
 import { cn } from "@/lib/utils";
 
 /* ================================================================
@@ -95,7 +97,7 @@ const LOOP_STEPS = [
     icon: TrendingUp,
     color: "#4ade80",
     title: "UPGRADE // Открой следующий уровень",
-    text: "Сдал на ≥70% — щёлкнул замок: следующий предмет дорожки разблокирован. Алгебра → Геометрия → Вероятность → Русский → История → Литература. Шесть уровней — и середина 8 класса в кармане.",
+    text: "Сдал на ≥70% — щёлкнул замок: следующий предмет дорожки разблокирован. Алгебра → Геометрия → Вероятность → Русский → История → Литература. Семь уровней — и середина 8 класса в кармане.",
     hint: "Прогресс хранится в твоём профиле и на устройстве",
   },
 ];
@@ -116,6 +118,9 @@ export default function VprMatrixLanding() {
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 400], [0, 120]);
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0.3]);
+  // task222: встроенный СУПЕРТЕСТ — диагностика прямо в Матрице (TG WebApp =
+  // авторизованный контекст; прямая ссылка на /vpr-super остаётся гостевой)
+  const [superOpen, setSuperOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#030712] text-zinc-300 font-sans overflow-x-hidden">
@@ -176,7 +181,15 @@ export default function VprMatrixLanding() {
                 Начать тренировку <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
-            <Link href="#loop">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setSuperOpen(true)}
+              className="border-cyan-500/50 text-cyan-300 font-bold text-base px-8 py-6 rounded-xl hover:bg-cyan-950/30"
+            >
+              <Radar className="mr-2 w-5 h-5" /> Супертест: найти дыры
+            </Button>
+            <Link href="#loop" className="hidden sm:block">
               <Button size="lg" variant="outline" className="border-zinc-700 text-zinc-300 font-bold text-base px-8 py-6 rounded-xl">
                 Как это работает
               </Button>
@@ -209,10 +222,64 @@ export default function VprMatrixLanding() {
         </motion.div>
       </section>
 
+      {/* ============ СУПЕРТЕСТ (task222) ============ */}
+      <section id="super" className="relative max-w-5xl mx-auto px-4 py-20">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 border border-cyan-500/30 bg-cyan-950/30 px-4 py-1.5 rounded-full text-xs font-mono text-cyan-400 mb-6">
+            <Radar className="w-4 h-4" />
+            <span>diagnostic_protocol // 12 минут</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
+            Не знаешь, с чего начать? <span className="text-cyan-400">Супертест</span>
+          </h2>
+          <p className="text-zinc-500 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
+            Один прогон — все 7 предметов вперемешку. Система найдёт твои дыры и
+            выстроит <b className="text-white">личную дорожку</b>: слабейшие предметы станут первыми уровнями.
+            Без таймера, без наказаний — чистая диагностика.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 mt-6">
+            {Object.values(SUPER_SUBJECT_META).map((m) => (
+              <span
+                key={m.short}
+                className="px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border"
+                style={{ color: m.color, borderColor: `${m.color}30`, backgroundColor: `${m.color}0d` }}
+              >
+                {m.short}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {superOpen ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-cyan-500/25 bg-zinc-950/80 overflow-hidden"
+          >
+            <SuperTestFlow embedded defaultMode="standard" onExit={() => setSuperOpen(false)} />
+          </motion.div>
+        ) : (
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              size="lg"
+              onClick={() => setSuperOpen(true)}
+              className="bg-cyan-500 hover:bg-cyan-400 text-black font-black text-base px-8 py-6 rounded-xl shadow-[0_0_40px_rgba(34,211,238,0.3)]"
+            >
+              <Zap className="mr-2 w-5 h-5" /> Запустить диагностику
+            </Button>
+            <Link href="/vpr-super">
+              <Button size="lg" variant="outline" className="border-zinc-700 text-zinc-300 font-bold text-base px-8 py-6 rounded-xl">
+                Полный экран
+              </Button>
+            </Link>
+          </div>
+        )}
+      </section>
+
       {/* ============ ДОРОЖКА УРОВНЕЙ ============ */}
       <section className="relative max-w-5xl mx-auto px-4 py-20">
         <h2 className="text-3xl md:text-4xl font-black text-white text-center mb-4">
-          Шесть уровней — <span className="text-green-400">одна дорожка</span>
+          Семь уровней — <span className="text-green-400">одна дорожка</span>
         </h2>
         <p className="text-zinc-500 text-center max-w-xl mx-auto mb-14 text-sm md:text-base">
           Каждый следующий предмет закрыт замком. Ключ от замка — сданный тест предыдущего (минимум 70%).
@@ -350,16 +417,21 @@ export default function VprMatrixLanding() {
             Середина года — <span className="text-green-400">пройдена</span>
           </h2>
           <p className="text-zinc-400 leading-relaxed mb-10 max-w-xl mx-auto">
-            Шесть зелёных галочек на дорожке — и контрольные больше не монстр,
+            Семь зелёных галочек на дорожке — и контрольные больше не монстр,
             а чекпоинт, который ты уже прошёл в тренажёре. Красная или синяя пилюля —
-            то есть, начать с Алгебры или со списка тестов?
+            то есть, найти свои дыры или открыть список уровней?
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/vpr-test/71">
-              <Button size="lg" className="bg-green-500 hover:bg-green-400 text-black font-black text-base px-8 py-6 rounded-xl shadow-[0_0_40px_rgba(34,197,94,0.35)]">
-                Level 1: Алгебра <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              onClick={() => {
+                setSuperOpen(true);
+                document.getElementById("super")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="bg-green-500 hover:bg-green-400 text-black font-black text-base px-8 py-6 rounded-xl shadow-[0_0_40px_rgba(34,197,94,0.35)]"
+            >
+              <Radar className="mr-2 w-5 h-5" /> Пройти Супертест
+            </Button>
             <Link href="/vpr-tests">
               <Button size="lg" variant="outline" className="border-green-500/40 text-green-400 font-bold text-base px-8 py-6 rounded-xl">
                 Открыть дорожку
