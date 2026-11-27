@@ -485,8 +485,8 @@ export default function Russian8Cheatsheet() {
         <VprCtaTest
           slug="russian-8"
           subjectTitle="Русский язык"
-          nextHref="/vpr/history/8/cheatsheet"
-          nextTitle="История"
+          nextHref="/vpr/worldhistory/8/cheatsheet"
+          nextTitle="Всеобщая история"
           accentShadow="rgba(168,85,247,1)"
         />
         <footer className="text-center pb-20 text-zinc-700 text-[10px] font-mono uppercase tracking-widest">

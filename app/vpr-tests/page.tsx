@@ -277,9 +277,9 @@ const gradeCheats: Record<number, CheatData[]> = {
     },
     {
       href: "/vpr/history/8/cheatsheet",
-      title: "Chrono_Archive",
-      subtitle: "XIX Century Protocol",
-      desc: "От Бородино до индустриализации: таймлайн века, декабристы, великие реформы, квиз.",
+      title: "Rus_Chronicle",
+      subtitle: "XIX Century Protocol (2-е полугодие)",
+      desc: "История России: от Бородино до великих реформ — таймлайн века, декабристы, внешняя политика, квиз.",
       color: "#eab308",
       glowColor: "rgba(234, 179, 8, 0.3)",
       borderColor: "border-yellow-500/30",
@@ -313,6 +313,19 @@ const gradeCheats: Record<number, CheatData[]> = {
       icon: "activity",
       tag: "Probability",
       tagColor: "text-green-300 bg-green-900/40 border-green-500/20",
+    },
+    {
+      href: "/vpr/worldhistory/8/cheatsheet",
+      title: "World_History",
+      subtitle: "Modern Era Protocol",
+      desc: "Новое время: абсолютизм, Реформация, мануфактуры, Просвещение, революции. Определения и понятия — минимум дат.",
+      color: "#f59e0b",
+      glowColor: "rgba(245, 158, 11, 0.3)",
+      borderColor: "border-amber-500/30",
+      bgAccent: "bg-amber-500/5",
+      icon: "globe",
+      tag: "World History",
+      tagColor: "text-amber-300 bg-amber-900/40 border-amber-500/20",
     },
     {
       href: "/vpr/chemistry/8/cheatsheet",
@@ -751,16 +764,20 @@ function SectionHeader({ icon, title, subtitle, accent }: {
    Предметы открываются по цепочке: тест сдан (≥70%) → следующий unlocked.
    ================================================================ */
 
-const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'flask' | 'activity' | 'languages' | 'landmark' | 'hash'; color: string; testId: number; cheatsheet: string }> = {
+const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'flask' | 'activity' | 'languages' | 'landmark' | 'globe' | 'hash'; color: string; testId: number | null; cheatsheet: string }> = {
   algebra: { label: "Алгебра", icon: "calculator", color: "#22d3ee", testId: 71, cheatsheet: "/vpr/algebra/8/cheatsheet" },
   geometry: { label: "Геометрия", icon: "ruler", color: "#0bf2f6", testId: 75, cheatsheet: "/vpr/geometry/8/cheatsheet" },
   probability: { label: "Вероятность и статистика", icon: "activity", color: "#4ade80", testId: 79, cheatsheet: "/vpr/probability/8/cheatsheet" },
   russian: { label: "Русский язык", icon: "languages", color: "#a855f7", testId: 76, cheatsheet: "/vpr/russian/8/cheatsheet" },
-  history: { label: "История", icon: "landmark", color: "#eab308", testId: 77, cheatsheet: "/vpr/history/8/cheatsheet" },
+  // task219: 1-е полугодие 8 класса — ВСЕОБЩАЯ история (Новое время).
+  // testId подтягивается из БД клиентски (см. useRoadmapTestIds), в константе — null.
+  worldhistory: { label: "Всеобщая история", icon: "globe", color: "#f59e0b", testId: null, cheatsheet: "/vpr/worldhistory/8/cheatsheet" },
   literature: { label: "Литература", icon: "hash", color: "#f43f5e", testId: 78, cheatsheet: "/vpr/literature/8/cheatsheet" },
+  // task219: История России — 2-е полугодие, финальный уровень лестницы.
+  history: { label: "История России", icon: "landmark", color: "#eab308", testId: 77, cheatsheet: "/vpr/history/8/cheatsheet" },
 };
 
-const ROADMAP_ORDER = ["algebra", "geometry", "probability", "russian", "history", "literature"] as const;
+const ROADMAP_ORDER = ["algebra", "geometry", "probability", "russian", "worldhistory", "literature", "history"] as const;
 
 function RoadmapDeck() {
   const { progress, isUnlocked, isCompleted } = useVprRoadmap();
@@ -802,7 +819,7 @@ function RoadmapDeck() {
         </div>
         <div className="flex justify-between mt-2 text-[9px] font-mono uppercase tracking-wider text-zinc-600">
           <span>Level 1 · Алгебра</span>
-          <span>Финал · Литература</span>
+          <span>Финал · История России</span>
         </div>
       </div>
 
@@ -875,11 +892,19 @@ function RoadmapDeck() {
                           <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Шпаргалка
                         </Button>
                       </Link>
-                      <Link href={`/vpr-test/${meta.testId}`} className="flex-1">
-                        <Button size="sm" className="w-full font-bold" style={{ backgroundColor: meta.color, color: "#030712" }}>
-                          <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
-                        </Button>
-                      </Link>
+                      {(meta.testId ?? roadmapTestIds[slug]) ? (
+                        <Link href={`/vpr-test/${meta.testId ?? roadmapTestIds[slug]}`} className="flex-1">
+                          <Button size="sm" className="w-full font-bold" style={{ backgroundColor: meta.color, color: "#030712" }}>
+                            <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
+                          </Button>
+                        </Link>
+                      ) : (
+                        <span className="flex-1" title="Тест появится после загрузки в БД">
+                          <Button size="sm" disabled className="w-full font-bold opacity-50">
+                            <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
+                          </Button>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1205,6 +1230,21 @@ export default function VprTestsListPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.15], [1, 0.95]);
 
+  // task219: testId предметов дорожки из БД по слагу (всеобщая история и
+  // будущие предметы получают id автоматически, без правки константы)
+  const [roadmapTestIds, setRoadmapTestIds] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!allSubjects.length) return;
+    const bySlug: Record<string, number> = {};
+    for (const sub of allSubjects) {
+      const slug = getVprSubjectSlug(sub.name, sub.grade_level).replace("-8", "");
+      if (ROADMAP_ORDER.includes(slug as (typeof ROADMAP_ORDER)[number]) && !bySlug[slug]) {
+        bySlug[slug] = sub.id;
+      }
+    }
+    setRoadmapTestIds(bySlug);
+  }, [allSubjects]);
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -1516,7 +1556,7 @@ export default function VprTestsListPage() {
                   Матрица середины года
                 </div>
                 <div className="text-sm text-zinc-300 max-w-md mb-5 hidden sm:block">
-                  Feed → Fight → Fail → Repeat → Upgrade. Пройди дорожку из 6 уровней к контрольным за полугодие.
+                  Feed → Fight → Fail → Repeat → Upgrade. Пройди дорожку из 7 уровней к контрольным за полугодие.
                 </div>
                 <Link href="/vpr-matrix" className="w-fit">
                   <Button className="bg-green-500 hover:bg-green-400 text-black font-black px-6 py-5 rounded-xl shadow-[0_0_30px_rgba(34,197,94,0.3)]">

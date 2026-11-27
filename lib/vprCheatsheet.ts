@@ -18,7 +18,14 @@ export function getVprSubjectSlug(subjectName?: string, gradeLevel?: number | nu
   if (raw.includes("геометр")) return "geometry-8";
   if (raw.includes("литерат")) return "literature-8";
   if (raw.includes("русский")) return "russian-8";
-  if (raw.includes("истор")) return isGrade8 || raw.includes("8") ? "history-8" : "history-7";
+  // task219: в 8 классе ДВЕ истории: «Всеобщая история» (1-е полугодие,
+  // Новое время) и «История России» (2-е полугодие). Матчим по точному
+  // вхождению: «всеобщ» важнее общего «истор».
+  if (raw.includes("всеобщ") && raw.includes("истор")) return "worldhistory-8";
+  if (raw.includes("истор")) {
+    if (isGrade8 || raw.includes("8")) return "history-8";
+    return "history-7";
+  }
   // 7 класс и прочее
   if (raw.includes("информ")) return "informatics-7";
   if (raw.includes("физ")) return "physics-7";
@@ -37,6 +44,7 @@ export function getVprCheatsheetHref(subjectSlug: string): string {
     "geometry-8": "/vpr/geometry/8/cheatsheet",
     "literature-8": "/vpr/literature/8/cheatsheet",
     "russian-8": "/vpr/russian/8/cheatsheet",
+    "worldhistory-8": "/vpr/worldhistory/8/cheatsheet",
     "history-8": "/vpr/history/8/cheatsheet",
     "chemistry-8": "/vpr/chemistry/8/cheatsheet",
     // 7 класс

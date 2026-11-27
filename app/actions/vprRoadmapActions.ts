@@ -133,7 +133,7 @@ async function notifyRoadmapProgress(params: {
       text =
         `🏆 *ДОРОЖКА ПРОЙДЕНА!*\n\n` +
         `*${subjectLabel}* — финальный уровень сдан (${score}/${total}, ${pct}%).\n` +
-        `Все 6 предметов 8 класса разблокированы и сданы. Середина года дешифрована — I know kung fu и теорему Пифагора 😎`;
+        `Все ${VPR_ROADMAP_ORDER.length} предметов 8 класса разблокированы и сданы. Середина года дешифрована — I know kung fu и теорему Пифагора 😎`;
       ctaText = "🎮 В Матрицу";
     } else if (kind === "almost") {
       const need = Math.max(1, Math.ceil(VPR_PASS_RATIO * total) - score);
@@ -198,7 +198,7 @@ async function notifyParentSummary(params: {
 
     const body =
       `${subjectLabel}: ${score}/${total} (${pct}%).\n` +
-      `Прогресс дорожки: ${completedCount}/6 предметов сдано.`;
+      `Прогресс дорожки: ${completedCount}/${VPR_ROADMAP_ORDER.length} предметов сдано.`;
 
     const ach = achievements.length > 0 ? `\n🏅 Ачивки: ${achievements.join(", ")}` : "";
     const advice =
@@ -319,9 +319,9 @@ export async function recordVprRoadmapResultAction(params: {
     if (passed && Object.keys(progress.completed).length >= 1) claim("first_blood");
     if (passed && score === total) claim("flawless");
     if (passed && !wasCompleted && (progress.fails?.[slug] || 0) > 0) claim("iron_will");
-    if (Object.keys(progress.completed).length >= 3) claim("half_matrix");
-    if (Object.keys(progress.completed).length >= 5) claim("one_to_go");
-    if (Object.keys(progress.completed).length >= 6) claim("the_one");
+    if (Object.keys(progress.completed).length >= Math.ceil(VPR_ROADMAP_ORDER.length / 2)) claim("half_matrix");
+    if (Object.keys(progress.completed).length >= VPR_ROADMAP_ORDER.length - 1) claim("one_to_go");
+    if (Object.keys(progress.completed).length >= VPR_ROADMAP_ORDER.length) claim("the_one");
     progress.achievements = Array.from(owned);
 
     // сохраняем, если что-то изменилось

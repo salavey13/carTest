@@ -7,8 +7,12 @@ export const VPR_ROADMAP_ORDER = [
   "geometry",
   "probability",
   "russian",
-  "history",
+  "worldhistory",
   "literature",
+  // task219: История России — второе полугодие; в 1-м полугодии 8 класса
+  // по программе идёт ВСЕОБЩАЯ история (Новое время), поэтому в лестнице
+  // разблокировки она раньше, а российская — финальный уровень.
+  "history",
 ] as const;
 
 export type VprRoadmapSlug = (typeof VPR_ROADMAP_ORDER)[number];
@@ -33,8 +37,9 @@ export const VPR_ROADMAP_LABELS: Record<string, string> = {
   geometry: "Геометрия",
   probability: "Вероятность и статистика",
   russian: "Русский язык",
-  history: "История",
+  worldhistory: "Всеобщая история",
   literature: "Литература",
+  history: "История России",
 };
 
 /**
@@ -46,6 +51,7 @@ export const VPR_HERO_IMAGES: Record<string, string> = {
   geometry: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/geometry-hero.jpg",
   probability: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/probability-hero.jpg",
   russian: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/russian-hero.jpg",
+  worldhistory: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/history-hero.jpg",
   history: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/history-hero.jpg",
   literature: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/literature-hero.jpg",
 };
@@ -76,16 +82,16 @@ export const VPR_ACHIEVEMENTS: VprAchievementDef[] = [
   {
     key: "half_matrix",
     title: "🌗 Половина Матрицы",
-    text: () => `Три из шести уровней сданы. Экватор пройден — обратной дороги к «не хочу учиться» больше нет.`,
+    text: () => `Три из ${VPR_ROADMAP_ORDER.length} уровней сданы. Экватор пройден — обратной дороги к «не хочу учиться» больше нет.`,
   },
   {
     key: "one_to_go",
     title: "⏳ Один до конца",
-    text: () => `Пять из шести! Остался последний уровень — добей и стань Избранным.`,
+    text: () => `${VPR_ROADMAP_ORDER.length - 1} из ${VPR_ROADMAP_ORDER.length}! Остался последний уровень — добей и стань Избранным.`,
   },
   {
     key: "the_one",
     title: "🕶️ The One",
-    text: () => `ВСЕ ШЕСТЬ УРОВНЕЙ СДАНЫ. Ты — Избранный. Матрица 8 класса покорена полностью.`,
+    text: () => `ВСЕ ${VPR_ROADMAP_ORDER.length} УРОВНЕЙ СДАНЫ. Ты — Избранный. Матрица 8 класса покорена полностью.`,
   },
 ];

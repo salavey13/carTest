@@ -18,6 +18,11 @@
     "app/vpr/russian/8/cheatsheet/page.tsx",
     "app/vpr/history/8/cheatsheet/page.tsx",
     "app/vpr/literature/8/cheatsheet/page.tsx",
-    "app/vpr-tests/page.tsx"
+    "app/vpr-tests/page.tsx",
+    "app/vpr/worldhistory/8/cheatsheet/page.tsx",
+    "lib/vprRoadmap.ts",
+    "hooks/useVprRoadmap.ts",
+    "app/actions/vprRoadmapActions.ts",
+    "app/vpr-matrix/page.tsx"
   ]
 }

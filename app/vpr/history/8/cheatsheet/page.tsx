@@ -405,9 +405,9 @@ export default function History8Cheatsheet() {
         {/* CTA: тест-бой предмета + межлинковка (task217, legacy-промо убрано) */}
         <VprCtaTest
           slug="history-8"
-          subjectTitle="История"
-          nextHref="/vpr/literature/8/cheatsheet"
-          nextTitle="Литература"
+          subjectTitle="История России"
+          nextHref="/vpr/chemistry/8/cheatsheet"
+          nextTitle="Химия"
           accentShadow="rgba(234,179,8,1)"
         />
         <footer className="text-center pb-20 text-zinc-700 text-[10px] font-mono uppercase tracking-widest">
