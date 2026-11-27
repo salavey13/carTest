@@ -80,6 +80,16 @@ const VprHistoryCheatsheet: React.FC = () => {
               <h2 className={cn("flex items-center text-2xl font-bold text-blue-700 mb-3")}>
                 <VibeContentRenderer content="<FaLandmark />" className="mr-2 text-blue-500 hover:scale-110 transition-transform" /> Уровень 1: Древняя Русь — Начало приключения! 🛡️
               </h2>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#3b82f633" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/history-6.jpg"
+              alt="История 6 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
               <p className="text-gray-700 mb-4">Древняя Русь — как сказка про князей и варягов! Варяги приплыли, Рюрик стал правителем. Потом крещение, расцвет. А ты знал, что Москва упоминается в 1147? Волшебство истории! ✨</p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li><strong>Ключевые даты:</strong> 862 — варяги, 988 — крещение, 1223 — Калка.</li>

@@ -104,6 +104,16 @@ const VprBiologyCheatsheet6: NextPage = () => {
             <VibeContentRenderer content="<FaBookOpen />" className="mr-2 md:mr-3 text-emerald-600" />
             Биология 6 класс: Подробная Шпаргалка к ВПР
           </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#22c55e33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/biology-6.jpg"
+              alt="Биология 6 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
 
           {/* Light Theme Card */}
           <Card className="max-w-7xl mx-auto bg-white/95 text-slate-800 rounded-xl border border-emerald-200/80 shadow-lg">

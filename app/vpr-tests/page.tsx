@@ -189,6 +189,19 @@ const gradeCheats: Record<number, CheatData[]> = {
       tag: "Literature",
       tagColor: "text-rose-300 bg-rose-900/40 border-rose-500/20",
     },
+    {
+      href: "/vpr/socialstudies/7/cheatsheet",
+      title: "Society_Map",
+      subtitle: "Law & Economy",
+      desc: "Экономика и собственность, труд и карьера, Конституция РФ и права подростка. С укладом под цитаты статей.",
+      color: "#3b82f6",
+      glowColor: "rgba(59, 130, 246, 0.3)",
+      borderColor: "border-blue-500/30",
+      bgAccent: "bg-blue-500/5",
+      icon: "globe",
+      tag: "Social",
+      tagColor: "text-blue-300 bg-blue-900/40 border-blue-500/20",
+    },
   ],
   6: [
     {
@@ -229,6 +242,58 @@ const gradeCheats: Record<number, CheatData[]> = {
       icon: "leaf",
       tag: "Biology",
       tagColor: "text-green-300 bg-green-900/40 border-green-500/20",
+    },
+    {
+      href: "/vpr/math/6/cheatsheet",
+      title: "Math_Core",
+      subtitle: "Number Engine",
+      desc: "Дроби, проценты, пропорции, отрицательные числа и координатная прямая. Арифметический протокол 6 уровня.",
+      color: "#3b82f6",
+      glowColor: "rgba(59, 130, 246, 0.3)",
+      borderColor: "border-blue-500/30",
+      bgAccent: "bg-blue-500/5",
+      icon: "hash",
+      tag: "Math",
+      tagColor: "text-blue-300 bg-blue-900/40 border-blue-500/20",
+    },
+    {
+      href: "/vpr/russian/6/cheatsheet",
+      title: "Русский_Код",
+      subtitle: "Spelling Engine",
+      desc: "Ё после шипящих, ПРЕ/ПРИ, то же/тоже, части речи. Орфографические протоколы 6 уровня.",
+      color: "#a855f7",
+      glowColor: "rgba(168, 85, 247, 0.3)",
+      borderColor: "border-violet-500/30",
+      bgAccent: "bg-violet-500/5",
+      icon: "languages",
+      tag: "Russian",
+      tagColor: "text-violet-300 bg-violet-900/40 border-violet-500/20",
+    },
+    {
+      href: "/vpr/socialstudies/6/cheatsheet",
+      title: "Society_Map",
+      subtitle: "Human Protocol",
+      desc: "Человек как биосоциальное существо, виды деятельности, семья и малые группы. Понятия — по определениям.",
+      color: "#3b82f6",
+      glowColor: "rgba(59, 130, 246, 0.3)",
+      borderColor: "border-blue-500/30",
+      bgAccent: "bg-blue-500/5",
+      icon: "globe",
+      tag: "Social",
+      tagColor: "text-blue-300 bg-blue-900/40 border-blue-500/20",
+    },
+    {
+      href: "/vpr/english/6/cheatsheet",
+      title: "Lingua_Code",
+      subtitle: "Grammar Engine",
+      desc: "Tenses, degrees of comparison, who/which, типы вопросов. Декодирование английской грамматики 6 уровня.",
+      color: "#22d3ee",
+      glowColor: "rgba(34, 211, 238, 0.3)",
+      borderColor: "border-cyan-500/30",
+      bgAccent: "bg-cyan-500/5",
+      icon: "languages",
+      tag: "English",
+      tagColor: "text-cyan-300 bg-cyan-900/40 border-cyan-500/20",
     },
   ],
   8: [
@@ -1064,7 +1129,9 @@ function SubjectMissionCard({ subject, index }: { subject: Subject; index: numbe
   const knownSlugs = new Set([...ROADMAP_ORDER.map((o) => `${o}-8`)]);
   const cheatsheetHref =
     slug !== "general" ? getVprCheatsheetHref(slug) : null;
-  const cheatsheetExists = cheatsheetHref && (knownSlugs.has(slug) || slug.endsWith("-7") || slug === "chemistry-8");
+  // task220: шпаргалки теперь есть у всех -6/-7 слагов (russian-6,
+  // socialstudies-6/7, english-6 добавлены) — проверка по href-карте маппера
+  const cheatsheetExists = cheatsheetHref && cheatsheetHref !== "/vpr-tests";
   return (
     <Link href={`/vpr-test/${subject.id}`} passHref legacyBehavior>
       <motion.a

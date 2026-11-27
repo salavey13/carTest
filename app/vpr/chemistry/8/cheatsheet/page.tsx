@@ -122,6 +122,16 @@ export default function Chemistry8FriendlyCheatsheet() {
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Шпаргалка по <span className="text-emerald-400">Химии</span>
           </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#22c55e33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/chemistry-8.jpg"
+              alt="Химия 8 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
           <p className="text-zinc-400 text-sm leading-relaxed max-w-2xl">
             Загрузка перед контрольной: вещества и явления, атомы и молекулы, знаки элементов,
             Ar/Mr, валентность с конструктором формул и массовая доля. 8 модулей + квиз.

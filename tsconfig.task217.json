@@ -23,6 +23,13 @@
     "lib/vprRoadmap.ts",
     "hooks/useVprRoadmap.ts",
     "app/actions/vprRoadmapActions.ts",
-    "app/vpr-matrix/page.tsx"
+    "app/vpr-matrix/page.tsx",
+    "app/vpr/russian/6/cheatsheet/page.tsx",
+    "app/vpr/socialstudies/6/cheatsheet/page.tsx",
+    "app/vpr/english/6/cheatsheet/page.tsx",
+    "app/vpr/socialstudies/7/cheatsheet/page.tsx",
+    "app/vpr/math/6/cheatsheet/page.tsx",
+    "app/vpr/geometry/7/cheatsheet/page.tsx",
+    "app/vpr/history/6/cheatsheet/page.tsx"
   ]
 }

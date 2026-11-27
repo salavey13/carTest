@@ -591,6 +591,16 @@ export default function HistoryCheatsheetPage() {
                   <div className="text-center space-y-4 py-8">
                     <motion.div initial={{scale:0,rotate:-180}} animate={{scale:1,rotate:0}} transition={{type:"spring",bounce:0.4}} className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-amber-500/20 border border-amber-500/30 mb-4"><History size={40} className="text-amber-400"/></motion.div>
                     <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-500 bg-clip-text text-transparent">ИСТОРИЯ EXPLORER</h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#eab30833" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/history-7.jpg"
+              alt="История 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
                     <p className="text-gray-400 text-lg max-w-lg mx-auto">Интерактивный тренажёр подготовки к ВПР по истории России. 7 класс: XIV–XX века.</p>
                     <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
                       <span className="flex items-center gap-1"><Target size={14}/> 24 вопроса</span>

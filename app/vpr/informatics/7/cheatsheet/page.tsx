@@ -2488,6 +2488,16 @@ export default function Informatics7Cheatsheet() {
                   </span>{" "}
                   <span className="text-white">ARCHITECT</span>
                 </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#22c55e33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/informatics-7.jpg"
+              alt="Информатика 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
                 <p className="text-green-400/70 text-lg">
                   7 класс // Информатика, Алгоритмы, Логика, Архитектура
                 </p>

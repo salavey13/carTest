@@ -110,6 +110,16 @@ export default function Algebra8FriendlyCheatsheet() {
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight">
             Algebra <span className="text-brand-cyan">Master</span>
           </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#22d3ee33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/algebra-8.jpg"
+              alt="Алгебра 8 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
           <p className="text-zinc-500 text-lg">Всё, что нужно для контрольных и ВПР, в одном месте.</p>
         </header>
 

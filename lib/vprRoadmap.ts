@@ -47,13 +47,14 @@ export const VPR_ROADMAP_LABELS: Record<string, string> = {
  * Telegram качает URL сам через sendPhoto, inline-кнопки вешаются на фото.
  */
 export const VPR_HERO_IMAGES: Record<string, string> = {
-  algebra: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/algebra-hero.jpg",
-  geometry: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/geometry-hero.jpg",
-  probability: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/probability-hero.jpg",
-  russian: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/russian-hero.jpg",
-  worldhistory: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/history-hero.jpg",
-  history: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/history-hero.jpg",
-  literature: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task212/literature-hero.jpg",
+  // task220: переведены на новые hero-иллюстрации (те же слаги дорожки)
+  algebra: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/algebra-8.jpg",
+  geometry: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/geometry-8.jpg",
+  probability: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/probability-8.jpg",
+  russian: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/russian-8.jpg",
+  worldhistory: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/worldhistory-8.jpg",
+  literature: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/literature-8.jpg",
+  history: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/history-8.jpg",
 };
 
 /** Ачивки заметных чекпоинтов (task214). Ключи хранятся в progress.achievements. */

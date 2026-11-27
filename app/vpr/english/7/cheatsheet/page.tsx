@@ -280,6 +280,16 @@ export default function EnglishVPR7() {
               <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-400 bg-clip-text text-transparent">
                 ВПР — Английский язык
               </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#22d3ee33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/english-7.jpg"
+              alt="Английский 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
               <p className="text-cyan-500/60 text-sm mt-1">7 класс · Interactive Practice · 4 VPR Types</p>
               <div className="flex items-center gap-3 mt-2 justify-center sm:justify-start">
                 <Badge variant="outline" className="border-cyan-700/40 text-cyan-400 text-xs">

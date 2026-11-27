@@ -354,6 +354,16 @@ export default function WorldHistoryCheatsheet() {
             Всеобщая история <span className="text-amber-400">8 класса</span>
             <span className="block text-xl sm:text-2xl text-zinc-400 font-bold mt-2">Новое время. XVIII век</span>
           </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#f59e0b33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/worldhistory-8.jpg"
+              alt="Всеобщая история 8 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed max-w-2xl">
             Первый семестр 8 класса — это зарубежная история: Просвещение, промышленный переворот,
             две революции (американская и французская) и традиционный Восток.

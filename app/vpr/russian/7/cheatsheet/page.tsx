@@ -481,6 +481,16 @@ export default function Russian7Cheatsheet() {
               <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-violet-400 via-purple-300 to-fuchsia-400 bg-clip-text text-transparent">
                 РУССКИЙ ЯЗЫК
               </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#a855f733" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/russian-7.jpg"
+              alt="Русский язык 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
               <p className="text-sm sm:text-base text-violet-300/70 mt-1">
                 7 класс — Орфография, Пунктуация, Морфология
               </p>

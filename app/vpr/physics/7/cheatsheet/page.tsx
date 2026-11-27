@@ -590,6 +590,16 @@ export default function Physics7Practice() {
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-300 via-amber-400 to-orange-500">PHYSICS</span>{' '}
                 <span className="text-white">LAB</span>
               </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#f9731633" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/physics-7.jpg"
+              alt="Физика 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
               <p className="text-orange-400/60 text-sm md:text-base mt-1">7 класс — Механика, Давление, Плотность, Архимед</p>
               <div className="flex items-center gap-4 mt-3 justify-center md:justify-start text-xs text-orange-500/60">
                 <span className="flex items-center gap-1"><Calculator className="w-3 h-3" /> 20 вопросов</span>

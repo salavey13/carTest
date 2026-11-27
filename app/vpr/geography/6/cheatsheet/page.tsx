@@ -65,6 +65,16 @@ const VprGeographyCheatsheet6: NextPage = () => {
                         <FaBookOpen className="mr-3 text-brand-green/80 inline-block" />
                         ВПР География 6 класс: Шпаргалка
                     </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#14b8a633" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/geography-6.jpg"
+              alt="География 6 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
 
                     <Card className="max-w-6xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-purple/40 shadow-[0_0_30px_rgba(157,0,255,0.3)]">
                          <CardHeader className="text-center border-b border-brand-purple/20 pb-4 pt-6">

@@ -72,6 +72,16 @@ const MathCheatsheet: React.FC = () => {
               <h2 className={cn("flex items-center text-2xl font-bold text-blue-700 mb-3")}>
                 <VibeContentRenderer content="<FaPlusMinus />" className="mr-2 text-blue-500 hover:scale-110 transition-transform" /> Уровень 1: Арифметика — Числа дерутся и дружат! ⚔️
               </h2>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#3b82f633" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/math-6.jpg"
+              alt="Математика 6 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
               <p className="text-gray-700 mb-4">Положительные — добрые рыцари, отрицательные — тени. Умножаем? Копируем силу! Делим? Раздаём конфеты. Сначала скобки — спаси друзей! А ты знал, что - × - = +? Волшебство! ✨</p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li><strong>Совет:</strong> Отрицательные: + × + = +, + × - = -, - × - = +. Ты — рефери! 👊</li>

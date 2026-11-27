@@ -717,6 +717,16 @@ export default function Geometry7Cheatsheet() {
           >
             BLUEPRINT GEO
           </motion.h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#0bf2f633" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/geometry-7.jpg"
+              alt="Геометрия 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80 rounded-lg"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
 
           <motion.p
             initial={{ opacity: 0 }}

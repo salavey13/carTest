@@ -293,6 +293,16 @@ export default function Literature7CheatsheetPage() {
           <h1 className="relative text-3xl font-bold md:text-4xl bg-gradient-to-r from-cyan-200 via-slate-100 to-violet-200 bg-clip-text text-transparent">
             Шпаргалка для ВПР по литературе, 7 класс
           </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#f43f5e33" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/literature-7.jpg"
+              alt="Литература 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
           <p className="relative mt-3 max-w-3xl text-slate-400 leading-relaxed">
             Быстрый конспект без «каши в голове»: термины, шаблоны ответов,
             разбор стихотворения и мини-карточки произведений, которые часто

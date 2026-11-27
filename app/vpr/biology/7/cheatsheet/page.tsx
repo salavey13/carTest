@@ -780,6 +780,16 @@ export default function Biology7Cheatsheet() {
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black bg-gradient-to-r from-emerald-300 via-teal-200 to-lime-400 bg-clip-text text-transparent mb-4 leading-tight">
             МИР РАСТЕНИЙ
           </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#10b98133" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/biology-7.jpg"
+              alt="Биология 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
           <p className="text-emerald-200/50 text-base sm:text-lg max-w-2xl mx-auto">
             От водорослей до покрытосеменных: вся ботаника 7 класса.
             <br /><span className="text-emerald-400 font-bold">Цель:</span> Разобрать все 27 типов заданий ВПР по биологии с реальными ответами.

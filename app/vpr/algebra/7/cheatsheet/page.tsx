@@ -818,6 +818,16 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
         <h1 className="text-6xl md:text-8xl font-black bg-gradient-to-r from-cyan-400 via-violet-500 to-cyan-400 bg-clip-text text-transparent leading-tight tracking-tight">
           МАТЕРИЯ
         </h1>
+          {/* HERO-иллюстрация (task220) */}
+          <div className="relative mb-6 overflow-hidden rounded-none border" style={{ borderColor: "#3b82f633" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/task220/algebra-7.jpg"
+              alt="Алгебра 7 класс — неоновая иллюстрация"
+              className="w-full h-auto opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-transparent" />
+          </div>
         <motion.p className="mt-3 text-lg md:text-xl text-slate-400 font-medium"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
           Алгебра 7 класс — интерактивный тренажёр ВПР
