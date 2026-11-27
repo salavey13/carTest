@@ -36,6 +36,9 @@
     "app/vpr/geography/8/cheatsheet/page.tsx",
     "app/vpr/english/8/cheatsheet/page.tsx",
     "app/vpr/socialstudies/8/cheatsheet/page.tsx",
-    "app/vpr/informatics/8/cheatsheet/page.tsx"
+    "app/vpr/informatics/8/cheatsheet/page.tsx",
+    "app/vpr-super/page.tsx",
+    "app/actions/vprSuperTestActions.ts",
+    "lib/vprSuperTest.ts"
   ]
 }

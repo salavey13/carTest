@@ -12,10 +12,12 @@ import {
   Cpu, Zap, Activity,
   Map as MapIcon, Leaf, Bug, Atom, Ruler,
   Globe, Landmark, ChevronRight, ChevronDown,
-  Languages, Hash, ArrowRight, Radar, Shield, Flame, Star, Users, Lock
+  Languages, Hash, ArrowRight, Radar, Shield, Flame, Star, Users, Lock,
+  BrainCircuit, Gauge, TrendingDown
 } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { useVprRoadmap } from "@/hooks/useVprRoadmap";
+import { useVprRoadmap, useRoadmapDisplayOrder } from "@/hooks/useVprRoadmap";
+import { SUPER_MODES } from "@/lib/vprSuperTest";
 import { getVprSubjectSlug, getVprCheatsheetHref } from "@/lib/vprCheatsheet";
 import type { Database } from "@/types/database.types";
 
@@ -925,9 +927,22 @@ const ROADMAP_ORDER = ["algebra", "geometry", "probability", "russian", "worldhi
 
 function RoadmapDeck() {
   const { progress, isUnlocked, isCompleted } = useVprRoadmap();
-  const unlockedCount = ROADMAP_ORDER.filter((s) => isUnlocked(s)).length;
-  const completedCount = ROADMAP_ORDER.filter((s) => isCompleted(s)).length;
-  const nextSlug = ROADMAP_ORDER.find((s) => !isCompleted(s));
+  // task221: личный порядок от супертеста (слабейшие первыми), дефолт — канон
+  const displayOrder = useRoadmapDisplayOrder();
+  const isPersonal = Boolean(progress.personalOrder && progress.personalOrder.length > 0);
+  const unlockedCount = displayOrder.filter((s) => isUnlocked(s)).length;
+  const completedCount = displayOrder.filter((s) => isCompleted(s)).length;
+  const nextSlug = displayOrder.find((s) => !isCompleted(s));
+  // quick stats (task221): средний % сданных, лучший предмет, всего попыток
+  const completedEntries = Object.entries(progress.completed || {});
+  const avgPct = completedEntries.length > 0
+    ? Math.round(completedEntries.reduce((acc, [, r]) => acc + (r.score / r.total), 0) / completedEntries.length * 100)
+    : null;
+  const bestEntry = completedEntries.reduce<{ slug: string; pct: number } | null>((best, [slug, r]) => {
+    const pct = Math.round((r.score / r.total) * 100);
+    return !best || pct > best.pct ? { slug, pct } : best;
+  }, null);
+  const failsTotal = Object.values(progress.fails || {}).reduce((a, b) => a + b, 0);
 
   return (
     <motion.section
@@ -939,9 +954,90 @@ function RoadmapDeck() {
       <SectionHeader
         icon={<Flame className="w-6 h-6" />}
         title="Дорожка 8 класса // Mission_Road"
-        subtitle={`Уровней открыто: ${unlockedCount}/${ROADMAP_ORDER.length} · Сдано: ${completedCount}/${ROADMAP_ORDER.length}`}
+        subtitle={`Уровней открыто: ${unlockedCount}/${displayOrder.length} · Сдано: ${completedCount}/${displayOrder.length}${isPersonal ? " · 🧠 личный порядок" : ""}`}
         accent
       />
+
+      {/* ═══ task221: СУПЕРТЕСТ-карточка + Quick Stats ═══ */}
+      <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="lg:col-span-2 relative rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-zinc-950 to-violet-950/20 overflow-hidden"
+        >
+          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+          <div className="relative p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <BrainCircuit className="w-5 h-5 text-cyan-400" />
+                  <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-cyan-400">diagnostic protocol</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">СУПЕРТЕСТ: все предметы разом</h3>
+                <p className="text-[12px] text-zinc-400 leading-relaxed mt-2 max-w-md">
+                  Случайные вопросы из всех 7 предметов 8 класса за один прогон. На выходе — карта дыр
+                  и <span className="text-white font-semibold">личный порядок разблокировки</span>: слабейшие предметы станут первыми уровнями.
+                </p>
+              </div>
+              {isPersonal && (
+                <span className="shrink-0 hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-violet-500/40 bg-violet-500/10 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-wider">
+                  <BrainCircuit className="w-3.5 h-3.5" /> порядок настроен
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {(Object.keys(SUPER_MODES) as ("quick" | "standard" | "full")[]).map((k) => (
+                <span key={k} className="px-2.5 py-1 rounded-md border border-zinc-700/60 bg-zinc-900/60 text-[10px] font-mono text-zinc-400">
+                  {SUPER_MODES[k].label}: {SUPER_MODES[k].desc.split("·")[1]?.trim() ?? ""}
+                </span>
+              ))}
+            </div>
+            <Link href="/vpr-super">
+              <Button className="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-6 py-4 rounded-xl shadow-[0_0_25px_rgba(34,211,238,0.25)]">
+                <Zap className="w-4 h-4 mr-2" /> Пройти диагностику
+              </Button>
+            </Link>
+          </div>
+        </motion.div>
+
+        {/* Quick Stats (task221) */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+          className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-5 sm:p-6 flex flex-col"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Gauge className="w-4 h-4 text-green-400" />
+            <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">quick stats</span>
+          </div>
+          <div className="flex-1 grid grid-cols-3 lg:grid-cols-1 gap-3">
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-600">средний сдан</div>
+              <div className="text-xl lg:text-2xl font-black text-white leading-tight">
+                {avgPct !== null ? `${avgPct}%` : <span className="text-zinc-600 text-base font-bold">—</span>}
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-600">лучший</div>
+              <div className="text-xl lg:text-2xl font-black text-white leading-tight">
+                {bestEntry ? `${ROADMAP_META[bestEntry.slug]?.label ?? bestEntry.slug}` : <span className="text-zinc-600 text-base font-bold">—</span>}
+              </div>
+              {bestEntry && <div className="text-[10px] font-mono text-green-400">{bestEntry.pct}%</div>}
+            </div>
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-wider text-zinc-600">факторов повтора</div>
+              <div className="text-xl lg:text-2xl font-black text-white leading-tight">{failsTotal}</div>
+              {failsTotal > 0 && <div className="text-[10px] font-mono text-yellow-500/80 flex items-center gap-0.5"><TrendingDown className="w-2.5 h-2.5" /> fail → repeat</div>}
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[10px] text-zinc-600 font-mono">
+            // статистика твоей дорожки 8 класса
+          </div>
+        </motion.div>
+      </div>
 
       {/* Прогресс-бар дорожки */}
       <div className="mb-8 px-1">
@@ -962,14 +1058,14 @@ function RoadmapDeck() {
           ))}
         </div>
         <div className="flex justify-between mt-2 text-[9px] font-mono uppercase tracking-wider text-zinc-600">
-          <span>Level 1 · Алгебра</span>
-          <span>Финал · История России</span>
+          <span>Level 1 · {ROADMAP_META[displayOrder[0]]?.label ?? "Алгебра"}</span>
+          <span>Финал · {ROADMAP_META[displayOrder[displayOrder.length - 1]]?.label ?? "История России"}</span>
         </div>
       </div>
 
       {/* Карточки дорожки */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-        {ROADMAP_ORDER.map((slug, i) => {
+        {displayOrder.map((slug, i) => {
           const meta = ROADMAP_META[slug];
           const unlocked = isUnlocked(slug);
           const completed = isCompleted(slug);

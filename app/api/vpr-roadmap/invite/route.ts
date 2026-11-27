@@ -7,7 +7,8 @@ import { logger } from "@/lib/logger";
 // Юзер (родитель/организатор) получает сообщение у себя в TG и форвардит
 // его геймеру. task214: hero-фото алгебры + inline URL-кнопки — они
 // переживают пересылку, в отличие от reply-клавиатуры.
-// GET/POST с ?chat_id= (по умолчанию ADMIN_CHAT_ID).
+// task221: v2 — СУПЕРТЕСТ-режим (?mode=super): персональные приглашения
+// «протестируй себя» геймеру и боссу (me), разные тексты + CC-копия.
 
 const INVITE_TEXT =
   `🎮 *МАТРИЦА 8 КЛАССА — тренировочная программа*\n\n` +
@@ -23,16 +24,46 @@ const INVITE_TEXT =
   `Прогресс сохраняется, бот присылает уведомления об открытых уровнях и ачивках 🏆\n\n` +
   `Wake up, восьмиклассник… 💊`;
 
+// task221: приглашение на СУПЕРТЕСТ геймеру (w3onax)
+const SUPER_INVITE_GAMER =
+  `⚡ *СУПЕРТЕСТ: проверь себя за 12 минут*\n\n` +
+  `Один прогон — все 7 предметов 8 класса вперемешку: алгебра, геометрия, ` +
+  `вероятность, русский, всеобщая, литература и история России.\n\n` +
+  `Зачем:\n` +
+  `🎯 За 12 минут система найдёт твои дыры — без оценки и наказаний\n` +
+  `🧠 Матрица перестроится под тебя: слабейшие предметы станут первыми уровнями\n` +
+  `📊 Тебе покажут карту: где ты силён, а где — раскол\n\n` +
+  `Три режима: Quick_Scan (12 вопросов), Full_Scan (21), Deep_Scan (35).\n` +
+  `Провалишь вопрос — увидишь разбор сразу. Это не контрольная, это диагностика.\n\n` +
+  `Wake up, восьмиклассник. Посмотрим, что ты на самом деле знаешь 💊`;
+
+// task221: приглашение боссу (me) — «протестируй себя»
+const SUPER_INVITE_BOSS =
+  `🧪 *СУПЕРТЕСТ готов — проверь себя первым*\n\n` +
+  `Новый диагностический режим Матрицы 8 класса:\n` +
+  `• случайные вопросы из всех 7 предметов за один прогон\n` +
+  `• карта дыр по каждому предмету с порогом 70%\n` +
+  `• персональный порядок разблокировки: слабейшие предметы — первыми уровнями\n` +
+  `• quick stats в хабе: средний %, лучший предмет, повторы\n\n` +
+  `Режимы: Quick_Scan 12 вопросов / Full_Scan 21 / Deep_Scan 35.\n` +
+  `Геймеру (w3onax) приглашение отправлено отдельным сообщением ниже ⬇️\n\n` +
+  `Прогони сам — увидишь, что увидит он 😉`;
+
 // task215b: экранирование пользовательских вставок (ключ доступа) в Markdown
 const escapeMd = (s: string) => s.replace(/([_*`\[\]])/g, "\\$1");
 
-async function sendTo(chatId: string, text: string): Promise<{ ok: boolean; error?: string }> {
-  const buttons = [
+async function sendTo(
+  chatId: string,
+  text: string,
+  opts?: { photo?: string; buttons?: { text: string; url: string }[][] }
+): Promise<{ ok: boolean; error?: string }> {
+  const buttons = opts?.buttons ?? [
     [{ text: "🔴 Начать тренировку", url: VPR_TG_DEEPLINK }],
     [{ text: "🌐 Открыть в браузере", url: "https://v0-car-test.vercel.app/vpr-matrix" }],
   ];
+  const photo = opts?.photo ?? VPR_HERO_IMAGES.algebra;
   const result = await telegramDeliver("sendPhoto", chatId, {
-    photo: VPR_HERO_IMAGES.algebra,
+    photo,
     caption: text,
     parse_mode: "Markdown",
     reply_markup: { inline_keyboard: buttons },
@@ -57,7 +88,43 @@ async function handleInvite(req: NextRequest) {
     // task215b: личный ключ доступа (append к инвайту) + копия админу
     const code = (url.searchParams.get("code") || "").trim().slice(0, 64);
     const cc = url.searchParams.get("cc") === "admin";
+    // task221: режим супертеста + отдельный адрес босса
+    const mode = url.searchParams.get("mode");
+    const bossId = url.searchParams.get("boss_id") || process.env.ADMIN_CHAT_ID || "413553377";
 
+    // ── task221: СУПЕРТЕСТ-приглашения ──
+    if (mode === "super") {
+      const superButtons = [
+        [{ text: "⚡ Пройти СУПЕРТЕСТ", url: "https://v0-car-test.vercel.app/vpr-super" }],
+        [{ text: "🎮 Вся Матрица", url: VPR_TG_DEEPLINK }],
+      ];
+      // 1) геймеру — игровой текст
+      const gamerText = code
+        ? `${SUPER_INVITE_GAMER}\n🔑 Твой ключ доступа: \`${escapeMd(code)}\`\n`
+        : SUPER_INVITE_GAMER;
+      const gamerResult = await sendTo(chatId, gamerText, {
+        photo: VPR_HERO_IMAGES.probability, // неоновая probability-8 — символ «всё вперемешку»
+        buttons: superButtons,
+      });
+      if (!gamerResult.ok) {
+        return NextResponse.json({ success: false, error: gamerResult.error, target: "gamer" }, { status: 500 });
+      }
+      // 2) боссу (me) — свой текст, всегда
+      const bossResult = bossId && bossId !== chatId
+        ? await sendTo(bossId, SUPER_INVITE_BOSS, {
+            photo: VPR_HERO_IMAGES.algebra,
+            buttons: superButtons,
+          })
+        : null;
+      return NextResponse.json({
+        success: true,
+        mode: "super",
+        gamer: { chatId, ok: true },
+        boss: bossResult ? { chatId: bossId, ok: bossResult.ok } : "skipped",
+      });
+    }
+
+    // ── обычный инвайт (task213/214/215b) ──
     const text = code
       ? `${INVITE_TEXT}\n🔑 Твой ключ доступа: \`${code}\`\n`
       : INVITE_TEXT;

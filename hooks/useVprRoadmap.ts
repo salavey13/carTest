@@ -34,12 +34,14 @@ function readLS(): VprRoadmapProgress | null {
     const parsed = JSON.parse(raw);
     // task215: старый кэш (до task214) не имеет achievements/fails —
     // достраиваем пустыми, чтобы UI не падал на undefined-полях.
+    // task221: personalOrder — опциональный (появился с супертестом).
     if (parsed && Array.isArray(parsed.unlocked)) {
       return {
         unlocked: parsed.unlocked,
         completed: parsed.completed || {},
         achievements: parsed.achievements || [],
         fails: parsed.fails || {},
+        personalOrder: Array.isArray(parsed.personalOrder) ? parsed.personalOrder : undefined,
       };
     }
   } catch {
@@ -128,4 +130,20 @@ export function useVprRoadmap() {
   const isCompleted = useCallback((slug: string) => Boolean(progress.completed?.[slug]), [progress.completed]);
 
   return { progress, isLoaded, recordResult, isUnlocked, isCompleted };
+}
+
+/**
+ * task221: эффективный порядок дорожки для UI — персональный (из
+ * супертеста), если есть, иначе канонический VPR_ROADMAP_ORDER.
+ * Гость: личный порядок читается из localStorage-прогресса (гость мог
+ * пройти супертест без авторизации — диагноз работает локально).
+ */
+export function useRoadmapDisplayOrder(): string[] {
+  const { progress } = useVprRoadmap();
+  if (progress.personalOrder && progress.personalOrder.length > 0) {
+    // порядок мог устареть (появились новые слаги) — достраиваем хвостом
+    const missing = VPR_ROADMAP_ORDER.filter((s) => !progress.personalOrder!.includes(s));
+    return [...progress.personalOrder, ...missing];
+  }
+  return [...VPR_ROADMAP_ORDER];
 }
