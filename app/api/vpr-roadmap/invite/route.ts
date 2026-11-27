@@ -62,12 +62,25 @@ async function sendTo(
     [{ text: "🌐 Открыть в браузере", url: "https://v0-car-test.vercel.app/vpr-matrix" }],
   ];
   const photo = opts?.photo ?? VPR_HERO_IMAGES.algebra;
-  const result = await telegramDeliver("sendPhoto", chatId, {
+  const payload = {
     photo,
     caption: text,
     parse_mode: "Markdown",
     reply_markup: { inline_keyboard: buttons },
-  });
+  };
+  let result = await telegramDeliver("sendPhoto", chatId, payload);
+  if (!result.ok) {
+    // task221: битый Markdown (непарные _ * у пользовательских вставок или
+    // имён режимов) валяет всю отправку — ретрай без форматирования лучше,
+    // чем потерянное приглашение (паттерн из vprRoadmapActions).
+    logger.warn(`[VprInvite] Markdown failed (${result.error}), retrying plain for ${chatId}`);
+    const plain: Record<string, unknown> = {
+      photo,
+      caption: text.replace(/[*_`]/g, ""),
+      reply_markup: payload.reply_markup,
+    };
+    result = await telegramDeliver("sendPhoto", chatId, plain);
+  }
   if (!result.ok) logger.error(`[VprInvite] failed for ${chatId}: ${result.error}`);
   else logger.info(`[VprInvite] sent to ${chatId}`);
   return result;
