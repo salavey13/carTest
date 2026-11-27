@@ -166,7 +166,7 @@ export default function VprMatrixLanding() {
             className="text-zinc-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10"
           >
             Контрольные за полугодия не сдаются зубрёжкой — они <b className="text-white">дешифруются</b>.
-            Шесть уровней-предметов, шпаргалки как загрузка знаний, тесты как бои.
+            Семь уровней-предметов, шпаргалки как загрузка знаний, тесты как бои.
             Провалился — повторил — прокачался. Это не школа, это 21 век.
           </motion.p>
 
