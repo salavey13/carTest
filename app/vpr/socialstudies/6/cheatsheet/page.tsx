@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
-  Users, BookOpen, Lightbulb, Brain, Sparkles, User, Family,
-  Activity, GraduationCap, Home,
+  Users, BookOpen, Lightbulb, Brain, Sparkles, User, HeartHandshake,
+  Activity, GraduationCap, House,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -362,7 +362,7 @@ export default function SocialStudiesCheatsheet6() {
         {/* ============ TOPIC 4: СЕМЬЯ ============ */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-            <Family className="text-rose-400" /> 4. Семья: типы и функции
+            <HeartHandshake className="text-rose-400" /> 4. Семья: типы и функции
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <Card className="bg-zinc-900 border-zinc-800">
