@@ -390,7 +390,7 @@ export default function SocialStudiesCheatsheet6() {
           </div>
           <Card className="bg-rose-950/10 border-rose-500/20">
             <CardContent className="p-4 flex items-start gap-3">
-              <Home className="text-rose-400 w-10 h-10 flex-shrink-0" />
+              <House className="text-rose-400 w-10 h-10 flex-shrink-0" />
               <div className="text-sm">
                 <p className="font-bold text-white mb-1">Хак: «два поколения» в задании</p>
                 <p>В заданиях ВПР часто описывают семью по списку членов. Считай поколения: однопоколенная (супруги) → простая; три и больше (внуки+родители+бабушки) → расширенная.</p>
