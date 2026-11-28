@@ -42,6 +42,7 @@
     "lib/vprSuperTest.ts",
     "components/vpr/SuperTestFlow.tsx",
     "components/vpr/VprCompletionScreen.tsx",
-    "app/salavey13/Sly13LandingClient.tsx"
+    "app/salavey13/Sly13LandingClient.tsx",
+    "app/franchize/actions-runtime.ts"
   ]
 }

@@ -995,7 +995,18 @@ export async function getFranchizeBySlug(slug: string): Promise<FranchizeBySlugR
         brandName: readPath(franchize, ["branding", "name"], crew.name ?? "Franchize"),
         tagline: readPath(franchize, ["branding", "tagline"], "Витрина экипажа"),
         logoUrl: readPath(franchize, ["branding", "logoUrl"], crew.logo_url ?? ""),
-        logoHref: readPath(franchize, ["header", "logoHref"], `/franchize/${crew.slug ?? safeSlug}`),
+        // task225b (boss): «/» в metadata ведёт логотип хедера на корень сайта
+        // вместо лендинга экипажа. Санитайзер: пустой/корневой/внешний href —
+        // fallback на витрину экипажа; валидный внутренний путь (например
+        // /salavey13 у SLY13) проходит как есть.
+        logoHref: (() => {
+          const rawLogoHref = readPath(franchize, ["header", "logoHref"], `/franchize/${crew.slug ?? safeSlug}`);
+          const crewCatalogPath = `/franchize/${crew.slug ?? safeSlug}`;
+          if (rawLogoHref.trim() === "" || rawLogoHref === "/" || !rawLogoHref.startsWith("/")) {
+            return crewCatalogPath;
+          }
+          return rawLogoHref;
+        })(),
         menuLinks,
       },
       contacts: {
