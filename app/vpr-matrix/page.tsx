@@ -62,7 +62,7 @@ const LOOP_STEPS = [
     color: "#22d3ee",
     title: "FEED // Проглоти знание",
     text: "Открываешь шпаргалку уровня: теорема Пифагора в пошаговом разборе, Николай I в таймлайне, эпитеты в игре-определителе. Это не учебник — это загрузка программы в Нео. 15 минут — и в голове структура, которой не было.",
-    hint: "7 интерактивных шпаргалок: мини-игры, квизы, пошаговые разборы",
+    hint: "13 интерактивных шпаргалок: мини-игры, квизы, пошаговые разборы — включая Информатику и Английский",
   },
   {
     key: "fight",
@@ -71,7 +71,7 @@ const LOOP_STEPS = [
     color: "#f43f5e",
     title: "FIGHT // Сразись с тестом",
     text: "ВПР-вариант ждёт: 10 вопросов, 4 варианта ответа, таймер. Каждый вопрос — удар. Объяснение после ответа — разбор твоей техники в slow-motion. Здесь проверяется, что реально загрузилось.",
-    hint: "Реальные вопросы из базы: алгебра, геометрия, русский, история, литература, вероятность",
+    hint: "Реальные вопросы из базы: вся дорожка + Информатика и Английский",
   },
   {
     key: "fail",
@@ -97,7 +97,7 @@ const LOOP_STEPS = [
     icon: TrendingUp,
     color: "#4ade80",
     title: "UPGRADE // Открой следующий уровень",
-    text: "Сдал на ≥70% — щёлкнул замок: следующий предмет дорожки разблокирован. Алгебра → Геометрия → Вероятность → Русский → История → Литература. Семь уровней — и середина 8 класса в кармане.",
+    text: "Сдал на ≥70% — щёлкнул замок: следующий предмет дорожки разблокирован. Алгебра → Геометрия → Вероятность → Русский → Всеобщая история → Литература → История России. Семь уровней — и середина 8 класса в кармане. А Информатика и Английский прокачиваются бонусом — по шпаргалкам и супертесту.",
     hint: "Прогресс хранится в твоём профиле и на устройстве",
   },
 ];
@@ -112,6 +112,11 @@ const LEVELS = [
   { n: 5, label: "Всеобщая история", color: "#f59e0b" },
   { n: 6, label: "Литература", color: "#f43f5e" },
   { n: 7, label: "История России", color: "#eab308" },
+  // task223 (запрос босса: «focus more on informatics and english»):
+  // два бонус-предмета вне замковой дорожки — открыты сразу, диагностика
+  // супертестом, шпаргалки есть (/vpr/informatics/8, /vpr/english/8).
+  { n: 8, label: "Информатика", color: "#60a5fa", bonus: true },
+  { n: 9, label: "Английский язык", color: "#2dd4bf", bonus: true },
 ];
 
 export default function VprMatrixLanding() {
@@ -166,7 +171,7 @@ export default function VprMatrixLanding() {
             className="text-zinc-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10"
           >
             Контрольные за полугодия не сдаются зубрёжкой — они <b className="text-white">дешифруются</b>.
-            Семь уровней-предметов, шпаргалки как загрузка знаний, тесты как бои.
+            Семь уровней-предметов и два бонусных — Информатика и Английский, шпаргалки как загрузка знаний, тесты как бои.
             Провалился — повторил — прокачался. Это не школа, это 21 век.
           </motion.p>
 
@@ -227,15 +232,15 @@ export default function VprMatrixLanding() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 border border-cyan-500/30 bg-cyan-950/30 px-4 py-1.5 rounded-full text-xs font-mono text-cyan-400 mb-6">
             <Radar className="w-4 h-4" />
-            <span>diagnostic_protocol // 12 минут</span>
+            <span>diagnostic_protocol // 7–15 минут</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
             Не знаешь, с чего начать? <span className="text-cyan-400">Супертест</span>
           </h2>
           <p className="text-zinc-500 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
-            Один прогон — все 7 предметов вперемешку. Система найдёт твои дыры и
-            выстроит <b className="text-white">личную дорожку</b>: слабейшие предметы станут первыми уровнями.
-            Без таймера, без наказаний — чистая диагностика.
+            Один прогон — все 9 предметов вперемешку: дорожка <b className="text-white">плюс Информатика и Английский</b> в
+            каждом наборе. Система найдёт твои дыры и выстроит <b className="text-white">личную дорожку</b>:
+            слабейшие предметы станут первыми уровнями. Без таймера, без наказаний — чистая диагностика.
           </p>
           <div className="flex flex-wrap justify-center gap-2 mt-6">
             {Object.values(SUPER_SUBJECT_META).map((m) => (
@@ -280,9 +285,11 @@ export default function VprMatrixLanding() {
       <section className="relative max-w-5xl mx-auto px-4 py-20">
         <h2 className="text-3xl md:text-4xl font-black text-white text-center mb-4">
           Семь уровней — <span className="text-green-400">одна дорожка</span>
+          <span className="block text-lg md:text-xl text-zinc-400 font-bold mt-2">плюс два бонус-предмета: <span style={{ color: "#60a5fa" }}>Информатика</span> и <span style={{ color: "#2dd4bf" }}>Английский</span></span>
         </h2>
         <p className="text-zinc-500 text-center max-w-xl mx-auto mb-14 text-sm md:text-base">
-          Каждый следующий предмет закрыт замком. Ключ от замка — сданный тест предыдущего (минимум 70%).
+          Дорожечные предметы открываются по цепочке: ключ от замка — сданный тест предыдущего (минимум 70%).
+          Бонус-предметы открыты сразу — их прокачивает супертест и шпаргалки.
         </p>
 
         <div className="relative">
@@ -291,7 +298,7 @@ export default function VprMatrixLanding() {
 
           <div className="space-y-8">
             {LEVELS.map((lvl, i) => {
-              const locked = i > 0;
+              const locked = i > 0 && !lvl.bonus;
               return (
                 <motion.div
                   key={lvl.n}
@@ -312,12 +319,17 @@ export default function VprMatrixLanding() {
 
                   <div className={cn(
                     "flex-1 md:w-[calc(50%-2.5rem)] p-5 rounded-2xl border bg-zinc-950/70 backdrop-blur-sm",
-                    locked ? "border-zinc-800/50" : "border-green-500/30"
-                  )}>
+                    locked ? "border-zinc-800/50" : lvl.bonus ? "border-dashed" : "border-green-500/30"
+                  )} style={!locked && lvl.bonus ? { borderColor: `${lvl.color}50` } : undefined}>
                     <div className={cn("flex items-center gap-3", i % 2 ? "md:flex-row-reverse" : "")}>
                       {locked ? (
                         <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
                           <Lock className="w-5 h-5 text-zinc-600" />
+                        </div>
+                      ) : lvl.bonus ? (
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-dashed"
+                             style={{ backgroundColor: `${lvl.color}12`, borderColor: `${lvl.color}60` }}>
+                          <Sparkles className="w-5 h-5" style={{ color: lvl.color }} />
                         </div>
                       ) : (
                         <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border"
@@ -327,7 +339,7 @@ export default function VprMatrixLanding() {
                       )}
                       <div>
                         <div className="text-[9px] font-mono uppercase tracking-[0.25em] text-zinc-600">
-                          Level {lvl.n} {locked ? "// locked" : "// открыт"}
+                          {lvl.bonus ? "Bonus" : `Level ${lvl.n}`} {locked ? "// locked" : lvl.bonus ? "// вне дорожки" : "// открыт"}
                         </div>
                         <div className="text-lg font-black" style={{ color: locked ? "#71717a" : "#fff" }}>
                           {lvl.label}

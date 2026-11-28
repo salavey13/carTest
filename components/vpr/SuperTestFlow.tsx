@@ -215,8 +215,9 @@ export function SuperTestFlow({ embedded = false, defaultMode = "standard", onFi
               СУПЕР<span className="text-cyan-400">ТЕСТ</span>
             </h1>
             <p className="text-zinc-400 text-sm sm:text-base leading-relaxed max-w-xl mb-3">
-              Все предметы 8 класса в одном прогоне: алгебра, геометрия, вероятность,
-              русский, обе истории и литература — вперемешку и случайно.
+              Все предметы в одном прогоне: вся дорожка (алгебра, геометрия,
+              вероятность, русский, обе истории, литература) плюс Информатика и
+              Английский — вперемешку и случайно.
             </p>
             <p className="text-zinc-500 text-[13px] leading-relaxed max-w-xl mb-8">
               Задача — не оценка, а <span className="text-white font-semibold">карта дыр</span>: система

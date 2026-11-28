@@ -13,6 +13,8 @@ import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger";
 import {
   SUPER_SUBJECTS,
+  SUPER_ROADMAP_SUBJECTS,
+  SUPER_PRIORITY_SUBJECTS,
   SUPER_MODES,
   SUPER_GAP_RATIO,
   buildPersonalOrder,
@@ -65,22 +67,30 @@ let subjectIdMapCache: { slugToId: Map<string, number>; idToSlug: Map<number, st
 
 async function getSubjectIdMaps(): Promise<{ slugToId: Map<string, number>; idToSlug: Map<number, string> }> {
   if (subjectIdMapCache) return subjectIdMapCache;
+  // task223: без фильтра класса — бонус-предметы живут на grade 7
+  // («Информатика» id 70, «Английский язык» id 5), а «Английский» есть и в
+  // 6-м (id 38). Для базового слага берём строку с МАКСИМАЛЬНЫм классом:
+  // english: 7 > 6 → id 5; russian: 8 > 7 → id 76 и т.д.
   const { data, error } = await supabaseAnon
     .from("subjects")
-    .select("id, name, grade_level")
-    .eq("grade_level", 8);
+    .select("id, name, grade_level");
   if (error || !data) {
-    throw new Error(`Не удалось загрузить предметы 8 класса: ${error?.message || "no data"}`);
+    throw new Error(`Не удалось загрузить предметы: ${error?.message || "no data"}`);
+  }
+  const best = new Map<string, { id: number; grade: number }>();
+  for (const sub of data) {
+    // базовый слаг = слаг шпаргалки без суффикса класса («algebra-8» → «algebra»)
+    const baseSlug = getVprSubjectSlug(sub.name, sub.grade_level).replace(/-\d+$/, "");
+    if (!SUPER_SUBJECTS.includes(baseSlug)) continue;
+    const grade = typeof sub.grade_level === "number" ? sub.grade_level : 0;
+    const prev = best.get(baseSlug);
+    if (!prev || grade > prev.grade) best.set(baseSlug, { id: sub.id, grade });
   }
   const slugToId = new Map<string, number>();
   const idToSlug = new Map<number, string>();
-  for (const sub of data) {
-    // слаг дорожки = слаг шпаргалки без суффикса класса («algebra-8» → «algebra»)
-    const slug = getVprSubjectSlug(sub.name, sub.grade_level).replace(/-8$/, "");
-    if (SUPER_SUBJECTS.includes(slug) && !slugToId.has(slug)) {
-      slugToId.set(slug, sub.id);
-      idToSlug.set(sub.id, slug);
-    }
+  for (const [slug, { id }] of best) {
+    slugToId.set(slug, id);
+    idToSlug.set(id, slug);
   }
   subjectIdMapCache = { slugToId, idToSlug };
   return subjectIdMapCache;
@@ -111,12 +121,14 @@ export async function startSuperTestAction(mode: SuperModeKey = "standard"): Pro
     // какие предметы в этом прогоне
     let pickedSubjects = SUPER_SUBJECTS;
     if (cfg.subjects < SUPER_SUBJECTS.length) {
-      // слот-ротация: сдвиг = сколько супертестов юзер уже видел бы —
-      // берём из секунд текущей минуты / длину кольца как псевдослучайный
-      // детерминированный сдвиг сессии (без юзер-стейта: сессия на клиенте).
-      const shift = Math.floor(Date.now() / 60000) % SUPER_SUBJECTS.length;
-      const ring = [...SUPER_SUBJECTS.slice(shift), ...SUPER_SUBJECTS.slice(0, shift)];
-      pickedSubjects = ring.slice(0, cfg.subjects);
+      // task223: приоритетные (информатика + английский) — всегда в наборе,
+      // остаток добираем слот-ротацией дорожечного кольца (псевдослучайный
+      // детерминированный сдвиг по минуте, без юзер-стейта).
+      const rest = SUPER_SUBJECTS.filter((sl) => !SUPER_PRIORITY_SUBJECTS.includes(sl));
+      const shift = Math.floor(Date.now() / 60000) % rest.length;
+      const ring = [...rest.slice(shift), ...rest.slice(0, shift)];
+      const takeRest = Math.max(cfg.subjects - SUPER_PRIORITY_SUBJECTS.length, 0);
+      pickedSubjects = [...SUPER_PRIORITY_SUBJECTS, ...ring.slice(0, takeRest)];
     }
 
     // динамический резолв id (task222: без хардкода — контуры БД различаются)
@@ -207,7 +219,11 @@ export async function finishSuperTestAction(params: {
     const perSubject = [...bySlug.values()];
     const total = answers.length;
     const score = answers.filter((a) => a.wasCorrect).length;
-    const order = buildPersonalOrder(perSubject);
+    // task223: порядок разблокировки — только по 7 дорожечным предметам;
+    // информатика/английский остаются в perSubject (радар, вердикты, CTA
+    // шпаргалок), но дорожку не перекраивают.
+    const roadmapDiag = perSubject.filter((d) => SUPER_ROADMAP_SUBJECTS.includes(d.slug));
+    const order = buildPersonalOrder(roadmapDiag);
     const gaps = perSubject
       .filter((d) => d.asked > 0 && d.correct / d.asked < SUPER_GAP_RATIO)
       .map((d) => d.slug);
@@ -254,7 +270,7 @@ export async function finishSuperTestAction(params: {
         return order.indexOf(a) - order.indexOf(b); // стабильность
       });
       // сданные предметы, которых нет в order (были сданы до супертеста), добавляем в конец
-      const missing = SUPER_SUBJECTS.filter((s) => !sortedOrder.includes(s));
+      const missing = SUPER_ROADMAP_SUBJECTS.filter((s) => !sortedOrder.includes(s));
       const finalOrder = [...sortedOrder, ...missing];
       newMeta.vprProgress = {
         ...oldProgress,

@@ -976,7 +976,7 @@ function RoadmapDeck() {
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white">СУПЕРТЕСТ: все предметы разом</h3>
                 <p className="text-[12px] text-zinc-400 leading-relaxed mt-2 max-w-md">
-                  Случайные вопросы из всех 7 предметов 8 класса за один прогон. На выходе — карта дыр
+                  Случайные вопросы из всех 9 предметов за один прогон — вся дорожка плюс Информатика и Английский. На выходе — карта дыр
                   и <span className="text-white font-semibold">личный порядок разблокировки</span>: слабейшие предметы станут первыми уровнями.
                 </p>
               </div>

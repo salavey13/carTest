@@ -5,11 +5,23 @@
 import { VPR_ROADMAP_ORDER } from "./vprRoadmap";
 
 /**
- * Предметы супертеста = предметы дорожки 8 класса (7 шт. с тестами в БД).
- * Слаги совпадают с VPR_ROADMAP_ORDER — диагностика напрямую маппится в
- * персональный порядок разблокировки.
+ * Предметы супертеста (task223): 7 дорожечных + 2 бонус-предмета —
+ * Информатика (id 70 в БД, grade 7, 36 вопросов) и Английский (id 5,
+ * grade 7, 37 вопросов). Бонус-предметы участвуют в диагностике, радаре
+ * и CTA шпаргалок, но НЕ входят в персональный порядок разблокировки —
+ * дорожка остаётся семиуровневой (см. SUPER_ROADMAP_SUBJECTS).
+ * Слаги базовые (без суффикса класса): CTA шпаргалки строит
+ * /vpr/{slug}/8/cheatsheet — /vpr/informatics/8 и /vpr/english/8 живы.
  */
-export const SUPER_SUBJECTS = [...VPR_ROADMAP_ORDER] as string[];
+export const SUPER_SUBJECTS = [...VPR_ROADMAP_ORDER, "informatics", "english"] as string[];
+
+/** Дорожечные предметы (7): только они входят в personalOrder/unlocked. */
+export const SUPER_ROADMAP_SUBJECTS = [...VPR_ROADMAP_ORDER] as string[];
+
+/** task223 (запрос босса: «focus more on informatics and english»):
+ *  в quick-режиме эти два предмета ГАРАНТИРОВАНЫ, остальные добираются
+ *  слот-ротацией по кольцу. */
+export const SUPER_PRIORITY_SUBJECTS = ["informatics", "english"] as string[];
 
 /** id предметов в БД подтягиваются клиентски (/api/vpr-roadmap/subjects),
  *  здесь — только офсеты для описаний. Подписи/цвета — единый источник. */
@@ -24,16 +36,19 @@ export const SUPER_SUBJECT_META: Record<
   worldhistory: { label: "Всеобщая история", short: "ВСИ", color: "#f59e0b" },
   literature: { label: "Литература", short: "ЛИТ", color: "#f43f5e" },
   history: { label: "История России", short: "ИСТ", color: "#eab308" },
+  // task223: бонус-предметы (вне дорожки, но в диагностике)
+  informatics: { label: "Информатика", short: "ИНФ", color: "#60a5fa" },
+  english: { label: "Английский язык", short: "АНГ", color: "#2dd4bf" },
 };
 
-/** Режимы длины супертеста (task221): quick = 4 предмета × 3 вопроса,
- *  standard = 7 × 3, full = 7 × 5. Слот-ротация не даёт quick-режиму
- *  вечно гонять одни и те же 4 предмета: каждый прогон стартует со
- *  следующего сдвига по кольцу. */
+/** Режимы длины супертеста (task223): quick = информатика + английский +
+ *  2 случайных дорожечных × 3, standard = 9 × 3, full = 9 × 4.
+ *  Слот-ротация добирает недостающие предметы по кольцу, чтобы quick-режим
+ *  не вечно гонял одну и ту же пару дорожечных. */
 export const SUPER_MODES = {
-  quick: { subjects: 4, perSubject: 3, label: "Quick_Scan", desc: "4 предмета · 12 вопросов · ~7 мин" },
-  standard: { subjects: 7, perSubject: 3, label: "Full_Scan", desc: "все 7 предметов · 21 вопрос · ~12 мин" },
-  full: { subjects: 7, perSubject: 5, label: "Deep_Scan", desc: "все 7 предметов · 35 вопросов · ~20 мин" },
+  quick: { subjects: 4, perSubject: 3, label: "Quick_Scan", desc: "информатика + английский + 2 случайных · 12 вопросов · ~7 мин" },
+  standard: { subjects: 9, perSubject: 3, label: "Full_Scan", desc: "все 9 предметов · 27 вопросов · ~15 мин" },
+  full: { subjects: 9, perSubject: 4, label: "Deep_Scan", desc: "все 9 предметов · 36 вопросов · ~18 мин" },
 } as const;
 
 export type SuperModeKey = keyof typeof SUPER_MODES;
