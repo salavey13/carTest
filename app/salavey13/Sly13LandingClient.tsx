@@ -2508,11 +2508,12 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                     Telegram · @SALAVEY13
                   </a>
                 </li>
-                {/* task227 2026-11-28: телефон djorudjov (Rustam) — как в блоке
-                    СВЯЗЬ внизу /rent/interview: тапабельный tel:-линк */}
+                {/* task227b: телефон djorudjov (Rustam) — тот, что в контактах
+                    внизу interview.html (блок vc-item с t.me/DJORUDJOV):
+                    «+7 987 745-37-37 · можно звонить» */}
                 <li>
-                  <a href="tel:+79200789888" className="transition hover:text-[var(--sly-accent)]" style={{ color: p.textSecondary }}>
-                    Телефон · +7 9200-789-888
+                  <a href="tel:+79877453737" className="transition hover:text-[var(--sly-accent)]" style={{ color: p.textSecondary }}>
+                    Телефон · +7 987 745-37-37
                   </a>
                 </li>
                 <li>

@@ -81,8 +81,8 @@ function contrastRatio(bg: string, fg: string) {
 
 function contrastLabel(ratio: number | null) {
   if (ratio === null) return "Проверьте формат #RRGGBB";
-  if (ratio < 3) return "Критично: плохо читается";
-  if (ratio < 4.5) return "Предупреждение: слабая читаемость";
+  if (ratio < 3) return "Контраст слабый — стоит поменять цвета";
+  if (ratio < 4.5) return "Читаемость средняя — можно улучшить";
   return "Ок: хороший контраст";
 }
 
@@ -547,13 +547,13 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
   const inputClass = "w-full rounded-xl border px-3 py-2 text-sm outline-none transition";
   const fieldErrorText = (key: string) => fieldErrors[key]?.[0];
   const inputStyleFor = (key: string) => ({
-    borderColor: fieldErrorText(key) ? "#ef4444" : ui.border,
+    borderColor: fieldErrorText(key) ? "#F87171" : ui.border,
     backgroundColor: ui.inputBg,
     color: ui.text,
   });
   const renderFieldError = (key: string) =>
     fieldErrorText(key) ? (
-      <span className="mt-1 block text-xs" style={{ color: "#ef4444" }}>{fieldErrorText(key)}</span>
+      <span className="mt-1 block text-xs" style={{ color: "#F87171" }}>{fieldErrorText(key)}</span>
     ) : null;
 
   const stageLabels: Record<Stage, string> = {
@@ -561,7 +561,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
     palette: "Цвета",
     content: "Контент",
     map: "Карта",
-    ai: "AI JSON",
+    ai: "AI-сборка",
     ops: "Пульт",
   };
 
@@ -625,17 +625,17 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       <div className="rounded-2xl border p-4" style={{ borderColor: ui.border, background: `linear-gradient(120deg, ${ui.pageBg}, ${ui.cardBg})` }}>
         <p className="text-xs uppercase tracking-[0.14em]" style={{ color: ui.accent }}>{form.brandName || "Franchize"}</p>
         <h1 className="mt-1 text-2xl font-semibold" style={{ color: ui.text }}>Брендинг-редактор франшизы</h1>
-        <p className="mt-1 text-sm" style={{ color: ui.muted }}>Поток из трёх фаз: цвета → тексты/контакты → AI JSON.</p>
+        <p className="mt-1 text-sm" style={{ color: ui.muted }}>Шаги одного вечера: экипаж → цвета → контент → карта → запуск.</p>
         <p className="mt-2 text-xs" style={{ color: ui.muted }}>Чужие данные доступны в read-only после загрузки. Сохранять может только owner экипажа или all-admin.</p>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
         {([
           ["create", "Создать экипаж"],
-          ["palette", "Фаза 1: Цвета"],
-          ["content", "Фаза 2: Контент"],
-          ["map", "Фаза 3: Карта"],
-          ["ai", "Фаза 4: AI JSON"],
+          ["palette", "Цвета"],
+          ["content", "Контент"],
+          ["map", "Карта"],
+          ["ai", "AI-сборка"],
           ["ops", "Пульт запуска"],
         ] as const).map(([value, label]) => {
           // Hide "create" tab if user already owns a crew (they don't need it)
@@ -764,7 +764,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
             {userCrewInfo?.slug && (
               <p className="text-xs" style={{ color: ui.muted }}>
                 У вас уже есть экипаж <code style={{ color: ui.accent }}>{userCrewInfo.slug}</code> —
-                вы можете настроить его на вкладке «Фаза 1: Цвета».
+                вы можете настроить его на вкладке «Цвета».
               </p>
             )}
           </div>
@@ -817,7 +817,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
             </div>
           </div>
           <div className="rounded-xl border p-3 text-sm" style={{ borderColor: ui.border, backgroundColor: ui.inputBg }}>
-            <p className="font-semibold">Контраст-предупреждения</p>
+            <p className="font-semibold">Проверка контраста</p>
             <ul className="mt-2 space-y-1">{contrastChecks.map((check) => <li key={check.label}>{check.label}: {check.ratio ? check.ratio.toFixed(2) : "n/a"} — {contrastLabel(check.ratio)}</li>)}{lightContrastChecks.map((check) => <li key={check.label}>{check.label}: {check.ratio ? check.ratio.toFixed(2) : "n/a"} — {contrastLabel(check.ratio)}</li>)}</ul>
           </div>
         </section>
@@ -905,7 +905,7 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
       )}
       {stage === "ai" && (
         <section className={`${sectionClass} grid gap-3`} style={{ borderColor: ui.border, backgroundColor: ui.sectionBg }}>
-          <h2 className="text-lg font-medium" style={{ color: ui.text }}>AI-фаза: экономим время</h2>
+          <h2 className="text-lg font-medium" style={{ color: ui.text }}>AI-сборка: экономим время</h2>
           <div className="grid gap-2 sm:grid-cols-3">
             <button type="button" className="rounded-xl px-3 py-2 text-sm font-semibold" style={{ backgroundColor: ui.accent, color: ui.accentText }} onClick={() => copyToClipboard(JSON.stringify(TEMPLATE_PAYLOAD, null, 2), "Шаблон скопирован")}>Скопировать шаблон</button>
             <button type="button" className="rounded-xl border px-3 py-2 text-sm font-semibold" style={{ borderColor: ui.border, color: ui.text }} onClick={() => copyToClipboard(BOT_PROMPT, "Промпт скопирован")}>Скопировать промпт для бота</button>
@@ -982,8 +982,10 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
         <p className="text-sm" style={{ color: ui.muted }}>{isPending ? "Обрабатываю..." : message}</p>
       </div>
       {Object.keys(fieldErrors).length > 0 && (
-        <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "#ef4444", backgroundColor: "#fef2f2", color: "#991b1b" }}>
-          <p className="font-semibold">Не пройдена проверка полей — исправьте значения и сохраните снова:</p>
+        // task227b: тёмно-красный блок вместо светлого (#fef2f2 вылазил на
+        // тёмной странице) + формулировка мягче
+        <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "#7F1D1D", backgroundColor: "#2A1416", color: "#FCA5A5" }}>
+          <p className="font-semibold">Пара полей ждёт внимания — поправьте их, и сохранение пройдёт:</p>
           <ul className="mt-1 list-inside list-disc">
             {Object.entries(fieldErrors).map(([key, messages]) => (
               <li key={key}>{key}: {messages.join("; ")}</li>
