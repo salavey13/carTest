@@ -320,6 +320,26 @@ const NEW_METHOD = [
   { n: "03", title: "Публикация", text: "Вечером ссылка живая: каталог, корзина, договоры, бот-клерк." },
 ];
 
+// task226: DNA base44 (website-builder/ecommerce/online-store) — «Your store
+// comes with everything included» (Hosting handled for you / Secure from the
+// first visit / Your address, then your own domain) и «Bring shoppers to your
+// store across channels». Переведено в продуктовую ДНК SLY13: витрина без
+// отдельных счетов за хостинг/бэкенд + клиенты уже там, где живёт прокат
+// (Авито, Telegram, витрина). Два блока одной секции после «метода».
+const INCLUDED = [
+  { title: "Хостинг и SSL", text: "Сайт живёт на платформе, https с первого визита — не «перенесём после оплаты»." },
+  { title: "Свой адрес", text: "Сначала страница на платформе, потом свой домен — как у vip-bike.ru." },
+  { title: "База данных", text: "С историей и бэкапами, а не эксель в мессенджере, который врёт после первой смены." },
+  { title: "Вход и роли", text: "Оператор, админ, механик — у каждого своё окно и свой доступ." },
+  { title: "Бот-клерк", text: "Telegram-бот бронирует, принимает залог и напоминает о возврате — 24/7." },
+  { title: "Двойная книга", text: "Касса отделена от личного, каждая операция — с датой, автором и фото." },
+];
+const CHANNELS = [
+  { title: "Авито", text: "Заявки с двух аккаунтов падают в одно окно оператора — без копипасты." },
+  { title: "Telegram", text: "Бот-клерк отвечает и бронирует прямо в чате, где клиент и живёт." },
+  { title: "Витрина", text: "Каталог с корзиной и оплатой. Одна ссылка — на визитку, в сторис, в QR." },
+];
+
 // task197: секция «франшиза» — против франшиз-продавцов (кейс №15 из
 // лид-листа: Motoclub, motoclub-buisness.ru — сайт франшизы от той же
 // студии): пайки LOW/BASE/PRO до 3 / от 3,5 / от 5 млн ₽, окупаемость
@@ -1847,6 +1867,80 @@ export default function Sly13LandingClient({ palette: p }: { palette: Palette })
                   </p>
                 </SpotlightCard>
               </Reveal>
+            </div>
+          </section>
+
+          {/* ── 06½ · ВСЁ ВКЛЮЧЕНО (task226: DNA base44 «everything included»
+              + «across channels»). Два блока: что уже встроено в витрину
+              (шесть плашек) и где клиенты её находят (три канала). После
+              «метода»: сначала «как строится», потом «что внутри» — и лишь
+              затем портфолио живых экипажей. */}
+          <section id="included" className="relative isolate scroll-mt-20 overflow-hidden">
+            <SlyGhostWord word="встроено" />
+            <Reveal>
+              <p className="font-jb text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: p.accentMain }}>
+                06½ · всё включено
+              </p>
+              <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                Витрина приезжает <span style={{ color: p.accentMain }}>со всем встроенным</span>
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-relaxed md:text-lg" style={{ color: p.textSecondary }}>
+                У студии хостинг, база и бэкенд — отдельные строки в смете. Здесь они не опция,
+                а корпус системы: ты не собираешь витрину из плагинов и не платишь отдельный
+                счёт за каждый кусок. И клиенты не приходят «потом, с рекламой» — они уже там,
+                где живёт прокат.
+              </p>
+            </Reveal>
+
+            <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {INCLUDED.map((it, i) => (
+                <Reveal key={it.title} delay={0.04 + (i % 3) * 0.06}>
+                  <SpotlightCard
+                    className="h-full rounded-2xl border p-6"
+                    style={{ background: p.bgCard, borderColor: p.borderSoft }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="font-jb inline-block h-2 w-2 shrink-0 rotate-45"
+                        style={{ background: p.accentMain }}
+                        aria-hidden
+                      />
+                      <h3 className="text-base font-bold" style={{ color: p.textPrimary }}>
+                        {it.title}
+                      </h3>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      {it.text}
+                    </p>
+                  </SpotlightCard>
+                </Reveal>
+              ))}
+            </div>
+
+            <Reveal delay={0.08}>
+              <h3 className="mt-14 text-xl font-black tracking-tight sm:text-2xl" style={{ color: p.textPrimary }}>
+                Клиенты приходят там, <span style={{ color: p.accentMain }}>где ты уже есть</span>
+              </h3>
+            </Reveal>
+            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              {CHANNELS.map((c, i) => (
+                <Reveal key={c.title} delay={0.05 + i * 0.06}>
+                  <SpotlightCard
+                    className="sly-lift h-full rounded-2xl border p-6"
+                    style={{ background: `${p.accentMain}0F`, borderColor: `${p.accentMain}33` }}
+                  >
+                    <p className="font-jb text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: p.accentMain }}>
+                      канал {String(i + 1).padStart(2, "0")}
+                    </p>
+                    <h4 className="mt-2 text-lg font-black uppercase tracking-tight" style={{ color: p.textPrimary }}>
+                      {c.title}
+                    </h4>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: p.textSecondary }}>
+                      {c.text}
+                    </p>
+                  </SpotlightCard>
+                </Reveal>
+              ))}
             </div>
           </section>
 
