@@ -256,23 +256,23 @@ export default function CreateFranchizeForm({ initialSlug = "" }: { initialSlug?
 
   const isDark = useMemo(() => form.themeMode.toLowerCase().includes("dark"), [form.themeMode]);
 
-  // styling-fix: use CSS vars from parent FranchizePageShell (crew theme) for the container
-  // shell, so the form blends with the admin page. The form's OWN palette (form.bgBase etc.)
-  // is still used for the live preview sections (palette contrast checks, etc.) but the
-  // outer container, inputs, and buttons now inherit the crew's theme.
+  // task227b: форма живёт ТОЛЬКО на /franchize/create (проверено — один
+  // импортёр), и страница теперь всегда тёмная. var(--franchize-*) тут
+  // резолвились в СВЕТЛЫЕ :root-дефолты globals.css (у страницы нет .dark) —
+  // это и был «несогласованный light». Литералы = бывшие тёмные фолбэки.
   const ui = useMemo(
     () => ({
-      pageBg: "var(--franchize-bg-base, var(--fr-admin-bg, #0B0C10))",
-      cardBg: "var(--franchize-bg-card, var(--fr-admin-bg, #111217))",
-      sectionBg: "color-mix(in srgb, var(--franchize-bg-card, var(--fr-admin-bg, #111217)) 85%, transparent)",
-      border: "var(--franchize-border-soft, var(--fr-admin-border, #24262E))",
-      text: "var(--franchize-text-primary, var(--fr-admin-text, #F2F2F3))",
-      muted: "var(--franchize-text-secondary, var(--fr-admin-muted, #A7ABB4))",
-      accent: "var(--franchize-accent-main, var(--fr-admin-accent, #D99A00))",
-      accentText: "var(--franchize-accent-contrast, #16130A)",
-      inputBg: "var(--franchize-bg-card, var(--fr-admin-bg, #0B0C10))",
+      pageBg: "#0B0C10",
+      cardBg: "#111217",
+      sectionBg: "color-mix(in srgb, #111217 85%, transparent)",
+      border: "#24262E",
+      text: "#F2F2F3",
+      muted: "#A7ABB4",
+      accent: "#D99A00",
+      accentText: "#16130A",
+      inputBg: "#0B0C10",
     }),
-    [], // CSS vars are static — they resolve at render time from the parent
+    [],
   );
 
   // Keep the form's own palette for the live preview sections (contrast checks, color swatches)
