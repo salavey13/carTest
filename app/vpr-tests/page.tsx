@@ -13,11 +13,12 @@ import {
   Map as MapIcon, Leaf, Bug, Atom, Ruler,
   Globe, Landmark, ChevronRight, ChevronDown,
   Languages, Hash, ArrowRight, Radar, Shield, Flame, Star, Users, Lock,
-  BrainCircuit, Gauge, TrendingDown
+  BrainCircuit, Gauge, TrendingDown, Sparkles, Layers, Swords
 } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useVprRoadmap, useRoadmapDisplayOrder } from "@/hooks/useVprRoadmap";
 import { SUPER_MODES } from "@/lib/vprSuperTest";
+import { VPR_ACHIEVEMENTS } from "@/lib/vprRoadmap";
 import { getVprSubjectSlug, getVprCheatsheetHref } from "@/lib/vprCheatsheet";
 import type { Database } from "@/types/database.types";
 
@@ -910,7 +911,7 @@ function SectionHeader({ icon, title, subtitle, accent }: {
    Предметы открываются по цепочке: тест сдан (≥70%) → следующий unlocked.
    ================================================================ */
 
-const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'flask' | 'activity' | 'languages' | 'landmark' | 'globe' | 'hash'; color: string; testId: number | null; cheatsheet: string }> = {
+const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler' | 'flask' | 'activity' | 'languages' | 'landmark' | 'globe' | 'hash' | 'atom' | 'terminal' | 'bug'; color: string; testId: number | null; cheatsheet: string; side?: boolean }> = {
   algebra: { label: "Алгебра", icon: "calculator", color: "#22d3ee", testId: 71, cheatsheet: "/vpr/algebra/8/cheatsheet" },
   geometry: { label: "Геометрия", icon: "ruler", color: "#0bf2f6", testId: 75, cheatsheet: "/vpr/geometry/8/cheatsheet" },
   probability: { label: "Вероятность и статистика", icon: "activity", color: "#4ade80", testId: 79, cheatsheet: "/vpr/probability/8/cheatsheet" },
@@ -921,12 +922,171 @@ const ROADMAP_META: Record<string, { label: string; icon: 'calculator' | 'ruler'
   literature: { label: "Литература", icon: "hash", color: "#f43f5e", testId: 78, cheatsheet: "/vpr/literature/8/cheatsheet" },
   // task219: История России — 2-е полугодие, финальный уровень лестницы.
   history: { label: "История России", icon: "landmark", color: "#eab308", testId: 77, cheatsheet: "/vpr/history/8/cheatsheet" },
+  // task224: бонус-зона — открыта сразу (супертест уже диагностирует их),
+  // тесты доступны как обычно
+  informatics: { label: "Информатика", icon: "terminal", color: "#60a5fa", testId: null, cheatsheet: "/vpr/informatics/8/cheatsheet", side: true },
+  english: { label: "Английский язык", icon: "languages", color: "#2dd4bf", testId: null, cheatsheet: "/vpr/english/8/cheatsheet", side: true },
 };
+
+// task224: сайд-предметы 8 класса с тестами в БД, но вне дорожки и вне
+// бонус-зоны (химия/физика/био/гео/общество). Шпаргалки можно читать
+// после сдачи дорожки; тесты — вместе с дорожкой (единая механика
+// разблокировки, открытого списка больше нет).
+const SIDE_ORDER = ["chemistry", "physics", "biology", "geography", "socialstudies"] as const;
+const SIDE_META: Record<string, { label: string; icon: 'flask' | 'atom' | 'bug' | 'globe'; color: string; cheatsheet: string }> = {
+  chemistry: { label: "Химия", icon: "flask", color: "#34d399", cheatsheet: "/vpr/chemistry/8/cheatsheet" },
+  physics: { label: "Физика", icon: "atom", color: "#f97316", cheatsheet: "/vpr/physics/8/cheatsheet" },
+  biology: { label: "Биология", icon: "bug", color: "#10b981", cheatsheet: "/vpr/biology/8/cheatsheet" },
+  geography: { label: "География", icon: "globe", color: "#14b8a6", cheatsheet: "/vpr/geography/8/cheatsheet" },
+  socialstudies: { label: "Обществознание", icon: "globe", color: "#3b82f6", cheatsheet: "/vpr/socialstudies/8/cheatsheet" },
+};
+
 
 const ROADMAP_ORDER = ["algebra", "geometry", "probability", "russian", "worldhistory", "literature", "history"] as const;
 
-function RoadmapDeck() {
+/* ================================================================
+   UNLOCK STRIP (task224) — персональная полоса стадии юзера.
+   «Где я сейчас»: открытые уровни, следующий бой, ачивки-медали.
+   Гость без прогресса видит призыв начать (уровень 1 открыт).
+   ================================================================ */
+
+function UnlockStrip({ roadmapTestIds }: { roadmapTestIds: Record<string, number> }) {
+  const { progress } = useVprRoadmap();
+  const displayOrder = useRoadmapDisplayOrder();
+  const unlockedSet = new Set(displayOrder.filter((s) => progress.unlocked.includes(s)));
+  const completedSet = new Set(displayOrder.filter((s) => progress.completed?.[s]));
+  const isPersonal = Boolean(progress.personalOrder?.length);
+  const nextSlug = displayOrder.find((s) => unlockedSet.has(s) && !completedSet.has(s));
+  const nextMeta = nextSlug ? ROADMAP_META[nextSlug] : null;
+  const earned = progress.achievements || [];
+  const stage = unlockedSet.size; // 1..7
+  const isFresh = unlockedSet.size === 1 && completedSet.size === 0 && earned.length === 0;
+  const achDefs = earned
+    .map((key) => VPR_ACHIEVEMENTS.find((a) => a.key === key))
+    .filter(Boolean) as typeof VPR_ACHIEVEMENTS;
+
+  // прогресс-кольцо стадии
+  const pct = Math.round((stage / displayOrder.length) * 100);
+  const R = 30;
+  const C = 2 * Math.PI * R;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45 }}
+      className="mb-6 relative rounded-2xl border border-green-500/25 bg-gradient-to-r from-green-950/20 via-zinc-950/80 to-zinc-950/60 overflow-hidden"
+    >
+      <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-green-500/10 blur-3xl pointer-events-none" />
+      <div className="relative p-5 sm:p-6 flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
+        {/* Кольцо стадии */}
+        <div className="relative w-[76px] h-[76px] shrink-0 mx-auto md:mx-0">
+          <svg viewBox="0 0 76 76" className="w-full h-full -rotate-90">
+            <circle cx="38" cy="38" r={R} fill="none" stroke="#18181b" strokeWidth="7" />
+            <motion.circle
+              cx="38" cy="38" r={R} fill="none"
+              stroke="url(#unlockGrad)" strokeWidth="7" strokeLinecap="round"
+              strokeDasharray={C}
+              initial={{ strokeDashoffset: C }}
+              animate={{ strokeDashoffset: C - (C * pct) / 100 }}
+              transition={{ duration: 1.1, ease: "easeOut" }}
+            />
+            <defs>
+              <linearGradient id="unlockGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#22d3ee" />
+                <stop offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xl font-black text-white leading-none">{stage}</span>
+            <span className="text-[8px] font-mono text-zinc-500 uppercase">of {displayOrder.length}</span>
+          </div>
+        </div>
+
+        {/* Текст стадии */}
+        <div className="flex-1 min-w-0 text-center md:text-left">
+          <div className="flex items-center gap-2 justify-center md:justify-start mb-1.5 flex-wrap">
+            <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-green-400">operator_status</span>
+            {isPersonal && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-500/40 bg-violet-500/10 text-violet-300 text-[9px] font-mono font-bold uppercase">
+                <BrainCircuit className="w-3 h-3" /> личный порядок
+              </span>
+            )}
+            {completedSet.size > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-green-500/40 bg-green-500/10 text-green-300 text-[9px] font-mono font-bold uppercase">
+                <Trophy className="w-3 h-3" /> сдано {completedSet.size}
+              </span>
+            )}
+          </div>
+          <h3 className="text-lg sm:text-xl font-black text-white leading-tight">
+            {isFresh
+              ? "Стадия 1: замок Алгебры уже открыт"
+              : completedSet.size === displayOrder.length
+                ? "Дорожка пройдена полностью — сайд-сектор разблокирован 🎉"
+                : nextSlug && nextMeta
+                  ? <>Твой бой сейчас: <span style={{ color: nextMeta.color }}>{nextMeta.label}</span></>
+                  : "Дорожка ждёт тебя"}
+          </h3>
+          <p className="text-[12px] text-zinc-500 leading-relaxed mt-1">
+            {isFresh
+              ? "Проглоти шпаргалку → сразись с тестом (≥70%) → Геометрия разблокируется. Дальше — по цепочке до Истории России."
+              : completedSet.size === displayOrder.length
+                ? "Все семь уровней сданы. Открылись шпаргалки и тесты сайд-сектора: химия, физика, биология, география, обществознание."
+                : `Открыто ${unlockedSet.size} из ${displayOrder.length} уровней · сдано ${completedSet.size}. Сдаёшь текущий — щёлкает следующий замок.`}
+          </p>
+        </div>
+
+        {/* CTA стадии */}
+        <div className="shrink-0 flex flex-col items-center md:items-end gap-2">
+          {nextSlug && nextMeta ? (
+            <>
+              <Link href={`/vpr-test/${nextMeta.testId ?? roadmapTestIds[nextSlug]}`} className="w-full md:w-auto">
+                <Button className="bg-green-500 hover:bg-green-400 text-black font-black px-5 py-3 rounded-xl shadow-[0_0_25px_rgba(34,197,94,0.3)] whitespace-nowrap">
+                  <Swords className="w-4 h-4 mr-1.5" /> В бой: тест
+                </Button>
+              </Link>
+              <Link href={nextMeta.cheatsheet} className="w-full md:w-auto">
+                <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:text-white font-bold w-full md:w-auto">
+                  <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Шпаргалка
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <span className="text-[10px] font-mono text-green-500/70 uppercase tracking-wider">// все уровни взяты</span>
+          )}
+        </div>
+      </div>
+
+      {/* Ачивки-медали: показываем, если заработана хотя бы одна */}
+      {achDefs.length > 0 && (
+        <div className="relative border-t border-zinc-800/60 px-5 sm:px-6 py-3.5 flex items-center gap-3 flex-wrap">
+          <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-yellow-500/80 shrink-0 flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5" /> медали ({achDefs.length}/{VPR_ACHIEVEMENTS.length})
+          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {achDefs.map((a) => (
+              <motion.span
+                key={a.key}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                title={a.text("уровень")}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-[10px] font-bold text-yellow-300"
+              >
+                {a.title}
+              </motion.span>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function RoadmapDeck({ roadmapTestIds }: { roadmapTestIds: Record<string, number> }) {
   const { progress, isUnlocked, isCompleted } = useVprRoadmap();
+  // task224: дорожка сдана целиком — ключ к сайд-сектору
+  const fullyDone = ROADMAP_ORDER.every((s) => progress.completed?.[s]);
   // task221: личный порядок от супертеста (слабейшие первыми), дефолт — канон
   const displayOrder = useRoadmapDisplayOrder();
   const isPersonal = Boolean(progress.personalOrder && progress.personalOrder.length > 0);
@@ -957,6 +1117,9 @@ function RoadmapDeck() {
         subtitle={`Уровней открыто: ${unlockedCount}/${displayOrder.length} · Сдано: ${completedCount}/${displayOrder.length}${isPersonal ? " · 🧠 личный порядок" : ""}`}
         accent
       />
+
+      {/* ═══ task224: UNLOCK STRIP — персональная стадия ═══ */}
+      <UnlockStrip roadmapTestIds={roadmapTestIds} />
 
       {/* ═══ task221: СУПЕРТЕСТ-карточка + Quick Stats ═══ */}
       <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1192,6 +1355,147 @@ function RoadmapDeck() {
           Проглоти шпаргалку → сразись с тестом → не больше 30% ошибок → следующий предмет разблокирован.
           Провалил — шпаргалка никуда не денется: feed, fight, fail, repeat, upgrade. Прогресс хранится в твоём профиле.
         </p>
+      </div>
+
+      {/* ═══ task224: БОНУС-ЗОНА — Информатика + Английский ═══ */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <Sparkles className="w-4 h-4 text-blue-400" />
+          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">bonus_zone // вне дорожки</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {(["informatics", "english"] as const).map((slug) => {
+            const meta = ROADMAP_META[slug];
+            return (
+              <motion.div
+                key={slug}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="relative rounded-2xl border border-dashed bg-zinc-950/80 overflow-hidden"
+                style={{ borderColor: `${meta.color}50` }}
+              >
+                <div className="absolute top-3 left-3 text-[10px] font-mono font-bold" style={{ color: `${meta.color}90` }}>
+                  BONUS
+                </div>
+                <div className="absolute top-3 right-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                     style={{ color: meta.color, borderColor: `${meta.color}40`, backgroundColor: `${meta.color}10` }}>
+                  <Sparkles className="w-3 h-3" /> всегда открыт
+                </div>
+                <div className="p-5 sm:p-6 pt-10">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border border-dashed shrink-0"
+                         style={{ backgroundColor: `${meta.color}12`, borderColor: `${meta.color}60` }}>
+                      <CheatIconSVG type={meta.icon} color={meta.color} size={36} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-black tracking-tight" style={{ color: meta.color }}>{meta.label}</h3>
+                      <p className="text-[11px] text-zinc-500 leading-relaxed mt-1">
+                        Не входит в замковую дорожку — прокачивается напрямую: шпаргалка и тест открыты всегда,
+                        супертест включает предмет в каждый прогон диагностики.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-5">
+                    <Link href={meta.cheatsheet} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full border-zinc-700 text-zinc-300 hover:text-white font-bold">
+                        <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Шпаргалка
+                      </Button>
+                    </Link>
+                    {(meta.testId ?? roadmapTestIds[slug]) ? (
+                      <Link href={`/vpr-test/${meta.testId ?? roadmapTestIds[slug]}`} className="flex-1">
+                        <Button size="sm" className="w-full font-bold" style={{ backgroundColor: meta.color, color: "#030712" }}>
+                          <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
+                        </Button>
+                      </Link>
+                    ) : (
+                      <span className="flex-1" title="Тест появится после загрузки в БД">
+                        <Button size="sm" disabled className="w-full font-bold opacity-50">
+                          <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
+                        </Button>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ═══ task224: САЙД-ГРИД — предметы с тестами, но вне дорожки ═══ */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <Layers className="w-4 h-4 text-zinc-500" />
+          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">side_sector // вне программы</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {SIDE_ORDER.map((slug, i) => {
+            const meta = SIDE_META[slug];
+            const cheatsOpen = fullyDone;
+            const testOpen = cheatsOpen && Boolean(roadmapTestIds[slug]);
+            return (
+              <motion.div
+                key={slug}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+                className={cn(
+                  "relative h-full rounded-2xl border overflow-hidden transition-all duration-500",
+                  cheatsOpen ? "border-zinc-800/60 bg-zinc-950/80 hover:border-zinc-700/80" : "border-zinc-800/40 bg-zinc-950/40"
+                )}
+              >
+                <div className="p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center border shrink-0"
+                         style={{ backgroundColor: `${meta.color}10`, borderColor: cheatsOpen ? `${meta.color}25` : "border-zinc-800" }}>
+                      <CheatIconSVG type={meta.icon} color={cheatsOpen ? meta.color : "#52525b"} size={36} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className={cn("text-base font-black tracking-tight", cheatsOpen ? "" : "text-zinc-500")} style={cheatsOpen ? { color: meta.color } : undefined}>
+                        {meta.label}
+                      </h3>
+                      <p className="text-[11px] text-zinc-500 leading-relaxed mt-1">
+                        {cheatsOpen
+                          ? "Дорожка сдана — сектор разблокирован. Шпаргалка и тест открыты."
+                          : "Вне дорожки 8 класса. Откроется после сдачи всех семи уровней — как босс-файт после основной игры."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-5">
+                    {cheatsOpen ? (
+                      <Link href={meta.cheatsheet} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full border-zinc-700 text-zinc-300 hover:text-white font-bold">
+                          <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Шпаргалка
+                        </Button>
+                      </Link>
+                    ) : (
+                      <span className="flex-1">
+                        <Button variant="outline" size="sm" disabled className="w-full border-zinc-800 text-zinc-600 font-bold">
+                          <Lock className="w-3.5 h-3.5 mr-1.5" /> Закрыто
+                        </Button>
+                      </span>
+                    )}
+                    {testOpen ? (
+                      <Link href={`/vpr-test/${roadmapTestIds[slug]}`} className="flex-1">
+                        <Button size="sm" className="w-full font-bold" style={{ backgroundColor: meta.color, color: "#030712" }}>
+                          <Terminal className="w-3.5 h-3.5 mr-1.5" /> Тест
+                        </Button>
+                      </Link>
+                    ) : (
+                      <span className="flex-1" title={cheatsOpen ? "Тест появится после загрузки в БД" : "Сначала сдай дорожку"}>
+                        <Button size="sm" disabled className="w-full font-bold opacity-50">
+                          <Lock className="w-3.5 h-3.5 mr-1.5" /> Тест
+                        </Button>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
     </motion.section>
   );
@@ -1480,7 +1784,8 @@ export default function VprTestsListPage() {
     const bySlug: Record<string, number> = {};
     for (const sub of allSubjects) {
       const slug = getVprSubjectSlug(sub.name, sub.grade_level).replace("-8", "");
-      if (ROADMAP_ORDER.includes(slug as (typeof ROADMAP_ORDER)[number]) && !bySlug[slug]) {
+      const known = [...ROADMAP_ORDER, "informatics", "english", ...SIDE_ORDER] as string[];
+      if (known.includes(slug) && !bySlug[slug]) {
         bySlug[slug] = sub.id;
       }
     }
@@ -1689,7 +1994,7 @@ export default function VprTestsListPage() {
               transition={{ delay: 1.1 }}
               className="flex flex-wrap justify-center gap-2 mt-6"
             >
-              {['ВПР', '7 класс', 'Шпаргалки', 'Тренажеры'].map((tag) => (
+              {['ВПР', '6–8 класс', 'Шпаргалки', 'Разблокировка уровней'].map((tag) => (
                 <span
                   key={tag}
                   className="px-3 py-1 bg-zinc-900/50 border border-zinc-800/50 rounded-full text-[10px] text-zinc-500 uppercase tracking-wider"
@@ -1714,7 +2019,7 @@ export default function VprTestsListPage() {
               <AnimatedCounter target={totalCheats} label="Шпаргалок" color="#00c2ff" icon={<Cpu className="w-5 h-5" />} />
               <AnimatedCounter target={allSubjects.length} label="Предметов" color="#a855f7" icon={<BookOpen className="w-5 h-5" />} />
               <AnimatedCounter target={leaderboard.length} label="Операторов" color="#22c55e" icon={<Users className="w-5 h-5" />} />
-              <AnimatedCounter target={3} label="Уровней" color="#f97316" icon={<Shield className="w-5 h-5" />} />
+              <AnimatedCounter target={9} label="Уровней_8кл" color="#f97316" icon={<Shield className="w-5 h-5" />} />
             </div>
           </motion.section>
 
@@ -1775,8 +2080,11 @@ export default function VprTestsListPage() {
 
           {/* ============================================
               MATRIX LANDING CTA (task212c)
+              task224: для 8к баннер убран — RoadmapDeck ниже уже
+              показывает дорожку с супертестом и кнопкой Матрицы;
+              для 6-7 классов баннер не показывался и раньше.
               ============================================ */}
-          {selectedGrade === 8 && (
+          {false && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1812,11 +2120,16 @@ export default function VprTestsListPage() {
           {/* ============================================
               ROADMAP DECK (task212c) — только для 8 класса
               ============================================ */}
-          {selectedGrade === 8 && <RoadmapDeck />}
+          {selectedGrade === 8 && <RoadmapDeck roadmapTestIds={roadmapTestIds} />}
 
           {/* ============================================
               CHEATSHEETS GRID
+              task224: для 8 класса открытая сетка шпаргалок убрана —
+              все 14 шпаргалок 8к теперь живут в механике разблокировки
+              (RoadmapDeck: дорожка 7 + бонус-зона 2 + сайд-сектор 5).
+              Сетка остаётся для 6-7 классов, где механики разблокировки нет.
               ============================================ */}
+          {selectedGrade !== 8 && (
           <AnimatePresence mode="wait">
             <motion.section
               key={`cheats-${selectedGrade}`}
@@ -1908,6 +2221,7 @@ export default function VprTestsListPage() {
               </motion.div>
             </motion.section>
           </AnimatePresence>
+          )}
 
           {/* ============================================
               SUBJECT MISSIONS GRID

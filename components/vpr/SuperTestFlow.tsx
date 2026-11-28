@@ -179,6 +179,28 @@ export function SuperTestFlow({ embedded = false, defaultMode = "standard", onFi
     }
   }, [qIndex, total, dbUser?.user_id, mode, answersLog]);
 
+  // ── task224: клавиатура — 1..9 выбор опции, Enter/Space — дальше ──
+  useEffect(() => {
+    if (phase !== "running" || !q) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        if (revealed) {
+          e.preventDefault();
+          void next();
+        }
+        return;
+      }
+      const n = parseInt(e.key, 10);
+      if (!Number.isNaN(n) && n >= 1 && n <= q.vpr_answers.length && !revealed) {
+        e.preventDefault();
+        answer(q.vpr_answers[n - 1].id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, q, revealed, next, answer]);
+
   // ══════════════════ WELCOME ══════════════════
   // embedded-режим стартует сразу с running (промо-карточка Матрицы уже
   // сыграла роль welcome); при повторном входе — welcome тоже показываем.
@@ -408,7 +430,10 @@ export function SuperTestFlow({ embedded = false, defaultMode = "standard", onFi
                           revealed && !isRight && !isPicked && "border-zinc-800/60 bg-zinc-950/40 opacity-50"
                         )}
                       >
-                        <span className="font-mono text-[10px] text-zinc-600 mr-2">{String.fromCharCode(65 + oi)}</span>
+                        <span className={cn(
+                          "font-mono text-[10px] mr-2 px-1.5 py-0.5 rounded border",
+                          revealed ? "text-zinc-600 border-transparent" : "text-zinc-400 border-zinc-700 bg-zinc-900"
+                        )}>{oi + 1}</span>
                         {opt.text}
                         {revealed && isRight && <CheckCircle2 className="absolute top-3.5 right-3 w-4 h-4 text-green-400" />}
                         {revealed && isPicked && !isRight && <XCircle className="absolute top-3.5 right-3 w-4 h-4 text-red-400" />}
@@ -416,6 +441,13 @@ export function SuperTestFlow({ embedded = false, defaultMode = "standard", onFi
                     );
                   })}
                 </div>
+
+                {/* task224: подсказка про клавиатуру */}
+                {!revealed && q.vpr_answers.length > 0 && (
+                  <div className="mt-4 text-[10px] font-mono text-zinc-600 text-center">
+                    клавиши 1–{q.vpr_answers.length} — быстрый выбор · Enter — дальше
+                  </div>
+                )}
 
                 {/* разбор + кнопка дальше */}
                 <AnimatePresence>

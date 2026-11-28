@@ -418,10 +418,8 @@ export default function VprTestPage() {
                         } else if (finishTotal > 0 && finishScore / finishTotal >= 0.6) {
                             toast.warning("⚡ Почти! Ещё чуть-чуть до разблокировки следующего уровня", { duration: 6000 });
                         }
-                        // task214: ачивки — отдельными тостами поверх основного
-                        for (const ach of rr.earnedAchievements || []) {
-                            toast.success(`🏅 АЧИВКА: ${ach}`, { duration: 8000 });
-                        }
+                        // task224: ачивки показывает золотой блок VprCompletionScreen —
+                        // тосты-дубли убраны (unlock-тост выше остаётся)
                     } catch (e) {
                         debugLogger.warn("[VprRoadmap] record failed", e);
                     }

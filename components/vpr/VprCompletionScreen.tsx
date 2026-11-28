@@ -221,7 +221,7 @@ export function VprCompletionScreen({
             className="w-full bg-gray-600 text-light-text/90 px-6 py-3 rounded-lg font-semibold text-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
           >
             <BookOpen className="h-5 w-5" />
-            К списку тестов
+            К дорожке уровней
           </button>
         </div>
       </motion.div>

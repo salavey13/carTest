@@ -40,6 +40,7 @@
     "app/vpr-super/page.tsx",
     "app/actions/vprSuperTestActions.ts",
     "lib/vprSuperTest.ts",
-    "components/vpr/SuperTestFlow.tsx"
+    "components/vpr/SuperTestFlow.tsx",
+    "components/vpr/VprCompletionScreen.tsx"
   ]
 }
